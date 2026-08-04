@@ -96,6 +96,7 @@ class ProductPurchasableObjectField(serializers.RelatedField):
                     "type": "object",
                     "properties": {
                         "id": {"type": "integer"},
+                        "content_type": {"type": "string", "enum": ["programrun"]},
                         "run_tag": {"type": "string"},
                         "start_date": {"type": "string", "format": "date-time"},
                         "end_date": {"type": "string", "format": "date-time"},
@@ -121,12 +122,14 @@ class ProductPurchasableObjectField(serializers.RelatedField):
                         "enrollment_start": {"type": "string", "format": "date-time"},
                         "enrollment_end": {"type": "string", "format": "date-time"},
                         "course_number": {"type": "string"},
+                        "content_type": {"type": "string", "enum": ["courserun"]},
                     },
                 },
                 {
                     "type": "object",
                     "properties": {
                         "id": {"type": "integer"},
+                        "content_type": {"type": "string", "enum": ["program"]},
                         "title": {"type": "string"},
                         "readable_id": {"type": "string"},
                         "page": {"type": "object"},
@@ -137,12 +140,18 @@ class ProductPurchasableObjectField(serializers.RelatedField):
     )
     def to_representation(self, value):
         """Serialize the purchasable object using appropriate serializer"""
+        # `content_type` is set here rather than on each variant serializer so it
+        # cannot drift from the dispatch below. Values match Django model names,
+        # matching TransactionLineSerializer's `content_type`.
         if isinstance(value, ProgramRun):
-            return ProgramRunProductPurchasableObjectSerializer(instance=value).data
+            data = ProgramRunProductPurchasableObjectSerializer(instance=value).data
+            return {**data, "content_type": "programrun"}
         elif isinstance(value, CourseRun):
-            return CourseRunProductPurchasableObjectSerializer(instance=value).data
+            data = CourseRunProductPurchasableObjectSerializer(instance=value).data
+            return {**data, "content_type": "courserun"}
         elif isinstance(value, Program):
-            return ProgramProductPurchasableObjectSerializer(instance=value).data
+            data = ProgramProductPurchasableObjectSerializer(instance=value).data
+            return {**data, "content_type": "program"}
 
         error_message = (
             f"Unexpected type for Product.purchasable_object: {value.__class__}"
@@ -539,7 +548,7 @@ class OrderSerializer(serializers.ModelSerializer):
             return street_address
         return None
 
-    @extend_schema_field(ExtendedLegalAddressSerializer(many=True))
+    @extend_schema_field(ExtendedLegalAddressSerializer)
     def get_purchaser(self, instance):
         """Get the purchaser infrmation"""
         return ExtendedLegalAddressSerializer(instance.purchaser.legal_address).data
@@ -573,7 +582,7 @@ class OrderHistorySerializer(serializers.ModelSerializer):
             product = models.Product.all_objects.get(
                 pk=line.product_version.field_dict["id"]
             )
-            if product.content_type.model == "courserun":
+            if product.content_type.model == "courserun" and product.purchasable_object:
                 titles.append(product.purchasable_object.course.title)
             elif product.content_type.model == "programrun":
                 titles.append(product.description)

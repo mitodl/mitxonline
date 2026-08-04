@@ -63,6 +63,9 @@ def test_product_course_serializer(mock_context):
     product = ProductFactory.create(purchasable_object=run)
     product_serialized = ProductSerializer(instance=product).data
     run_serialized = CourseRunProductPurchasableObjectSerializer(instance=run).data
+    # `content_type` is added by ProductPurchasableObjectField, not the variant
+    # serializer, so it is not in `run_serialized`.
+    run_serialized["content_type"] = "courserun"
 
     assert_drf_json_equal(
         product_serialized,
@@ -95,6 +98,7 @@ def test_product_program_serializer(mock_context):
     product = ProductFactory.create(purchasable_object=run)
     product_serialized = ProductSerializer(instance=product).data
     run_serialized = ProgramRunProductPurchasableObjectSerializer(instance=run).data
+    run_serialized["content_type"] = "programrun"
 
     assert_drf_json_equal(
         product_serialized,
@@ -118,6 +122,7 @@ def test_product_program_object_serializer(mock_context):
     program_serialized = ProgramProductPurchasableObjectSerializer(
         instance=program
     ).data
+    program_serialized["content_type"] = "program"
 
     assert_drf_json_equal(
         product_serialized,

@@ -155,15 +155,28 @@ class ExtendedLegalAddressSerializer(LegalAddressSerializer):
     """Serializer class that includes email address as part of the legal address"""
 
     email = serializers.SerializerMethodField()
+    name = serializers.SerializerMethodField()
 
     @extend_schema_field(str)
     def get_email(self, instance):
         """Get email from the linked user object"""
         return instance.user.email
 
+    @extend_schema_field(str)
+    def get_name(self, instance):
+        """
+        Get the purchaser's full name.
+
+        Prefers the legal address name, which is what was recorded for billing.
+        Falls back to the user's profile name, since the legal address name fields
+        are newer than most existing addresses and are often blank.
+        """
+        legal_name = f"{instance.first_name} {instance.last_name}".strip()
+        return legal_name or instance.user.name
+
     class Meta:
         model = LegalAddress
-        fields = LegalAddressSerializer.Meta.fields + ("email",)  # noqa: RUF005
+        fields = LegalAddressSerializer.Meta.fields + ("email", "name")  # noqa: RUF005
 
 
 class PublicUserSerializer(serializers.ModelSerializer):
