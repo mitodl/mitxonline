@@ -6619,8 +6619,6 @@ components:
       required:
       - country
       - email
-      - first_name
-      - last_name
     Faculty:
       type: object
       description: Serializer for faculty details used in course pages.
@@ -7024,8 +7022,6 @@ components:
           maxLength: 20
       required:
       - country
-      - first_name
-      - last_name
     LegalAddressRequest:
       type: object
       description: Serializer for legal address
@@ -7036,11 +7032,9 @@ components:
           maxLength: 2
         first_name:
           type: string
-          minLength: 1
           maxLength: 60
         last_name:
           type: string
-          minLength: 1
           maxLength: 60
         street_address_1:
           type: string
@@ -7060,8 +7054,6 @@ components:
           maxLength: 20
       required:
       - country
-      - first_name
-      - last_name
     Line:
       type: object
       description: Serializes order lines.
