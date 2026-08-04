@@ -205,52 +205,6 @@ class EnrollmentChangeCommand(BaseCommand):
     def handle(self, *args, **options):
         pass
 
-    @staticmethod
-    def fetch_enrollment(user, command_options):
-        """
-        Fetches the appropriate enrollment model object paired with an object of the
-        Program/Course that the user is enrolled in.
-
-        Args:
-            user (User): An enrolled User
-            command_options (dict): A dict of command parameters
-        Returns:
-            tuple: (ProgramEnrollment, Program) or (CourseRunEnrollment, CourseRun)
-        """
-        program_property = command_options.get("program")
-        run_property = command_options.get("run")
-        force = command_options.get("force")
-
-        if program_property and run_property:
-            raise CommandError(
-                "Either 'program' or 'run' should be provided, not both."  # noqa: EM101
-            )
-        if not program_property and not run_property:
-            raise CommandError("Either 'program' or 'run' must be provided.")  # noqa: EM101
-
-        query_params = {"user": user}
-
-        if program_property:
-            query_params["program"] = enrolled_obj = Program.objects.get(
-                readable_id=program_property
-            )
-            enrollment = ProgramEnrollment.all_objects.filter(**query_params).first()
-        else:
-            query_params["run"] = enrolled_obj = CourseRun.objects.get(
-                courseware_id=run_property
-            )
-            enrollment = CourseRunEnrollment.all_objects.filter(**query_params).first()
-
-        if not enrollment:
-            raise CommandError(f"Enrollment not found for: {enrolled_obj}")  # noqa: EM102
-        if not enrollment.active and not force:
-            raise CommandError(
-                f"The given enrollment is not active ({enrollment.id}).\n"  # noqa: EM102
-                "Add the -f/--force flag if you want to change the status anyway."
-            )
-
-        return enrollment, enrolled_obj
-
     def create_program_enrollment(
         self,
         existing_enrollment,
