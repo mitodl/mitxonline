@@ -6590,10 +6590,28 @@ components:
         country:
           type: string
           maxLength: 2
+        first_name:
+          type: string
+          maxLength: 60
+        last_name:
+          type: string
+          maxLength: 60
+        street_address_1:
+          type: string
+          maxLength: 255
+        street_address_2:
+          type: string
+          maxLength: 255
+        city:
+          type: string
+          maxLength: 255
         state:
           type: string
           nullable: true
           maxLength: 10
+        postal_code:
+          type: string
+          maxLength: 20
         email:
           type: string
           description: Get email from the linked user object
@@ -6980,10 +6998,28 @@ components:
         country:
           type: string
           maxLength: 2
+        first_name:
+          type: string
+          maxLength: 60
+        last_name:
+          type: string
+          maxLength: 60
+        street_address_1:
+          type: string
+          maxLength: 255
+        street_address_2:
+          type: string
+          maxLength: 255
+        city:
+          type: string
+          maxLength: 255
         state:
           type: string
           nullable: true
           maxLength: 10
+        postal_code:
+          type: string
+          maxLength: 20
       required:
       - country
     LegalAddressRequest:
@@ -6994,10 +7030,28 @@ components:
           type: string
           minLength: 1
           maxLength: 2
+        first_name:
+          type: string
+          maxLength: 60
+        last_name:
+          type: string
+          maxLength: 60
+        street_address_1:
+          type: string
+          maxLength: 255
+        street_address_2:
+          type: string
+          maxLength: 255
+        city:
+          type: string
+          maxLength: 255
         state:
           type: string
           nullable: true
           maxLength: 10
+        postal_code:
+          type: string
+          maxLength: 20
       required:
       - country
     Line:
