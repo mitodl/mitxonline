@@ -30,6 +30,10 @@ def default_settings(monkeypatch, settings):
     settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = False
     settings.FEATURES[features.STRIPE_ENABLE_FEATURE_FLAG] = False
     settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = True
+    # Off by default so that the many tests building CourseRuns (the factory sets
+    # upgrade_deadline) never reach out to edX. Tests that exercise the sync turn
+    # it on explicitly.
+    settings.FEATURES[features.SYNC_UPGRADE_DEADLINE_TO_EDX] = False
 
 
 @pytest.fixture(autouse=True)
