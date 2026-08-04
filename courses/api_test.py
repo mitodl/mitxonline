@@ -1235,6 +1235,49 @@ def test_sync_course_runs(settings, mocker, mocked_api_response, expect_success)
         assert failure_count == 1
 
 
+@patch("courses.signals.transaction.on_commit", side_effect=lambda callback: callback())
+@patch("cms.tasks.queue_fastly_surrogate_key_purge.delay")
+def test_sync_course_runs_skips_unchanged(
+    mock_purge_delay, mock_on_commit, settings, mocker
+):
+    """
+    A run whose edX values match what's already stored is not re-saved, so it
+    triggers no additional full-column UPDATE and no additional Fastly purge.
+    """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+
+    course_run = CourseRunFactory.create(courseware_id="course-v1:MITx+6.00.1x+3T2015")
+    course_detail = CourseDetail(
+        {
+            "id": "course-v1:MITx+6.00.1x+3T2015",
+            "start": "2015-09-15T05:00:00Z",
+            "end": "2015-12-31T05:00:00Z",
+            "enrollment_start": "2015-09-01T00:00:00Z",
+            "enrollment_end": None,
+            "name": "Introduction to Computer Science",
+            "pacing": "instructor",
+        }
+    )
+
+    mock_course_list = mocker.patch("courses.api.get_edx_api_course_list_client")
+    mock_course_list.return_value.get_courses.return_value = [course_detail]
+
+    # Ignore any purges enqueued by the factory setup above so we only measure
+    # purges caused by the sync calls themselves.
+    mock_purge_delay.reset_mock()
+
+    # First pass writes the edX values and enqueues exactly one purge.
+    success_count, failure_count = sync_course_runs([course_run])
+    assert (success_count, failure_count) == (1, 0)
+    assert mock_purge_delay.call_count == 1
+
+    # Second pass with identical edX data is a no-op: no save, no new purge.
+    mock_purge_delay.reset_mock()
+    success_count, failure_count = sync_course_runs([course_run])
+    assert (success_count, failure_count) == (0, 0)
+    assert mock_purge_delay.call_count == 0
+
+
 @pytest.mark.parametrize(
     "mocked_api_response, expect_success",  # noqa: PT006
     [

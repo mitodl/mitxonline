@@ -1320,7 +1320,11 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
             courseware_object = self.course
         elif self.is_program_page:
             courseware_object = self.program
-        if courseware_object:
+        # Only push the title down (and save) when it actually changed. An
+        # unconditional save here fires the courseware object's post_save
+        # Fastly purge signal on every page save, so publishing one page
+        # would otherwise emit several redundant purges of the same key.
+        if courseware_object and courseware_object.title != self.title:
             courseware_object.title = self.title
             courseware_object.save()
 
