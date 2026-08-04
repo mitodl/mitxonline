@@ -64,6 +64,7 @@ from courses.utils import (
 )
 from ecommerce.models import OrderStatus, Product
 from main import features
+from main.constants import ENV_TO_LEARN_HOSTNAME_MAP
 from openedx.api import (
     create_edx_course_mode,
     enroll_in_edx_course_runs,
@@ -1744,14 +1745,6 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
 ACHIEVEMENT_TYPE_MAP = {
     "course_run": "Course",
     "program": "Program",
-}
-
-# Maps the value of settings.ENVIRONMENT to the hostname for that environment's Learn instance
-# This is ugly, if anyone has other suggestions I'm all ears.
-ENV_TO_LEARN_HOSTNAME_MAP = {
-    "production": "learn.mit.edu",
-    "rc": "rc.learn.mit.edu",
-    "ci": "ci.learn.mit.edu",
 }
 
 
