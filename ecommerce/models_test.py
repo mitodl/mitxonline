@@ -1,4 +1,5 @@
 import random
+import uuid
 from datetime import timedelta
 from decimal import Decimal
 
@@ -263,6 +264,35 @@ def test_basket_order_equivalency(user, basket, unlimited_discount):
     basket.refresh_from_db()
 
     assert basket.compare_to_order(order) is False
+
+
+def test_basket_is_anonymous():
+    """Test that is_anonymous reflects whether the basket has a user or an anonymous_id"""
+    user_basket = BasketFactory.create()
+    anonymous_basket = BasketFactory.create(user=None, anonymous_id=uuid.uuid4())
+
+    assert user_basket.is_anonymous is False
+    assert anonymous_basket.is_anonymous is True
+
+
+def test_basket_requires_exactly_one_of_user_or_anonymous_id():
+    """Test the CheckConstraint rejects baskets with both or neither of user/anonymous_id set"""
+    user = UserFactory.create()
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Basket.objects.create(user=user, anonymous_id=uuid.uuid4())
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Basket.objects.create(user=None, anonymous_id=None)
+
+
+def test_compare_to_order_anonymous_basket(user):
+    """Test that an anonymous basket never compares equal to an order"""
+    anonymous_basket = BasketFactory.create(user=None, anonymous_id=uuid.uuid4())
+    order = Order(purchaser=user, state=OrderStatus.FULFILLED, total_price_paid=10)
+    order.save()
+
+    assert anonymous_basket.compare_to_order(order) is False
 
 
 def test_product_delete_protection_inactive():

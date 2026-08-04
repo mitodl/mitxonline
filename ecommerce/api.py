@@ -2,6 +2,7 @@
 
 import logging
 import uuid
+from datetime import timedelta
 from decimal import Decimal
 from urllib.parse import urljoin
 
@@ -449,6 +450,100 @@ def establish_basket(request, *, no_delay=False):
         basket.save()
 
     return basket
+
+
+ANONYMOUS_BASKET_SESSION_KEY = "anonymous_basket_id"
+
+
+def get_anonymous_basket_id(request, *, create=False):
+    """
+    Get the anonymous basket id stored in the request's session, minting one
+    if requested and none exists yet.
+
+    Kwargs:
+        create (bool): mint and store a new id in the session if one isn't
+            already present. Only pass True from call sites that are about to
+            write to the basket - minting an id writes to the session, which
+            forces a Set-Cookie header and defeats caching for anonymous page
+            views that don't need one.
+    """
+    anonymous_id = request.session.get(ANONYMOUS_BASKET_SESSION_KEY)
+
+    if anonymous_id is None and create:
+        anonymous_id = str(uuid.uuid4())
+        request.session[ANONYMOUS_BASKET_SESSION_KEY] = anonymous_id
+
+    return anonymous_id
+
+
+def establish_basket_for_request(request, *, for_update=False):
+    """
+    Get or create the basket for the current request, whether the requester
+    is authenticated or anonymous.
+
+    Kwargs:
+        for_update (bool): re-fetch the basket with select_for_update() so it's
+            locked for the remainder of the caller's transaction. Pass True
+            when the caller is about to mutate basket contents.
+    """
+    if request.user.is_authenticated:
+        basket = establish_basket(request)
+    else:
+        anonymous_id = get_anonymous_basket_id(request, create=True)
+        basket, _ = Basket.objects.get_or_create(anonymous_id=anonymous_id)
+
+    if for_update:
+        basket = Basket.objects.select_for_update().get(pk=basket.pk)
+
+    return basket
+
+
+def claim_anonymous_basket(request):
+    """
+    Convert the anonymous basket identified by the current session into a
+    basket for the now-authenticated request.user.
+
+    If request.user already has a basket, it is discarded in favor of the
+    anonymous basket - the anonymous basket reflects what was just shown on
+    the cart page, and merging would silently change the price the user saw.
+
+    Returns the claimed basket, or None if there's no anonymous basket to
+    claim (e.g. an expired session).
+    """
+    anonymous_id = get_anonymous_basket_id(request, create=False)
+    if anonymous_id is None:
+        return None
+
+    with transaction.atomic():
+        try:
+            anon_basket = Basket.objects.select_for_update().get(
+                anonymous_id=anonymous_id
+            )
+        except Basket.DoesNotExist:
+            return None
+
+        Basket.objects.filter(user=request.user).exclude(pk=anon_basket.pk).delete()
+
+        anon_basket.user = request.user
+        anon_basket.anonymous_id = None
+        anon_basket.save(update_fields=["user", "anonymous_id"])
+
+    del request.session[ANONYMOUS_BASKET_SESSION_KEY]
+    apply_user_discounts(request)
+
+    return anon_basket
+
+
+def cull_anonymous_baskets():
+    """
+    Delete anonymous baskets that haven't been touched in a while (abandoned
+    carts). A basket's anonymous_id is only reachable via its session cookie,
+    so once that cookie could plausibly have expired there's no way for a
+    basket to ever be claimed - it's safe to remove.
+    """
+    cutoff = now_in_utc() - timedelta(seconds=settings.ANONYMOUS_BASKET_CULL_AGE)
+
+    Basket.objects.filter(anonymous_id__isnull=False, updated_on__lt=cutoff).delete()
 
 
 def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs):  # noqa: RUF013

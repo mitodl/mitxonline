@@ -8,6 +8,7 @@ import django_filters
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from django.db.models import Count, Q
 from django.http import Http404
 from django.shortcuts import redirect
@@ -27,7 +28,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import ParseError
 from rest_framework.generics import RetrieveAPIView
 from rest_framework.pagination import LimitOffsetPagination
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_extensions.mixins import NestedViewSetMixin
@@ -45,6 +46,7 @@ from courses.utils import is_uai_course_run, is_uai_program
 from ecommerce.api import (
     apply_discount_to_basket,
     establish_basket,
+    establish_basket_for_request,
     generate_checkout_payload,
     generate_discount_code,
     get_auto_apply_discounts_for_basket,
@@ -225,7 +227,6 @@ def _create_basket_from_product(
     Returns:
         Response: HTTP response
     """
-    basket = establish_basket(request)
     quantity = request.data.get("quantity", 1)
     checkout = request.data.get("checkout", False)
 
@@ -236,49 +237,68 @@ def _create_basket_from_product(
             {"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND
         )
 
-    # FUTURE: This is where the basket_add hook was called.
+    with transaction.atomic():
+        basket = establish_basket_for_request(request, for_update=True)
 
-    (_, created) = BasketItem.objects.update_or_create(
-        basket=basket, product=product, defaults={"quantity": quantity}
-    )
+        # FUTURE: This is where the basket_add hook was called.
 
-    sync_hubspot_cart_add(
-        request.user,
-        product,
-        is_uai=(
-            is_product_courserun(product)
-            and is_uai_course_run(product.purchasable_object)
+        (_, created) = BasketItem.objects.update_or_create(
+            basket=basket, product=product, defaults={"quantity": quantity}
         )
-        or (is_product_program(product) and is_uai_program(product.purchasable_object)),
-    )
 
-    existing_basket_discounts = [bd.redeemed_discount for bd in basket.discounts.all()]
-    discounts_to_apply = [
-        *existing_basket_discounts,
-        *list(get_auto_apply_discounts_for_basket(basket.id).all()),
-    ]
+        if request.user.is_authenticated:
+            sync_hubspot_cart_add(
+                request.user,
+                product,
+                is_uai=(
+                    is_product_courserun(product)
+                    and is_uai_course_run(product.purchasable_object)
+                )
+                or (
+                    is_product_program(product)
+                    and is_uai_program(product.purchasable_object)
+                ),
+            )
 
-    # Clear the discounts that are in the basket - we retained whatever was
-    # already applied above and will re-apply so the codes get re-checked. (So,
-    # if a code has now expired, you don't get it anymore.)
-    BasketDiscount.objects.filter(redeemed_basket=basket).delete()
+            # Discounts (including auto-applied financial assistance) are only
+            # ever computed against a real user, and shouldn't show up at all for
+            # a logged-out cart - so this whole step is skipped for anonymous
+            # baskets rather than run against a basket with no user to check.
+            existing_basket_discounts = [
+                bd.redeemed_discount for bd in basket.discounts.all()
+            ]
+            discounts_to_apply = [
+                *existing_basket_discounts,
+                *list(get_auto_apply_discounts_for_basket(basket.id).all()),
+            ]
 
-    for discount in discounts_to_apply:
-        apply_discount_to_basket(basket, discount, allow_finaid=True)
+            # Clear the discounts that are in the basket - we retained whatever was
+            # already applied above and will re-apply so the codes get re-checked. (So,
+            # if a code has now expired, you don't get it anymore.)
+            BasketDiscount.objects.filter(redeemed_basket=basket).delete()
 
-    # Order matters - apply the code supplied last so we can always attach a
-    # better-value discount by hand if we want. (Also, turn off finaid flag here.)
-    if discount_code:
-        try:
-            supplied_discount = Discount.objects.get(discount_code=discount_code)
-            apply_discount_to_basket(basket, supplied_discount)
-        except Discount.DoesNotExist:
-            pass
+            for discount in discounts_to_apply:
+                apply_discount_to_basket(basket, discount, allow_finaid=True)
+
+            # Order matters - apply the code supplied last so we can always attach a
+            # better-value discount by hand if we want. (Also, turn off finaid flag here.)
+            if discount_code:
+                try:
+                    supplied_discount = Discount.objects.get(
+                        discount_code=discount_code
+                    )
+                    apply_discount_to_basket(basket, supplied_discount)
+                except Discount.DoesNotExist:
+                    pass
 
     basket.refresh_from_db()
 
     if checkout:
-        return redirect("checkout_interstitial_page")
+        return redirect(
+            "checkout_interstitial_page"
+            if request.user.is_authenticated
+            else "checkout-anonymous"
+        )
 
     return Response(
         BasketWithProductSerializer(basket).data,
@@ -300,7 +320,7 @@ def _create_basket_from_product(
     ],
 )
 @api_view(["POST"])
-@permission_classes((IsAuthenticated,))
+@permission_classes((AllowAny,))
 def create_basket_from_product(request, product_id: int):
     """Run _create_basket_from_product."""
 
@@ -440,7 +460,7 @@ def create_basket_with_products(request):
     responses={204: OpenApiResponse(description="Basket cleared successfully")},
 )
 @api_view(["DELETE"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def clear_basket(request):
     """
     Clear the basket for the current user.
@@ -451,9 +471,9 @@ def clear_basket(request):
     Returns:
         Response: HTTP response
     """
-    basket = establish_basket(request)
-
-    basket.delete()
+    with transaction.atomic():
+        basket = establish_basket_for_request(request, for_update=True)
+        basket.delete()
 
     return Response(None, status=status.HTTP_204_NO_CONTENT)
 

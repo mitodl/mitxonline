@@ -1106,6 +1106,8 @@ paths:
       description: Clears the basket for the current user.
       tags:
       - baskets
+      security:
+      - {}
       responses:
         '204':
           description: Basket cleared successfully
@@ -1122,6 +1124,8 @@ paths:
         required: true
       tags:
       - baskets
+      security:
+      - {}
       responses:
         '200':
           content:
@@ -4508,6 +4512,7 @@ components:
           readOnly: true
         user:
           type: integer
+          nullable: true
         basket_items:
           type: array
           items:
@@ -4516,7 +4521,6 @@ components:
       required:
       - basket_items
       - id
-      - user
     BasketDiscountDetail:
       type: object
       description: BasketDiscount model serializer
@@ -4552,6 +4556,11 @@ components:
           readOnly: true
         user:
           type: integer
+          nullable: true
+        anonymous_id:
+          type: string
+          format: uuid
+          nullable: true
         basket_items:
           type: array
           items:
@@ -4596,7 +4605,6 @@ components:
       - discounts
       - id
       - total_price
-      - user
     BlankEnum:
       enum:
       - ''

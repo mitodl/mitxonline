@@ -3,6 +3,7 @@ from django.urls import include, path, re_path
 from ecommerce.admin import AdminRefundOrderView
 from ecommerce.views.legacy import (
     AllProductViewSet,
+    AnonymousCheckoutView,
     BackofficeCallbackView,
     BasketDiscountViewSet,
     BasketItemViewSet,
@@ -91,6 +92,11 @@ urlpatterns = [
         "checkout/to_payment",
         CheckoutInterstitialView.as_view(),
         name="checkout_interstitial_page",
+    ),
+    re_path(
+        r"^checkout/anonymous/?$",
+        AnonymousCheckoutView.as_view(),
+        name="checkout-anonymous",
     ),
     path(
         "api/orders/receipt/<int:pk>/",

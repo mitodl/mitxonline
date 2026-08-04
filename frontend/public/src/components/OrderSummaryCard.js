@@ -15,7 +15,8 @@ type Props = {
   refunds: Array<Refund>,
   addDiscount?: Function,
   discountCode: string,
-  cardTitle?: string
+  cardTitle?: string,
+  isAuthenticated: boolean
 }
 
 type FormValues = {
@@ -124,6 +125,12 @@ export class OrderSummaryCard extends React.Component<Props, State> {
     )
   }
 
+  getCheckoutUrl() {
+    return this.props.isAuthenticated ?
+      "/checkout/to_payment" :
+      "/checkout/anonymous/"
+  }
+
   handlePlaceOrder = async () => {
     const formik = this.formikRef.current
     const { discounts } = this.props
@@ -134,7 +141,7 @@ export class OrderSummaryCard extends React.Component<Props, State> {
       discounts.length > 0 &&
       (!formik || !formik.values.couponCode || !formik.values.couponCode.trim())
     ) {
-      window.location = "/checkout/to_payment"
+      window.location = this.getCheckoutUrl()
       return
     }
 
@@ -145,7 +152,7 @@ export class OrderSummaryCard extends React.Component<Props, State> {
       await formik.submitForm()
     } else {
       // No coupon code, proceed directly to payment
-      window.location = "/checkout/to_payment"
+      window.location = this.getCheckoutUrl()
     }
   }
 
@@ -166,7 +173,8 @@ export class OrderSummaryCard extends React.Component<Props, State> {
       addDiscount,
       discountCode,
       cardTitle,
-      refunds
+      refunds,
+      isAuthenticated
     } = this.props
 
     const fmtPrice = formatLocalePrice(totalPrice)
@@ -203,7 +211,7 @@ export class OrderSummaryCard extends React.Component<Props, State> {
             </div>
           </div>
 
-          {!orderFulfilled ? (
+          {!orderFulfilled && isAuthenticated ? (
             <Formik
               innerRef={this.formikRef}
               initialValues={{ couponCode: initialCouponCode }}
@@ -222,7 +230,7 @@ export class OrderSummaryCard extends React.Component<Props, State> {
 
                     if (this.state.submittingPlaceOrder) {
                       // Redirect only if there were no errors and this was from Place Order button
-                      window.location = "/checkout/to_payment"
+                      window.location = this.getCheckoutUrl()
                     }
                   }
 
