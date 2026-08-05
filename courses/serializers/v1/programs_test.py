@@ -463,7 +463,9 @@ def test_learner_record_serializer_raises_with_anonymous_user(
     """Raises ValidationError when the request user is anonymous."""
     context = {"request": mocker.Mock(user=AnonymousUser())}
     with pytest.raises(ValidationError):
-        _ = LearnerRecordSerializer(program_with_empty_requirements, context=context).data
+        _ = LearnerRecordSerializer(
+            program_with_empty_requirements, context=context
+        ).data
 
 
 def test_learner_record_serializer_user_from_context_key(
