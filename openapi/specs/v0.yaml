@@ -7562,17 +7562,6 @@ components:
       required:
       - state
       - total_price_paid
-<<<<<<< HEAD
-    OrganizationManagerCheck:
-      type: object
-      description: Response shape for the org-manager check.
-      properties:
-        is_manager:
-          type: boolean
-          description: True if the user manages the organization.
-      required:
-      - is_manager
-=======
     OrderStatus:
       type: object
       description: Very simple serializer for order information.
@@ -7598,7 +7587,15 @@ components:
       - reference_number
       - state
       - total_price_paid
->>>>>>> 79a2fb26 (Move the webhook URLs out into a separate place (like legacy - not necessarily versioned, not really public access); added poll API for order status; update openapi specs; fix some import issues with hookimpls)
+    OrganizationManagerCheck:
+      type: object
+      description: Response shape for the org-manager check.
+      properties:
+        is_manager:
+          type: boolean
+          description: True if the user manages the organization.
+      required:
+      - is_manager
     OrganizationPage:
       type: object
       description: Serializer for the OrganizationPage model.
