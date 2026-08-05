@@ -7461,9 +7461,8 @@ components:
         state:
           $ref: '#/components/schemas/StateEnum'
         purchaser:
-          type: array
-          items:
-            $ref: '#/components/schemas/ExtendedLegalAddress'
+          allOf:
+          - $ref: '#/components/schemas/ExtendedLegalAddress'
           readOnly: true
         total_price_paid:
           type: string

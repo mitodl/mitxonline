@@ -172,3 +172,13 @@ GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/{course_run_id}/enrollments/ the response's body `type` changed from `array<object>` to `object` for status `200`
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/ the response property `total_codes` became nullable for the status `200`
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/ the response property `unassigned_codes` became nullable for the status `200`
+
+# Spec correction: `purchaser` was annotated `many=True` but the serializer method
+# has always returned a single object. The schema is now correct; response bodies
+# are unchanged.
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ the 'results/items/redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '200'
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ the 'redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '200'
+GET /api/v0/orders/receipt/{id}/ the 'purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '200'
+PATCH /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ the 'redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '200'
+POST /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ the 'redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '201'
+PUT /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ the 'redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '200'
