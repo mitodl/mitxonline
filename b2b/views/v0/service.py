@@ -37,6 +37,7 @@ from b2b.serializers.v0.service import (
     OrganizationManagerCheckSerializer,
     ServiceDetailErrorSerializer,
 )
+from main.versioning import V0Versioning
 from users.models import User
 
 # Distinct from the user-facing scopes in OAUTH2_PROVIDER["SCOPES"]: this one
@@ -54,6 +55,7 @@ class OrganizationManagerCheckView(APIView):
     to answer its one question.
     """
 
+    versioning_class = V0Versioning
     authentication_classes = [OAuth2Authentication]
     permission_classes = [TokenHasScope]
     required_scopes = [MANAGER_CHECK_SCOPE]

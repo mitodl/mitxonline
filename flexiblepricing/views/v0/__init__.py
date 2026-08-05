@@ -16,6 +16,7 @@ from flexiblepricing.tasks import (
     notify_flexible_price_status_change_email,
 )
 from main.views import RefinePagination
+from openapi.utils import extend_schema_get_queryset
 
 
 class CurrencyExchangeRateViewSet(ModelViewSet):
@@ -38,6 +39,7 @@ class FlexiblePriceViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     pagination_class = RefinePagination
 
+    @extend_schema_get_queryset(models.FlexiblePrice.objects.none())
     def get_queryset(self):
         return models.FlexiblePrice.objects.filter(user=self.request.user).all()
 

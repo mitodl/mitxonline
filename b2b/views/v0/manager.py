@@ -59,6 +59,7 @@ from b2b.utils import is_redeemed_attachment_record
 from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME
 from ecommerce.models import Discount
+from main.versioning import V0Versioning
 
 log = logging.getLogger(__name__)
 
@@ -154,6 +155,7 @@ def _create_discount_codes_for_contract(
 class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
     """List organizations available for the current user."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAuthenticated]
     serializer_class = OrganizationPageSerializer
     pagination_class = ManagerContractOrgPagination
@@ -262,6 +264,7 @@ class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
 class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     """List an organization's contracts."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAuthenticated, IsOrganizationManager]
     # While we define this at the class level, we pretty much have to do the pagination manually in view defintions for anything that matters
     # The queryset we return is for ContractPages - course_run_enrollments and codes lookups are performed almost entirely in view

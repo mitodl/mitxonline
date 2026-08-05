@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from hubspot_sync.task_helpers import sync_hubspot_user
 from main import features
 from main.permissions import UserIsOwnerPermission
+from main.versioning import V0Versioning
 from main.views import RefinePagination
 from openedx import tasks
 from users.models import ChangeEmailRequest, User
@@ -93,6 +94,8 @@ class UserInfoViewSet(CurrentUserRetrieveUpdateViewSet):
     """
     User info viewset for the open edx OAuth, extends CurrentUserRetrieveUpdateViewSet
     """
+
+    versioning_class = V0Versioning
 
     def retrieve(self, request, *args, **kwargs):
         """

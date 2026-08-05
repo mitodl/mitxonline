@@ -39,6 +39,7 @@ from ecommerce.models import Discount, Product
 from main.authentication import CsrfExemptSessionAuthentication
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
 from main.permissions import IsAdminOrReadOnly
+from main.versioning import V0Versioning
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +48,8 @@ class OrganizationPageViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Viewset for the OrganizationPage model.
     """
+
+    versioning_class = V0Versioning
 
     queryset = OrganizationPage.objects.prefetch_related(
         Prefetch(
@@ -72,6 +75,7 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
     Viewset for the ContractPage model.
     """
 
+    versioning_class = V0Versioning
     serializer_class = ContractPageSerializer
     permission_classes = [IsAdminOrReadOnly | HasAPIKey]
     lookup_field = "slug"
@@ -145,6 +149,7 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
 class Enroll(APIView):
     """View for enrolling in a B2B course."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
@@ -184,6 +189,7 @@ class Enroll(APIView):
 class AttachContractApi(APIView):
     """View for attaching a user to a B2B contract."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAuthenticated]
     authentication_classes = [
         CsrfExemptSessionAuthentication,
