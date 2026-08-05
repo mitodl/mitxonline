@@ -96,8 +96,11 @@ def mock_context(mocker, user):
 def valid_address_dict():
     """Yields a dict that will deserialize into a valid legal address"""
     return dict(  # noqa: C408
+        first_name="Test",
+        last_name="User",
         country="US",
         state="US-MA",
+        postal_code="02139",
     )
 
 
@@ -105,8 +108,11 @@ def valid_address_dict():
 def invalid_address_dict():
     """Yields a dict that will deserialize into an invalid US legal address"""
     return dict(  # noqa: C408
+        first_name="Test",
+        last_name="User",
         country="US",
         state="XX",
+        postal_code="02139",
     )
 
 
@@ -114,8 +120,11 @@ def invalid_address_dict():
 def address_no_state_dict():
     """Yields a dict that will deserialize into a US legal address with no state"""
     return dict(  # noqa: C408
+        first_name="Test",
+        last_name="User",
         country="US",
         state=None,
+        postal_code="02139",
     )
 
 
@@ -124,8 +133,10 @@ def intl_address_dict():
     """Yields a dict that will deserialize into an valid non-US/CA legal address"""
 
     return dict(  # noqa: C408
+        first_name="Test",
         last_name="User",
         country="JP",
+        postal_code="100-0001",
     )
 
 

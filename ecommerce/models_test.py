@@ -1,4 +1,5 @@
 import random
+import uuid
 from datetime import timedelta
 from decimal import Decimal
 
@@ -15,6 +16,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
+    ZERO_PAYMENT_DATA,
 )
 from ecommerce.factories import (
     BasketFactory,
@@ -26,6 +28,7 @@ from ecommerce.factories import (
     SetLimitDiscountFactory,
     UnlimitedUseDiscountFactory,
 )
+from ecommerce.fixtures import stripe_event
 from ecommerce.models import (
     Basket,
     BasketDiscount,
@@ -38,6 +41,7 @@ from ecommerce.models import (
     OrderStatus,
     PendingOrder,
     Product,
+    StripeEventLog,
     Transaction,
     UserDiscount,
 )
@@ -263,6 +267,35 @@ def test_basket_order_equivalency(user, basket, unlimited_discount):
     basket.refresh_from_db()
 
     assert basket.compare_to_order(order) is False
+
+
+def test_basket_is_anonymous():
+    """Test that is_anonymous reflects whether the basket has a user or an anonymous_id"""
+    user_basket = BasketFactory.create()
+    anonymous_basket = BasketFactory.create(user=None, anonymous_id=uuid.uuid4())
+
+    assert user_basket.is_anonymous is False
+    assert anonymous_basket.is_anonymous is True
+
+
+def test_basket_requires_exactly_one_of_user_or_anonymous_id():
+    """Test the CheckConstraint rejects baskets with both or neither of user/anonymous_id set"""
+    user = UserFactory.create()
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Basket.objects.create(user=user, anonymous_id=uuid.uuid4())
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Basket.objects.create(user=None, anonymous_id=None)
+
+
+def test_compare_to_order_anonymous_basket(user):
+    """Test that an anonymous basket never compares equal to an order"""
+    anonymous_basket = BasketFactory.create(user=None, anonymous_id=uuid.uuid4())
+    order = Order(purchaser=user, state=OrderStatus.FULFILLED, total_price_paid=10)
+    order.save()
+
+    assert anonymous_basket.compare_to_order(order) is False
 
 
 def test_product_delete_protection_inactive():
@@ -857,7 +890,7 @@ def test_process_transaction_line_hooks(mocker, user, user_drf_client):
     [(True, False), (False, True)],
 )
 def test_fulfill_skip_receipt(
-    mocker, django_capture_on_commit_callbacks, skip_receipt, email_sent
+    mocker, fake, django_capture_on_commit_callbacks, skip_receipt, email_sent
 ):
     """Test that fulfill respects the skip_receipt flag for sending receipt email."""
     mocker.patch("courses.api.create_run_enrollments", autospec=True)
@@ -870,7 +903,7 @@ def test_fulfill_skip_receipt(
 
     with django_capture_on_commit_callbacks(execute=True):
         order_flow.fulfill(
-            {"amount": 0, "data": {"reason": "No payment required"}},
+            ZERO_PAYMENT_DATA,
             skip_receipt=skip_receipt,
         )
 
@@ -878,3 +911,30 @@ def test_fulfill_skip_receipt(
         mock_send_receipt.assert_called_once_with(pending_order.id)
     else:
         mock_send_receipt.assert_not_called()
+
+
+def test_stripe_event_log_resave():
+    """Test that resaving a StripeEventLog works as expected."""
+
+    event = stripe_event()
+    logged_event = StripeEventLog.objects.create(
+        event_id=event.id, event_data=event.to_dict(for_json=True)
+    )
+
+    assert event.id == logged_event.event_id
+    assert not logged_event.related_order
+
+    order = OrderFactory.create()
+
+    logged_event.event_id = "some_other_id"
+    logged_event.event_data = {
+        "some other stuff": "and things",
+    }
+    logged_event.related_order = order
+    logged_event.save()
+
+    logged_event.refresh_from_db()
+
+    assert event.id == logged_event.event_id
+    assert logged_event.related_order == order
+    assert logged_event.event_data == event.to_dict(for_json=True)

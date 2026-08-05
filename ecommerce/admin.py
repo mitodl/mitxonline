@@ -31,9 +31,11 @@ from ecommerce.models import (
     PendingOrder,
     Product,
     RefundedOrder,
+    StripeEventLog,
     Transaction,
     UserDiscount,
 )
+from main.admin import ReadOnlyModelAdmin
 
 
 @admin.register(Transaction)
@@ -479,3 +481,56 @@ class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, Template
                 "errors": {},
             },
         )
+
+
+class StripeEventTypeNamespaceFilter(admin.SimpleListFilter):
+    """Filter by Stripe event "namespace"."""
+
+    title = "event namespace"
+    parameter_name = "event_namespace"
+
+    def lookups(self, request, model_admin):  # noqa: ARG002
+        """Return the list of namespaces. This is the first dot of the type."""
+
+        type_qs = (
+            StripeEventLog.objects.order_by("event_type")
+            .only("event_type")
+            .values_list("event_type", flat=True)
+        )
+
+        namespaces = []
+
+        for eventtype in type_qs.all():
+            names = eventtype.split(".")
+            namespaces.append((names[0], names[0])) if (
+                names[0],
+                names[0],
+            ) not in namespaces else None
+
+        return namespaces
+
+    def queryset(self, request, queryset):  # noqa: ARG002
+        """Return the queryset filtered by the specified type."""
+
+        if self.value():
+            queryset = queryset.filter(event_type__startswith=self.value())
+
+        return queryset
+
+
+@admin.register(StripeEventLog)
+class StripeEventLogAdmin(ReadOnlyModelAdmin):
+    """Admin for StripeEventLog"""
+
+    model = StripeEventLog
+    list_display = [
+        "created_on",
+        "event_id",
+        "event_type",
+        "related_order__reference_number",
+        "related_order__purchaser__email",
+    ]
+    list_filter = [
+        StripeEventTypeNamespaceFilter,
+        "event_type",
+    ]

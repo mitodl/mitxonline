@@ -48,7 +48,6 @@ def get_js_settings(request: HttpRequest):  # noqa: ARG001
         "features": {},
         "posthog_api_token": settings.POSTHOG_PROJECT_API_KEY,
         "posthog_api_host": settings.POSTHOG_API_HOST,
-        "unified_ecommerce_url": settings.UNIFIED_ECOMMERCE_URL,
         "oidc_login_url": None,
         "api_gateway_enabled": not settings.MITOL_APIGATEWAY_DISABLE_MIDDLEWARE,
         "mit_learn_dashboard_url": settings.MIT_LEARN_DASHBOARD_URL,

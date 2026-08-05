@@ -11,6 +11,7 @@ import freezegun
 import pytest
 import reversion
 from django.forms.models import model_to_dict
+from django.test import Client
 from django.urls import reverse
 from mitol.common.utils.datetime import now_in_utc
 from reversion.models import Version
@@ -521,6 +522,86 @@ def test_create_basket_with_product(  # noqa: PLR0913
                 )
                 .exists()
             )
+
+
+# These four tests use transaction=True rather than the default django_db
+# marker. The views under test call select_for_update(), which requires an
+# active transaction.atomic() block in the view itself - the default
+# django_db marker silently masks a missing atomic() block by wrapping the
+# whole test in its own outer transaction, so this is the only way to
+# actually exercise (and catch regressions in) that requirement.
+@pytest.mark.django_db(transaction=True, serialized_rollback=True)
+def test_create_basket_from_product_anonymous(mocker):
+    """
+    Test that an anonymous caller can create a basket via create_from_product,
+    without triggering hubspot sync or picking up auto-applied discounts.
+    """
+    mock_sync = mocker.patch("ecommerce.views.v0.sync_hubspot_cart_add")
+    product = ProductFactory.create()
+    UnlimitedUseDiscountFactory.create(automatic=True)
+
+    client = Client()
+    url = reverse(
+        "v0:baskets_api-create_from_product",
+        kwargs={"product_id": product.id},
+    )
+
+    response = client.post(url)
+
+    assert response.status_code == 201
+
+    basket = Basket.objects.get(id=response.data["id"])
+    assert basket.is_anonymous is True
+    assert basket.basket_items.count() == 1
+    assert basket.discounts.count() == 0
+    mock_sync.assert_not_called()
+
+
+@pytest.mark.django_db(transaction=True, serialized_rollback=True)
+def test_create_basket_from_product_anonymous_checkout_redirect(mocker):
+    """Test that checkout=True redirects an anonymous caller to the anonymous checkout flow"""
+    mocker.patch("ecommerce.views.v0.sync_hubspot_cart_add")
+    product = ProductFactory.create()
+
+    client = Client()
+    url = reverse(
+        "v0:baskets_api-create_from_product",
+        kwargs={"product_id": product.id},
+    )
+
+    response = client.post(url, {"checkout": True})
+
+    assert response.status_code == 302
+    assert response.url == reverse("checkout-anonymous")
+
+
+@pytest.mark.django_db(transaction=True, serialized_rollback=True)
+def test_clear_basket_anonymous():
+    """Test that an anonymous caller can clear their own anonymous basket"""
+    client = Client()
+    product = ProductFactory.create()
+
+    create_url = reverse(
+        "v0:baskets_api-create_from_product",
+        kwargs={"product_id": product.id},
+    )
+    response = client.post(create_url)
+    basket_id = response.data["id"]
+
+    clear_response = client.delete(reverse("v0:baskets_api-clear_basket"))
+
+    assert clear_response.status_code == 204
+    assert not Basket.objects.filter(id=basket_id).exists()
+
+
+@pytest.mark.django_db(transaction=True, serialized_rollback=True)
+def test_clear_basket_anonymous_with_no_basket_yet():
+    """Test that clearing with no prior basket is a harmless no-op"""
+    client = Client()
+
+    response = client.delete(reverse("v0:baskets_api-clear_basket"))
+
+    assert response.status_code == 204
 
 
 @pytest.mark.parametrize(

@@ -453,10 +453,16 @@ class LegalAddress(TimestampedModel):
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="legal_address"
     )
+    first_name = models.CharField(max_length=60, blank=True)
+    last_name = models.CharField(max_length=60, blank=True)
     country = models.CharField(
         max_length=2, blank=True, validators=[validate_iso_3166_1_code]
     )  # ISO-3166-1
     state = models.CharField(max_length=255, blank=True, null=True)  # noqa: DJ001
+    postal_code = models.CharField(max_length=20, blank=True)
+    street_address_1 = models.CharField(max_length=255, blank=True)
+    street_address_2 = models.CharField(max_length=255, blank=True)
+    city = models.CharField(max_length=255, blank=True)
 
     @property
     def us_state(self):
