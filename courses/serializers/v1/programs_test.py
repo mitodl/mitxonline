@@ -3,16 +3,21 @@ from decimal import Decimal
 from unittest.mock import ANY
 
 import pytest
+from django.contrib.auth.models import AnonymousUser
 from django.utils.timezone import now
 from mitol.common.utils import now_in_utc
+from rest_framework.exceptions import ValidationError
 
 from cms.serializers import ProgramPageSerializer
 from courses.factories import (
     CourseFactory,
+    CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     CourseRunGradeFactory,
     EnrollmentModeFactory,
+    LearnerProgramRecordShareFactory,
+    PartnerSchoolFactory,
     ProgramFactory,
     program_with_empty_requirements,  # noqa: F401
     program_with_requirements,  # noqa: F401
@@ -27,6 +32,7 @@ from courses.serializers.v1.programs import (
 )
 from main.test_utils import assert_drf_json_equal
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -442,6 +448,128 @@ def test_learner_record_serializer(
     assert user_info_payload == serialized_data["user"]
     assert program_requirements_payload == serialized_data["program"]["requirements"]
     assert course_0_payload == serialized_data["program"]["courses"][0]
+
+
+def test_learner_record_serializer_raises_without_user(program_with_empty_requirements):  # noqa: F811
+    """Raises ValidationError when context contains no valid user."""
+    with pytest.raises(ValidationError):
+        LearnerRecordSerializer(program_with_empty_requirements, context={}).data
+
+
+def test_learner_record_serializer_raises_with_anonymous_user(
+    mocker, program_with_empty_requirements  # noqa: F811
+):
+    """Raises ValidationError when the request user is anonymous."""
+    context = {"request": mocker.Mock(user=AnonymousUser())}
+    with pytest.raises(ValidationError):
+        LearnerRecordSerializer(program_with_empty_requirements, context=context).data
+
+
+def test_learner_record_serializer_user_from_context_key(program_with_empty_requirements):  # noqa: F811
+    """User passed via context['user'] is used when no request is present."""
+    user = UserFactory()
+    data = LearnerRecordSerializer(
+        program_with_empty_requirements, context={"user": user}
+    ).data
+    assert data["user"]["email"] == user.email
+    assert data["user"]["name"] == user.name
+    assert data["user"]["username"] == user.edx_username
+
+
+def test_learner_record_serializer_anonymous_pull_hides_sharing_and_partners(
+    program_with_empty_requirements,  # noqa: F811
+):
+    """anonymous_pull context causes sharing and partner_schools to be empty."""
+    program = program_with_empty_requirements
+    user = UserFactory()
+    LearnerProgramRecordShareFactory(user=user, program=program, is_active=True)
+    PartnerSchoolFactory()
+    data = LearnerRecordSerializer(
+        program, context={"user": user, "anonymous_pull": True}
+    ).data
+    assert data["sharing"] == []
+    assert data["partner_schools"] == []
+
+
+def test_learner_record_serializer_with_certificate(program_with_empty_requirements):  # noqa: F811
+    """Grade and certificate are populated for a course with a non-revoked certificate."""
+    program = program_with_empty_requirements
+    user = UserFactory()
+    course = CourseFactory()
+    program.add_requirement(course)
+    course_run = CourseRunFactory(course=course)
+    certificate = CourseRunCertificateFactory(user=user, course_run=course_run)
+    grade = CourseRunGradeFactory(user=user, course_run=course_run, grade=0.85)
+
+    data = LearnerRecordSerializer(program, context={"user": user}).data
+    course_data = data["program"]["courses"][0]
+
+    assert course_data["certificate"] == {
+        "uuid": str(certificate.uuid),
+        "link": certificate.link,
+    }
+    assert course_data["grade"]["grade"] == round(grade.grade, 2)
+
+
+def test_learner_record_serializer_revoked_certificate_excluded(
+    program_with_empty_requirements,  # noqa: F811
+):
+    """A revoked certificate does not contribute to grade or certificate output."""
+    program = program_with_empty_requirements
+    user = UserFactory()
+    course = CourseFactory()
+    program.add_requirement(course)
+    course_run = CourseRunFactory(course=course)
+    CourseRunCertificateFactory(user=user, course_run=course_run, is_revoked=True)
+    CourseRunGradeFactory(user=user, course_run=course_run)
+
+    data = LearnerRecordSerializer(program, context={"user": user}).data
+    course_data = data["program"]["courses"][0]
+
+    assert course_data["certificate"] is None
+    assert course_data["grade"] is None
+
+
+def test_learner_record_serializer_highest_grade_selected(
+    program_with_empty_requirements,  # noqa: F811
+):
+    """When a course has certificates on multiple runs, the highest grade is shown."""
+    program = program_with_empty_requirements
+    user = UserFactory()
+    course = CourseFactory()
+    program.add_requirement(course)
+    run_low = CourseRunFactory(course=course)
+    run_high = CourseRunFactory(course=course)
+    CourseRunCertificateFactory(user=user, course_run=run_low)
+    CourseRunCertificateFactory(user=user, course_run=run_high)
+    CourseRunGradeFactory(user=user, course_run=run_low, grade=0.5)
+    high_grade = CourseRunGradeFactory(user=user, course_run=run_high, grade=0.9)
+
+    data = LearnerRecordSerializer(program, context={"user": user}).data
+    course_data = data["program"]["courses"][0]
+
+    assert course_data["grade"]["grade"] == round(high_grade.grade, 2)
+
+
+def test_learner_record_serializer_sharing_and_partner_schools(
+    program_with_empty_requirements,  # noqa: F811
+):
+    """Active shares appear in sharing; inactive shares do not. All partner schools appear."""
+    program = program_with_empty_requirements
+    user = UserFactory()
+    active_share = LearnerProgramRecordShareFactory(
+        user=user, program=program, is_active=True
+    )
+    LearnerProgramRecordShareFactory(user=user, program=program, is_active=False)
+    school = PartnerSchoolFactory()
+
+    data = LearnerRecordSerializer(program, context={"user": user}).data
+
+    sharing_uuids = [str(s["share_uuid"]) for s in data["sharing"]]
+    assert str(active_share.share_uuid) in sharing_uuids
+    assert len(data["sharing"]) == 1
+    school_ids = [s["id"] for s in data["partner_schools"]]
+    assert school.id in school_ids
 
 
 def test_program_serializer_returns_null_image_when_no_page():
