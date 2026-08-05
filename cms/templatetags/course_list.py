@@ -5,6 +5,7 @@ Generates a <ul> block for a list of courses. Pass in the list of courses.
 from django import template
 
 from cms.templatetags.feature_img_src import feature_img_src
+from main.utils import get_learn_product_url
 
 register = template.Library()
 
@@ -36,6 +37,7 @@ def course_list(courses):
                 "page": page,
                 "start_descriptor": start_descriptor,
                 "featured_image": featured_image,
+                "learn_url": get_learn_product_url("courses", course.readable_id),
             }
         )
 
