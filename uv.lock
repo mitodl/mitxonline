@@ -1974,7 +1974,7 @@ wheels = [
 
 [[package]]
 name = "mitol-django-payment-gateway"
-version = "2026.7.15"
+version = "2026.8.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cybersource-rest-client-python" },
@@ -1983,9 +1983,9 @@ dependencies = [
     { name = "mitol-django-common" },
     { name = "stripe" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ad/46/3466166a6e2c669b8b68a21f47f3cf52124fae7497ce24de916489541458/mitol_django_payment_gateway-2026.7.15.tar.gz", hash = "sha256:e60f35d750aa3f545e67af877a47eda408c3dc12084c92d85536fd6b34153687", size = 19856, upload-time = "2026-07-15T19:15:32.283Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/85/94/822ce662bb0aa011f930a5b2c7983f4b955327f539a6e6e1fedcd7ee57b6/mitol_django_payment_gateway-2026.8.5.tar.gz", hash = "sha256:64e15d10299cc57146ef3d4542739437d9eb1ee08e91fbf56009a449a7c14f86", size = 20071, upload-time = "2026-08-05T16:18:57.819Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/03/e6/eb31c907bd6a0d71b0b4ab82f33e7d9000deff4850e1d921dc3b78b1fe30/mitol_django_payment_gateway-2026.7.15-py3-none-any.whl", hash = "sha256:816461f4a375ec2d74e2ce3c38dec3d5c541d7a5cbe84c6cae1a334ee685874e", size = 27123, upload-time = "2026-07-15T19:15:31.472Z" },
+    { url = "https://files.pythonhosted.org/packages/48/2b/1e509ced5855a00f6e745e4a964617800fb9ff12d267c3947b1bd4a1ebac/mitol_django_payment_gateway-2026.8.5-py3-none-any.whl", hash = "sha256:03c06448e6744143027af400c7e1b1c12806287aa9bebd7addd6f5bd8a876804", size = 27427, upload-time = "2026-08-05T16:18:56.799Z" },
 ]
 
 [[package]]
@@ -2181,7 +2181,7 @@ requires-dist = [
     { name = "mitol-django-observability", specifier = ">=2026.1.0" },
     { name = "mitol-django-olposthog", specifier = ">=2026.3.6,<2027" },
     { name = "mitol-django-openedx", specifier = "==2026.4.29" },
-    { name = "mitol-django-payment-gateway", specifier = "==2026.7.15" },
+    { name = "mitol-django-payment-gateway", specifier = "==2026.8.5" },
     { name = "mitol-django-scim", specifier = "==2026.4.29" },
     { name = "opentelemetry-instrumentation-celery", specifier = ">=0.52b0" },
     { name = "opentelemetry-instrumentation-django", specifier = ">=0.52b0" },
