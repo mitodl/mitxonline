@@ -467,7 +467,7 @@ def test_learner_record_serializer_raises_with_anonymous_user(
 
 
 def test_learner_record_serializer_user_from_context_key(
-    program_with_empty_requirements,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """User passed via context['user'] is used when no request is present."""
     user = UserFactory()
