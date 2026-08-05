@@ -173,10 +173,7 @@ def get_missing_export_compliance_fields(user) -> list[str]:
     bill_to = _build_bill_to(user)
     missing_bill_to_fields = _missing_bill_to_fields(bill_to)
     return sorted(
-        {
-            BILL_TO_FIELD_TO_PROFILE_FIELD[field]
-            for field in missing_bill_to_fields
-        }
+        {BILL_TO_FIELD_TO_PROFILE_FIELD[field] for field in missing_bill_to_fields}
     )
 
 
