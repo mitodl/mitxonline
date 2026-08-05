@@ -24,12 +24,6 @@ class EnrollmentCodeAssignmentMessage(TemplatedMessage):
         return headers
 
 
-def get_learn_hostname():
-    from courses.api import ENV_TO_LEARN_HOSTNAME_MAP  # noqa: PLC0415
-
-    return ENV_TO_LEARN_HOSTNAME_MAP.get(settings.ENVIRONMENT, "learn.mit.edu")
-
-
 def send_email_helper(email, code, code_url, organization_name, contract_name):
     try:
         with get_message_sender(EnrollmentCodeAssignmentMessage) as sender:
@@ -75,10 +69,9 @@ def send_enrollment_code_assignment_email(assignment_record_ids):
         ).select_related("discount", "contract")
     )
 
-    learn_hostname = get_learn_hostname()
     for assignment in assignments:
         code = assignment.discount.discount_code
-        code_url = f"https://{learn_hostname}/enrollmentcode/{code}"
+        code_url = f"{settings.MIT_LEARN_ATTACH_URL}{code}"
         organization_name = assignment.contract.organization.name
         send_email_helper(
             assignment.assigned_email,
@@ -91,11 +84,10 @@ def send_enrollment_code_assignment_email(assignment_record_ids):
 
 def send_test_enrollment_code_assignment_email(email, contract_record_id):
     contract = ContractPage.objects.get(pk=contract_record_id)
-    learn_hostname = get_learn_hostname()
     send_email_helper(
         email,
         "PLACEHOLDER_CODE",
-        f"https://{learn_hostname}/enrollmentcode/PLACEHOLDER_CODE",
+        f"{settings.MIT_LEARN_ATTACH_URL}PLACEHOLDER_CODE",
         contract.organization.name,
         contract.name,
     )

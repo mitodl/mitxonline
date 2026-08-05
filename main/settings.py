@@ -651,27 +651,33 @@ MIT_LEARN_REPLY_TO_EMAIL = get_string(
     description="Reply-to email address for UAI enrollment emails (defaults to MIT_LEARN_FROM_EMAIL)",
 )
 
+MIT_LEARN_BASE_URL = get_string(
+    name="MIT_LEARN_BASE_URL",
+    default=f"https://{ENV_TO_LEARN_HOSTNAME_MAP.get(ENVIRONMENT, 'learn.mit.edu')}",
+    description="Base URL of the MIT Learn instance for this environment",
+)
+
 MIT_LEARN_DASHBOARD_URL = get_string(
     name="MIT_LEARN_DASHBOARD_URL",
-    default="https://learn.mit.edu/dashboard",
+    default=f"{MIT_LEARN_BASE_URL}/dashboard",
     description="Dashboard URL for UAI enrollment emails",
 )
 
 MIT_LEARN_TERMS_URL = get_string(
     name="MIT_LEARN_TERMS_URL",
-    default=f"https://{ENV_TO_LEARN_HOSTNAME_MAP.get(ENVIRONMENT, 'learn.mit.edu')}/terms",
+    default=f"{MIT_LEARN_BASE_URL}/terms",
     description="Terms of service URL",
 )
 
 MIT_LEARN_PRIVACY_URL = get_string(
     name="MIT_LEARN_PRIVACY_URL",
-    default=f"https://{ENV_TO_LEARN_HOSTNAME_MAP.get(ENVIRONMENT, 'learn.mit.edu')}/privacy",
+    default=f"{MIT_LEARN_BASE_URL}/privacy",
     description="Privacy policy URL",
 )
 
 MIT_LEARN_HONOR_CODE_URL = get_string(
     name="MIT_LEARN_HONOR_CODE_URL",
-    default=f"https://{ENV_TO_LEARN_HOSTNAME_MAP.get(ENVIRONMENT, 'learn.mit.edu')}/honor_code",
+    default=f"{MIT_LEARN_BASE_URL}/honor_code",
     description="Honor code URL",
 )
 
@@ -1599,6 +1605,6 @@ VERIFIABLE_CREDENTIAL_DID = get_string(
 
 MIT_LEARN_ATTACH_URL = get_string(
     name="MIT_LEARN_ATTACH_URL",
-    default="https://learn.mit.edu/enrollmentcode/",
+    default=f"{MIT_LEARN_BASE_URL}/enrollmentcode/",
     description="The URL to use for generating contract attachment URLs for B2B.",
 )

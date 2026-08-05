@@ -12,7 +12,7 @@ from main.utils import (
     date_to_datetime,
     get_field_names,
     get_js_settings,
-    get_learn_hostname,
+    get_learn_base_url,
     get_learn_product_url,
     get_partitioned_set_difference,
     parse_supplied_date,
@@ -61,43 +61,50 @@ def test_get_js_settings(settings, rf):
         "mit_learn_terms_url": settings.MIT_LEARN_TERMS_URL,
         "mit_learn_privacy_url": settings.MIT_LEARN_PRIVACY_URL,
         "mit_learn_honor_code_url": settings.MIT_LEARN_HONOR_CODE_URL,
-        "mit_learn_base_url": "https://learn.mit.edu",
+        "mit_learn_base_url": settings.MIT_LEARN_BASE_URL,
     }
 
 
 @pytest.mark.parametrize(
-    ("environment", "expected_hostname"),
+    "base_url",
     [
-        ("production", "learn.mit.edu"),
-        ("rc", "rc.learn.mit.edu"),
-        ("ci", "ci.learn.mit.edu"),
-        ("dev", "learn.mit.edu"),
-        ("pytest", "learn.mit.edu"),
+        "https://learn.mit.edu",
+        "https://rc.learn.mit.edu",
+        "http://open.odl.local:8065",
     ],
 )
-def test_get_learn_hostname(settings, environment, expected_hostname):
-    """Test that get_learn_hostname resolves per-environment, with a safe fallback"""
-    settings.ENVIRONMENT = environment
-    assert get_learn_hostname() == expected_hostname
+def test_get_learn_base_url(settings, base_url):
+    """Test that get_learn_base_url returns the configured MIT_LEARN_BASE_URL setting"""
+    settings.MIT_LEARN_BASE_URL = base_url
+    assert get_learn_base_url() == base_url
 
 
 @pytest.mark.parametrize(
-    ("environment", "expected_url"),
+    ("base_url", "expected_url"),
     [
-        ("production", "https://learn.mit.edu/courses/course-v1:MITx+DEDP"),
-        ("rc", "https://rc.learn.mit.edu/courses/course-v1:MITx+DEDP"),
-        ("ci", "https://ci.learn.mit.edu/courses/course-v1:MITx+DEDP"),
+        (
+            "https://learn.mit.edu",
+            "https://learn.mit.edu/courses/course-v1:MITx+DEDP",
+        ),
+        (
+            "https://rc.learn.mit.edu",
+            "https://rc.learn.mit.edu/courses/course-v1:MITx+DEDP",
+        ),
+        (
+            "https://ci.learn.mit.edu",
+            "https://ci.learn.mit.edu/courses/course-v1:MITx+DEDP",
+        ),
     ],
 )
-def test_get_learn_product_url_courses(settings, environment, expected_url):
-    """Test that get_learn_product_url builds the correct per-environment course URL"""
-    settings.ENVIRONMENT = environment
+def test_get_learn_product_url_courses(settings, base_url, expected_url):
+    """Test that get_learn_product_url builds the correct course URL from the base URL"""
+    settings.MIT_LEARN_BASE_URL = base_url
     assert get_learn_product_url("courses", "course-v1:MITx+DEDP") == expected_url
 
 
 def test_get_learn_product_url_programs(settings):
     """Test that get_learn_product_url builds the correct program URL"""
-    settings.ENVIRONMENT = "production"
+    settings.MIT_LEARN_BASE_URL = "https://learn.mit.edu"
     assert (
         get_learn_product_url("programs", "program-v1:MITx+DEDP")
         == "https://learn.mit.edu/programs/program-v1:MITx+DEDP"
