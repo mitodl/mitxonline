@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -19,11 +20,13 @@ from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
-from b2b.api import _create_discount_with_product
+from b2b.api import _create_discount_with_product, is_potentially_valid_mailgun_webhook
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
 from b2b.models import (
+    EMAIL_STATUS_PENDING,
     REDEMPTION_STATUS_ASSIGNED,
     REDEMPTION_STATUS_REDEEMED,
     ContractPage,
@@ -48,6 +51,7 @@ from b2b.serializers.v0.manager import (
     SendTestEmailSerializer,
 )
 from b2b.tasks import (
+    queue_process_mailgun_webhook_for_enrollment_code_emails,
     queue_send_enrollment_code_assignment_email,
     queue_send_test_enrollment_code_assignment_email,
 )
@@ -73,6 +77,13 @@ class CodeAssignment:
     code: str
 
 
+def clear_assignment_email_deliverability_fields(assignment):
+    assignment.email_message_id = ""
+    assignment.email_status = ""
+    assignment.email_status_event_timestamp = None
+    return assignment
+
+
 def assign_codes_and_send_emails(
     assignments: list[CodeAssignment], assigning_user
 ) -> bool:
@@ -95,9 +106,9 @@ def assign_codes_and_send_emails(
             assigned_email=assignment.email,
             assigned_name=assignment.name,
             assigned_by=assigning_user,
-            last_reminder_sent_on=now,
             created_on=now,
             updated_on=now,
+            email_status=EMAIL_STATUS_PENDING,
         )
         # Set the prefetched_redemptions attribute on the discount so that serializers
         # can return the updated redemption info without needing an extra query.
@@ -649,9 +660,10 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             )
 
         # Just send the email reminder and update the last sent timestamp
-        queue_send_enrollment_code_assignment_email.delay([assignment_record.id])
-        assignment_record.last_reminder_sent_on = now_in_utc()
+        clear_assignment_email_deliverability_fields(assignment_record)
+        assignment_record.email_status = EMAIL_STATUS_PENDING
         assignment_record.save()
+        queue_send_enrollment_code_assignment_email.delay([assignment_record.id])
 
         # Set prefetched_redemptions so the serializer returns the current assignment status.
         discount.prefetched_redemptions = [assignment_record]
@@ -845,7 +857,9 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         assignment_record.assigned_email = email
         assignment_record.assigned_name = name
         assignment_record.assigned_by = request.user
-        assignment_record.last_reminder_sent_on = now_in_utc()
+        assignment_record.last_reminder_sent_on = None
+        clear_assignment_email_deliverability_fields(assignment_record)
+        assignment_record.email_status = EMAIL_STATUS_PENDING
         assignment_record.save()
         queue_send_enrollment_code_assignment_email.delay([assignment_record.id])
         discount.prefetched_redemptions = [assignment_record]
@@ -882,5 +896,22 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         email = serializer.validated_data["email"]
         queue_send_test_enrollment_code_assignment_email.delay(email, contract.id)
+
+        return Response(status=http_status.HTTP_200_OK)
+
+
+class ProcessMailgunWebhook(APIView):
+    permission_classes = []
+
+    @csrf_exempt
+    def post(self, request):
+        # Need to validate that this is proper json.
+        payload = request.data
+        if not is_potentially_valid_mailgun_webhook(payload):
+            # Mailgun would retry on a 400, but we wanna drop the majority of webhooks without even queueing anything
+            log.info("Got invalid mailgun webhook payload")
+            return Response(status=200)
+
+        queue_process_mailgun_webhook_for_enrollment_code_emails.delay(payload)
 
         return Response(status=http_status.HTTP_200_OK)

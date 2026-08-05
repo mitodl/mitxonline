@@ -11,6 +11,7 @@ from b2b.views.v0 import (
 from b2b.views.v0.manager import (
     ManagerContractViewSet,
     ManagerOrganizationViewSet,
+    ProcessMailgunWebhook,
 )
 from b2b.views.v0.service import OrganizationManagerCheckView
 from main.routers import SimpleRouterWithNesting
@@ -52,6 +53,8 @@ urlpatterns = [
         AttachContractApi.as_view(),
         name="attach-user",
     ),
+    # Probably not the place this is gonna live long term.
+    path(r"webhook", ProcessMailgunWebhook.as_view(), name="mailgun-webhook"),
     # Service-to-service; delete along with b2b/views/v0/service.py once
     # org-manager status is visible in Keycloak (mitodl/hq#10594).
     path(

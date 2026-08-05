@@ -43,6 +43,24 @@ REDEMPTION_STATUSES = (
     REDEMPTION_STATUS_REDEEMED,
 )
 
+EMAIL_STATUS_FAILED_TEMPORARY_SEVERITY = "temporary"
+EMAIL_STATUS_DELIVERED = "delivered"
+EMAIL_STATUS_OPENED = "opened"
+EMAIL_STATUS_CLICKED = "clicked"
+EMAIL_STATUS_ACCEPTED = "accepted"
+EMAIL_STATUS_FAILED = "failed"
+# Pending is a special case in that it does not map to a mailgun event.
+# It is set by us to indicate that we've queued the task but we have not yet received any webhook from mailgun
+EMAIL_STATUS_PENDING = "pending"
+MAILGUN_EMAIL_EVENT_TYPES = (
+    EMAIL_STATUS_DELIVERED,
+    EMAIL_STATUS_ACCEPTED,
+    EMAIL_STATUS_OPENED,
+    EMAIL_STATUS_CLICKED,
+    EMAIL_STATUS_FAILED,
+)
+EMAIL_STATUSES = (*MAILGUN_EMAIL_EVENT_TYPES, EMAIL_STATUS_PENDING)
+
 
 class OrganizationObjectIndexPage(Page):
     """The index page for organizations - provides the root level folder."""
@@ -771,6 +789,26 @@ class DiscountContractAttachmentRedemption(TimestampedModel):
     )
     last_reminder_sent_on = models.DateTimeField(
         null=True, blank=True, help_text="When the code last had a reminder email sent."
+    )
+    # Need to verify the format for Mailgun message IDs and map event types to statuses.
+    # This is only nullable for one functional reason - we create the DCAR records on assignment and kick a downstream
+    # task for email sending. Between creation and task execution, message ID won't exist.
+    # Might be nice to make this unique, but it'll need to be nullable if so.
+    email_message_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Mailgun message ID for the email sent to the user.",
+    )
+    email_status = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Mailgun status for the email sent to the user.",
+    )
+    email_status_event_timestamp = models.DateTimeField(
+        blank=True,
+        null=True,
     )
 
     @property

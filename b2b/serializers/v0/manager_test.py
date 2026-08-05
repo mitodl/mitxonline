@@ -77,6 +77,11 @@ class TestManagerEnrollmentCodeSerializerUnassigned:
         assert data["redemption_status"] == REDEMPTION_STATUS_UNASSIGNED
         assert data["assigned_to"] is None
 
+    def test_email_status_fields_are_none(self, discount):
+        data = _serialize(discount)
+        assert data["email_status"] is None
+        assert data["email_status_event_timestamp"] is None
+
 
 class TestManagerEnrollmentCodeSerializerAssigned:
     def test_redemption_status_is_assigned(self, discount, contract):
@@ -164,6 +169,81 @@ class TestManagerEnrollmentCodeSerializerAssigned:
         )
         data = _serialize(discount, [redemption])
         assert data["assigned_name"] == ""
+
+    def test_email_status_fields_populated_when_set(self, discount, contract):
+        now = timezone.now()
+        redemption = DiscountContractAttachmentRedemption.objects.create(
+            discount=discount,
+            contract=contract,
+            assigned_email="learner@example.com",
+            email_status="delivered",
+            email_status_event_timestamp=now,
+        )
+        data = _serialize(discount, [redemption])
+        assert data["email_status"] == "delivered"
+        assert data["email_status_event_timestamp"] is not None
+
+    def test_email_status_is_none_when_redemption_has_no_status_yet(
+        self, discount, contract
+    ):
+        """A redemption exists (the code was assigned) but no webhook event has
+        arrived yet, so email_status defaults to "" - that should still
+        serialize as None, not an empty string.
+        """
+        redemption = DiscountContractAttachmentRedemption.objects.create(
+            discount=discount,
+            contract=contract,
+            assigned_email="learner@example.com",
+        )
+        data = _serialize(discount, [redemption])
+        assert data["email_status"] is None
+
+    def test_email_status_pending_serializes_as_pending(self, discount, contract):
+        """The synthetic "pending" status we set on assignment/reminder/reassign
+        should be surfaced to managers as-is.
+        """
+        redemption = DiscountContractAttachmentRedemption.objects.create(
+            discount=discount,
+            contract=contract,
+            assigned_email="learner@example.com",
+            email_status="pending",
+        )
+        data = _serialize(discount, [redemption])
+        assert data["email_status"] == "pending"
+
+    def test_email_status_accepted_is_masked_as_pending(self, discount, contract):
+        """
+        "accepted" is a real mailgun event, but we deliberately don't expose
+        it to managers - it should be collapsed into the vaguer "pending" status.
+        """
+        now = timezone.now()
+        redemption = DiscountContractAttachmentRedemption.objects.create(
+            discount=discount,
+            contract=contract,
+            assigned_email="learner@example.com",
+            email_status="accepted",
+            email_status_event_timestamp=now,
+        )
+        data = _serialize(discount, [redemption])
+        assert data["email_status"] == "pending"
+
+    @pytest.mark.parametrize(
+        "email_status", ["opened", "clicked", "failed", "delivered"]
+    )
+    def test_other_email_statuses_are_not_masked(
+        self, discount, contract, email_status
+    ):
+        """Only "accepted" gets collapsed into "pending" - every other tracked
+        status should be reported as-is.
+        """
+        redemption = DiscountContractAttachmentRedemption.objects.create(
+            discount=discount,
+            contract=contract,
+            assigned_email="learner@example.com",
+            email_status=email_status,
+        )
+        data = _serialize(discount, [redemption])
+        assert data["email_status"] == email_status
 
 
 class TestManagerEnrollmentCodeSerializerRedeemed:
@@ -268,5 +348,7 @@ class TestManagerEnrollmentCodeSerializerPrefetchBehavior:
             "redeemed_on",
             "redeemed_by",
             "last_sent",
+            "email_status",
+            "email_status_event_timestamp",
         }
         assert set(data.keys()) == expected_fields
