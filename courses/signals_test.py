@@ -2,9 +2,11 @@
 Tests for signals
 """
 
+from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
+from mitol.common.utils.datetime import now_in_utc
 
 from courses.factories import (
     CourseFactory,
@@ -14,6 +16,7 @@ from courses.factories import (
     ProgramFactory,
     UserFactory,
 )
+from courses.models import CourseRun
 
 pytestmark = pytest.mark.django_db
 
@@ -161,3 +164,99 @@ def test_purge_fastly_cache_on_program_save(mock_purge_delay, mock_on_commit):
     """
     program = ProgramFactory.create()
     mock_purge_delay.assert_called_with(f"mitxonline:program:{program.readable_id}")
+
+
+@pytest.fixture
+def mock_deadline_sync_task(mocker):
+    """
+    Patch the deadline sync task's delay and make on_commit fire immediately.
+
+    pytest-django wraps each test in a transaction that is rolled back, so
+    on_commit callbacks would otherwise never run.
+    """
+    mocker.patch(
+        "courses.signals.transaction.on_commit", side_effect=lambda callback: callback()
+    )
+    return mocker.patch("courses.tasks.sync_courserun_upgrade_deadline.delay")
+
+
+def test_upgrade_deadline_change_queues_edx_sync(mock_deadline_sync_task):
+    """Editing upgrade_deadline should queue a push to edX."""
+    run = CourseRunFactory.create()
+    mock_deadline_sync_task.reset_mock()
+
+    run.upgrade_deadline = now_in_utc() + timedelta(days=45)
+    run.save()
+
+    mock_deadline_sync_task.assert_called_once_with(run.id)
+
+
+def test_unrelated_save_does_not_queue_edx_sync(mock_deadline_sync_task):
+    """
+    Saving a run without touching upgrade_deadline must not call edX.
+
+    The nightly sync_course_runs task saves every live run, so a signal that
+    fired on any save would hammer edX with pointless writes - and each write
+    sets expiration_datetime_is_explicit in edX.
+    """
+    run = CourseRunFactory.create()
+    mock_deadline_sync_task.reset_mock()
+
+    run.title = "A new title"
+    run.save()
+
+    mock_deadline_sync_task.assert_not_called()
+
+
+def test_resaving_same_deadline_does_not_queue_edx_sync(mock_deadline_sync_task):
+    """Re-assigning the identical deadline is not a change."""
+    run = CourseRunFactory.create()
+    mock_deadline_sync_task.reset_mock()
+
+    run.upgrade_deadline = run.upgrade_deadline
+    run.save()
+
+    mock_deadline_sync_task.assert_not_called()
+
+
+def test_new_run_with_deadline_queues_edx_sync(mock_deadline_sync_task):
+    """A run created with a deadline should push it."""
+    run = CourseRunFactory.create(upgrade_deadline=now_in_utc() + timedelta(days=10))
+
+    mock_deadline_sync_task.assert_called_once_with(run.id)
+
+
+def test_new_run_without_deadline_does_not_queue_edx_sync(mock_deadline_sync_task):
+    """Creating a run with no deadline has nothing to push."""
+    CourseRunFactory.create(upgrade_deadline=None)
+
+    mock_deadline_sync_task.assert_not_called()
+
+
+def test_clearing_deadline_queues_edx_sync(mock_deadline_sync_task):
+    """
+    Clearing the deadline still queues, so the task can report that edX's copy
+    cannot be unset through the API and needs a manual fix.
+    """
+    run = CourseRunFactory.create(upgrade_deadline=now_in_utc() + timedelta(days=10))
+    mock_deadline_sync_task.reset_mock()
+
+    run.upgrade_deadline = None
+    run.save()
+
+    mock_deadline_sync_task.assert_called_once_with(run.id)
+
+
+def test_deferred_deadline_does_not_queue_edx_sync(mock_deadline_sync_task):
+    """
+    A run loaded with upgrade_deadline deferred should be left alone - touching
+    the attribute would trigger a refetch and we have nothing to compare.
+    """
+    run = CourseRunFactory.create()
+    mock_deadline_sync_task.reset_mock()
+
+    deferred_run = CourseRun.objects.defer("upgrade_deadline").get(id=run.id)
+    deferred_run.title = "Retitled without loading the deadline"
+    deferred_run.save()
+
+    mock_deadline_sync_task.assert_not_called()

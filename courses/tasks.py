@@ -7,6 +7,8 @@ import logging
 
 from django.db.models import Prefetch, Q
 from mitol.common.utils.datetime import now_in_utc
+from requests.exceptions import ConnectionError as RequestsConnectionError
+from requests.exceptions import HTTPError
 
 from courses.models import (
     CourseRun,
@@ -37,6 +39,37 @@ def sync_courseruns_data():
 
     # `sync_course_runs` logs internally so no need to capture/output the returned values
     sync_course_runs(runs)
+
+
+@app.task(
+    autoretry_for=(HTTPError, RequestsConnectionError),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def sync_courserun_upgrade_deadline(course_run_id):
+    """
+    Push a single course run's upgrade deadline into its edX verified mode.
+
+    Queued from the CourseRun post_save signal, so it must tolerate the run
+    having been deleted between the save and the task running.
+
+    Args:
+        course_run_id (int): pk of the CourseRun to sync.
+
+    Returns:
+        str: the UpgradeDeadlineSyncResult value, for log/flower visibility.
+    """
+    from openedx.api import sync_courserun_upgrade_deadline_to_edx
+
+    run = CourseRun.all_objects.filter(id=course_run_id).first()
+    if run is None:
+        log.warning(
+            "CourseRun %s no longer exists, skipping upgrade deadline sync",
+            course_run_id,
+        )
+        return None
+
+    return str(sync_courserun_upgrade_deadline_to_edx(run))
 
 
 @app.task(acks_late=True)
