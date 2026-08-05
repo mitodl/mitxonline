@@ -60,3 +60,10 @@ def perform_check_for_duplicate_discount_redemptions():
     from ecommerce.api import check_for_duplicate_discount_redemptions
 
     check_for_duplicate_discount_redemptions()
+
+
+@app.task(acks_late=True)
+def perform_cull_anonymous_baskets():
+    from ecommerce.api import cull_anonymous_baskets
+
+    cull_anonymous_baskets()

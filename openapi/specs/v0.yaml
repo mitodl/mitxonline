@@ -1106,6 +1106,8 @@ paths:
       description: Clears the basket for the current user.
       tags:
       - baskets
+      security:
+      - {}
       responses:
         '204':
           description: Basket cleared successfully
@@ -1122,6 +1124,8 @@ paths:
         required: true
       tags:
       - baskets
+      security:
+      - {}
       responses:
         '200':
           content:
@@ -2349,6 +2353,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Order'
+          description: ''
+  /api/v0/orders/status/{order_id}/:
+    get:
+      operationId: orders_status_retrieve
+      description: Pollable interface to determine status of a particular order.
+      parameters:
+      - in: path
+        name: order_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - orders
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderStatus'
           description: ''
   /api/v0/products/:
     get:
@@ -4508,6 +4531,7 @@ components:
           readOnly: true
         user:
           type: integer
+          nullable: true
         basket_items:
           type: array
           items:
@@ -4516,7 +4540,6 @@ components:
       required:
       - basket_items
       - id
-      - user
     BasketDiscountDetail:
       type: object
       description: BasketDiscount model serializer
@@ -4552,6 +4575,11 @@ components:
           readOnly: true
         user:
           type: integer
+          nullable: true
+        anonymous_id:
+          type: string
+          format: uuid
+          nullable: true
         basket_items:
           type: array
           items:
@@ -4596,7 +4624,6 @@ components:
       - discounts
       - id
       - total_price
-      - user
     BlankEnum:
       enum:
       - ''
@@ -6582,10 +6609,28 @@ components:
         country:
           type: string
           maxLength: 2
+        first_name:
+          type: string
+          maxLength: 60
+        last_name:
+          type: string
+          maxLength: 60
+        street_address_1:
+          type: string
+          maxLength: 255
+        street_address_2:
+          type: string
+          maxLength: 255
+        city:
+          type: string
+          maxLength: 255
         state:
           type: string
           nullable: true
           maxLength: 10
+        postal_code:
+          type: string
+          maxLength: 20
         email:
           type: string
           description: Get email from the linked user object
@@ -6972,10 +7017,28 @@ components:
         country:
           type: string
           maxLength: 2
+        first_name:
+          type: string
+          maxLength: 60
+        last_name:
+          type: string
+          maxLength: 60
+        street_address_1:
+          type: string
+          maxLength: 255
+        street_address_2:
+          type: string
+          maxLength: 255
+        city:
+          type: string
+          maxLength: 255
         state:
           type: string
           nullable: true
           maxLength: 10
+        postal_code:
+          type: string
+          maxLength: 20
       required:
       - country
     LegalAddressRequest:
@@ -6986,10 +7049,28 @@ components:
           type: string
           minLength: 1
           maxLength: 2
+        first_name:
+          type: string
+          maxLength: 60
+        last_name:
+          type: string
+          maxLength: 60
+        street_address_1:
+          type: string
+          maxLength: 255
+        street_address_2:
+          type: string
+          maxLength: 255
+        city:
+          type: string
+          maxLength: 255
         state:
           type: string
           nullable: true
           maxLength: 10
+        postal_code:
+          type: string
+          maxLength: 20
       required:
       - country
     Line:
@@ -7479,6 +7560,31 @@ components:
           nullable: true
           maxLength: 255
       required:
+      - state
+      - total_price_paid
+    OrderStatus:
+      type: object
+      description: Very simple serializer for order information.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        reference_number:
+          type: string
+          readOnly: true
+          nullable: true
+        total_price_paid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,5})?$
+          readOnly: true
+        state:
+          allOf:
+          - $ref: '#/components/schemas/StateEnum'
+          readOnly: true
+      required:
+      - id
+      - reference_number
       - state
       - total_price_paid
     OrganizationManagerCheck:

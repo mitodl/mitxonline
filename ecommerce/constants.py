@@ -1,6 +1,10 @@
 """Constants for ecommerce."""
 
 from mitol.payment_gateway.api import ProcessorResponse
+from mitol.payment_gateway.constants import (
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+    MITOL_PAYMENT_GATEWAY_STRIPE,
+)
 
 REFERENCE_NUMBER_PREFIX = "mitxonline-"
 
@@ -83,7 +87,11 @@ REFUND_SUCCESS_STATES = [
     ProcessorResponse.STATE_PENDING,
 ]
 
-ZERO_PAYMENT_DATA = {"amount": 0, "data": {"reason": "No payment required"}}
+ZERO_PAYMENT_DATA = {
+    "amount": 0,
+    "transaction_id": "zero-payment-transaction",
+    "data": {"reason": "No payment required"},
+}
 
 PAYMENT_HOOK_ACTION_PRE_SALE = "presale"
 PAYMENT_HOOK_ACTION_POST_SALE = "postsale"
@@ -106,3 +114,24 @@ GEOLOCATION_TYPES = [
     GEOLOCATION_TYPE_NONE,
 ]
 GEOLOCATION_CHOICES = zip(GEOLOCATION_TYPES, GEOLOCATION_TYPES)
+
+STRIPE_PAYMENT_STATUS_PAID = "paid"
+STRIPE_PAYMENT_STATUS_NPR = "no_payment_required"
+STRIPE_PAYMENT_STATUS_UNPAID = "unpaid"
+
+STRIPE_PAYMENT_STATUSES_GOOD = [STRIPE_PAYMENT_STATUS_NPR, STRIPE_PAYMENT_STATUS_PAID]
+
+STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE = "complete"
+STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED = "expired"
+STRIPE_CHECKOUT_SESSION_STATUS_OPEN = "open"
+
+CHECKOUT_SUCCESS_ROUTE_MAP = {
+    "None": "checkout-result-callback",
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE: "checkout-result-callback",
+    MITOL_PAYMENT_GATEWAY_STRIPE: "checkout-result-callback",
+}
+CHECKOUT_CANCEL_ROUTE_MAP = {
+    "None": "checkout-result-callback",
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE: "checkout-result-callback",
+    MITOL_PAYMENT_GATEWAY_STRIPE: "checkout-result-callback",
+}
