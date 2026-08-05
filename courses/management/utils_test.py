@@ -9,7 +9,6 @@ from mitol.common.utils.datetime import now_in_utc
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
-    ProgramEnrollmentFactory,
 )
 from courses.management.utils import EnrollmentChangeCommand
 from main.test_utils import MockHttpError
@@ -17,7 +16,6 @@ from openedx.exceptions import EdxApiEnrollErrorException, UnknownEdxApiEnrollEx
 from users.factories import UserFactory
 
 User = get_user_model()
-
 
 
 @pytest.mark.django_db

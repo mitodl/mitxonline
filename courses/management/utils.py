@@ -4,13 +4,13 @@ import json
 import logging
 
 from django.contrib.auth import get_user_model
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 from mitol.common.utils.collections import has_equal_properties
 
 from courses import mail_api
 from courses.api import deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
-from courses.models import CourseRun, CourseRunEnrollment, Program, ProgramEnrollment
+from courses.models import CourseRun, CourseRunEnrollment, ProgramEnrollment
 from main import settings
 from openedx.api import enroll_in_edx_course_runs
 from openedx.exceptions import (
