@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.162.1
+Version 1.162.1 (Released August 05, 2026)
 ---------------
 
 - anonymous user handling (#3805)
