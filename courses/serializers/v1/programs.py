@@ -274,7 +274,9 @@ class LearnerRecordSerializer(serializers.Serializer):
         Args:
         - instance (Program): The program to retrieve data for.
         """
-        user = self.context.get("user") or getattr(self.context.get("request"), "user", None)
+        user = self.context.get("user") or getattr(
+            self.context.get("request"), "user", None
+        )
         if not isinstance(user, User):
             raise ValidationError("Valid user object not found")  # noqa: EM101
 

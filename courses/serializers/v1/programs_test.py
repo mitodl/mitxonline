@@ -457,7 +457,8 @@ def test_learner_record_serializer_raises_without_user(program_with_empty_requir
 
 
 def test_learner_record_serializer_raises_with_anonymous_user(
-    mocker, program_with_empty_requirements  # noqa: F811
+    mocker,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """Raises ValidationError when the request user is anonymous."""
     context = {"request": mocker.Mock(user=AnonymousUser())}
@@ -465,7 +466,9 @@ def test_learner_record_serializer_raises_with_anonymous_user(
         _ = LearnerRecordSerializer(program_with_empty_requirements, context=context).data
 
 
-def test_learner_record_serializer_user_from_context_key(program_with_empty_requirements):  # noqa: F811
+def test_learner_record_serializer_user_from_context_key(
+    program_with_empty_requirements,
+):
     """User passed via context['user'] is used when no request is present."""
     user = UserFactory()
     data = LearnerRecordSerializer(
