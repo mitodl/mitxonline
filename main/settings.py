@@ -29,6 +29,7 @@ from mitol.common.settings.celery import *  # noqa: F403
 from mitol.google_sheets.settings.google_sheets import *  # noqa: F403
 from mitol.google_sheets_deferrals.settings.google_sheets_deferrals import *  # noqa: F403
 from mitol.google_sheets_refunds.settings.google_sheets_refunds import *  # noqa: F403
+from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
 from mitol.scim.settings.scim import *  # noqa: F403
 from redbeat import RedBeatScheduler
 
@@ -266,7 +267,7 @@ INSTALLED_APPS = (
     "cms.apps.CustomWagtailUsersAppConfig",
     "cms",
     "sheets",
-    # "compliance",
+    "compliance",
     "openedx",
     # must be after "users" to pick up custom user model
     "ecommerce",
@@ -304,6 +305,7 @@ MIDDLEWARE = (
     "django.middleware.common.CommonMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "mitol.apigateway.middleware.ApisixUserMiddleware",
+    "main.middleware.AnonymousBasketHandoffMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "main.middleware.HostBasedCSRFMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -333,6 +335,12 @@ if ENVIRONMENT == "pytest":
     PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
+
+ANONYMOUS_BASKET_CULL_AGE = get_int(
+    name="ANONYMOUS_BASKET_CULL_AGE",
+    default=global_settings.SESSION_COOKIE_AGE,
+    description="Seconds of inactivity after which an anonymous (unclaimed) basket is deleted",
+)
 
 MITXONLINE_NEW_USER_LOGIN_URL = get_string(
     name="MITXONLINE_NEW_USER_LOGIN_URL",
@@ -1068,6 +1076,10 @@ CELERY_BEAT_SCHEDULE = {
             offset=timedelta(seconds=B2B_GSHEETS_UPDATE_OFFSET),
         ),
     },
+    "cull-anonymous-baskets": {
+        "task": "ecommerce.tasks.perform_cull_anonymous_baskets",
+        "schedule": crontab(minute=0, hour=4),
+    },
 }
 
 # django cache back-ends
@@ -1158,7 +1170,7 @@ PASSWORD_RESET_CONFIRM_URL = "password_reset/confirm/{uid}/{token}/"  # noqa: S1
 
 import_settings_modules(
     "mitol.authentication.settings.djoser_settings",
-    "mitol.payment_gateway.settings.cybersource",
+    "mitol.payment_gateway.settings",
     "mitol.olposthog.settings.olposthog",
 )
 
@@ -1454,20 +1466,6 @@ UAI_HUBSPOT_PIPELINE_ID = get_string(
     description="Hubspot ecommerce pipeline ID for the UAI/xPro account",
 )
 
-# Unified Ecommerce integration
-
-UNIFIED_ECOMMERCE_URL = get_string(
-    name="UNIFIED_ECOMMERCE_URL",
-    default="",
-    description="The base URL for Unified Ecommerce.",
-)
-
-UNIFIED_ECOMMERCE_API_KEY = get_string(
-    name="UNIFIED_ECOMMERCE_API_KEY",
-    default="",
-    description="The API key for Unified Ecommerce.",
-)
-
 SPECTACULAR_SETTINGS = open_spectacular_settings
 
 
@@ -1632,3 +1630,6 @@ MIT_LEARN_ATTACH_URL = get_string(
     default="https://learn.mit.edu/enrollmentcode/",
     description="The URL to use for generating contract attachment URLs for B2B.",
 )
+
+if ECOMMERCE_DEFAULT_PAYMENT_GATEWAY == "None":  # noqa: F405
+    ECOMMERCE_DEFAULT_PAYMENT_GATEWAY = MITOL_PAYMENT_GATEWAY_CYBERSOURCE

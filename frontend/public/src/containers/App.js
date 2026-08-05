@@ -123,7 +123,7 @@ export class App extends React.Component<Props, void> {
           !this.isLearnerRecordsPage() && (
           <Header
             currentUser={currentUser}
-            cartItemsCount={currentUser.is_authenticated ? cartItemsCount : 0}
+            cartItemsCount={cartItemsCount}
             location={location}
           />
         )}
@@ -214,16 +214,7 @@ const mapDispatchToProps = {
   addUserNotification
 }
 
-const mapPropsToConfig = props => {
-  const queries = [users.currentUserQuery()]
-
-  // Add cart query for authenticated users
-  if (props.currentUser && props.currentUser.is_authenticated) {
-    queries.push(cartItemsCountQuery())
-  }
-
-  return queries
-}
+const mapPropsToConfig = () => [users.currentUserQuery(), cartItemsCountQuery()]
 export default compose(
   connect(mapStateToProps, mapDispatchToProps),
   connectRequest(mapPropsToConfig)

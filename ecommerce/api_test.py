@@ -1,7 +1,9 @@
 """Tests for Ecommerce api"""
 
 import random
+import uuid
 from datetime import datetime, timedelta
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import freezegun
@@ -9,13 +11,16 @@ import pytest
 import reversion
 from CyberSource.rest import ApiException
 from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 from django.test import RequestFactory
 from django.urls import reverse
 from factory import Faker, fuzzy
 from mitol.common.utils.datetime import now_in_utc
-from mitol.payment_gateway.api import ProcessorResponse
+from mitol.payment_gateway.api import CartItem, PaymentGateway, ProcessorResponse
+from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_STRIPE
 from reversion.models import Version
+from stripe import convert_to_stripe_object
 
 from courses.factories import (
     CourseRunEnrollmentFactory,
@@ -24,20 +29,32 @@ from courses.factories import (
     ProgramFactory,
 )
 from ecommerce.api import (
+    ANONYMOUS_BASKET_SESSION_KEY,
     apply_discount_to_basket,
     check_and_process_pending_orders_for_resolution,
     check_for_duplicate_discount_redemptions,
+    claim_anonymous_basket,
     create_verified_program_course_run_enrollment,
     create_verified_program_discount,
+    cull_anonymous_baskets,
     establish_basket,
+    establish_basket_for_request,
     generate_checkout_payload,
+    get_anonymous_basket_id,
     get_auto_apply_discounts_for_basket,
+    log_stripe_event,
     process_cybersource_payment_response,
+    process_stripe_checkout_completed,
+    process_stripe_checkout_expired,
     refund_order,
     unenroll_learner_from_order,
 )
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
+    STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+    STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED,
+    STRIPE_PAYMENT_STATUS_PAID,
+    STRIPE_PAYMENT_STATUS_UNPAID,
     TRANSACTION_TYPE_PAYMENT,
     TRANSACTION_TYPE_REFUND,
 )
@@ -54,6 +71,7 @@ from ecommerce.factories import (
     TransactionFactory,
     UnlimitedUseDiscountFactory,
 )
+from ecommerce.fixtures import stripe_checkout_session, stripe_event
 from ecommerce.models import (
     Basket,
     BasketDiscount,
@@ -64,6 +82,7 @@ from ecommerce.models import (
     Order,
     OrderStatus,
     Product,
+    StripeEventLog,
     Transaction,
     UserDiscount,
 )
@@ -1231,3 +1250,306 @@ def test_establish_basket_calls_create_user(mocker, no_delay):
     establish_basket(request)
 
     assert not expected_run_mock.called
+
+
+def test_get_anonymous_basket_id_no_create_does_not_write_session():
+    """Test that create=False never mints or writes an id into the session"""
+    request = RequestFactory().get("/")
+    request.session = {}
+
+    result = get_anonymous_basket_id(request, create=False)
+
+    assert result is None
+    assert ANONYMOUS_BASKET_SESSION_KEY not in request.session
+
+
+def test_get_anonymous_basket_id_create_mints_and_is_idempotent():
+    """Test that create=True mints an id once and reuses it on subsequent calls"""
+    request = RequestFactory().get("/")
+    request.session = {}
+
+    first_id = get_anonymous_basket_id(request, create=True)
+
+    assert first_id is not None
+    assert request.session[ANONYMOUS_BASKET_SESSION_KEY] == first_id
+
+    second_id = get_anonymous_basket_id(request, create=True)
+
+    assert second_id == first_id
+
+
+def test_establish_basket_for_request_authenticated(user):
+    """Test that an authenticated request dispatches to establish_basket"""
+    request = RequestFactory().get("/")
+    request.session = {}
+    request.user = user
+
+    basket = establish_basket_for_request(request)
+
+    assert basket.user_id == user.id
+    assert basket.is_anonymous is False
+
+
+def test_establish_basket_for_request_anonymous_creates_basket():
+    """Test that an anonymous request creates a basket keyed by the session's anonymous id"""
+    request = RequestFactory().get("/")
+    request.session = {}
+    request.user = AnonymousUser()
+
+    basket = establish_basket_for_request(request)
+
+    assert basket.is_anonymous is True
+    assert str(basket.anonymous_id) == request.session[ANONYMOUS_BASKET_SESSION_KEY]
+
+    # A second call with the same session should return the same basket
+    same_basket = establish_basket_for_request(request)
+    assert same_basket.id == basket.id
+
+
+def test_establish_basket_for_request_for_update_locks_basket(mocker):
+    """Test that for_update=True re-fetches the basket with select_for_update"""
+    request = RequestFactory().get("/")
+    request.session = {}
+    request.user = AnonymousUser()
+
+    select_for_update_spy = mocker.spy(Basket.objects, "select_for_update")
+
+    basket = establish_basket_for_request(request, for_update=True)
+
+    select_for_update_spy.assert_called_once()
+    assert basket.is_anonymous is True
+
+
+def test_claim_anonymous_basket_no_session_returns_none(user):
+    """Test that there's nothing to claim if the session has no anonymous basket id"""
+    request = RequestFactory().get("/")
+    request.session = {}
+    request.user = user
+
+    assert claim_anonymous_basket(request) is None
+
+
+def test_claim_anonymous_basket_missing_basket_row_returns_none(user):
+    """Test a stale session id (e.g. the basket was culled) returns None rather than raising"""
+    request = RequestFactory().get("/")
+    request.session = {ANONYMOUS_BASKET_SESSION_KEY: str(uuid.uuid4())}
+    request.user = user
+
+    assert claim_anonymous_basket(request) is None
+
+
+def test_claim_anonymous_basket_claims_and_pops_session(user):
+    """Test the normal claim path: basket is reassigned, anonymous_id cleared, session popped"""
+    anon_request = RequestFactory().get("/")
+    anon_request.session = {}
+    anon_request.user = AnonymousUser()
+    anon_basket = establish_basket_for_request(anon_request)
+
+    claim_request = RequestFactory().get("/")
+    claim_request.session = anon_request.session
+    claim_request.user = user
+
+    claimed = claim_anonymous_basket(claim_request)
+
+    assert claimed.id == anon_basket.id
+    assert claimed.user_id == user.id
+    assert claimed.anonymous_id is None
+    assert ANONYMOUS_BASKET_SESSION_KEY not in claim_request.session
+
+
+def test_claim_anonymous_basket_discards_existing_user_basket(user):
+    """Test that an existing basket for the user is discarded in favor of the anonymous one"""
+    existing_basket = Basket.objects.create(user=user)
+
+    anon_request = RequestFactory().get("/")
+    anon_request.session = {}
+    anon_request.user = AnonymousUser()
+    anon_basket = establish_basket_for_request(anon_request)
+
+    claim_request = RequestFactory().get("/")
+    claim_request.session = anon_request.session
+    claim_request.user = user
+
+    claimed = claim_anonymous_basket(claim_request)
+
+    assert claimed.id == anon_basket.id
+    assert not Basket.objects.filter(pk=existing_basket.pk).exists()
+
+
+def test_claim_anonymous_basket_applies_user_discount_after_conversion(user):
+    """Test that a pre-assigned user discount is applied once the basket is claimed"""
+    product = ProductFactory.create()
+    discount = UnlimitedUseDiscountFactory.create()
+    UserDiscount.objects.create(discount=discount, user=user)
+
+    anon_request = RequestFactory().get("/")
+    anon_request.session = {}
+    anon_request.user = AnonymousUser()
+    anon_basket = establish_basket_for_request(anon_request)
+    BasketItem.objects.create(basket=anon_basket, product=product)
+
+    assert BasketDiscount.objects.filter(redeemed_basket=anon_basket).count() == 0
+
+    claim_request = RequestFactory().get("/")
+    claim_request.session = anon_request.session
+    claim_request.user = user
+
+    claimed = claim_anonymous_basket(claim_request)
+
+    assert (
+        BasketDiscount.objects.filter(
+            redeemed_basket=claimed, redeemed_discount=discount
+        ).count()
+        == 1
+    )
+
+
+def test_cull_anonymous_baskets(settings, user):
+    """Test that only anonymous baskets older than the cutoff are removed"""
+    settings.ANONYMOUS_BASKET_CULL_AGE = 100
+
+    old_anon_basket = Basket.objects.create(anonymous_id=uuid.uuid4())
+    Basket.objects.filter(pk=old_anon_basket.pk).update(
+        updated_on=now_in_utc() - timedelta(seconds=200)
+    )
+
+    recent_anon_basket = Basket.objects.create(anonymous_id=uuid.uuid4())
+
+    old_user_basket = Basket.objects.create(user=user)
+    Basket.objects.filter(pk=old_user_basket.pk).update(
+        updated_on=now_in_utc() - timedelta(seconds=200)
+    )
+
+    cull_anonymous_baskets()
+
+    assert not Basket.objects.filter(pk=old_anon_basket.pk).exists()
+    assert Basket.objects.filter(pk=recent_anon_basket.pk).exists()
+    assert Basket.objects.filter(pk=old_user_basket.pk).exists()
+
+
+def test_log_stripe_event():
+    """Test that the event logging functionality works as expected."""
+
+    event = stripe_event()
+    log_stripe_event(event)
+
+    assert StripeEventLog.objects.filter(event_id=event.id).exists()
+
+
+def _configure_checkout_session_object(
+    order_line, *, was_successful=True, is_expired=False
+):
+    """
+    Generate and configure a Stripe CheckoutSession for testing.
+
+    This all sets up a Stripe Event with a checkout session that looks
+    right-ish for the order. A lot of this data will be set to whatever
+    is in the sample object, which is fine; we really only care about the
+    reference number and status fields when processing.
+
+    The data is not signed - Stripe passes this in the HTTP headers and that
+    is handled before it gets to what's under test.
+
+    Note that was_successful and is_expired are different states and would
+    be different events. was_successful is ignored if is_expired is True.
+
+    Args:
+    - order_line (Line): the line item to start with
+    - was_successful (bool): if the result should be a successful one or not
+    - is_expired (bool): if the session expired
+    """
+
+    cart_item = CartItem(
+        sku=order_line.courseware,
+        code=order_line.courseware,
+        unitprice=Decimal(order_line.unit_price),
+        name=order_line.courseware,
+    )
+
+    # use the payment gateway to generate the line items to get everything
+    # shaped right, then convert those to StripeObject so they match what
+    # Stripe sends. (also, their to_dict has a "for_json" that fixes
+    # Decimal and other things, but not if it's not a StripeObject.)
+    gateway = PaymentGateway.get_gateway_class(MITOL_PAYMENT_GATEWAY_STRIPE)
+    formatted_line = gateway._generate_line_item(cart_item)  # noqa: SLF001
+    formatted_lines = convert_to_stripe_object([formatted_line])
+
+    event = stripe_event()
+
+    event.type = (
+        "checkout.session.expired" if is_expired else "checkout.session.completed"
+    )
+    event.data.object = stripe_checkout_session()
+    event.data.object.mode = "payment"
+    event.data.object.line_items = formatted_lines
+    event.data.object.client_reference_id = order_line.order.reference_number
+    event.data.object.customer_email = order_line.order.purchaser.email
+    # Stripe expects this in cents.
+    event.data.object.amount_total = int(order_line.order.total_price_paid * 100)
+    event.data.object.amount_subtotal = int(order_line.order.total_price_paid * 100)
+
+    if is_expired:
+        event.data.object.payment_status = STRIPE_PAYMENT_STATUS_UNPAID
+        event.data.object.status = STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED
+    elif was_successful:
+        event.data.object.payment_status = STRIPE_PAYMENT_STATUS_PAID
+        event.data.object.status = STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE
+    else:
+        event.data.object.payment_status = STRIPE_PAYMENT_STATUS_UNPAID
+        event.data.object.status = STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE
+
+    return event
+
+
+@pytest.mark.parametrize(
+    "was_successful",
+    [
+        True,
+        False,
+    ],
+)
+def test_process_stripe_checkout_completed(
+    bootstrapped_verified_program, was_successful
+):
+    """Test that the checkout processing works."""
+
+    *_, cr_product = bootstrapped_verified_program
+
+    product_version = Version.objects.get_for_object(cr_product).get()
+    order_line = LineFactory.create(
+        product_version=product_version,
+        order__gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+    )
+
+    event = _configure_checkout_session_object(
+        order_line, was_successful=was_successful
+    )
+
+    updated_order = process_stripe_checkout_completed(event)
+
+    assert updated_order
+    assert updated_order.id == order_line.order.id
+    if was_successful:
+        assert updated_order.state == OrderStatus.FULFILLED
+    else:
+        assert updated_order.state == OrderStatus.ERRORED
+
+
+def test_process_stripe_checkout_expired(bootstrapped_verified_program):
+    """Test that expiry works as expected."""
+
+    *_, cr_product = bootstrapped_verified_program
+
+    product_version = Version.objects.get_for_object(cr_product).get()
+    order_line = LineFactory.create(
+        product_version=product_version,
+        order__gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+    )
+
+    event = _configure_checkout_session_object(order_line, is_expired=True)
+
+    updated_order = process_stripe_checkout_expired(event)
+
+    assert updated_order
+    assert updated_order.id == order_line.order.id
+    assert updated_order.state == OrderStatus.CANCELED
