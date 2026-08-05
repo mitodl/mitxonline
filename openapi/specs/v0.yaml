@@ -848,6 +848,40 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrganizationPage'
           description: ''
+  /api/v0/b2b/service/organization-manager-check/:
+    get:
+      operationId: b2b_service_organization_manager_check
+      description: Check whether a user is a manager of an organization. Service-to-service
+        only; requires the `b2b:manager-check` scope.
+      parameters:
+      - in: query
+        name: sso_organization_id
+        schema:
+          type: string
+          format: uuid
+        description: The organization's Keycloak UUID (OrganizationPage.sso_organization_id).
+        required: true
+      - in: query
+        name: user_global_id
+        schema:
+          type: string
+        description: The user's Keycloak subject (User.global_id).
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationManagerCheck'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceDetailError'
+          description: ''
   /api/v0/baskets/:
     get:
       operationId: baskets_list
@@ -1072,6 +1106,8 @@ paths:
       description: Clears the basket for the current user.
       tags:
       - baskets
+      security:
+      - {}
       responses:
         '204':
           description: Basket cleared successfully
@@ -1088,6 +1124,8 @@ paths:
         required: true
       tags:
       - baskets
+      security:
+      - {}
       responses:
         '200':
           content:
@@ -2315,6 +2353,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Order'
+          description: ''
+  /api/v0/orders/status/{order_id}/:
+    get:
+      operationId: orders_status_retrieve
+      description: Pollable interface to determine status of a particular order.
+      parameters:
+      - in: path
+        name: order_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - orders
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderStatus'
           description: ''
   /api/v0/products/:
     get:
@@ -4474,6 +4531,7 @@ components:
           readOnly: true
         user:
           type: integer
+          nullable: true
         basket_items:
           type: array
           items:
@@ -4482,7 +4540,6 @@ components:
       required:
       - basket_items
       - id
-      - user
     BasketDiscountDetail:
       type: object
       description: BasketDiscount model serializer
@@ -4518,6 +4575,11 @@ components:
           readOnly: true
         user:
           type: integer
+          nullable: true
+        anonymous_id:
+          type: string
+          format: uuid
+          nullable: true
         basket_items:
           type: array
           items:
@@ -4562,7 +4624,6 @@ components:
       - discounts
       - id
       - total_price
-      - user
     BlankEnum:
       enum:
       - ''
@@ -6491,6 +6552,29 @@ components:
       description: '* `course` - course'
       x-enum-descriptions:
       - course
+    EmailStatusEnum:
+      enum:
+      - delivered
+      - accepted
+      - opened
+      - clicked
+      - failed
+      - pending
+      type: string
+      description: |-
+        * `delivered` - delivered
+        * `accepted` - accepted
+        * `opened` - opened
+        * `clicked` - clicked
+        * `failed` - failed
+        * `pending` - pending
+      x-enum-descriptions:
+      - delivered
+      - accepted
+      - opened
+      - clicked
+      - failed
+      - pending
     EnrollmentMode:
       type: object
       description: Enrollment mode serializer.
@@ -6548,10 +6632,28 @@ components:
         country:
           type: string
           maxLength: 2
+        first_name:
+          type: string
+          maxLength: 60
+        last_name:
+          type: string
+          maxLength: 60
+        street_address_1:
+          type: string
+          maxLength: 255
+        street_address_2:
+          type: string
+          maxLength: 255
+        city:
+          type: string
+          maxLength: 255
         state:
           type: string
           nullable: true
           maxLength: 10
+        postal_code:
+          type: string
+          maxLength: 20
         email:
           type: string
           description: Get email from the linked user object
@@ -6938,10 +7040,28 @@ components:
         country:
           type: string
           maxLength: 2
+        first_name:
+          type: string
+          maxLength: 60
+        last_name:
+          type: string
+          maxLength: 60
+        street_address_1:
+          type: string
+          maxLength: 255
+        street_address_2:
+          type: string
+          maxLength: 255
+        city:
+          type: string
+          maxLength: 255
         state:
           type: string
           nullable: true
           maxLength: 10
+        postal_code:
+          type: string
+          maxLength: 20
       required:
       - country
     LegalAddressRequest:
@@ -6952,10 +7072,28 @@ components:
           type: string
           minLength: 1
           maxLength: 2
+        first_name:
+          type: string
+          maxLength: 60
+        last_name:
+          type: string
+          maxLength: 60
+        street_address_1:
+          type: string
+          maxLength: 255
+        street_address_2:
+          type: string
+          maxLength: 255
+        city:
+          type: string
+          maxLength: 255
         state:
           type: string
           nullable: true
           maxLength: 10
+        postal_code:
+          type: string
+          maxLength: 20
       required:
       - country
     Line:
@@ -7205,11 +7343,24 @@ components:
           nullable: true
           description: Return when the last reminder email was sent.
           readOnly: true
+        email_status:
+          nullable: true
+          readOnly: true
+          oneOf:
+          - $ref: '#/components/schemas/EmailStatusEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        email_status_event_timestamp:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
       required:
       - assigned_name
       - assigned_on
       - assigned_to
       - code
+      - email_status
+      - email_status_event_timestamp
       - id
       - last_sent
       - redeemed_by
@@ -7447,6 +7598,40 @@ components:
       required:
       - state
       - total_price_paid
+    OrderStatus:
+      type: object
+      description: Very simple serializer for order information.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        reference_number:
+          type: string
+          readOnly: true
+          nullable: true
+        total_price_paid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,5})?$
+          readOnly: true
+        state:
+          allOf:
+          - $ref: '#/components/schemas/StateEnum'
+          readOnly: true
+      required:
+      - id
+      - reference_number
+      - state
+      - total_price_paid
+    OrganizationManagerCheck:
+      type: object
+      description: Response shape for the org-manager check.
+      properties:
+        is_manager:
+          type: boolean
+          description: True if the user manages the organization.
+      required:
+      - is_manager
     OrganizationPage:
       type: object
       description: Serializer for the OrganizationPage model.
@@ -8787,6 +8972,24 @@ components:
           minLength: 1
       required:
       - email
+    ServiceDetailError:
+      type: object
+      description: |-
+        Response shape for the 400 error responses below.
+
+        Same shape as b2b.serializers.v0.manager.DetailErrorSerializer, but
+        duplicated rather than imported (and distinctly named, since
+        drf-spectacular keys its component registry on class identity, not
+        structural equality -- reusing the same name for a different class
+        produces a "components with identical names" warning and an
+        unpredictable schema) so this module stays self-contained and its
+        deletion remains a plain file removal (see the module docstring in
+        b2b/views/v0/service.py).
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
     SignatoryItem:
       type: object
       description: Serializer for signatory items used in certificate pages.

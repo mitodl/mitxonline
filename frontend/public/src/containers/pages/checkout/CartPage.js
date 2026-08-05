@@ -11,6 +11,7 @@ import { createStructuredSelector } from "reselect"
 import { pathOr } from "ramda"
 
 import type { BasketItem, Discount } from "../../../flow/cartTypes"
+import type { CurrentUser } from "../../../flow/authTypes"
 
 import Loader from "../../../components/Loader"
 import { CartItemCard } from "../../../components/CartItemCard"
@@ -25,6 +26,7 @@ import {
   discountSelector,
   applyDiscountCodeMutation
 } from "../../../lib/queries/cart"
+import { currentUserSelector } from "../../../lib/queries/users"
 
 import type { RouterHistory } from "react-router"
 import { isSuccessResponse } from "../../../lib/util"
@@ -39,7 +41,8 @@ type Props = {
   isLoading: boolean,
   applyDiscountCode: (code: string) => Promise<any>,
   addUserNotification: Function,
-  forceRequest: Function
+  forceRequest: Function,
+  currentUser: ?CurrentUser
 }
 
 type CartState = {
@@ -98,7 +101,7 @@ export class CartPage extends React.Component<Props, CartState> {
   }
 
   renderOrderSummaryCard() {
-    const { totalPrice, discountedPrice, discounts } = this.props
+    const { totalPrice, discountedPrice, discounts, currentUser } = this.props
     const refunds = []
 
     return (
@@ -110,12 +113,18 @@ export class CartPage extends React.Component<Props, CartState> {
         refunds={refunds}
         addDiscount={this.addDiscount.bind(this)}
         discountCode={this.state.discountCode}
+        isAuthenticated={Boolean(currentUser && currentUser.is_authenticated)}
       />
     )
   }
 
   renderFinancialAssistanceOffer() {
-    const { cartItems, discounts } = this.props
+    const { cartItems, discounts, currentUser } = this.props
+
+    if (!currentUser || !currentUser.is_authenticated) {
+      return null
+    }
+
     let userFlexiblePriceExists = false
     // Check if there are any discounts, and if those discounts are for flexible pricing.
     if (
@@ -199,7 +208,8 @@ const mapStateToProps = createStructuredSelector({
   totalPrice:      totalPriceSelector,
   discountedPrice: discountedPriceSelector,
   discounts:       discountSelector,
-  isLoading:       pathOr(true, ["queries", cartQueryKey, "isPending"])
+  isLoading:       pathOr(true, ["queries", cartQueryKey, "isPending"]),
+  currentUser:     currentUserSelector
 })
 
 const mapDispatchToProps = {

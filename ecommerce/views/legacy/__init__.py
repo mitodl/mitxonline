@@ -26,7 +26,7 @@ from rest_framework.authentication import SessionAuthentication, TokenAuthentica
 from rest_framework.decorators import action
 from rest_framework.exceptions import ParseError
 from rest_framework.generics import ListCreateAPIView, RetrieveAPIView
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import (
@@ -587,6 +587,12 @@ class CheckoutApiViewSet(ViewSet):
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated,)
 
+    def get_permissions(self):
+        """Allow anonymous access to everything except discount redemption"""
+        if self.action == "redeem_discount":
+            return [IsAuthenticated()]
+        return [AllowAny()]
+
     @extend_schema(
         request=RedeemDiscountRequestSerializer,
         responses={200: RedeemDiscountResponseSerializer},
@@ -687,9 +693,7 @@ class CheckoutApiViewSet(ViewSet):
     def add_to_cart(self, request):
         """Add product to the cart"""
         with transaction.atomic():
-            basket, _ = Basket.objects.select_for_update().get_or_create(
-                user=self.request.user
-            )
+            basket = api.establish_basket_for_request(request, for_update=True)
 
             # Check if multiple cart items feature is enabled
             allow_multiple_items = getattr(
@@ -766,9 +770,17 @@ class CheckoutApiViewSet(ViewSet):
         """
         Returns the current cart, with the product info embedded.
         """
-        try:
-            basket = Basket.objects.filter(user=request.user).get()
-        except ObjectDoesNotExist:
+        if request.user.is_authenticated:
+            basket = Basket.objects.filter(user=request.user).first()
+        else:
+            anonymous_id = api.get_anonymous_basket_id(request, create=False)
+            basket = (
+                Basket.objects.filter(anonymous_id=anonymous_id).first()
+                if anonymous_id
+                else None
+            )
+
+        if basket is None:
             return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
 
         if not basket.get_products():
@@ -776,7 +788,8 @@ class CheckoutApiViewSet(ViewSet):
                 "No product in basket", status=status.HTTP_406_NOT_ACCEPTABLE
             )
 
-        api.apply_user_discounts(request)
+        if request.user.is_authenticated:
+            api.apply_user_discounts(request)
 
         return Response(BasketWithProductSerializer(basket).data)
 
@@ -787,9 +800,17 @@ class CheckoutApiViewSet(ViewSet):
         url_name="basket_items_count",
     )
     def basket_items_count(self, request):
-        basket, _ = Basket.objects.get_or_create(user=request.user)
+        if request.user.is_authenticated:
+            basket, _ = Basket.objects.get_or_create(user=request.user)
+        else:
+            anonymous_id = api.get_anonymous_basket_id(request, create=False)
+            basket = (
+                Basket.objects.filter(anonymous_id=anonymous_id).first()
+                if anonymous_id
+                else None
+            )
 
-        return Response(basket.basket_items.count())
+        return Response(basket.basket_items.count() if basket else 0)
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -904,6 +925,27 @@ class CheckoutCallbackView(View):
             else:
                 return self.post_checkout_redirect(order.state, order, request)
 
+    def get(self, request):
+        """
+        Process a GET request to this endpoint.
+
+        Stripe just redirects users back to the app. We might get a checkout
+        session ID here, which we can load and check, but for now just redirect
+        back to the dashboard and wait for them to hit the webhook.
+        """
+
+        order_ref = request.session.get("order_reference_number", None)
+        if order_ref:
+            order = Order.objects.filter(reference_number=order_ref).first()
+
+            return (
+                _learn_dashboard_redirect(order)
+                if order and _should_redirect_to_learn(order)
+                else HttpResponseRedirect(reverse("user-dashboard"))
+            )
+
+        return HttpResponseRedirect(reverse("user-dashboard"))
+
 
 # Add a serializer for the cybersource payment response
 class CybersourcePaymentResponseSerializer(serializers.Serializer):
@@ -955,7 +997,7 @@ class BackofficeCallbackView(APIView):
             return Response(status=status.HTTP_200_OK)
 
 
-class CheckoutProductView(LoginRequiredMixin, RedirectView):
+class CheckoutProductView(RedirectView):
     """View to add products to the cart and proceed to the checkout page"""
 
     pattern_name = "cart"
@@ -963,9 +1005,7 @@ class CheckoutProductView(LoginRequiredMixin, RedirectView):
     def get_redirect_url(self, *args, **kwargs):
         """Populate the basket before redirecting"""
         with transaction.atomic():
-            basket, _ = Basket.objects.select_for_update().get_or_create(
-                user=self.request.user
-            )
+            basket = api.establish_basket_for_request(self.request, for_update=True)
             basket.basket_items.all().delete()
             BasketDiscount.objects.filter(redeemed_basket=basket).delete()
 
@@ -996,6 +1036,16 @@ class CheckoutProductView(LoginRequiredMixin, RedirectView):
             for product in Product.objects.filter(id__in=all_product_ids):
                 BasketItem.objects.create(basket=basket, product=product)
 
+        return super().get_redirect_url(*args, **kwargs)
+
+
+class AnonymousCheckoutView(LoginRequiredMixin, RedirectView):
+    """Claim the anonymous basket for the now-authenticated user, then proceed to checkout"""
+
+    pattern_name = "checkout_interstitial_page"
+
+    def get_redirect_url(self, *args, **kwargs):
+        api.claim_anonymous_basket(self.request)
         return super().get_redirect_url(*args, **kwargs)
 
 
@@ -1082,15 +1132,37 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
                 {"type": USER_MSG_TYPE_BASKET_EMPTY},
             )
 
+        if checkout_payload["method"] == "GET":
+            # GET method means we redirect the learner
+            # Throw a couple of identifiers into the session because otherwise
+            # we aren't guaranteed to get them back out the other side
+            log.debug(
+                "Interstitial: payload said GET, so redirecting to %s",
+                checkout_payload["url"],
+            )
+            request.session["stripe_session_id"] = checkout_payload["payload"].id
+            request.session["order_reference_number"] = checkout_payload[
+                "payload"
+            ].client_reference_id
+            return HttpResponseRedirect(checkout_payload["url"])
+
         context = {
             "checkout_payload": checkout_payload,
             "form": checkout_payload["payload"],
         }
 
-        ga_purchase_flag = is_posthog_enabled(
-            features.ENABLE_GOOGLE_ANALYTICS_DATA_PUSH,
-            False,  # noqa: FBT003
-            self.request.user.id,
+        # NOTE: Leave a user with no global_id unflagged rather than passing
+        # None through. is_posthog_enabled falls back to its default unique id
+        # (the hostname) when opt_unique_id is empty, which would evaluate and
+        # cache the flag once for every such user collectively.
+        global_id = self.request.user.global_id
+        ga_purchase_flag = bool(
+            global_id
+            and is_posthog_enabled(
+                features.ENABLE_GOOGLE_ANALYTICS_DATA_PUSH,
+                default=False,
+                opt_unique_id=global_id,
+            )
         )
         ga_purchase_payload = None
         if ga_purchase_flag:

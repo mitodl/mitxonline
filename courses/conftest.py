@@ -331,6 +331,76 @@ class UserWithEnrollmentsAndCerts(NamedTuple):
     program_certificates: list[ProgramCertificate]
 
 
+def _sample_runs_for_programs(fake, course_runs, programs, length):
+    """
+    Sample `length` course runs, split so that at least one of `programs` has a
+    run among its courses and at least one has none.
+
+    Enrolling in a program does not imply enrolling in any of its courses, so
+    both cases are real and both are worth generating. Sampling runs
+    independently of the programs leaves the split to chance instead: it happens
+    to produce full coverage about 97.6% of the time, which makes the uncovered
+    case effectively untested and makes any test asserting full coverage fail
+    the rest of the time.
+
+    Runs are returned in the order they should be enrolled in -- consumers
+    compare positionally against responses ordered by enrollment id.
+    """
+    if len(programs) < 2:  # noqa: PLR2004
+        return pytest.fail("Need at least 2 program enrollments to cover only some")
+    if length < 1:
+        return pytest.fail("Need at least 1 run enrollment to cover a program")
+
+    course_ids_by_program_id = {
+        program.id: {course.id for course in program.courses_qset}
+        for program in programs
+    }
+    runs_by_course_id = defaultdict(list)
+    for run in course_runs:
+        runs_by_course_id[run.course_id].append(run)
+
+    # Whichever program is left uncovered, some other program has to keep a run
+    # outside it, or there is nothing left that can be covered.
+    for uncovered in fake.random_sample(programs, length=len(programs)):
+        uncovered_course_ids = course_ids_by_program_id[uncovered.id]
+        runs_outside_uncovered = {
+            program.id: [
+                run
+                for course_id in course_ids_by_program_id[program.id]
+                - uncovered_course_ids
+                for run in runs_by_course_id[course_id]
+            ]
+            for program in programs
+            if program.id != uncovered.id
+        }
+        coverable = [
+            program for program in programs if runs_outside_uncovered.get(program.id)
+        ]
+        if coverable:
+            break
+    else:
+        return pytest.fail(
+            "No program has a course run outside another program's courses; "
+            "cannot cover one program and leave another uncovered"
+        )
+
+    eligible = [run for run in course_runs if run.course_id not in uncovered_course_ids]
+    if length > len(eligible):
+        return pytest.fail(
+            f"Cannot enroll in {length} runs outside {uncovered.readable_id}'s "
+            f"courses; only {len(eligible)} of {len(course_runs)} runs are eligible"
+        )
+
+    covered = fake.random_element(coverable)
+    covering_run = fake.random_element(runs_outside_uncovered[covered.id])
+    return [
+        covering_run,
+        *fake.random_sample(
+            [run for run in eligible if run.id != covering_run.id], length=length - 1
+        ),
+    ]
+
+
 @pytest.fixture
 def user_with_enrollments_and_certificates(
     fake,
@@ -350,8 +420,11 @@ def user_with_enrollments_and_certificates(
         programs_to_enroll_in, length=user_enrollment_config.program_enrollment_count
     )
 
-    runs_to_enroll_in = fake.random_sample(
-        course_runs, length=user_enrollment_config.run_enrollment_count
+    runs_to_enroll_in = _sample_runs_for_programs(
+        fake,
+        course_runs,
+        programs_to_enroll_in,
+        user_enrollment_config.run_enrollment_count,
     )
     runs_with_certificate = fake.random_sample(
         runs_to_enroll_in, length=user_enrollment_config.run_certificate_count

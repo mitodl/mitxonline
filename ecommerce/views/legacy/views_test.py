@@ -1,17 +1,20 @@
 import operator as op
 import random
+import uuid
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import freezegun
 import pytest
 import reversion
+from django.conf import settings
 from django.forms.models import model_to_dict
 from django.test import Client, RequestFactory
 from django.urls import reverse
 from mitol.common.utils.datetime import now_in_utc
 from mitol.payment_gateway.api import PaymentGateway
 from rest_framework import status
+from rest_framework.test import APIClient
 from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
@@ -69,6 +72,21 @@ from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
+
+
+def set_anonymous_basket_session(client, anonymous_id):
+    """
+    Seed a test client's session with an anonymous_basket_id.
+
+    SESSION_ENGINE is signed_cookies, so session.save() only updates the
+    in-memory session_key - it doesn't rewrite the client's cookie jar the
+    way it would for a server-side session backend. The cookie has to be set
+    manually or the modified session never reaches the next request.
+    """
+    session = client.session
+    session["anonymous_basket_id"] = str(anonymous_id)
+    session.save()
+    client.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
 
 
 @pytest.fixture
@@ -538,6 +556,40 @@ def test_start_checkout_with_discounts_and_b2b(
 
 
 @pytest.mark.skip_nplusone_check
+def test_start_checkout_with_stripe(mocker, user, user_client, fake):
+    """Make sure we get the right result out of the interstitial for Stripe payments."""
+
+    class FakePayload:
+        """A fake Stripe payload, so the interstitial page doesn't fail."""
+
+        id = "test1234"
+        client_reference_id = "mitxonline-test-12345"
+
+    def patched_generate_checkout_payload(request, **kwargs):
+        """Return a GET payload to test the redirect."""
+
+        return {
+            "url": fake.url(),
+            "payload": FakePayload(),
+            "method": "GET",
+        }
+
+    mocker.patch(
+        "ecommerce.api.generate_checkout_payload",
+        side_effect=patched_generate_checkout_payload,
+    )
+
+    with reversion.create_revision():
+        product = ProductFactory.create()
+
+    create_basket(user, [product])
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+
+
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize(
     "decision, expected_redirect_url, expected_state, basket_exists",  # noqa: PT006
     [
@@ -988,6 +1040,183 @@ def test_add_to_cart_does_not_trigger_hubspot_for_duplicate_product(
     assert resp.status_code == status.HTTP_200_OK
     assert resp.json()["message"] == "Product already in cart"
     mock_sync.assert_not_called()
+
+
+def test_add_to_cart_anonymous_creates_basket():
+    """An anonymous caller can add a product to a new anonymous basket"""
+    client = APIClient()
+    product = ProductFactory.create()
+
+    resp = client.post(
+        reverse("checkout_api-add_to_cart"),
+        data={"product_id": product.id},
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+
+    basket = Basket.objects.get(anonymous_id__isnull=False)
+    assert basket.basket_items.count() == 1
+    assert basket.basket_items.first().product == product
+    assert client.session["anonymous_basket_id"] == str(basket.anonymous_id)
+
+
+@pytest.mark.parametrize(
+    "cart_exists, cart_empty, expected_status, expected_message",  # noqa: PT006
+    [
+        (False, True, status.HTTP_406_NOT_ACCEPTABLE, "No basket"),
+        (True, True, status.HTTP_406_NOT_ACCEPTABLE, "No product in basket"),
+        (True, False, status.HTTP_200_OK, ""),
+    ],
+)
+def test_checkout_cart_anonymous(
+    cart_exists, cart_empty, expected_status, expected_message
+):
+    """Verifies cart/ behaves the same way for anonymous users as for authenticated ones"""
+    client = APIClient()
+
+    # An authenticated user's basket must never leak to an anonymous caller
+    other_basket = BasketFactory.create()
+    BasketItemFactory.create(basket=other_basket)
+
+    basket = None
+    if cart_exists:
+        anonymous_id = uuid.uuid4()
+        basket = Basket.objects.create(anonymous_id=anonymous_id)
+        set_anonymous_basket_session(client, anonymous_id)
+
+    if basket and not cart_empty:
+        BasketItemFactory.create(basket=basket)
+
+    resp = client.get(reverse("checkout_api-cart"))
+    assert resp.status_code == expected_status
+
+    if cart_empty:
+        assert resp.data == expected_message
+    else:
+        assert_drf_json_equal(resp.json(), BasketWithProductSerializer(basket).data)
+
+
+def test_checkout_cart_anonymous_no_session_does_not_leak_other_baskets():
+    """An anonymous caller with no session id must never see another user's basket"""
+    client = APIClient()
+
+    other_basket = BasketFactory.create()
+    BasketItemFactory.create(basket=other_basket)
+
+    resp = client.get(reverse("checkout_api-cart"))
+
+    assert resp.status_code == status.HTTP_406_NOT_ACCEPTABLE
+    assert resp.data == "No basket"
+
+
+def test_basket_items_count_authenticated(user, user_drf_client):
+    """Authenticated basket item count reflects the user's own basket"""
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create_batch(2, basket=basket)
+
+    resp = user_drf_client.get(reverse("checkout_api-basket_items_count"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == 2
+
+
+def test_basket_items_count_anonymous_no_session_returns_zero():
+    """An anonymous caller with no session yet gets zero, not an error, and no leak"""
+    client = APIClient()
+
+    other_basket = BasketFactory.create()
+    BasketItemFactory.create(basket=other_basket)
+
+    resp = client.get(reverse("checkout_api-basket_items_count"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == 0
+
+
+def test_basket_items_count_anonymous_with_items():
+    """An anonymous caller with an established basket gets the real count"""
+    client = APIClient()
+    anonymous_id = uuid.uuid4()
+    basket = Basket.objects.create(anonymous_id=anonymous_id)
+    BasketItemFactory.create_batch(3, basket=basket)
+
+    set_anonymous_basket_session(client, anonymous_id)
+
+    resp = client.get(reverse("checkout_api-basket_items_count"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == 3
+
+
+def test_redeem_discount_anonymous_forbidden():
+    """Anonymous users cannot redeem discount codes, unlike the other checkout actions"""
+    client = APIClient()
+
+    resp = client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": "SOMECODE"}
+    )
+
+    assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_checkout_product_anonymous():
+    """CheckoutProductView is reachable anonymously and populates an anonymous basket"""
+    client = Client()
+    product = ProductFactory.create()
+
+    resp = client.get(reverse("checkout-product"), {"product_id": product.id})
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+
+    basket = Basket.objects.get(anonymous_id__isnull=False)
+    assert [item.product for item in basket.basket_items.all()] == [product]
+
+
+def test_anonymous_checkout_view_requires_login():
+    """AnonymousCheckoutView is defense-in-depth protected behind LoginRequiredMixin"""
+    client = Client()
+
+    resp = client.get(reverse("checkout-anonymous"))
+
+    assert resp.status_code == 302
+    assert resp.url.startswith(reverse("gateway-login"))
+
+
+def test_anonymous_checkout_view_claims_basket_and_redirects(user):
+    """
+    The anonymous_basket_id must survive the login round trip so that the
+    basket set up before authentication can be claimed once the user logs in.
+    """
+    client = Client()
+    product = ProductFactory.create()
+
+    resp = client.post(
+        reverse("checkout_api-add_to_cart"), data={"product_id": product.id}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+
+    anon_basket = Basket.objects.get(anonymous_id__isnull=False)
+    session_anon_id = client.session["anonymous_basket_id"]
+
+    # Force login with a non-remote backend: real APISIX-authenticated sessions
+    # carry a header on every subsequent request that keeps a
+    # RemoteUserBackend-authenticated session alive, but this test client
+    # doesn't send that header, so using that backend here would cause
+    # ApisixUserMiddleware to immediately invalidate the session again.
+    client.force_login(user, backend="django.contrib.auth.backends.ModelBackend")
+
+    assert client.session["anonymous_basket_id"] == session_anon_id
+
+    resp2 = client.get(reverse("checkout-anonymous"))
+
+    assert resp2.status_code == 302
+    assert resp2.url == reverse("checkout_interstitial_page")
+
+    anon_basket.refresh_from_db()
+    assert anon_basket.user_id == user.id
+    assert anon_basket.anonymous_id is None
+    assert "anonymous_basket_id" not in client.session
 
 
 def test_discount_rest_api(admin_drf_client, user_drf_client):
@@ -1545,6 +1774,27 @@ def test_checkout_interstitial_google_analytics_object(
         assert isinstance(item["discount"], float)
         assert isinstance(item["price"], float)
         assert isinstance(item["quantity"], int)
+
+
+def test_checkout_interstitial_no_ga_flag_without_global_id(
+    mocker, settings, user_client, products
+):
+    """A user with no global_id is left unflagged rather than sharing a bucket."""
+
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+
+    user_no_global_id = UserFactory.create(global_id=None)
+    user_client.force_login(user_no_global_id)
+
+    mock_is_enabled = mocker.patch("ecommerce.views.legacy.is_posthog_enabled")
+
+    basket = create_basket_with_product(user_no_global_id, products[0])
+    PendingOrder.create_from_basket(basket)
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 200
+    assert "ga_purchase_payload" not in resp.context
+    mock_is_enabled.assert_not_called()
 
 
 @pytest.mark.skip_nplusone_check

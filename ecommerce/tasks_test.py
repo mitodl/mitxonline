@@ -4,6 +4,7 @@ import reversion
 from ecommerce.factories import ProductFactory
 from ecommerce.serializers.serializers_test import create_order_receipt
 from ecommerce.tasks import (
+    perform_cull_anonymous_baskets,
     perform_downgrade_from_order,
     perform_unenrollment_from_order,
 )
@@ -13,6 +14,15 @@ from ecommerce.tasks import (
 def products():
     with reversion.create_revision():
         return ProductFactory.create_batch(5)
+
+
+def test_perform_cull_anonymous_baskets_calls_api(mocker):
+    """The task should just delegate to the api function"""
+    mock_cull = mocker.patch("ecommerce.api.cull_anonymous_baskets")
+
+    perform_cull_anonymous_baskets()
+
+    mock_cull.assert_called_once()
 
 
 @pytest.mark.skip_nplusone_check

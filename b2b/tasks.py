@@ -220,3 +220,12 @@ def queue_send_test_enrollment_code_assignment_email(
     email: str, contract_record_id: int
 ):
     send_test_enrollment_code_assignment_email(email, contract_record_id)
+
+
+# At the moment, we only process webhooks for b2b admin dashboard-sent emails and throw out the rest.
+# As a result, we don't wanna track results for this task as most are no-ops
+@app.task(ignore_result=True)
+def queue_process_mailgun_webhook_for_enrollment_code_emails(payload):
+    from b2b.api import process_mailgun_webhook_for_enrollment_code_emails
+
+    process_mailgun_webhook_for_enrollment_code_emails(payload)

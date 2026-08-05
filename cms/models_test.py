@@ -665,6 +665,21 @@ def test_courseware_title_synced_with_product_page_title(test_course):
     assert courseware.title == updated_title
 
 
+@pytest.mark.parametrize("test_course", [True, False])
+def test_product_page_save_skips_courseware_save_when_title_unchanged(test_course):
+    """
+    Saving a product page without changing its title must not re-save the
+    linked courseware object, so it fires no redundant Fastly purge signal.
+    """
+    product_page = CoursePageFactory() if test_course else ProgramPageFactory()
+    courseware = product_page.course if test_course else product_page.program
+
+    with patch.object(type(courseware), "save") as mock_courseware_save:
+        product_page.save()
+
+    mock_courseware_save.assert_not_called()
+
+
 @pytest.mark.parametrize("flex_form_for_course", [True, False])
 def test_flexible_pricing_request_form_context(flex_form_for_course):
     """

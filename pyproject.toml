@@ -44,7 +44,7 @@ dependencies = [
     "mitol-django-hubspot-api==2026.4.29",
     "mitol-django-mail==2026.4.29",
     "mitol-django-openedx==2026.4.29",
-    "mitol-django-payment-gateway==2026.4.29",
+    "mitol-django-payment-gateway==2026.8.5",
     "mitol-django-scim==2026.4.29",
     "mitol-django-observability>=2026.1.0",
     "opentelemetry-instrumentation-celery>=0.52b0",
@@ -52,8 +52,7 @@ dependencies = [
     "opentelemetry-instrumentation-psycopg>=0.52b0",
     "opentelemetry-instrumentation-redis>=0.52b0",
     "opentelemetry-instrumentation-requests>=0.52b0",
-    "psycopg>=3.2.4,<4",
-    "psycopg2>=2.9.5,<3",
+    "psycopg[c]>=3.2.4,<4",
     "pyOpenSSL>=26,<27",
     "pycountry>=26.2.16,<27",
     "pyparsing>=3.2,<4",
@@ -83,6 +82,7 @@ dependencies = [
     "django-prefetch>=1.2.3,<2",
     "lru-method-cache>=0.2.0",
     "django-qp[drf]>=0.2.0",
+    "pydantic>=2.13.4",
 ]
 
 [dependency-groups]
@@ -117,6 +117,8 @@ dev = [
 [tool.uv]
 package = false
 default-groups = "all"
+
+[tool.uv.sources]
 
 [tool.uv.build-backend]
 module-root = ""

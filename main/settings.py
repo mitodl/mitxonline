@@ -29,6 +29,7 @@ from mitol.common.settings.celery import *  # noqa: F403
 from mitol.google_sheets.settings.google_sheets import *  # noqa: F403
 from mitol.google_sheets_deferrals.settings.google_sheets_deferrals import *  # noqa: F403
 from mitol.google_sheets_refunds.settings.google_sheets_refunds import *  # noqa: F403
+from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
 from mitol.scim.settings.scim import *  # noqa: F403
 from redbeat import RedBeatScheduler
 
@@ -38,7 +39,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "1.160.5"
+VERSION = "1.161.0"
 
 log = logging.getLogger()
 
@@ -266,7 +267,7 @@ INSTALLED_APPS = (
     "cms.apps.CustomWagtailUsersAppConfig",
     "cms",
     "sheets",
-    # "compliance",
+    "compliance",
     "openedx",
     # must be after "users" to pick up custom user model
     "ecommerce",
@@ -304,6 +305,7 @@ MIDDLEWARE = (
     "django.middleware.common.CommonMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "mitol.apigateway.middleware.ApisixUserMiddleware",
+    "main.middleware.AnonymousBasketHandoffMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "main.middleware.HostBasedCSRFMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -333,6 +335,12 @@ if ENVIRONMENT == "pytest":
     PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
+
+ANONYMOUS_BASKET_CULL_AGE = get_int(
+    name="ANONYMOUS_BASKET_CULL_AGE",
+    default=global_settings.SESSION_COOKIE_AGE,
+    description="Seconds of inactivity after which an anonymous (unclaimed) basket is deleted",
+)
 
 MITXONLINE_NEW_USER_LOGIN_URL = get_string(
     name="MITXONLINE_NEW_USER_LOGIN_URL",
@@ -679,6 +687,18 @@ MIT_LEARN_HONOR_CODE_URL = get_string(
     name="MIT_LEARN_HONOR_CODE_URL",
     default=f"{MIT_LEARN_BASE_URL}/honor_code",
     description="Honor code URL",
+)
+
+MAILGUN_WEBHOOK_SIGNING_SECRET = get_string(
+    name="MAILGUN_WEBHOOK_SIGNING_SECRET",
+    default="",
+    description="The secret to use for validating Mailgun webhook signatures",
+)
+
+MAILGUN_WEBHOOK_VALIDATE_SIGNATURE = get_bool(
+    name="MAILGUN_WEBHOOK_VALIDATE_SIGNATURE",
+    default=True,
+    description="Whether to validate Mailgun signature webhooks for enrollment invite emails. Most useful to disable for local development w/ synthetic payloads",
 )
 
 # Logging configuration
@@ -1062,6 +1082,10 @@ CELERY_BEAT_SCHEDULE = {
             offset=timedelta(seconds=B2B_GSHEETS_UPDATE_OFFSET),
         ),
     },
+    "cull-anonymous-baskets": {
+        "task": "ecommerce.tasks.perform_cull_anonymous_baskets",
+        "schedule": crontab(minute=0, hour=4),
+    },
 }
 
 # django cache back-ends
@@ -1099,6 +1123,10 @@ OAUTH2_PROVIDER = {
         "write": "Write scope",
         "openid": "OpenID Connect scope",
         "user:read": "Can read user and profile data",
+        # Service-to-service only, never granted to a user-facing client.
+        # Remove with b2b/views/v0/service.py once org-manager status is
+        # visible in Keycloak (mitodl/hq#10594).
+        "b2b:manager-check": "Can check whether a user manages an organization",
         # "digitalcredentials": "Can read and write Digital Credentials data",  # noqa: ERA001
     },
     "DEFAULT_SCOPES": ["user:read"],
@@ -1148,7 +1176,7 @@ PASSWORD_RESET_CONFIRM_URL = "password_reset/confirm/{uid}/{token}/"  # noqa: S1
 
 import_settings_modules(
     "mitol.authentication.settings.djoser_settings",
-    "mitol.payment_gateway.settings.cybersource",
+    "mitol.payment_gateway.settings",
     "mitol.olposthog.settings.olposthog",
 )
 
@@ -1356,22 +1384,36 @@ MITOL_GOOGLE_SHEETS_DEFERRALS_PLUGINS = ["sheets.deferrals_plugin.DeferralPlugin
 
 
 # Fastly configuration
-MITX_ONLINE_FASTLY_AUTH_TOKEN = get_string(
-    name="FASTLY_AUTH_TOKEN",
+# MITxOnline's own Fastly config follows the convention used throughout this file:
+# the MITX_ONLINE_-prefixed name is the *env var*, the unprefixed one the setting
+# (as EMAIL_BACKEND is read from MITX_ONLINE_EMAIL_BACKEND, and 16 others).
+# These three previously inverted that -- prefixed settings reading bare env vars --
+# which is how the env vars came to be renamed to the setting names, breaking the
+# read entirely: https://github.com/mitodl/ol-infrastructure/pull/5119
+FASTLY_AUTH_TOKEN = get_string(
+    name="MITX_ONLINE_FASTLY_AUTH_TOKEN",
     default=None,
     description="Optional token for the Fastly purge API.",
 )
 
-MITX_ONLINE_FASTLY_URL = get_string(
-    name="FASTLY_URL",
+FASTLY_URL = get_string(
+    name="MITX_ONLINE_FASTLY_URL",
     default="https://api.fastly.com",
     description="The URL to the Fastly API.",
 )
 
-MITX_ONLINE_FASTLY_SERVICE_ID = get_string(
-    name="FASTLY_SERVICE_ID",
+# Not MITX_ONLINE_-prefixed, because the value is not MITxOnline's: MIT_LEARN_* is
+# this file's namespace for MIT Learn config, and those seven settings all use the
+# env var name unchanged.
+MIT_LEARN_FASTLY_SERVICE_ID = get_string(
+    name="MIT_LEARN_FASTLY_SERVICE_ID",
     default=None,
-    description="Fastly service ID used for surrogate key (tag) purging.",
+    description=(
+        "Fastly service ID for the MIT Learn frontend, used for surrogate key "
+        "(tag) purging. MIT Learn tags its product page responses with MITxOnline "
+        "surrogate keys, so this is Learn's service ID -- not the service ID of "
+        "MITxOnline's own Fastly service."
+    ),
 )
 
 # Hubspot sync settings
@@ -1428,20 +1470,6 @@ UAI_HUBSPOT_PIPELINE_ID = get_string(
     name="UAI_HUBSPOT_PIPELINE_ID",
     default="75e28846-ad0d-4be2-a027-5e1da6590b98",
     description="Hubspot ecommerce pipeline ID for the UAI/xPro account",
-)
-
-# Unified Ecommerce integration
-
-UNIFIED_ECOMMERCE_URL = get_string(
-    name="UNIFIED_ECOMMERCE_URL",
-    default="",
-    description="The base URL for Unified Ecommerce.",
-)
-
-UNIFIED_ECOMMERCE_API_KEY = get_string(
-    name="UNIFIED_ECOMMERCE_API_KEY",
-    default="",
-    description="The API key for Unified Ecommerce.",
 )
 
 SPECTACULAR_SETTINGS = open_spectacular_settings
@@ -1608,3 +1636,6 @@ MIT_LEARN_ATTACH_URL = get_string(
     default=f"{MIT_LEARN_BASE_URL}/enrollmentcode/",
     description="The URL to use for generating contract attachment URLs for B2B.",
 )
+
+if ECOMMERCE_DEFAULT_PAYMENT_GATEWAY == "None":  # noqa: F405
+    ECOMMERCE_DEFAULT_PAYMENT_GATEWAY = MITOL_PAYMENT_GATEWAY_CYBERSOURCE

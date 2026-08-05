@@ -13,6 +13,7 @@ from b2b.api import ensure_enrollment_codes_exist
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE
 from b2b.factories import ContractPageFactory
 from b2b.models import (
+    EMAIL_STATUS_PENDING,
     REDEMPTION_STATUS_ASSIGNED,
     REDEMPTION_STATUS_REDEEMED,
     REDEMPTION_STATUS_UNASSIGNED,
@@ -819,6 +820,8 @@ def test_assign_code(org_setup, manager_drf_client, mocker):
     assert resp_data["redemption_status"] == REDEMPTION_STATUS_ASSIGNED
     assert resp_data["assigned_to"] == "learner@example.com"
     assert resp_data["assigned_name"] == "Test Learner"
+    assert resp_data["email_status"] == EMAIL_STATUS_PENDING
+    assert redemption.email_status == EMAIL_STATUS_PENDING
 
 
 def test_assign_code_name_defaults_to_empty(org_setup, manager_drf_client, mocker):
@@ -1275,6 +1278,39 @@ def test_send_reminder_no_assigned_email(org_setup, manager_drf_client):
     assert "no assigned email" in resp.json()["detail"]
 
 
+def test_send_reminder_resets_status_to_pending(org_setup, manager_drf_client, mocker):
+    """
+    Sending a reminder clears out any prior mailgun-reported status and marks
+    the assignment as pending again while the new email is in flight.
+    """
+    mocker.patch("b2b.views.v0.manager.queue_send_enrollment_code_assignment_email")
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discount,
+        contract=contract_1,
+        assigned_email="assignee@example.com",
+        email_message_id="old-message-id",
+        email_status="failed",
+        email_status_event_timestamp=now_in_utc(),
+    )
+
+    remind_url = reverse(
+        "b2b:b2b-manager-org-contract-send-reminder-for-code-assignment",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.post(remind_url, format="json")
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["email_status"] == EMAIL_STATUS_PENDING
+
+
 # ---------------------------------------------------------------------------
 # bulk_assign tests
 # ---------------------------------------------------------------------------
@@ -1726,6 +1762,48 @@ def test_reassign_code_updates_assigned_by(org_setup, manager_drf_client, mocker
     assert redemption.assigned_by == manager_user
 
 
+def test_reassign_code_resets_status_to_pending_and_clears_last_sent(
+    org_setup, manager_drf_client, mocker
+):
+    """
+    Reassigning a code clears out any prior mailgun-reported status and the
+    last reminder timestamp, since the new assignee hasn't been sent anything yet.
+    """
+    mocker.patch("b2b.views.v0.manager.queue_send_enrollment_code_assignment_email")
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discount,
+        contract=contract_1,
+        assigned_email="original@example.com",
+        email_message_id="old-message-id",
+        email_status="failed",
+        email_status_event_timestamp=now_in_utc(),
+        last_reminder_sent_on=now_in_utc(),
+    )
+
+    reassign_url = reverse(
+        "b2b:b2b-manager-org-contract-reassign-code",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.put(
+        reassign_url,
+        data={"email": "new@example.com"},
+        format="json",
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    resp_data = resp.json()
+    assert resp_data["email_status"] == EMAIL_STATUS_PENDING
+    assert resp_data["last_sent"] is None
+
+
 def test_reassign_code_name_defaults_to_empty(org_setup, manager_drf_client, mocker):
     """Reassigning a code without a name stores an empty string for assigned_name."""
     mocker.patch("b2b.views.v0.manager.queue_send_enrollment_code_assignment_email")
@@ -2115,6 +2193,7 @@ def test_assign_codes_and_send_emails_creates_records(org_setup, mock_email_task
     assert record.assigned_name == "Test Learner"
     assert record.assigned_by == manager_user
     assert record.contract == contract_1
+    assert record.email_status == EMAIL_STATUS_PENDING
 
 
 def test_assign_codes_and_send_emails_queues_email_with_record_ids(
@@ -2231,4 +2310,5 @@ def test_assign_codes_and_send_emails_timestamps_are_set(org_setup, mock_email_t
     )
     assert record.created_on is not None
     assert record.updated_on is not None
-    assert record.last_reminder_sent_on is not None
+    # Since email sending happens in a task, this value should remain unset between creation and that task executing
+    assert record.last_reminder_sent_on is None

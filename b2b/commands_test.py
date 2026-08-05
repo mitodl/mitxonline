@@ -33,7 +33,10 @@ def _create_run_with_product_and_discount(contract, *, with_enrollment=False):
 def test_b2b_courseware_remove_run_without_enrollments_unlinks_and_deactivates(mocker):
     """Removing a run with no enrollments should unlink it and deactivate related objects."""
 
-    mocker.patch("b2b.management.commands.b2b_courseware.update_edx_course")
+    # b2b_courseware pushes dates through courses.retirement now, shared with
+    # retire_courserun. Patch the edX boundary rather than the helper, so the
+    # payload-building logic still runs under test.
+    mocker.patch("courses.retirement.update_edx_course")
 
     contract = ContractPageFactory.create()
     run, product, discount = _create_run_with_product_and_discount(
@@ -69,7 +72,10 @@ def test_b2b_courseware_remove_run_with_enrollments_keeps_contract_and_deactivat
 ):
     """Removing a run with enrollments should keep contract link but deactivate run/products/codes."""
 
-    mocker.patch("b2b.management.commands.b2b_courseware.update_edx_course")
+    # b2b_courseware pushes dates through courses.retirement now, shared with
+    # retire_courserun. Patch the edX boundary rather than the helper, so the
+    # payload-building logic still runs under test.
+    mocker.patch("courses.retirement.update_edx_course")
 
     contract = ContractPageFactory.create()
     run, product, discount = _create_run_with_product_and_discount(
@@ -105,7 +111,10 @@ def test_b2b_courseware_remove_run_does_not_delete_used_discount_order_redemptio
 ):
     """Discounts that have been used for an order should not be deleted."""
 
-    mocker.patch("b2b.management.commands.b2b_courseware.update_edx_course")
+    # b2b_courseware pushes dates through courses.retirement now, shared with
+    # retire_courserun. Patch the edX boundary rather than the helper, so the
+    # payload-building logic still runs under test.
+    mocker.patch("courses.retirement.update_edx_course")
 
     contract = ContractPageFactory.create()
     run, product, discount = _create_run_with_product_and_discount(
@@ -128,7 +137,10 @@ def test_b2b_courseware_remove_run_does_not_delete_used_discount_contract_attach
 ):
     """Discounts that have been used to attach a user to a contract should not be deleted."""
 
-    mocker.patch("b2b.management.commands.b2b_courseware.update_edx_course")
+    # b2b_courseware pushes dates through courses.retirement now, shared with
+    # retire_courserun. Patch the edX boundary rather than the helper, so the
+    # payload-building logic still runs under test.
+    mocker.patch("courses.retirement.update_edx_course")
 
     contract = ContractPageFactory.create()
     run, product, discount = _create_run_with_product_and_discount(

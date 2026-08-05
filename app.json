@@ -138,14 +138,6 @@
       "description": "Expose the OIDC login functionality.",
       "required": false
     },
-    "FASTLY_AUTH_TOKEN": {
-      "description": "Optional token for the Fastly purge API.",
-      "required": false
-    },
-    "FASTLY_URL": {
-      "description": "The URL to the Fastly API.",
-      "required": false
-    },
     "GA_TRACKING_ID": {
       "description": "Google analytics tracking ID",
       "required": false
@@ -482,6 +474,14 @@
       "description": "The execution environment that the app is in (e.g. dev, staging, prod)",
       "required": true
     },
+    "MITX_ONLINE_FASTLY_AUTH_TOKEN": {
+      "description": "Optional token for the Fastly purge API.",
+      "required": false
+    },
+    "MITX_ONLINE_FASTLY_URL": {
+      "description": "The URL to the Fastly API.",
+      "required": false
+    },
     "MITX_ONLINE_FROM_EMAIL": {
       "description": "E-mail to use for the from field",
       "required": false
@@ -544,6 +544,10 @@
     },
     "MIT_LEARN_DASHBOARD_URL": {
       "description": "Dashboard URL for UAI enrollment emails",
+      "required": false
+    },
+    "MIT_LEARN_FASTLY_SERVICE_ID": {
+      "description": "Fastly service ID for the MIT Learn frontend, used for surrogate key (tag) purging.",
       "required": false
     },
     "MIT_LEARN_FROM_EMAIL": {

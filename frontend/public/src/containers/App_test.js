@@ -98,7 +98,7 @@ describe("Top-level App", () => {
     sinon.assert.calledOnce(removeStoredUserMessageStub)
   })
 
-  it("does not call cartItemsCountQuery for unauthenticated users", async () => {
+  it("calls cartItemsCountQuery for unauthenticated users too", async () => {
     helper.handleRequestStub.returns(anonymousUser)
     await renderPage()
     // Should call /api/users/me to get user data
@@ -107,8 +107,9 @@ describe("Top-level App", () => {
       "/api/v0/users/current_user/",
       "GET"
     )
-    // Should NOT call the cart items count API for unauthenticated users
-    sinon.assert.neverCalledWith(
+    // Should also call the cart items count API for unauthenticated users,
+    // so the header badge works for anonymous carts
+    sinon.assert.calledWith(
       helper.handleRequestStub,
       "/api/checkout/basket_items_count/",
       "GET"
