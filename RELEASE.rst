@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 1.162.2
+---------------
+
+- 12036 update mitxonline internal links to product pages to point to learn (#3795)
+- B2B Enrollment email deliverability indications via webhooks (#3775)
+- Support multiple payment gateways (#3751)
+- Guarantee enrollment fixture covers programs with and without run enrollments (#3812)
+- Add CyberSource export compliance app and legal address profile fields (#3785)
+
 Version 1.162.1 (Released August 05, 2026)
 ---------------
 
