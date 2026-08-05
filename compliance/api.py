@@ -95,8 +95,22 @@ def _normalize_administrative_area(
     return normalized_state
 
 
-def _validate_bill_to_fields(user, bill_to: dict[str, str]) -> None:
-    """Raise a clear error when required CyberSource bill-to fields are missing."""
+# Maps CyberSource bill-to field names to the profile field names an API
+# consumer should show the user as missing.
+BILL_TO_FIELD_TO_PROFILE_FIELD = {
+    "first_name": "first_name",
+    "last_name": "last_name",
+    "email": "email",
+    "address1": "street_address_1",
+    "locality": "city",
+    "country": "country",
+    "administrative_area": "state",
+    "postal_code": "postal_code",
+}
+
+
+def _missing_bill_to_fields(bill_to: dict[str, str]) -> list[str]:
+    """Return the CyberSource bill-to field names missing from the given data."""
     missing_fields = []
 
     if not bill_to.get("first_name"):
@@ -110,12 +124,18 @@ def _validate_bill_to_fields(user, bill_to: dict[str, str]) -> None:
 
     missing_fields.extend(field for field in required_fields if not bill_to.get(field))
 
+    return missing_fields
+
+
+def _validate_bill_to_fields(user, bill_to: dict[str, str]) -> None:
+    """Raise a clear error when required CyberSource bill-to fields are missing."""
+    missing_fields = _missing_bill_to_fields(bill_to)
     if missing_fields:
         raise ExportComplianceDataError(user, missing_fields)
 
 
-def _build_export_payload(user) -> Any:
-    """Build the CyberSource export compliance REST request payload."""
+def _build_bill_to(user) -> dict[str, str]:
+    """Build the CyberSource bill-to fields from a user's legal address."""
     try:
         legal_address = user.legal_address
     except ObjectDoesNotExist:
@@ -145,6 +165,24 @@ def _build_export_payload(user) -> Any:
     if legal_address and legal_address.postal_code:
         bill_to["postal_code"] = legal_address.postal_code
 
+    return bill_to
+
+
+def get_missing_export_compliance_fields(user) -> list[str]:
+    """Return the profile field names required for an export compliance check that are missing."""
+    bill_to = _build_bill_to(user)
+    missing_bill_to_fields = _missing_bill_to_fields(bill_to)
+    return sorted(
+        {
+            BILL_TO_FIELD_TO_PROFILE_FIELD[field]
+            for field in missing_bill_to_fields
+        }
+    )
+
+
+def _build_export_payload(user) -> Any:
+    """Build the CyberSource export compliance REST request payload."""
+    bill_to = _build_bill_to(user)
     _validate_bill_to_fields(user, bill_to)
 
     return ValidateExportComplianceRequest(
