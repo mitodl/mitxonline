@@ -6,7 +6,6 @@ from b2b.api import create_contract_run_key
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.tasks import (
     create_program_contract_runs,
-    queue_process_mailgun_webhook_for_enrollment_code_emails,
 )
 from courses.factories import CourseFactory, CourseRunFactory, ProgramFactory
 from courses.models import ProgramRequirement, ProgramRequirementNodeType
@@ -354,20 +353,3 @@ def test_create_program_contract_runs_logging_output(mocker):
     assert final_call[0][3] == 1
     assert final_call[0][4] == 0
     assert final_call[0][5] == 0
-
-
-def test_queue_process_mailgun_webhook_for_enrollment_code_emails_calls_processor(
-    mocker,
-):
-    """The task should just be a thin wrapper delegating to the api function."""
-    mock_processor = mocker.patch(
-        "b2b.api.process_mailgun_webhook_for_enrollment_code_emails"
-    )
-    payload = {"event-data": {"event": "delivered"}}
-
-    result = queue_process_mailgun_webhook_for_enrollment_code_emails.apply(
-        args=[payload]
-    )
-
-    assert result.successful()
-    mock_processor.assert_called_once_with(payload)
