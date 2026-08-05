@@ -55,6 +55,5 @@ open_spectacular_settings = {
     ],
     "PREPROCESSING_HOOKS": [
         "openapi.hooks.exclude_paths_hook",
-        "openapi.hooks.insert_wagtail_pages_schema",
     ],
 }
