@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('ecommerce', '0040_refund_request'),
+        ('ecommerce', '0042_refund_request'),
     ]
 
     operations = [

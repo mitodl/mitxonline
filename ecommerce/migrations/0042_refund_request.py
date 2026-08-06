@@ -7,7 +7,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("ecommerce", "0039_add_b2b_gsheet_index_to_discount"),
+        ("ecommerce", "0041_add_gateway_type_and_stripe_log"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
