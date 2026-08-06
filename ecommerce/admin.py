@@ -383,10 +383,10 @@ class RefundRequestAdmin(TimestampedModelAdmin):
         "updated_on",
     )
 
-    def has_add_permission(self, request):
+    def has_add_permission(self, _request):
         return False
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, _request, _obj=None):
         return False
 
 
