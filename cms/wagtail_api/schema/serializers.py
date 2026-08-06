@@ -155,6 +155,15 @@ class CertificatePageSerializer(serializers.Serializer):
     signatory_items = SignatoryItemSerializer(many=True)
 
 
+class CertificatePageListSerializer(serializers.Serializer):
+    """
+    Serializer for a list of certificate pages.
+    """
+
+    meta = PageListMetaSerializer()
+    items = CertificatePageSerializer(many=True)
+
+
 class CoursePageItemSerializer(serializers.ModelSerializer):
     """
     Serializer for individual course page items, including all relevant fields.
@@ -205,6 +214,15 @@ class CoursePageItemSerializer(serializers.ModelSerializer):
     course_details = CourseSerializer()
     topic_list = TopicSerializer(many=True)
     how_youll_learn = HowYoullLearnSerializer(many=True)
+
+
+class CoursePageListSerializer(serializers.Serializer):
+    """
+    Serializer for a list of course pages, including metadata and items.
+    """
+
+    meta = PageListMetaSerializer()
+    items = CoursePageItemSerializer(many=True)
 
 
 class ProgramPageItemSerializer(serializers.ModelSerializer):
@@ -262,3 +280,12 @@ class ProgramPageItemSerializer(serializers.ModelSerializer):
     certificate_page = CertificatePageSerializer()
     program_details = ProgramSerializer()
     how_youll_learn = HowYoullLearnSerializer(many=True)
+
+
+class ProgramPageListSerializer(serializers.Serializer):
+    """
+    Serializer for a list of program pages, including metadata and items.
+    """
+
+    meta = PageListMetaSerializer()
+    items = ProgramPageItemSerializer(many=True)

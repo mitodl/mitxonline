@@ -391,6 +391,60 @@ paths:
               schema:
                 $ref: '#/components/schemas/PageDetail'
           description: ''
+  /api/v2/pages/?fields=*&type=cms.certificatepage:
+    get:
+      operationId: pages_?fields=*&type=cms.certificatepage_retrieve
+      description: Returns pages of type cms.CertificatePage
+      summary: List all Certificate Pages
+      tags:
+      - pages
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificatePageList'
+          description: ''
+  /api/v2/pages/?fields=*&type=cms.coursepage:
+    get:
+      operationId: pages_?fields=*&type=cms.coursepage_retrieve
+      description: Returns pages of type cms.CoursePage
+      summary: List all Course Pages
+      parameters:
+      - in: query
+        name: readable_id
+        schema:
+          type: string
+        description: filter by course readable_id
+      tags:
+      - pages
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoursePageList'
+          description: ''
+  /api/v2/pages/?fields=*&type=cms.programpage:
+    get:
+      operationId: pages_?fields=*&type=cms.programpage_retrieve
+      description: Returns pages of type cms.ProgramPage
+      summary: List all Program Pages
+      parameters:
+      - in: query
+        name: readable_id
+        schema:
+          type: string
+        description: filter by program readable_id
+      tags:
+      - pages
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgramPageList'
+          description: ''
   /api/v2/pages/find/:
     get:
       operationId: pages_find_retrieve
@@ -802,6 +856,19 @@ components:
       - product_name
       - signatory_items
       - title
+    CertificatePageList:
+      type: object
+      description: Serializer for a list of certificate pages.
+      properties:
+        meta:
+          $ref: '#/components/schemas/PageListMeta'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CertificatePage'
+      required:
+      - items
+      - meta
     CertificatePageModel:
       type: object
       description: Extends the CertificatePageSerializer to work with a model object.
@@ -1045,6 +1112,19 @@ components:
       - topic_list
       - video_url
       - what_you_learn
+    CoursePageList:
+      type: object
+      description: Serializer for a list of course pages, including metadata and items.
+      properties:
+        meta:
+          $ref: '#/components/schemas/PageListMeta'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CoursePageItem'
+      required:
+      - items
+      - meta
     CourseRunCertificate:
       type: object
       description: CourseRunCertificate model serializer
@@ -2268,6 +2348,20 @@ components:
       - title
       - video_url
       - what_you_learn
+    ProgramPageList:
+      type: object
+      description: Serializer for a list of program pages, including metadata and
+        items.
+      properties:
+        meta:
+          $ref: '#/components/schemas/PageListMeta'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProgramPageItem'
+      required:
+      - items
+      - meta
     PublicUser:
       type: object
       description: Serializer for public user data
