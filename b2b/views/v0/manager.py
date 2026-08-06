@@ -438,7 +438,15 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                     contract_redemptions__redeemed_on__isnull=True
                 )
             elif status_filter == EMAIL_STATUS_FAILED:
-                filter_q &= Q(contract_redemptions__email_status=EMAIL_STATUS_FAILED)
+                # A failed invite email only matters if the code hasn't since
+                # been redeemed some other way - exclude redeemed codes here.
+                # We shouldn't really be in this state under normal operation,
+                # but it could happen if we give a user their code out of band.
+                filter_q &= (
+                    Q(contract_redemptions__email_status=EMAIL_STATUS_FAILED)
+                    & Q(contract_redemptions__user__isnull=True)
+                    & Q(contract_redemptions__redeemed_on__isnull=True)
+                )
 
             discounts = (
                 contract.get_discounts()
