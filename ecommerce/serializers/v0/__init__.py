@@ -20,7 +20,14 @@ from ecommerce.constants import (
     PAYMENT_TYPES,
     TRANSACTION_TYPE_REFUND,
 )
-from ecommerce.models import Basket, BasketItem, Order, OrderStatus, Product, RefundRequest
+from ecommerce.models import (
+    Basket,
+    BasketItem,
+    Order,
+    OrderStatus,
+    Product,
+    RefundRequest,
+)
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from main.constants import (
     USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,

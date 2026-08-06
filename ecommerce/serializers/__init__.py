@@ -917,5 +917,3 @@ class OrderReceiptSerializer(serializers.ModelSerializer):
     class Meta:
         fields = ["purchaser", "lines", "coupon", "order", "receipt"]
         model = models.Order
-
-

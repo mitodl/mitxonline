@@ -1658,5 +1658,5 @@ ECOMMERCE_DEFAULT_PAYMENT_GATEWAY = get_string(
     description="The default payment gateway to use. Must match the value of the constant in the mitol.payment_gateway library.",
 )
 
-if ECOMMERCE_DEFAULT_PAYMENT_GATEWAY == "None":  # noqa: F405
+if ECOMMERCE_DEFAULT_PAYMENT_GATEWAY == "None":
     ECOMMERCE_DEFAULT_PAYMENT_GATEWAY = MITOL_PAYMENT_GATEWAY_CYBERSOURCE
