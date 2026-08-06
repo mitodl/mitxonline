@@ -32,7 +32,7 @@ x-extra-hosts:
 
 services:
   db:
-    image: postgres:15.16
+    image: postgres:15.16@sha256:2bc89eed5490967e6b1fa5175d84cb45d65f19fbb8973c7b23450dea785b9505
     ports:
       - "5432"
     environment:
@@ -177,7 +177,7 @@ services:
       - "8080:8080"
 
   varnish:
-    image: varnish:fresh
+    image: varnish:fresh@sha256:5bc4e05a10570fb234fff01d13eb25ecac697f5c66a2c26ba7353ce491ac5500
     links:
       - nginx
     ports:
@@ -188,7 +188,7 @@ services:
       - nginx
 
   keycloak:
-    image: quay.io/keycloak/keycloak:latest
+    image: quay.io/keycloak/keycloak:latest@sha256:2eb3cd316835c990e69e26ade292ffa78f6fb0db7d5fc6377463c162e1979ac0
     profiles:
       - keycloak
     depends_on:
@@ -216,7 +216,7 @@ services:
       - ./config/keycloak/realms:/opt/keycloak/data/import
 
   api:
-    image: apache/apisix:latest
+    image: apache/apisix:latest@sha256:f307376987ee07cc8f183dee648d70c07eaa2e34cb78bc08dda0ade6956a8f87
     profiles:
       - apisix
     environment:
@@ -238,13 +238,13 @@ services:
   coordinator:
     profiles:
       - verifiable-creds
-    image: digitalcredentials/issuer-coordinator:1.0.0
+    image: digitalcredentials/issuer-coordinator:1.0.0@sha256:8610376d4c35420e1c780f90c9b6402ebcfa965ee0e67383493dde31afa95a91
     ports:
       - "4005:4005"
   signer:
     profiles:
       - verifiable-creds
-    image: digitalcredentials/signing-service:1.2.0
+    image: digitalcredentials/signing-service:1.2.0@sha256:2a2e2fe4f4782b5c62783fc06d8b3931e95f3873779df34a2aa441545eaa3446
 
 
 volumes:
