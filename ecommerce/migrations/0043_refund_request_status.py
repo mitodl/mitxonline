@@ -4,15 +4,22 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('ecommerce', '0042_refund_request'),
+        ("ecommerce", "0042_refund_request"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='refundrequest',
-            name='status',
-            field=models.CharField(choices=[('pending', 'Pending'), ('approved', 'Approved'), ('denied', 'Denied')], default='pending', max_length=20),
+            model_name="refundrequest",
+            name="status",
+            field=models.CharField(
+                choices=[
+                    ("pending", "Pending"),
+                    ("approved", "Approved"),
+                    ("denied", "Denied"),
+                ],
+                default="pending",
+                max_length=20,
+            ),
         ),
     ]

@@ -370,7 +370,15 @@ class RefundRequestAdmin(TimestampedModelAdmin):
     """Admin for learner-submitted refund requests. Status is editable; all other fields are read-only."""
 
     model = RefundRequest
-    list_display = ("id", "user", "order", "refund_reason", "status", "consent_given", "created_on")
+    list_display = (
+        "id",
+        "user",
+        "order",
+        "refund_reason",
+        "status",
+        "consent_given",
+        "created_on",
+    )
     list_filter = ("status", "refund_reason")
     search_fields = ("user__email", "order__reference_number")
     readonly_fields = (
