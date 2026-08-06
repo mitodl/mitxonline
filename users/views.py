@@ -36,6 +36,7 @@ log = logging.getLogger(__name__)
 class UserRetrieveViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """User retrieve viewsets"""
 
+    versioning_class = V0Versioning
     queryset = User.objects.all()
     serializer_class = PublicUserSerializer
     permission_classes = [IsAuthenticatedOrTokenHasScope, UserIsOwnerPermission]
@@ -47,6 +48,7 @@ class CurrentUserRetrieveUpdateViewSet(
 ):
     """User retrieve and update viewsets for the current user"""
 
+    versioning_class = V0Versioning
     # NOTE: this is a separate viewset from UserRetrieveViewSet because of the differences in permission requirements
     serializer_class = UserSerializer
     permission_classes = []
@@ -116,6 +118,7 @@ class ChangeEmailRequestViewSet(
 ):
     """Viewset for creating and updating email change requests"""
 
+    versioning_class = V0Versioning
     lookup_field = "code"
 
     def get_permissions(self):
@@ -146,6 +149,7 @@ class ChangeEmailRequestViewSet(
 class CountriesStatesViewSet(viewsets.GenericViewSet, GenericAPIView):
     """Retrieve viewset of countries, with states/provinces for US and Canada"""
 
+    versioning_class = V0Versioning
     permission_classes = []
     serializer_class = CountrySerializer
 
@@ -165,6 +169,7 @@ class UsersViewSet(viewsets.ReadOnlyModelViewSet):
     dashboard.
     """
 
+    versioning_class = V0Versioning
     serializer_class = StaffDashboardUserSerializer
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAdminUser]

@@ -106,6 +106,11 @@ def exclude_paths_hook(endpoints, **kwargs):  # noqa: ARG001
         "/api/internal/",
         "/api/v0/b2b/webhook",
         "/webhook/",
+        # Learner records: unversioned paths under /api/records/, consumed only by
+        # our own hand-written redux-query code, which doesn't read the spec.
+        "/api/records/",
+        # Enrollment form-post/redirect target, outside the /api/ REST surface.
+        "/enrollments/",
     ]
 
     # Filter out endpoints whose paths start with any of the excluded prefixes

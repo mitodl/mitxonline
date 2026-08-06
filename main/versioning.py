@@ -4,15 +4,24 @@ from rest_framework import exceptions
 from rest_framework.versioning import NamespaceVersioning
 
 
-class _FallbackNamespaceVersioning(NamespaceVersioning):
+class FallbackNamespaceVersioning(NamespaceVersioning):
     """
     Like NamespaceVersioning, but falls back to `default_version`
     instead of raising NotFound when the resolved namespace doesn't
-    match any allowed version. Real request-time behavior is
-    unaffected (nothing reads request.version today) - this exists for
-    views whose real, load-bearing namespace (used elsewhere for
-    `reverse()`) can't be changed to match a version namespace, so
-    schema generation needs an explicit per-view override instead.
+    match any allowed version.
+
+    This is the project-wide default (see DEFAULT_VERSIONING_CLASS).
+    Plain NamespaceVersioning would 404 every DRF view whose namespace
+    isn't in ALLOWED_VERSIONS - and plenty of ours aren't, because a
+    namespace is load-bearing for `reverse()` (b2b's "b2b", Wagtail's
+    "wagtailapi:images") and can't be renamed to a version. With
+    `default_version` left as DEFAULT_VERSION (None), those views get
+    `request.version = None`, which is exactly what they got before
+    versioning was switched on, and nothing reads request.version.
+
+    Subclass it with an explicit `default_version` to attribute such a
+    view to a spec, since schema generation matches on version and None
+    matches nothing.
     """
 
     def determine_version(self, request, *args, **kwargs):
@@ -22,7 +31,7 @@ class _FallbackNamespaceVersioning(NamespaceVersioning):
             return self.default_version
 
 
-class V0Versioning(_FallbackNamespaceVersioning):
+class V0Versioning(FallbackNamespaceVersioning):
     """
     b2b's views live under namespace "b2b" (relied on by reverse()
     calls throughout its test suite), not "v0". Used directly on b2b's
@@ -33,7 +42,7 @@ class V0Versioning(_FallbackNamespaceVersioning):
     default_version = "v0"
 
 
-class V2Versioning(_FallbackNamespaceVersioning):
+class V2Versioning(FallbackNamespaceVersioning):
     """
     Wagtail's own router puts its real pages viewset under a namespace
     we don't control (`wagtailapi:pages`), which will never be in
