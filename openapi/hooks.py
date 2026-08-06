@@ -119,3 +119,38 @@ def exclude_paths_hook(endpoints, **kwargs):  # noqa: ARG001
         for (path, path_regex, method, callback) in endpoints
         if not any(path.startswith(prefix) for prefix in EXCLUDED_PATHS)
     ]
+
+
+def insert_wagtail_pages_schema(endpoints, **kwargs):  # noqa: ARG001
+    """
+    Publish one operation per Wagtail page type filter.
+
+    Wagtail serves every page type from `/api/v2/pages/` discriminated by a
+    `?type=` query parameter, and OpenAPI cannot key an operation on a query
+    string - so these operations are appended here rather than routed. The
+    views carry `SchemaOnlyV2Versioning`, which keeps them in v2.yaml only.
+
+    See `cms.wagtail_api.schema.views` for why the paths look like this and
+    why the operation ids must stay path-derived.
+    """
+    from cms.wagtail_api.schema.views import (  # noqa: PLC0415
+        WagtailCertificatePagesSchemaView,
+        WagtailCoursePagesSchemaView,
+        WagtailProgramPagesSchemaView,
+    )
+
+    type_filters = [
+        ("cms.certificatepage", WagtailCertificatePagesSchemaView),
+        ("cms.coursepage", WagtailCoursePagesSchemaView),
+        ("cms.programpage", WagtailProgramPagesSchemaView),
+    ]
+
+    for page_type, view_class in type_filters:
+        path = f"/api/v2/pages/?fields=*&type={page_type}"
+        callback = view_class.as_view()
+        # drf-spectacular reads `.cls` off the callback to build the view it
+        # introspects; as_view() only sets `.cls` for DRF's own routers.
+        callback.cls = view_class
+        endpoints.append((path, f"^{path.lstrip('/')}$", "GET", callback))
+
+    return endpoints

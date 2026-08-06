@@ -1,7 +1,7 @@
 """Custom DRF versioning schemes."""
 
 from rest_framework import exceptions
-from rest_framework.versioning import NamespaceVersioning
+from rest_framework.versioning import NamespaceVersioning, URLPathVersioning
 
 
 class FallbackNamespaceVersioning(NamespaceVersioning):
@@ -50,3 +50,25 @@ class V2Versioning(FallbackNamespaceVersioning):
     """
 
     default_version = "v2"
+
+
+class SchemaOnlyV2Versioning(URLPathVersioning):
+    """
+    Pins a synthetic, schema-only view to v2.
+
+    For operations injected by a drf-spectacular preprocessing hook at a
+    "path" that is not a real URL - the Wagtail pages type filters, whose
+    path carries a query string. A NamespaceVersioning subclass is wrong
+    here: drf-spectacular resolves the path against the URLconf to find
+    the namespace, and a non-URL path raises Resolver404, which emits a
+    spectacular error and fails `--fail-on-warn`. URLPathVersioning skips
+    that resolution, and reporting `default_version` unconditionally puts
+    the operation in exactly one spec.
+
+    These views are never routed, so this has no request-time meaning.
+    """
+
+    default_version = "v2"
+
+    def determine_version(self, request, *args, **kwargs):  # noqa: ARG002
+        return self.default_version
