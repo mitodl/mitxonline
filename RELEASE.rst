@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.162.2
+Version 1.162.2 (Released August 06, 2026)
 ---------------
 
 - 12036 update mitxonline internal links to product pages to point to learn (#3795)
