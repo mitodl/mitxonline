@@ -56,6 +56,7 @@ from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from flexiblepricing.models import FlexiblePrice
+from main.utils import get_learn_product_url
 
 pytestmark = [pytest.mark.django_db]
 
@@ -746,7 +747,9 @@ def test_homepage_featured_products(settings, mocker):
             "description": enrollable_future_course_page.description,
             "feature_image": enrollable_future_course_page.feature_image,
             "start_date": enrollable_future_courserun.start_date,
-            "url_path": enrollable_future_course_page.get_url(),
+            "url_path": get_learn_product_url(
+                "courses", enrollable_future_course.readable_id
+            ),
             "is_program": enrollable_future_course_page.is_program_page,
             "is_self_paced": False,
             "program_type": None,
@@ -779,7 +782,9 @@ def test_homepage_featured_products(settings, mocker):
             "description": enrollable_future_course_with_no_enrollment_end_page.description,
             "feature_image": enrollable_future_course_with_no_enrollment_end_page.feature_image,
             "start_date": enrollable_future_courserun_with_no_enrollment_end.start_date,
-            "url_path": enrollable_future_course_with_no_enrollment_end_page.get_url(),
+            "url_path": get_learn_product_url(
+                "courses", enrollable_future_course_with_no_enrollment_end.readable_id
+            ),
             "is_program": enrollable_future_course_with_no_enrollment_end_page.is_program_page,
             "is_self_paced": False,
             "program_type": None,

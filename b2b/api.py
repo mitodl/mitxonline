@@ -1,7 +1,10 @@
 """API functions for B2B operations."""
 
+import hashlib
+import hmac
 import logging
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Union
 from uuid import uuid4
@@ -15,6 +18,8 @@ from django.db import transaction
 from django.db.models import Count, Manager, Prefetch, Q
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ValidationError as PydanticValidationError
 from wagtail.models import Page
 
 from b2b.constants import (
@@ -29,9 +34,14 @@ from b2b.constants import (
 from b2b.exceptions import SourceCourseIncompleteError
 from b2b.keycloak_admin_api import KCAM_ORGANIZATIONS, get_keycloak_model
 from b2b.keycloak_admin_dataclasses import OrganizationRepresentation
+from b2b.mail import ENROLLMENT_CODE_ASSINGMENT_TAG
 from b2b.models import (
+    EMAIL_STATUS_FAILED,
+    EMAIL_STATUS_FAILED_TEMPORARY_SEVERITY,
+    MAILGUN_EMAIL_EVENT_TYPES,
     ContractPage,
     ContractProgramItem,
+    DiscountContractAttachmentRedemption,
     OrganizationIndexPage,
     OrganizationPage,
     UserOrganization,
@@ -1878,3 +1888,128 @@ def process_remove_org_membership(user, organization):
         user=user,
         organization=organization,
     ).get().delete()
+
+
+def verify_mailgun_signature(api_key, token, timestamp, signature):
+    # Cribbed from https://www.mailgun.com/blog/email/your-guide-to-webhooks/.
+    if not settings.MAILGUN_WEBHOOK_VALIDATE_SIGNATURE:
+        return True
+
+    message = f"{timestamp}{token}"
+    expected_signature = hmac.new(
+        key=api_key.encode(), msg=message.encode(), digestmod=hashlib.sha256
+    ).hexdigest()
+    return signature == expected_signature
+
+
+class MailgunWebhookSignature(BaseModel):
+    """The signature block Mailgun attaches to every webhook payload."""
+
+    token: str
+    timestamp: str
+    signature: str
+
+
+class MailgunWebhookMessageHeaders(BaseModel):
+    """The subset of message headers Mailgun includes with an event."""
+
+    model_config = ConfigDict(extra="allow")
+
+    message_id: str = Field(alias="message-id")
+
+
+class MailgunWebhookMessage(BaseModel):
+    """The message block describing the email an event pertains to."""
+
+    model_config = ConfigDict(extra="allow")
+
+    headers: MailgunWebhookMessageHeaders
+
+
+class MailgunWebhookEventData(BaseModel):
+    """The event-data block of a Mailgun webhook payload."""
+
+    model_config = ConfigDict(extra="allow")
+
+    event: str
+    tags: list[str] = Field(default_factory=list)
+    message: MailgunWebhookMessage
+    severity: str | None = None
+    timestamp: float
+
+
+class MailgunWebhookPayload(BaseModel):
+    """A synthetic or real Mailgun webhook payload, as built by build_payload."""
+
+    model_config = ConfigDict(extra="allow")
+
+    signature: MailgunWebhookSignature
+    event_data: MailgunWebhookEventData = Field(alias="event-data")
+
+
+def is_potentially_valid_mailgun_webhook(payload):
+    signing_secret = settings.MAILGUN_WEBHOOK_SIGNING_SECRET
+    # If we are supposed to validate signatures but don't have a secret, fail closed
+    # If we aren't validating signatures (such as in local development w/ synthetic data),
+    # it doesnt matter if we have a secret, treat everything as potentially valid
+    if not signing_secret and settings.MAILGUN_WEBHOOK_VALIDATE_SIGNATURE:
+        return False
+
+    try:
+        webhook = MailgunWebhookPayload.model_validate(payload)
+    except PydanticValidationError:
+        return False
+
+    # Check for the right message tag - if it's not there, do nothing else.
+    # We want to throw out unrelated messages as fast as possible
+    return ENROLLMENT_CODE_ASSINGMENT_TAG in webhook.event_data.tags
+
+
+# We may want to move some of the cheapest checks to the web tier, but the actual queries need to happen in a task.
+def process_mailgun_webhook_for_enrollment_code_emails(payload):
+    if not is_potentially_valid_mailgun_webhook(payload):
+        return None
+
+    signing_secret = settings.MAILGUN_WEBHOOK_SIGNING_SECRET
+    event_data = payload["event-data"]
+    # Now that we've run the cheapest check, validate the event signature.
+    signature_param = payload["signature"]
+    token = signature_param["token"]
+    timestamp = signature_param["timestamp"]
+    signature = signature_param["signature"]
+
+    if not verify_mailgun_signature(signing_secret, token, timestamp, signature):
+        return None
+
+    # We only want to store some email statuses. If it's not one of the ones we care about, we can toss the event
+    event_type = event_data["event"]
+    if event_type not in MAILGUN_EMAIL_EVENT_TYPES:
+        return None
+
+    if event_type == EMAIL_STATUS_FAILED:
+        # This field is only present on temporary and permanent failures.
+        # We don't want to show temporary ones to contract managers since there's nothing to do but wait for resolution
+        severity = event_data.get("severity", "")
+        if severity == EMAIL_STATUS_FAILED_TEMPORARY_SEVERITY:
+            return None
+
+    # At this point we know that the payload is for the email we care about, it's from mailgun, and it's one of the events we care about
+    # Save it to the row corresponding to the event we just got and move on with our lives
+    message_id = event_data["message"]["headers"]["message-id"]
+    message_timestamp = datetime.fromtimestamp(event_data["timestamp"], tz=UTC)
+    assignment = DiscountContractAttachmentRedemption.objects.get(
+        email_message_id=message_id
+    )
+    saved_event_timestamp = assignment.email_status_event_timestamp
+
+    # We want to store event with the most recent timestamp we get from mailgun.
+    # Event receipt/processing is not guaranteed to be chronologically ordered, so this prevents older events from
+    # clobbering ones which actually occurred later.
+    if saved_event_timestamp and saved_event_timestamp >= message_timestamp:
+        return assignment
+
+    assignment.email_status = event_type
+    assignment.email_status_event_timestamp = message_timestamp
+    assignment.save()
+
+    return assignment

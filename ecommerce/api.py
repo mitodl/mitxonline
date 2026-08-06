@@ -2,6 +2,7 @@
 
 import logging
 import uuid
+from datetime import timedelta
 from decimal import Decimal
 from urllib.parse import urljoin
 
@@ -13,9 +14,11 @@ from django.db.models import Q, QuerySet
 from django.urls import reverse
 from ipware import get_client_ip
 from mitol.common.utils.datetime import now_in_utc
+from mitol.olposthog.features import is_enabled
 from mitol.payment_gateway.api import CartItem as GatewayCartItem
 from mitol.payment_gateway.api import Order as GatewayOrder
 from mitol.payment_gateway.api import PaymentGateway, ProcessorResponse
+from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_STRIPE
 
 from b2b.api import (
     get_active_contracts_from_basket_items,
@@ -28,6 +31,8 @@ from ecommerce.constants import (
     ALL_DISCOUNT_TYPES,
     ALL_PAYMENT_TYPES,
     ALL_REDEMPTION_TYPES,
+    CHECKOUT_CANCEL_ROUTE_MAP,
+    CHECKOUT_SUCCESS_ROUTE_MAP,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     PAYMENT_TYPE_SALES,
@@ -35,6 +40,8 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
     REFUND_SUCCESS_STATES,
+    STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+    STRIPE_PAYMENT_STATUSES_GOOD,
     ZERO_PAYMENT_DATA,
 )
 from ecommerce.exceptions import (
@@ -54,11 +61,13 @@ from ecommerce.models import (
     OrderStatus,
     PendingOrder,
     Product,
+    StripeEventLog,
     UserDiscount,
 )
 from ecommerce.tasks import perform_downgrade_from_order
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from hubspot_sync.task_helpers import sync_hubspot_cart_add, sync_hubspot_deal
+from main import features
 from main.constants import (
     USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
     USER_MSG_TYPE_B2B_INVALID_BASKET,
@@ -77,8 +86,32 @@ from openedx.tasks import create_user_from_id
 log = logging.getLogger(__name__)
 
 
-def generate_checkout_payload(  # noqa: PLR0911
-    request, *, skip_discount_check=False, skip_receipt=False
+def get_checkout_success_url(gateway_type):
+    """Get the success endpoint for the gateway type."""
+
+    if gateway_type not in CHECKOUT_SUCCESS_ROUTE_MAP:
+        msg = f"Gateway {gateway_type} has no success route mapped"
+        raise ValidationError(msg)
+
+    return urljoin(
+        settings.SITE_BASE_URL, reverse(CHECKOUT_SUCCESS_ROUTE_MAP[gateway_type])
+    )
+
+
+def get_checkout_cancel_url(gateway_type):
+    """Get the cancel endpoint for the gateway type."""
+
+    if gateway_type not in CHECKOUT_CANCEL_ROUTE_MAP:
+        msg = f"Gateway {gateway_type} has no cancel route mapped"
+        raise ValidationError(msg)
+
+    return urljoin(
+        settings.SITE_BASE_URL, reverse(CHECKOUT_CANCEL_ROUTE_MAP[gateway_type])
+    )
+
+
+def generate_checkout_payload(  # noqa: PLR0911, C901
+    request, *, skip_discount_check=False, skip_receipt=False, gateway_type=None
 ):
     """
     Generate the checkout payload for the current basket.
@@ -87,16 +120,31 @@ def generate_checkout_payload(  # noqa: PLR0911
     enrollment. The discount in that case is attached to the program, not the
     courserun that's being purchased, so it's technically "invalid".
 
+    This will use the default configured gateway unless it is able to determine that the current user should use a specific gateway. This can be
+    overridden by specifying gateway_type.
+
     Args:
     - request: the incoming http request
     Kwargs:
     - skip_discount_check: skip checking discounts for validity (default False)
     - skip_receipt: skip sending order receipt email (default False)
+    - gateway_type: specify specific gateway type (default None)
     """
 
     from b2b.api import validate_basket_for_b2b_purchase  # noqa: PLC0415
 
     basket = establish_basket(request)
+
+    if not gateway_type:
+        global_id = request.user.global_id
+        if global_id and is_enabled(
+            features.STRIPE_ENABLE_FEATURE_FLAG,
+            default=False,
+            opt_unique_id=global_id,
+        ):
+            gateway_type = MITOL_PAYMENT_GATEWAY_STRIPE
+        else:
+            gateway_type = ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 
     if basket.has_user_blocked_products(request.user):
         return {
@@ -145,7 +193,7 @@ def generate_checkout_payload(  # noqa: PLR0911
             "error": USER_MSG_TYPE_BASKET_EMPTY,
         }
 
-    order = PendingOrder.create_from_basket(basket)
+    order = PendingOrder.create_from_basket(basket, gateway_type=gateway_type)
     total_price = 0
 
     ip = get_client_ip(request)[0]
@@ -188,12 +236,11 @@ def generate_checkout_payload(  # noqa: PLR0911
             "order_id": order.id,
         }
 
-    callback_uri = urljoin(settings.SITE_BASE_URL, reverse("checkout-result-callback"))
     payload = PaymentGateway.start_payment(
-        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
+        gateway_type,
         gateway_order,
-        callback_uri,
-        callback_uri,
+        get_checkout_success_url(gateway_type),
+        get_checkout_cancel_url(gateway_type),
         merchant_fields=[basket.id],
     )
 
@@ -449,6 +496,100 @@ def establish_basket(request, *, no_delay=False):
         basket.save()
 
     return basket
+
+
+ANONYMOUS_BASKET_SESSION_KEY = "anonymous_basket_id"
+
+
+def get_anonymous_basket_id(request, *, create=False):
+    """
+    Get the anonymous basket id stored in the request's session, minting one
+    if requested and none exists yet.
+
+    Kwargs:
+        create (bool): mint and store a new id in the session if one isn't
+            already present. Only pass True from call sites that are about to
+            write to the basket - minting an id writes to the session, which
+            forces a Set-Cookie header and defeats caching for anonymous page
+            views that don't need one.
+    """
+    anonymous_id = request.session.get(ANONYMOUS_BASKET_SESSION_KEY)
+
+    if anonymous_id is None and create:
+        anonymous_id = str(uuid.uuid4())
+        request.session[ANONYMOUS_BASKET_SESSION_KEY] = anonymous_id
+
+    return anonymous_id
+
+
+def establish_basket_for_request(request, *, for_update=False):
+    """
+    Get or create the basket for the current request, whether the requester
+    is authenticated or anonymous.
+
+    Kwargs:
+        for_update (bool): re-fetch the basket with select_for_update() so it's
+            locked for the remainder of the caller's transaction. Pass True
+            when the caller is about to mutate basket contents.
+    """
+    if request.user.is_authenticated:
+        basket = establish_basket(request)
+    else:
+        anonymous_id = get_anonymous_basket_id(request, create=True)
+        basket, _ = Basket.objects.get_or_create(anonymous_id=anonymous_id)
+
+    if for_update:
+        basket = Basket.objects.select_for_update().get(pk=basket.pk)
+
+    return basket
+
+
+def claim_anonymous_basket(request):
+    """
+    Convert the anonymous basket identified by the current session into a
+    basket for the now-authenticated request.user.
+
+    If request.user already has a basket, it is discarded in favor of the
+    anonymous basket - the anonymous basket reflects what was just shown on
+    the cart page, and merging would silently change the price the user saw.
+
+    Returns the claimed basket, or None if there's no anonymous basket to
+    claim (e.g. an expired session).
+    """
+    anonymous_id = get_anonymous_basket_id(request, create=False)
+    if anonymous_id is None:
+        return None
+
+    with transaction.atomic():
+        try:
+            anon_basket = Basket.objects.select_for_update().get(
+                anonymous_id=anonymous_id
+            )
+        except Basket.DoesNotExist:
+            return None
+
+        Basket.objects.filter(user=request.user).exclude(pk=anon_basket.pk).delete()
+
+        anon_basket.user = request.user
+        anon_basket.anonymous_id = None
+        anon_basket.save(update_fields=["user", "anonymous_id"])
+
+    del request.session[ANONYMOUS_BASKET_SESSION_KEY]
+    apply_user_discounts(request)
+
+    return anon_basket
+
+
+def cull_anonymous_baskets():
+    """
+    Delete anonymous baskets that haven't been touched in a while (abandoned
+    carts). A basket's anonymous_id is only reachable via its session cookie,
+    so once that cookie could plausibly have expired there's no way for a
+    basket to ever be claimed - it's safe to remove.
+    """
+    cutoff = now_in_utc() - timedelta(seconds=settings.ANONYMOUS_BASKET_CULL_AGE)
+
+    Basket.objects.filter(anonymous_id__isnull=False, updated_on__lt=cutoff).delete()
 
 
 def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs):  # noqa: RUF013
@@ -1111,3 +1252,102 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
         raise VerifiedProgramInvalidOrderError
 
     return courserun.enrollments.filter(user=request.user).get()
+
+
+def log_stripe_event(event, *, order: Order | None = None):
+    """Log a Stripe event."""
+
+    return StripeEventLog.objects.create(
+        event_id=event.id, event_data=event.to_dict(for_json=True), related_order=order
+    )
+
+
+def process_stripe_checkout_completed(event):
+    """Process the checkout completed event."""
+
+    checkout_session = event.data.object
+    order_reference_number = checkout_session.client_reference_id
+    session_id = checkout_session.id
+
+    log.debug(
+        "process_stripe_checkout_completed: processing event %s for checkout session %s (order %s)",
+        event.id,
+        session_id,
+        order_reference_number,
+    )
+
+    # Repeating this here as a reminder: if the order includes a grace/trial
+    # period, the payment_status will still be "paid".
+
+    if (
+        checkout_session.status != STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE
+        or checkout_session.payment_status not in STRIPE_PAYMENT_STATUSES_GOOD
+    ):
+        log.error(
+            "process_stripe_checkout_completed: session %s for order %s ended unsuccessfully: %s - %s",
+            session_id,
+            order_reference_number,
+            checkout_session.status,
+            checkout_session.payment_status,
+        )
+
+        if order_reference_number:
+            order = Order.objects.filter(
+                reference_number=order_reference_number
+            ).first()
+
+            if order:
+                StripeEventLog.objects.filter(event_id=event.id).update(
+                    related_order=order
+                )
+                order.get_object_flow().errored(
+                    api_response_data=event.to_dict(for_json=True)
+                )
+                order.refresh_from_db()
+                return order
+
+        return False
+
+    order = Order.objects.filter(reference_number=order_reference_number).get()
+    StripeEventLog.objects.filter(event_id=event.id).update(related_order=order)
+
+    basket = Basket.objects.filter(user=order.purchaser).first()
+
+    fulfill_completed_order(order, event.to_dict(for_json=True), basket)
+
+    order.refresh_from_db()
+    return order
+
+
+def process_stripe_checkout_expired(event):
+    """
+    Process the checkout expired event.
+
+    Checkout sessions last for a finite amount of time; if the user doesn't
+    complete checkout in enough time, it will expire and we'll need to cancel
+    the order.
+    """
+
+    checkout_session = event.data.object
+    order_reference_number = checkout_session.client_reference_id
+    session_id = checkout_session.id
+
+    log.debug(
+        "process_stripe_checkout_expired: processing event %s for checkout session %s (order %s)",
+        event.id,
+        session_id,
+        order_reference_number,
+    )
+    log.warning(
+        "process_stripe_checkout_expired: checkout session %s for order %s expired - cancelling the in-flight order",
+        session_id,
+        order_reference_number,
+    )
+
+    order = Order.objects.filter(reference_number=order_reference_number).get()
+    StripeEventLog.objects.filter(event_id=event.id).update(related_order=order)
+
+    order.get_object_flow().cancel(api_response_data=event.to_dict(for_json=True))
+
+    order.refresh_from_db()
+    return order

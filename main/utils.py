@@ -26,6 +26,25 @@ if TYPE_CHECKING:
     from rest_framework.response import Response
 
 
+def get_learn_base_url() -> str:
+    """Get the MIT Learn base URL for the current environment."""
+    return settings.MIT_LEARN_BASE_URL
+
+
+def get_learn_product_url(product_type: str, readable_id: str) -> str:
+    """
+    Build the MIT Learn URL for a course or program product page.
+
+    Args:
+        product_type: "courses" or "programs"
+        readable_id: the course or program's readable_id
+
+    Returns:
+        str: the absolute MIT Learn URL for the given product
+    """
+    return f"{get_learn_base_url()}/{product_type}/{readable_id}"
+
+
 def get_js_settings(request: HttpRequest):  # noqa: ARG001
     """
     Get the set of JS settings
@@ -48,13 +67,13 @@ def get_js_settings(request: HttpRequest):  # noqa: ARG001
         "features": {},
         "posthog_api_token": settings.POSTHOG_PROJECT_API_KEY,
         "posthog_api_host": settings.POSTHOG_API_HOST,
-        "unified_ecommerce_url": settings.UNIFIED_ECOMMERCE_URL,
         "oidc_login_url": None,
         "api_gateway_enabled": not settings.MITOL_APIGATEWAY_DISABLE_MIDDLEWARE,
         "mit_learn_dashboard_url": settings.MIT_LEARN_DASHBOARD_URL,
         "mit_learn_terms_url": settings.MIT_LEARN_TERMS_URL,
         "mit_learn_privacy_url": settings.MIT_LEARN_PRIVACY_URL,
         "mit_learn_honor_code_url": settings.MIT_LEARN_HONOR_CODE_URL,
+        "mit_learn_base_url": get_learn_base_url(),
     }
 
 

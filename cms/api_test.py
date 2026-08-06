@@ -34,6 +34,7 @@ from cms.models import (
     ResourcePage,
 )
 from courses.factories import CourseFactory, CourseRunFactory, ProgramFactory
+from main.utils import get_learn_product_url
 
 
 @pytest.mark.django_db
@@ -202,7 +203,9 @@ def test_home_page_featured_products(mocker):
             "description": course_page.description,
             "feature_image": course_page.feature_image,
             "start_date": run.start_date if run is not None else None,
-            "url_path": course_page.get_url(),
+            "url_path": get_learn_product_url(
+                "courses", course_page.product.readable_id
+            ),
             "is_program": False,
             "is_self_paced": run.is_self_paced if run is not None else None,
             "program_type": None,

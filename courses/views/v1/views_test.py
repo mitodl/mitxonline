@@ -76,7 +76,7 @@ from main.constants import (
     USER_MSG_TYPE_ENROLLED,
 )
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
-from main.utils import encode_json_cookie_value
+from main.utils import encode_json_cookie_value, get_learn_product_url
 from openedx.exceptions import NoEdxApiAuthError
 from users.factories import UserFactory
 
@@ -815,10 +815,14 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
         for program_enrollment in program_enrollments
     }
 
-    # assert that we ended up with data
+    # Assert that we ended up with data, covering both cases: a program the user
+    # has course run enrollments in, and one they have none in. Enrolling in a
+    # program does not imply enrolling in its courses, so the response has to be
+    # right either way.
     assert len(program_enrollments) > 0
-    for runs in run_enrollments_by_program_id.values():
-        assert len(runs) > 0
+    runs_per_program = list(run_enrollments_by_program_id.values())
+    assert [runs for runs in runs_per_program if len(runs) > 0]
+    assert [runs for runs in runs_per_program if len(runs) == 0]
 
     resp = user_drf_client.get(reverse("v1:user_program_enrollments_api-list"))
 
@@ -860,7 +864,9 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                         "next_run_id": getattr(course.first_unexpired_run, "id", None),
                         "current_price": None,
                         "page": dict(CoursePageSerializer(course.page).data),
-                        "page_url": None,
+                        "page_url": get_learn_product_url(
+                            "courses", course.readable_id
+                        ),
                         "programs": None,
                         "live": course.live,
                         "effort": course.page.effort,

@@ -5,6 +5,11 @@ import qs from "query-string"
 
 export const getNextParam = (search: string) => qs.parse(search).next || "/"
 
+export const learnProductUrl = (productType: string, readableId: string) => {
+  const base = SETTINGS.mit_learn_base_url || "https://learn.mit.edu"
+  return `${base}/${productType}/${readableId}`
+}
+
 export const routes = {
   root:                   "/",
   dashboard:              "/dashboard/",

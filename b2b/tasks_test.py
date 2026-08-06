@@ -4,7 +4,9 @@ import pytest
 
 from b2b.api import create_contract_run_key
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
-from b2b.tasks import create_program_contract_runs
+from b2b.tasks import (
+    create_program_contract_runs,
+)
 from courses.factories import CourseFactory, CourseRunFactory, ProgramFactory
 from courses.models import ProgramRequirement, ProgramRequirementNodeType
 
@@ -346,7 +348,6 @@ def test_create_program_contract_runs_logging_output(mocker):
 
     final_call = mock_log_info.call_args_list[-1]
     assert "Completed contract run creation" in final_call[0][0]
-
     assert final_call[0][1] == program.readable_id
     assert final_call[0][2] == contract.slug
     assert final_call[0][3] == 1

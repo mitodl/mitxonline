@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 from faker import Faker
 from hubspot.crm.objects import SimplePublicObject
+from nacl.encoding import Base64Encoder
+from nacl.public import PrivateKey
 
 # auto load in fixtures
 pytest_plugins = [
@@ -40,9 +42,26 @@ def mocked_flexibleprice_signal(mocker):
 
 @pytest.fixture(autouse=True)
 def payment_gateway_settings(settings):
+    """Set default CyberSource settings for tests."""
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY = "Test Security Key"
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY = "Test Access Key"
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID = uuid.uuid4()
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_ID = "merchant-id"
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET_KEY_ID = uuid.uuid4().hex
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET = uuid.uuid4().hex
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_REST_API_ENVIRONMENT = (
+        "apitest.cybersource.com"
+    )
+
+
+@pytest.fixture
+def export_compliance_keypair(settings):
+    """Provide an ephemeral NaCl keypair for encrypting/decrypting cached export compliance data in tests."""
+    private_key = PrivateKey.generate()
+    settings.CYBERSOURCE_INQUIRY_LOG_NACL_ENCRYPTION_KEY = Base64Encoder.encode(
+        bytes(private_key.public_key)
+    ).decode("ascii")
+    return private_key
 
 
 @pytest.fixture(autouse=True)

@@ -24,6 +24,7 @@ from courses.factories import (
 )
 from ecommerce.factories import ProductFactory
 from main.test_utils import assert_drf_json_equal
+from main.utils import get_learn_product_url
 
 pytestmark = [pytest.mark.django_db]
 
@@ -59,7 +60,9 @@ def test_serialize_course_page(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": course_page.url,
+            "page_url": get_learn_product_url(
+                "courses", course_page.product.readable_id
+            ),
             "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_page.slug}/",
             "instructors": [],
             "current_price": None,
@@ -102,7 +105,9 @@ def test_serialize_course_page_with_flex_price_with_program_fk_and_parent(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": course_page.url,
+            "page_url": get_learn_product_url(
+                "courses", course_page.product.readable_id
+            ),
             "financial_assistance_form_url": f"{program_page.get_url()}{financial_assistance_form.slug}/",
             "instructors": [],
             "current_price": None,
@@ -144,7 +149,9 @@ def test_serialize_course_page_with_flex_price_with_program_fk_no_parent(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": course_page.url,
+            "page_url": get_learn_product_url(
+                "courses", course_page.product.readable_id
+            ),
             "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_form.slug}/",
             "instructors": [],
             "current_price": None,
@@ -186,7 +193,9 @@ def test_serialize_course_page_with_flex_price_form_as_program_child(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": course_page.url,
+            "page_url": get_learn_product_url(
+                "courses", course_page.product.readable_id
+            ),
             "financial_assistance_form_url": f"{program_page.get_url()}{financial_assistance_page.slug}/",
             "instructors": [],
             "current_price": None,
@@ -225,7 +234,9 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": course_page.url,
+            "page_url": get_learn_product_url(
+                "courses", course_page.product.readable_id
+            ),
             "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_form.slug}/",
             "instructors": [],
             "current_price": None,
@@ -405,7 +416,9 @@ def test_serialize_program_page(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": program_page.url,
+            "page_url": get_learn_product_url(
+                "programs", program_page.product.readable_id
+            ),
             "financial_assistance_form_url": f"{program_page.get_url()}{financial_assistance_form.slug}/",
             "description": bleach.clean(program_page.description, tags={}, strip=True),
             "live": True,
@@ -457,7 +470,9 @@ def test_serialize_program_page__form_child_of_course_with_program_fk(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": program_page.url,
+            "page_url": get_learn_product_url(
+                "programs", program_page.product.readable_id
+            ),
             "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_form.slug}/",
             "description": bleach.clean(program_page.description, tags={}, strip=True),
             "live": True,
@@ -497,7 +512,9 @@ def test_serialize_program_page__with_related_financial_form(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": program_page.url,
+            "page_url": get_learn_product_url(
+                "programs", program_page.product.readable_id
+            ),
             "financial_assistance_form_url": f"{other_program_page.get_url()}{financial_assistance_form.slug}/",
             "description": bleach.clean(program_page.description, tags={}, strip=True),
             "live": True,
@@ -531,7 +548,9 @@ def test_serialize_program_page__no_financial_form(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": program_page.url,
+            "page_url": get_learn_product_url(
+                "programs", program_page.product.readable_id
+            ),
             "financial_assistance_form_url": "",
             "description": bleach.clean(program_page.description, tags={}, strip=True),
             "live": True,
@@ -568,7 +587,9 @@ def test_serialize_program_page__with_related_program_no_financial_form(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": program_page.url,
+            "page_url": get_learn_product_url(
+                "programs", program_page.product.readable_id
+            ),
             "financial_assistance_form_url": "",
             "description": bleach.clean(program_page.description, tags={}, strip=True),
             "live": True,

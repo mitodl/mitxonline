@@ -26,6 +26,7 @@ from ecommerce.serializers.v0 import BaseProductSerializer
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory
 from main.test_utils import assert_drf_json_equal, drf_datetime
+from main.utils import get_learn_product_url
 
 pytestmark = [pytest.mark.django_db]
 
@@ -114,7 +115,7 @@ def test_serialize_course_with_page_fields(
             "id": course.id,
             "type": "course",
             "feature_image_src": fake_image_src,
-            "page_url": None,
+            "page_url": get_learn_product_url("courses", course.readable_id),
             "financial_assistance_form_url": expected_financial_assistance_url,
             "instructors": [],
             "current_price": None,
