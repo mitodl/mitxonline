@@ -4,6 +4,7 @@ from django.db import transaction
 from rest_framework import mixins, viewsets
 
 from hubspot_sync.task_helpers import sync_hubspot_user
+from main.versioning import V0Versioning
 from users.serializers import UserSerializer
 
 
@@ -12,6 +13,7 @@ class CurrentUserRetrieveUpdateViewSet(
 ):
     """User retrieve and update viewsets for the current user"""
 
+    versioning_class = V0Versioning
     serializer_class = UserSerializer
     permission_classes = []
 

@@ -1,0 +1,1341 @@
+openapi: 3.0.3
+info:
+  title: MITx Online API
+  version: 0.0.1 (v3)
+  description: MIT public API
+paths:
+  /api/v3/courses/{course_id}/ol_openedx_outline/:
+    get:
+      operationId: course_outline_retrieve_v3
+      description: Fetch course outline data for the given course key from Open edX.
+      parameters:
+      - in: path
+        name: course_id
+        schema:
+          type: string
+        description: Open edX course key (URL-encoded recommended), e.g. course-v1%3AOpenedX%2BDemoX%2BDemoCourse
+        required: true
+      tags:
+      - courses
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseOutlineResponse'
+              examples:
+                CourseOutlineSuccess:
+                  value:
+                    course_id: course-v1:OpenedX+DemoX+DemoCourse
+                    generated_at: '2026-04-10T07:17:20Z'
+                    modules:
+                    - id: block-v1:OpenedX+DemoX+DemoCourse+type@chapter+block@abc123
+                      title: Module 1
+                      effort_time: 0
+                      effort_activities: 0
+                      counts:
+                        videos: 2
+                        readings: 1
+                        problems: 1
+                        assignments: 0
+                        app_items: 0
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseOutlineBadRequestResponse'
+              examples:
+                InvalidCourseId:
+                  value:
+                    detail: Invalid course_id format. Expected an Open edX course
+                      key.
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseOutlineUpstreamErrorResponse'
+              examples:
+                UpstreamError:
+                  value:
+                    detail: Unable to fetch course outline from Open edX.
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseOutlineServerErrorResponse'
+          description: ''
+  /api/v3/courses/variant_runs/:
+    get:
+      operationId: course_variant_runs_v3
+      description: Fetch variant runs for a course(s) matching the specified filters.
+      parameters:
+      - in: query
+        name: contract
+        schema:
+          type: integer
+        description: Contract to filter by
+        required: true
+      - in: query
+        name: course_id
+        schema:
+          type: array
+          items:
+            type: integer
+        description: Course ID(s) to use
+        required: true
+      - in: query
+        name: industry
+        schema:
+          type: string
+        description: Industry focus to retrieve
+      - in: query
+        name: language
+        schema:
+          type: string
+        description: Language to retrieve
+      - in: query
+        name: length
+        schema:
+          type: string
+        description: Language to retrieve
+      tags:
+      - courses
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CourseVariantRunsResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseVariantRunBadRequest'
+          description: ''
+  /api/v3/enrollments/:
+    get:
+      operationId: user_enrollments_list_v3
+      description: List user enrollments with B2B organization and contract information
+        - API v3. Use ?exclude_b2b=true to filter out enrollments linked to course
+        runs with B2B contracts. Use ?org_id=<id> to filter enrollments by specific
+        B2B organization.
+      parameters:
+      - in: query
+        name: exclude_b2b
+        schema:
+          type: boolean
+        description: Exclude B2B enrollments (enrollments linked to course runs with
+          B2B contracts)
+      - in: query
+        name: org_id
+        schema:
+          type: number
+        description: Filter by B2B organization ID
+      tags:
+      - enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CourseRunEnrollmentV3'
+          description: ''
+    post:
+      operationId: user_enrollments_create_v3
+      description: Create a new user enrollment - API v3
+      tags:
+      - enrollments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CourseRunEnrollmentV3Request'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CourseRunEnrollmentV3Request'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CourseRunEnrollmentV3Request'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseRunEnrollmentV3'
+          description: ''
+  /api/v3/enrollments/{id}/:
+    get:
+      operationId: enrollments_retrieve
+      description: API view set for user enrollments - v3
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course run enrollment.
+        required: true
+      tags:
+      - enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseRunEnrollmentV3'
+          description: ''
+    delete:
+      operationId: user_enrollments_destroy_v3
+      description: Unenroll from a course - API v3
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course run enrollment.
+        required: true
+      tags:
+      - enrollments
+      responses:
+        '204':
+          description: No response body
+  /api/v3/program_enrollments/:
+    get:
+      operationId: v3_program_enrollments_list
+      description: ViewSet for user program enrollments with v3 serializers.
+      tags:
+      - program_enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/V3UserProgramEnrollment'
+          description: ''
+    post:
+      operationId: v3_program_enrollments_create
+      description: |-
+        Create a program enrollment for the authenticated user.
+
+        Returns 200 if the user already has an active enrollment,
+        201 if a new enrollment was created or an inactive one was reactivated.
+      tags:
+      - program_enrollments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/V3ProgramEnrollmentRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/V3ProgramEnrollmentRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/V3ProgramEnrollmentRequestRequest'
+        required: true
+      responses:
+        '201':
+          description: No response body
+  /api/v3/program_enrollments/{program_id}/:
+    get:
+      operationId: v3_program_enrollments_retrieve
+      description: ViewSet for user program enrollments with v3 serializers.
+      parameters:
+      - in: path
+        name: program_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - program_enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V3UserProgramEnrollment'
+          description: ''
+    delete:
+      operationId: v3_program_enrollments_destroy
+      description: |-
+        Unenroll the user from this program.
+
+        Returns 204 No Content. Idempotent - returns 204 even if not currently
+        enrolled. Returns 404 if the program does not exist.
+      parameters:
+      - in: path
+        name: program_id
+        schema:
+          type: integer
+        description: Program ID
+        required: true
+      tags:
+      - program_enrollments
+      responses:
+        '204':
+          description: No response body
+components:
+  schemas:
+    BaseCourseRun:
+      type: object
+      description: Minimal CourseRun model serializer
+      properties:
+        title:
+          type: string
+          description: The title of the course. This value is synced automatically
+            with edX studio.
+          maxLength: 255
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day the course begins. This value is synced automatically
+            with edX studio.
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day the course is active. This value is synced automatically
+            with edX studio.
+        enrollment_start:
+          type: string
+          format: date-time
+          nullable: true
+          description: The first day students can enroll. This value is synced automatically
+            with edX studio.
+        enrollment_end:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day students can enroll. This value is synced automatically
+            with edX studio.
+        expiration_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner should not see link to this
+            course run on their dashboard.
+        courseware_url:
+          type: string
+          nullable: true
+          description: Get the courseware URL
+          readOnly: true
+        courseware_id:
+          type: string
+          maxLength: 255
+        certificate_available_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day certificates should be available to users. This value
+            is synced automatically with edX studio.
+        upgrade_deadline:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner can not enroll in paid course
+            mode.
+        is_upgradable:
+          type: boolean
+          description: Check if the course run is upgradable
+          readOnly: true
+        is_enrollable:
+          type: boolean
+          description: Check if the course run is enrollable
+          readOnly: true
+        is_archived:
+          type: boolean
+          description: Check if the course run is archived
+          readOnly: true
+        is_self_paced:
+          type: boolean
+        run_tag:
+          type: string
+          description: 'A string that identifies the set of runs that this run belongs
+            to (example: ''R2'')'
+          maxLength: 100
+        id:
+          type: integer
+          readOnly: true
+        live:
+          type: boolean
+        course_number:
+          type: string
+          description: Get the course number
+          readOnly: true
+        enrollment_modes:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          description: Get the enrollment modes for the course run
+          readOnly: true
+        language:
+          description: |-
+            ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr'). Leave blank for unspecified.
+
+            * `af_ZA` - af_ZA
+            * `ar` - ar
+            * `az` - az
+            * `bo` - bo
+            * `da` - da
+            * `de` - de
+            * `de_DE` - de_DE
+            * `el` - el
+            * `es_419` - es_419
+            * `es_ES` - es_ES
+            * `en` - en
+            * `fa` - fa
+            * `fr` - fr
+            * `fr_CA` - fr_CA
+            * `he` - he
+            * `hi` - hi
+            * `hu` - hu
+            * `id` - id
+            * `it_IT` - it_IT
+            * `ja` - ja
+            * `ka` - ka
+            * `kk` - kk
+            * `ko` - ko
+            * `lv` - lv
+            * `nl` - nl
+            * `pl` - pl
+            * `pt_BR` - pt_BR
+            * `pt_PT` - pt_PT
+            * `ro` - ro
+            * `ru` - ru
+            * `sq` - sq
+            * `sv` - sv
+            * `sw` - sw
+            * `te` - te
+            * `th` - th
+            * `tr_TR` - tr_TR
+            * `uk` - uk
+            * `uz` - uz
+            * `vi` - vi
+            * `zh_CN` - zh_CN
+            * `zh_HANS` - zh_HANS
+            * `zh_HK` - zh_HK
+          oneOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        is_primary_language:
+          type: boolean
+          description: Designates this run as the primary-language version for its
+            run-tag group. The primary run is used as the canonical run when grouping
+            language variants. If no run in a group is marked primary, the oldest
+            run by creation date is treated as primary.
+        language_label:
+          type: string
+          description: Return the label for the language, using the override if necessary
+          readOnly: true
+        variant_industry:
+          description: |-
+            Variant: Describes the industry the run is adapted for.
+
+            * `` - Original
+            * `E` - Energy
+            * `F` - Finance
+            * `HC` - Healthcare
+          oneOf:
+          - $ref: '#/components/schemas/VariantIndustryEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        variant_length:
+          description: |-
+            Variant: Describes the length of the run (short/long).
+
+            * `` - Full
+            * `S` - Short
+          oneOf:
+          - $ref: '#/components/schemas/VariantLengthEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        course_id:
+          type: integer
+          readOnly: true
+      required:
+      - course_id
+      - course_number
+      - courseware_id
+      - courseware_url
+      - enrollment_modes
+      - id
+      - is_archived
+      - is_enrollable
+      - is_upgradable
+      - language_label
+      - run_tag
+      - title
+    BlankEnum:
+      enum:
+      - ''
+    CourseOutlineBadRequestResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    CourseOutlineModule:
+      type: object
+      description: A single module within a course outline.
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        effort_time:
+          type: integer
+        effort_activities:
+          type: integer
+        counts:
+          $ref: '#/components/schemas/CourseOutlineModuleCounts'
+      required:
+      - counts
+      - effort_activities
+      - effort_time
+      - id
+      - title
+    CourseOutlineModuleCounts:
+      type: object
+      description: Activity counts within a course outline module.
+      properties:
+        videos:
+          type: integer
+        readings:
+          type: integer
+        problems:
+          type: integer
+        assignments:
+          type: integer
+        app_items:
+          type: integer
+      required:
+      - app_items
+      - assignments
+      - problems
+      - readings
+      - videos
+    CourseOutlineResponse:
+      type: object
+      description: Course outline data fetched from Open edX.
+      properties:
+        course_id:
+          type: string
+        generated_at:
+          type: string
+          format: date-time
+        modules:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseOutlineModule'
+      required:
+      - course_id
+      - generated_at
+      - modules
+    CourseOutlineServerErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    CourseOutlineUpstreamErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    CourseRunEnrollmentV3:
+      type: object
+      description: CourseRunEnrollment model serializer
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        edx_emails_subscription:
+          type: boolean
+        certificate:
+          allOf:
+          - $ref: '#/components/schemas/V3CourseRunCertificate'
+          readOnly: true
+          nullable: true
+        enrollment_mode:
+          allOf:
+          - $ref: '#/components/schemas/EnrollmentModeEnum'
+          readOnly: true
+        grades:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseRunGrade'
+          readOnly: true
+        run:
+          allOf:
+          - $ref: '#/components/schemas/CourseRunWithCourseV3'
+          readOnly: true
+        b2b_organization_id:
+          type: integer
+          nullable: true
+          readOnly: true
+        b2b_contract_id:
+          type: integer
+          nullable: true
+          readOnly: true
+      required:
+      - b2b_contract_id
+      - b2b_organization_id
+      - certificate
+      - enrollment_mode
+      - grades
+      - id
+      - run
+    CourseRunEnrollmentV3Request:
+      type: object
+      description: CourseRunEnrollment model serializer
+      properties:
+        edx_emails_subscription:
+          type: boolean
+    CourseRunGrade:
+      type: object
+      description: CourseRunGrade serializer
+      properties:
+        grade:
+          type: number
+          format: double
+          maximum: 1.0
+          minimum: 0.0
+          readOnly: true
+        letter_grade:
+          type: string
+          readOnly: true
+          nullable: true
+          maxLength: 10
+        passed:
+          type: boolean
+          readOnly: true
+        set_by_admin:
+          type: boolean
+          readOnly: true
+        grade_percent:
+          type: number
+          format: double
+          description: Returns the grade field value as a number out of 100 (or Decimal(0)
+            if the value is None)
+          readOnly: true
+      required:
+      - grade
+      - grade_percent
+      - letter_grade
+      - passed
+      - set_by_admin
+    CourseRunWithCourseV3:
+      type: object
+      description: CourseRun serializer
+      properties:
+        title:
+          type: string
+          description: The title of the course. This value is synced automatically
+            with edX studio.
+          maxLength: 255
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day the course begins. This value is synced automatically
+            with edX studio.
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day the course is active. This value is synced automatically
+            with edX studio.
+        enrollment_start:
+          type: string
+          format: date-time
+          nullable: true
+          description: The first day students can enroll. This value is synced automatically
+            with edX studio.
+        enrollment_end:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day students can enroll. This value is synced automatically
+            with edX studio.
+        expiration_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner should not see link to this
+            course run on their dashboard.
+        courseware_url:
+          type: string
+          nullable: true
+          description: Get the courseware URL
+          readOnly: true
+        courseware_id:
+          type: string
+          maxLength: 255
+        certificate_available_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day certificates should be available to users. This value
+            is synced automatically with edX studio.
+        upgrade_deadline:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner can not enroll in paid course
+            mode.
+        is_upgradable:
+          type: boolean
+          description: Check if the course run is upgradable
+          readOnly: true
+        is_enrollable:
+          type: boolean
+          description: Check if the course run is enrollable
+          readOnly: true
+        is_archived:
+          type: boolean
+          description: Check if the course run is archived
+          readOnly: true
+        is_self_paced:
+          type: boolean
+        run_tag:
+          type: string
+          description: 'A string that identifies the set of runs that this run belongs
+            to (example: ''R2'')'
+          maxLength: 100
+        id:
+          type: integer
+          readOnly: true
+        live:
+          type: boolean
+        course_number:
+          type: string
+          description: Get the course number
+          readOnly: true
+        enrollment_modes:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          description: Get the enrollment modes for the course run
+          readOnly: true
+        language:
+          description: |-
+            ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr'). Leave blank for unspecified.
+
+            * `af_ZA` - af_ZA
+            * `ar` - ar
+            * `az` - az
+            * `bo` - bo
+            * `da` - da
+            * `de` - de
+            * `de_DE` - de_DE
+            * `el` - el
+            * `es_419` - es_419
+            * `es_ES` - es_ES
+            * `en` - en
+            * `fa` - fa
+            * `fr` - fr
+            * `fr_CA` - fr_CA
+            * `he` - he
+            * `hi` - hi
+            * `hu` - hu
+            * `id` - id
+            * `it_IT` - it_IT
+            * `ja` - ja
+            * `ka` - ka
+            * `kk` - kk
+            * `ko` - ko
+            * `lv` - lv
+            * `nl` - nl
+            * `pl` - pl
+            * `pt_BR` - pt_BR
+            * `pt_PT` - pt_PT
+            * `ro` - ro
+            * `ru` - ru
+            * `sq` - sq
+            * `sv` - sv
+            * `sw` - sw
+            * `te` - te
+            * `th` - th
+            * `tr_TR` - tr_TR
+            * `uk` - uk
+            * `uz` - uz
+            * `vi` - vi
+            * `zh_CN` - zh_CN
+            * `zh_HANS` - zh_HANS
+            * `zh_HK` - zh_HK
+          oneOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        is_primary_language:
+          type: boolean
+          description: Designates this run as the primary-language version for its
+            run-tag group. The primary run is used as the canonical run when grouping
+            language variants. If no run in a group is marked primary, the oldest
+            run by creation date is treated as primary.
+        language_label:
+          type: string
+          description: Return the label for the language, using the override if necessary
+          readOnly: true
+        variant_industry:
+          description: |-
+            Variant: Describes the industry the run is adapted for.
+
+            * `` - Original
+            * `E` - Energy
+            * `F` - Finance
+            * `HC` - Healthcare
+          oneOf:
+          - $ref: '#/components/schemas/VariantIndustryEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        variant_length:
+          description: |-
+            Variant: Describes the length of the run (short/long).
+
+            * `` - Full
+            * `S` - Short
+          oneOf:
+          - $ref: '#/components/schemas/VariantLengthEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        course_id:
+          type: integer
+          readOnly: true
+        upgrade_product_id:
+          type: integer
+          nullable: true
+          readOnly: true
+        upgrade_product_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+          nullable: true
+          readOnly: true
+        upgrade_product_is_active:
+          type: boolean
+          nullable: true
+          readOnly: true
+        course:
+          allOf:
+          - $ref: '#/components/schemas/CourseV3'
+          readOnly: true
+      required:
+      - course
+      - course_id
+      - course_number
+      - courseware_id
+      - courseware_url
+      - enrollment_modes
+      - id
+      - is_archived
+      - is_enrollable
+      - is_upgradable
+      - language_label
+      - run_tag
+      - title
+      - upgrade_product_id
+      - upgrade_product_is_active
+      - upgrade_product_price
+    CourseRunWithCourseV3Request:
+      type: object
+      description: CourseRun serializer
+      properties:
+        title:
+          type: string
+          minLength: 1
+          description: The title of the course. This value is synced automatically
+            with edX studio.
+          maxLength: 255
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day the course begins. This value is synced automatically
+            with edX studio.
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day the course is active. This value is synced automatically
+            with edX studio.
+        enrollment_start:
+          type: string
+          format: date-time
+          nullable: true
+          description: The first day students can enroll. This value is synced automatically
+            with edX studio.
+        enrollment_end:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day students can enroll. This value is synced automatically
+            with edX studio.
+        expiration_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner should not see link to this
+            course run on their dashboard.
+        courseware_id:
+          type: string
+          minLength: 1
+          maxLength: 255
+        certificate_available_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day certificates should be available to users. This value
+            is synced automatically with edX studio.
+        upgrade_deadline:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner can not enroll in paid course
+            mode.
+        is_self_paced:
+          type: boolean
+        run_tag:
+          type: string
+          minLength: 1
+          description: 'A string that identifies the set of runs that this run belongs
+            to (example: ''R2'')'
+          maxLength: 100
+        live:
+          type: boolean
+        language:
+          description: |-
+            ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr'). Leave blank for unspecified.
+
+            * `af_ZA` - af_ZA
+            * `ar` - ar
+            * `az` - az
+            * `bo` - bo
+            * `da` - da
+            * `de` - de
+            * `de_DE` - de_DE
+            * `el` - el
+            * `es_419` - es_419
+            * `es_ES` - es_ES
+            * `en` - en
+            * `fa` - fa
+            * `fr` - fr
+            * `fr_CA` - fr_CA
+            * `he` - he
+            * `hi` - hi
+            * `hu` - hu
+            * `id` - id
+            * `it_IT` - it_IT
+            * `ja` - ja
+            * `ka` - ka
+            * `kk` - kk
+            * `ko` - ko
+            * `lv` - lv
+            * `nl` - nl
+            * `pl` - pl
+            * `pt_BR` - pt_BR
+            * `pt_PT` - pt_PT
+            * `ro` - ro
+            * `ru` - ru
+            * `sq` - sq
+            * `sv` - sv
+            * `sw` - sw
+            * `te` - te
+            * `th` - th
+            * `tr_TR` - tr_TR
+            * `uk` - uk
+            * `uz` - uz
+            * `vi` - vi
+            * `zh_CN` - zh_CN
+            * `zh_HANS` - zh_HANS
+            * `zh_HK` - zh_HK
+          oneOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        is_primary_language:
+          type: boolean
+          description: Designates this run as the primary-language version for its
+            run-tag group. The primary run is used as the canonical run when grouping
+            language variants. If no run in a group is marked primary, the oldest
+            run by creation date is treated as primary.
+        variant_industry:
+          description: |-
+            Variant: Describes the industry the run is adapted for.
+
+            * `` - Original
+            * `E` - Energy
+            * `F` - Finance
+            * `HC` - Healthcare
+          oneOf:
+          - $ref: '#/components/schemas/VariantIndustryEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        variant_length:
+          description: |-
+            Variant: Describes the length of the run (short/long).
+
+            * `` - Full
+            * `S` - Short
+          oneOf:
+          - $ref: '#/components/schemas/VariantLengthEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+      required:
+      - courseware_id
+      - run_tag
+      - title
+    CourseV3:
+      type: object
+      description: Course serializer
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        readable_id:
+          type: string
+          pattern: ^[\w\-+:\.]+$
+          maxLength: 255
+        type:
+          type: string
+          description: Returns the type of object this is serializing.
+          readOnly: true
+        include_in_learn_catalog:
+          type: boolean
+          description: |-
+            Return true if the course should be included in the Learn catalog.
+
+            This is controlled in the CoursePage for the course, and will default
+            to False if there isn't one.
+          readOnly: true
+      required:
+      - id
+      - include_in_learn_catalog
+      - readable_id
+      - title
+      - type
+    CourseV3Request:
+      type: object
+      description: Course serializer
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        readable_id:
+          type: string
+          minLength: 1
+          pattern: ^[\w\-+:\.]+$
+          maxLength: 255
+      required:
+      - readable_id
+      - title
+    CourseVariantRunBadRequest:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    CourseVariantRunsResponse:
+      type: object
+      description: Serializer for the course variant run API.
+      properties:
+        id:
+          type: integer
+        courseruns:
+          type: array
+          items:
+            $ref: '#/components/schemas/BaseCourseRun'
+      required:
+      - courseruns
+      - id
+    DisplayModeEnum:
+      enum:
+      - course
+      type: string
+      description: '* `course` - course'
+      x-enum-descriptions:
+      - course
+    EnrollmentModeEnum:
+      enum:
+      - audit
+      - verified
+      type: string
+      description: |-
+        * `audit` - audit
+        * `verified` - verified
+      x-enum-descriptions:
+      - audit
+      - verified
+    LanguageEnum:
+      enum:
+      - af_ZA
+      - ar
+      - az
+      - bo
+      - da
+      - de
+      - de_DE
+      - el
+      - es_419
+      - es_ES
+      - en
+      - fa
+      - fr
+      - fr_CA
+      - he
+      - hi
+      - hu
+      - id
+      - it_IT
+      - ja
+      - ka
+      - kk
+      - ko
+      - lv
+      - nl
+      - pl
+      - pt_BR
+      - pt_PT
+      - ro
+      - ru
+      - sq
+      - sv
+      - sw
+      - te
+      - th
+      - tr_TR
+      - uk
+      - uz
+      - vi
+      - zh_CN
+      - zh_HANS
+      - zh_HK
+      type: string
+      description: |-
+        * `af_ZA` - af_ZA
+        * `ar` - ar
+        * `az` - az
+        * `bo` - bo
+        * `da` - da
+        * `de` - de
+        * `de_DE` - de_DE
+        * `el` - el
+        * `es_419` - es_419
+        * `es_ES` - es_ES
+        * `en` - en
+        * `fa` - fa
+        * `fr` - fr
+        * `fr_CA` - fr_CA
+        * `he` - he
+        * `hi` - hi
+        * `hu` - hu
+        * `id` - id
+        * `it_IT` - it_IT
+        * `ja` - ja
+        * `ka` - ka
+        * `kk` - kk
+        * `ko` - ko
+        * `lv` - lv
+        * `nl` - nl
+        * `pl` - pl
+        * `pt_BR` - pt_BR
+        * `pt_PT` - pt_PT
+        * `ro` - ro
+        * `ru` - ru
+        * `sq` - sq
+        * `sv` - sv
+        * `sw` - sw
+        * `te` - te
+        * `th` - th
+        * `tr_TR` - tr_TR
+        * `uk` - uk
+        * `uz` - uz
+        * `vi` - vi
+        * `zh_CN` - zh_CN
+        * `zh_HANS` - zh_HANS
+        * `zh_HK` - zh_HK
+      x-enum-descriptions:
+      - af_ZA
+      - ar
+      - az
+      - bo
+      - da
+      - de
+      - de_DE
+      - el
+      - es_419
+      - es_ES
+      - en
+      - fa
+      - fr
+      - fr_CA
+      - he
+      - hi
+      - hu
+      - id
+      - it_IT
+      - ja
+      - ka
+      - kk
+      - ko
+      - lv
+      - nl
+      - pl
+      - pt_BR
+      - pt_PT
+      - ro
+      - ru
+      - sq
+      - sv
+      - sw
+      - te
+      - th
+      - tr_TR
+      - uk
+      - uz
+      - vi
+      - zh_CN
+      - zh_HANS
+      - zh_HK
+    NullEnum:
+      enum:
+      - null
+    V3CourseRunCertificate:
+      type: object
+      description: CourseRunCertificate model serializer
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        link:
+          type: string
+          description: |-
+            Get the link at which this certificate will be served
+            Format: /certificate/<uuid>/
+            Example: /certificate/93ebd74e-5f88-4b47-bb09-30a6d575328f/
+          readOnly: true
+      required:
+      - link
+      - uuid
+    V3ProgramCertificate:
+      type: object
+      description: ProgramCertificate model serializer
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        link:
+          type: string
+          description: |-
+            Get the link at which this certificate will be served
+            Format: /certificate/program/<uuid>/
+            Example: /certificate/program/93ebd74e-5f88-4b47-bb09-30a6d575328f/
+          readOnly: true
+      required:
+      - link
+      - uuid
+    V3ProgramEnrollmentRequestRequest:
+      type: object
+      description: |-
+        Serializer for creating a program enrollment.
+        Accepts a program_id and validates it corresponds to a live program.
+      properties:
+        program_id:
+          type: integer
+          writeOnly: true
+      required:
+      - program_id
+    V3SimpleProgram:
+      type: object
+      description: Program Model Serializer v2
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        readable_id:
+          type: string
+          pattern: ^[\w\-+:\.]+$
+          maxLength: 255
+        id:
+          type: integer
+          readOnly: true
+        program_type:
+          type: string
+          nullable: true
+          maxLength: 255
+        live:
+          type: boolean
+        display_mode:
+          nullable: true
+          description: |-
+            Set to 'course' to treat this program as a course in APIs.
+
+            * `course` - course
+          oneOf:
+          - $ref: '#/components/schemas/DisplayModeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+      required:
+      - id
+      - readable_id
+      - title
+    V3UserProgramEnrollment:
+      type: object
+      description: Serializer for user program enrollments.
+      properties:
+        program:
+          allOf:
+          - $ref: '#/components/schemas/V3SimpleProgram'
+          readOnly: true
+        certificate:
+          allOf:
+          - $ref: '#/components/schemas/V3ProgramCertificate'
+          readOnly: true
+          nullable: true
+        enrollment_mode:
+          type: string
+          maxLength: 20
+      required:
+      - certificate
+      - program
+    VariantIndustryEnum:
+      enum:
+      - E
+      - F
+      - HC
+      type: string
+      description: |-
+        * `` - Original
+        * `E` - Energy
+        * `F` - Finance
+        * `HC` - Healthcare
+      x-enum-descriptions:
+      - Energy
+      - Finance
+      - Healthcare
+    VariantLengthEnum:
+      enum:
+      - S
+      type: string
+      description: |-
+        * `` - Full
+        * `S` - Short
+      x-enum-descriptions:
+      - Short
