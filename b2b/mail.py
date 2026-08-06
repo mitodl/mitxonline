@@ -56,7 +56,14 @@ def send_email_helper(  # noqa: PLR0913
                 == "anymail.backends.mailgun.EmailBackend"
             ):
                 recipient_status = message.anymail_status.recipients.get(email)
-                message_id = recipient_status.message_id if recipient_status else None
+                # Message ID is in the following format when pulled from anymail
+                # '<20260806133209.67c51081a4f1c478@mitxonline-rc-mail.mitxonline.mit.edu>'
+                # The webhook doesn't have the leading or trailing angle brackets, so we'll remove those
+                message_id = (
+                    recipient_status.message_id.strip("<>")
+                    if recipient_status
+                    else None
+                )
             else:
                 message_id = str(uuid.uuid4())
 
