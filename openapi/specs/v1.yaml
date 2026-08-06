@@ -9288,8 +9288,15 @@ components:
           readOnly: true
           nullable: true
           description: The SSO ID (usually a Keycloak UUID) for the user.
+        compliance_missing_fields:
+          type: array
+          items:
+            type: string
+          description: Get the profile fields missing for an export compliance check
+          readOnly: true
       required:
       - b2b_organizations
+      - compliance_missing_fields
       - created_on
       - global_id
       - grants

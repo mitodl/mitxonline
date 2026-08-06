@@ -10,6 +10,7 @@ from mitol.common.utils import now_in_utc
 from rest_framework import status
 
 from b2b.factories import ContractPageFactory
+from compliance.api import get_missing_export_compliance_fields
 from main.test_utils import drf_datetime
 from users.api import User
 from users.factories import UserFactory
@@ -127,6 +128,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
             "user_profile": None,
             "is_active": False,
             "b2b_organizations": b2b_orgs,
+            "compliance_missing_fields": [],
         }
     else:
         assert resp.json() == {
@@ -163,6 +165,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
             "grants": list(user.get_all_permissions()),
             "is_active": True,
             "b2b_organizations": b2b_orgs,
+            "compliance_missing_fields": get_missing_export_compliance_fields(user),
         }
 
 
@@ -310,6 +313,7 @@ def test_get_userinfo(client, user, is_anonymous, has_openedx_user, has_edx_user
             "grants": list(user.get_all_permissions()),
             "is_active": True,
             "b2b_organizations": b2b_orgs,
+            "compliance_missing_fields": get_missing_export_compliance_fields(user),
         }
 
 

@@ -12,6 +12,7 @@ from rest_framework import serializers
 
 from b2b.api import get_user_b2b_organizations
 from b2b.serializers.v0 import OrganizationPageSerializer
+from compliance.api import get_missing_export_compliance_fields
 from hubspot_sync.task_helpers import sync_hubspot_user
 
 # from ecommerce.api import fetch_and_serialize_unused_coupons  # noqa: ERA001
@@ -218,6 +219,7 @@ class UserSerializer(serializers.ModelSerializer):
     b2b_organizations = serializers.SerializerMethodField()
     is_anonymous = serializers.BooleanField(read_only=True)
     is_authenticated = serializers.BooleanField(read_only=True)
+    compliance_missing_fields = serializers.SerializerMethodField()
 
     def validate_email(self, value):
         if (
@@ -247,6 +249,14 @@ class UserSerializer(serializers.ModelSerializer):
         return OrganizationPageSerializer(
             get_user_b2b_organizations(instance), many=True
         ).data
+
+    @extend_schema_field(list[str])
+    def get_compliance_missing_fields(self, instance):
+        """Get the profile fields missing for an export compliance check"""
+        if instance.is_anonymous:
+            return []
+
+        return get_missing_export_compliance_fields(instance)
 
     def validate(self, data):
         request = self.context.get("request", None)
@@ -409,6 +419,7 @@ class UserSerializer(serializers.ModelSerializer):
             "is_active",
             "b2b_organizations",
             "global_id",
+            "compliance_missing_fields",
         )
         read_only_fields = (
             "is_anonymous",
@@ -421,6 +432,7 @@ class UserSerializer(serializers.ModelSerializer):
             "grants",
             "global_id",
             "b2b_organizations",
+            "compliance_missing_fields",
         )
 
 
