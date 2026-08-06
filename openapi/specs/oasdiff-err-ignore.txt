@@ -172,3 +172,164 @@ GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/{course_run_id}/enrollments/ the response's body `type` changed from `array<object>` to `object` for status `200`
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/ the response property `total_codes` became nullable for the status `200`
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/ the response property `unassigned_codes` became nullable for the status `200`
+
+# ============================================================================
+# ONE-TIME: OpenAPI spec repartitioning (PR #3824).
+#
+# Until now REST_FRAMEWORK used the non-existent key "DEFAULT_VERSIONING",
+# so NamespaceVersioning was never active and every per-version spec file
+# contained every path in the project. Partitioning them therefore reports
+# each path as "removed" from the files it no longer belongs to. Every entry
+# below is api-path-removed-without-deprecation and no endpoint actually
+# changed - each one still exists, just in its own version's spec.
+#
+# DELETE THIS ENTIRE BLOCK in a follow-up PR immediately after #3824 merges.
+# Once main's specs are partitioned this noise disappears, and leaving these
+# lines in place would permanently mask genuine removals of the same paths.
+# ============================================================================
+DELETE /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/revoke/ api path removed without deprecation
+DELETE /api/v0/baskets/clear/ api path removed without deprecation
+DELETE /api/v0/baskets/{parent_lookup_basket}/items/{id}/ api path removed without deprecation
+DELETE /api/v0/discounts/{id}/ api path removed without deprecation
+DELETE /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ api path removed without deprecation
+DELETE /api/v0/discounts/{parent_lookup_discount}/products/{id}/ api path removed without deprecation
+DELETE /api/v0/discounts/{parent_lookup_discount}/tiers/{id}/ api path removed without deprecation
+DELETE /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ api path removed without deprecation
+DELETE /api/v0/products/all/{id}/ api path removed without deprecation
+DELETE /api/v1/enrollments/{id}/ api path removed without deprecation
+DELETE /api/v1/program_enrollments/{id}/ api path removed without deprecation
+DELETE /api/v2/enrollments/{id}/ api path removed without deprecation
+DELETE /api/v2/program_enrollments/{id}/ api path removed without deprecation
+DELETE /api/v3/enrollments/{id}/ api path removed without deprecation
+DELETE /api/v3/program_enrollments/{program_id}/ api path removed without deprecation
+GET /api/records/program/{id}/ api path removed without deprecation
+GET /api/records/shared/{uuid}/ api path removed without deprecation
+GET /api/v0/b2b/contracts/ api path removed without deprecation
+GET /api/v0/b2b/contracts/{contract_slug}/all_variant_runs/ api path removed without deprecation
+GET /api/v0/b2b/contracts/{contract_slug}/ api path removed without deprecation
+GET /api/v0/b2b/manager/organizations/ api path removed without deprecation
+GET /api/v0/b2b/manager/organizations/{id}/ api path removed without deprecation
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/ api path removed without deprecation
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/ api path removed without deprecation
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/ api path removed without deprecation
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/ api path removed without deprecation
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/{course_run_id}/enrollments/ api path removed without deprecation
+GET /api/v0/b2b/organizations/ api path removed without deprecation
+GET /api/v0/b2b/organizations/{organization_slug}/ api path removed without deprecation
+GET /api/v0/b2b/service/organization-manager-check/ api path removed without deprecation
+GET /api/v0/baskets/ api path removed without deprecation
+GET /api/v0/baskets/checkout/ api path removed without deprecation
+GET /api/v0/baskets/{id}/ api path removed without deprecation
+GET /api/v0/baskets/{parent_lookup_basket}/items/ api path removed without deprecation
+GET /api/v0/baskets/{parent_lookup_basket}/items/{id}/ api path removed without deprecation
+GET /api/v0/countries/ api path removed without deprecation
+GET /api/v0/discounts/ api path removed without deprecation
+GET /api/v0/discounts/{id}/ api path removed without deprecation
+GET /api/v0/discounts/{parent_lookup_discount}/assignees/ api path removed without deprecation
+GET /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ api path removed without deprecation
+GET /api/v0/discounts/{parent_lookup_discount}/products/ api path removed without deprecation
+GET /api/v0/discounts/{parent_lookup_discount}/products/{id}/ api path removed without deprecation
+GET /api/v0/discounts/{parent_lookup_discount}/tiers/ api path removed without deprecation
+GET /api/v0/discounts/{parent_lookup_discount}/tiers/{id}/ api path removed without deprecation
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ api path removed without deprecation
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ api path removed without deprecation
+GET /api/v0/orders/history/ api path removed without deprecation
+GET /api/v0/orders/history/{id}/ api path removed without deprecation
+GET /api/v0/orders/receipt/{id}/ api path removed without deprecation
+GET /api/v0/orders/status/{order_id}/ api path removed without deprecation
+GET /api/v0/products/all/ api path removed without deprecation
+GET /api/v0/products/all/{id}/ api path removed without deprecation
+GET /api/v0/products/ api path removed without deprecation
+GET /api/v0/products/{id}/ api path removed without deprecation
+GET /api/v0/products/{id}/user_flexible_price/ api path removed without deprecation
+GET /api/v0/userinfo/ api path removed without deprecation
+GET /api/v0/users/current_user/ api path removed without deprecation
+GET /api/v0/user_search/ api path removed without deprecation
+GET /api/v0/user_search/{id}/ api path removed without deprecation
+GET /api/v0/users/{id}/ api path removed without deprecation
+GET /api/v0/users/me api path removed without deprecation
+GET /api/v1/course_runs/ api path removed without deprecation
+GET /api/v1/course_runs/{id}/ api path removed without deprecation
+GET /api/v1/courses/ api path removed without deprecation
+GET /api/v1/courses/{id}/ api path removed without deprecation
+GET /api/v1/departments/ api path removed without deprecation
+GET /api/v1/departments/{id}/ api path removed without deprecation
+GET /api/v1/enrollments/ api path removed without deprecation
+GET /api/v1/program_enrollments/ api path removed without deprecation
+GET /api/v1/program_enrollments/{id}/ api path removed without deprecation
+GET /api/v1/programs/ api path removed without deprecation
+GET /api/v1/programs/{id}/ api path removed without deprecation
+GET /api/v2/course_certificates/{uuid}/ api path removed without deprecation
+GET /api/v2/courses/ api path removed without deprecation
+GET /api/v2/courses/{id}/ api path removed without deprecation
+GET /api/v2/departments/ api path removed without deprecation
+GET /api/v2/departments/{id}/ api path removed without deprecation
+GET /api/v2/enrollments/ api path removed without deprecation
+GET /api/v2/pages/ api path removed without deprecation
+GET /api/v2/pages/?fields=*&type=cms.certificatepage api path removed without deprecation
+GET /api/v2/pages/?fields=*&type=cms.coursepage api path removed without deprecation
+GET /api/v2/pages/?fields=*&type=cms.programpage api path removed without deprecation
+GET /api/v2/pages/{id}/ api path removed without deprecation
+GET /api/v2/program_certificates/{uuid}/ api path removed without deprecation
+GET /api/v2/program-collections/ api path removed without deprecation
+GET /api/v2/program-collections/{id}/ api path removed without deprecation
+GET /api/v2/program_enrollments/ api path removed without deprecation
+GET /api/v2/program_enrollments/{id}/ api path removed without deprecation
+GET /api/v2/programs/ api path removed without deprecation
+GET /api/v2/programs/{id}/ api path removed without deprecation
+GET /api/v2/verifiable_course_credential/{credential_id}/download/ api path removed without deprecation
+GET /api/v2/verifiable_program_credential/{credential_id}/download/ api path removed without deprecation
+GET /api/v3/courses/{course_id}/ol_openedx_outline/ api path removed without deprecation
+GET /api/v3/courses/variant_runs/ api path removed without deprecation
+GET /api/v3/enrollments/ api path removed without deprecation
+GET /api/v3/enrollments/{id}/ api path removed without deprecation
+GET /api/v3/program_enrollments/ api path removed without deprecation
+GET /api/v3/program_enrollments/{program_id}/ api path removed without deprecation
+PATCH /api/v0/baskets/{parent_lookup_basket}/items/{id}/ api path removed without deprecation
+PATCH /api/v0/change-emails/{code}/ api path removed without deprecation
+PATCH /api/v0/discounts/{id}/ api path removed without deprecation
+PATCH /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ api path removed without deprecation
+PATCH /api/v0/discounts/{parent_lookup_discount}/products/{id}/ api path removed without deprecation
+PATCH /api/v0/discounts/{parent_lookup_discount}/tiers/{id}/ api path removed without deprecation
+PATCH /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ api path removed without deprecation
+PATCH /api/v0/products/all/{id}/ api path removed without deprecation
+PATCH /api/v0/users/current_user/ api path removed without deprecation
+PATCH /api/v0/users/me api path removed without deprecation
+PATCH /api/v1/enrollments/{id}/ api path removed without deprecation
+POST /api/records/program/{id}/revoke/ api path removed without deprecation
+POST /api/records/program/{id}/share/ api path removed without deprecation
+POST /api/v0/b2b/attach/{enrollment_code}/ api path removed without deprecation
+POST /api/v0/b2b/enroll/{readable_id}/ api path removed without deprecation
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/bulk_assign/ api path removed without deprecation
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/assign/ api path removed without deprecation
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/ api path removed without deprecation
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/send_test_email/ api path removed without deprecation
+POST /api/v0/baskets/add_discount/ api path removed without deprecation
+POST /api/v0/baskets/create_from_product/{product_id}/ api path removed without deprecation
+POST /api/v0/baskets/create_from_product/{product_id}/{discount_code}/ api path removed without deprecation
+POST /api/v0/baskets/create_with_products/ api path removed without deprecation
+POST /api/v0/baskets/{parent_lookup_basket}/items/ api path removed without deprecation
+POST /api/v0/change-emails/ api path removed without deprecation
+POST /api/v0/discounts/ api path removed without deprecation
+POST /api/v0/discounts/create_batch/ api path removed without deprecation
+POST /api/v0/discounts/{parent_lookup_discount}/assignees/ api path removed without deprecation
+POST /api/v0/discounts/{parent_lookup_discount}/products/ api path removed without deprecation
+POST /api/v0/discounts/{parent_lookup_discount}/tiers/ api path removed without deprecation
+POST /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ api path removed without deprecation
+POST /api/v0/products/all/ api path removed without deprecation
+POST /api/v1/enrollments/ api path removed without deprecation
+POST /api/v2/enrollments/ api path removed without deprecation
+POST /api/v2/verified_program_enrollments/{courserun_id}/ api path removed without deprecation
+POST /api/v3/enrollments/ api path removed without deprecation
+POST /api/v3/program_enrollments/ api path removed without deprecation
+POST /enrollments/ api path removed without deprecation
+PUT /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/reassign/ api path removed without deprecation
+PUT /api/v0/baskets/{parent_lookup_basket}/items/{id}/ api path removed without deprecation
+PUT /api/v0/change-emails/{code}/ api path removed without deprecation
+PUT /api/v0/discounts/{id}/ api path removed without deprecation
+PUT /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ api path removed without deprecation
+PUT /api/v0/discounts/{parent_lookup_discount}/products/{id}/ api path removed without deprecation
+PUT /api/v0/discounts/{parent_lookup_discount}/tiers/{id}/ api path removed without deprecation
+PUT /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ api path removed without deprecation
+PUT /api/v0/products/all/{id}/ api path removed without deprecation
+PUT /api/v1/enrollments/{id}/ api path removed without deprecation
