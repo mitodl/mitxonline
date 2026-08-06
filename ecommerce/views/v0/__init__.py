@@ -62,7 +62,6 @@ from ecommerce.models import (
     Product,
     UserDiscount,
 )
-from ecommerce.serializers import RefundRequestSerializer
 from ecommerce.serializers.v0 import (
     BasketItemSerializer,
     BasketWithProductSerializer,
@@ -74,6 +73,7 @@ from ecommerce.serializers.v0 import (
     OrderSerializer,
     ProductFlexiblePriceSerializer,
     ProductSerializer,
+    RefundRequestSerializer,
     UserDiscountMetaSerializer,
     UserDiscountSerializer,
     V0DiscountSerializer,

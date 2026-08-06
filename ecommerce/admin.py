@@ -31,6 +31,7 @@ from ecommerce.models import (
     PendingOrder,
     Product,
     RefundedOrder,
+    RefundRequest,
     Transaction,
     UserDiscount,
 )
@@ -360,6 +361,31 @@ class FulfilledOrderAdmin(TimestampedModelAdmin):
             )
 
         return super().response_change(request, obj)
+
+
+@admin.register(RefundRequest)
+class RefundRequestAdmin(TimestampedModelAdmin):
+    """Admin for learner-submitted refund requests. Status is editable; all other fields are read-only."""
+
+    model = RefundRequest
+    list_display = ("id", "user", "order", "refund_reason", "status", "consent_given", "created_on")
+    list_filter = ("status", "refund_reason")
+    search_fields = ("user__email", "order__reference_number")
+    readonly_fields = (
+        "order",
+        "user",
+        "refund_reason",
+        "refund_reason_text",
+        "consent_given",
+        "created_on",
+        "updated_on",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(RefundedOrder)

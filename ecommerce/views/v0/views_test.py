@@ -54,6 +54,7 @@ from ecommerce.models import (
     DiscountRedemption,
     Order,
     OrderStatus,
+    RefundRequest,
     UserDiscount,
 )
 from ecommerce.serializers import (
@@ -1440,3 +1441,112 @@ def test_receipt_by_program_uses_latest_paid_record(user, client):
 
     assert resp.status_code == 302
     assert resp["Location"] == f"/orders/receipt/{newer_order.id}/"
+
+
+def test_refund_request_success(user, user_drf_client):
+    """An authenticated user can submit a refund request for their own fulfilled order."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": "other",
+            "refund_reason_text": "Changed my mind.",
+            "consent_given": True,
+        },
+    )
+
+    assert resp.status_code == 201
+    assert RefundRequest.objects.filter(order=order, user=user).exists()
+
+
+def test_refund_request_unauthenticated(client):
+    """Unauthenticated requests to the refund request endpoint are rejected."""
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+
+    resp = client.post(
+        reverse("v0:refund_requests_api"),
+        data={"order": order.id, "consent_given": True},
+        content_type="application/json",
+    )
+
+    assert resp.status_code == 403
+
+
+def test_refund_request_other_users_order(user, user_drf_client):
+    """A user cannot submit a refund request for another user's order."""
+    other_order = OrderFactory.create(state=OrderStatus.FULFILLED)
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={"order": other_order.id, "consent_given": True},
+    )
+
+    assert resp.status_code == 400
+    assert "order" in resp.json()["errors"]
+
+
+def test_refund_request_non_fulfilled_order(user, user_drf_client):
+    """A refund request for a non-fulfilled order is rejected."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.PENDING)
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={"order": order.id, "consent_given": True},
+    )
+
+    assert resp.status_code == 400
+    assert "order" in resp.json()["errors"]
+
+
+def test_refund_request_no_consent(user, user_drf_client):
+    """A refund request submitted without consent is rejected."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={"order": order.id, "consent_given": False},
+    )
+
+    assert resp.status_code == 400
+    assert "consent_given" in resp.json()["errors"]
+
+
+@pytest.mark.skip_nplusone_check
+def test_refund_request_b2b_order(user, user_drf_client):
+    """B2B contract orders are excluded from self-service refund requests."""
+    contract = ContractPageFactory.create()
+    courserun = CourseRunFactory.create(b2b_contract=contract)
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=courserun)
+    product_version = Version.objects.get_for_object(product).last()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    LineFactory.create(
+        order=order, purchased_object=courserun, product_version=product_version
+    )
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={"order": order.id, "consent_given": True},
+    )
+
+    assert resp.status_code == 400
+    assert "order" in resp.json()["errors"]
+
+
+@pytest.mark.skip_nplusone_check
+def test_order_history_includes_refund_eligible(user, user_drf_client):
+    """Order history responses include the refund_eligible field."""
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    product_version = Version.objects.get_for_object(product).last()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    LineFactory.create(order=order, product_version=product_version)
+
+    resp = user_drf_client.get(reverse("v0:orderhistory_api-list"))
+
+    assert resp.status_code == 200
+    returned_orders = resp.json()
+    assert len(returned_orders) == 1
+    assert "refund_eligible" in returned_orders[0]

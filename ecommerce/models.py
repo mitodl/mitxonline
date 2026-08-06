@@ -1236,6 +1236,12 @@ class RefundReasonChoices(models.TextChoices):
     OTHER = "other", "Other"
 
 
+class RefundRequestStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    APPROVED = "approved", "Approved"
+    DENIED = "denied", "Denied"
+
+
 class RefundRequest(TimestampedModel):
     """A learner-submitted request for an order refund."""
 
@@ -1256,6 +1262,11 @@ class RefundRequest(TimestampedModel):
     )
     refund_reason_text = models.TextField(blank=True)
     consent_given = models.BooleanField(default=False)
+    status = models.CharField(
+        max_length=20,
+        choices=RefundRequestStatus,
+        default=RefundRequestStatus.PENDING,
+    )
 
     def __str__(self):
         return f"RefundRequest for Order {self.order_id} by {self.user.email}"
