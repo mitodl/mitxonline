@@ -1180,6 +1180,15 @@ import_settings_modules(
     "mitol.olposthog.settings.olposthog",
 )
 
+CYBERSOURCE_INQUIRY_LOG_NACL_ENCRYPTION_KEY = get_string(
+    name="CYBERSOURCE_INQUIRY_LOG_NACL_ENCRYPTION_KEY",
+    default=None,
+    description=(
+        "Base64-encoded NaCl public key used to encrypt cached CyberSource "
+        "export compliance request/response payloads."
+    ),
+)
+
 # mitol-django-common
 MITOL_COMMON_USER_FACTORY = "users.factories.UserFactory"
 
