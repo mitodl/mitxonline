@@ -1779,7 +1779,9 @@ def get_verifiable_credentials_payload(
         program = certificate.program
         program_page = program.program_page
         url = get_learn_product_url("programs", program.readable_id)
-        certificate_name = certificate.program.title
+        certificate_name = (
+            certificate_page.product_name or ""
+        ).strip() or certificate.program.title
         activity_start_date = ProgramEnrollment.all_objects.get(
             user_id=certificate.user_id, program=program
         ).created_on.strftime("%Y-%m-%dT%H:%M:%SZ")

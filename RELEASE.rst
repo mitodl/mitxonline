@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 1.162.3
+---------------
+
+- Strip angle brackets (#3825)
+- Add zizmor pre-commit hook and 7-day uv dependency delay (#3808)
+- Use CMS Certificate Title for program verifiable credentials (#3698)
+
 Version 1.162.2 (Released August 06, 2026)
 ---------------
 
