@@ -546,7 +546,7 @@ def test_user_enrollments_create_export_compliance_blocked(
 ):
     """The user enrollments view should fail closed when the export compliance check rejects the user."""
     run = CourseRunFactory.create()
-    exc = ExportComplianceError(user, "REJECT", 102)
+    exc = ExportComplianceError(user, "REJECT", "102")
     mocker.patch(
         "courses.serializers.v1.courses.create_run_enrollments",
         side_effect=exc,
@@ -761,7 +761,7 @@ def test_create_enrollments_export_compliance_blocked(mocker, user_client, user)
     if the export compliance check does not accept the enrollment.
     """
     run = CourseRunFactory.create()
-    exc = ExportComplianceError(user, "REJECT", 102)
+    exc = ExportComplianceError(user, "REJECT", "102")
     mocker.patch(
         "courses.views.v1.create_run_enrollments",
         side_effect=exc,

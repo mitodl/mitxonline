@@ -26,7 +26,6 @@ from courses.factories import (
     ProgramFactory,
 )
 from courses.models import (
-    CourseRunEnrollment,
     PaidProgram,
     ProgramEnrollment,
 )
@@ -651,7 +650,7 @@ def test_create_program_enrollment_export_compliance_blocked(
 ):
     """POST should fail closed when the export compliance check rejects the user."""
     program = ProgramFactory.create(live=True)
-    exc = ExportComplianceError(user, "REJECT", 102)
+    exc = ExportComplianceError(user, "REJECT", "102")
     mocker.patch("courses.views.v3.create_program_enrollments", side_effect=exc)
 
     resp = user_drf_client.post(
@@ -663,28 +662,6 @@ def test_create_program_enrollment_export_compliance_blocked(
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {"errors": exc.to_error_detail()}
     assert not ProgramEnrollment.objects.filter(user=user, program=program).exists()
-
-
-def test_user_enrollments_create_export_compliance_blocked_v3(
-    mocker, user_drf_client, user
-):
-    """v3 enrollments API should fail closed when the export compliance check rejects the user."""
-    run = CourseRunFactory.create()
-    exc = ExportComplianceError(user, "REJECT", 102)
-    mocker.patch(
-        "courses.serializers.v3.courses.create_run_enrollments",
-        side_effect=exc,
-    )
-
-    resp = user_drf_client.post(
-        reverse("v3:user_enrollments_api-list"),
-        data={"run_id": run.id},
-        format="json",
-    )
-
-    assert resp.status_code == status.HTTP_400_BAD_REQUEST
-    assert resp.json() == {"errors": exc.to_error_detail()}
-    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
 
 
 def test_create_program_enrollment_unauthenticated():

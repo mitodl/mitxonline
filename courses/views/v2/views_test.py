@@ -1162,7 +1162,7 @@ def test_user_enrollments_create_export_compliance_blocked_v2(
 ):
     """v2 enrollments API should fail closed when the export compliance check rejects the user."""
     run = CourseRunFactory.create()
-    exc = ExportComplianceError(user, "REJECT", 102)
+    exc = ExportComplianceError(user, "REJECT", "102")
     mocker.patch(
         "courses.serializers.v2.courses.create_run_enrollments",
         side_effect=exc,
@@ -2028,7 +2028,7 @@ def test_add_verified_program_course_enrollment_export_compliance_blocked(
     course_run = CourseRunFactory.create()
     program.add_requirement(course_run.course)
 
-    exc = ExportComplianceError(user, "REJECT", 102)
+    exc = ExportComplianceError(user, "REJECT", "102")
     mocker.patch("courses.views.v2.create_run_enrollments", side_effect=exc)
 
     resp = user_drf_client.post(
@@ -2251,7 +2251,7 @@ def test_add_nested_verified_program_course_enrollment_export_compliance_blocked
         program=base_program, user=user, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
     )
 
-    exc = ExportComplianceError(user, "REJECT", 102)
+    exc = ExportComplianceError(user, "REJECT", "102")
     mocker.patch("courses.views.v2.create_program_enrollments", side_effect=exc)
 
     resp = user_drf_client.post(
