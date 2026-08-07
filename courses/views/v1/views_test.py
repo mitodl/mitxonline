@@ -24,6 +24,7 @@ from reversion.models import Version
 from b2b.factories import ContractPageFactory
 from cms.factories import ProgramPageFactory
 from cms.serializers import CoursePageSerializer, ProgramPageSerializer
+from compliance.exceptions import ExportComplianceDataError, ExportComplianceError
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
     BlockedCountryFactory,
@@ -540,6 +541,24 @@ def test_user_enrollments_create_invalid(user_drf_client, user):
     assert resp.json() == {"errors": {"run_id": "Invalid course run id: 1234"}}
 
 
+def test_user_enrollments_create_export_compliance_blocked(
+    mocker, user_drf_client, user
+):
+    """The user enrollments view should fail closed when the export compliance check rejects the user."""
+    run = CourseRunFactory.create()
+    exc = ExportComplianceError(user, "REJECT", 102)
+    mocker.patch(
+        "courses.serializers.v1.courses.create_run_enrollments",
+        side_effect=exc,
+    )
+    resp = user_drf_client.post(
+        reverse("v1:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {"errors": exc.to_error_detail()}
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
 def test_user_enrollments_create_b2b_run_invalid(user_drf_client, user):
     """Creating an enrollment for a B2B course run via the public API should be rejected."""
     contract = ContractPageFactory.create()
@@ -733,6 +752,54 @@ def test_create_enrollments_blocked_country(user_client, user):
         {
             "type": USER_MSG_TYPE_ENROLL_BLOCKED,
         }
+    )
+
+
+def test_create_enrollments_export_compliance_blocked(mocker, user_client, user):
+    """
+    Create enrollment view should redirect with a user message in a cookie
+    if the export compliance check does not accept the enrollment.
+    """
+    run = CourseRunFactory.create()
+    exc = ExportComplianceError(user, "REJECT", 102)
+    mocker.patch(
+        "courses.views.v1.create_run_enrollments",
+        side_effect=exc,
+    )
+    resp = user_client.post(
+        reverse("create-enrollment-via-form"),
+        data={"run": str(run.id)},
+        HTTP_REFERER=EXAMPLE_URL,
+    )
+    assert resp.status_code == status.HTTP_302_FOUND
+    assert resp.url == reverse("user-dashboard")
+    assert USER_MSG_COOKIE_NAME in resp.cookies
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_ENROLL_BLOCKED, **exc.to_error_detail()}
+    )
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+def test_create_enrollments_export_compliance_missing_data(mocker, user_client, user):
+    """
+    Create enrollment view should redirect with the missing profile fields
+    when the export compliance check can't run due to incomplete profile data.
+    """
+    run = CourseRunFactory.create()
+    exc = ExportComplianceDataError(user, ["postal_code", "state"])
+    mocker.patch(
+        "courses.views.v1.create_run_enrollments",
+        side_effect=exc,
+    )
+    resp = user_client.post(
+        reverse("create-enrollment-via-form"),
+        data={"run": str(run.id)},
+        HTTP_REFERER=EXAMPLE_URL,
+    )
+    assert resp.status_code == status.HTTP_302_FOUND
+    assert resp.url == reverse("user-dashboard")
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_ENROLL_BLOCKED, **exc.to_error_detail()}
     )
 
 
