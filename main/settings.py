@@ -624,6 +624,12 @@ EMAIL_SUPPORT = get_string(
     description="Email address listed for customer support in the frontend. Not used for sending email.",
 )
 
+REFUND_REQUEST_EMAIL = get_string(
+    name="MITX_ONLINE_REFUND_REQUEST_EMAIL",
+    default=EMAIL_SUPPORT,
+    description="Email address that receives refund request notifications from learners.",
+)
+
 NOTIFICATION_EMAIL_BACKEND = get_string(
     name="MITX_ONLINE_NOTIFICATION_EMAIL_BACKEND",
     default="anymail.backends.mailgun.EmailBackend",
@@ -1646,5 +1652,11 @@ MIT_LEARN_ATTACH_URL = get_string(
     description="The URL to use for generating contract attachment URLs for B2B.",
 )
 
-if ECOMMERCE_DEFAULT_PAYMENT_GATEWAY == "None":  # noqa: F405
+ECOMMERCE_DEFAULT_PAYMENT_GATEWAY = get_string(
+    name="ECOMMERCE_DEFAULT_PAYMENT_GATEWAY",
+    default=MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+    description="The default payment gateway to use. Must match the value of the constant in the mitol.payment_gateway library.",
+)
+
+if ECOMMERCE_DEFAULT_PAYMENT_GATEWAY == "None":
     ECOMMERCE_DEFAULT_PAYMENT_GATEWAY = MITOL_PAYMENT_GATEWAY_CYBERSOURCE

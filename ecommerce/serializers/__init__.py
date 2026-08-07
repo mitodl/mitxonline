@@ -19,7 +19,12 @@ from ecommerce.constants import (
     PAYMENT_TYPES,
     TRANSACTION_TYPE_REFUND,
 )
-from ecommerce.models import Basket, BasketItem, Order, Product
+from ecommerce.models import (
+    Basket,
+    BasketItem,
+    Order,
+    Product,
+)
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from main.settings import TIME_ZONE
 from users.serializers import ExtendedLegalAddressSerializer
@@ -406,6 +411,11 @@ class OrderSerializer(serializers.ModelSerializer):
     purchaser = serializers.SerializerMethodField()
     transactions = serializers.SerializerMethodField()
     street_address = serializers.SerializerMethodField()
+    refund_eligible = serializers.SerializerMethodField()
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_refund_eligible(self, instance):
+        return instance.is_refund_eligible
 
     @extend_schema_field(LineSerializer(many=True))
     def get_lines(self, instance):
@@ -557,6 +567,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "created_on",
             "transactions",
             "street_address",
+            "refund_eligible",
         ]
         model = models.Order
 
@@ -564,6 +575,11 @@ class OrderSerializer(serializers.ModelSerializer):
 class OrderHistorySerializer(serializers.ModelSerializer):
     titles = serializers.SerializerMethodField()
     lines = LineSerializer(many=True)
+    refund_eligible = serializers.SerializerMethodField()
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_refund_eligible(self, instance):
+        return instance.is_refund_eligible
 
     @extend_schema_field(serializers.ListField)
     def get_titles(self, instance):
@@ -593,6 +609,7 @@ class OrderHistorySerializer(serializers.ModelSerializer):
             "created_on",
             "titles",
             "updated_on",
+            "refund_eligible",
         ]
         model = models.Order
         depth = 1

@@ -1,0 +1,54 @@
+{% extends "email_base.html" %}
+
+{% block content %}
+<tr>
+    <td style="background-color: #ffffff;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+            <tr>
+                <td style="padding: 20px; font-family: sans-serif; font-size: 15px; line-height: 20px; color: #555555;">
+                    <p style="margin: 0 0 10px;">A learner has submitted a refund request.</p>
+
+                    <table style="width: 100%; border-collapse: collapse; margin: 0 0 15px;">
+                        <tr>
+                            <td style="padding: 6px 10px; font-weight: bold; width: 180px;">Learner</td>
+                            <td style="padding: 6px 10px;">{{ user.name }} ({{ user.email }})</td>
+                        </tr>
+                        <tr style="background-color: #f5f5f5;">
+                            <td style="padding: 6px 10px; font-weight: bold;">Order Reference</td>
+                            <td style="padding: 6px 10px;">{{ order.reference_number }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 6px 10px; font-weight: bold;">Order Date</td>
+                            <td style="padding: 6px 10px;">{{ order.created_on|date:"N j, Y" }}</td>
+                        </tr>
+                        <tr style="background-color: #f5f5f5;">
+                            <td style="padding: 6px 10px; font-weight: bold;">Amount Paid</td>
+                            <td style="padding: 6px 10px;">${{ order.total_price_paid }}</td>
+                        </tr>
+                        {% if line %}
+                        <tr>
+                            <td style="padding: 6px 10px; font-weight: bold;">Course / Program</td>
+                            <td style="padding: 6px 10px;">{{ line.purchased_object.title }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr style="background-color: #f5f5f5;">
+                            <td style="padding: 6px 10px; font-weight: bold;">Reason</td>
+                            <td style="padding: 6px 10px;">{{ refund_request.get_refund_reason_display|default:"—" }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 6px 10px; font-weight: bold;">Additional Details</td>
+                            <td style="padding: 6px 10px;">{{ refund_request.refund_reason_text|default:"—" }}</td>
+                        </tr>
+                        <tr style="background-color: #f5f5f5;">
+                            <td style="padding: 6px 10px; font-weight: bold;">Request Submitted</td>
+                            <td style="padding: 6px 10px;">{{ refund_request.created_on|date:"N j, Y g:i A" }} UTC</td>
+                        </tr>
+                    </table>
+
+                    <p style="margin: 0 0 10px;">Please review and process this request according to the standard refund workflow.</p>
+                </td>
+            </tr>
+        </table>
+    </td>
+</tr>
+{% endblock %}

@@ -9,7 +9,11 @@ from mitol.mail.api import get_message_sender
 
 from courses.models import CourseRun
 from ecommerce.constants import TRANSACTION_TYPE_REFUND
-from ecommerce.messages import OrderReceiptMessage, OrderRefundMessage
+from ecommerce.messages import (
+    OrderReceiptMessage,
+    OrderRefundMessage,
+    RefundRequestNotificationMessage,
+)
 
 log = logging.getLogger()
 
@@ -95,3 +99,29 @@ def send_ecommerce_refund_message(order_record):
             )
     except:  # noqa: E722
         log.exception("Error sending order refund email.")
+
+
+def send_refund_request_notification(refund_request):
+    """
+    Send a notification email to customer service when a learner submits a refund request.
+
+    Args:
+        refund_request: A RefundRequest instance.
+    """
+    from django.conf import settings  # noqa: PLC0415
+
+    line = refund_request.order.lines.first()
+
+    try:
+        with get_message_sender(RefundRequestNotificationMessage) as sender:
+            sender.build_and_send_message(
+                settings.REFUND_REQUEST_EMAIL,
+                {
+                    "refund_request": refund_request,
+                    "order": refund_request.order,
+                    "user": refund_request.user,
+                    "line": line,
+                },
+            )
+    except:  # noqa: E722
+        log.exception("Error sending refund request notification email.")

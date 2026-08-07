@@ -67,3 +67,12 @@ def perform_cull_anonymous_baskets():
     from ecommerce.api import cull_anonymous_baskets
 
     cull_anonymous_baskets()
+
+
+@app.task
+def send_refund_request_notification_email(refund_request_id):
+    from ecommerce.mail_api import send_refund_request_notification
+    from ecommerce.models import RefundRequest
+
+    refund_request = RefundRequest.objects.get(pk=refund_request_id)
+    send_refund_request_notification(refund_request)

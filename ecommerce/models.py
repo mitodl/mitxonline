@@ -820,6 +820,27 @@ class Order(TimestampedModel):
     def is_fulfilled(self):
         return self.state == OrderStatus.FULFILLED
 
+    @property
+    def is_refund_eligible(self):
+        """
+        Returns True if the order is within the standard refund window:
+        - Within 7 days of purchase, OR
+        - Within 7 days of the course start date, if the user purchased before the course started.
+        """
+        from datetime import timedelta  # noqa: PLC0415
+
+        now = now_in_utc()
+        if now <= self.created_on + timedelta(days=7):
+            return True
+        for run in self.purchased_runs:
+            if (
+                run.start_date
+                and run.start_date > self.created_on
+                and now <= run.start_date + timedelta(days=7)
+            ):
+                return True
+        return False
+
     def _generate_reference_number(self):
         return f"{REFERENCE_NUMBER_PREFIX}{settings.ENVIRONMENT}-{self.id}"
 
@@ -1300,3 +1321,50 @@ class StripeEventLog(TimestampedModel):
             self.event_type = self.event_data.get("type", "invalid.event")
 
         super().save(**kwargs)
+
+
+class RefundReasonChoices(models.TextChoices):
+    ENROLLED_IN_ANOTHER_COURSE = (
+        "enrolled_in_another_course",
+        "I enrolled in another course",
+    )
+    COURSE_NOT_AS_EXPECTED = "course_not_as_expected", "Course is not what I expected"
+    TECHNICAL_DIFFICULTIES = "technical_difficulties", "Technical difficulties"
+    FINANCIAL_REASONS = "financial_reasons", "Financial reasons"
+    OTHER = "other", "Other"
+
+
+class RefundRequestStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    APPROVED = "approved", "Approved"
+    DENIED = "denied", "Denied"
+
+
+class RefundRequest(TimestampedModel):
+    """A learner-submitted request for an order refund."""
+
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="refund_requests",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="refund_requests",
+    )
+    refund_reason = models.CharField(
+        max_length=100,
+        choices=RefundReasonChoices,
+        blank=True,
+    )
+    refund_reason_text = models.TextField(blank=True)
+    consent_given = models.BooleanField(default=False)
+    status = models.CharField(
+        max_length=20,
+        choices=RefundRequestStatus,
+        default=RefundRequestStatus.PENDING,
+    )
+
+    def __str__(self):
+        return f"RefundRequest for Order {self.order_id} by {self.user.email}"
