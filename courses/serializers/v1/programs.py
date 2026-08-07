@@ -1,4 +1,3 @@
-from django.contrib.auth.models import AnonymousUser
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from mitol.common.utils import now_in_utc
@@ -275,16 +274,10 @@ class LearnerRecordSerializer(serializers.Serializer):
         Args:
         - instance (Program): The program to retrieve data for.
         """
-        user = None
-
-        if "request" in self.context:  # noqa: SIM102
-            if not isinstance(self.context["request"].user, AnonymousUser):
-                user = self.context["request"].user
-
-        if "user" in self.context and isinstance(self.context["user"], User):
-            user = self.context["user"]
-
-        if user is None:
+        user = self.context.get("user") or getattr(
+            self.context.get("request"), "user", None
+        )
+        if not isinstance(user, User):
             raise ValidationError("Valid user object not found")  # noqa: EM101
 
         courses = []
@@ -297,23 +290,25 @@ class LearnerRecordSerializer(serializers.Serializer):
                 "grade": None,
                 "certificate": None,
             }
-            runs_ids = models.CourseRunCertificate.objects.filter(
+            certs = models.CourseRunCertificate.objects.filter(
                 user=user, course_run__course=course, is_revoked=False
-            ).values_list("course_run__id", flat=True)
+            ).order_by("-created_on")
+            runs_ids = [c.course_run_id for c in certs]
 
             if not runs_ids:
                 # if there are no certificates then show verified enrollment grades that either
                 # certificate available date has passed or course has ended if no certificate available date
+                now = now_in_utc()
                 runs_ids = models.CourseRunEnrollment.objects.filter(
                     Q(user=user)
                     & Q(run__course=course)
                     & Q(enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE)
                     & Q(change_status=None)
                     & (
-                        Q(run__certificate_available_date__lt=now_in_utc())
+                        Q(run__certificate_available_date__lt=now)
                         | (
                             Q(run__certificate_available_date=None)
-                            & Q(run__end_date__lt=now_in_utc())
+                            & Q(run__end_date__lt=now)
                         )
                     )
                 ).values_list("run__id", flat=True)
@@ -324,30 +319,24 @@ class LearnerRecordSerializer(serializers.Serializer):
                 .first()
             )
 
-            if grade is not None:
-                grade.grade = round(grade.grade, 2)
-                fmt_course["grade"] = CourseRunGradeSerializer(grade).data
+            if grade:
+                grade_data = CourseRunGradeSerializer(grade).data
+                grade_data["grade"] = round(grade_data["grade"], 2)
+                fmt_course["grade"] = grade_data
 
-            certificate = (
-                models.CourseRunCertificate.objects.filter(
-                    user=user, course_run__course=course, is_revoked=False
-                )
-                .order_by("-created_on")
-                .first()
-            )
-
-            if certificate is not None:
+            if certs:
                 fmt_course["certificate"] = CourseRunCertificateSerializer(
-                    certificate
+                    certs[0]
                 ).data
 
             courses.append(fmt_course)
 
         shares = models.LearnerProgramRecordShare.objects.filter(
             user=user, program=instance, is_active=True
-        ).all()
+        )
+        anonymous = "anonymous_pull" in self.context
 
-        output = {
+        return {
             "user": {
                 "name": user.name,
                 "email": user.email,
@@ -361,14 +350,12 @@ class LearnerRecordSerializer(serializers.Serializer):
                     instance.requirements_root
                 ).data,
             },
-            "sharing": LearnerProgramRecordShareSerializer(shares, many=True).data
-            if "anonymous_pull" not in self.context
-            else [],
-            "partner_schools": PartnerSchoolSerializer(
+            "sharing": []
+            if anonymous
+            else LearnerProgramRecordShareSerializer(shares, many=True).data,
+            "partner_schools": []
+            if anonymous
+            else PartnerSchoolSerializer(
                 models.PartnerSchool.objects.all(), many=True
-            ).data
-            if "anonymous_pull" not in self.context
-            else [],
+            ).data,
         }
-
-        return output  # noqa: RET504
