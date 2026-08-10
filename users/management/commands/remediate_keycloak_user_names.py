@@ -102,12 +102,9 @@ class Command(BaseCommand):
                 {"firstName": given_name, "lastName": family_name},
             )
             # verify - don't just trust a 2xx
-            refetched = client.retrieve(
-                f"users/{keycloak_user.id}", UserRepresentation
-            )
+            refetched = client.retrieve(f"users/{keycloak_user.id}", UserRepresentation)
             row["verified"] = (
-                refetched.firstName == given_name
-                and refetched.lastName == family_name
+                refetched.firstName == given_name and refetched.lastName == family_name
             )
             patched.append(row)
             patch_count += 1
@@ -142,9 +139,7 @@ class Command(BaseCommand):
     def _paginate_keycloak_users(self, client):
         first = 0
         while True:
-            page = client.list(
-                "users", UserRepresentation, first=first, max=PAGE_SIZE
-            )
+            page = client.list("users", UserRepresentation, first=first, max=PAGE_SIZE)
             if not page:
                 return
             yield from page
