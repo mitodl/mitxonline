@@ -100,7 +100,8 @@ def test_learn_user_adapter_from_dict_writes_legal_address():
 def test_learn_user_adapter_from_dict_explicit_null_name_does_not_blank_out():
     """An explicit JSON null for givenName/familyName is treated the same as an
     absent key - it must not overwrite legal_address with None, since those
-    are non-nullable CharFields and would raise an IntegrityError on save"""
+    are non-nullable CharFields and would raise an IntegrityError on save
+    """
     user = UserFactory.create(name="Joe Smith")
     user.legal_address.first_name = "Joe"
     user.legal_address.last_name = "Smith"
