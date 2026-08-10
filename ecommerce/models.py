@@ -677,7 +677,7 @@ class OrderFlow:
         amount = kwargs.get("amount")
         reason = kwargs.get("reason")
 
-        transaction_id = api_response_data.get("id")
+        transaction_id = api_response_data.get("id") if api_response_data else None
         if transaction_id is None:
             raise ValidationError(
                 "Failed to record transaction: Missing transaction id from refund API response"  # noqa: EM101
@@ -753,18 +753,22 @@ class OrderFlow:
         source=OrderStatus.PENDING,
         target=OrderStatus.FULFILLED,
     )
-    def fulfill(self, payment_data, already_enrolled=False, skip_receipt=False):  # noqa: FBT002
+    def fulfill(self, payment_data, already_enrolled=False, skip_receipt=False, skip_fulfillment=False):  # noqa: FBT002
+        """Fulfill the order - create a transaction, send email, trigger plugins."""
+
         # record the transaction
         self.create_transaction(payment_data)
 
-        # record all the courseruns in the order
-        self.create_enrollments()
+        # record all the courseruns in the order (unless we're told not to)
+        if not skip_fulfillment:
+            self.create_enrollments()
 
         # No email is required as this order is generated from management command
         # Skip receipt emails for UAI orders and program-derived course run orders
         if (
             not already_enrolled
             and not skip_receipt
+            and not skip_fulfillment
             and not is_uai_order(self.order)
             and not is_contract_order(self.order)
         ):

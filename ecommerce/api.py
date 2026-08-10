@@ -18,7 +18,10 @@ from mitol.olposthog.features import is_enabled
 from mitol.payment_gateway.api import CartItem as GatewayCartItem
 from mitol.payment_gateway.api import Order as GatewayOrder
 from mitol.payment_gateway.api import PaymentGateway, ProcessorResponse
-from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_STRIPE
+from mitol.payment_gateway.constants import (
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+    MITOL_PAYMENT_GATEWAY_STRIPE,
+)
 
 from b2b.api import (
     get_active_contracts_from_basket_items,
@@ -717,85 +720,134 @@ def unenroll_learner_from_order(order_id):
                 pass
 
 
-def check_and_process_pending_orders_for_resolution(refnos=None):
+def _retrieve_pending_cybersource_orders(orders):
+    """
+    Retrieve the current status for CyberSource Secure Acceptance orders.
+
+    For these, we look up the CyberSource order info in a batch and then sort
+    them into buckets for further processing.
+    """
+
+    completed = {}
+    cancelled = {}
+
+    order_refnos = [ order.reference_number for order in orders ]
+    gateway = PaymentGateway.get_gateway_class(MITOL_PAYMENT_GATEWAY_CYBERSOURCE)
+
+    results = gateway.find_and_get_transactions(order_refnos)
+
+    if len(results.keys()) == 0:
+        log.info("_retrieve_pending_cybersource_orders: No orders found to resolve.")
+        return (completed, cancelled,)
+
+    for result in results:
+        payload = results[result]
+        if int(payload["reason_code"]) == 100:  # noqa: PLR2004
+            completed[payload["req_reference_number"]] = {
+                "transaction_id": payload["transaction_id"]
+            }
+        else:
+            cancelled[payload["req_reference_number"]] = payload
+
+    return (completed, cancelled,)
+
+
+def _retrieve_pending_stripe_orders(orders):
+    """
+    Retrieve current status for Stripe orders.
+
+    Stripe doesn't have a batch list - we have to retrieve each one individually.
+    So this does that, and sorts into the same buckets as
+    _retrieve_pending_cybersource_orders.
+    """
+
+    completed = {}
+    cancelled = {}
+
+    return (completed, cancelled,)
+
+
+def check_and_process_pending_orders_for_resolution(refnos: list[str], *, check_status: bool = True, skip_fulfillment: bool = False):
     """
     Checks pending orders for resolution. By default, this will pull all the
     pending orders that are in the system.
 
     Args:
-    - refnos (list or None): check specific reference numbers
+    - refnos: list of reference numbers to check - empty list to check all Pending
+    Keyword Args:
+    - check_status: get the status of the order from the payment processor (default True)
+    - skip_fulfillment: don't fulfill the order, just mark it as Fulfilled
     Returns:
     - Tuple of counts: fulfilled count, cancelled count, error count
 
     """
 
-    gateway = PaymentGateway.get_gateway_class(ECOMMERCE_DEFAULT_PAYMENT_GATEWAY)
+    fulfilled_count = cancel_count = error_count = 0
 
-    if refnos is not None:
+    if len(refnos) > 0:
         pending_orders = PendingOrder.objects.filter(
             state=OrderStatus.PENDING, reference_number__in=refnos
-        ).values_list("reference_number", flat=True)
+        )
     else:
         pending_orders = PendingOrder.objects.filter(
             state=OrderStatus.PENDING
-        ).values_list("reference_number", flat=True)
+        )
 
     if len(pending_orders) == 0:
         return (0, 0, 0)
 
-    log.info(f"Resolving {len(pending_orders)} orders")  # noqa: G004
+    log.info("Resolving %s orders", len(pending_orders))
 
-    results = gateway.find_and_get_transactions(pending_orders)
+    # todo: get the stripe part of this fleshed out
+    # and add the "force" option (where we just mark them as done regardless of
+    # what the gateway says)
 
-    if len(results.keys()) == 0:
-        log.info("No orders found to resolve.")
-        return (0, 0, 0)
+    cs_gateway_orders = [ pending_order for pending_order in pending_orders if pending_order.gateway_type == MITOL_PAYMENT_GATEWAY_CYBERSOURCE ]
+    stripe_gateway_orders = [ pending_order for pending_order in pending_orders if pending_order.gateway_type == MITOL_PAYMENT_GATEWAY_STRIPE ]
 
-    fulfilled_count = cancel_count = error_count = 0
+    cs_success, cs_cancel = _retrieve_pending_cybersource_orders(cs_gateway_orders)
+    stripe_success, stripe_cancel = _retrieve_pending_stripe_orders(stripe_gateway_orders)
 
-    for result in results:
-        payload = results[result]
-        if int(payload["reason_code"]) == 100:  # noqa: PLR2004
-            try:
-                order = PendingOrder.objects.filter(
-                    state=OrderStatus.PENDING,
-                    reference_number=payload["req_reference_number"],
-                ).get()
-                order_flow = order.get_object_flow()
-                order_flow.fulfill(payload)
-                sync_hubspot_deal(order)
-                fulfilled_count += 1
+    success_orders = {**cs_success, **stripe_success}
+    cancel_orders = {**cs_cancel, **stripe_cancel}
 
-                log.info(f"Fulfilled order {order.reference_number}.")  # noqa: G004
-            except Exception as e:  # noqa: BLE001
-                log.error(  # noqa: TRY400
-                    f"Couldn't process pending order for fulfillment {payload['req_reference_number']}: {e!s}"  # noqa: G004
-                )
-                error_count += 1
-        else:
-            try:
-                order = PendingOrder.objects.filter(
-                    state=OrderStatus.PENDING,
-                    reference_number=payload["req_reference_number"],
-                ).get()
-                order_flow = order.get_object_flow()
-                order_flow.cancel()
-                order.transactions.create(
-                    transaction_id=payload["transaction_id"],
-                    amount=order.total_price_paid,
-                    data=payload,
-                    reason=f"Cancelled due to processor code {payload['reason_code']}",
-                )
-                order.save()
-                sync_hubspot_deal(order)
-                cancel_count += 1
+    for refno, payload in success_orders.items():
+        try:
+            order = PendingOrder.objects.filter(
+                state=OrderStatus.PENDING,
+                reference_number=refno,
+            ).get()
+            order_flow = order.get_object_flow()
+            order_flow.fulfill(payload, skip_fulfillment=skip_fulfillment)
+            sync_hubspot_deal(order)
+            fulfilled_count += 1
 
-                log.info(f"Cancelled order {order.reference_number}.")  # noqa: G004
-            except Exception as e:  # noqa: BLE001
-                log.error(  # noqa: TRY400
-                    f"Couldn't process pending order for cancellation {payload['req_reference_number']}: {e!s}"  # noqa: G004
-                )
-                error_count += 1
+            log.info("Fulfilled order %s.", order.reference_number)
+        except Exception:  # noqa: PERF203
+            log.exception(
+                "Couldn't process pending order for fulfillment %s",
+                refno,
+            )
+            error_count += 1
+
+    for refno, payload in cancel_orders.items():
+        try:
+            order = PendingOrder.objects.filter(
+                state=OrderStatus.PENDING,
+                reference_number=refno,
+            ).get()
+            order_flow = order.get_object_flow()
+            order_flow.cancel(api_response_data=payload)
+            sync_hubspot_deal(order)
+            cancel_count += 1
+
+            log.info("Cancelled order %s.", order.reference_number)
+        except Exception:  # noqa: PERF203
+            log.exception(
+                "Couldn't process pending order for cancellation %s",
+                refno,
+            )
+            error_count += 1
 
     return (fulfilled_count, cancel_count, error_count)
 
