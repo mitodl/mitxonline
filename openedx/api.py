@@ -838,15 +838,27 @@ def _refresh_edx_api_auth(auth):
             updated OpenEdxApiAuth
     """
     # Note: this is subject to thundering herd problems, we should address this at some point
-    return _create_tokens_and_update_auth(
-        auth,
-        dict(  # noqa: C408
-            refresh_token=auth.refresh_token,
-            grant_type="refresh_token",
-            client_id=settings.OPENEDX_API_CLIENT_ID,
-            client_secret=settings.OPENEDX_API_CLIENT_SECRET,
-        ),
-    )
+    try:
+        return _create_tokens_and_update_auth(
+            auth,
+            dict(  # noqa: C408
+                refresh_token=auth.refresh_token,
+                grant_type="refresh_token",
+                client_id=settings.OPENEDX_API_CLIENT_ID,
+                client_secret=settings.OPENEDX_API_CLIENT_SECRET,
+            ),
+        )
+    except requests.exceptions.HTTPError as exc:
+        if exc.response is not None and exc.response.status_code == 400:  # noqa: PLR2004
+            log.warning(
+                "Refresh token rejected with 400 for user %s; clearing tokens and attempting full re-authorization.",
+                auth.user,
+            )
+            auth.refresh_token = None
+            auth.access_token = None
+            auth.save(update_fields=["refresh_token", "access_token"])
+            return create_edx_auth_token(auth.user)
+        raise
 
 
 def get_edx_api_client(user, ttl_in_seconds=OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS):
