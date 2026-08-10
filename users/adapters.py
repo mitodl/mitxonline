@@ -21,6 +21,10 @@ class LearnUserAdapter(UserAdapter):
         ("active", None, None): "is_active",
         ("userName", None, None): "username",
         ("fullName", None, None): "name",
+        ("name", "givenName", None): "legal_address__first_name",
+        ("givenName", None, None): "legal_address__first_name",
+        ("name", "familyName", None): "legal_address__last_name",
+        ("familyName", None, None): "legal_address__last_name",
     }
 
     obj: "User"
@@ -52,16 +56,59 @@ class LearnUserAdapter(UserAdapter):
         """
         return self.obj.name
 
+    def _resolve_name(self) -> tuple[str, str]:
+        """
+        Resolve (given_name, family_name) for the SCIM ``name`` attribute.
+
+        Keycloak has no combined "full name" field - it only stores split
+        firstName/lastName, fed by SCIM's name.givenName/name.familyName. So
+        whatever single name string we have has to be split into two pieces
+        before it's sent; there's no way to hand Keycloak one string and have
+        it split for us. Tiers, in order of confidence:
+
+        1. legal_address.first_name/last_name, if both are set - real
+           structured data.
+        2. self.obj.name, split heuristically (last whitespace-separated
+           token = family name, remainder = given name) - no naive split is
+           correct for every name (breaks on single-name accounts,
+           multi-word surnames, non-Western conventions), but it's the best
+           data available for users who only came through the edX migration
+           and never had a legal_address name recorded.
+        3. Neither available - both empty strings.
+
+        This is deliberately never persisted back onto legal_address, which
+        is used for SDN compliance screening - writing a heuristic guess into
+        a field that compliance screening may rely on for an accurate legal
+        name would be a real risk, not just a data-quality nitpick.
+        """
+        if self.legal_address.first_name and self.legal_address.last_name:
+            return self.legal_address.first_name, self.legal_address.last_name
+
+        given_and_family_name_parts = 2
+        full_name = (self.obj.name or "").strip()
+        if full_name:
+            parts = full_name.rsplit(None, 1)
+            if len(parts) == given_and_family_name_parts:
+                return parts[0], parts[1]
+            return parts[0], ""
+
+        return "", ""
+
     def to_dict(self):
         """
         Return a ``dict`` conforming to the SCIM User Schema,
         ready for conversion to a JSON object.
         """
+        given_name, family_name = self._resolve_name()
         return {
             "id": self.id,
             "externalId": self.obj.scim_external_id,
             "schemas": [SchemaURI.USER],
             "userName": self.obj.username,
+            "name": {
+                "givenName": given_name,
+                "familyName": family_name,
+            },
             "displayName": self.display_name,
             "emails": self.emails,
             "active": self.obj.is_active,
@@ -89,6 +136,17 @@ class LearnUserAdapter(UserAdapter):
         self.obj.scim_external_id = d.get("externalId")
         self.obj.global_id = self.obj.scim_external_id or ""
         self.obj.name = d.get("fullName", self.obj.name)
+
+        # Inbound name.givenName/familyName always writes to legal_address
+        # directly - this is real data from an external SCIM client, never
+        # a derived guess (see _resolve_name's tier 2, which is outbound-only).
+        name = d.get("name") or {}
+        self.legal_address.first_name = name.get(
+            "givenName", self.legal_address.first_name
+        )
+        self.legal_address.last_name = name.get(
+            "familyName", self.legal_address.last_name
+        )
 
     def _save_related(self):
         self.user_profile.user = self.obj
