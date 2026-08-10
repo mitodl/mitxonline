@@ -1652,11 +1652,9 @@ MIT_LEARN_ATTACH_URL = get_string(
     description="The URL to use for generating contract attachment URLs for B2B.",
 )
 
-ECOMMERCE_DEFAULT_PAYMENT_GATEWAY = get_string(
-    name="ECOMMERCE_DEFAULT_PAYMENT_GATEWAY",
-    default=MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
-    description="The default payment gateway to use. Must match the value of the constant in the mitol.payment_gateway library.",
-)
-
+# mitol.payment_gateway.settings (imported above via import_settings_modules)
+# already declares ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, defaulting to "None" if
+# unset. Coerce that default to CyberSource, since this app always expects a
+# real gateway to be configured.
 if ECOMMERCE_DEFAULT_PAYMENT_GATEWAY == "None":
     ECOMMERCE_DEFAULT_PAYMENT_GATEWAY = MITOL_PAYMENT_GATEWAY_CYBERSOURCE
