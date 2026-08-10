@@ -140,15 +140,17 @@ class LearnUserAdapter(UserAdapter):
         # Inbound name.givenName/familyName always writes to legal_address
         # directly - this is real data from an external SCIM client, never
         # a derived guess (see _resolve_name's tier 2, which is outbound-only).
-        # An explicit JSON null (as opposed to an absent key) is treated the
-        # same as absent - legal_address.first_name/last_name are non-nullable
-        # CharFields, so assigning None would raise an IntegrityError on save.
+        # An absent key, an explicit JSON null, or a blank/whitespace-only
+        # string are all treated as "no value provided" and leave the
+        # existing value alone - legal_address feeds SDN compliance
+        # screening, so a client silently sending an empty name should not
+        # be able to blank out a previously-valid one.
         name = d.get("name") or {}
-        given_name = name.get("givenName")
-        if given_name is not None:
+        given_name = (name.get("givenName") or "").strip()
+        if given_name:
             self.legal_address.first_name = given_name
-        family_name = name.get("familyName")
-        if family_name is not None:
+        family_name = (name.get("familyName") or "").strip()
+        if family_name:
             self.legal_address.last_name = family_name
 
     def _save_related(self):

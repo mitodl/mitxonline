@@ -124,6 +124,32 @@ def test_learn_user_adapter_from_dict_explicit_null_name_does_not_blank_out():
     assert user.legal_address.last_name == "Smith"
 
 
+def test_learn_user_adapter_from_dict_blank_name_does_not_blank_out():
+    """An empty or whitespace-only string for givenName/familyName is treated
+    the same as absent/null - it must not silently overwrite a previously
+    valid legal_address name with blank data"""
+    user = UserFactory.create(name="Joe Smith")
+    user.legal_address.first_name = "Joe"
+    user.legal_address.last_name = "Smith"
+    user.legal_address.save()
+
+    adapter = LearnUserAdapter(user)
+    adapter.from_dict(
+        {
+            "active": True,
+            "userName": "jsmith",
+            "externalId": "1",
+            "name": {"givenName": "", "familyName": "   "},
+        }
+    )
+    adapter.save()
+
+    user.refresh_from_db()
+
+    assert user.legal_address.first_name == "Joe"
+    assert user.legal_address.last_name == "Smith"
+
+
 def test_learn_user_adapter_blank_fields():
     """An incoming request with no name data doesn't blank out existing fields"""
     user = UserFactory.create(name="Joe Smith")
