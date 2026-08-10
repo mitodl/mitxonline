@@ -127,7 +127,8 @@ def test_learn_user_adapter_from_dict_explicit_null_name_does_not_blank_out():
 def test_learn_user_adapter_from_dict_blank_name_does_not_blank_out():
     """An empty or whitespace-only string for givenName/familyName is treated
     the same as absent/null - it must not silently overwrite a previously
-    valid legal_address name with blank data"""
+    valid legal_address name with blank data
+    """
     user = UserFactory.create(name="Joe Smith")
     user.legal_address.first_name = "Joe"
     user.legal_address.last_name = "Smith"
