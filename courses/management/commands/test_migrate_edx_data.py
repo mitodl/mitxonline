@@ -170,9 +170,7 @@ def test_limit_caps_number_of_users_repaired():
     """--limit caps how many affected users are considered at all, leaving
     the rest broken for a later run
     """
-    users = [
-        UserFactory.create(email=f"limited-{i}@example.com") for i in range(3)
-    ]
+    users = [UserFactory.create(email=f"limited-{i}@example.com") for i in range(3)]
     for user in users:
         _break_user(user)
 

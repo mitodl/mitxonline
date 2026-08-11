@@ -481,7 +481,9 @@ class Command(BaseCommand):
         unmatched = len(affected_by_email) - len(repaired_emails)
         if dry_run:
             self.stdout.write(
-                self.style.WARNING(f"[DRY RUN] Would repair {len(repaired_emails)} users")
+                self.style.WARNING(
+                    f"[DRY RUN] Would repair {len(repaired_emails)} users"
+                )
             )
         else:
             self.stdout.write(
