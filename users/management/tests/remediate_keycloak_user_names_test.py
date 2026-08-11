@@ -43,7 +43,8 @@ def test_mitxonline_users_lookup_query_count_is_flat(django_assert_max_num_queri
     """_mitxonline_users_by_scim_id() plus constructing a LearnUserAdapter per
     user (as handle() does) must not issue extra queries per user - the fixed
     query count covers select_related(legal_address, user_profile) plus one
-    bulk prefetch for openedx_users, regardless of how many users there are"""
+    bulk prefetch for openedx_users, regardless of how many users there are
+    """
     for i in range(5):
         user = UserFactory.create(scim_external_id=f"kc-{i}")
         user.legal_address.first_name = "Joe"

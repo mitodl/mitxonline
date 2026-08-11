@@ -53,8 +53,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--dry-run",
             action="store_true",
-            help="Run backfill and classification only; do not sync or write "
-            "anything.",
+            help="Run backfill and classification only; do not sync or write anything.",
         )
         parser.add_argument(
             "--report-path",
@@ -109,9 +108,7 @@ class Command(BaseCommand):
         verified, mismatched = [], []
         for start in range(0, len(to_sync), batch_size):
             batch = to_sync[start : start + batch_size]
-            states = scim_api.sync_users_to_scim_remote(
-                [row["user"] for row in batch]
-            )
+            states = scim_api.sync_users_to_scim_remote([row["user"] for row in batch])
             self.stdout.write(
                 f"  batch {start // batch_size + 1}: "
                 f"{sum(1 for s in states if s.success)}/{len(states)} succeeded"
