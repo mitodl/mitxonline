@@ -126,11 +126,26 @@ class Command(BaseCommand):
         )
 
     def _mitxonline_users_by_scim_id(self):
-        users = User.objects.filter(is_active=True).exclude(
-            scim_external_id__isnull=True
+        # LearnUserAdapter.__init__ touches user_profile and openedx_user on
+        # every instantiation (not just legal_address), so both need to be
+        # covered here too or the loop in handle() does 2 extra queries per
+        # user. user_profile is a real OneToOneField, so select_related
+        # covers it. openedx_user is a cached_property backed by
+        # self.openedx_users.first() - select_related can't target it
+        # (openedx_users is the real FK), and prefetch_related alone doesn't
+        # help either, since .first() re-queries instead of using the
+        # prefetch cache. So we prefetch openedx_users and manually prime the
+        # cached_property's cache from it below.
+        users = (
+            User.objects.filter(is_active=True)
+            .exclude(scim_external_id__isnull=True)
+            .select_related("legal_address", "user_profile")
+            .prefetch_related("openedx_users")
         )
         by_id = {}
-        for user in users.select_related("legal_address"):
+        for user in users:
+            prefetched = list(user.openedx_users.all())
+            user.__dict__["openedx_user"] = prefetched[0] if prefetched else None
             if user.scim_external_id:
                 by_id[user.scim_external_id] = user
         return by_id

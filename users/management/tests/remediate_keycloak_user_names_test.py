@@ -5,6 +5,7 @@ import json
 import pytest
 
 from b2b.keycloak_admin_dataclasses import UserRepresentation
+from users.adapters import LearnUserAdapter
 from users.factories import UserFactory
 from users.management.commands import remediate_keycloak_user_names
 
@@ -35,6 +36,24 @@ def mock_bootstrap(mocker):
     return mocker.patch(
         "users.management.commands.remediate_keycloak_user_names.bootstrap_client"
     )
+
+
+@pytest.mark.django_db
+def test_mitxonline_users_lookup_query_count_is_flat(django_assert_max_num_queries):
+    """_mitxonline_users_by_scim_id() plus constructing a LearnUserAdapter per
+    user (as handle() does) must not issue extra queries per user - the fixed
+    query count covers select_related(legal_address, user_profile) plus one
+    bulk prefetch for openedx_users, regardless of how many users there are"""
+    for i in range(5):
+        user = UserFactory.create(scim_external_id=f"kc-{i}")
+        user.legal_address.first_name = "Joe"
+        user.legal_address.last_name = "Smith"
+        user.legal_address.save()
+
+    with django_assert_max_num_queries(3):
+        by_id = COMMAND._mitxonline_users_by_scim_id()  # noqa: SLF001
+        for user in by_id.values():
+            LearnUserAdapter(user)._resolve_name()  # noqa: SLF001
 
 
 @pytest.mark.django_db
