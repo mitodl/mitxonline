@@ -26,6 +26,7 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 from b2b.api import _create_discount_with_product, is_potentially_valid_mailgun_webhook
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
 from b2b.models import (
+    EMAIL_STATUS_FAILED,
     EMAIL_STATUS_PENDING,
     REDEMPTION_STATUS_ASSIGNED,
     REDEMPTION_STATUS_REDEEMED,
@@ -377,9 +378,13 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 name="status",
                 type=str,
                 location=OpenApiParameter.QUERY,
-                description="Filter codes by status. Supported values are assigned and redeemed.",
+                description="Filter codes by status. Supported values are assigned, redeemed, and failed.",
                 required=False,
-                enum=[REDEMPTION_STATUS_ASSIGNED, REDEMPTION_STATUS_REDEEMED],
+                enum=[
+                    REDEMPTION_STATUS_ASSIGNED,
+                    REDEMPTION_STATUS_REDEEMED,
+                    EMAIL_STATUS_FAILED,
+                ],
             ),
         ],
     )
@@ -432,6 +437,17 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 filter_q &= Q(contract_redemptions__user__isnull=True) & Q(
                     contract_redemptions__redeemed_on__isnull=True
                 )
+            elif status_filter == EMAIL_STATUS_FAILED:
+                # A failed invite email only matters if the code hasn't since
+                # been redeemed some other way - exclude redeemed codes here.
+                # We shouldn't really be in this state under normal operation,
+                # but it could happen if we give a user their code out of band.
+                filter_q &= (
+                    Q(contract_redemptions__email_status=EMAIL_STATUS_FAILED)
+                    & Q(contract_redemptions__user__isnull=True)
+                    & Q(contract_redemptions__redeemed_on__isnull=True)
+                )
+
             discounts = (
                 contract.get_discounts()
                 .filter(filter_q)

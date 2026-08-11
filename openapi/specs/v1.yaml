@@ -386,8 +386,10 @@ paths:
           type: string
           enum:
           - assigned
+          - failed
           - redeemed
-        description: Filter codes by status. Supported values are assigned and redeemed.
+        description: Filter codes by status. Supported values are assigned, redeemed,
+          and failed.
       tags:
       - b2b
       responses:
