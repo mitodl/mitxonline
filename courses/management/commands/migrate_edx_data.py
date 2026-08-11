@@ -272,7 +272,9 @@ class Command(BaseCommand):
             new_users.append(user)
             new_emails.append(email)
 
-        User.objects.bulk_create(new_users, batch_size=batch_size, ignore_conflicts=True)
+        User.objects.bulk_create(
+            new_users, batch_size=batch_size, ignore_conflicts=True
+        )
 
         if not new_emails:
             return []

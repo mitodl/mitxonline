@@ -54,7 +54,18 @@ USER_COLUMNS = [
 
 
 def _user_row(email, name, country="US"):
-    return (email, name, country, "MA", "02139", "1 Main St", "", "Cambridge", None, None)
+    return (
+        email,
+        name,
+        country,
+        "MA",
+        "02139",
+        "1 Main St",
+        "",
+        "Cambridge",
+        None,
+        None,
+    )
 
 
 def test_bulk_create_users_returns_real_ids():
