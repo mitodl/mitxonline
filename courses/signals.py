@@ -2,6 +2,7 @@
 Signals for mitxonline course certificates
 """
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -90,7 +91,11 @@ def purge_fastly_cache_on_course_save(
     from cms.tasks import queue_fastly_surrogate_key_purge  # noqa: PLC0415
 
     surrogate_key = f"mitxonline:course:{instance.readable_id}"
-    transaction.on_commit(lambda: queue_fastly_surrogate_key_purge.delay(surrogate_key))
+    transaction.on_commit(
+        lambda: queue_fastly_surrogate_key_purge.delay(
+            surrogate_key, settings.MIT_LEARN_FASTLY_SERVICE_ID
+        )
+    )
 
 
 @receiver(post_save, sender=CourseRun, dispatch_uid="courserun_post_save_fastly_purge")
@@ -107,7 +112,11 @@ def purge_fastly_cache_on_course_run_save(
     from cms.tasks import queue_fastly_surrogate_key_purge  # noqa: PLC0415
 
     surrogate_key = f"mitxonline:course:{instance.course.readable_id}"
-    transaction.on_commit(lambda: queue_fastly_surrogate_key_purge.delay(surrogate_key))
+    transaction.on_commit(
+        lambda: queue_fastly_surrogate_key_purge.delay(
+            surrogate_key, settings.MIT_LEARN_FASTLY_SERVICE_ID
+        )
+    )
 
 
 @receiver(post_save, sender=Program, dispatch_uid="program_post_save_fastly_purge")
@@ -124,4 +133,8 @@ def purge_fastly_cache_on_program_save(
     from cms.tasks import queue_fastly_surrogate_key_purge  # noqa: PLC0415
 
     surrogate_key = f"mitxonline:program:{instance.readable_id}"
-    transaction.on_commit(lambda: queue_fastly_surrogate_key_purge.delay(surrogate_key))
+    transaction.on_commit(
+        lambda: queue_fastly_surrogate_key_purge.delay(
+            surrogate_key, settings.MIT_LEARN_FASTLY_SERVICE_ID
+        )
+    )
