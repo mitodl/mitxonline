@@ -1,4 +1,5 @@
-"""Tests for migrate_edx_data management command's repair_migrated_profiles type"""
+"""Tests for migrate_edx_data management command's user-migration bulk_create
+fix and repair_migrated_profiles type"""
 
 import pytest
 
@@ -74,6 +75,81 @@ def _break_user(user):
     """
     LegalAddress.objects.filter(user=user).delete()
     UserProfile.objects.filter(user=user).delete()
+
+
+def test_bulk_create_users_returns_real_ids():
+    """_bulk_create_users must return objects with real, populated ids -
+    bulk_create(ignore_conflicts=True) never sets .pk on its own, on any
+    backend, so this only works if the returned rows are re-fetched
+    """
+    rows = [{"user_email": "new@example.com", "user_full_name": "New User"}]
+
+    created = Command._bulk_create_users(  # noqa: SLF001
+        rows, existing_emails=set(), batch_size=100
+    )
+
+    assert len(created) == 1
+    assert created[0].id is not None
+    assert User.objects.get(email="new@example.com").id == created[0].id
+
+
+def test_migrate_users_creates_legal_address_and_profile():
+    """End to end through _migrate_users: new users must actually get
+    LegalAddress and UserProfile rows, not just a User row
+    """
+    conn = FakeConnection(
+        columns=USER_COLUMNS,
+        rows=[_user_row("alice@example.com", "Alice A", country="US")],
+    )
+
+    Command()._migrate_users(conn, {})  # noqa: SLF001
+
+    user = User.objects.get(email="alice@example.com")
+    assert user.legal_address.country == "US"
+    assert UserProfile.objects.filter(user=user).exists()
+
+
+def test_migrate_users_multiple_new_users_in_one_batch():
+    """Multiple new users in a single batch must each get their own
+    LegalAddress - previously, every user.id was None, so id_row_lookup
+    collapsed every entry onto the same None key and only one user's row
+    data survived
+    """
+    conn = FakeConnection(
+        columns=USER_COLUMNS,
+        rows=[
+            _user_row("alice@example.com", "Alice A", country="US"),
+            _user_row("bob@example.com", "Bob B", country="CA"),
+        ],
+    )
+
+    Command()._migrate_users(conn, {})  # noqa: SLF001
+
+    alice = User.objects.get(email="alice@example.com")
+    bob = User.objects.get(email="bob@example.com")
+    assert alice.legal_address.country == "US"
+    assert bob.legal_address.country == "CA"
+    assert UserProfile.objects.filter(user=alice).exists()
+    assert UserProfile.objects.filter(user=bob).exists()
+
+
+def test_migrate_users_skips_existing_emails():
+    """A user who already exists in mitxonline must not get a duplicate
+    User row, and their existing LegalAddress/UserProfile must be left
+    alone
+    """
+    existing_user = UserFactory.create(email="existing@example.com")
+    LegalAddress.objects.filter(user=existing_user).delete()
+
+    conn = FakeConnection(
+        columns=USER_COLUMNS,
+        rows=[_user_row(existing_user.email, "Existing User", country="US")],
+    )
+
+    Command()._migrate_users(conn, {})  # noqa: SLF001
+
+    assert User.objects.filter(email=existing_user.email).count() == 1
+    assert not LegalAddress.objects.filter(user=existing_user).exists()
 
 
 def test_repair_creates_missing_legal_address_and_profile():
