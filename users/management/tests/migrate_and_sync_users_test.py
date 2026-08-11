@@ -54,9 +54,7 @@ def test_limit_is_threaded_through_to_migrate_edx_data(mock_edx_migration, mocke
         return_value=[],
     )
 
-    COMMAND.handle(
-        dry_run=False, skip_edx_migration=False, force=False, limit=5
-    )
+    COMMAND.handle(dry_run=False, skip_edx_migration=False, force=False, limit=5)
 
     mock_edx_migration.assert_called_once_with(
         "migrate_edx_data", type="users", limit=5
