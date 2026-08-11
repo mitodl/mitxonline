@@ -97,6 +97,49 @@ def test_up_to_date_user_is_skipped(mocker):
 
 
 @pytest.mark.django_db
+def test_single_name_user_with_null_keycloak_field_is_up_to_date(mocker):
+    """A mononym user (resolved family_name == "") whose Keycloak record has
+    lastName=None, not "", must still be treated as up to date - None and ""
+    both mean "no last name", and Keycloak may return either representation"""
+    user = UserFactory.create(name="Madonna", scim_external_id="kc-1")
+    user.legal_address.first_name = ""
+    user.legal_address.last_name = ""
+    user.legal_address.save()
+
+    kc_user = UserRepresentation(id="kc-1", firstName="Madonna", lastName=None)
+    client = _mock_client(mocker, [[kc_user]])
+    remediate_keycloak_user_names.bootstrap_client.return_value = client
+
+    COMMAND.handle(apply=True, limit=None, report_path=None)
+
+    client.save.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_single_name_user_patch_verified_when_refetch_returns_null(mocker, tmp_path):
+    """After patching a mononym user's lastName to "", the verify step must
+    still pass if Keycloak's re-fetch normalizes the empty string back to
+    None"""
+    user = UserFactory.create(name="Madonna", scim_external_id="kc-1")
+    user.legal_address.first_name = ""
+    user.legal_address.last_name = ""
+    user.legal_address.save()
+
+    kc_user = UserRepresentation(id="kc-1", firstName="", lastName="")
+    client = _mock_client(mocker, [[kc_user]])
+    client.retrieve.return_value = UserRepresentation(
+        id="kc-1", firstName="Madonna", lastName=None
+    )
+    remediate_keycloak_user_names.bootstrap_client.return_value = client
+
+    report = _run(tmp_path, apply=True, limit=None)
+    patched_row = report["patched"][0]
+
+    assert patched_row["verified"] is True
+    client.retrieve.assert_called_once()
+
+
+@pytest.mark.django_db
 def test_unpatchable_user_has_no_name_data(mocker, tmp_path):
     """A user with no name data anywhere in mitxonline is reported separately,
     never patched even with --apply

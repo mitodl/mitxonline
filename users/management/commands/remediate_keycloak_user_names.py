@@ -79,8 +79,8 @@ class Command(BaseCommand):
                 continue
 
             if (
-                keycloak_user.firstName == given_name
-                and keycloak_user.lastName == family_name
+                (keycloak_user.firstName or "") == given_name
+                and (keycloak_user.lastName or "") == family_name
             ):
                 up_to_date.append(
                     self._row(keycloak_user, user, given_name, family_name)
@@ -104,7 +104,8 @@ class Command(BaseCommand):
             # verify - don't just trust a 2xx
             refetched = client.retrieve(f"users/{keycloak_user.id}", UserRepresentation)
             row["verified"] = (
-                refetched.firstName == given_name and refetched.lastName == family_name
+                (refetched.firstName or "") == given_name
+                and (refetched.lastName or "") == family_name
             )
             patched.append(row)
             patch_count += 1
