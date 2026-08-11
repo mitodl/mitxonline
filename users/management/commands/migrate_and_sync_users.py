@@ -6,6 +6,17 @@ data, sync to Keycloak via SCIM, verify what was actually stored, and report.
 This replaces the old two-step manual process (running `migrate_edx_data`,
 then an ad hoc SCIM sync script with no field-level visibility) with one
 auditable command.
+
+Stage 1 delegates to `migrate_edx_data --type users` via `call_command()`
+rather than reimplementing its Trino/bulk_create logic here - that command
+also serves five other unrelated migration types (course_runs, entitlements,
+etc.) and owns the Trino schema, so duplicating its logic would mean two
+places to keep in sync as that schema changes. This delegation has real
+limits worth knowing: `migrate_edx_data`'s "users" type doesn't support
+`--dry-run` (only its course_runs/entitlements types do), so this command's
+own `--dry-run` cannot make Stage 1 a no-op - it always writes unless
+`--skip-edx-migration` is also passed. `--limit` is threaded through, since
+that type does respect it.
 """
 
 import json
