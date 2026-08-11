@@ -48,10 +48,13 @@ def _order_is_for_program_enrolled_course(order: Order) -> bool:
         purchased_object = line.purchased_object
         if not purchased_object:
             continue
-        if isinstance(purchased_object, CourseRun) and ProgramEnrollment.objects.filter(
-            user=order.purchaser,
-            program__all_requirements__course=purchased_object.course,
-        ).exists():
+        if (
+            isinstance(purchased_object, CourseRun)
+            and ProgramEnrollment.objects.filter(
+                user=order.purchaser,
+                program__all_requirements__course=purchased_object.course,
+            ).exists()
+        ):
             return True
     return False
 
