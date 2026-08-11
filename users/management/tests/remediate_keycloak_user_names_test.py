@@ -100,7 +100,8 @@ def test_up_to_date_user_is_skipped(mocker):
 def test_single_name_user_with_null_keycloak_field_is_up_to_date(mocker):
     """A mononym user (resolved family_name == "") whose Keycloak record has
     lastName=None, not "", must still be treated as up to date - None and ""
-    both mean "no last name", and Keycloak may return either representation"""
+    both mean "no last name", and Keycloak may return either representation
+    """
     user = UserFactory.create(name="Madonna", scim_external_id="kc-1")
     user.legal_address.first_name = ""
     user.legal_address.last_name = ""
@@ -119,7 +120,8 @@ def test_single_name_user_with_null_keycloak_field_is_up_to_date(mocker):
 def test_single_name_user_patch_verified_when_refetch_returns_null(mocker, tmp_path):
     """After patching a mononym user's lastName to "", the verify step must
     still pass if Keycloak's re-fetch normalizes the empty string back to
-    None"""
+    None
+    """
     user = UserFactory.create(name="Madonna", scim_external_id="kc-1")
     user.legal_address.first_name = ""
     user.legal_address.last_name = ""
