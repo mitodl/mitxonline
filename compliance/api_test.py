@@ -182,7 +182,7 @@ def test_verify_user_with_exports_calls_validate_export_compliance(
     assert payload["order_information"]["bill_to"]["postal_code"] == "02139"
     assert payload["client_reference_information"].get("partner") is None
 
-    log_entry = get_latest_export_compliance_log(user, run)
+    log_entry = get_latest_export_compliance_log(user)
     assert log_entry is not None
     assert log_entry.decision == "COMPLETED"
     assert log_entry.reason_code == "MATCH-BCO"
@@ -272,10 +272,10 @@ def test_verify_user_with_exports_uses_cached_failed_result(mocker, export_setti
     assert result.raw is None
 
 
-def test_verify_user_with_exports_uses_failed_log_for_other_stale_run(
+def test_verify_user_with_exports_rechecks_after_expired_failed_log(
     mocker, export_settings
 ):
-    """A failed log for a different, stale run should still short-circuit the CyberSource call."""
+    """An expired (>7 days old) failed log should no longer short-circuit the CyberSource call."""
     user = UserFactory.create()
     other_run = CourseRunFactory.create()
     run = CourseRunFactory.create()
@@ -287,23 +287,29 @@ def test_verify_user_with_exports_uses_failed_log_for_other_stale_run(
         request_id="cached-request-id",
     )
     ExportComplianceLog.objects.filter(pk=stale_log.pk).update(
-        created_on=now_in_utc() - timedelta(hours=25)
+        created_on=now_in_utc() - timedelta(days=8)
+    )
+    response = SimpleNamespace(
+        status="COMPLETED",
+        id="abc123",
+        export_compliance_information=SimpleNamespace(info_codes=[]),
+        error_information=None,
+        message=None,
     )
     mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.return_value = response
     mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
 
     result = verify_user_with_exports(user, run)
 
-    mock_client.validate_export_compliance.assert_not_called()
-    assert result.accepted is False
-    assert result.decision == "DECLINED"
-    assert result.request_id == "cached-request-id"
+    mock_client.validate_export_compliance.assert_called_once()
+    assert result.decision == "COMPLETED"
 
 
-def test_verify_user_with_exports_ignores_stale_log_for_other_run(
+def test_verify_user_with_exports_ignores_expired_log_for_other_run(
     mocker, export_settings
 ):
-    """An accepted log for a different run older than 24 hours should not produce a cache hit."""
+    """An accepted log for a different run older than 7 days should not produce a cache hit."""
     user = UserFactory.create(name="Ada Lovelace", email="ada@example.com")
     user.legal_address.country = "US"
     user.legal_address.street_address_1 = "77 Massachusetts Ave"
@@ -317,7 +323,43 @@ def test_verify_user_with_exports_ignores_stale_log_for_other_run(
         user=user, courseware_object=other_run, decision="COMPLETED"
     )
     ExportComplianceLog.objects.filter(pk=stale_log.pk).update(
-        created_on=now_in_utc() - timedelta(hours=25)
+        created_on=now_in_utc() - timedelta(days=8)
+    )
+
+    response = SimpleNamespace(
+        status="COMPLETED",
+        id="abc123",
+        export_compliance_information=SimpleNamespace(info_codes=[]),
+        error_information=None,
+        message=None,
+    )
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.return_value = response
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    result = verify_user_with_exports(user, run)
+
+    mock_client.validate_export_compliance.assert_called_once()
+    assert result.decision == "COMPLETED"
+
+
+def test_verify_user_with_exports_rechecks_after_expired_log_for_same_run(
+    mocker, export_settings
+):
+    """An accepted log for the SAME run older than 7 days should not produce a cache hit."""
+    user = UserFactory.create(name="Ada Lovelace", email="ada@example.com")
+    user.legal_address.country = "US"
+    user.legal_address.street_address_1 = "77 Massachusetts Ave"
+    user.legal_address.city = "Cambridge"
+    user.legal_address.state = "US-MA"
+    user.legal_address.postal_code = "02139"
+    user.legal_address.save()
+    run = CourseRunFactory.create()
+    stale_log = ExportComplianceLogFactory.create(
+        user=user, courseware_object=run, decision="COMPLETED"
+    )
+    ExportComplianceLog.objects.filter(pk=stale_log.pk).update(
+        created_on=now_in_utc() - timedelta(days=8)
     )
 
     response = SimpleNamespace(
@@ -340,7 +382,7 @@ def test_verify_user_with_exports_ignores_stale_log_for_other_run(
 def test_verify_user_with_exports_uses_recent_accepted_log_for_other_run(
     mocker, export_settings
 ):
-    """An accepted log for a different run within the last 24 hours should produce a cache hit."""
+    """An accepted log for a different run within the last 7 days should produce a cache hit."""
     user = UserFactory.create()
     other_run = CourseRunFactory.create()
     run = CourseRunFactory.create()

@@ -24,9 +24,7 @@ from CyberSource.models.validate_export_compliance_request import (
     ValidateExportComplianceRequest,
 )
 from django.conf import settings
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
-from django.db.models import Q
 from mitol.common.utils.datetime import now_in_utc
 from nacl.encoding import Base64Encoder
 from nacl.public import PublicKey, SealedBox
@@ -37,7 +35,7 @@ from compliance.models import ExportComplianceLog
 log = logging.getLogger(__name__)
 
 ISO_3166_2_PART_COUNT = 2
-RECENT_EXPORT_COMPLIANCE_CHECK_WINDOW = timedelta(hours=24)
+EXPORT_COMPLIANCE_CHECK_EXPIRATION = timedelta(days=7)
 
 DecryptedExportComplianceLog = namedtuple(  # noqa: PYI024
     "DecryptedExportComplianceLog", ["request", "response"]
@@ -319,24 +317,17 @@ def log_export_compliance_check(
     )
 
 
-def get_latest_export_compliance_log(user, run) -> ExportComplianceLog | None:
+def get_latest_export_compliance_log(user) -> ExportComplianceLog | None:
     """
-    Return the most recent export compliance log for a user that either
-    matches the given courseware object, was created within the last 24
-    hours (regardless of courseware object), or represents a prior failed
-    check for this user (regardless of age or courseware object), if any.
+    Return the user's most recent export compliance log, if it was created
+    within the last EXPORT_COMPLIANCE_CHECK_EXPIRATION (7 days). Once a log
+    expires, it's no longer reused regardless of its decision or which
+    courseware object it was for - the next enrollment attempt triggers a
+    fresh CyberSource check.
     """
-    cutoff = now_in_utc() - RECENT_EXPORT_COMPLIANCE_CHECK_WINDOW
+    cutoff = now_in_utc() - EXPORT_COMPLIANCE_CHECK_EXPIRATION
     return (
-        ExportComplianceLog.objects.filter(user=user)
-        .filter(
-            Q(
-                courseware_content_type=ContentType.objects.get_for_model(run),
-                courseware_object_id=run.id,
-            )
-            | Q(created_on__gte=cutoff)
-            | ~Q(decision__in=ExportComplianceLog.ACCEPTED_DECISIONS)
-        )
+        ExportComplianceLog.objects.filter(user=user, created_on__gte=cutoff)
         .order_by("-created_on")
         .first()
     )
@@ -361,11 +352,11 @@ def decrypt_export_compliance_log(
 def verify_user_with_exports(user, run) -> ExportComplianceResult:
     """
     Verify a user against CyberSource export compliance services for a given
-    CourseRun or Program, reusing any cached result (accepted or failed)
-    for the same courseware object, from the last 24 hours, or representing
-    a prior failed check for this user.
+    CourseRun or Program, reusing the user's most recent cached result
+    (accepted or failed) if it was created within the last
+    EXPORT_COMPLIANCE_CHECK_EXPIRATION (7 days).
     """
-    cached_log = get_latest_export_compliance_log(user, run)
+    cached_log = get_latest_export_compliance_log(user)
     if cached_log is not None:
         return ExportComplianceResult(
             decision=cached_log.decision,
