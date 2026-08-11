@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.162.3
+Version 1.162.3 (Released August 11, 2026)
 ---------------
 
 - Strip angle brackets (#3825)
