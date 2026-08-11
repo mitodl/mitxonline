@@ -368,8 +368,9 @@ class User(
 
     @property
     def should_skip_onboarding(self):
+        user_profile = getattr(self, "user_profile", None)
         return (
-            self.user_profile.completed_onboarding
+            (user_profile is not None and user_profile.completed_onboarding)
             or self.courserunenrollment_set(manager="all_objects").exists()
         )
 
