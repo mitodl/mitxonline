@@ -19,6 +19,7 @@ from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import permission_classes
+from rest_framework.exceptions import ValidationError
 from rest_framework.generics import GenericAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -32,6 +33,7 @@ from courses.api import (
     deactivate_run_enrollment,
     get_relevant_course_run_qset,
     get_user_relevant_program_course_run_qset,
+    partner_schools_for_program,
 )
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
@@ -632,6 +634,32 @@ class PartnerSchoolViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = PartnerSchoolSerializer
     queryset = PartnerSchool.objects.all()
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="program",
+                type=int,
+                description="Only return schools assigned to this program id.",
+                required=False,
+            )
+        ]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    def get_queryset(self):
+        """Optionally scope the list to a single program."""
+        queryset = super().get_queryset()
+        program_id = self.request.query_params.get("program")
+        if program_id:
+            try:
+                program_id = int(program_id)
+            except ValueError:
+                msg = "program must be an integer id."
+                raise ValidationError({"program": msg}) from None
+            queryset = queryset.filter(programs__id=program_id).distinct()
+        return queryset
+
 
 def get_enrolled_program_or_404(user, program_id: int) -> Program:
     """Return a program only if the user has an active enrollment for it."""
@@ -684,7 +712,9 @@ class LearnerRecordShareView(APIView):
             and request.data["partnerSchool"] is not None
         ):
             try:
-                school = PartnerSchool.objects.get(pk=request.data["partnerSchool"])
+                school = partner_schools_for_program(program).get(
+                    pk=request.data["partnerSchool"]
+                )
             except PartnerSchool.DoesNotExist:
                 return Response("Partner school not found.", status.HTTP_404_NOT_FOUND)
 
