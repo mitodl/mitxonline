@@ -84,7 +84,7 @@ def backfill_verified_course_enrollments(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("courses", "0100_courserunenrollment_edx_enrollment_retry_count"),
+        ("courses", "0101_partnerschoolprogram"),
         ("ecommerce", "0043_refund_request_status"),
     ]
 
