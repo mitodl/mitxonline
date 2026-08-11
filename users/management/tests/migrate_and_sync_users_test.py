@@ -43,6 +43,43 @@ def mock_edx_migration(mocker):
 
 
 @pytest.mark.django_db
+def test_limit_is_threaded_through_to_migrate_edx_data(mock_edx_migration, mocker):
+    """--limit should also limit Stage 1's Trino query, not just which
+    mitxonline candidates get classified/synced - otherwise a small test run
+    still backfills the entire edX dataset before test-syncing a handful
+    of users
+    """
+    mocker.patch(
+        "users.management.commands.migrate_and_sync_users.scim_api.sync_users_to_scim_remote",
+        return_value=[],
+    )
+
+    COMMAND.handle(
+        dry_run=False, skip_edx_migration=False, force=False, limit=5
+    )
+
+    mock_edx_migration.assert_called_once_with(
+        "migrate_edx_data", type="users", limit=5
+    )
+
+
+@pytest.mark.django_db
+def test_no_limit_does_not_pass_limit_kwarg(mock_edx_migration, mocker):
+    """Without --limit, migrate_edx_data should run with its own default
+    (unbounded), not an explicit limit=None which would behave differently
+    if migrate_edx_data ever starts treating limit=None as limit=0
+    """
+    mocker.patch(
+        "users.management.commands.migrate_and_sync_users.scim_api.sync_users_to_scim_remote",
+        return_value=[],
+    )
+
+    COMMAND.handle(dry_run=False, skip_edx_migration=False, force=False, limit=None)
+
+    mock_edx_migration.assert_called_once_with("migrate_edx_data", type="users")
+
+
+@pytest.mark.django_db
 def test_dry_run_classifies_without_syncing(mocker, tmp_path):
     """Dry run reports classification tiers and never calls the sync API"""
     mock_sync = mocker.patch(

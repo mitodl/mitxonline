@@ -42,7 +42,10 @@ class Command(BaseCommand):
         parser.add_argument(
             "--limit",
             type=int,
-            help="Limit the number of users processed (for testing purposes).",
+            help="Limit the number of users processed (for testing purposes). "
+            "Also passed through to migrate_edx_data's Trino query in Stage 1, "
+            "so a small test run doesn't backfill the entire edX dataset just "
+            "to test-sync a handful of users.",
         )
         parser.add_argument(
             "--force",
@@ -53,7 +56,11 @@ class Command(BaseCommand):
         parser.add_argument(
             "--dry-run",
             action="store_true",
-            help="Run backfill and classification only; do not sync or write anything.",
+            help="Run classification only; do not sync to Keycloak. Note this "
+            "does NOT make Stage 1 a no-op - migrate_edx_data's own 'users' "
+            "migration type doesn't support --dry-run, so it still writes "
+            "User/LegalAddress/UserProfile rows unless --skip-edx-migration "
+            "is also passed.",
         )
         parser.add_argument(
             "--report-path",
@@ -69,11 +76,10 @@ class Command(BaseCommand):
         dry_run = options.get("dry_run", False)
         report_path = options.get("report_path")
 
-        if not options.get("skip_edx_migration", False):
-            self.stdout.write("Stage 1: backfilling edX user data...")
-            call_command("migrate_edx_data", type="users")
-        else:
+        if options.get("skip_edx_migration", False):
             self.stdout.write("Stage 1: skipped (--skip-edx-migration).")
+        else:
+            self._run_edx_backfill(limit)
 
         self.stdout.write("Stage 2: classifying sync candidates...")
         candidates = list(
@@ -177,6 +183,21 @@ class Command(BaseCommand):
             },
             report_path,
         )
+
+    def _run_edx_backfill(self, limit):
+        """Run Stage 1 (migrate_edx_data's "users" migration type).
+
+        migrate_edx_data's "users" type doesn't support --dry-run (only
+        course_runs/entitlements do) - it always writes, so there's no
+        dry_run to thread through here. --limit is threaded through so a
+        small test run doesn't backfill the entire edX dataset just to
+        test-sync a handful of users.
+        """
+        self.stdout.write("Stage 1: backfilling edX user data...")
+        if limit is not None:
+            call_command("migrate_edx_data", type="users", limit=limit)
+        else:
+            call_command("migrate_edx_data", type="users")
 
     def _classify(self, candidates, *, force):
         """Split candidates into (to_sync, blocked) using LearnUserAdapter's
