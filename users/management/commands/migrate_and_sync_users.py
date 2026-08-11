@@ -138,9 +138,16 @@ class Command(BaseCommand):
                     continue
 
                 sent_name = row["given_name"], row["family_name"]
+                # Keycloak may omit "name" entirely, or echo it back as an
+                # explicit null, for a user synced with a blank given/family
+                # name (exactly the population this command targets) -
+                # `.get("name", {})` only covers the omitted case; a present
+                # `"name": null` returns None itself, and calling .get() on
+                # that would raise AttributeError. Normalize every case to "".
+                name_body = state.response_body.get("name") or {}
                 got_name = (
-                    state.response_body.get("name", {}).get("givenName"),
-                    state.response_body.get("name", {}).get("familyName"),
+                    name_body.get("givenName") or "",
+                    name_body.get("familyName") or "",
                 )
                 if got_name == sent_name:
                     verified.append(row)

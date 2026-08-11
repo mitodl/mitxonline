@@ -151,6 +151,54 @@ def test_verifies_matching_response_body(mocker, tmp_path):
 
 
 @pytest.mark.django_db
+def test_verifies_blank_name_when_response_body_omits_name(mocker, tmp_path):
+    """A tier-3 (forced blank name) user's response body omitting "name"
+    entirely must still verify - sent ("", "") should match an absent name,
+    not be flagged as a mismatch"""
+    user = UserFactory.create(name="", global_id=None)
+    user.legal_address.first_name = ""
+    user.legal_address.last_name = ""
+    user.legal_address.save()
+
+    mocker.patch(
+        "users.management.commands.migrate_and_sync_users.scim_api.sync_users_to_scim_remote",
+        return_value=[_state(user, response_body={})],
+    )
+
+    report = _run(
+        tmp_path, dry_run=False, skip_edx_migration=False, force=True, limit=None
+    )
+
+    assert [row["user_id"] for row in report["verified"]] == [user.id]
+    assert report["mismatched"] == []
+
+
+@pytest.mark.django_db
+def test_verifies_blank_name_when_response_body_has_explicit_null_name(
+    mocker, tmp_path
+):
+    """A response body with "name": null (present, not omitted) must not
+    crash - .get("name", {}) returns None itself in that case, and calling
+    .get() on it would raise AttributeError without a guard"""
+    user = UserFactory.create(name="", global_id=None)
+    user.legal_address.first_name = ""
+    user.legal_address.last_name = ""
+    user.legal_address.save()
+
+    mocker.patch(
+        "users.management.commands.migrate_and_sync_users.scim_api.sync_users_to_scim_remote",
+        return_value=[_state(user, response_body={"name": None})],
+    )
+
+    report = _run(
+        tmp_path, dry_run=False, skip_edx_migration=False, force=True, limit=None
+    )
+
+    assert [row["user_id"] for row in report["verified"]] == [user.id]
+    assert report["mismatched"] == []
+
+
+@pytest.mark.django_db
 def test_flags_mismatched_response_body(mocker, tmp_path):
     """A synced user whose echoed response doesn't match what was sent is flagged,
     not silently counted as a success
