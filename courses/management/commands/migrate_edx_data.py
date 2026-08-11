@@ -391,9 +391,7 @@ class Command(BaseCommand):
             )
 
             if dry_run:
-                new_emails = [
-                    email for email in emails if email not in existing_emails
-                ]
+                new_emails = [email for email in emails if email not in existing_emails]
                 user_creation_count += len(new_emails)
                 continue
 
