@@ -154,7 +154,8 @@ def test_verifies_matching_response_body(mocker, tmp_path):
 def test_verifies_blank_name_when_response_body_omits_name(mocker, tmp_path):
     """A tier-3 (forced blank name) user's response body omitting "name"
     entirely must still verify - sent ("", "") should match an absent name,
-    not be flagged as a mismatch"""
+    not be flagged as a mismatch
+    """
     user = UserFactory.create(name="", global_id=None)
     user.legal_address.first_name = ""
     user.legal_address.last_name = ""
@@ -179,7 +180,8 @@ def test_verifies_blank_name_when_response_body_has_explicit_null_name(
 ):
     """A response body with "name": null (present, not omitted) must not
     crash - .get("name", {}) returns None itself in that case, and calling
-    .get() on it would raise AttributeError without a guard"""
+    .get() on it would raise AttributeError without a guard
+    """
     user = UserFactory.create(name="", global_id=None)
     user.legal_address.first_name = ""
     user.legal_address.last_name = ""
