@@ -175,6 +175,19 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSeri
         if run.b2b_contract is not None:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
 
+        # The enrollment window governs getting into a run. An existing active
+        # enrollment is exempt so that mode changes and idempotent retries for
+        # already-enrolled learners keep working after the window closes.
+        if (
+            not run.is_enrollable
+            and not models.CourseRunEnrollment.objects.filter(
+                run=run, user=user, active=True
+            ).exists()
+        ):
+            raise ValidationError(
+                {"run_id": f"Course run is not open for enrollment: {run_id}"}
+            )
+
         successful_enrollments, _ = create_run_enrollments(
             user,
             [run],
