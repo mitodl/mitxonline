@@ -1,5 +1,6 @@
 """Tests for migrate_edx_data management command's repair_migrated_profiles
-type and --dry-run behavior"""
+type and --dry-run behavior
+"""
 
 import pytest
 
