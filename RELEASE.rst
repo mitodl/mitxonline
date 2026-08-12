@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.162.4
+Version 1.162.4 (Released August 12, 2026)
 ---------------
 
 - Add failed filter to /codes (#3827)
