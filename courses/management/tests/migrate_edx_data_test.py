@@ -1,5 +1,6 @@
 """Tests for migrate_edx_data management command's user-migration bulk_create
-fix and repair_migrated_profiles type"""
+fix and repair_migrated_profiles type
+"""
 
 import pytest
 
