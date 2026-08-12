@@ -122,8 +122,18 @@ BILL_TO_FIELD_TO_PROFILE_FIELD = {
 }
 
 
-def _missing_bill_to_fields(bill_to: dict[str, str]) -> list[str]:
-    """Return the CyberSource bill-to field names missing from the given data."""
+def _missing_bill_to_fields(
+    bill_to: dict[str, str], *, always_require_postal_and_state: bool = False
+) -> list[str]:
+    """
+    Return the CyberSource bill-to field names missing from the given data.
+
+    CyberSource itself only requires administrative_area/postal_code for US
+    and CA addresses. Pass always_require_postal_and_state=True to flag them
+    as missing whenever they're empty regardless of country - used when
+    reporting missing profile fields back to the user, since they're useful
+    to have on file no matter where they live.
+    """
     missing_fields = []
 
     if not bill_to.get("first_name"):
@@ -132,7 +142,7 @@ def _missing_bill_to_fields(bill_to: dict[str, str]) -> list[str]:
         missing_fields.append("last_name")
 
     required_fields = ["address1", "locality", "country", "email"]
-    if bill_to.get("country") in {"US", "CA"}:
+    if always_require_postal_and_state or bill_to.get("country") in {"US", "CA"}:
         required_fields.extend(["administrative_area", "postal_code"])
 
     missing_fields.extend(field for field in required_fields if not bill_to.get(field))
@@ -182,9 +192,17 @@ def _build_bill_to(user) -> dict[str, str]:
 
 
 def get_missing_export_compliance_fields(user) -> list[str]:
-    """Return the profile field names required for an export compliance check that are missing."""
+    """
+    Return the profile field names required for an export compliance check that are missing.
+
+    Unlike the CyberSource check itself, state and postal code are always
+    flagged here when empty, even for countries where CyberSource doesn't
+    require them.
+    """
     bill_to = _build_bill_to(user)
-    missing_bill_to_fields = _missing_bill_to_fields(bill_to)
+    missing_bill_to_fields = _missing_bill_to_fields(
+        bill_to, always_require_postal_and_state=True
+    )
     return sorted(
         {BILL_TO_FIELD_TO_PROFILE_FIELD[field] for field in missing_bill_to_fields}
     )
