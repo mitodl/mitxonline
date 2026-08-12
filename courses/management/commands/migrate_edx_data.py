@@ -428,7 +428,7 @@ class Command(BaseCommand):
         affected_users = list(
             User.objects.filter(
                 Q(legal_address__isnull=True) | Q(user_profile__isnull=True)
-            )
+            ).only("id", "email")
         )
         if limit is not None:
             affected_users = affected_users[:limit]
