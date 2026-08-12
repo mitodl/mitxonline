@@ -44,19 +44,17 @@ def sync_hubspot_user(user: User):
 
 def _order_is_for_program_enrolled_course(order: Order) -> bool:
     """Return True if any line is a course run belonging to a program the purchaser is already enrolled in."""
-    for line in order.lines.all():
-        purchased_object = line.purchased_object
-        if not purchased_object:
-            continue
-        if (
-            isinstance(purchased_object, CourseRun)
-            and ProgramEnrollment.objects.filter(
-                user=order.purchaser,
-                program__all_requirements__course=purchased_object.course,
-            ).exists()
-        ):
-            return True
-    return False
+    course_ids = [
+        line.purchased_object.course_id
+        for line in order.lines.all()
+        if line.purchased_object and isinstance(line.purchased_object, CourseRun)
+    ]
+    if not course_ids:
+        return False
+    return ProgramEnrollment.objects.filter(
+        user=order.purchaser,
+        program__all_requirements__course__in=course_ids,
+    ).exists()
 
 
 def sync_hubspot_deal(order: Order):
