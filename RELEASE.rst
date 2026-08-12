@@ -1,6 +1,20 @@
 Release Notes
 =============
 
+Version 1.162.4 (Released August 12, 2026)
+---------------
+
+- Add failed filter to /codes (#3827)
+- Support program-specific pathway schools in learner record sharing (#3802)
+- Fix duplicate ECOMMERCE_DEFAULT_PAYMENT_GATEWAY env var declaration (#3832)
+- Add learner refund request workflow (#3810)
+- Learner record serializer tests (#3819)
+- Update dependency webpack-dev-server to v5.2.5 [SECURITY] (#3764)
+- Update dependency wagtail to v7.3.3 [SECURITY] (#3763)
+- Remove unused fetch_enrollment helper (#3820)
+- Adding missing profile fields to profile api (#3818)
+- Add CyberSource export compliance data model (#3793)
+
 Version 1.162.3 (Released August 11, 2026)
 ---------------
 
