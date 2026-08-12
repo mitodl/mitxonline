@@ -49,6 +49,7 @@ from courses.models import (
     Program,
     ProgramEnrollment,
 )
+from courses.serializers.v1.base import EnrollmentModeSerializer
 from courses.serializers.v2.certificates import (
     CourseRunCertificateSerializer,
     ProgramCertificateSerializer,
@@ -1699,7 +1700,7 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                 "collections": [],
                 "availability": "anytime",
                 "certificate_type": "Certificate of Completion",
-                "certificate_available": False,
+                "certificate_available": True,
                 "required_prerequisites": _get_page_prop(
                     program_enrollment, "prerequisites", ""
                 )
@@ -1711,7 +1712,9 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                 "end_date": None,
                 "enrollment_end": None,
                 "enrollment_start": None,
-                "enrollment_modes": [],
+                "enrollment_modes": EnrollmentModeSerializer(
+                    program_enrollment.program.enrollment_modes, many=True
+                ).data,
                 "duration": _get_page_prop(program_enrollment, "length"),
                 "time_commitment": _get_page_prop(program_enrollment, "effort"),
                 "min_price": _get_page_prop(program_enrollment, "min_price"),

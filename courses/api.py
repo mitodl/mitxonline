@@ -1268,10 +1268,18 @@ def _has_earned_program_cert(user, program):
             # has passed the referenced course
             return node.course in [*cert_courses, *grade_courses]
         elif node.is_program:
-            # has earned certificate for the required sub-program
-            return ProgramCertificate.all_objects.filter(
-                user=user, program=node.required_program, is_revoked=False
-            ).exists()
+            # If the program has a verified mode (requires_payment=True), then
+            # check for a certificate. If not, then recurse; if the learner would
+            # have earned a certificate, we should count that.
+            if (
+                node.is_program
+                and node.program.enrollment_modes.filter(requires_payment=True).exists()
+            ):
+                return ProgramCertificate.all_objects.filter(
+                    user=user, program=node.required_program, is_revoked=False
+                ).exists()
+
+            return _has_earned_program_cert(user, node.program)
         return False
 
     return _has_earned(root)
