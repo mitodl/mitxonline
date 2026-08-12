@@ -4,6 +4,7 @@ import logging
 
 from django.conf import settings
 
+from courses.models import CourseRun, ProgramEnrollment
 from courses.utils import is_uai_order
 from ecommerce.models import Order, Product
 from hubspot_sync import tasks
@@ -41,6 +42,21 @@ def sync_hubspot_user(user: User):
             )
 
 
+def _order_is_for_program_enrolled_course(order: Order) -> bool:
+    """Return True if any line is a course run belonging to a program the purchaser is already enrolled in."""
+    course_ids = [
+        line.purchased_object.course_id
+        for line in order.lines.all()
+        if line.purchased_object and isinstance(line.purchased_object, CourseRun)
+    ]
+    if not course_ids:
+        return False
+    return ProgramEnrollment.objects.filter(
+        user=order.purchaser,
+        program__all_requirements__course__in=course_ids,
+    ).exists()
+
+
 def sync_hubspot_deal(order: Order):
     """
     Trigger celery task to sync an order to Hubspot if it has lines.
@@ -57,6 +73,15 @@ def sync_hubspot_deal(order: Order):
             order.purchaser.edx_username or order.purchaser.email,
             order.purchaser.id,
             order.id,
+        )
+        return
+
+    if _order_is_for_program_enrolled_course(order):
+        log.info(
+            "Skipping HubSpot deal sync for order %d: user %s (user_id=%d) is already enrolled in a program containing this course",
+            order.id,
+            order.purchaser.edx_username or order.purchaser.email,
+            order.purchaser.id,
         )
         return
 

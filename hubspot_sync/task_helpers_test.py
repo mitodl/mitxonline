@@ -1,9 +1,13 @@
 """Tests for hubspot_sync.task_helpers"""
 
 import pytest
+import reversion
+from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
-from ecommerce.factories import ProductFactory
+from courses.factories import CourseRunFactory, ProgramEnrollmentFactory, ProgramFactory
+from courses.models import ProgramRequirementNodeType
+from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from hubspot_sync.task_helpers import (
     sync_hubspot_cart_add,
     sync_hubspot_deal,
@@ -170,6 +174,100 @@ def test_sync_hubspot_product(mocker, mock_exception_log, raise_exc):
         )
     else:
         mock_exception_log.assert_not_called()
+
+
+def test_sync_hubspot_deal_skips_for_course_in_enrolled_program(mocker, settings):
+    """sync_hubspot_deal should skip if the order is for a course run in a program the user is enrolled in."""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "faketoken"  # noqa: S105
+
+    mock_sync = mocker.patch(
+        "hubspot_sync.task_helpers.tasks.sync_deal_with_hubspot_targeted.apply_async"
+    )
+    mocker.patch("hubspot_sync.task_helpers.is_uai_order", return_value=False)
+
+    course_run = CourseRunFactory.create()
+    program = ProgramFactory.create()
+    program.requirements_root.add_child(
+        node_type=ProgramRequirementNodeType.COURSE,
+        course=course_run.course,
+    )
+
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=course_run)
+
+    order = OrderFactory.create()
+    LineFactory.create(
+        order=order,
+        product_version=Version.objects.get_for_object(product).first(),
+        purchased_object=course_run,
+    )
+    ProgramEnrollmentFactory.create(user=order.purchaser, program=program)
+
+    sync_hubspot_deal(order)
+
+    mock_sync.assert_not_called()
+
+
+def test_sync_hubspot_deal_proceeds_for_course_not_in_program(
+    mocker, mock_exception_log, settings
+):
+    """sync_hubspot_deal should proceed if the order is for a course not in any program."""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "faketoken"  # noqa: S105
+
+    mock_sync = mocker.patch(
+        "hubspot_sync.task_helpers.tasks.sync_deal_with_hubspot_targeted.apply_async"
+    )
+    mocker.patch("hubspot_sync.task_helpers.is_uai_order", return_value=False)
+
+    course_run = CourseRunFactory.create()
+
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=course_run)
+
+    order = OrderFactory.create()
+    LineFactory.create(
+        order=order,
+        product_version=Version.objects.get_for_object(product).first(),
+        purchased_object=course_run,
+    )
+
+    sync_hubspot_deal(order)
+
+    mock_sync.assert_called_once()
+
+
+def test_sync_hubspot_deal_proceeds_when_not_enrolled_in_program(
+    mocker, mock_exception_log, settings
+):
+    """sync_hubspot_deal should proceed if the user is not enrolled in the program containing this course."""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "faketoken"  # noqa: S105
+
+    mock_sync = mocker.patch(
+        "hubspot_sync.task_helpers.tasks.sync_deal_with_hubspot_targeted.apply_async"
+    )
+    mocker.patch("hubspot_sync.task_helpers.is_uai_order", return_value=False)
+
+    course_run = CourseRunFactory.create()
+    program = ProgramFactory.create()
+    program.requirements_root.add_child(
+        node_type=ProgramRequirementNodeType.COURSE,
+        course=course_run.course,
+    )
+
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=course_run)
+
+    order = OrderFactory.create()
+    LineFactory.create(
+        order=order,
+        product_version=Version.objects.get_for_object(product).first(),
+        purchased_object=course_run,
+    )
+    # Intentionally do not enroll the user in the program
+
+    sync_hubspot_deal(order)
+
+    mock_sync.assert_called_once()
 
 
 @pytest.mark.parametrize("raise_exc", [True, False])
