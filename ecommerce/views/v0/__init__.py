@@ -482,9 +482,7 @@ def clear_basket(request):
 
 
 @extend_schema(
-    description=(
-        "Returns the payload necessary to redirect the user to CyberSource for payment."
-    ),
+    description=("Returns the payload necessary to start the payment process."),
     methods=["GET"],
     responses=CheckoutPayloadSerializer,
 )
@@ -495,10 +493,7 @@ def checkout_basket(request):
     Generate the data for checkout and return it.
 
     This gathers and converts the data in the current user's Basket, makes it
-    into an Order, and returns the form data needed to start the checkout process
-    in CyberSource. The frontend app then needs to pull the data into a form and
-    POST it to the appropriate URL to send the user over to CyberSource so we can
-    collect payment.
+    into an Order, and returns the data to start the checkout process.
     """
 
     try:
@@ -509,7 +504,7 @@ def checkout_basket(request):
 
         return Response(CheckoutPayloadSerializer(payload).data, status=req_status)
     except ObjectDoesNotExist:
-        return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
+        return Response("No basket", status=status.HTTP_400_BAD_REQUEST)
 
 
 class ProductsPagination(LimitOffsetPagination):

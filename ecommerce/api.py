@@ -21,6 +21,7 @@ from mitol.payment_gateway.api import PaymentGateway, ProcessorResponse
 from mitol.payment_gateway.constants import (
     MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
     MITOL_PAYMENT_GATEWAY_STRIPE,
+    STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
 )
 
 from b2b.api import (
@@ -31,6 +32,7 @@ from courses.api import create_run_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.utils import is_uai_course_run
 from ecommerce.constants import (
+    ADMIN_FULFILLED_PAYMENT_DATA,
     ALL_DISCOUNT_TYPES,
     ALL_PAYMENT_TYPES,
     ALL_REDEMPTION_TYPES,
@@ -247,7 +249,16 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
         merchant_fields=[basket.id],
     )
 
-    return payload  # noqa: RET504
+    if gateway_type == MITOL_PAYMENT_GATEWAY_STRIPE:
+        # We will have gotten a CheckoutSession object from start_payment above.
+        # This needs to be logged as a transaction, or we won't be able to find
+        # this again in Stripe if something goes wrong after this step.
+        order_flow = order.get_object_flow()
+        order_flow.create_transaction(
+            payload["payload"], reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION
+        )
+
+    return payload
 
 
 def check_discount_for_products(discount, basket):
@@ -731,43 +742,91 @@ def _retrieve_pending_cybersource_orders(orders):
     completed = {}
     cancelled = {}
 
-    order_refnos = [ order.reference_number for order in orders ]
+    order_refnos = [order.reference_number for order in orders]
     gateway = PaymentGateway.get_gateway_class(MITOL_PAYMENT_GATEWAY_CYBERSOURCE)
 
     results = gateway.find_and_get_transactions(order_refnos)
 
     if len(results.keys()) == 0:
         log.info("_retrieve_pending_cybersource_orders: No orders found to resolve.")
-        return (completed, cancelled,)
+        return (
+            completed,
+            cancelled,
+        )
 
-    for result in results:
-        payload = results[result]
+    for _, payload in results.items():
         if int(payload["reason_code"]) == 100:  # noqa: PLR2004
-            completed[payload["req_reference_number"]] = {
-                "transaction_id": payload["transaction_id"]
-            }
+            completed[payload["req_reference_number"]] = payload
         else:
             cancelled[payload["req_reference_number"]] = payload
 
-    return (completed, cancelled,)
+    return (
+        completed,
+        cancelled,
+    )
 
 
 def _retrieve_pending_stripe_orders(orders):
     """
     Retrieve current status for Stripe orders.
 
-    Stripe doesn't have a batch list - we have to retrieve each one individually.
-    So this does that, and sorts into the same buckets as
-    _retrieve_pending_cybersource_orders.
+    Stripe doesn't have a batch list, so retrieve status individually, and sort
+    into the same buckets as _retrieve_pending_cybersource_orders. We must have
+    a CheckoutSession stored for the order to be able to look it up later.
     """
 
     completed = {}
     cancelled = {}
+    gateway = PaymentGateway.get_gateway_class(MITOL_PAYMENT_GATEWAY_STRIPE)
 
-    return (completed, cancelled,)
+    # We should be logging the initial checkout session in a specific way
+    # (see generate_checkout_payload) so we can find those transactions for the
+    # order. If there's not one then we skip it, so maybe it can be picked up
+    # later in event processing.
+
+    for order in orders:
+        checkout_session_transactions = order.transactions.filter(
+            reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION
+        )
+
+        if not checkout_session_transactions.exists():
+            log.info(
+                "Order %s (ref %s) has no apparant CheckoutSession logged.",
+                order.id,
+                order.reference_number,
+            )
+            continue
+
+        session_transaction = checkout_session_transactions.first()
+        checkout_session_id = session_transaction.data.get("id")
+
+        if (
+            session_transaction.data.get("object") != "checkout.session"
+            or not checkout_session_id
+        ):
+            log.info(
+                "Order %s (ref %s) has no apparant CheckoutSession logged.",
+                order.id,
+                order.reference_number,
+            )
+            continue
+
+        checkout_session = process_stripe_checkout_session_status(checkout_session_id)
+
+        if checkout_session["status"] == "cancelled":
+            cancelled[order.reference_number] = checkout_session["transaction"]
+        elif checkout_session["status"] == "paid":
+            completed[order.reference_number] = checkout_session["transaction"]
+
+    return (
+        completed,
+        cancelled,
+    )
 
 
-def check_and_process_pending_orders_for_resolution(refnos: list[str], *, check_status: bool = True, skip_fulfillment: bool = False):
+def check_and_process_pending_orders_for_resolution(
+    refnos: list[str], *, check_status: bool = True, skip_fulfillment: bool = False
+):
     """
     Checks pending orders for resolution. By default, this will pull all the
     pending orders that are in the system.
@@ -789,27 +848,39 @@ def check_and_process_pending_orders_for_resolution(refnos: list[str], *, check_
             state=OrderStatus.PENDING, reference_number__in=refnos
         )
     else:
-        pending_orders = PendingOrder.objects.filter(
-            state=OrderStatus.PENDING
-        )
+        pending_orders = PendingOrder.objects.filter(state=OrderStatus.PENDING)
 
     if len(pending_orders) == 0:
         return (0, 0, 0)
 
     log.info("Resolving %s orders", len(pending_orders))
 
-    # todo: get the stripe part of this fleshed out
-    # and add the "force" option (where we just mark them as done regardless of
-    # what the gateway says)
+    # TODO: get the stripe part of this fleshed out
 
-    cs_gateway_orders = [ pending_order for pending_order in pending_orders if pending_order.gateway_type == MITOL_PAYMENT_GATEWAY_CYBERSOURCE ]
-    stripe_gateway_orders = [ pending_order for pending_order in pending_orders if pending_order.gateway_type == MITOL_PAYMENT_GATEWAY_STRIPE ]
+    if check_status:
+        cs_gateway_orders = [
+            pending_order
+            for pending_order in pending_orders
+            if pending_order.gateway_type == MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+        ]
+        stripe_gateway_orders = [
+            pending_order
+            for pending_order in pending_orders
+            if pending_order.gateway_type == MITOL_PAYMENT_GATEWAY_STRIPE
+        ]
 
-    cs_success, cs_cancel = _retrieve_pending_cybersource_orders(cs_gateway_orders)
-    stripe_success, stripe_cancel = _retrieve_pending_stripe_orders(stripe_gateway_orders)
+        cs_success, cs_cancel = _retrieve_pending_cybersource_orders(cs_gateway_orders)
+        stripe_success, stripe_cancel = _retrieve_pending_stripe_orders(
+            stripe_gateway_orders
+        )
 
-    success_orders = {**cs_success, **stripe_success}
-    cancel_orders = {**cs_cancel, **stripe_cancel}
+        success_orders = {**cs_success, **stripe_success}
+        cancel_orders = {**cs_cancel, **stripe_cancel}
+    else:
+        cancel_orders = {}
+        success_orders = {}
+        for order in pending_orders:
+            success_orders[order.reference_number] = ADMIN_FULFILLED_PAYMENT_DATA
 
     for refno, payload in success_orders.items():
         try:
@@ -1312,6 +1383,108 @@ def log_stripe_event(event, *, order: Order | None = None):
     return StripeEventLog.objects.create(
         event_id=event.id, event_data=event.to_dict(for_json=True), related_order=order
     )
+
+
+def process_stripe_checkout_session_status(checkout_session: dict | str):
+    """
+    Process the provided Stripe CheckoutSession and provide its status.
+
+    The CheckoutSession has some status fields in it, but we also need to look
+    at the PaymentIntent to get the status of the payment itself. This will
+    re-pull the session from the API with expand turned on for PaymentIntent so
+    we get that data. (As is the PaymentGateway calls don't use expand, so there
+    would have needed to be an additional API call to get the PaymentIntent
+    anyway.)
+
+    Args:
+    - checkout_session (dict|str): either a CheckoutSession (as a dict), or the
+      ID of the checkout session to pull
+    Returns:
+    - something, dunno yet
+    """
+
+    stripe_gateway_cls = PaymentGateway.get_gateway_class(MITOL_PAYMENT_GATEWAY_STRIPE)
+    stripe_gateway = stripe_gateway_cls()
+
+    if isinstance(checkout_session, dict):
+        session_id = checkout_session.get("id")
+    else:
+        session_id = checkout_session
+
+    if not session_id:
+        msg = "checkout session ID not found"
+        raise ValueError(msg)
+
+    # Call this directly so we can tell the client to expand payment_intent.
+
+    cs = stripe_gateway.stripe_client.v1.checkout.sessions.retrieve(
+        session_id,
+        {
+            "expand": [
+                "payment_intent",
+            ],
+        },
+    )
+
+    # The session itself has two status fields: status and payment_status
+    # status is the session status - open, complete, expired
+    # payment_status is payment with relation to the session - no_payment_required, paid, unpaid
+    # The PaymentIntent (if it exists) has the status of whatever actual payment
+    # was received. If cancelled, it also has a cancellation reason.
+
+    session_status = {
+        "status": "pending",
+        "cancel_reason": "",
+        "action_reason": "",
+        "checkout_session_id": cs.id,
+        "payment_intent_id": "",
+        "transaction": cs.to_dict(for_json=True),
+    }
+
+    # TODO: all these statuses shouldn't be hard-coded strings probably
+    # and this shouldn't be here, it should be in PaymentGateway but easier to debug here
+
+    if not cs.payment_intent:
+        if cs.status == "open" or (
+            cs.status == "complete" and cs.payment_status == "unpaid"
+        ):
+            session_status["status"] = "pending"
+        elif cs.status == "complete" and (
+            cs.payment_status == "no_payment_required" or cs.payment_status == "paid"
+        ):
+            # "complete" and "paid" is a weird state - we should have a PaymentIntent
+            session_status["status"] = "paid"
+        elif cs.status == "expired" and cs.payment_status == "unpaid":
+            session_status["status"] = "cancelled"
+            session_status["cancel_reason"] = "expired-unpaid"
+        else:
+            # weird state again - expired and paid or expired and no-payment-required
+
+            log.warning(
+                "Checkout session %s in weird state: state %s and payment_state %s",
+                cs.id,
+                cs.status,
+                cs.payment_status,
+            )
+            session_status["status"] = "pending"
+
+        return session_status
+
+    pi = cs.payment_intent
+    session_status["payment_intent_id"] = pi.id
+
+    if pi.status == "processing":
+        session_status["status"] = "pending"
+    elif pi.status == "succeeded":
+        session_status["status"] = "paid"
+    elif pi.status == "canceled":
+        session_status["status"] = "cancelled"
+        session_status["cancel_reason"] = pi.cancellation_reason
+    else:
+        session_status["status"] = "pending-action"
+        session_status["action_reason"] = pi.status
+
+    return session_status
 
 
 def process_stripe_checkout_completed(event):

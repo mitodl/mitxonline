@@ -994,13 +994,13 @@ class CheckoutPayloadSerializer(serializers.Serializer):
         read_only=True,
         required=False,
         default="",
-        help_text="The URL to POST the form to.",
+        help_text="The URL to POST the form to, or to redirect the user to.",
     )
     method = serializers.CharField(
         read_only=True,
         required=False,
         default="POST",
-        help_text="The method to use for the checkout form (always POST).",
+        help_text="The method to use for the data - POST for form data, GET for redirect.",
     )
     payload = serializers.JSONField(
         read_only=True, required=False, default={}, help_text="The data for the form."

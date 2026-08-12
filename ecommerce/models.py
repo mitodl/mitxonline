@@ -695,7 +695,7 @@ class OrderFlow:
 
         return refund_transaction
 
-    def create_transaction(self, payment_data):
+    def create_transaction(self, payment_data, *, reason: str | None = None):
         """Create a record of the payment processor transaction."""
 
         transaction_payload = {
@@ -704,9 +704,10 @@ class OrderFlow:
             "data": payment_data,
         }
 
-        if self.order.total_price_paid == 0:
+        if self.order.total_price_paid == 0 or payment_data.get("is_administrative"):
             # If the price paid was $0, then we don't necessarily have a payment
-            # processor, so generate the transaction ID.
+            # processor, so generate the transaction ID. Do this also if we've
+            # generated the payload ("is_administrative" is set).
             transaction_payload["transaction_id"] = uuid.uuid4()
         elif self.order.gateway_type == MITOL_PAYMENT_GATEWAY_CYBERSOURCE:
             transaction_payload["transaction_id"] = payment_data.get("transaction_id")
@@ -733,7 +734,10 @@ class OrderFlow:
             msg = "Failed to record transaction: Missing transaction id from payment API response"
             raise ValidationError(msg)
 
-        self.order.transactions.get_or_create(
+        if reason:
+            transaction_payload["reason"] = reason
+
+        return self.order.transactions.get_or_create(
             transaction_id=transaction_payload["transaction_id"],
             defaults=transaction_payload,
         )
@@ -753,7 +757,13 @@ class OrderFlow:
         source=OrderStatus.PENDING,
         target=OrderStatus.FULFILLED,
     )
-    def fulfill(self, payment_data, already_enrolled=False, skip_receipt=False, skip_fulfillment=False):  # noqa: FBT002
+    def fulfill(
+        self,
+        payment_data,
+        already_enrolled=False,
+        skip_receipt=False,
+        skip_fulfillment=False,
+    ):
         """Fulfill the order - create a transaction, send email, trigger plugins."""
 
         # record the transaction

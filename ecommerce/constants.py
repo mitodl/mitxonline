@@ -91,6 +91,13 @@ ZERO_PAYMENT_DATA = {
     "amount": 0,
     "transaction_id": "zero-payment-transaction",
     "data": {"reason": "No payment required"},
+    "is_administrative": True,
+}
+ADMIN_FULFILLED_PAYMENT_DATA = {
+    "amount": 0,
+    "transaction_id": "administratively-fulfilled",
+    "data": {"reason": "Order fulfilled administratively."},
+    "is_administrative": True,
 }
 
 PAYMENT_HOOK_ACTION_PRE_SALE = "presale"
@@ -114,6 +121,8 @@ GEOLOCATION_TYPES = [
     GEOLOCATION_TYPE_NONE,
 ]
 GEOLOCATION_CHOICES = zip(GEOLOCATION_TYPES, GEOLOCATION_TYPES)
+
+STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION = "Initial CheckoutSession"
 
 STRIPE_PAYMENT_STATUS_PAID = "paid"
 STRIPE_PAYMENT_STATUS_NPR = "no_payment_required"
