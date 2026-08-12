@@ -329,15 +329,25 @@ def test_product_managers():
     )
 
 
-def test_product_multiple_active_for_single_purchasable_object():
-    """Test that creating multiple Products with the same course/program
-    and are active is not allowed
+def test_product_multiple_for_single_purchasable_object():
+    """Test that creating multiple Products with the same course/program is not allowed,
+    regardless of active state.
     """
     first_product = ProductFactory.create()
     try:
         with transaction.atomic():
             ProductFactory.create(purchasable_object=first_product.purchasable_object)
         pytest.fail("Two active Products for the same purchasable_object were allowed.")
+    except IntegrityError:
+        pass
+
+    first_product.delete()
+    try:
+        with transaction.atomic():
+            ProductFactory.create(purchasable_object=first_product.purchasable_object)
+        pytest.fail(
+            "A Product was created for a purchasable_object that already has an inactive Product."
+        )
     except IntegrityError:
         pass
 

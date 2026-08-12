@@ -102,8 +102,7 @@ class Product(TimestampedModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["object_id", "is_active", "content_type"],
-                condition=models.Q(is_active=True),
+                fields=["object_id", "content_type"],
                 name="unique_purchasable_object",
             )
         ]
