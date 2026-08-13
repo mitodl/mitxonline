@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.162.5
+Version 1.162.5 (Released August 13, 2026)
 ---------------
 
 - Backfill missing LegalAddress/UserProfile for migrated users; guard should_skip_onboarding (#3845)
