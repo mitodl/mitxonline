@@ -114,14 +114,7 @@ def update_edx_user_profile(user_id):
     Task to update the edX user profile. This doesn't change the name or email.
     """
     user = User.objects.get(id=user_id)
-    try:
-        api.update_edx_user_profile(user)
-    except Exception:
-        log.exception(
-            "Failed to update Open edX user profile for user %s (id=%s); skipping.",
-            user,
-            user_id,
-        )
+    api.update_edx_user_profile(user)
 
 
 @app.task(
