@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.162.5 (Released August 13, 2026)
+---------------
+
+- Backfill missing LegalAddress/UserProfile for migrated users; guard should_skip_onboarding (#3845)
+- refactor: pass the Learn Fastly service ID at the call sites (#3804)
+
 Version 1.162.4 (Released August 12, 2026)
 ---------------
 
