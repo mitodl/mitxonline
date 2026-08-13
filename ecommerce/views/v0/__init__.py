@@ -923,6 +923,18 @@ class UserDiscountViewSet(ModelViewSet):
     pagination_class = LimitOffsetPagination
 
 
+class OrderHistoryPagination(LimitOffsetPagination):
+    """
+    Sets a default limit for the order history API.
+
+    Without a default, DRF skips pagination when the caller omits `limit` and
+    returns a bare list instead of the `{count, next, previous, results}` envelope
+    the generated spec declares.
+    """
+
+    default_limit = 20
+
+
 @extend_schema_view(
     list=extend_schema(
         description=("Retrives the current user's order history."),
@@ -939,7 +951,7 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
     """Viewset to retrieve a user's order history."""
 
     serializer_class = OrderHistorySerializer
-    pagination_class = LimitOffsetPagination
+    pagination_class = OrderHistoryPagination
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):

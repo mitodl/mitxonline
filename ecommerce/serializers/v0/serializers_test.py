@@ -113,3 +113,28 @@ def test_program_order_lines_serializer(settings, mocker, user):
     serialized_data = TransactionLineSerializer(instance=order.lines, many=True).data
 
     assert serialized_data == expected_lines
+
+
+@pytest.mark.skip_nplusone_check
+def test_order_lines_serializer_tolerates_deleted_courseware_object(
+    settings, mocker, user
+):
+    """
+    A receipt must still serialize when its product's courseware object is gone.
+
+    `purchasable_object` is a GenericForeignKey with no database constraint, so
+    deleting the course run leaves the product pointing at nothing.
+    """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+
+    with reversion.create_revision():
+        products = ProductFactory.create_batch(1)
+
+    order = create_order(mocker, user, products)
+    CourseRun.objects.filter(id=products[0].object_id).delete()
+
+    serialized_data = TransactionLineSerializer(instance=order.lines, many=True).data
+
+    assert serialized_data[0]["start_date"] is None
+    assert serialized_data[0]["end_date"] is None
+    assert serialized_data[0]["content_title"] is None
