@@ -53,6 +53,7 @@ def payment_gateway_settings(settings):
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_REST_API_ENVIRONMENT = (
         "apitest.cybersource.com"
     )
+    settings.MITOL_PAYMENT_GATEWAY_STRIPE_API_KEY = uuid.uuid4()
 
 
 @pytest.fixture

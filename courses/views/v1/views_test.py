@@ -47,6 +47,7 @@ from courses.models import (
     Program,
     ProgramEnrollment,
 )
+from courses.serializers.v1.base import EnrollmentModeSerializer
 from courses.serializers.v1.courses import (
     CourseRunEnrollmentSerializer,
     CourseRunSerializer,
@@ -836,7 +837,9 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                 "title": program_enrollment.program.title,
                 "live": program_enrollment.program.live,
                 "departments": [],
-                "enrollment_modes": [],
+                "enrollment_modes": EnrollmentModeSerializer(
+                    program_enrollment.program.enrollment_modes, many=True
+                ).data,
                 "readable_id": program_enrollment.program.readable_id,
                 "req_tree": list(
                     ProgramRequirementTreeSerializer(

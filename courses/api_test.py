@@ -2367,15 +2367,56 @@ def test_generate_program_certificate_failure_not_all_passed_nested_elective_sti
 
 
 @pytest.mark.parametrize(
-    ("has_main_enroll", "has_sub_enroll"),
+    (
+        "has_main_enroll",
+        "has_sub_enroll",
+        "sub_is_audit_only",
+        "sub_course_passed",
+    ),
     [
         (
             True,
             True,
+            False,
+            True,
         ),
-        (True, False),
-        (False, True),
-        (False, False),
+        (
+            True,
+            True,
+            False,
+            False,
+        ),
+        (
+            True,
+            False,
+            False,
+            True,
+        ),
+        (
+            True,
+            False,
+            False,
+            False,
+        ),
+        (False, True, False, True),
+        (
+            False,
+            False,
+            False,
+            True,
+        ),
+        (
+            True,
+            True,
+            True,
+            True,
+        ),
+        (
+            True,
+            True,
+            True,
+            False,
+        ),
     ],
 )
 @patch("courses.signals.upsert_custom_properties")
@@ -2386,10 +2427,12 @@ def test_generate_program_certificate_with_subprogram_requirement(  # noqa: PLR0
     default_mode_records,
     has_main_enroll,
     has_sub_enroll,
+    sub_is_audit_only,
+    sub_course_passed,
 ):
     """
-    Test that generate_program_certificate considers sub-program (nested program) requirements
-    when determining if a user has earned a program certificate.
+    Test that generate_program_certificate considers sub-program (nested program)
+    requirements when determining if a user has earned a program certificate.
     """
     patched_sync_hubspot_user = mocker.patch(
         "hubspot_sync.task_helpers.sync_hubspot_user",
@@ -2399,7 +2442,12 @@ def test_generate_program_certificate_with_subprogram_requirement(  # noqa: PLR0
     )
 
     # Create a sub-program that the user will complete
-    sub_program = ProgramFactory.create()
+    modes = (
+        [EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)]
+        if sub_is_audit_only
+        else []
+    )
+    sub_program = ProgramFactory.create(enrollment_modes=modes)
     sub_course = CourseFactory.create()
     sub_program.add_requirement(sub_course)
 
@@ -2446,8 +2494,9 @@ def test_generate_program_certificate_with_subprogram_requirement(  # noqa: PLR0
     main_certificate, main_created = generate_program_certificate(
         user=user, program=main_program
     )
-    if has_main_enroll and has_sub_enroll:
-        # Should only get a certificate if we had a cert in the sub
+    if has_main_enroll and has_sub_enroll and sub_course_passed:
+        # Should only get a certificate if we had a cert (or a passing grade!)
+        # in the sub
         # So, we'd have to have been enrolled there, too
         assert main_created is True
         assert isinstance(main_certificate, ProgramCertificate)

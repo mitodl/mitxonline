@@ -12,7 +12,6 @@ from cms.serializers import ProgramPageSerializer
 from courses.factories import (  # noqa: F401
     CourseFactory,
     CourseRunFactory,
-    EnrollmentModeFactory,
     ProgramCollectionFactory,
     ProgramFactory,
     program_with_empty_requirements,
@@ -25,6 +24,7 @@ from courses.models import (
     ProgramCollectionItem,
     ProgramRequirement,
 )
+from courses.serializers.v1.base import EnrollmentModeSerializer
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.serializers.v2.programs import (
     ProgramDetailSerializer,
@@ -164,8 +164,10 @@ def test_serialize_program(
             "min_weekly_hours": program_with_empty_requirements.page.min_weekly_hours,
             "min_price": program_with_empty_requirements.page.min_price,
             "max_price": program_with_empty_requirements.page.max_price,
-            "certificate_available": False,
-            "enrollment_modes": [],
+            "certificate_available": True,
+            "enrollment_modes": EnrollmentModeSerializer(
+                program_with_empty_requirements.enrollment_modes, many=True
+            ).data,
             "display_mode": None,
         },
     )
@@ -340,11 +342,10 @@ def test_serialize_program_certificate_available(
     expected,
 ):
     """Test that certificate_available reflects whether any enrollment mode requires payment."""
-    mode = EnrollmentModeFactory.create(
-        mode_slug="verified" if has_paid_mode else "audit",
-        requires_payment=has_paid_mode,
-    )
-    program_with_empty_requirements.enrollment_modes.add(mode)
+    if not has_paid_mode:
+        program_with_empty_requirements.enrollment_modes.filter(
+            requires_payment=True
+        ).delete()
 
     data = ProgramSerializer(
         instance=program_with_empty_requirements, context=mock_context

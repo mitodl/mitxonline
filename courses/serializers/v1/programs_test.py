@@ -24,6 +24,7 @@ from courses.factories import (
     program_with_requirements,  # noqa: F401
 )
 from courses.models import Department, ProgramRequirement, ProgramRequirementNodeType
+from courses.serializers.v1.base import EnrollmentModeSerializer
 from courses.serializers.v1.courses import CourseWithCourseRunsSerializer
 from courses.serializers.v1.programs import (
     LearnerRecordSerializer,
@@ -140,7 +141,9 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
             "program_type": "Series",
             "departments": [],
             "live": True,
-            "enrollment_modes": [],
+            "enrollment_modes": EnrollmentModeSerializer(
+                program_with_empty_requirements.enrollment_modes, many=True
+            ).data,
         },
     )
 
