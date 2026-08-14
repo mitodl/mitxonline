@@ -6,6 +6,7 @@ from datetime import timedelta
 from decimal import Decimal
 from urllib.parse import urljoin
 
+import stripe
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
@@ -21,7 +22,6 @@ from mitol.payment_gateway.api import PaymentGateway, ProcessorResponse
 from mitol.payment_gateway.constants import (
     MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
     MITOL_PAYMENT_GATEWAY_STRIPE,
-    STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
 )
 
 from b2b.api import (
@@ -46,7 +46,18 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_UNLIMITED,
     REFUND_SUCCESS_STATES,
     STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+    STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
+    STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
+    STRIPE_OVERALL_CHECKOUT_STATUS_ERROR,
+    STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+    STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+    STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
+    STRIPE_PAYMENT_INTENT_STATUS_CANCELLED,
+    STRIPE_PAYMENT_INTENT_STATUS_PROCESSING,
+    STRIPE_PAYMENT_INTENT_STATUS_SUCCEEDED,
+    STRIPE_PAYMENT_STATUS_UNPAID,
     STRIPE_PAYMENT_STATUSES_GOOD,
+    STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
     ZERO_PAYMENT_DATA,
 )
 from ecommerce.exceptions import (
@@ -82,7 +93,6 @@ from main.constants import (
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
 )
-from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import parse_supplied_date
 from openedx.api import create_user
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
@@ -149,7 +159,7 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
         ):
             gateway_type = MITOL_PAYMENT_GATEWAY_STRIPE
         else:
-            gateway_type = ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
+            gateway_type = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 
     if basket.has_user_blocked_products(request.user):
         return {
@@ -381,7 +391,7 @@ def fulfill_completed_order(
 def get_order_from_cybersource_payment_response(request):
     payment_data = request.POST
     converted_order = PaymentGateway.get_gateway_class(
-        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
+        settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
     ).convert_to_order(payment_data)
     order_id = Order.decode_reference_number(converted_order.reference)
 
@@ -405,14 +415,14 @@ def process_cybersource_payment_response(request, order):
     """
 
     if not PaymentGateway.validate_processor_response(
-        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
+        settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
     ):
         raise PermissionDenied(
             "Could not validate response from the payment processor."  # noqa: EM101
         )
 
     processor_response = PaymentGateway.get_formatted_response(
-        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
+        settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
     )
 
     # Log message if reason_code is anything other than 100 (successful transaction)
@@ -659,11 +669,11 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
         transaction_dict["req_amount"] = refund_amount
 
     refund_gateway_request = PaymentGateway.create_refund_request(
-        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, transaction_dict
+        settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, transaction_dict
     )
 
     response = PaymentGateway.start_refund(
-        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
+        settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
         refund_gateway_request,
     )
 
@@ -1385,6 +1395,36 @@ def log_stripe_event(event, *, order: Order | None = None):
     )
 
 
+def process_stripe_checkout_session_event(event: stripe.Event):
+    """
+    Process the Stripe event passed.
+
+    This validates that the event is a CheckoutSession event and strips the
+    CheckoutSession object out of the event.
+    """
+
+    valid_types = [
+        "checkout.session.completed",
+        "checkout.session.expired",
+        "checkout.session.async_payment_failed",
+        "checkout.session.async_payment_succeeded",
+    ]
+
+    ev_type = event.type
+    if ev_type not in valid_types:
+        msg = f"Event passed to process_stripe_checkout_session_event is type {ev_type} - not a checkout session event"
+        raise ValueError(msg)
+
+    return event.data.object
+
+
+def _get_stripe_checkout_session_v1():
+    """Return the checkout session v1 client (mostly to make testing easier)."""
+
+    stripe_gateway = PaymentGateway.get_gateway_class(MITOL_PAYMENT_GATEWAY_STRIPE)
+    return stripe_gateway.stripe_client.v1.checkout.sessions
+
+
 def process_stripe_checkout_session_status(checkout_session: dict | str):
     """
     Process the provided Stripe CheckoutSession and provide its status.
@@ -1403,8 +1443,7 @@ def process_stripe_checkout_session_status(checkout_session: dict | str):
     - something, dunno yet
     """
 
-    stripe_gateway_cls = PaymentGateway.get_gateway_class(MITOL_PAYMENT_GATEWAY_STRIPE)
-    stripe_gateway = stripe_gateway_cls()
+    stripe_checkout_session_client = _get_stripe_checkout_session_v1()
 
     if isinstance(checkout_session, dict):
         session_id = checkout_session.get("id")
@@ -1417,7 +1456,7 @@ def process_stripe_checkout_session_status(checkout_session: dict | str):
 
     # Call this directly so we can tell the client to expand payment_intent.
 
-    cs = stripe_gateway.stripe_client.v1.checkout.sessions.retrieve(
+    cs = stripe_checkout_session_client.retrieve(
         session_id,
         {
             "expand": [
@@ -1426,6 +1465,8 @@ def process_stripe_checkout_session_status(checkout_session: dict | str):
         },
     )
 
+    breakpoint()
+
     # The session itself has two status fields: status and payment_status
     # status is the session status - open, complete, expired
     # payment_status is payment with relation to the session - no_payment_required, paid, unpaid
@@ -1433,7 +1474,7 @@ def process_stripe_checkout_session_status(checkout_session: dict | str):
     # was received. If cancelled, it also has a cancellation reason.
 
     session_status = {
-        "status": "pending",
+        "status": STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
         "cancel_reason": "",
         "action_reason": "",
         "checkout_session_id": cs.id,
@@ -1441,21 +1482,21 @@ def process_stripe_checkout_session_status(checkout_session: dict | str):
         "transaction": cs.to_dict(for_json=True),
     }
 
-    # TODO: all these statuses shouldn't be hard-coded strings probably
-    # and this shouldn't be here, it should be in PaymentGateway but easier to debug here
-
     if not cs.payment_intent:
-        if cs.status == "open" or (
-            cs.status == "complete" and cs.payment_status == "unpaid"
+        if cs.status == STRIPE_CHECKOUT_SESSION_STATUS_OPEN or (
+            cs.status == STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE
+            and cs.payment_status == STRIPE_PAYMENT_STATUS_UNPAID
         ):
-            session_status["status"] = "pending"
-        elif cs.status == "complete" and (
-            cs.payment_status == "no_payment_required" or cs.payment_status == "paid"
+            session_status["status"] = STRIPE_OVERALL_CHECKOUT_STATUS_PENDING
+        elif cs.status == STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE and (
+            cs.payment_status in STRIPE_PAYMENT_STATUSES_GOOD
         ):
             # "complete" and "paid" is a weird state - we should have a PaymentIntent
-            session_status["status"] = "paid"
-        elif cs.status == "expired" and cs.payment_status == "unpaid":
-            session_status["status"] = "cancelled"
+            session_status["status"] = STRIPE_OVERALL_CHECKOUT_STATUS_PAID
+        elif (
+            cs.status == "expired" and cs.payment_status == STRIPE_PAYMENT_STATUS_UNPAID
+        ):
+            session_status["status"] = STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED
             session_status["cancel_reason"] = "expired-unpaid"
         else:
             # weird state again - expired and paid or expired and no-payment-required
@@ -1466,22 +1507,22 @@ def process_stripe_checkout_session_status(checkout_session: dict | str):
                 cs.status,
                 cs.payment_status,
             )
-            session_status["status"] = "pending"
+            session_status["status"] = STRIPE_OVERALL_CHECKOUT_STATUS_PENDING
 
         return session_status
 
     pi = cs.payment_intent
     session_status["payment_intent_id"] = pi.id
 
-    if pi.status == "processing":
-        session_status["status"] = "pending"
-    elif pi.status == "succeeded":
-        session_status["status"] = "paid"
-    elif pi.status == "canceled":
-        session_status["status"] = "cancelled"
+    if pi.status == STRIPE_PAYMENT_INTENT_STATUS_PROCESSING:
+        session_status["status"] = STRIPE_OVERALL_CHECKOUT_STATUS_PENDING
+    elif pi.status == STRIPE_PAYMENT_INTENT_STATUS_SUCCEEDED:
+        session_status["status"] = STRIPE_OVERALL_CHECKOUT_STATUS_PAID
+    elif pi.status == STRIPE_PAYMENT_INTENT_STATUS_CANCELLED:
+        session_status["status"] = STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED
         session_status["cancel_reason"] = pi.cancellation_reason
     else:
-        session_status["status"] = "pending-action"
+        session_status["status"] = STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION
         session_status["action_reason"] = pi.status
 
     return session_status
@@ -1490,57 +1531,65 @@ def process_stripe_checkout_session_status(checkout_session: dict | str):
 def process_stripe_checkout_completed(event):
     """Process the checkout completed event."""
 
-    checkout_session = event.data.object
+    checkout_session = process_stripe_checkout_session_event(event)
+
     order_reference_number = checkout_session.client_reference_id
     session_id = checkout_session.id
+    status_obj = process_stripe_checkout_session_status(checkout_session.id)
 
     log.debug(
-        "process_stripe_checkout_completed: processing event %s for checkout session %s (order %s)",
+        "process_stripe_checkout_completed: processing event %s for checkout session %s (order %s)in overall state %s",
         event.id,
         session_id,
         order_reference_number,
+        status_obj["status"],
     )
 
-    # Repeating this here as a reminder: if the order includes a grace/trial
-    # period, the payment_status will still be "paid".
+    order = Order.objects.filter(reference_number=order_reference_number).first()
 
-    if (
-        checkout_session.status != STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE
-        or checkout_session.payment_status not in STRIPE_PAYMENT_STATUSES_GOOD
-    ):
+    StripeEventLog.objects.filter(event_id=event.id).update(related_order=order)
+
+    if not order:
         log.error(
-            "process_stripe_checkout_completed: session %s for order %s ended unsuccessfully: %s - %s",
+            "process_stripe_checkout_completed: session %s for order %s has no matching order",
             session_id,
             order_reference_number,
-            checkout_session.status,
-            checkout_session.payment_status,
         )
-
-        if order_reference_number:
-            order = Order.objects.filter(
-                reference_number=order_reference_number
-            ).first()
-
-            if order:
-                StripeEventLog.objects.filter(event_id=event.id).update(
-                    related_order=order
-                )
-                order.get_object_flow().errored(
-                    api_response_data=event.to_dict(for_json=True)
-                )
-                order.refresh_from_db()
-                return order
 
         return False
 
-    order = Order.objects.filter(reference_number=order_reference_number).get()
-    StripeEventLog.objects.filter(event_id=event.id).update(related_order=order)
+    if status_obj["status"] in [
+        STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
+        STRIPE_OVERALL_CHECKOUT_STATUS_ERROR,
+    ]:
+        log.info(
+            "process_stripe_checkout_completed: session %s for order %s ended unsuccessfully: %s - %s",
+            session_id,
+            order_reference_number,
+            status_obj["status"],
+            status_obj["cancel_reason"],
+        )
 
-    basket = Basket.objects.filter(user=order.purchaser).first()
+        order.get_object_flow().errored(api_response_data=event.to_dict(for_json=True))
+        order.refresh_from_db()
+    elif status_obj["status"] in [
+        STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+        STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
+    ]:
+        log.info(
+            "process_stripe_checkout_completed: session %s for order %s is still in pending state: %s - %s",
+            session_id,
+            order_reference_number,
+            status_obj["status"],
+            status_obj["action_reason"],
+        )
+    else:
+        basket = Basket.objects.filter(user=order.purchaser).first()
 
-    fulfill_completed_order(order, event.to_dict(for_json=True), basket)
+        fulfill_completed_order(order, event.to_dict(for_json=True), basket)
 
-    order.refresh_from_db()
+        order.refresh_from_db()
+
     return order
 
 
@@ -1550,10 +1599,12 @@ def process_stripe_checkout_expired(event):
 
     Checkout sessions last for a finite amount of time; if the user doesn't
     complete checkout in enough time, it will expire and we'll need to cancel
-    the order.
+    the order. This does less procesing than the completed webhook; we can use
+    the event type as the order state.
     """
 
-    checkout_session = event.data.object
+    checkout_session = process_stripe_checkout_session_event(event)
+
     order_reference_number = checkout_session.client_reference_id
     session_id = checkout_session.id
 

@@ -71,7 +71,11 @@ from ecommerce.factories import (
     TransactionFactory,
     UnlimitedUseDiscountFactory,
 )
-from ecommerce.fixtures import stripe_checkout_session, stripe_event
+from ecommerce.fixtures import (
+    stripe_checkout_session,
+    stripe_event,
+    stripe_payment_intent,
+)
 from ecommerce.models import (
     Basket,
     BasketDiscount,
@@ -694,7 +698,9 @@ def test_check_and_process_pending_orders_for_resolution(mocker, test_type):
         return_value=retval,
     )
 
-    (fulfilled, cancelled, errored) = check_and_process_pending_orders_for_resolution()
+    (fulfilled, cancelled, errored) = check_and_process_pending_orders_for_resolution(
+        []
+    )
 
     if test_type == "empty":
         assert not mocked_gateway_func.called
@@ -1509,9 +1515,35 @@ def _configure_checkout_session_object(
     ],
 )
 def test_process_stripe_checkout_completed(
-    bootstrapped_verified_program, was_successful
+    mocker, bootstrapped_verified_program, was_successful
 ):
     """Test that the checkout processing works."""
+
+    class MockedCheckoutSessionClient:
+        """Mocked Stripe CheckoutSession client"""
+
+        def retrieve(self, session_id, options=None):  # noqa: ARG002
+            """Retrieve the (fake) checkout session."""
+
+            # This needs to take in some params so it can configure the
+            # checkout session and payment intent that it generates, otherwise
+            # it's always going to throw back the sample data.
+
+            session = stripe_checkout_session()
+
+            if (
+                isinstance(options, dict)
+                and "expand" in options
+                and "payment_intent" in options["expand"]
+            ):
+                session.payment_intent = stripe_payment_intent()
+
+            return session
+
+    mocked_cs_client = mocker.patch(
+        "ecommerce.api._get_stripe_checkout_session_v1",
+        side_effect=MockedCheckoutSessionClient,
+    )
 
     *_, cr_product = bootstrapped_verified_program
 
@@ -1527,6 +1559,7 @@ def test_process_stripe_checkout_completed(
 
     updated_order = process_stripe_checkout_completed(event)
 
+    mocked_cs_client.assert_called()
     assert updated_order
     assert updated_order.id == order_line.order.id
     if was_successful:
