@@ -8,11 +8,9 @@ or by forcing the order to the Fulfilled state.
 """
 
 from django.core.management import BaseCommand
-from mitol.payment_gateway.api import PaymentGateway
 
 from ecommerce.api import check_and_process_pending_orders_for_resolution
 from ecommerce.models import PendingOrder
-from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 
 
 class Command(BaseCommand):
@@ -37,13 +35,16 @@ class Command(BaseCommand):
         )
 
         parser.add_argument(
-            "--no-check", action="store_true", help="Don't check with the payment processor, just mark the order as Fulfilled.",
+            "--no-check",
+            action="store_true",
+            help="Don't check with the payment processor, just mark the order as Fulfilled.",
         )
 
         parser.add_argument(
-            "--no-fulfillment", action="store_true", help="Only mark the order as Fulfilled. Don't perform any fulfillment actions.",
+            "--no-fulfillment",
+            action="store_true",
+            help="Only mark the order as Fulfilled. Don't perform any fulfillment actions.",
         )
-
 
     def handle(self, *args, **kwargs):  # noqa: ARG002
         if not kwargs["all"] and not kwargs["order"]:
