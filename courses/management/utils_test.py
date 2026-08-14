@@ -67,7 +67,7 @@ class TestEnrollLearnerInRun:
 
     def test_creates_openedx_user_if_missing(self, mocker):
         """Should create the learner's edX account first if they don't have one"""
-        user = UserFactory.create()
+        user = UserFactory.create(no_openedx_user=True)
         run = CourseRunFactory.create()
         mock_create_user = mocker.patch("courses.management.utils.create_user")
         enrollment = CourseRunEnrollmentFactory.build(user=user, run=run)
@@ -82,13 +82,8 @@ class TestEnrollLearnerInRun:
 
     def test_skips_openedx_user_creation_if_exists(self, mocker):
         """Should not try to create an edX account if the learner already has one"""
-        user = UserFactory.create()
+        user = UserFactory.create()  # has a synced openedx_user by default
         run = CourseRunFactory.create()
-        mocker.patch(
-            "users.models.User.openedx_user_exists",
-            new_callable=mocker.PropertyMock,
-            return_value=True,
-        )
         mock_create_user = mocker.patch("courses.management.utils.create_user")
         enrollment = CourseRunEnrollmentFactory.build(user=user, run=run)
         mocker.patch(

@@ -329,11 +329,9 @@ class TestBulkEnrollNoArgs:
 
     def test_invalid_mode_raises_error(self):
         """An unsupported --mode value should raise CommandError"""
-        with pytest.raises(CommandError):
+        # Choice validation only runs against argv-style invocation, not
+        # against kwargs passed directly to call_command.
+        with pytest.raises(CommandError, match="invalid choice: 'bogus'"):
             call_command(
-                "enroll_learners",
-                users="a@b.com",
-                run="run-1",
-                mode="bogus",
-                stdout=StringIO(),
+                "enroll_learners", "--users=a@b.com", "--run=run-1", "--mode=bogus"
             )
