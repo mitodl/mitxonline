@@ -641,3 +641,19 @@ def test_bootstrap_client(settings, mocker, verify_realm):
 
     if verify_realm:
         mocked_client_request.assert_called()
+
+
+def test_realm_representation_ignores_extra_fields():
+    """Test that RealmRepresentation does not fail when given unknown fields.
+
+    This validates that new fields added to the Keycloak API response will not
+    break instantiation of the model.
+    """
+    fake_realm = RealmRepresentationFactory.create()
+    data = fake_realm.__dict__.copy()
+    data["brandNewUnknownField"] = "some_value"
+
+    realm = RealmRepresentation(**data)
+
+    assert realm.id == fake_realm.id
+    assert realm.realm == fake_realm.realm
