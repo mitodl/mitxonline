@@ -3195,15 +3195,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@json-editor/json-editor@npm:2.16.0":
-  version: 2.16.0
-  resolution: "@json-editor/json-editor@npm:2.16.0"
-  dependencies:
-    core-js: ^3.27.2
-  checksum: 5ccf6cbfbbd975c4057da1a5212e81638abf255377b4050e1c5b8019df922e13ed3e4ffe60054b14e35f76445af0c506a4f328f76f9e7bd2ad4d65b887bd9063
-  languageName: node
-  linkType: hard
-
 "@jsonjoy.com/base64@npm:17.67.0":
   version: 17.67.0
   resolution: "@jsonjoy.com/base64@npm:17.67.0"
@@ -8469,7 +8460,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"core-js@npm:^3.19.2, core-js@npm:^3.27.2, core-js@npm:^3.33.0, core-js@npm:^3.38.1":
+"core-js@npm:^3.19.2, core-js@npm:^3.33.0, core-js@npm:^3.38.1":
   version: 3.42.0
   resolution: "core-js@npm:3.42.0"
   checksum: 270b5532511e2e6cc8e6b10c1434306208dca377aba3850875941316ce605b008ddbdeca0b6dd6eb2a4b188899dab259c0aecd7dc265bc5e7df19563e4e284b7
@@ -16014,7 +16005,6 @@ __metadata:
     "@babel/preset-react": 7.28.5
     "@babel/register": 7.28.3
     "@fancyapps/fancybox": 3.5.7
-    "@json-editor/json-editor": 2.16.0
     "@material/layout-grid": 0.41.0
     "@material/top-app-bar": 1.1.1
     "@sentry/browser": 10.38.0
