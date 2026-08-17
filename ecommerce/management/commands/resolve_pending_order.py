@@ -73,11 +73,16 @@ class Command(BaseCommand):
         else:
             pending_orders = []
 
+        check = not kwargs.get("no_check", False)
+        skip_fulfill = kwargs.get("no_fulfillment", False)
+
         (
             fulfilled_count,
             cancel_count,
             error_count,
-        ) = check_and_process_pending_orders_for_resolution(pending_orders)
+        ) = check_and_process_pending_orders_for_resolution(
+            pending_orders, check_status=check, skip_fulfillment=skip_fulfill
+        )
 
         self.stdout.write(
             self.style.SUCCESS(

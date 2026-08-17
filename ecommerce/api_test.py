@@ -728,6 +728,36 @@ def test_check_and_process_pending_orders_for_resolution(mocker, test_type):
         assert (fulfilled, cancelled, errored) == (1, 0, 0)
 
 
+def test_check_and_process_pending_orders_options(mocker):
+    """
+    Test that the flags for no-check and no-fulfill do what we expect.
+
+    If we set check=False, we shouldn't check the status of the request with
+    the payment processor. If skip_fulfillment=True, we shouldn't try to fulfill
+    the order. These don't depend on each other so they're being tested together.
+    """
+
+    order = OrderFactory.create(state=OrderStatus.PENDING)
+    mocked_gateway_func = mocker.patch(
+        "mitol.payment_gateway.api.CyberSourcePaymentGateway.find_and_get_transactions"
+    )
+    mocked_create_enrollments = mocker.patch(
+        "ecommerce.models.OrderFlow.create_enrollments", return_value=True
+    )
+
+    (fulfilled, cancelled, errored) = check_and_process_pending_orders_for_resolution(
+        [],
+        check_status=False,
+        skip_fulfillment=True,
+    )
+
+    order.refresh_from_db()
+    assert order.state == OrderStatus.FULFILLED
+    assert (fulfilled, cancelled, errored) == (1, 0, 0)
+    mocked_gateway_func.assert_not_called()
+    mocked_create_enrollments.assert_not_called()
+
+
 @pytest.mark.parametrize("peruser", [True, False])
 def test_duplicate_redemption_check(peruser):
     """
