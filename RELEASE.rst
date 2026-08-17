@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.162.6 (Released August 17, 2026)
+---------------
+
+- Recurse into the program if the program doesn't have a verified mode when generating certificates (#3848)
+- Add postal_code and state to missing fields in the user api (#3850)
+- Skip HubSpot deal sync for program-enrolled courses (#3844)
+- Backfill verified enrollments when verified program (#3838)
+
 Version 1.162.5 (Released August 13, 2026)
 ---------------
 
