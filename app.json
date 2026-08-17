@@ -637,8 +637,8 @@
       "description": "The number of hours until an access token for the Open edX API expires",
       "required": false
     },
-    "OPENTELEMETRY_ENABLED": {
-      "description": "Enable collection and shipment of opentelemetry data",
+    "OPENTELEMETRY_BATCH_SIZE": {
+      "description": "Batch size for traces",
       "required": false
     },
     "OPENTELEMETRY_ENDPOINT": {
@@ -655,10 +655,6 @@
     },
     "OPENTELEMETRY_SERVICE_NAME": {
       "description": "The name of the service to report to opentelemetry",
-      "required": false
-    },
-    "OPENTELEMETRY_TRACES_BATCH_SIZE": {
-      "description": "Batch size for traces",
       "required": false
     },
     "OPEN_EXCHANGE_RATES_APP_ID": {
