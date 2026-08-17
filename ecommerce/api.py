@@ -764,7 +764,7 @@ def _retrieve_pending_cybersource_orders(orders):
             cancelled,
         )
 
-    for _, payload in results.items():
+    for payload in results.values():
         if int(payload["reason_code"]) == 100:  # noqa: PLR2004
             completed[payload["req_reference_number"]] = payload
         else:
@@ -787,7 +787,6 @@ def _retrieve_pending_stripe_orders(orders):
 
     completed = {}
     cancelled = {}
-    gateway = PaymentGateway.get_gateway_class(MITOL_PAYMENT_GATEWAY_STRIPE)
 
     # We should be logging the initial checkout session in a specific way
     # (see generate_checkout_payload) so we can find those transactions for the
@@ -823,9 +822,9 @@ def _retrieve_pending_stripe_orders(orders):
 
         checkout_session = process_stripe_checkout_session_status(checkout_session_id)
 
-        if checkout_session["status"] == "cancelled":
+        if checkout_session["status"] == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED:
             cancelled[order.reference_number] = checkout_session["transaction"]
-        elif checkout_session["status"] == "paid":
+        elif checkout_session["status"] == STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
             completed[order.reference_number] = checkout_session["transaction"]
 
     return (
@@ -864,8 +863,6 @@ def check_and_process_pending_orders_for_resolution(
         return (0, 0, 0)
 
     log.info("Resolving %s orders", len(pending_orders))
-
-    # TODO: get the stripe part of this fleshed out
 
     if check_status:
         cs_gateway_orders = [
@@ -1465,8 +1462,6 @@ def process_stripe_checkout_session_status(checkout_session: dict | str):
         },
     )
 
-    breakpoint()
-
     # The session itself has two status fields: status and payment_status
     # status is the session status - open, complete, expired
     # payment_status is payment with relation to the session - no_payment_required, paid, unpaid
@@ -1558,10 +1553,10 @@ def process_stripe_checkout_completed(event):
 
         return False
 
-    if status_obj["status"] in [
-        STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
-        STRIPE_OVERALL_CHECKOUT_STATUS_ERROR,
-    ]:
+    if status_obj["status"] == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED:
+        order.get_object_flow().cancel(api_response_data=event.to_dict(for_json=True))
+        order.refresh_from_db()
+    elif status_obj["status"] == STRIPE_OVERALL_CHECKOUT_STATUS_ERROR:
         log.info(
             "process_stripe_checkout_completed: session %s for order %s ended unsuccessfully: %s - %s",
             session_id,
