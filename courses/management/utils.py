@@ -134,16 +134,27 @@ def enroll_learner_in_run(
             enrollment_result is the created/updated enrollment on success, None on failure.
             message is a human-readable status string.
     """
-    if not user.openedx_user_exists:
-        create_user(user)
-        user.refresh_from_db()
+    try:
+        if not user.openedx_user_exists:
+            create_user(user)
+            user.refresh_from_db()
 
-    successful_enrollments, edx_request_success = create_run_enrollments(
-        user,
-        [course_run],
-        keep_failed_enrollments=keep_failed_enrollments,
-        mode=mode,
-    )
+        successful_enrollments, edx_request_success = create_run_enrollments(
+            user,
+            [course_run],
+            keep_failed_enrollments=keep_failed_enrollments,
+            mode=mode,
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        # create_user() re-raises edX failures (e.g. unreachable edX) unless
+        # IGNORE_EDX_FAILURES is set, so this must be caught here to keep a
+        # single bad row from aborting the rest of a bulk enrollment run.
+        log.exception("Failed to enroll %s in %s", user.email, course_run.courseware_id)
+        return (
+            None,
+            f"Failed to enroll {user.email} in {course_run.courseware_id}: {exc}",
+        )
+
     if not successful_enrollments:
         return (
             None,
