@@ -5,7 +5,12 @@ from django.contrib import admin as django_admin
 from django.urls import reverse
 
 from courses.admin import CourseRunEnrollmentAdmin
-from courses.factories import CourseRunEnrollmentFactory
+from courses.factories import (
+    CourseRunEnrollmentFactory,
+    PartnerSchoolFactory,
+    PartnerSchoolProgramFactory,
+    ProgramFactory,
+)
 from courses.models import CourseRunEnrollment
 from openedx.constants import OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES
 
@@ -56,3 +61,37 @@ def test_repair_exhausted_display(edx_enrolled, retry_count, expected):
     admin_instance = CourseRunEnrollmentAdmin(CourseRunEnrollment, django_admin.site)
 
     assert admin_instance.repair_exhausted(enrollment) is expected
+
+
+def test_partner_school_admin_change_page_lists_program_inline(admin_client):
+    """The change page exposes the program assignment inline, including alt_email."""
+    school = PartnerSchoolFactory.create()
+    program = ProgramFactory.create(title="Supply Chain Management")
+    PartnerSchoolProgramFactory.create(partner_school=school, program=program)
+
+    resp = admin_client.get(
+        reverse("admin:courses_partnerschool_change", args=[school.id])
+    )
+
+    assert resp.status_code == 200
+    assert b"program_links" in resp.content
+    assert b"alt_email" in resp.content
+
+
+def test_partner_school_admin_changelist_filters_by_program(admin_client):
+    """The changelist can be filtered down to one program's schools."""
+    scm = ProgramFactory.create()
+    dedp = ProgramFactory.create()
+    scm_school = PartnerSchoolFactory.create(name="SCM Only School")
+    dedp_school = PartnerSchoolFactory.create(name="DEDP Only School")
+    PartnerSchoolProgramFactory.create(partner_school=scm_school, program=scm)
+    PartnerSchoolProgramFactory.create(partner_school=dedp_school, program=dedp)
+
+    resp = admin_client.get(
+        reverse("admin:courses_partnerschool_changelist"),
+        {"programs__id__exact": scm.id},
+    )
+
+    assert resp.status_code == 200
+    assert b"SCM Only School" in resp.content
+    assert b"DEDP Only School" not in resp.content

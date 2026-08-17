@@ -752,6 +752,27 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
 
     run = CourseRun.objects.filter(courseware_id=courserun_id).get()
 
+    # A program enrollment doesn't entitle the learner to bypass the run's
+    # enrollment window. This guards both the audit and the verified paths
+    # below, neither of which checks the window itself.
+    #
+    # The window only governs getting into a run in the first place. A learner
+    # who already holds a seat may still change mode (e.g. an audit enrollment
+    # upgrading because they bought the program), which is gated by
+    # is_upgradable further down rather than by the window.
+    if (
+        not run.is_enrollable
+        and not CourseRunEnrollment.objects.filter(
+            run=run, user=request.user, active=True
+        ).exists()
+    ):
+        log.warning(
+            "_create_course_enrollment_from_program: user %s tried to enroll in %s, which is outside its enrollment window",
+            request.user,
+            courserun_id,
+        )
+        return Response(status=status.HTTP_400_BAD_REQUEST)
+
     in_program = run.course in [
         *program_enrollment.program.required_courses,
         *program_enrollment.program.elective_courses,

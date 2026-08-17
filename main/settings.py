@@ -39,7 +39,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "1.162.2"
+VERSION = "1.162.6"
 
 log = logging.getLogger()
 
@@ -1653,11 +1653,5 @@ MIT_LEARN_ATTACH_URL = get_string(
     description="The URL to use for generating contract attachment URLs for B2B.",
 )
 
-ECOMMERCE_DEFAULT_PAYMENT_GATEWAY = get_string(
-    name="ECOMMERCE_DEFAULT_PAYMENT_GATEWAY",
-    default=MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
-    description="The default payment gateway to use. Must match the value of the constant in the mitol.payment_gateway library.",
-)
-
-if ECOMMERCE_DEFAULT_PAYMENT_GATEWAY == "None":
+if ECOMMERCE_DEFAULT_PAYMENT_GATEWAY == "None":  # noqa: F405
     ECOMMERCE_DEFAULT_PAYMENT_GATEWAY = MITOL_PAYMENT_GATEWAY_CYBERSOURCE

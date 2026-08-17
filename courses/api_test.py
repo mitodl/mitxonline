@@ -53,6 +53,7 @@ from courses.api import (
     manage_course_run_certificate_access,
     manage_program_certificate_access,
     override_user_grade,
+    partner_schools_for_program,
     process_course_run_grade_certificate,
     pull_course_modes,
     sync_course_mode,
@@ -76,6 +77,8 @@ from courses.factories import (
     CourseRunGradeFactory,
     DepartmentFactory,
     EnrollmentModeFactory,
+    PartnerSchoolFactory,
+    PartnerSchoolProgramFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
@@ -98,6 +101,7 @@ from courses.models import (
 )
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Basket, OrderStatus
+from main import features
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
 from main.test_utils import MockHttpError
 from openedx.constants import (
@@ -2363,15 +2367,56 @@ def test_generate_program_certificate_failure_not_all_passed_nested_elective_sti
 
 
 @pytest.mark.parametrize(
-    ("has_main_enroll", "has_sub_enroll"),
+    (
+        "has_main_enroll",
+        "has_sub_enroll",
+        "sub_is_audit_only",
+        "sub_course_passed",
+    ),
     [
         (
             True,
             True,
+            False,
+            True,
         ),
-        (True, False),
-        (False, True),
-        (False, False),
+        (
+            True,
+            True,
+            False,
+            False,
+        ),
+        (
+            True,
+            False,
+            False,
+            True,
+        ),
+        (
+            True,
+            False,
+            False,
+            False,
+        ),
+        (False, True, False, True),
+        (
+            False,
+            False,
+            False,
+            True,
+        ),
+        (
+            True,
+            True,
+            True,
+            True,
+        ),
+        (
+            True,
+            True,
+            True,
+            False,
+        ),
     ],
 )
 @patch("courses.signals.upsert_custom_properties")
@@ -2382,10 +2427,12 @@ def test_generate_program_certificate_with_subprogram_requirement(  # noqa: PLR0
     default_mode_records,
     has_main_enroll,
     has_sub_enroll,
+    sub_is_audit_only,
+    sub_course_passed,
 ):
     """
-    Test that generate_program_certificate considers sub-program (nested program) requirements
-    when determining if a user has earned a program certificate.
+    Test that generate_program_certificate considers sub-program (nested program)
+    requirements when determining if a user has earned a program certificate.
     """
     patched_sync_hubspot_user = mocker.patch(
         "hubspot_sync.task_helpers.sync_hubspot_user",
@@ -2395,7 +2442,12 @@ def test_generate_program_certificate_with_subprogram_requirement(  # noqa: PLR0
     )
 
     # Create a sub-program that the user will complete
-    sub_program = ProgramFactory.create()
+    modes = (
+        [EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)]
+        if sub_is_audit_only
+        else []
+    )
+    sub_program = ProgramFactory.create(enrollment_modes=modes)
     sub_course = CourseFactory.create()
     sub_program.add_requirement(sub_course)
 
@@ -2442,8 +2494,9 @@ def test_generate_program_certificate_with_subprogram_requirement(  # noqa: PLR0
     main_certificate, main_created = generate_program_certificate(
         user=user, program=main_program
     )
-    if has_main_enroll and has_sub_enroll:
-        # Should only get a certificate if we had a cert in the sub
+    if has_main_enroll and has_sub_enroll and sub_course_passed:
+        # Should only get a certificate if we had a cert (or a passing grade!)
+        # in the sub
         # So, we'd have to have been enrolled there, too
         assert main_created is True
         assert isinstance(main_certificate, ProgramCertificate)
@@ -4148,3 +4201,59 @@ def test_generate_missing_program_certificates_failure_isolation(mock_upsert, mo
     assert stats["failed"] == 1
     assert stats["processed"] == 2
     assert mock_generate.call_count == 2
+
+
+def test_partner_schools_for_program_unfiltered_when_flag_off(settings):
+    """With the flag off every active school is returned, preserving old behavior."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = False
+    scm = ProgramFactory.create()
+    dedp = ProgramFactory.create()
+    scm_school = PartnerSchoolFactory.create(name="SCM School")
+    dedp_school = PartnerSchoolFactory.create(name="DEDP School")
+    PartnerSchoolProgramFactory.create(partner_school=scm_school, program=scm)
+    PartnerSchoolProgramFactory.create(partner_school=dedp_school, program=dedp)
+
+    result = partner_schools_for_program(scm)
+
+    assert sorted(school.name for school in result) == ["DEDP School", "SCM School"]
+
+
+def test_partner_schools_for_program_filtered_when_flag_on(settings):
+    """With the flag on only the program's own schools are returned."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    scm = ProgramFactory.create()
+    dedp = ProgramFactory.create()
+    scm_school = PartnerSchoolFactory.create(name="SCM School")
+    dedp_school = PartnerSchoolFactory.create(name="DEDP School")
+    PartnerSchoolProgramFactory.create(partner_school=scm_school, program=scm)
+    PartnerSchoolProgramFactory.create(partner_school=dedp_school, program=dedp)
+
+    result = partner_schools_for_program(scm)
+
+    assert [school.name for school in result] == ["SCM School"]
+
+
+def test_partner_schools_for_program_deduplicates_multi_recipient_school(settings):
+    """A school with two recipient rows appears once when the flag is on."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    program = ProgramFactory.create()
+    school = PartnerSchoolFactory.create(name="Reykjavik University")
+    PartnerSchoolProgramFactory.create(
+        partner_school=school, program=program, email="vd@example.com"
+    )
+    PartnerSchoolProgramFactory.create(
+        partner_school=school, program=program, email="cs@example.com"
+    )
+
+    result = partner_schools_for_program(program)
+
+    assert [school.name for school in result] == ["Reykjavik University"]
+
+
+def test_partner_schools_for_program_excludes_unassigned_when_flag_on(settings):
+    """An untagged school is invisible once filtering is live."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    program = ProgramFactory.create()
+    PartnerSchoolFactory.create(name="Unassigned School")
+
+    assert list(partner_schools_for_program(program)) == []

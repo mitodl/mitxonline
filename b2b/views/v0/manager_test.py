@@ -13,6 +13,8 @@ from b2b.api import ensure_enrollment_codes_exist
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE
 from b2b.factories import ContractPageFactory
 from b2b.models import (
+    EMAIL_STATUS_DELIVERED,
+    EMAIL_STATUS_FAILED,
     EMAIL_STATUS_PENDING,
     REDEMPTION_STATUS_ASSIGNED,
     REDEMPTION_STATUS_REDEEMED,
@@ -723,6 +725,61 @@ def test_org_contract_codes_status_filter(org_setup, manager_drf_client):
     ) == {
         discounts[1].discount_code,
         discounts[2].discount_code,
+    }
+
+
+def test_org_contract_codes_status_filter_failed(org_setup, manager_drf_client):
+    """
+    The "failed" status filters on email_status, but only for codes that
+    haven't since been redeemed - a redeemed code shouldn't show up as
+    "failed" since the code has been consumed.
+    """
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discounts = list(contract_1.get_discounts().order_by("id")[:4])
+
+    user_a = UserFactory.create(email="alice@example.com")
+
+    # assigned, invite email delivered successfully - not "failed"
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[0],
+        assigned_email="carol@example.com",
+        email_status=EMAIL_STATUS_DELIVERED,
+        contract=contract_1,
+    )
+    # assigned, invite email failed to send
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[1],
+        assigned_email="dave@example.com",
+        email_status=EMAIL_STATUS_FAILED,
+        contract=contract_1,
+    )
+    # redeemed (has user), invite email delivered - not "failed"
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[2],
+        user=user_a,
+        email_status=EMAIL_STATUS_DELIVERED,
+        contract=contract_1,
+    )
+    # redeemed (has redeemed_on but no user), but the invite email had failed
+    # before the code was redeemed some other way - should NOT count as "failed"
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[3],
+        redeemed_on=now_in_utc(),
+        email_status=EMAIL_STATUS_FAILED,
+        contract=contract_1,
+    )
+
+    url = reverse(
+        "b2b:b2b-manager-org-contract-codes",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+        },
+    )
+
+    assert _get_codes_for_status(manager_drf_client, url, EMAIL_STATUS_FAILED) == {
+        discounts[1].discount_code
     }
 
 

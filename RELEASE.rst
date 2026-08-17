@@ -1,6 +1,41 @@
 Release Notes
 =============
 
+Version 1.162.6 (Released August 17, 2026)
+---------------
+
+- Recurse into the program if the program doesn't have a verified mode when generating certificates (#3848)
+- Add postal_code and state to missing fields in the user api (#3850)
+- Skip HubSpot deal sync for program-enrolled courses (#3844)
+- Backfill verified enrollments when verified program (#3838)
+
+Version 1.162.5 (Released August 13, 2026)
+---------------
+
+- Backfill missing LegalAddress/UserProfile for migrated users; guard should_skip_onboarding (#3845)
+- refactor: pass the Learn Fastly service ID at the call sites (#3804)
+
+Version 1.162.4 (Released August 12, 2026)
+---------------
+
+- Add failed filter to /codes (#3827)
+- Support program-specific pathway schools in learner record sharing (#3802)
+- Fix duplicate ECOMMERCE_DEFAULT_PAYMENT_GATEWAY env var declaration (#3832)
+- Add learner refund request workflow (#3810)
+- Learner record serializer tests (#3819)
+- Update dependency webpack-dev-server to v5.2.5 [SECURITY] (#3764)
+- Update dependency wagtail to v7.3.3 [SECURITY] (#3763)
+- Remove unused fetch_enrollment helper (#3820)
+- Adding missing profile fields to profile api (#3818)
+- Add CyberSource export compliance data model (#3793)
+
+Version 1.162.3 (Released August 11, 2026)
+---------------
+
+- Strip angle brackets (#3825)
+- Add zizmor pre-commit hook and 7-day uv dependency delay (#3808)
+- Use CMS Certificate Title for program verifiable credentials (#3698)
+
 Version 1.162.2 (Released August 06, 2026)
 ---------------
 

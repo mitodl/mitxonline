@@ -121,8 +121,13 @@ def queue_fastly_surrogate_key_purge(surrogate_key, service_id=None):
 
     service_id = service_id or settings.MIT_LEARN_FASTLY_SERVICE_ID
 
+    # Logged at error level, not warning: a missing setting disables cache
+    # invalidation entirely, and Sentry only raises an issue from ERROR and above
+    # (main.sentry passes no event_level, so it keeps the sentry_sdk default).
+    # A warning here is a breadcrumb, which is how the unset service ID went
+    # unnoticed until it was found by reading the code.
     if not service_id:
-        logger.warning(
+        logger.error(
             "No Fastly service ID given; skipping surrogate key purge for %s. "
             "Is MIT_LEARN_FASTLY_SERVICE_ID set?",
             surrogate_key,
@@ -130,7 +135,7 @@ def queue_fastly_surrogate_key_purge(surrogate_key, service_id=None):
         return False
 
     if not settings.FASTLY_AUTH_TOKEN:
-        logger.warning(
+        logger.error(
             "FASTLY_AUTH_TOKEN is not set; skipping surrogate key purge for %s",
             surrogate_key,
         )

@@ -386,8 +386,10 @@ paths:
           type: string
           enum:
           - assigned
+          - failed
           - redeemed
-        description: Filter codes by status. Supported values are assigned and redeemed.
+        description: Filter codes by status. Supported values are assigned, redeemed,
+          and failed.
       tags:
       - b2b
       responses:
@@ -2353,6 +2355,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Order'
+          description: ''
+  /api/v0/orders/refund-requests/:
+    post:
+      operationId: orders_refund_requests_create
+      description: Submit a refund request for a fulfilled order. Only the order's
+        purchaser may submit a request, and B2B contract orders are excluded.
+      tags:
+      - orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RefundRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RefundRequestRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundRequest'
           description: ''
   /api/v0/orders/status/{order_id}/:
     get:
@@ -7461,9 +7489,8 @@ components:
         state:
           $ref: '#/components/schemas/StateEnum'
         purchaser:
-          type: array
-          items:
-            $ref: '#/components/schemas/ExtendedLegalAddress'
+          allOf:
+          - $ref: '#/components/schemas/ExtendedLegalAddress'
           readOnly: true
         total_price_paid:
           type: string
@@ -7528,12 +7555,16 @@ components:
             country:
               type: string
           readOnly: true
+        refund_eligible:
+          type: boolean
+          readOnly: true
       required:
       - created_on
       - discounts
       - id
       - lines
       - purchaser
+      - refund_eligible
       - refunds
       - state
       - street_address
@@ -7573,11 +7604,15 @@ components:
           type: string
           format: date-time
           readOnly: true
+        refund_eligible:
+          type: boolean
+          readOnly: true
       required:
       - created_on
       - id
       - lines
       - purchaser
+      - refund_eligible
       - state
       - titles
       - total_price_paid
@@ -8930,6 +8965,58 @@ components:
       - one-time
       - one-time-per-user
       - unlimited
+    RefundReasonEnum:
+      enum:
+      - enrolled_in_another_course
+      - course_not_as_expected
+      - technical_difficulties
+      - financial_reasons
+      - other
+      type: string
+      description: |-
+        * `enrolled_in_another_course` - I enrolled in another course
+        * `course_not_as_expected` - Course is not what I expected
+        * `technical_difficulties` - Technical difficulties
+        * `financial_reasons` - Financial reasons
+        * `other` - Other
+      x-enum-descriptions:
+      - I enrolled in another course
+      - Course is not what I expected
+      - Technical difficulties
+      - Financial reasons
+      - Other
+    RefundRequest:
+      type: object
+      description: Serializer for creating learner-submitted refund requests.
+      properties:
+        order:
+          type: integer
+        refund_reason:
+          oneOf:
+          - $ref: '#/components/schemas/RefundReasonEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        refund_reason_text:
+          type: string
+        consent_given:
+          type: boolean
+      required:
+      - order
+    RefundRequestRequest:
+      type: object
+      description: Serializer for creating learner-submitted refund requests.
+      properties:
+        order:
+          type: integer
+        refund_reason:
+          oneOf:
+          - $ref: '#/components/schemas/RefundReasonEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        refund_reason_text:
+          type: string
+        consent_given:
+          type: boolean
+      required:
+      - order
     ResultEnum:
       enum:
       - b2b-disallowed

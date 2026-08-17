@@ -773,6 +773,181 @@ def test_get_valid_edx_api_auth_expired(settings):
     )
 
 
+@responses.activate
+@freeze_time("2019-03-24 11:50:36")
+def test_get_valid_edx_api_auth_invalid_grant_reauthorizes(mocker, settings, caplog):
+    """Tests that a refresh token rejected as invalid_grant is replaced
+
+    Such a token can never be refreshed again, so the only recovery is re-running the
+    full authorization flow to obtain a new pair.
+    """
+    # openedx.api snapshots this setting into a module constant at import time, so the
+    # constant is patched directly to keep the test independent of the local environment
+    social_login_path = "/auth/login/mitxpro-oauth2/?auth_entry=login"
+    mocker.patch("openedx.api.OPENEDX_SOCIAL_LOGIN_PATH", social_login_path)
+    auth = OpenEdxApiAuthFactory.create(expired=True)
+    stale_refresh_token = auth.refresh_token
+    code = "ghi789"
+
+    # the refresh attempt: edX has expired or revoked the stored refresh token
+    responses.add(
+        responses.POST,
+        f"{settings.OPENEDX_API_BASE_URL}/oauth2/access_token",
+        json={"error": "invalid_grant"},
+        status=status.HTTP_400_BAD_REQUEST,
+    )
+    # the full re-authorization flow that should follow
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}{social_login_path}",
+        status=status.HTTP_200_OK,
+    )
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/oauth2/authorize",
+        headers={"Location": f"{settings.SITE_BASE_URL}/_/auth/complete?code={code}"},
+        status=status.HTTP_302_FOUND,
+    )
+    responses.add(
+        responses.GET,
+        f"{settings.SITE_BASE_URL}/_/auth/complete",
+        status=status.HTTP_200_OK,
+    )
+    responses.add(
+        responses.POST,
+        f"{settings.OPENEDX_API_BASE_URL}/oauth2/access_token",
+        json=dict(  # noqa: C408
+            refresh_token="new_refresh_token",  # noqa: S106
+            access_token="new_access_token",  # noqa: S106
+            expires_in=3600,
+        ),
+        status=status.HTTP_200_OK,
+    )
+
+    with caplog.at_level(logging.WARNING):
+        updated_auth = get_valid_edx_api_auth(auth.user)
+
+    assert updated_auth is not None
+    assert updated_auth.refresh_token == "new_refresh_token"  # noqa: S105
+    assert updated_auth.access_token == "new_access_token"  # noqa: S105
+    # the failed refresh, then the 4 calls of the authorization_code flow
+    assert len(responses.calls) == 5
+    assert dict(parse_qsl(responses.calls[0].request.body)) == dict(  # noqa: C408
+        refresh_token=stale_refresh_token,
+        grant_type="refresh_token",
+        client_id=settings.OPENEDX_API_CLIENT_ID,
+        client_secret=settings.OPENEDX_API_CLIENT_SECRET,
+    )
+    assert (
+        dict(parse_qsl(responses.calls[-1].request.body))["grant_type"]
+        == "authorization_code"
+    )
+    assert OpenEdxApiAuth.objects.filter(user=auth.user).count() == 1
+    assert "invalid_grant" in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("body_kwargs", "response_status"),
+    [
+        # a 400 that is not invalid_grant: the OAuth application is misconfigured or we
+        # built the request wrong, neither of which re-authorizing can fix
+        ({"json": {"error": "unauthorized_client"}}, status.HTTP_400_BAD_REQUEST),
+        ({"json": {"error": "invalid_request"}}, status.HTTP_400_BAD_REQUEST),
+        # invalid_grant but not a 400, so the status is what rules it out -- our own
+        # client credentials are wrong and every user would fail identically
+        ({"json": {"error": "invalid_grant"}}, status.HTTP_401_UNAUTHORIZED),
+        # bodies we cannot attribute to a dead token: not JSON at all, and JSON that is
+        # not an object so there is no "error" to read
+        (
+            {"body": "<html><body>Bad Request</body></html>"},
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        ({"body": "invalid_grant"}, status.HTTP_400_BAD_REQUEST),
+    ],
+)
+@responses.activate
+def test_get_valid_edx_api_auth_unrecoverable_refresh_error_raises(
+    settings, caplog, body_kwargs, response_status
+):
+    """Tests that only a 400 invalid_grant re-authorizes, and the rest surface"""
+    auth = OpenEdxApiAuthFactory.create(expired=True)
+    stale_refresh_token = auth.refresh_token
+
+    responses.add(
+        responses.POST,
+        f"{settings.OPENEDX_API_BASE_URL}/oauth2/access_token",
+        status=response_status,
+        **body_kwargs,
+    )
+
+    with caplog.at_level(logging.WARNING), pytest.raises(HTTPError):
+        get_valid_edx_api_auth(auth.user)
+
+    # no re-authorization was attempted and the credentials were left alone
+    assert len(responses.calls) == 1
+    auth.refresh_from_db()
+    assert auth.refresh_token == stale_refresh_token
+    # the response body is recorded, since the exception message carries only the status
+    assert "failed unrecoverably" in caplog.text
+
+
+@responses.activate
+def test_get_valid_edx_api_auth_invalid_grant_unsynced_user_raises(settings):
+    """Tests that a user with no synced Open edX account cannot be re-authorized
+
+    create_edx_auth_token returns None for them, and a None auth must not leak out to
+    callers that go straight on to read auth.access_token.
+    """
+    auth = OpenEdxApiAuthFactory.create(expired=True)
+    auth.user.openedx_users.update(has_been_synced=False)
+
+    responses.add(
+        responses.POST,
+        f"{settings.OPENEDX_API_BASE_URL}/oauth2/access_token",
+        json={"error": "invalid_grant"},
+        status=status.HTTP_400_BAD_REQUEST,
+    )
+
+    with pytest.raises(NoEdxApiAuthError):
+        get_valid_edx_api_auth(auth.user)
+
+
+@responses.activate
+def test_get_valid_edx_api_auth_keeps_tokens_when_reauthorization_fails(
+    mocker, settings, caplog
+):
+    """Tests that a failed re-authorization leaves the user's existing auth record intact
+
+    Re-authorizing is a multi-request flow against Open edX that does fail in practice,
+    and the user must not be left with no credentials at all when it does.
+    """
+    social_login_path = "/auth/login/mitxpro-oauth2/?auth_entry=login"
+    mocker.patch("openedx.api.OPENEDX_SOCIAL_LOGIN_PATH", social_login_path)
+    auth = OpenEdxApiAuthFactory.create(expired=True)
+    stale_refresh_token = auth.refresh_token
+
+    responses.add(
+        responses.POST,
+        f"{settings.OPENEDX_API_BASE_URL}/oauth2/access_token",
+        json={"error": "invalid_grant"},
+        status=status.HTTP_400_BAD_REQUEST,
+    )
+    # the re-authorization flow falls over on its first leg
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}{social_login_path}",
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+
+    with caplog.at_level(logging.WARNING), pytest.raises(HTTPError):
+        get_valid_edx_api_auth(auth.user)
+
+    assert "Re-authorizing" in caplog.text
+    # the clearing of the tokens was rolled back with the caller's transaction
+    auth.refresh_from_db()
+    assert auth.refresh_token == stale_refresh_token
+
+
 def test_get_edx_api_client(mocker, settings, user):
     """Tests that get_edx_api_client returns an EdxApi client"""
     settings.OPENEDX_API_BASE_URL = "http://example.com"

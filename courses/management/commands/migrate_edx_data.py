@@ -404,6 +404,100 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(f"{user_creation_count} users created"))
 
+    def _repair_migrated_user_profiles(self, conn, options):
+        """
+        Backfill LegalAddress/UserProfile rows for users left without them by
+        a historical bug in _bulk_create_users: bulk_create(ignore_conflicts=True)
+        never populates .pk on the objects passed into it, so every call here
+        used to build id_row_lookup keyed on user.id=None and then filter
+        User.objects.filter(id__in=[None, ...]), which always matches zero
+        rows - LegalAddress/UserProfile silently never got created for any
+        user who went through this command, regardless of the row data
+        Trino actually had for them.
+
+        This re-scans the same edX table used by _migrate_users, but only
+        acts on users already missing one of these rows - real, already-saved
+        User objects with real ids, so the existing bulk-create helpers work
+        correctly here the same way they already do for the enrollments
+        migration's opportunistic repair path.
+        """
+        limit = options.get("limit")
+        batch_size = options.get("batch_size", 1000)
+        dry_run = options.get("dry_run")
+
+        affected_users = list(
+            User.objects.filter(
+                Q(legal_address__isnull=True) | Q(user_profile__isnull=True)
+            ).only("id", "email")
+        )
+        if limit is not None:
+            affected_users = affected_users[:limit]
+        affected_by_email = {user.email: user for user in affected_users if user.email}
+
+        self.stdout.write(
+            f"{len(affected_by_email)} users found missing "
+            f"LegalAddress and/or UserProfile"
+        )
+
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM edxorg_to_mitxonline_users")
+        columns = [desc[0] for desc in cur.description]
+
+        # e.g. {"Male": "m", "Female": "f"}
+        GENDER_MAP = {label: code for code, label in GENDER_CHOICES}
+
+        repaired_emails = set()
+        while True:
+            results = cur.fetchmany(batch_size)
+            if not results:
+                break
+
+            rows = [dict(zip(columns, r)) for r in results]
+
+            matched_users = []
+            row_lookup_by_id = {}
+            for row in rows:
+                email = row.get("user_email")
+                user = affected_by_email.get(email)
+                if user is None or email in repaired_emails:
+                    continue
+                matched_users.append(user)
+                row_lookup_by_id[user.id] = row
+                repaired_emails.add(email)
+
+            if not matched_users:
+                continue
+
+            if dry_run:
+                continue
+
+            self._bulk_create_legal_addresses(
+                matched_users, row_lookup_by_id, batch_size
+            )
+            self._bulk_create_user_profiles(
+                matched_users, row_lookup_by_id, batch_size, GENDER_MAP
+            )
+
+        unmatched = len(affected_by_email) - len(repaired_emails)
+        if dry_run:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"[DRY RUN] Would repair {len(repaired_emails)} users"
+                )
+            )
+        else:
+            self.stdout.write(
+                self.style.SUCCESS(f"Repaired {len(repaired_emails)} users")
+            )
+        if unmatched:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"{unmatched} affected users had no matching row in "
+                    f"edxorg_to_mitxonline_users - still missing "
+                    f"LegalAddress/UserProfile, needs manual review"
+                )
+            )
+
     @staticmethod
     def _bulk_create_enrollments(
         rows,
@@ -1048,9 +1142,10 @@ class Command(BaseCommand):
                 "program_certificates",
                 "entitlements",
                 "future_enrollments",
+                "repair_migrated_profiles",
             ],
             default="course_runs",
-            help="Choose which migration to run: course_runs, users, course_certificates, program_certificates, entitlements, future_enrollments (default: course_runs)",
+            help="Choose which migration to run: course_runs, users, course_certificates, program_certificates, entitlements, future_enrollments, repair_migrated_profiles (default: course_runs)",
         )
         parser.add_argument("--dry-run", action="store_true")
         parser.add_argument(
@@ -1071,6 +1166,13 @@ class Command(BaseCommand):
         if migrate_type == "users":
             self.stdout.write("Migrating the edX users ...")
             self._migrate_users(conn, options)
+
+        if migrate_type == "repair_migrated_profiles":
+            self.stdout.write(
+                "Repairing LegalAddress/UserProfile rows missed by a "
+                "historical bug in the users migration ..."
+            )
+            self._repair_migrated_user_profiles(conn, options)
 
         if migrate_type == "course_certificates":
             self.stdout.write(

@@ -24,6 +24,7 @@ from mitol.common.utils.collections import (
     first_or_none,
     has_equal_properties,
 )
+from mitol.olposthog.features import is_enabled
 from opaque_keys.edx.keys import CourseKey
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
@@ -48,6 +49,7 @@ from courses.models import (
     Department,
     EnrollmentMode,
     PaidCourseRun,
+    PartnerSchool,
     Program,
     ProgramCertificate,
     ProgramEnrollment,
@@ -1266,10 +1268,18 @@ def _has_earned_program_cert(user, program):
             # has passed the referenced course
             return node.course in [*cert_courses, *grade_courses]
         elif node.is_program:
-            # has earned certificate for the required sub-program
-            return ProgramCertificate.all_objects.filter(
-                user=user, program=node.required_program, is_revoked=False
-            ).exists()
+            # If the program has a verified mode (requires_payment=True), then
+            # check for a certificate. If not, then recurse; if the learner would
+            # have earned a certificate, we should count that.
+            if (
+                node.is_program
+                and node.program.enrollment_modes.filter(requires_payment=True).exists()
+            ):
+                return ProgramCertificate.all_objects.filter(
+                    user=user, program=node.required_program, is_revoked=False
+                ).exists()
+
+            return _has_earned_program_cert(user, node.program)
         return False
 
     return _has_earned(root)
@@ -1523,6 +1533,31 @@ def manage_program_certificate_access(user, program, revoke_state):
     program_certificate.save()
 
     return True
+
+
+def partner_schools_for_program(program):
+    """
+    Return the pathway schools a learner may share this program's record with.
+
+    While ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS is off this returns every active
+    school, which is the pre-12321 behavior. Once the flag is on, only schools
+    assigned to this program are returned.
+
+    `.distinct()` is required: a school with more than one recipient row for the
+    program joins once per row and would otherwise be listed twice.
+
+    Args:
+        program (Program): the program whose record is being shared
+
+    Returns:
+        QuerySet of PartnerSchool
+    """
+    schools = PartnerSchool.objects.all()
+
+    if is_enabled(features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS):
+        schools = schools.filter(programs=program).distinct()
+
+    return schools
 
 
 def resolve_courseware_object_from_id(

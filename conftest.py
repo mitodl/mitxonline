@@ -26,6 +26,7 @@ def default_settings(monkeypatch, settings):
 
     settings.FEATURES[features.IGNORE_EDX_FAILURES] = False
     settings.FEATURES[features.SYNC_ON_DASHBOARD_LOAD] = False
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = False
 
 
 @pytest.fixture(autouse=True)
@@ -52,6 +53,7 @@ def payment_gateway_settings(settings):
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_REST_API_ENVIRONMENT = (
         "apitest.cybersource.com"
     )
+    settings.MITOL_PAYMENT_GATEWAY_STRIPE_API_KEY = uuid.uuid4()
 
 
 @pytest.fixture

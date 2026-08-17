@@ -6,6 +6,7 @@ from rest_framework.exceptions import ValidationError
 
 from cms.serializers import ProgramPageSerializer
 from courses import models
+from courses.api import partner_schools_for_program
 from courses.serializers.base import (
     BaseProgramRequirementTreeSerializer,
     get_thumbnail_url,
@@ -356,6 +357,6 @@ class LearnerRecordSerializer(serializers.Serializer):
             "partner_schools": []
             if anonymous
             else PartnerSchoolSerializer(
-                models.PartnerSchool.objects.all(), many=True
+                partner_schools_for_program(instance), many=True
             ).data,
         }
