@@ -1157,6 +1157,47 @@ def test_user_enrollments_create_b2b_run_invalid_v2(user_drf_client, user):
     assert resp.json() == {"errors": {"run_id": f"Invalid course run id: {run.id}"}}
 
 
+def test_user_enrollments_create_closed_run_invalid_v2(user_drf_client, user):
+    """v2 enrollments API should reject runs that are outside their enrollment window."""
+    course = CourseFactory.create()
+    run = CourseRunFactory.create(course=course, past_enrollment_end=True)
+
+    resp = user_drf_client.post(
+        reverse("v2:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "errors": {"run_id": f"Course run is not open for enrollment: {run.id}"}
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+def test_user_enrollments_create_closed_run_existing_enrollment_v2(
+    mocker, user_drf_client, user
+):
+    """
+    A learner who already holds an active seat isn't blocked by a closed window.
+
+    The window governs getting into a run; mode changes and idempotent retries
+    for an existing enrollment must keep working after it closes.
+    """
+    course = CourseFactory.create()
+    run = CourseRunFactory.create(course=course, past_enrollment_end=True)
+    enrollment = CourseRunEnrollmentFactory.create(user=user, run=run, active=True)
+    patched_enroll = mocker.patch(
+        "courses.serializers.v2.courses.create_run_enrollments",
+        return_value=([enrollment], True),
+    )
+
+    resp = user_drf_client.post(
+        reverse("v2:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+
+    assert resp.status_code == status.HTTP_201_CREATED
+    patched_enroll.assert_called_once()
+
+
 def test_program_filter_for_b2b_org(user, mock_course_run_clone):
     """Test that filtering programs by org works as expected."""
 
@@ -1983,6 +2024,165 @@ def test_add_verified_program_course_enrollment_audit_only_run_falls_back_to_aud
     assert resp.json()["run"]["id"] == course_run.id
     assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_AUDIT_MODE
     assert user.orders.count() == initial_order_count
+
+
+def _verified_program_enrollment_with_product(user):
+    """Set up a verified program enrollment whose program has a product."""
+
+    prog_enrollment = ProgramEnrollmentFactory.create(
+        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    program = prog_enrollment.program
+
+    program_content_type = ContentType.objects.get_for_model(program)
+    with reversion.create_revision():
+        Product.objects.create(
+            price=10,
+            is_active=True,
+            object_id=program.id,
+            content_type=program_content_type,
+        )
+
+    return program
+
+
+@pytest.mark.skip_nplusone_check
+@responses.activate
+def test_add_verified_program_course_enrollment_rejects_closed_non_upgradable_run(
+    user_drf_client, user
+):
+    """
+    A run whose enrollment window has closed must be rejected on the audit
+    fallback path, even for a learner enrolled in the program.
+
+    This is the shape reported in #12813: the run is closed and not upgradable
+    (no product), so it used to fall through to the audit branch and enroll the
+    learner with no enrollment-window check at all.
+    """
+
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/enrollment/v1/enrollments",
+        json={"results": [{"mode": EDX_ENROLLMENT_VERIFIED_MODE, "is_active": True}]},
+        status=status.HTTP_200_OK,
+    )
+
+    program = _verified_program_enrollment_with_product(user)
+
+    # No product for the run, so it is not upgradable -> audit fallback branch.
+    course_run = CourseRunFactory.create(past_enrollment_end=True)
+    program.add_requirement(course_run.course)
+
+    assert not course_run.is_upgradable
+    assert not course_run.is_enrollable
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={"courserun_id": course_run.courseware_id},
+        ),
+        data=[program.readable_id],
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
+
+
+@pytest.mark.skip_nplusone_check
+@responses.activate
+def test_add_verified_program_course_enrollment_rejects_closed_upgradable_run(
+    user_drf_client, user
+):
+    """
+    A closed run must also be rejected on the verified path, and no order should
+    be generated for it.
+
+    is_upgradable guards upgrade_deadline while is_enrollable guards
+    enrollment_end, so a run can be closed for enrollment and still upgradable.
+    That combination reaches the verified branch, which creates an order.
+    """
+
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/enrollment/v1/enrollments",
+        json={"results": [{"mode": EDX_ENROLLMENT_VERIFIED_MODE, "is_active": True}]},
+        status=status.HTTP_200_OK,
+    )
+
+    program = _verified_program_enrollment_with_product(user)
+
+    course_run = CourseRunFactory.create(past_enrollment_end=True)
+    program.add_requirement(course_run.course)
+
+    course_run_content_type = ContentType.objects.get_for_model(course_run)
+    with reversion.create_revision():
+        Product.objects.create(
+            price=10,
+            is_active=True,
+            object_id=course_run.id,
+            content_type=course_run_content_type,
+        )
+
+    # Closed for enrollment, but still upgradable, so this exercises the
+    # verified branch rather than the audit fallback.
+    assert course_run.is_upgradable
+    assert not course_run.is_enrollable
+
+    initial_order_count = user.orders.count()
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={"courserun_id": course_run.courseware_id},
+        ),
+        data=[program.readable_id],
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
+    assert user.orders.count() == initial_order_count
+
+
+@pytest.mark.skip_nplusone_check
+@responses.activate
+def test_add_verified_program_course_enrollment_closed_run_existing_enrollment(
+    user_drf_client, user
+):
+    """
+    A learner already holding a seat in a closed run still gets the idempotent
+    no-op rather than being rejected by the new window check.
+    """
+
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/enrollment/v1/enrollments",
+        json={"results": [{"mode": EDX_ENROLLMENT_AUDIT_MODE, "is_active": True}]},
+        status=status.HTTP_200_OK,
+    )
+
+    prog_enrollment = ProgramEnrollmentFactory.create(
+        user=user, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+    program = prog_enrollment.program
+
+    course_run = CourseRunFactory.create(past_enrollment_end=True)
+    program.add_requirement(course_run.course)
+    CourseRunEnrollmentFactory.create(
+        user=user,
+        run=course_run,
+        active=True,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+    )
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={"courserun_id": course_run.courseware_id},
+        ),
+        data=[program.readable_id],
+    )
+
+    assert resp.status_code == status.HTTP_204_NO_CONTENT
 
 
 @pytest.mark.skip_nplusone_check
