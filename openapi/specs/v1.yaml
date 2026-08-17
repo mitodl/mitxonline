@@ -1091,8 +1091,7 @@ paths:
   /api/v0/baskets/checkout/:
     get:
       operationId: baskets_checkout_retrieve
-      description: Returns the payload necessary to redirect the user to CyberSource
-        for payment.
+      description: Returns the payload necessary to start the payment process.
       tags:
       - baskets
       responses:
@@ -4815,12 +4814,13 @@ components:
           type: string
           readOnly: true
           default: ''
-          description: The URL to POST the form to.
+          description: The URL to POST the form to, or to redirect the user to.
         method:
           type: string
           readOnly: true
           default: POST
-          description: The method to use for the checkout form (always POST).
+          description: The method to use for the data - POST for form data, GET for
+            redirect.
         payload:
           readOnly: true
           default: {}
