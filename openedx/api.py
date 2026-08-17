@@ -69,6 +69,7 @@ OPENEDX_OAUTH2_ACCESS_TOKEN_PATH = "/oauth2/access_token"  # noqa: S105
 OPENEDX_OAUTH2_SCOPES = ["read", "write"]
 OPENEDX_OAUTH2_ACCESS_TOKEN_PARAM = "code"  # noqa: S105
 OPENEDX_OAUTH2_ACCESS_TOKEN_EXPIRY_MARGIN_SECONDS = 10
+OPENEDX_OAUTH2_INVALID_GRANT_ERROR = "invalid_grant"
 
 OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS = 60
 OPENEDX_AUTH_MAX_TTL_IN_SECONDS = 60 * 60
@@ -826,27 +827,113 @@ def get_valid_edx_api_auth(user, ttl_in_seconds=OPENEDX_AUTH_DEFAULT_TTL_IN_SECO
     return auth
 
 
+def _is_dead_refresh_token_error(exc):
+    """
+    Determines whether a token endpoint error means the refresh token itself is dead.
+
+    Only a 400 invalid_grant means the token is dead, which Open edX returns once it has
+    been swept away by the expired-token job, rotated away, revoked (a password reset,
+    retirement or support-tool disable deletes a user's tokens outright), or issued to a
+    different OAuth application. Such a token can never be refreshed again, so the only
+    recovery is a full re-authorization.
+
+    The endpoint's other errors are not fixed by re-authorizing and would be hidden by
+    it, so they propagate: unauthorized_client and invalid_scope mean the Open edX OAuth
+    application is misconfigured, invalid_request and unsupported_grant_type mean we
+    built the request wrong, and a 401 invalid_client means our credentials are wrong.
+
+    Args:
+        exc (requests.exceptions.HTTPError): the error raised by the token request
+
+    Returns:
+        bool: whether a full re-authorization should be attempted
+    """
+    response = exc.response
+    if response is None or response.status_code != status.HTTP_400_BAD_REQUEST:
+        return False
+    try:
+        body = response.json()
+    except ValueError:
+        return False
+    return (
+        isinstance(body, dict)
+        and body.get("error") == OPENEDX_OAUTH2_INVALID_GRANT_ERROR
+    )
+
+
 def _refresh_edx_api_auth(auth):
     """
     Updates the api tokens for the given auth
+
+    If Open edX reports the stored refresh token is no longer usable, the tokens are
+    cleared and replaced by re-running the full authorization flow. When that
+    re-authorization fails the caller's transaction is left to roll the clearing back,
+    so the dead record survives rather than the user losing it.
 
     Args:
         auth (openedx.models.OpenEdxApiAuth): the auth to update
 
     Returns:
         auth:
-            updated OpenEdxApiAuth
+            the auth for the user, holding freshly issued tokens
+
+    Raises:
+        requests.exceptions.HTTPError: if the refresh failed for a reason re-authorizing
+            cannot fix. Re-authorizing has its own failure modes, which propagate too.
+        openedx.exceptions.NoEdxApiAuthError: if the user has no synced Open edX
+            account, leaving nothing to re-authorize against
     """
     # Note: this is subject to thundering herd problems, we should address this at some point
-    return _create_tokens_and_update_auth(
-        auth,
-        dict(  # noqa: C408
-            refresh_token=auth.refresh_token,
-            grant_type="refresh_token",
-            client_id=settings.OPENEDX_API_CLIENT_ID,
-            client_secret=settings.OPENEDX_API_CLIENT_SECRET,
-        ),
-    )
+    try:
+        return _create_tokens_and_update_auth(
+            auth,
+            dict(  # noqa: C408
+                refresh_token=auth.refresh_token,
+                grant_type="refresh_token",
+                client_id=settings.OPENEDX_API_CLIENT_ID,
+                client_secret=settings.OPENEDX_API_CLIENT_SECRET,
+            ),
+        )
+    except HTTPError as exc:
+        user = auth.user
+        response_summary = (
+            get_error_response_summary(exc.response)
+            if exc.response is not None
+            else "no response available"
+        )
+        if not _is_dead_refresh_token_error(exc):
+            # warning rather than exception: the raise below is what Sentry should
+            # report, and logging at error level would file the same failure twice
+            log.warning(
+                "Refreshing the Open edX token for %s failed unrecoverably. %s",
+                user,
+                response_summary,
+            )
+            raise
+        log.warning(
+            "Open edX rejected the refresh token for %s as invalid_grant; "
+            "re-running the authorization flow. %s",
+            user,
+            response_summary,
+        )
+        # cleared in place rather than deleted: get_valid_edx_api_auth holds this row
+        # under select_for_update, and a waiter that unblocks on a deleted row sees no
+        # row at all. Both values falsy is enough to stop create_edx_auth_token treating
+        # the record as already authorized.
+        auth.refresh_token = ""
+        auth.access_token = ""
+        auth.save(update_fields=["refresh_token", "access_token"])
+        try:
+            new_auth = create_edx_auth_token(user)
+        except Exception:
+            # distinguishes a failed recovery from an ordinary create_edx_auth_token
+            # failure, which are otherwise identical in Sentry
+            log.warning("Re-authorizing %s after invalid_grant failed", user)
+            raise
+        if new_auth is None:
+            msg = f"{user!s} no longer has a synced Open edX account to re-authorize"
+            raise NoEdxApiAuthError(msg) from exc
+        return new_auth
 
 
 def get_edx_api_client(user, ttl_in_seconds=OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS):
