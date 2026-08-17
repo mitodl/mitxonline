@@ -18,15 +18,15 @@ By default, the command runs in dry-run mode (preview only). Use --commit to app
    (columns: email, courseware_id) instead of a single --run for every row:
 ./manage.py enroll_learners --csv=enrollments.csv --commit
 
-5. Enroll in "verified" mode instead of the default "audit" mode:
-./manage.py enroll_learners --csv=learners.csv --run=course-v1:MITxT+14.310Fx+2T2026 --mode=verified --commit
-
-6. Keep local enrollment records even if edX enrollment fails:
+5. Keep local enrollment records even if edX enrollment fails:
 ./manage.py enroll_learners --csv=learners.csv --run=course-v1:MITxT+14.310Fx+2T2026 --commit -k
 
 Note: creating an enrollment via this command runs the normal enrollment business
 logic (courses.api.create_run_enrollments), so it will also enroll the learner in
-edX and send them the standard enrollment confirmation email.
+edX and send them the standard enrollment confirmation email. This command only
+ever creates free "audit" enrollments (it never creates an Order/Product, so a
+paid "verified" enrollment isn't possible here) -- use the site's normal
+purchase flow, or `create_verified_enrollment`, for paid enrollments.
 """
 
 import csv
@@ -36,7 +36,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from courses.management.utils import bulk_enroll_learners
 from courses.models import CourseRun
-from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE
 from users.api import fetch_user
 
 User = get_user_model()
@@ -70,13 +70,6 @@ class Command(BaseCommand):
             help="The 'courseware_id' value for a CourseRun. Required with "
             "--users, and required with --csv unless the CSV has its own "
             "'courseware_id' column.",
-        )
-        parser.add_argument(
-            "--mode",
-            type=str,
-            default=EDX_ENROLLMENT_AUDIT_MODE,
-            choices=[EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE],
-            help="The enrollment mode to use for all enrollments (default: audit)",
         )
         parser.add_argument(
             "-k",
@@ -165,7 +158,7 @@ class Command(BaseCommand):
         """
         return [(u.strip(), courseware_id) for u in users_str.split(",") if u.strip()]
 
-    def _dry_run(self, entries, mode):
+    def _dry_run(self, entries):
         """Preview which enrollments would be created without making changes."""
         succeeded = 0
         skipped = 0
@@ -191,7 +184,9 @@ class Command(BaseCommand):
                 skipped += 1
                 continue
 
-            self.stdout.write(f"  Would enroll: {user.email} in {cw_id} (mode={mode})")
+            self.stdout.write(
+                f"  Would enroll: {user.email} in {cw_id} (mode={EDX_ENROLLMENT_AUDIT_MODE})"
+            )
             succeeded += 1
 
         self.stdout.write("")
@@ -231,7 +226,6 @@ class Command(BaseCommand):
         csv_path = options.get("csv")
         users_str = options.get("users")
         courseware_id = options.get("run")
-        mode = options.get("mode")
         keep_failed = options.get("keep_failed_enrollments")
         commit = options.get("commit")
 
@@ -244,12 +238,12 @@ class Command(BaseCommand):
         )
 
         if dry_run:
-            self._dry_run(entries, mode)
+            self._dry_run(entries)
             return
 
         summary = bulk_enroll_learners(
             entries,
-            mode=mode,
+            mode=EDX_ENROLLMENT_AUDIT_MODE,
             keep_failed_enrollments=keep_failed,
         )
 

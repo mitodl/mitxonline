@@ -82,23 +82,6 @@ class TestBulkEnrollInlineUsers:
             keep_failed_enrollments=True,
         )
 
-    def test_inline_users_mode_passed(self, mock_bulk_enroll):
-        """--mode flag should be passed through"""
-        call_command(
-            "enroll_learners",
-            users="a@b.com",
-            run="run-1",
-            mode="verified",
-            commit=True,
-            stdout=StringIO(),
-        )
-
-        mock_bulk_enroll.assert_called_once_with(
-            [("a@b.com", "run-1")],
-            mode="verified",
-            keep_failed_enrollments=False,
-        )
-
     def test_inline_users_mixed_results(self, mock_bulk_enroll):
         """Command should display correct summary from bulk_enroll_learners result"""
         mock_bulk_enroll.return_value = {
@@ -327,11 +310,9 @@ class TestBulkEnrollNoArgs:
                 stdout=StringIO(),
             )
 
-    def test_invalid_mode_raises_error(self):
-        """An unsupported --mode value should raise CommandError"""
-        # Choice validation only runs against argv-style invocation, not
-        # against kwargs passed directly to call_command.
-        with pytest.raises(CommandError, match="invalid choice: 'bogus'"):
+    def test_no_mode_flag_available(self):
+        """--mode should no longer be an accepted argument (audit-only command)"""
+        with pytest.raises(CommandError, match="unrecognized arguments"):
             call_command(
-                "enroll_learners", "--users=a@b.com", "--run=run-1", "--mode=bogus"
+                "enroll_learners", "--users=a@b.com", "--run=run-1", "--mode=verified"
             )
