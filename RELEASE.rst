@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.162.6
+Version 1.162.6 (Released August 17, 2026)
 ---------------
 
 - Recurse into the program if the program doesn't have a verified mode when generating certificates (#3848)
