@@ -5,6 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 from django.core.management import CommandError
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from users.factories import UserFactory
 from users.management.commands import migrate_and_sync_users
@@ -124,6 +126,25 @@ def test_classify_avoids_n_plus_one_queries(mocker, django_assert_max_num_querie
             limit=None,
             report_path=None,
         )
+
+
+@pytest.mark.django_db
+def test_get_candidates_applies_limit_in_sql():
+    """--limit must be applied at the queryset level (a SQL LIMIT), not by
+    slicing an already-materialized list - otherwise a small --limit for
+    testing still fetches and prefetches every unsynced user in the table.
+    """
+    for _ in range(5):
+        user = UserFactory.create(name="Joe Smith", global_id=None)
+        user.legal_address.first_name = "Joe"
+        user.legal_address.last_name = "Smith"
+        user.legal_address.save()
+
+    with CaptureQueriesContext(connection) as ctx:
+        candidates = migrate_and_sync_users.Command()._get_candidates(limit=2)  # noqa: SLF001
+
+    assert len(candidates) == 2
+    assert "LIMIT 2" in ctx.captured_queries[0]["sql"]
 
 
 @pytest.mark.django_db

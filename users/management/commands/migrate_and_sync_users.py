@@ -234,18 +234,22 @@ class Command(BaseCommand):
         cache manually from the bulk prefetch below, rather than paying one
         extra query per candidate.
         """
-        candidates = list(
+        queryset = (
             User.objects.filter(is_active=True)
             .filter(Q(global_id="") | Q(scim_external_id=None))
             .select_related("legal_address", "user_profile")
             .prefetch_related("openedx_users")
             .order_by("id")
         )
+        if limit is not None:
+            # Slice before evaluating - applying LIMIT in SQL, not fetching
+            # and prefetching every unsynced user in the table just to
+            # discard all but the first `limit` in Python afterward.
+            queryset = queryset[:limit]
+        candidates = list(queryset)
         for user in candidates:
             prefetched = list(user.openedx_users.all())
             user.__dict__["openedx_user"] = prefetched[0] if prefetched else None
-        if limit is not None:
-            candidates = candidates[:limit]
         return candidates
 
     def _classify(self, candidates, *, force):
