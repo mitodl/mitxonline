@@ -1562,11 +1562,9 @@ MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS = get_delimited_list(
 )
 
 # Tracing turns on when either OPENTELEMETRY_ENDPOINT or the
-# OTEL_EXPORTER_OTLP_ENDPOINT environment variable is set. Those two, and no
-# others -- the signal-specific OTEL_EXPORTER_OTLP_TRACES_ENDPOINT is not
-# consulted by the released library. There is no enable/disable flag: the old
-# OPENTELEMETRY_ENABLED was read by nothing, so setting it to false during an
-# incident would not have stopped tracing.
+# OTEL_EXPORTER_OTLP_ENDPOINT environment variable is set -- those two and no
+# others; the signal-specific OTEL_EXPORTER_OTLP_TRACES_ENDPOINT is not
+# consulted by the released library. There is no flag to disable it.
 OPENTELEMETRY_SERVICE_NAME = get_string(
     name="OPENTELEMETRY_SERVICE_NAME",
     default="mitxonline",
@@ -1582,8 +1580,8 @@ OPENTELEMETRY_ENDPOINT = get_string(
     default=None,
     description="Endpoint for opentelemetry",
 )
-# Name must match what telemetry.py reads; OPENTELEMETRY_TRACES_BATCH_SIZE was
-# never looked up, so the 512 default applied no matter what this was set to.
+# Name must match what mitol.observability.telemetry looks up, or the default
+# silently applies instead.
 OPENTELEMETRY_BATCH_SIZE = get_int(
     name="OPENTELEMETRY_BATCH_SIZE",
     default=512,
