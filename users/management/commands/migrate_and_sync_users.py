@@ -93,14 +93,7 @@ class Command(BaseCommand):
             self._run_edx_backfill(limit)
 
         self.stdout.write("Stage 2: classifying sync candidates...")
-        candidates = list(
-            User.objects.filter(is_active=True)
-            .filter(Q(global_id="") | Q(scim_external_id=None))
-            .select_related("legal_address")
-            .order_by("id")
-        )
-        if limit is not None:
-            candidates = candidates[:limit]
+        candidates = self._get_candidates(limit)
 
         to_sync, blocked = self._classify(candidates, force=force)
         self.stdout.write(
@@ -209,6 +202,34 @@ class Command(BaseCommand):
             call_command("migrate_edx_data", type="users", limit=limit)
         else:
             call_command("migrate_edx_data", type="users")
+
+    def _get_candidates(self, limit):
+        """Fetch Stage 2's sync candidates with the relations LearnUserAdapter
+        needs pre-loaded, then apply --limit.
+
+        LearnUserAdapter.__init__ touches user_profile and the openedx_user
+        cached_property on every instantiation (see _classify below) -
+        user_profile is a real OneToOneField, so select_related covers it,
+        but openedx_user is backed by self.openedx_users.first(), which
+        select_related can't target (openedx_users is the real FK) and
+        prefetch_related alone doesn't help either, since .first() re-queries
+        instead of using the prefetch cache. So prime the cached_property's
+        cache manually from the bulk prefetch below, rather than paying one
+        extra query per candidate.
+        """
+        candidates = list(
+            User.objects.filter(is_active=True)
+            .filter(Q(global_id="") | Q(scim_external_id=None))
+            .select_related("legal_address", "user_profile")
+            .prefetch_related("openedx_users")
+            .order_by("id")
+        )
+        for user in candidates:
+            prefetched = list(user.openedx_users.all())
+            user.__dict__["openedx_user"] = prefetched[0] if prefetched else None
+        if limit is not None:
+            candidates = candidates[:limit]
+        return candidates
 
     def _classify(self, candidates, *, force):
         """Split candidates into (to_sync, blocked) using LearnUserAdapter's

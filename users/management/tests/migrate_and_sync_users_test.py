@@ -78,6 +78,34 @@ def test_no_limit_does_not_pass_limit_kwarg(mock_edx_migration, mocker):
 
 
 @pytest.mark.django_db
+def test_classify_avoids_n_plus_one_queries(mocker, django_assert_max_num_queries):
+    """Stage 2's candidate query plus classifying every candidate must not
+    issue extra queries per user - LearnUserAdapter.__init__ touches
+    user_profile and the openedx_user cached_property on every
+    instantiation, so both need to be covered by handle()'s bulk
+    select_related/prefetch_related, not fetched one-by-one per candidate.
+    """
+    mocker.patch(
+        "users.management.commands.migrate_and_sync_users.scim_api.sync_users_to_scim_remote",
+        return_value=[],
+    )
+    for _ in range(5):
+        user = UserFactory.create(name="Joe Smith", global_id=None)
+        user.legal_address.first_name = "Joe"
+        user.legal_address.last_name = "Smith"
+        user.legal_address.save()
+
+    with django_assert_max_num_queries(3):
+        COMMAND.handle(
+            dry_run=True,
+            skip_edx_migration=True,
+            force=False,
+            limit=None,
+            report_path=None,
+        )
+
+
+@pytest.mark.django_db
 def test_dry_run_classifies_without_syncing(mocker, tmp_path):
     """Dry run reports classification tiers and never calls the sync API"""
     mock_sync = mocker.patch(
