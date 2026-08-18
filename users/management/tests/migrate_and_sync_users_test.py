@@ -181,6 +181,40 @@ def test_dry_run_classifies_without_syncing(mocker, tmp_path):
     assert tier2_user.id in to_sync_ids
     assert tier3_user.id in blocked_ids
 
+    tier_by_user_id = {row["user_id"]: row["tier"] for row in report["to_sync"]}
+    assert tier_by_user_id[tier2_user.id] == "full_name_only"
+
+
+@pytest.mark.django_db
+def test_full_name_only_user_is_not_blocked(mocker, tmp_path):
+    """A user with a full name (User.name) but no legal_address split is
+    classified as "full_name_only" and synced by default, not blocked -
+    LearnUserAdapter._resolve_name() no longer guesses a given/family split
+    from User.name (see users/adapters.py), so tier can't be based on
+    given_name/family_name being non-blank anymore. This is the common
+    edxorg-migration case, and it's exactly the population migrate_edx_data's
+    bulk_create bug (fixed separately in #3843) leaves without a
+    legal_address row at all - they must not be silently gated behind
+    --force just because the split-name signal is gone.
+    """
+    mocker.patch(
+        "users.management.commands.migrate_and_sync_users.scim_api.sync_users_to_scim_remote",
+        return_value=[],
+    )
+
+    user = UserFactory.create(name="Jane Doe", global_id=None)
+    user.legal_address.delete()
+
+    report = _run(
+        tmp_path, dry_run=True, skip_edx_migration=False, force=False, limit=None
+    )
+
+    assert report["blocked"] == []
+    row = next(row for row in report["to_sync"] if row["user_id"] == user.id)
+    assert row["tier"] == "full_name_only"
+    assert row["given_name"] == ""
+    assert row["family_name"] == ""
+
 
 @pytest.mark.django_db
 def test_tier3_blocked_without_force(mocker):

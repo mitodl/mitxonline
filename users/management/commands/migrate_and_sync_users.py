@@ -256,6 +256,16 @@ class Command(BaseCommand):
         """Split candidates into (to_sync, blocked) using LearnUserAdapter's
         _resolve_name() tiers, purely for classification/reporting - this
         never writes to legal_address.
+
+        _resolve_name() only ever returns a non-blank (given_name,
+        family_name) when legal_address already has both parts - it no
+        longer guesses a split from User.name (see users/adapters.py). So a
+        user with only a full name on file (the common edxorg-migration
+        case) always resolves to ("", "") here, same as a user with no name
+        data at all. Tier is therefore based on User.name directly, not on
+        given_name/family_name: a full name we can't split is still safe to
+        sync by default, since LearnUserAdapter.to_dict() sends it outbound
+        via the "fullName" attribute regardless of the given/family split.
         """
         to_sync, blocked = [], []
         for user in candidates:
@@ -264,6 +274,7 @@ class Command(BaseCommand):
             legal_address_complete = bool(
                 user.legal_address.first_name and user.legal_address.last_name
             )
+            full_name = (user.name or "").strip()
             row = {
                 "user": user,
                 "given_name": given_name,
@@ -271,7 +282,7 @@ class Command(BaseCommand):
                 "tier": (
                     "legal_address"
                     if legal_address_complete
-                    else ("split_name" if given_name or family_name else "none")
+                    else ("full_name_only" if full_name else "none")
                 ),
             }
             if row["tier"] == "none" and not force:
