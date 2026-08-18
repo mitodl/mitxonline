@@ -47,6 +47,8 @@ from ecommerce.constants import (
     REFUND_SUCCESS_STATES,
     STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
     STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
+    STRIPE_EVENTS_CHECKOUT_SESSION,
+    STRIPE_OBJECT_CHECKOUT_SESSION,
     STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
     STRIPE_OVERALL_CHECKOUT_STATUS_ERROR,
     STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
@@ -265,7 +267,8 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
         # this again in Stripe if something goes wrong after this step.
         order_flow = order.get_object_flow()
         order_flow.create_transaction(
-            payload["payload"], reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION
+            payload["payload"].to_dict(for_json=True),
+            reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
         )
 
     return payload
@@ -810,7 +813,7 @@ def _retrieve_pending_stripe_orders(orders):
         checkout_session_id = session_transaction.data.get("id")
 
         if (
-            session_transaction.data.get("object") != "checkout.session"
+            session_transaction.data.get("object") != STRIPE_OBJECT_CHECKOUT_SESSION
             or not checkout_session_id
         ):
             log.info(
@@ -1400,12 +1403,7 @@ def process_stripe_checkout_session_event(event: stripe.Event):
     CheckoutSession object out of the event.
     """
 
-    valid_types = [
-        "checkout.session.completed",
-        "checkout.session.expired",
-        "checkout.session.async_payment_failed",
-        "checkout.session.async_payment_succeeded",
-    ]
+    valid_types = STRIPE_EVENTS_CHECKOUT_SESSION
 
     ev_type = event.type
     if ev_type not in valid_types:

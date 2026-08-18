@@ -760,9 +760,9 @@ class OrderFlow:
     def fulfill(
         self,
         payment_data,
-        already_enrolled=False,
-        skip_receipt=False,
-        skip_fulfillment=False,
+        already_enrolled=False,  # noqa: FBT002
+        skip_receipt=False,  # noqa: FBT002
+        skip_fulfillment=False,  # noqa: FBT002
     ):
         """Fulfill the order - create a transaction, send email, trigger plugins."""
 
