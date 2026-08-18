@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.162.7 (Released August 18, 2026)
+---------------
+
+- fix: reject enrollments in course runs whose enrollment window has closed (#3846)
+- Fix: Handle expired OpenEdX refresh tokens gracefully (#3835)
+- Regen dataclass for Keycloak (#3852)
+- fix issues with orders api (#3823)
+
 Version 1.162.6 (Released August 17, 2026)
 ---------------
 
