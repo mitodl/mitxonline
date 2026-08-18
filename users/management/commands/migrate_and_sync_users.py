@@ -22,7 +22,7 @@ that type does respect it.
 import json
 
 from django.contrib.auth import get_user_model
-from django.core.management import BaseCommand, call_command
+from django.core.management import BaseCommand, CommandError, call_command
 from django.db.models import Q
 from mitol.scim import api as scim_api
 
@@ -81,7 +81,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):  # noqa: ARG002
         """Run the backfill/classify/sync/verify/report pipeline."""
-        batch_size = options.get("batch_size") or 250
+        batch_size = self._get_batch_size(options)
         limit = options.get("limit")
         force = options.get("force", False)
         dry_run = options.get("dry_run", False)
@@ -202,6 +202,23 @@ class Command(BaseCommand):
             call_command("migrate_edx_data", type="users", limit=limit)
         else:
             call_command("migrate_edx_data", type="users")
+
+    @staticmethod
+    def _get_batch_size(options):
+        """Resolve --batch-size, rejecting non-positive values.
+
+        range(0, len(to_sync), batch_size) silently performs zero iterations
+        for a non-positive step, which would skip Stage 3 entirely for a
+        nonempty to_sync list while the command still reports a "successful"
+        run - fail fast instead of producing a misleading result.
+        """
+        batch_size = options.get("batch_size")
+        if batch_size is None:
+            batch_size = 250
+        if batch_size <= 0:
+            msg = f"--batch-size must be a positive integer, got {batch_size}."
+            raise CommandError(msg)
+        return batch_size
 
     def _get_candidates(self, limit):
         """Fetch Stage 2's sync candidates with the relations LearnUserAdapter

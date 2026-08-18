@@ -4,6 +4,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
+from django.core.management import CommandError
 
 from users.factories import UserFactory
 from users.management.commands import migrate_and_sync_users
@@ -40,6 +41,26 @@ def _run(tmp_path, **options):
 def mock_edx_migration(mocker):
     """Stage 1 always gets skipped/mocked in these tests - never hit Trino."""
     return mocker.patch("users.management.commands.migrate_and_sync_users.call_command")
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("batch_size", [0, -1, -250])
+def test_non_positive_batch_size_is_rejected(mock_edx_migration, batch_size):
+    """A non-positive --batch-size must fail fast, before Stage 1 even runs -
+    range(0, len(to_sync), batch_size) silently performs zero iterations for
+    a negative step, which would skip Stage 3 entirely for a nonempty
+    to_sync list while the command still reports a "successful" run.
+    """
+    with pytest.raises(CommandError, match="--batch-size must be a positive"):
+        COMMAND.handle(
+            dry_run=False,
+            skip_edx_migration=False,
+            force=False,
+            limit=None,
+            batch_size=batch_size,
+        )
+
+    mock_edx_migration.assert_not_called()
 
 
 @pytest.mark.django_db
