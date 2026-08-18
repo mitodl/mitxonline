@@ -2445,7 +2445,10 @@ def test_generate_program_certificate_with_subprogram_requirement(  # noqa: PLR0
     modes = (
         [EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)]
         if sub_is_audit_only
-        else []
+        else [
+            EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_AUDIT_MODE),
+            EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE),
+        ]
     )
     sub_program = ProgramFactory.create(enrollment_modes=modes)
     sub_course = CourseFactory.create()
@@ -2455,7 +2458,9 @@ def test_generate_program_certificate_with_subprogram_requirement(  # noqa: PLR0
         ProgramEnrollment.objects.create(
             user=user,
             program=sub_program,
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+            if sub_is_audit_only
+            else EDX_ENROLLMENT_VERIFIED_MODE,
         )
 
     # Create the main program that requires the sub-program
@@ -2486,8 +2491,11 @@ def test_generate_program_certificate_with_subprogram_requirement(  # noqa: PLR0
         user=user, program=sub_program
     )
     if has_sub_enroll:
-        assert sub_created is True
-        assert isinstance(sub_certificate, ProgramCertificate)
+        if sub_is_audit_only:
+            assert sub_created is False
+        else:
+            assert sub_created is True
+            assert isinstance(sub_certificate, ProgramCertificate)
 
     # Now try to generate main program certificate
     # It should succeed if the user has a certificate for the required sub-program
@@ -2496,11 +2504,15 @@ def test_generate_program_certificate_with_subprogram_requirement(  # noqa: PLR0
     )
     if has_main_enroll and has_sub_enroll and sub_course_passed:
         # Should only get a certificate if we had a cert (or a passing grade!)
-        # in the sub
-        # So, we'd have to have been enrolled there, too
+        # in the sub. So, we'd have to have been enrolled there, too.
         assert main_created is True
         assert isinstance(main_certificate, ProgramCertificate)
-        assert len(ProgramCertificate.objects.all()) == 2
+        if sub_is_audit_only:
+            # No certificate for sub if it's not eligible for one
+            # But we should still get one for the root course
+            assert len(ProgramCertificate.objects.all()) == 1
+        else:
+            assert len(ProgramCertificate.objects.all()) == 2
         patched_sync_hubspot_user.assert_called()
 
     if not has_main_enroll or not has_sub_enroll:

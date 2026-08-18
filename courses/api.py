@@ -1258,28 +1258,46 @@ def _has_earned_program_cert(user, program):
     def _has_earned(node):
         if node.is_root or node.is_all_of_operator:
             # has passed all of the child requirements
+            log.debug("node is root or all of, stepping through children")
             return all(_has_earned(child) for child in node.get_children())
         elif node.is_min_number_of_operator:
             # has passed a minimum of the child requirements
+            log.debug(
+                "node is min num, checking children for %s passes", node.operator_value
+            )
             return len(list(filter(_has_earned, node.get_children()))) >= int(
                 node.operator_value
             )
         elif node.is_course:
             # has passed the referenced course
+            log.debug(
+                "node is course, checking for cert/pass for %s", node.course.readable_id
+            )
             return node.course in [*cert_courses, *grade_courses]
         elif node.is_program:
             # If the program has a verified mode (requires_payment=True), then
             # check for a certificate. If not, then recurse; if the learner would
             # have earned a certificate, we should count that.
-            if (
-                node.is_program
-                and node.program.enrollment_modes.filter(requires_payment=True).exists()
-            ):
+            if node.required_program.enrollment_modes.filter(
+                requires_payment=True
+            ).exists():
+                log.debug(
+                    "node is program w/ verified enrollment, checking for cert for %s",
+                    node.required_program.readable_id,
+                )
                 return ProgramCertificate.all_objects.filter(
                     user=user, program=node.required_program, is_revoked=False
                 ).exists()
 
-            return _has_earned_program_cert(user, node.program)
+            log.debug(
+                "node is audit-only program, checking for pass for %s",
+                node.required_program.readable_id,
+            )
+
+            return _has_earned_program_cert(user, node.required_program)
+
+        log.debug("node is weird, returning false")
+
         return False
 
     return _has_earned(root)
