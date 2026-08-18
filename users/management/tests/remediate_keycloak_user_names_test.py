@@ -78,7 +78,9 @@ def test_dry_run_reports_without_patching(mocker, tmp_path):
 
 @pytest.mark.django_db
 def test_apply_patches_and_verifies(mocker):
-    """--apply calls client.save with the resolved name, then re-fetches to verify"""
+    """--apply calls client.save with the resolved name and fullName, then
+    re-fetches to verify
+    """
     user = UserFactory.create(name="Joe Smith", scim_external_id="kc-1")
     user.legal_address.first_name = "Joe"
     user.legal_address.last_name = "Smith"
@@ -87,27 +89,42 @@ def test_apply_patches_and_verifies(mocker):
     kc_user = UserRepresentation(id="kc-1", firstName="", lastName="")
     client = _mock_client(mocker, [[kc_user]])
     client.retrieve.return_value = UserRepresentation(
-        id="kc-1", firstName="Joe", lastName="Smith"
+        id="kc-1",
+        firstName="Joe",
+        lastName="Smith",
+        attributes={"fullName": ["Joe Smith"]},
     )
     remediate_keycloak_user_names.bootstrap_client.return_value = client
 
     COMMAND.handle(apply=True, limit=None, report_path=None)
 
     client.save.assert_called_once_with(
-        "users/kc-1", {"firstName": "Joe", "lastName": "Smith"}
+        "users/kc-1",
+        {
+            "firstName": "Joe",
+            "lastName": "Smith",
+            "attributes": {"fullName": ["Joe Smith"]},
+        },
     )
     client.retrieve.assert_called_once()
 
 
 @pytest.mark.django_db
 def test_up_to_date_user_is_skipped(mocker):
-    """A user whose Keycloak record already matches isn't touched"""
+    """A user whose Keycloak record already matches - split name and
+    fullName both - isn't touched
+    """
     user = UserFactory.create(name="Joe Smith", scim_external_id="kc-1")
     user.legal_address.first_name = "Joe"
     user.legal_address.last_name = "Smith"
     user.legal_address.save()
 
-    kc_user = UserRepresentation(id="kc-1", firstName="Joe", lastName="Smith")
+    kc_user = UserRepresentation(
+        id="kc-1",
+        firstName="Joe",
+        lastName="Smith",
+        attributes={"fullName": ["Joe Smith"]},
+    )
     client = _mock_client(mocker, [[kc_user]])
     remediate_keycloak_user_names.bootstrap_client.return_value = client
 
@@ -119,15 +136,21 @@ def test_up_to_date_user_is_skipped(mocker):
 @pytest.mark.django_db
 def test_single_name_user_with_null_keycloak_field_is_up_to_date(mocker):
     """A mononym user (resolved family_name == "") whose Keycloak record has
-    lastName=None, not "", must still be treated as up to date - None and ""
-    both mean "no last name", and Keycloak may return either representation
+    lastName=None, not "", must still be treated as up to date once fullName
+    also matches - None and "" both mean "no last name", and Keycloak may
+    return either representation
     """
     user = UserFactory.create(name="Madonna", scim_external_id="kc-1")
     user.legal_address.first_name = ""
     user.legal_address.last_name = ""
     user.legal_address.save()
 
-    kc_user = UserRepresentation(id="kc-1", firstName="Madonna", lastName=None)
+    kc_user = UserRepresentation(
+        id="kc-1",
+        firstName="Madonna",
+        lastName=None,
+        attributes={"fullName": ["Madonna"]},
+    )
     client = _mock_client(mocker, [[kc_user]])
     remediate_keycloak_user_names.bootstrap_client.return_value = client
 
@@ -137,28 +160,64 @@ def test_single_name_user_with_null_keycloak_field_is_up_to_date(mocker):
 
 
 @pytest.mark.django_db
-def test_single_name_user_patch_verified_when_refetch_returns_null(mocker, tmp_path):
-    """After patching a mononym user's lastName to "", the verify step must
-    still pass if Keycloak's re-fetch normalizes the empty string back to
-    None
+def test_no_legal_address_split_only_patches_full_name(mocker):
+    """A user with no legal_address first/last (the common edxorg-migration
+    case) only gets the fullName attribute patched - Keycloak's existing
+    firstName/lastName are left alone rather than guessed at or blanked out
     """
     user = UserFactory.create(name="Madonna", scim_external_id="kc-1")
     user.legal_address.first_name = ""
     user.legal_address.last_name = ""
     user.legal_address.save()
 
-    kc_user = UserRepresentation(id="kc-1", firstName="", lastName="")
+    kc_user = UserRepresentation(id="kc-1", firstName="Madonna", lastName=None)
     client = _mock_client(mocker, [[kc_user]])
     client.retrieve.return_value = UserRepresentation(
-        id="kc-1", firstName="Madonna", lastName=None
+        id="kc-1",
+        firstName="Madonna",
+        lastName=None,
+        attributes={"fullName": ["Madonna"]},
     )
     remediate_keycloak_user_names.bootstrap_client.return_value = client
 
-    report = _run(tmp_path, apply=True, limit=None)
-    patched_row = report["patched"][0]
+    COMMAND.handle(apply=True, limit=None, report_path=None)
 
-    assert patched_row["verified"] is True
-    client.retrieve.assert_called_once()
+    client.save.assert_called_once_with(
+        "users/kc-1", {"attributes": {"fullName": ["Madonna"]}}
+    )
+
+
+@pytest.mark.django_db
+def test_patch_preserves_other_keycloak_attributes(mocker):
+    """Patching fullName must not clobber other custom attributes already on
+    the Keycloak record - the admin API PUT replaces the whole attributes
+    map, so existing entries have to be merged in, not overwritten
+    """
+    user = UserFactory.create(name="Joe Smith", scim_external_id="kc-1")
+    user.legal_address.first_name = "Joe"
+    user.legal_address.last_name = "Smith"
+    user.legal_address.save()
+
+    kc_user = UserRepresentation(
+        id="kc-1",
+        firstName="",
+        lastName="",
+        attributes={"someOtherAttr": ["keep-me"]},
+    )
+    client = _mock_client(mocker, [[kc_user]])
+    client.retrieve.return_value = UserRepresentation(id="kc-1")
+    remediate_keycloak_user_names.bootstrap_client.return_value = client
+
+    COMMAND.handle(apply=True, limit=None, report_path=None)
+
+    client.save.assert_called_once_with(
+        "users/kc-1",
+        {
+            "firstName": "Joe",
+            "lastName": "Smith",
+            "attributes": {"someOtherAttr": ["keep-me"], "fullName": ["Joe Smith"]},
+        },
+    )
 
 
 @pytest.mark.django_db

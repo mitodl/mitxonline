@@ -60,38 +60,19 @@ class LearnUserAdapter(UserAdapter):
         """
         Resolve (given_name, family_name) for the SCIM ``name`` attribute.
 
-        Keycloak has no combined "full name" field - it only stores split
-        firstName/lastName, fed by SCIM's name.givenName/name.familyName. So
-        whatever single name string we have has to be split into two pieces
-        before it's sent; there's no way to hand Keycloak one string and have
-        it split for us. Tiers, in order of confidence:
-
-        1. legal_address.first_name/last_name, if both are set - real
-           structured data.
-        2. self.obj.name, split heuristically (last whitespace-separated
-           token = family name, remainder = given name) - no naive split is
-           correct for every name (breaks on single-name accounts,
-           multi-word surnames, non-Western conventions), but it's the best
-           data available for users who only came through the edX migration
-           and never had a legal_address name recorded.
-        3. Neither available - both empty strings.
-
-        This is deliberately never persisted back onto legal_address, which
-        is used for SDN compliance screening - writing a heuristic guess into
-        a field that compliance screening may rely on for an accurate legal
-        name would be a real risk, not just a data-quality nitpick.
+        Only returns legal_address.first_name/last_name, and only when both
+        are set - real structured data, never a guess. A single full-name
+        string can't be reliably split into given/family (breaks on
+        single-name accounts, multi-word surnames, non-Western conventions),
+        so when legal_address doesn't have both parts this returns
+        ("", "") rather than guessing. The full name itself is still sent
+        outbound on its own via the "fullName" attribute (see to_dict), so
+        nothing is lost for users - most commonly those who only came
+        through the edX migration - who have a full name but no
+        legal_address split on file.
         """
         if self.legal_address.first_name and self.legal_address.last_name:
             return self.legal_address.first_name, self.legal_address.last_name
-
-        given_and_family_name_parts = 2
-        full_name = (self.obj.name or "").strip()
-        if full_name:
-            parts = full_name.rsplit(None, 1)
-            if len(parts) == given_and_family_name_parts:
-                return parts[0], parts[1]
-            return parts[0], ""
-
         return "", ""
 
     def to_dict(self):
@@ -105,6 +86,7 @@ class LearnUserAdapter(UserAdapter):
             "externalId": self.obj.scim_external_id,
             "schemas": [SchemaURI.USER],
             "userName": self.obj.username,
+            "fullName": self.obj.name,
             "name": {
                 "givenName": given_name,
                 "familyName": family_name,

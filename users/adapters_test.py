@@ -27,30 +27,42 @@ def test_learn_user_adapter_to_dict_uses_legal_address_name():
     }
 
 
-def test_learn_user_adapter_to_dict_falls_back_to_split_name():
-    """to_dict() splits User.name when legal_address has no name on file"""
+def test_learn_user_adapter_to_dict_sends_full_name_separately():
+    """to_dict() always sends User.name as the top-level fullName attribute,
+    regardless of whether legal_address has a usable split name
+    """
+    user = UserFactory.create(name="Joe Middle Smith")
+    user.legal_address.first_name = "Given"
+    user.legal_address.last_name = "Family"
+    user.legal_address.save()
+
+    assert _adapter(user).to_dict()["fullName"] == "Joe Middle Smith"
+
+
+def test_learn_user_adapter_to_dict_no_split_without_full_legal_address():
+    """to_dict() does not guess a given/family split from User.name when
+    legal_address has no name on file - a wrong guess is worse than blank
+    """
     user = UserFactory.create(name="Joe Middle Smith")
     user.legal_address.first_name = ""
     user.legal_address.last_name = ""
     user.legal_address.save()
 
-    assert _adapter(user).to_dict()["name"] == {
-        "givenName": "Joe Middle",
-        "familyName": "Smith",
-    }
+    assert _adapter(user).to_dict()["name"] == {"givenName": "", "familyName": ""}
 
 
-def test_learn_user_adapter_to_dict_single_token_name():
-    """A single-token name can't be split; givenName gets it, familyName is blank"""
+def test_learn_user_adapter_to_dict_single_token_name_not_split():
+    """A single-token name isn't guessed into a given/family split either;
+    it's still sent whole via fullName
+    """
     user = UserFactory.create(name="Madonna")
     user.legal_address.first_name = ""
     user.legal_address.last_name = ""
     user.legal_address.save()
 
-    assert _adapter(user).to_dict()["name"] == {
-        "givenName": "Madonna",
-        "familyName": "",
-    }
+    adapted = _adapter(user).to_dict()
+    assert adapted["name"] == {"givenName": "", "familyName": ""}
+    assert adapted["fullName"] == "Madonna"
 
 
 def test_learn_user_adapter_to_dict_no_name_data():
@@ -63,17 +75,16 @@ def test_learn_user_adapter_to_dict_no_name_data():
     assert _adapter(user).to_dict()["name"] == {"givenName": "", "familyName": ""}
 
 
-def test_learn_user_adapter_to_dict_partial_legal_address_falls_back():
-    """A half-filled legal_address isn't trusted; falls back to splitting name"""
+def test_learn_user_adapter_to_dict_partial_legal_address_not_trusted():
+    """A half-filled legal_address isn't trusted; returns blank rather than
+    guessing a split from User.name
+    """
     user = UserFactory.create(name="Joe Smith")
     user.legal_address.first_name = "OnlyGiven"
     user.legal_address.last_name = ""
     user.legal_address.save()
 
-    assert _adapter(user).to_dict()["name"] == {
-        "givenName": "Joe",
-        "familyName": "Smith",
-    }
+    assert _adapter(user).to_dict()["name"] == {"givenName": "", "familyName": ""}
 
 
 def test_learn_user_adapter_from_dict_writes_legal_address():
