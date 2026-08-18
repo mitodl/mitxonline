@@ -814,7 +814,7 @@ def _retrieve_pending_stripe_orders(orders):
             or not checkout_session_id
         ):
             log.info(
-                "Order %s (ref %s) has no apparant CheckoutSession logged.",
+                "Order %s (ref %s) has no apparent CheckoutSession logged.",
                 order.id,
                 order.reference_number,
             )
