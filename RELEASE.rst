@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.162.7
+Version 1.162.7 (Released August 18, 2026)
 ---------------
 
 - fix: reject enrollments in course runs whose enrollment window has closed (#3846)
