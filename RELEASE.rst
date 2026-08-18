@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 1.162.8
+---------------
+
+- Regen datamodel with pydantic classes (#3854)
+- Fix certificate generation for nested programs to check the required program (#3858)
+- Add enroll_learners management command for bulk csv enrollment (#3853)
+
 Version 1.162.7 (Released August 18, 2026)
 ---------------
 
