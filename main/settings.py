@@ -1561,10 +1561,11 @@ MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS = get_delimited_list(
     description="The list of hosts the app is allowed to redirect to",
 )
 
-# Tracing turns on when either OPENTELEMETRY_ENDPOINT or the
-# OTEL_EXPORTER_OTLP_ENDPOINT environment variable is set -- those two and no
-# others; the signal-specific OTEL_EXPORTER_OTLP_TRACES_ENDPOINT is not
-# consulted by the released library. There is no flag to disable it.
+# Telemetry turns on when any of OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
+# OTEL_EXPORTER_OTLP_METRICS_ENDPOINT or OTEL_EXPORTER_OTLP_ENDPOINT is set in
+# the environment, or the OPENTELEMETRY_ENDPOINT setting below is. Per signal
+# the environment is read most-specific-first, and the setting applies only
+# when the environment supplies nothing. There is no flag to disable it.
 OPENTELEMETRY_SERVICE_NAME = get_string(
     name="OPENTELEMETRY_SERVICE_NAME",
     default="mitxonline",
