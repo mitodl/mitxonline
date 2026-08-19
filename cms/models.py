@@ -6,7 +6,7 @@ import re
 import uuid
 from datetime import datetime
 from json import dumps
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlencode
 
 import pycountry
 from django.conf import settings
@@ -16,7 +16,7 @@ from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.forms import CheckboxInput, ChoiceField, IntegerField, Textarea
-from django.http import Http404
+from django.http import Http404, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.functional import cached_property
@@ -1987,6 +1987,18 @@ class FlexiblePricingRequestForm(AbstractForm):
         return context
 
     def serve(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            # A flexible price request always belongs to a user, so there is
+            # nothing to render anonymously. Bounce through the gateway login
+            # route, which APISIX authenticates, and come back here. Skip the
+            # profile onboarding interstitial: this form collects what it needs
+            # on its own, and most visitors arrive from Learn with no reason to
+            # detour through MITxOnline's account setup.
+            login_params = urlencode(
+                {"next": request.get_full_path(), "skip_onboarding": 1}
+            )
+            return HttpResponseRedirect(f"{reverse(settings.LOGIN_URL)}?{login_params}")
+
         previous_submission = self.get_previous_submission(request)
         if request.method == "POST" and (
             previous_submission is not None and not previous_submission.is_reset()
