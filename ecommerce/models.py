@@ -676,7 +676,7 @@ class OrderFlow:
         amount = kwargs.get("amount")
         reason = kwargs.get("reason")
 
-        transaction_id = api_response_data.get("id")
+        transaction_id = api_response_data.get("id") if api_response_data else None
         if transaction_id is None:
             raise ValidationError(
                 "Failed to record transaction: Missing transaction id from refund API response"  # noqa: EM101
@@ -694,7 +694,7 @@ class OrderFlow:
 
         return refund_transaction
 
-    def create_transaction(self, payment_data):
+    def create_transaction(self, payment_data, *, reason: str | None = None):
         """Create a record of the payment processor transaction."""
 
         transaction_payload = {
@@ -703,9 +703,10 @@ class OrderFlow:
             "data": payment_data,
         }
 
-        if self.order.total_price_paid == 0:
+        if self.order.total_price_paid == 0 or payment_data.get("is_administrative"):
             # If the price paid was $0, then we don't necessarily have a payment
-            # processor, so generate the transaction ID.
+            # processor, so generate the transaction ID. Do this also if we've
+            # generated the payload ("is_administrative" is set).
             transaction_payload["transaction_id"] = uuid.uuid4()
         elif self.order.gateway_type == MITOL_PAYMENT_GATEWAY_CYBERSOURCE:
             transaction_payload["transaction_id"] = payment_data.get("transaction_id")
@@ -732,7 +733,10 @@ class OrderFlow:
             msg = "Failed to record transaction: Missing transaction id from payment API response"
             raise ValidationError(msg)
 
-        self.order.transactions.get_or_create(
+        if reason:
+            transaction_payload["reason"] = reason
+
+        return self.order.transactions.get_or_create(
             transaction_id=transaction_payload["transaction_id"],
             defaults=transaction_payload,
         )
@@ -752,18 +756,28 @@ class OrderFlow:
         source=OrderStatus.PENDING,
         target=OrderStatus.FULFILLED,
     )
-    def fulfill(self, payment_data, already_enrolled=False, skip_receipt=False):  # noqa: FBT002
+    def fulfill(
+        self,
+        payment_data,
+        already_enrolled=False,  # noqa: FBT002
+        skip_receipt=False,  # noqa: FBT002
+        skip_fulfillment=False,  # noqa: FBT002
+    ):
+        """Fulfill the order - create a transaction, send email, trigger plugins."""
+
         # record the transaction
         self.create_transaction(payment_data)
 
-        # record all the courseruns in the order
-        self.create_enrollments()
+        # record all the courseruns in the order (unless we're told not to)
+        if not skip_fulfillment:
+            self.create_enrollments()
 
         # No email is required as this order is generated from management command
         # Skip receipt emails for UAI orders and program-derived course run orders
         if (
             not already_enrolled
             and not skip_receipt
+            and not skip_fulfillment
             and not is_uai_order(self.order)
             and not is_contract_order(self.order)
         ):

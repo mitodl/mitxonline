@@ -218,7 +218,9 @@ def test_order_refund(settings):
     with reversion.create_revision():
         basket_item = BasketItemFactory.create()
 
-    order = PendingOrder.create_from_basket(basket_item.basket)
+    order = PendingOrder.create_from_basket(
+        basket_item.basket, gateway_type=settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
+    )
     order_flow = order.get_object_flow()
     order_flow.fulfill({"result": "Payment succeeded", "transaction_id": "12345"})
 
@@ -638,7 +640,7 @@ def test_new_pending_order_is_created_if_product_is_different():
     assert Order.objects.filter(state=OrderStatus.PENDING).count() == 2
 
 
-def test_pending_order_is_reused_if_multiple_exist(basket):
+def test_pending_order_is_reused_if_multiple_exist(basket, settings):
     """
     Test that an existing PendingOrder is reused even if there are
     multiple existing PendingOrders which match the current PendingOrder.
@@ -653,6 +655,7 @@ def test_pending_order_is_reused_if_multiple_exist(basket):
         state=OrderStatus.PENDING,
         purchaser=basket.user,
         total_price_paid=0,
+        gateway_type=settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
     )
     Line.objects.create(
         order=order1,
@@ -665,6 +668,7 @@ def test_pending_order_is_reused_if_multiple_exist(basket):
         state=OrderStatus.PENDING,
         purchaser=basket.user,
         total_price_paid=0,
+        gateway_type=settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
     )
     Line.objects.create(
         order=order2,
@@ -676,7 +680,9 @@ def test_pending_order_is_reused_if_multiple_exist(basket):
 
     basket_item = BasketItem(product=product, basket=basket, quantity=1)
     basket_item.save()
-    order = PendingOrder.create_from_basket(basket)
+    order = PendingOrder.create_from_basket(
+        basket, gateway_type=settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
+    )
     order.save()
     # Verify that one of the existing PendingOrder's is reused insteading of
     # creating a third.
