@@ -2,7 +2,7 @@
 
 import pytest
 
-from users.factories import UserFactory
+from users.factories import LegalAddressFactory, UserFactory
 
 
 @pytest.mark.django_db(transaction=True)
@@ -32,3 +32,34 @@ def test_user_update_does_not_trigger_hubspot_sync(mocker, user):
     user.name = "Updated Name"
     user.save()
     mock_sync.assert_not_called()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_legal_address_create_triggers_hubspot_sync(mocker, user):
+    """
+    Test that creating a LegalAddress triggers a HubSpot sync for the associated user.
+
+    This covers the case where LegalAddress is created after the initial user sync,
+    which would have sent an empty first/last name to HubSpot.
+    """
+    mock_sync = mocker.patch("users.signals.sync_hubspot_user")
+
+    LegalAddressFactory.create(user=user, first_name="Jane", last_name="Doe")
+
+    mock_sync.assert_called_once_with(user)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_legal_address_update_triggers_hubspot_sync(mocker, user):
+    """
+    Test that updating a LegalAddress re-syncs the associated user to HubSpot.
+    """
+    mock_sync = mocker.patch("users.signals.sync_hubspot_user")
+
+    legal_address = LegalAddressFactory.create(user=user)
+    mock_sync.reset_mock()
+
+    legal_address.first_name = "Updated"
+    legal_address.save()
+
+    mock_sync.assert_called_once_with(user)
