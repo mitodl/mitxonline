@@ -16,7 +16,9 @@ def sync_user_to_hubspot_on_create(sender, instance, created, **kwargs):  # noqa
         transaction.on_commit(lambda: sync_hubspot_user(instance))
 
 
-@receiver(post_save, sender=LegalAddress, dispatch_uid="legal_address_post_save_hubspot_sync")
+@receiver(
+    post_save, sender=LegalAddress, dispatch_uid="legal_address_post_save_hubspot_sync"
+)
 def sync_user_to_hubspot_on_legal_address_save(sender, instance, **kwargs):  # noqa: ARG001
     """
     Re-sync the associated user to HubSpot when their legal address is saved.
