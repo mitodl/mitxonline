@@ -30,6 +30,7 @@ from courses.factories import (
 )
 from ecommerce.api import (
     ANONYMOUS_BASKET_SESSION_KEY,
+    _retrieve_pending_cybersource_orders,
     apply_discount_to_basket,
     check_and_process_pending_orders_for_resolution,
     check_for_duplicate_discount_redemptions,
@@ -1778,3 +1779,36 @@ def test_process_stripe_checkout_expired(bootstrapped_verified_program):
     assert updated_order
     assert updated_order.id == order_line.order.id
     assert updated_order.state == OrderStatus.CANCELED
+
+
+@pytest.mark.parametrize("test_type", ["empty", "completed", "cancelled"])
+def test_retrieve_pending_cs_orders(mocker, test_type):
+    """Test that pending CyberSource order get pulled successfully."""
+
+    if test_type == "empty":
+        order = []
+        return_value = {}
+    else:
+        order = [OrderFactory.create(state=OrderStatus.PENDING)]
+        return_value = {
+            order[0].reference_number: {
+                "req_reference_number": order[0].reference_number,
+                "reason_code": 100 if test_type == "completed" else 999,
+            }
+        }
+
+    mocked_cs_gateway = mocker.patch(
+        "mitol.payment_gateway.api.CyberSourcePaymentGateway.find_and_get_transactions",
+        return_value=return_value,
+    )
+
+    completed, cancelled = _retrieve_pending_cybersource_orders(order)
+
+    if test_type == "empty":
+        mocked_cs_gateway.asesrt_not_called()
+        assert len(completed.keys()) == 0
+        assert len(cancelled.keys()) == 0
+    else:
+        mocked_cs_gateway.assert_called()
+        assert len(completed.keys()) == (0 if test_type == "cancelled" else 1)
+        assert len(cancelled.keys()) == (0 if test_type == "completed" else 1)
