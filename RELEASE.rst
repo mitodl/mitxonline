@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.162.8
+Version 1.162.8 (Released August 19, 2026)
 ---------------
 
 - Regen datamodel with pydantic classes (#3854)
