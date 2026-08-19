@@ -755,6 +755,12 @@ def _retrieve_pending_cybersource_orders(orders):
     completed = {}
     cancelled = {}
 
+    if len(orders) == 0:
+        return (
+            completed,
+            cancelled,
+        )
+
     order_refnos = [order.reference_number for order in orders]
     gateway = PaymentGateway.get_gateway_class(MITOL_PAYMENT_GATEWAY_CYBERSOURCE)
 
