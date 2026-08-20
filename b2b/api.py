@@ -1965,6 +1965,32 @@ def is_potentially_valid_mailgun_webhook(payload):
     return ENROLLMENT_CODE_ASSINGMENT_TAG in webhook.event_data.tags
 
 
+def is_trackable_event_type(event_data):
+    event_type = event_data["event"]
+    if event_type not in MAILGUN_EMAIL_EVENT_TYPES:
+        return False
+
+    if event_type == EMAIL_STATUS_FAILED:
+        # This field is only present on temporary and permanent failures.
+        # We don't want to show temporary ones to contract managers since there's nothing to do but wait for resolution
+        severity = event_data.get("severity", "")
+        if severity == EMAIL_STATUS_FAILED_TEMPORARY_SEVERITY:
+            return False
+
+    return True
+
+
+def is_later_event(event_data, record):
+    event_timestamp = event_data["timestamp"]
+    if (  # noqa: SIM103
+        record.email_status_event_timestamp
+        and record.email_status_event_timestamp >= event_timestamp
+    ):
+        return False
+
+    return True
+
+
 # We may want to move some of the cheapest checks to the web tier, but the actual queries need to happen in a task.
 def process_mailgun_webhook_for_enrollment_code_emails(payload):
     if not is_potentially_valid_mailgun_webhook(payload):
@@ -1981,17 +2007,8 @@ def process_mailgun_webhook_for_enrollment_code_emails(payload):
     if not verify_mailgun_signature(signing_secret, token, timestamp, signature):
         return None
 
-    # We only want to store some email statuses. If it's not one of the ones we care about, we can toss the event
-    event_type = event_data["event"]
-    if event_type not in MAILGUN_EMAIL_EVENT_TYPES:
+    if not is_trackable_event_type(event_data):
         return None
-
-    if event_type == EMAIL_STATUS_FAILED:
-        # This field is only present on temporary and permanent failures.
-        # We don't want to show temporary ones to contract managers since there's nothing to do but wait for resolution
-        severity = event_data.get("severity", "")
-        if severity == EMAIL_STATUS_FAILED_TEMPORARY_SEVERITY:
-            return None
 
     # At this point we know that the payload is for the email we care about, it's from mailgun, and it's one of the events we care about
     # Save it to the row corresponding to the event we just got and move on with our lives
@@ -2000,16 +2017,15 @@ def process_mailgun_webhook_for_enrollment_code_emails(payload):
     assignment = DiscountContractAttachmentRedemption.objects.get(
         email_message_id=message_id
     )
-    saved_event_timestamp = assignment.email_status_event_timestamp
 
     # We want to store event with the most recent timestamp we get from mailgun.
     # Event receipt/processing is not guaranteed to be chronologically ordered, so this prevents older events from
     # clobbering ones which actually occurred later.
-    if saved_event_timestamp and saved_event_timestamp >= message_timestamp:
+    if is_later_event(event_data, assignment):
+        assignment.email_status = event_data["event"]
+        assignment.email_status_event_timestamp = message_timestamp
+        assignment.save()
+    else:
         return assignment
-
-    assignment.email_status = event_type
-    assignment.email_status_event_timestamp = message_timestamp
-    assignment.save()
 
     return assignment
