@@ -1007,36 +1007,60 @@ def test_refund_deadline_uses_the_latest_run():
 
 
 @pytest.mark.parametrize("days_since_purchase", [0, REFUND_WINDOW_DAYS - 1])
-def test_is_refund_eligible_within_window(days_since_purchase):
-    """An order is eligible until the window closes."""
+def test_within_refund_window_until_it_closes(days_since_purchase):
+    """The window stays open right up to the deadline."""
     order = OrderFactory.create()
 
     with freeze_time(order.created_on + timedelta(days=days_since_purchase)):
-        assert order.is_refund_eligible
+        assert order.is_within_refund_window
 
 
-def test_is_refund_eligible_after_window():
-    """An order is no longer eligible once the window has passed."""
+def test_not_within_refund_window_after_it_closes():
+    """The window is shut once the deadline passes."""
     order = OrderFactory.create()
 
     with freeze_time(order.created_on + timedelta(days=REFUND_WINDOW_DAYS, seconds=1)):
-        assert not order.is_refund_eligible
+        assert not order.is_within_refund_window
 
 
-def test_is_refund_eligible_for_course_starting_after_purchase():
+def test_refund_window_extends_for_a_course_starting_after_purchase():
     """
-    A purchase made well before the course starts stays eligible into the course,
-    even though the purchase-date window has long closed.
+    A purchase made well before the course starts stays in window into the
+    course, even though the purchase-date window has long closed.
     """
     order = OrderFactory.create()
     start_date = order.created_on + timedelta(days=60)
     _add_purchased_run(order, start_date)
 
     with freeze_time(start_date + timedelta(days=REFUND_WINDOW_DAYS - 1)):
-        assert order.is_refund_eligible
+        assert order.is_within_refund_window
 
     with freeze_time(start_date + timedelta(days=REFUND_WINDOW_DAYS, seconds=1)):
-        assert not order.is_refund_eligible
+        assert not order.is_within_refund_window
+
+
+def test_is_refund_eligible_only_when_a_request_would_be_accepted():
+    """
+    `is_refund_eligible` answers "could the learner request a refund now", not
+    "is the window open" — being in window is necessary but not sufficient.
+    """
+    fulfilled = OrderFactory.create(state=OrderStatus.FULFILLED)
+    assert fulfilled.is_refund_eligible
+
+    pending = OrderFactory.create(state=OrderStatus.PENDING)
+    assert pending.is_within_refund_window
+    assert not pending.is_refund_eligible
+
+
+def test_is_refund_eligible_false_once_a_request_exists(user):
+    """A learner with a request outstanding cannot make another."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    assert order.is_refund_eligible
+
+    RefundRequest.objects.create(order=order, user=user, consent_given=True)
+    del order.latest_refund_request  # clear the cached_property
+
+    assert not order.is_refund_eligible
 
 
 def test_refund_status_eligible():

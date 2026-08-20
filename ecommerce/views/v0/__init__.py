@@ -954,6 +954,8 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
         return (
             Order.objects.filter(purchaser=self.request.user)
             .filter(state__in=[OrderStatus.FULFILLED, OrderStatus.REFUNDED])
+            # Every serialized order reads both, once per row.
+            .prefetch_related("refund_requests", "lines__purchased_object")
             .order_by("-created_on")
             .all()
         )
