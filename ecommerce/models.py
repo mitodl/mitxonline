@@ -874,9 +874,27 @@ class Order(TimestampedModel):
         )
 
     @property
-    def is_refund_eligible(self):
-        """Return True if the order is still within the standard refund window."""
+    def is_within_refund_window(self):
+        """Return True if the standard refund window has not closed yet."""
         return now_in_utc() <= self.refund_deadline
+
+    @property
+    def is_refund_eligible(self):
+        """Return True if the learner could request a refund for this order now."""
+        return self.refund_status == OrderRefundStatus.ELIGIBLE
+
+    @cached_property
+    def is_b2b_order(self):
+        """
+        Return True if any purchased run belongs to a B2B contract.
+
+        Reads the line's denormalized `purchased_object` rather than resolving
+        `product.purchasable_object` through reversion. The two identify the same
+        object: `Line` rows are created with `purchased_object_id` and
+        `purchased_content_type_id` copied straight off the product, and that
+        triple is the line's uniqueness constraint.
+        """
+        return any(run.b2b_contract_id for run in self.purchased_runs)
 
     @cached_property
     def latest_refund_request(self):
@@ -909,12 +927,12 @@ class Order(TimestampedModel):
                 else OrderRefundStatus.REQUESTED
             )
 
-        if self.state != OrderStatus.FULFILLED or is_contract_order(self):
+        if self.state != OrderStatus.FULFILLED or self.is_b2b_order:
             return OrderRefundStatus.INELIGIBLE
 
         return (
             OrderRefundStatus.ELIGIBLE
-            if self.is_refund_eligible
+            if self.is_within_refund_window
             else OrderRefundStatus.WINDOW_CLOSED
         )
 

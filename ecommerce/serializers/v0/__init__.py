@@ -1076,8 +1076,6 @@ class RefundRequestSerializer(serializers.ModelSerializer):
         fields = ["order", "refund_reason", "refund_reason_text", "consent_given"]
 
     def validate_order(self, order):
-        from courses.utils import is_contract_order  # noqa: PLC0415
-
         user = self.context["request"].user
         if order.purchaser != user:
             msg = "You can only request a refund for your own orders."
@@ -1085,7 +1083,9 @@ class RefundRequestSerializer(serializers.ModelSerializer):
         if order.state != OrderStatus.FULFILLED:
             msg = "Refund requests can only be submitted for fulfilled orders."
             raise serializers.ValidationError(msg)
-        if is_contract_order(order):
+        # Same property `refund_status` reports on, so what the receipt advertises
+        # and what this endpoint accepts cannot drift apart.
+        if order.is_b2b_order:
             msg = (
                 "B2B contract orders are not eligible for self-service refund requests."
             )
