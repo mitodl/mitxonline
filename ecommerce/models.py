@@ -1378,7 +1378,7 @@ class RefundRequest(TimestampedModel):
         choices=RefundReasonChoices,
         blank=True,
     )
-    refund_reason_text = models.TextField(blank=True)
+    refund_reason_text = models.TextField(blank=True, max_length=1000)
     consent_given = models.BooleanField(default=False)
     status = models.CharField(
         max_length=20,

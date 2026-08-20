@@ -26,7 +26,9 @@ from ecommerce.models import (
     Order,
     OrderStatus,
     Product,
+    RefundReasonChoices,
     RefundRequest,
+    RefundRequestStatus,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from main.constants import (
@@ -1082,6 +1084,9 @@ class RefundRequestSerializer(serializers.ModelSerializer):
                 "B2B contract orders are not eligible for self-service refund requests."
             )
             raise serializers.ValidationError(msg)
+        if order.refund_requests.filter(status=RefundRequestStatus.PENDING).exists():
+            msg = "A refund request for this order is already awaiting review."
+            raise serializers.ValidationError(msg)
         return order
 
     def validate_consent_given(self, value):
@@ -1089,6 +1094,25 @@ class RefundRequestSerializer(serializers.ModelSerializer):
             msg = "You must acknowledge the consequences of requesting a refund."
             raise serializers.ValidationError(msg)
         return value
+
+    def validate(self, attrs):
+        """
+        Require free text when no preset reason identifies the request.
+
+        Requests made after the refund window offer no preset reasons at all, and
+        "Other" says nothing on its own, so both cases need the learner's own
+        words for customer service to act on.
+        """
+        reason = attrs.get("refund_reason", "")
+        if (
+            reason in ("", RefundReasonChoices.OTHER)
+            and not attrs.get("refund_reason_text", "").strip()
+        ):
+            msg = {
+                "refund_reason_text": "Please tell us why you are requesting a refund."
+            }
+            raise serializers.ValidationError(msg)
+        return attrs
 
     def create(self, validated_data):
         validated_data["user"] = self.context["request"].user

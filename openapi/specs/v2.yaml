@@ -9002,6 +9002,7 @@ components:
           - $ref: '#/components/schemas/BlankEnum'
         refund_reason_text:
           type: string
+          maxLength: 1000
         consent_given:
           type: boolean
       required:
@@ -9018,6 +9019,7 @@ components:
           - $ref: '#/components/schemas/BlankEnum'
         refund_reason_text:
           type: string
+          maxLength: 1000
         consent_given:
           type: boolean
       required:
