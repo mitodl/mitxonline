@@ -1981,7 +1981,7 @@ def is_trackable_event_type(event_data):
 
 
 def is_later_event(event_data, record):
-    event_timestamp = event_data["timestamp"]
+    event_timestamp = datetime.fromtimestamp(event_data["timestamp"], tz=UTC)
     if (  # noqa: SIM103
         record.email_status_event_timestamp
         and record.email_status_event_timestamp >= event_timestamp
