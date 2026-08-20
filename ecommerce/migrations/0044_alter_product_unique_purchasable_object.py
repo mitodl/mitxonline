@@ -1,5 +1,7 @@
 from django.db import migrations, models
 
+from ecommerce.db_utils import create_delete_rule, rollback_delete_rule
+
 
 def deduplicate_products(apps, schema_editor):
     """
@@ -25,6 +27,7 @@ def deduplicate_products(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    table_name = "product"
     dependencies = [
         ("ecommerce", "0043_refund_request_status"),
     ]
@@ -33,6 +36,10 @@ class Migration(migrations.Migration):
         migrations.RemoveConstraint(
             model_name="product",
             name="unique_purchasable_object",
+        ),
+        migrations.RunSQL(
+            sql=rollback_delete_rule(table_name),
+            reverse_sql=create_delete_rule(table_name),
         ),
         migrations.RunPython(
             deduplicate_products,
@@ -44,5 +51,9 @@ class Migration(migrations.Migration):
                 fields=("object_id", "content_type"),
                 name="unique_purchasable_object",
             ),
+        ),
+        migrations.RunSQL(
+            sql=create_delete_rule(table_name),
+            reverse_sql=rollback_delete_rule(table_name),
         ),
     ]
