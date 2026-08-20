@@ -1753,3 +1753,47 @@ def test_refund_request_text_length_capped(user, user_drf_client):
 
     assert resp.status_code == 400
     assert "refund_reason_text" in resp.json()["errors"]
+
+
+@pytest.mark.skip_nplusone_check
+def test_order_receipt_includes_refund_status(user, user_drf_client):
+    """The receipt reports one refund state for the UI to branch on."""
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    product_version = Version.objects.get_for_object(product).last()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    LineFactory.create(order=order, product_version=product_version)
+
+    resp = user_drf_client.get(reverse("v0:order_receipt_api", kwargs={"pk": order.id}))
+
+    assert resp.status_code == 200
+    assert resp.json()["refund_status"] == "eligible"
+    assert resp.json()["refund_requested_on"] is None
+
+
+@pytest.mark.skip_nplusone_check
+def test_order_receipt_refund_status_after_requesting(user, user_drf_client):
+    """Submitting a request moves the receipt's refund state without a page change."""
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    product_version = Version.objects.get_for_object(product).last()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    LineFactory.create(order=order, product_version=product_version)
+
+    user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": "financial_reasons",
+            "consent_given": True,
+        },
+    )
+
+    receipt = user_drf_client.get(
+        reverse("v0:order_receipt_api", kwargs={"pk": order.id})
+    ).json()
+
+    assert receipt["refund_status"] == "requested"
+    assert parse_datetime(receipt["refund_requested_on"]) == (
+        order.refund_requests.get().created_on
+    )

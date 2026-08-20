@@ -12,6 +12,7 @@ from freezegun import freeze_time
 from mitol.common.utils import now_in_utc
 from reversion.models import Version
 
+from b2b.factories import ContractPageFactory
 from courses.factories import CourseRunFactory
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
@@ -41,9 +42,12 @@ from ecommerce.models import (
     FulfilledOrder,
     Line,
     Order,
+    OrderRefundStatus,
     OrderStatus,
     PendingOrder,
     Product,
+    RefundRequest,
+    RefundRequestStatus,
     StripeEventLog,
     Transaction,
     UserDiscount,
@@ -1033,3 +1037,91 @@ def test_is_refund_eligible_for_course_starting_after_purchase():
 
     with freeze_time(start_date + timedelta(days=REFUND_WINDOW_DAYS, seconds=1)):
         assert not order.is_refund_eligible
+
+
+def test_refund_status_eligible():
+    """A fulfilled order inside the window can be refunded on request."""
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+
+    assert order.refund_status == OrderRefundStatus.ELIGIBLE
+
+
+def test_refund_status_window_closed():
+    """Past the window the learner may still ask, but through a review."""
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+
+    with freeze_time(order.created_on + timedelta(days=REFUND_WINDOW_DAYS, seconds=1)):
+        assert order.refund_status == OrderRefundStatus.WINDOW_CLOSED
+
+
+@pytest.mark.parametrize(
+    "state",
+    [OrderStatus.PENDING, OrderStatus.CANCELED, OrderStatus.DECLINED],
+)
+def test_refund_status_ineligible_for_unfulfilled_orders(state):
+    """Only a fulfilled order can be refunded."""
+    order = OrderFactory.create(state=state)
+
+    assert order.refund_status == OrderRefundStatus.INELIGIBLE
+
+
+@pytest.mark.skip_nplusone_check
+def test_refund_status_ineligible_for_b2b_orders():
+    """B2B contract orders are handled off the self-service path."""
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+    run = CourseRunFactory.create(b2b_contract=ContractPageFactory.create())
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run)
+    LineFactory.create(
+        order=order,
+        purchased_object=run,
+        product_version=Version.objects.get_for_object(product).last(),
+    )
+
+    assert order.refund_status == OrderRefundStatus.INELIGIBLE
+
+
+@pytest.mark.parametrize(
+    ("request_status", "expected"),
+    [
+        (RefundRequestStatus.PENDING, OrderRefundStatus.REQUESTED),
+        # Nothing marks the refund itself as done, so an approved request still
+        # reads as outstanding until the order state changes.
+        (RefundRequestStatus.APPROVED, OrderRefundStatus.REQUESTED),
+        (RefundRequestStatus.DENIED, OrderRefundStatus.DENIED),
+    ],
+)
+def test_refund_status_reflects_an_existing_request(user, request_status, expected):
+    """An existing request outranks the learner's eligibility to make one."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    RefundRequest.objects.create(
+        order=order, user=user, consent_given=True, status=request_status
+    )
+
+    assert order.refund_status == expected
+
+
+def test_refund_status_uses_the_latest_request(user):
+    """A fresh request after a denial supersedes it."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    RefundRequest.objects.create(
+        order=order, user=user, consent_given=True, status=RefundRequestStatus.DENIED
+    )
+    RefundRequest.objects.create(
+        order=order, user=user, consent_given=True, status=RefundRequestStatus.PENDING
+    )
+
+    assert order.refund_status == OrderRefundStatus.REQUESTED
+
+
+@pytest.mark.parametrize(
+    "state", [OrderStatus.REFUNDED, OrderStatus.PARTIALLY_REFUNDED]
+)
+def test_refund_status_completed_outranks_everything(user, state):
+    """Once the money is back, no other state matters."""
+    order = OrderFactory.create(purchaser=user, state=state)
+    RefundRequest.objects.create(
+        order=order, user=user, consent_given=True, status=RefundRequestStatus.PENDING
+    )
+
+    assert order.refund_status == OrderRefundStatus.COMPLETED

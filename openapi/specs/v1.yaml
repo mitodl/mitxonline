@@ -7562,6 +7562,15 @@ components:
           type: string
           format: date-time
           readOnly: true
+        refund_status:
+          allOf:
+          - $ref: '#/components/schemas/RefundStatusEnum'
+          readOnly: true
+        refund_requested_on:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
       required:
       - created_on
       - discounts
@@ -7570,6 +7579,8 @@ components:
       - purchaser
       - refund_deadline
       - refund_eligible
+      - refund_requested_on
+      - refund_status
       - refunds
       - state
       - street_address
@@ -9024,6 +9035,29 @@ components:
           type: boolean
       required:
       - order
+    RefundStatusEnum:
+      enum:
+      - completed
+      - requested
+      - denied
+      - eligible
+      - window_closed
+      - ineligible
+      type: string
+      description: |-
+        * `completed` - Completed
+        * `requested` - Requested
+        * `denied` - Denied
+        * `eligible` - Eligible
+        * `window_closed` - Window Closed
+        * `ineligible` - Ineligible
+      x-enum-descriptions:
+      - Completed
+      - Requested
+      - Denied
+      - Eligible
+      - Window Closed
+      - Ineligible
     ResultEnum:
       enum:
       - b2b-disallowed
