@@ -1456,14 +1456,27 @@ class StripeEventLog(TimestampedModel):
 
 
 class RefundReasonChoices(models.TextChoices):
+    """
+    Reasons a learner can give for requesting a refund.
+
+    The first seven are the choices the refund modal offers, in the order it
+    shows them. The last two predate that design and are kept so existing
+    requests still resolve to a label; nothing submits them any more.
+    """
+
+    NOT_ENOUGH_TIME = "not_enough_time", "I do not have enough time"
+    COURSE_NOT_AS_EXPECTED = "course_not_as_expected", "Course is not what I expected"
+    TECHNICAL_DIFFICULTIES = "technical_difficulties", "I had a technical issue"
+    COURSE_TOO_DIFFICULT = "course_too_difficult", "Course is too difficult"
+    PURCHASED_BY_MISTAKE = "purchased_by_mistake", "I purchased by mistake"
+    PREFER_NOT_TO_SAY = "prefer_not_to_say", "Prefer not to say"
+    OTHER = "other", "Other"
+
     ENROLLED_IN_ANOTHER_COURSE = (
         "enrolled_in_another_course",
         "I enrolled in another course",
     )
-    COURSE_NOT_AS_EXPECTED = "course_not_as_expected", "Course is not what I expected"
-    TECHNICAL_DIFFICULTIES = "technical_difficulties", "Technical difficulties"
     FINANCIAL_REASONS = "financial_reasons", "Financial reasons"
-    OTHER = "other", "Other"
 
 
 class RefundRequestStatus(models.TextChoices):
