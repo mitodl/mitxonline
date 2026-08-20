@@ -1797,3 +1797,50 @@ def test_order_receipt_refund_status_after_requesting(user, user_drf_client):
     assert parse_datetime(receipt["refund_requested_on"]) == (
         order.refund_requests.get().created_on
     )
+
+
+@pytest.mark.parametrize(
+    "refund_reason",
+    [
+        "not_enough_time",
+        "course_not_as_expected",
+        "technical_difficulties",
+        "course_too_difficult",
+        "purchased_by_mistake",
+        "prefer_not_to_say",
+    ],
+)
+def test_refund_request_accepts_every_preset_reason(
+    user, user_drf_client, refund_reason
+):
+    """Every reason the refund modal offers is accepted without free text."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": refund_reason,
+            "consent_given": True,
+        },
+    )
+
+    assert resp.status_code == 201
+    assert RefundRequest.objects.get(order=order).refund_reason == refund_reason
+
+
+def test_refund_request_rejects_an_unknown_reason(user, user_drf_client):
+    """A reason outside the enum is rejected rather than stored."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": "i_changed_my_mind",
+            "consent_given": True,
+        },
+    )
+
+    assert resp.status_code == 400
+    assert "refund_reason" in resp.json()["errors"]

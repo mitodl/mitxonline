@@ -8983,24 +8983,36 @@ components:
       - unlimited
     RefundReasonEnum:
       enum:
-      - enrolled_in_another_course
+      - not_enough_time
       - course_not_as_expected
       - technical_difficulties
-      - financial_reasons
+      - course_too_difficult
+      - purchased_by_mistake
+      - prefer_not_to_say
       - other
+      - enrolled_in_another_course
+      - financial_reasons
       type: string
       description: |-
-        * `enrolled_in_another_course` - I enrolled in another course
+        * `not_enough_time` - I do not have enough time
         * `course_not_as_expected` - Course is not what I expected
-        * `technical_difficulties` - Technical difficulties
-        * `financial_reasons` - Financial reasons
+        * `technical_difficulties` - I had a technical issue
+        * `course_too_difficult` - Course is too difficult
+        * `purchased_by_mistake` - I purchased by mistake
+        * `prefer_not_to_say` - Prefer not to say
         * `other` - Other
+        * `enrolled_in_another_course` - I enrolled in another course
+        * `financial_reasons` - Financial reasons
       x-enum-descriptions:
-      - I enrolled in another course
+      - I do not have enough time
       - Course is not what I expected
-      - Technical difficulties
-      - Financial reasons
+      - I had a technical issue
+      - Course is too difficult
+      - I purchased by mistake
+      - Prefer not to say
       - Other
+      - I enrolled in another course
+      - Financial reasons
     RefundRequest:
       type: object
       description: Serializer for creating learner-submitted refund requests.
