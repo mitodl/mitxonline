@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import List  # noqa: UP035
 from zoneinfo import ZoneInfo
@@ -38,6 +38,7 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPES,
     REFERENCE_NUMBER_PREFIX,
+    REFUND_WINDOW_DAYS,
     TRANSACTION_TYPE_PAYMENT,
     TRANSACTION_TYPE_REFUND,
     TRANSACTION_TYPES,
@@ -834,25 +835,31 @@ class Order(TimestampedModel):
         return self.state == OrderStatus.FULFILLED
 
     @property
-    def is_refund_eligible(self):
+    def refund_deadline(self):
         """
-        Returns True if the order is within the standard refund window:
-        - Within 7 days of purchase, OR
-        - Within 7 days of the course start date, if the user purchased before the course started.
-        """
-        from datetime import timedelta  # noqa: PLC0415
+        Return the moment the standard refund window closes:
+        - REFUND_WINDOW_DAYS after purchase, OR
+        - REFUND_WINDOW_DAYS after the course start date, if the user purchased
+          before the course started.
 
-        now = now_in_utc()
-        if now <= self.created_on + timedelta(days=7):
-            return True
-        for run in self.purchased_runs:
-            if (
-                run.start_date
-                and run.start_date > self.created_on
-                and now <= run.start_date + timedelta(days=7)
-            ):
-                return True
-        return False
+        Whichever is later, since either one on its own makes the order eligible.
+        """
+        window = timedelta(days=REFUND_WINDOW_DAYS)
+        return max(
+            [
+                self.created_on + window,
+                *[
+                    run.start_date + window
+                    for run in self.purchased_runs
+                    if run.start_date and run.start_date > self.created_on
+                ],
+            ]
+        )
+
+    @property
+    def is_refund_eligible(self):
+        """Return True if the order is still within the standard refund window."""
+        return now_in_utc() <= self.refund_deadline
 
     def _generate_reference_number(self):
         return f"{REFERENCE_NUMBER_PREFIX}{settings.ENVIRONMENT}-{self.id}"

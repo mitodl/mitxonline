@@ -495,10 +495,15 @@ class OrderSerializer(serializers.ModelSerializer):
     transactions = serializers.SerializerMethodField()
     street_address = serializers.SerializerMethodField()
     refund_eligible = serializers.SerializerMethodField()
+    refund_deadline = serializers.SerializerMethodField()
 
     @extend_schema_field(serializers.BooleanField())
     def get_refund_eligible(self, instance):
         return instance.is_refund_eligible
+
+    @extend_schema_field(serializers.DateTimeField())
+    def get_refund_deadline(self, instance):
+        return instance.refund_deadline
 
     @extend_schema_field(TransactionLineSerializer(many=True))
     def get_lines(self, instance):
@@ -651,6 +656,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "transactions",
             "street_address",
             "refund_eligible",
+            "refund_deadline",
         ]
         model = models.Order
 
