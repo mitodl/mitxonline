@@ -10,7 +10,9 @@ def test_user_creation_triggers_hubspot_sync(mocker):
     """
     Test that creating a user triggers the Hubspot sync.
 
-    This ensures users created via SCIM are synced to Hubspot.
+    UserFactory also creates a LegalAddress via RelatedFactory, so sync_hubspot_user
+    is called twice: once from the User post_save signal and once from the LegalAddress
+    post_save signal. Both calls carry the same user instance.
     """
     mock_sync = mocker.patch("users.signals.sync_hubspot_user")
 
@@ -19,7 +21,7 @@ def test_user_creation_triggers_hubspot_sync(mocker):
         email="test@example.com",
     )
 
-    mock_sync.assert_called_once_with(user)
+    mock_sync.assert_called_with(user)
 
 
 @pytest.mark.django_db
@@ -42,6 +44,7 @@ def test_legal_address_create_triggers_hubspot_sync(mocker, user):
     This covers the case where LegalAddress is created after the initial user sync,
     which would have sent an empty first/last name to HubSpot.
     """
+    user.legal_address.delete()
     mock_sync = mocker.patch("users.signals.sync_hubspot_user")
 
     LegalAddressFactory.create(user=user, first_name="Jane", last_name="Doe")
@@ -56,10 +59,7 @@ def test_legal_address_update_triggers_hubspot_sync(mocker, user):
     """
     mock_sync = mocker.patch("users.signals.sync_hubspot_user")
 
-    legal_address = LegalAddressFactory.create(user=user)
-    mock_sync.reset_mock()
-
-    legal_address.first_name = "Updated"
-    legal_address.save()
+    user.legal_address.first_name = "Updated"
+    user.legal_address.save()
 
     mock_sync.assert_called_once_with(user)
