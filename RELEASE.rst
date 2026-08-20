@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 1.163.0
+---------------
+
+- Handle SQL rules on the Product table (#3868)
+- fix(scim): send name.givenName/familyName in outbound SCIM payload (#3836)
+- Add manual order completion; refactor Stripe event handling (#3855)
+- Enforce one product per purchasable object (#3847)
+- chore(otel): delete a dead flag and fix a setting name that was never read (#3859)
+
 Version 1.162.8 (Released August 19, 2026)
 ---------------
 
