@@ -12,15 +12,18 @@ from freezegun import freeze_time
 from mitol.common.utils import now_in_utc
 from reversion.models import Version
 
+from courses.factories import CourseRunFactory
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
+    REFUND_WINDOW_DAYS,
     ZERO_PAYMENT_DATA,
 )
 from ecommerce.factories import (
     BasketFactory,
     BasketItemFactory,
+    LineFactory,
     OneTimeDiscountFactory,
     OneTimePerUserDiscountFactory,
     OrderFactory,
@@ -954,3 +957,79 @@ def test_stripe_event_log_resave():
     assert event.id == logged_event.event_id
     assert logged_event.related_order == order
     assert logged_event.event_data == event.to_dict(for_json=True)
+
+
+def _add_purchased_run(order, start_date):
+    """Attach a purchased course run to an order, the way a real purchase does."""
+    run = CourseRunFactory.create(start_date=start_date)
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run)
+    LineFactory.create(
+        order=order,
+        purchased_object=run,
+        product_version=Version.objects.get_for_object(product).last(),
+    )
+    return run
+
+
+def test_refund_deadline_defaults_to_purchase_date():
+    """With no run starting after the purchase, the window runs from the purchase."""
+    order = OrderFactory.create()
+    _add_purchased_run(order, order.created_on - timedelta(days=30))
+
+    assert order.refund_deadline == order.created_on + timedelta(
+        days=REFUND_WINDOW_DAYS
+    )
+
+
+def test_refund_deadline_extends_to_later_course_start():
+    """A run starting after the purchase pushes the deadline out to its start date."""
+    order = OrderFactory.create()
+    start_date = order.created_on + timedelta(days=60)
+    _add_purchased_run(order, start_date)
+
+    assert order.refund_deadline == start_date + timedelta(days=REFUND_WINDOW_DAYS)
+
+
+def test_refund_deadline_uses_the_latest_run():
+    """With several qualifying runs, the latest start date wins."""
+    order = OrderFactory.create()
+    for offset in (30, 90, 60):
+        _add_purchased_run(order, order.created_on + timedelta(days=offset))
+
+    assert order.refund_deadline == order.created_on + timedelta(
+        days=90 + REFUND_WINDOW_DAYS
+    )
+
+
+@pytest.mark.parametrize("days_since_purchase", [0, REFUND_WINDOW_DAYS - 1])
+def test_is_refund_eligible_within_window(days_since_purchase):
+    """An order is eligible until the window closes."""
+    order = OrderFactory.create()
+
+    with freeze_time(order.created_on + timedelta(days=days_since_purchase)):
+        assert order.is_refund_eligible
+
+
+def test_is_refund_eligible_after_window():
+    """An order is no longer eligible once the window has passed."""
+    order = OrderFactory.create()
+
+    with freeze_time(order.created_on + timedelta(days=REFUND_WINDOW_DAYS, seconds=1)):
+        assert not order.is_refund_eligible
+
+
+def test_is_refund_eligible_for_course_starting_after_purchase():
+    """
+    A purchase made well before the course starts stays eligible into the course,
+    even though the purchase-date window has long closed.
+    """
+    order = OrderFactory.create()
+    start_date = order.created_on + timedelta(days=60)
+    _add_purchased_run(order, start_date)
+
+    with freeze_time(start_date + timedelta(days=REFUND_WINDOW_DAYS - 1)):
+        assert order.is_refund_eligible
+
+    with freeze_time(start_date + timedelta(days=REFUND_WINDOW_DAYS, seconds=1)):
+        assert not order.is_refund_eligible

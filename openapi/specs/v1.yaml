@@ -7558,12 +7558,17 @@ components:
         refund_eligible:
           type: boolean
           readOnly: true
+        refund_deadline:
+          type: string
+          format: date-time
+          readOnly: true
       required:
       - created_on
       - discounts
       - id
       - lines
       - purchaser
+      - refund_deadline
       - refund_eligible
       - refunds
       - state

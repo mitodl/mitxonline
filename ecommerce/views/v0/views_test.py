@@ -13,6 +13,7 @@ import reversion
 from django.forms.models import model_to_dict
 from django.test import Client
 from django.urls import reverse
+from django.utils.dateparse import parse_datetime
 from mitol.common.utils.datetime import now_in_utc
 from reversion.models import Version
 
@@ -1637,3 +1638,20 @@ def test_order_history_includes_refund_eligible(user, user_drf_client):
     returned_orders = resp.json()["results"]
     assert len(returned_orders) == 1
     assert "refund_eligible" in returned_orders[0]
+
+
+@pytest.mark.skip_nplusone_check
+def test_order_receipt_includes_refund_deadline(user, user_drf_client):
+    """The receipt carries the refund window's end so the UI can display it."""
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    product_version = Version.objects.get_for_object(product).last()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    LineFactory.create(order=order, product_version=product_version)
+
+    resp = user_drf_client.get(reverse("v0:order_receipt_api", kwargs={"pk": order.id}))
+
+    assert resp.status_code == 200
+    receipt = resp.json()
+    assert receipt["refund_eligible"] is True
+    assert parse_datetime(receipt["refund_deadline"]) == order.refund_deadline
