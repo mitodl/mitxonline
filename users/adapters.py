@@ -21,6 +21,10 @@ class LearnUserAdapter(UserAdapter):
         ("active", None, None): "is_active",
         ("userName", None, None): "username",
         ("fullName", None, None): "name",
+        ("name", "givenName", None): "legal_address__first_name",
+        ("givenName", None, None): "legal_address__first_name",
+        ("name", "familyName", None): "legal_address__last_name",
+        ("familyName", None, None): "legal_address__last_name",
     }
 
     obj: "User"
@@ -52,16 +56,41 @@ class LearnUserAdapter(UserAdapter):
         """
         return self.obj.name
 
+    def _resolve_name(self) -> tuple[str, str]:
+        """
+        Resolve (given_name, family_name) for the SCIM ``name`` attribute.
+
+        Only returns legal_address.first_name/last_name, and only when both
+        are set - real structured data, never a guess. A single full-name
+        string can't be reliably split into given/family (breaks on
+        single-name accounts, multi-word surnames, non-Western conventions),
+        so when legal_address doesn't have both parts this returns
+        ("", "") rather than guessing. The full name itself is still sent
+        outbound on its own via the "fullName" attribute (see to_dict), so
+        nothing is lost for users - most commonly those who only came
+        through the edX migration - who have a full name but no
+        legal_address split on file.
+        """
+        if self.legal_address.first_name and self.legal_address.last_name:
+            return self.legal_address.first_name, self.legal_address.last_name
+        return "", ""
+
     def to_dict(self):
         """
         Return a ``dict`` conforming to the SCIM User Schema,
         ready for conversion to a JSON object.
         """
+        given_name, family_name = self._resolve_name()
         return {
             "id": self.id,
             "externalId": self.obj.scim_external_id,
             "schemas": [SchemaURI.USER],
             "userName": self.obj.username,
+            "fullName": self.obj.name,
+            "name": {
+                "givenName": given_name,
+                "familyName": family_name,
+            },
             "displayName": self.display_name,
             "emails": self.emails,
             "active": self.obj.is_active,
@@ -89,6 +118,22 @@ class LearnUserAdapter(UserAdapter):
         self.obj.scim_external_id = d.get("externalId")
         self.obj.global_id = self.obj.scim_external_id or ""
         self.obj.name = d.get("fullName", self.obj.name)
+
+        # Inbound name.givenName/familyName always writes to legal_address
+        # directly - this is real data from an external SCIM client, never
+        # a derived guess (see _resolve_name's tier 2, which is outbound-only).
+        # An absent key, an explicit JSON null, or a blank/whitespace-only
+        # string are all treated as "no value provided" and leave the
+        # existing value alone - legal_address feeds SDN compliance
+        # screening, so a client silently sending an empty name should not
+        # be able to blank out a previously-valid one.
+        name = d.get("name") or {}
+        given_name = (name.get("givenName") or "").strip()
+        if given_name:
+            self.legal_address.first_name = given_name
+        family_name = (name.get("familyName") or "").strip()
+        if family_name:
+            self.legal_address.last_name = family_name
 
     def _save_related(self):
         self.user_profile.user = self.obj
