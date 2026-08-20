@@ -118,7 +118,14 @@ class Command(BaseCommand):
         verified, mismatched = [], []
         for start in range(0, len(to_sync), batch_size):
             batch = to_sync[start : start + batch_size]
-            states = scim_api.sync_users_to_scim_remote([row["user"] for row in batch])
+            # sync_users_to_scim_remote is a generator - it does nothing
+            # until iterated, and yields once instead of supporting repeat
+            # iteration. Materialize it here, bounded to this one batch
+            # (batch_size, not the whole to_sync list), rather than at the
+            # library level where the full result set could be unbounded.
+            states = list(
+                scim_api.sync_users_to_scim_remote([row["user"] for row in batch])
+            )
             self.stdout.write(
                 f"  batch {start // batch_size + 1}: "
                 f"{sum(1 for s in states if s.success)}/{len(states)} succeeded"

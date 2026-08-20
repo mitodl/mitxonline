@@ -290,6 +290,40 @@ def test_verifies_matching_response_body(mocker, tmp_path):
 
 
 @pytest.mark.django_db
+def test_handles_sync_users_to_scim_remote_as_a_real_generator(mocker, tmp_path):
+    """sync_users_to_scim_remote is a generator in real mitol-django-scim -
+    it does nothing until iterated and can't be iterated twice. The mocks
+    in other tests return plain lists, which would mask a regression back
+    to `len(states)`/multi-pass iteration over a bare generator, so this
+    exercises a real one-shot generator to confirm Stage 3/4 only iterate
+    it once.
+    """
+    user = UserFactory.create(name="Joe Smith", global_id=None)
+    user.legal_address.first_name = "Joe"
+    user.legal_address.last_name = "Smith"
+    user.legal_address.save()
+
+    def _one_shot_states(users):
+        for synced_user in users:
+            yield _state(
+                synced_user,
+                response_body={"name": {"givenName": "Joe", "familyName": "Smith"}},
+            )
+
+    mocker.patch(
+        "users.management.commands.migrate_and_sync_users.scim_api.sync_users_to_scim_remote",
+        side_effect=_one_shot_states,
+    )
+
+    report = _run(
+        tmp_path, dry_run=False, skip_edx_migration=False, force=False, limit=None
+    )
+
+    assert [row["user_id"] for row in report["verified"]] == [user.id]
+    assert report["mismatched"] == []
+
+
+@pytest.mark.django_db
 def test_verifies_blank_name_when_response_body_omits_name(mocker, tmp_path):
     """A tier-3 (forced blank name) user's response body omitting "name"
     entirely must still verify - sent ("", "") should match an absent name,
