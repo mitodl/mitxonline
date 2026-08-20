@@ -1,11 +1,18 @@
 """Management command to backfill email deliverability events for DiscountContractAttachmentRedemption records."""
 
+from datetime import UTC, datetime
+
 from django.core.management import BaseCommand
 
 from b2b.api import is_later_event, is_trackable_event_type
 from b2b.models import (
     DiscountContractAttachmentRedemption,
 )
+
+MAILGUN_LOGS_API_URL = "https://api.mailgun.net/v1/analytics/logs"
+MAILGUN_LOGS_PAGE_LIMIT = 300
+# Mailgun only retains log data for 30 days on paid plans, so there's no point asking further back than that.
+MAILGUN_LOGS_RETENTION_DAYS = 30
 
 
 class Command(BaseCommand):
@@ -41,7 +48,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):  # noqa: ARG002
 
-        record_ids = [int(record_id) for record_id in kwargs["record_id"].split(",")]
+        record_ids = [int(record_id) for record_id in kwargs["record_ids"].split(",")]
 
         records = DiscountContractAttachmentRedemption.objects.filter(pk=record_ids)
         filtered_records = []
@@ -60,15 +67,23 @@ class Command(BaseCommand):
         latest_events_by_message_id = self.get_latest_event_for_message_ids(
             list(message_id_to_filtered_record.keys())
         )
+        # Technically we aren't getting events back, we're getting logs.
+        # We'll have to munge it into a format consistent w/ the webhooks
         for message_id, record in message_id_to_filtered_record.items():
-            event = latest_events_by_message_id[message_id]
+            event = latest_events_by_message_id.get(message_id)
+            if not event:
+                self.stdout.write(f"Skipping record {record}, no event found.")
+                continue
+
             if self.should_persist_event(record, event):
                 if kwargs["execute"]:
                     self.stdout.write(
                         f"Persisting event status {event['event']} to record {record}."
                     )
                     record.email_status = event["event"]
-                    record.email_status_event_timestamp = event["timestamp"]
+                    record.email_status_event_timestamp = datetime.fromtimestamp(
+                        event["timestamp"], tz=UTC
+                    )
                     record.save()
                 else:
                     self.stdout.write(
