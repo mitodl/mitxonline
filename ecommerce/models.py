@@ -602,6 +602,23 @@ class OrderStatus(TextChoices):
     PARTIALLY_REFUNDED = "partially_refunded"
 
 
+class OrderRefundStatus(TextChoices):
+    """
+    Where an order sits in the self-service refund flow.
+
+    Derived state, not stored: it combines the order's own status, any refund
+    request the learner has already made, and the refund window. Consumers get
+    one value to branch on instead of reassembling those rules themselves.
+    """
+
+    COMPLETED = "completed"
+    REQUESTED = "requested"
+    DENIED = "denied"
+    ELIGIBLE = "eligible"
+    WINDOW_CLOSED = "window_closed"
+    INELIGIBLE = "ineligible"
+
+
 class OrderFlow:
     state = State(OrderStatus, default=OrderStatus.PENDING)
 
@@ -834,7 +851,7 @@ class Order(TimestampedModel):
     def is_fulfilled(self):
         return self.state == OrderStatus.FULFILLED
 
-    @property
+    @cached_property
     def refund_deadline(self):
         """
         Return the moment the standard refund window closes:
@@ -860,6 +877,46 @@ class Order(TimestampedModel):
     def is_refund_eligible(self):
         """Return True if the order is still within the standard refund window."""
         return now_in_utc() <= self.refund_deadline
+
+    @cached_property
+    def latest_refund_request(self):
+        """Return the learner's most recent refund request for this order, if any."""
+        return self.refund_requests.order_by("-created_on").first()
+
+    @property
+    def refund_status(self):
+        """
+        Return where this order sits in the self-service refund flow.
+
+        Precedence matters: a refund that already happened settles the question,
+        then any request the learner has made, and only then whether they could
+        make one right now.
+
+        The final branch deliberately mirrors what `RefundRequestSerializer`
+        accepts, so anything but `eligible` or `window_closed` means a request
+        would be rejected.
+        """
+        if self.state in (OrderStatus.REFUNDED, OrderStatus.PARTIALLY_REFUNDED):
+            return OrderRefundStatus.COMPLETED
+
+        latest_request = self.latest_refund_request
+        if latest_request:
+            # An approved request still reads as "requested" until the money moves,
+            # since nothing marks the refund itself as done.
+            return (
+                OrderRefundStatus.DENIED
+                if latest_request.status == RefundRequestStatus.DENIED
+                else OrderRefundStatus.REQUESTED
+            )
+
+        if self.state != OrderStatus.FULFILLED or is_contract_order(self):
+            return OrderRefundStatus.INELIGIBLE
+
+        return (
+            OrderRefundStatus.ELIGIBLE
+            if self.is_refund_eligible
+            else OrderRefundStatus.WINDOW_CLOSED
+        )
 
     def _generate_reference_number(self):
         return f"{REFERENCE_NUMBER_PREFIX}{settings.ENVIRONMENT}-{self.id}"

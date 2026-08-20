@@ -25,6 +25,7 @@ from ecommerce.models import (
     Basket,
     BasketItem,
     Order,
+    OrderRefundStatus,
     OrderStatus,
     Product,
     RefundReasonChoices,
@@ -498,6 +499,8 @@ class OrderSerializer(serializers.ModelSerializer):
     street_address = serializers.SerializerMethodField()
     refund_eligible = serializers.SerializerMethodField()
     refund_deadline = serializers.SerializerMethodField()
+    refund_status = serializers.SerializerMethodField()
+    refund_requested_on = serializers.SerializerMethodField()
 
     @extend_schema_field(serializers.BooleanField())
     def get_refund_eligible(self, instance):
@@ -506,6 +509,15 @@ class OrderSerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.DateTimeField())
     def get_refund_deadline(self, instance):
         return instance.refund_deadline
+
+    @extend_schema_field(serializers.ChoiceField(choices=OrderRefundStatus.choices))
+    def get_refund_status(self, instance):
+        return instance.refund_status
+
+    @extend_schema_field(serializers.DateTimeField(allow_null=True))
+    def get_refund_requested_on(self, instance):
+        request = instance.latest_refund_request
+        return request.created_on if request else None
 
     @extend_schema_field(TransactionLineSerializer(many=True))
     def get_lines(self, instance):
@@ -659,6 +671,8 @@ class OrderSerializer(serializers.ModelSerializer):
             "street_address",
             "refund_eligible",
             "refund_deadline",
+            "refund_status",
+            "refund_requested_on",
         ]
         model = models.Order
 
