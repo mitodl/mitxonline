@@ -57,6 +57,7 @@ from ecommerce.models import (
     Order,
     OrderStatus,
     RefundRequest,
+    RefundRequestStatus,
     UserDiscount,
 )
 from ecommerce.serializers import (
@@ -1655,3 +1656,100 @@ def test_order_receipt_includes_refund_deadline(user, user_drf_client):
     receipt = resp.json()
     assert receipt["refund_eligible"] is True
     assert parse_datetime(receipt["refund_deadline"]) == order.refund_deadline
+
+
+def test_refund_request_duplicate_rejected(user, user_drf_client):
+    """A second request is rejected while the first is still awaiting review."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    payload = {
+        "order": order.id,
+        "refund_reason": "financial_reasons",
+        "consent_given": True,
+    }
+
+    assert (
+        user_drf_client.post(
+            reverse("v0:refund_requests_api"), data=payload
+        ).status_code
+        == 201
+    )
+
+    resp = user_drf_client.post(reverse("v0:refund_requests_api"), data=payload)
+
+    assert resp.status_code == 400
+    assert "order" in resp.json()["errors"]
+    assert RefundRequest.objects.filter(order=order).count() == 1
+
+
+def test_refund_request_allowed_after_denial(user, user_drf_client):
+    """A denied request does not block the learner from asking again."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    RefundRequest.objects.create(
+        order=order, user=user, consent_given=True, status=RefundRequestStatus.DENIED
+    )
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": "financial_reasons",
+            "consent_given": True,
+        },
+    )
+
+    assert resp.status_code == 201
+
+
+@pytest.mark.parametrize("refund_reason", ["", "other"])
+def test_refund_request_requires_text_without_a_preset_reason(
+    user, user_drf_client, refund_reason
+):
+    """A blank reason and "Other" both need the learner's own words."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": refund_reason,
+            "refund_reason_text": "   ",
+            "consent_given": True,
+        },
+    )
+
+    assert resp.status_code == 400
+    assert "refund_reason_text" in resp.json()["errors"]
+
+
+def test_refund_request_preset_reason_needs_no_text(user, user_drf_client):
+    """A preset reason stands on its own."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": "technical_difficulties",
+            "consent_given": True,
+        },
+    )
+
+    assert resp.status_code == 201
+
+
+def test_refund_request_text_length_capped(user, user_drf_client):
+    """The free-text reason is capped to the length the UI advertises."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": "other",
+            "refund_reason_text": "x" * 1001,
+            "consent_given": True,
+        },
+    )
+
+    assert resp.status_code == 400
+    assert "refund_reason_text" in resp.json()["errors"]
