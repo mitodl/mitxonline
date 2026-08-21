@@ -1,8 +1,12 @@
 """Management command to backfill email deliverability events for DiscountContractAttachmentRedemption records."""
 
+import email.utils
 from datetime import UTC, datetime
 
+import requests
+from django.conf import settings
 from django.core.management import BaseCommand
+from mitol.common.utils import now_in_utc
 
 from b2b.api import is_later_event, is_trackable_event_type
 from b2b.models import (
@@ -38,6 +42,49 @@ class Command(BaseCommand):
 
     def get_latest_event_for_message_ids(self, message_ids):
         pass
+
+    def fetch_logs_for_message(self, message_id):
+        """Page through POST /v1/analytics/logs for a single message_id."""
+        items = []
+        pagination = {"sort": "timestamp:asc", "limit": 100}
+
+        while True:
+            body = {
+                "end": email.utils.format_datetime(now_in_utc()),
+                "duration": "30d",
+                "filter": {
+                    "AND": [
+                        {
+                            "attribute": "message_id",
+                            "comparator": "=",
+                            "values": [{"label": message_id, "value": message_id}],
+                        }
+                    ]
+                },
+                "include_subaccounts": True,
+                "pagination": pagination,
+            }
+
+            resp = requests.post(
+                MAILGUN_LOGS_API_URL,
+                json=body,
+                headers={"Content-Type": "application/json"},
+                auth=("api", settings.MAILGUN_KEY),
+                timeout=30,
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+
+            page_items = payload.get("items", [])
+            items.extend(page_items)
+
+            next_token = payload.get("pagination", {}).get("next")
+            if not next_token or not page_items:
+                break
+
+            pagination = {"sort": "timestamp:asc", "limit": 100, "token": next_token}
+
+        return items
 
     # Same set of checks as in process_mailgun_webhook_for_enrollment_code_emails but without signature validation
     def should_persist_event(self, record, event):
