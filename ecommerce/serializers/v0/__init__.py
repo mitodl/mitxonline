@@ -87,6 +87,7 @@ class TransactionLineSerializer(serializers.Serializer):
     total_paid = serializers.CharField()
     discount = serializers.CharField()
     price = serializers.CharField()
+    has_free_audit = serializers.BooleanField()
 
     def to_representation(self, instance):
         """Returns the representation of the object."""
@@ -124,6 +125,10 @@ class TransactionLineSerializer(serializers.Serializer):
             # object was deleted; the receipt still has to serialize.
             start_date=content_object.start_date if content_object else None,
             end_date=content_object.end_date if content_object else None,
+            # Refunding drops the learner to the audit track, unless there is
+            # no audit track, in which case they lose access altogether. The
+            # refund modal warns about whichever applies.
+            has_free_audit=(content_object.has_free_audit if content_object else False),
         )
 
         return line  # noqa: RET504

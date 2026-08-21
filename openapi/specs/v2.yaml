@@ -9351,12 +9351,15 @@ components:
           type: string
         price:
           type: string
+        has_free_audit:
+          type: boolean
       required:
       - CEUs
       - content_title
       - content_type
       - discount
       - end_date
+      - has_free_audit
       - price
       - quantity
       - readable_id

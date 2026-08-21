@@ -8,12 +8,13 @@ from django.test import Client, RequestFactory
 from django.urls import reverse
 from reversion.models import Version
 
-from courses.models import CourseRun, Program
+from courses.models import CourseRun, EnrollmentMode, Program
 from ecommerce.api import generate_checkout_payload
 from ecommerce.factories import OrderFactory, ProductFactory, ProgramProductFactory
 from ecommerce.models import Line, Order, OrderStatus
 from ecommerce.serializers.v0 import TransactionLineSerializer
 from ecommerce.views.legacy.views_test import create_basket
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE
 
 pytestmark = [pytest.mark.django_db]
 
@@ -76,6 +77,7 @@ def build_expected_line(instance):
         price=str(instance.product.price),
         start_date=content_object.start_date,
         end_date=content_object.end_date,
+        has_free_audit=content_object.has_free_audit,
     )
 
 
@@ -181,3 +183,35 @@ def test_receipt_line_shows_no_discount_when_the_price_was_not_discounted():
 
     assert data["discount"] == "0.00"
     assert data["total_paid"] == "300.00"
+
+@pytest.mark.skip_nplusone_check
+def test_order_line_reports_a_free_audit_track(settings, mocker, user):
+    """A run with an audit mode tells the receipt the learner can fall back to it."""
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+
+    with reversion.create_revision():
+        products = ProductFactory.create_batch(1)
+    order = create_order(mocker, user, products)
+    run = CourseRun.objects.get(id=products[0].object_id)
+    run.enrollment_modes.add(
+        EnrollmentMode.objects.get_or_create(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)[0]
+    )
+
+    serialized = TransactionLineSerializer(instance=order.lines, many=True).data
+
+    assert serialized[0]["has_free_audit"] is True
+
+
+@pytest.mark.skip_nplusone_check
+def test_order_line_reports_no_free_audit_track(settings, mocker, user):
+    """Without an audit mode, refunding costs the learner access entirely."""
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+
+    with reversion.create_revision():
+        products = ProductFactory.create_batch(1)
+    order = create_order(mocker, user, products)
+    CourseRun.objects.get(id=products[0].object_id).enrollment_modes.clear()
+
+    serialized = TransactionLineSerializer(instance=order.lines, many=True).data
+
+    assert serialized[0]["has_free_audit"] is False
