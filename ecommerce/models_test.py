@@ -1149,3 +1149,31 @@ def test_refund_status_completed_outranks_everything(user, state):
     )
 
     assert order.refund_status == OrderRefundStatus.COMPLETED
+
+
+def test_refund_reviewed_on_is_none_while_pending(user):
+    """A request nobody has acted on has no review date."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    RefundRequest.objects.create(order=order, user=user, consent_given=True)
+
+    assert order.refund_reviewed_on is None
+
+
+@pytest.mark.parametrize(
+    "status", [RefundRequestStatus.APPROVED, RefundRequestStatus.DENIED]
+)
+def test_refund_reviewed_on_is_set_once_decided(user, status):
+    """Deciding a request stamps it, and that is the review date."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    request = RefundRequest.objects.create(
+        order=order, user=user, consent_given=True, status=status
+    )
+
+    assert order.refund_reviewed_on == request.updated_on
+
+
+def test_refund_reviewed_on_is_none_without_a_request():
+    """An order nobody has asked to refund has no review date."""
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+
+    assert order.refund_reviewed_on is None

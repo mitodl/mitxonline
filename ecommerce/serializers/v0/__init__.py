@@ -507,6 +507,7 @@ class OrderSerializer(serializers.ModelSerializer):
     refund_deadline = serializers.SerializerMethodField()
     refund_status = serializers.SerializerMethodField()
     refund_requested_on = serializers.SerializerMethodField()
+    refund_reviewed_on = serializers.SerializerMethodField()
 
     @extend_schema_field(serializers.BooleanField())
     def get_refund_eligible(self, instance):
@@ -524,6 +525,10 @@ class OrderSerializer(serializers.ModelSerializer):
     def get_refund_requested_on(self, instance):
         request = instance.latest_refund_request
         return request.created_on if request else None
+
+    @extend_schema_field(serializers.DateTimeField(allow_null=True))
+    def get_refund_reviewed_on(self, instance):
+        return instance.refund_reviewed_on
 
     @extend_schema_field(TransactionLineSerializer(many=True))
     def get_lines(self, instance):
@@ -679,6 +684,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "refund_deadline",
             "refund_status",
             "refund_requested_on",
+            "refund_reviewed_on",
         ]
         model = models.Order
 

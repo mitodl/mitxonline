@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("ecommerce", "0044_alter_product_unique_purchasable_object"),
+        ("ecommerce", "0046_alter_product_unique_purchasable_object_pt3"),
     ]
 
     operations = [

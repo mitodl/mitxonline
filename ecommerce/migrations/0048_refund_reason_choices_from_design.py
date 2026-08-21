@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("ecommerce", "0045_refund_reason_text_max_length"),
+        ("ecommerce", "0047_refund_reason_text_max_length"),
     ]
 
     operations = [

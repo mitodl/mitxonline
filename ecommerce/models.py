@@ -902,6 +902,20 @@ class Order(TimestampedModel):
         return self.refund_requests.order_by("-created_on").first()
 
     @property
+    def refund_reviewed_on(self):
+        """
+        Return when the latest refund request was decided, or None if it is
+        still pending.
+
+        `RefundRequest` carries no dedicated review timestamp. A request only
+        leaves `pending` when someone acts on it, so `updated_on` is that moment.
+        """
+        request = self.latest_refund_request
+        if request and request.status != RefundRequestStatus.PENDING:
+            return request.updated_on
+        return None
+
+    @property
     def refund_status(self):
         """
         Return where this order sits in the self-service refund flow.

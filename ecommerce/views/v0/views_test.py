@@ -1844,3 +1844,23 @@ def test_refund_request_rejects_an_unknown_reason(user, user_drf_client):
 
     assert resp.status_code == 400
     assert "refund_reason" in resp.json()["errors"]
+
+
+@pytest.mark.skip_nplusone_check
+def test_order_receipt_reports_when_a_request_was_decided(user, user_drf_client):
+    """A declined request carries the date it was decided, not just submitted."""
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    product_version = Version.objects.get_for_object(product).last()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    LineFactory.create(order=order, product_version=product_version)
+    request = RefundRequest.objects.create(
+        order=order, user=user, consent_given=True, status=RefundRequestStatus.DENIED
+    )
+
+    receipt = user_drf_client.get(
+        reverse("v0:order_receipt_api", kwargs={"pk": order.id})
+    ).json()
+
+    assert receipt["refund_status"] == "denied"
+    assert parse_datetime(receipt["refund_reviewed_on"]) == request.updated_on
