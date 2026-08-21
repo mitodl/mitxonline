@@ -358,6 +358,7 @@ class Command(BaseCommand):
         """
         limit = options.get("limit")
         batch_size = options.get("batch_size", 1000)
+        dry_run = options.get("dry_run")
 
         cur = conn.cursor()
 
@@ -389,6 +390,11 @@ class Command(BaseCommand):
                 ).values_list("email", flat=True)
             )
 
+            if dry_run:
+                new_emails = [email for email in emails if email not in existing_emails]
+                user_creation_count += len(new_emails)
+                continue
+
             created_users = self._bulk_create_users(rows, existing_emails, batch_size)
             user_creation_count += len(created_users)
 
@@ -401,6 +407,14 @@ class Command(BaseCommand):
             self._bulk_create_user_profiles(
                 created_users, id_row_lookup, batch_size, GENDER_MAP
             )
+
+        if dry_run:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"[DRY RUN] Would create {user_creation_count} users"
+                )
+            )
+            return
 
         self.stdout.write(self.style.SUCCESS(f"{user_creation_count} users created"))
 
