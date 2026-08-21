@@ -122,8 +122,13 @@ class Command(BaseCommand):
 
             patch = {}
             if have_split_name:
-                patch["first_name"] = given_name
-                patch["last_name"] = family_name
+                # client.save() PUTs this dict as raw JSON straight to
+                # Keycloak's admin REST API - it never goes through
+                # UserRepresentation, so these must be Keycloak's actual
+                # wire-format field names (firstName/lastName), not the
+                # pydantic model's snake_case attribute names.
+                patch["firstName"] = given_name
+                patch["lastName"] = family_name
             if full_name:
                 attributes = dict(keycloak_user.attributes or {})
                 attributes["fullName"] = [full_name]
