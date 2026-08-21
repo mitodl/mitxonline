@@ -15,15 +15,17 @@ from b2b.models import (
 )
 
 MAILGUN_LOGS_API_URL = "https://api.mailgun.net/v1/analytics/logs"
-MAILGUN_LOGS_PAGE_LIMIT = 300
+MAILGUN_LOGS_PAGE_LIMIT = 100
 MAILGUN_LOGS_DESC = "timestamp:desc"
-# Mailgun only retains log data for 30 days on paid plans, so there's no point asking further back than that.
+# Mailgun only retains log data for 30 days, so there's no point asking further back than that.
 MAILGUN_LOGS_RETENTION_DAYS = "30d"
 
 
 # Normalize the response to have fields expected from webhooks. At the moment, its just timestamp which is misnamed
 def _unpack_event_data_from_api_response(mailgun_log_response):
-    mailgun_log_response["timestamp"] = mailgun_log_response["@timestamp"]
+    mailgun_log_response["timestamp"] = datetime.fromisoformat(
+        mailgun_log_response["@timestamp"]
+    ).timestamp()
     return mailgun_log_response
 
 
@@ -36,13 +38,13 @@ class Command(BaseCommand):
         """Add arguments to the command."""
 
         parser.add_argument(
-            "record_ids",
+            "--record-ids",
             type=str,
             default="",
             help="Comma-separated list of IDs of the DiscountContractAttachmentRedemption records to send webhooks for.",
         )
         parser.add_argument(
-            "execute",
+            "--execute",
             action="store_true",
             default=False,
             help="When specified, persist the retrieved events to the database. Otherwise, just print them.",
@@ -116,7 +118,7 @@ class Command(BaseCommand):
 
         record_ids = [int(record_id) for record_id in kwargs["record_ids"].split(",")]
 
-        records = DiscountContractAttachmentRedemption.objects.filter(pk=record_ids)
+        records = DiscountContractAttachmentRedemption.objects.filter(pk__in=record_ids)
         filtered_records = []
         for record in records:
             if not record.email_message_id:
