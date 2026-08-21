@@ -47,6 +47,7 @@ from main.models import AuditableModel, AuditModel, ValidateOnSaveMixin
 from main.utils import serialize_model_object
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
+    EDX_ENROLLMENT_AUDIT_MODE,
     EDX_ENROLLMENT_VERIFIED_MODE,
     EDX_ENROLLMENTS_PAID_MODES,
 )
@@ -242,6 +243,13 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     def text_id(self):
         """Gets the readable_id"""
         return self.readable_id
+
+    @property
+    def has_free_audit(self):
+        """Whether this can still be taken for free once a paid enrollment ends."""
+        return self.enrollment_modes.filter(
+            mode_slug=EDX_ENROLLMENT_AUDIT_MODE
+        ).exists()
 
     @property
     def related_programs_qs(self):
@@ -1601,6 +1609,13 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
     def text_id(self):
         """Gets the courseware_id"""
         return self.courseware_id
+
+    @property
+    def has_free_audit(self):
+        """Whether this can still be taken for free once a paid enrollment ends."""
+        return self.enrollment_modes.filter(
+            mode_slug=EDX_ENROLLMENT_AUDIT_MODE
+        ).exists()
 
     @property
     def course_number(self):
