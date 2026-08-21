@@ -39,7 +39,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "1.162.3"
+VERSION = "1.162.8"
 
 log = logging.getLogger()
 
@@ -386,7 +386,6 @@ DEFAULT_DATABASE_CONFIG = dj_database_url.parse(
         default="sqlite:///{0}".format(os.path.join(BASE_DIR, "db.sqlite3")),  # noqa: PTH118, UP030
         description="The connection url to the Postgres database",
         required=True,
-        write_app_json=False,
     )
 )
 DEFAULT_DATABASE_CONFIG["CONN_MAX_AGE"] = get_int(
@@ -1561,11 +1560,11 @@ MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS = get_delimited_list(
     description="The list of hosts the app is allowed to redirect to",
 )
 
-OPENTELEMETRY_ENABLED = get_bool(
-    name="OPENTELEMETRY_ENABLED",
-    default=False,
-    description="Enable collection and shipment of opentelemetry data",
-)
+# Telemetry turns on when any of OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
+# OTEL_EXPORTER_OTLP_METRICS_ENDPOINT or OTEL_EXPORTER_OTLP_ENDPOINT is set in
+# the environment, or the OPENTELEMETRY_ENDPOINT setting below is. Per signal
+# the environment is read most-specific-first, and the setting applies only
+# when the environment supplies nothing. There is no flag to disable it.
 OPENTELEMETRY_SERVICE_NAME = get_string(
     name="OPENTELEMETRY_SERVICE_NAME",
     default="mitxonline",
@@ -1581,8 +1580,10 @@ OPENTELEMETRY_ENDPOINT = get_string(
     default=None,
     description="Endpoint for opentelemetry",
 )
-OPENTELEMETRY_TRACES_BATCH_SIZE = get_int(
-    name="OPENTELEMETRY_TRACES_BATCH_SIZE",
+# Name must match what mitol.observability.telemetry looks up, or the default
+# silently applies instead.
+OPENTELEMETRY_BATCH_SIZE = get_int(
+    name="OPENTELEMETRY_BATCH_SIZE",
     default=512,
     description="Batch size for traces",
 )

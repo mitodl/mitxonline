@@ -1,6 +1,49 @@
 Release Notes
 =============
 
+Version 1.162.8 (Released August 19, 2026)
+---------------
+
+- Regen datamodel with pydantic classes (#3854)
+- Fix certificate generation for nested programs to check the required program (#3858)
+- Add enroll_learners management command for bulk csv enrollment (#3853)
+
+Version 1.162.7 (Released August 18, 2026)
+---------------
+
+- fix: reject enrollments in course runs whose enrollment window has closed (#3846)
+- Fix: Handle expired OpenEdX refresh tokens gracefully (#3835)
+- Regen dataclass for Keycloak (#3852)
+- fix issues with orders api (#3823)
+
+Version 1.162.6 (Released August 17, 2026)
+---------------
+
+- Recurse into the program if the program doesn't have a verified mode when generating certificates (#3848)
+- Add postal_code and state to missing fields in the user api (#3850)
+- Skip HubSpot deal sync for program-enrolled courses (#3844)
+- Backfill verified enrollments when verified program (#3838)
+
+Version 1.162.5 (Released August 13, 2026)
+---------------
+
+- Backfill missing LegalAddress/UserProfile for migrated users; guard should_skip_onboarding (#3845)
+- refactor: pass the Learn Fastly service ID at the call sites (#3804)
+
+Version 1.162.4 (Released August 12, 2026)
+---------------
+
+- Add failed filter to /codes (#3827)
+- Support program-specific pathway schools in learner record sharing (#3802)
+- Fix duplicate ECOMMERCE_DEFAULT_PAYMENT_GATEWAY env var declaration (#3832)
+- Add learner refund request workflow (#3810)
+- Learner record serializer tests (#3819)
+- Update dependency webpack-dev-server to v5.2.5 [SECURITY] (#3764)
+- Update dependency wagtail to v7.3.3 [SECURITY] (#3763)
+- Remove unused fetch_enrollment helper (#3820)
+- Adding missing profile fields to profile api (#3818)
+- Add CyberSource export compliance data model (#3793)
+
 Version 1.162.3 (Released August 11, 2026)
 ---------------
 

@@ -482,9 +482,7 @@ def clear_basket(request):
 
 
 @extend_schema(
-    description=(
-        "Returns the payload necessary to redirect the user to CyberSource for payment."
-    ),
+    description=("Returns the payload necessary to start the payment process."),
     methods=["GET"],
     responses=CheckoutPayloadSerializer,
 )
@@ -495,10 +493,7 @@ def checkout_basket(request):
     Generate the data for checkout and return it.
 
     This gathers and converts the data in the current user's Basket, makes it
-    into an Order, and returns the form data needed to start the checkout process
-    in CyberSource. The frontend app then needs to pull the data into a form and
-    POST it to the appropriate URL to send the user over to CyberSource so we can
-    collect payment.
+    into an Order, and returns the data to start the checkout process.
     """
 
     try:
@@ -509,7 +504,7 @@ def checkout_basket(request):
 
         return Response(CheckoutPayloadSerializer(payload).data, status=req_status)
     except ObjectDoesNotExist:
-        return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
+        return Response("No basket", status=status.HTTP_400_BAD_REQUEST)
 
 
 class ProductsPagination(LimitOffsetPagination):
@@ -923,6 +918,18 @@ class UserDiscountViewSet(ModelViewSet):
     pagination_class = LimitOffsetPagination
 
 
+class OrderHistoryPagination(LimitOffsetPagination):
+    """
+    Sets a default limit for the order history API.
+
+    Without a default, DRF skips pagination when the caller omits `limit` and
+    returns a bare list instead of the `{count, next, previous, results}` envelope
+    the generated spec declares.
+    """
+
+    default_limit = 20
+
+
 @extend_schema_view(
     list=extend_schema(
         description=("Retrives the current user's order history."),
@@ -939,7 +946,7 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
     """Viewset to retrieve a user's order history."""
 
     serializer_class = OrderHistorySerializer
-    pagination_class = LimitOffsetPagination
+    pagination_class = OrderHistoryPagination
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):

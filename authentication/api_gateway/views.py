@@ -29,6 +29,7 @@ from main.constants import (
     USER_MSG_TYPE_PROFILE_CREATED,
 )
 from main.utils import encode_json_cookie_value, is_success_response
+from users.models import UserProfile
 
 User = get_user_model()
 
@@ -135,7 +136,7 @@ class GatewayLoginView(View):
             params = urlencode({"next": redirect_url})
             redirect_url = f"{settings.MITXONLINE_NEW_USER_LOGIN_URL}?{params}"
 
-            profile = user.user_profile
+            profile, _ = UserProfile.objects.get_or_create(user=user)
             profile.completed_onboarding = True
             profile.save()
         return redirect(redirect_url)

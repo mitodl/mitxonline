@@ -934,7 +934,7 @@ def test_b2b_reconcile_keycloak_orgs(mocker, update_an_org):
         existing_org = factories.OrganizationPageFactory.create()
         org_model.orgs.append(
             factories.OrganizationRepresentationFactory(
-                id=existing_org.sso_organization_id,
+                id=str(existing_org.sso_organization_id),
                 name="We changed the name",
                 alias="changedKey",
                 description="A new description",

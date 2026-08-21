@@ -13,6 +13,7 @@ from django.test import Client, RequestFactory
 from django.urls import reverse
 from mitol.common.utils.datetime import now_in_utc
 from mitol.payment_gateway.api import PaymentGateway
+from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
 from rest_framework import status
 from rest_framework.test import APIClient
 from reversion.models import Version
@@ -1405,7 +1406,9 @@ def test_paid_and_unpaid_courserun_checkout(
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     product = products[0]
     basket = create_basket_with_product(user, product)
-    order = PendingOrder.create_from_basket(basket)
+    order = PendingOrder.create_from_basket(
+        basket, gateway_type=MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+    )
     order_flow = order.get_object_flow()
     order_flow.fulfill({"result": "Payment succeeded", "transaction_id": "12345"})
 
@@ -1761,7 +1764,9 @@ def test_checkout_interstitial_google_analytics_object(
 
     product = products[0]
     basket = create_basket_with_product(user, product)
-    PendingOrder.create_from_basket(basket)
+    PendingOrder.create_from_basket(
+        basket, gateway_type=MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+    )
     resp = user_client.get(reverse("checkout_interstitial_page"))
     assert resp.status_code == 200
 
@@ -1789,7 +1794,9 @@ def test_checkout_interstitial_no_ga_flag_without_global_id(
     mock_is_enabled = mocker.patch("ecommerce.views.legacy.is_posthog_enabled")
 
     basket = create_basket_with_product(user_no_global_id, products[0])
-    PendingOrder.create_from_basket(basket)
+    PendingOrder.create_from_basket(
+        basket, gateway_type=MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+    )
     resp = user_client.get(reverse("checkout_interstitial_page"))
 
     assert resp.status_code == 200

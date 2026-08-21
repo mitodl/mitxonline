@@ -121,8 +121,10 @@ class TransactionLineSerializer(serializers.Serializer):
             content_type=content_type,
             readable_id=readable_id,
             price=str(instance.product.price),
-            start_date=content_object.start_date,
-            end_date=content_object.end_date,
+            # `purchasable_object` is a generic FK and dangles if the courseware
+            # object was deleted; the receipt still has to serialize.
+            start_date=content_object.start_date if content_object else None,
+            end_date=content_object.end_date if content_object else None,
         )
 
         return line  # noqa: RET504
@@ -636,7 +638,7 @@ class OrderSerializer(serializers.ModelSerializer):
             return street_address
         return None
 
-    @extend_schema_field(ExtendedLegalAddressSerializer(many=True))
+    @extend_schema_field(ExtendedLegalAddressSerializer)
     def get_purchaser(self, instance):
         """Get the purchaser infrmation"""
         return ExtendedLegalAddressSerializer(instance.purchaser.legal_address).data
@@ -994,13 +996,13 @@ class CheckoutPayloadSerializer(serializers.Serializer):
         read_only=True,
         required=False,
         default="",
-        help_text="The URL to POST the form to.",
+        help_text="The URL to POST the form to, or to redirect the user to.",
     )
     method = serializers.CharField(
         read_only=True,
         required=False,
         default="POST",
-        help_text="The method to use for the checkout form (always POST).",
+        help_text="The method to use for the data - POST for form data, GET for redirect.",
     )
     payload = serializers.JSONField(
         read_only=True, required=False, default={}, help_text="The data for the form."

@@ -172,3 +172,20 @@ GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/{course_run_id}/enrollments/ the response's body `type` changed from `array<object>` to `object` for status `200`
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/ the response property `total_codes` became nullable for the status `200`
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/ the response property `unassigned_codes` became nullable for the status `200`
+
+# Spec correction: `purchaser` was annotated `many=True` but the serializer method
+# has always returned a single object, so the schema was wrong rather than the API.
+# Response bodies are unchanged.
+#
+# oasdiff reports the new type as `any`. That is how it renders a `$ref` that
+# carries a sibling `readOnly`, which JSON Schema requires be wrapped in `allOf`.
+# The property is not untyped: this spec already uses the same shape for 35 other
+# read-only nested fields (CourseRunEnrollment.certificate, .run, .enrollment_mode,
+# CoursePage.page, ...) and the generated clients type every one of them correctly.
+# `purchaser` generates as `ExtendedLegalAddress`.
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ the 'results/items/redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '200'
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ the 'redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '200'
+GET /api/v0/orders/receipt/{id}/ the 'purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '200'
+PATCH /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ the 'redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '200'
+POST /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ the 'redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '201'
+PUT /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ the 'redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '200'

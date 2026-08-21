@@ -47,6 +47,7 @@ from courses.models import (
     Program,
     ProgramEnrollment,
 )
+from courses.serializers.v1.base import EnrollmentModeSerializer
 from courses.serializers.v1.courses import (
     CourseRunEnrollmentSerializer,
     CourseRunSerializer,
@@ -555,6 +556,22 @@ def test_user_enrollments_create_b2b_run_invalid(user_drf_client, user):
     assert resp.json() == {"errors": {"run_id": f"Invalid course run id: {run.id}"}}
 
 
+def test_user_enrollments_create_closed_run_invalid(user_drf_client, user):
+    """Creating an enrollment for a run outside its enrollment window should be rejected."""
+    course = CourseFactory.create()
+    run = CourseRunFactory.create(course=course, past_enrollment_end=True)
+
+    resp = user_drf_client.post(
+        reverse("v1:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "errors": {"run_id": f"Course run is not open for enrollment: {run.id}"}
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
 @pytest.mark.parametrize(
     "deactivate_fail, exp_success, exp_status_code",  # noqa: PT006
     [
@@ -836,7 +853,9 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                 "title": program_enrollment.program.title,
                 "live": program_enrollment.program.live,
                 "departments": [],
-                "enrollment_modes": [],
+                "enrollment_modes": EnrollmentModeSerializer(
+                    program_enrollment.program.enrollment_modes, many=True
+                ).data,
                 "readable_id": program_enrollment.program.readable_id,
                 "req_tree": list(
                     ProgramRequirementTreeSerializer(

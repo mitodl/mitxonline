@@ -16,6 +16,7 @@ from compliance.api import (
     decrypt_export_compliance_log,
     get_cybersource_client,
     get_latest_export_compliance_log,
+    get_missing_export_compliance_fields,
     log_export_compliance_check,
     verify_user_with_exports,
 )
@@ -104,6 +105,53 @@ def test_build_export_payload_requires_legal_address(export_settings):
         "last_name",
         "locality",
     ]
+
+
+def test_build_export_payload_does_not_require_state_and_postal_code_outside_us_ca(
+    export_settings,
+):
+    """CyberSource itself only requires state/postal code for US and CA addresses."""
+    user = UserFactory.create(name="Ada Lovelace", email="ada@example.com")
+    user.legal_address.country = "FR"
+    user.legal_address.street_address_1 = "5 Rue de Rivoli"
+    user.legal_address.city = "Paris"
+    user.legal_address.state = ""
+    user.legal_address.postal_code = ""
+    user.legal_address.save()
+
+    payload = _build_export_payload(user)
+
+    assert payload.order_information.bill_to.country == "FR"
+
+
+def test_get_missing_export_compliance_fields_always_flags_state_and_postal_code():
+    """
+    The profile-facing missing fields list should flag state/postal code
+    whenever they're empty, even for countries where CyberSource doesn't
+    require them.
+    """
+    user = UserFactory.create(name="Ada Lovelace", email="ada@example.com")
+    user.legal_address.country = "FR"
+    user.legal_address.street_address_1 = "5 Rue de Rivoli"
+    user.legal_address.city = "Paris"
+    user.legal_address.state = ""
+    user.legal_address.postal_code = ""
+    user.legal_address.save()
+
+    assert get_missing_export_compliance_fields(user) == ["postal_code", "state"]
+
+
+def test_get_missing_export_compliance_fields_us_address():
+    """State/postal code should still be flagged as missing for US addresses."""
+    user = UserFactory.create(name="Ada Lovelace", email="ada@example.com")
+    user.legal_address.country = "US"
+    user.legal_address.street_address_1 = "77 Massachusetts Ave"
+    user.legal_address.city = "Cambridge"
+    user.legal_address.state = ""
+    user.legal_address.postal_code = ""
+    user.legal_address.save()
+
+    assert get_missing_export_compliance_fields(user) == ["postal_code", "state"]
 
 
 def test_normalize_administrative_area_strips_country_prefix():
