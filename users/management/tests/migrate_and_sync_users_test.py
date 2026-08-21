@@ -148,6 +148,20 @@ def test_get_candidates_applies_limit_in_sql():
 
 
 @pytest.mark.django_db
+def test_get_candidates_includes_null_global_id():
+    """global_id defaults to None (its actual DB default), not "" - a user
+    with global_id=None and a real scim_external_id (an inconsistent state,
+    but not one this query should silently miss) must still be a candidate.
+    Only checking global_id="" would drop them.
+    """
+    user = UserFactory.create(global_id=None, scim_external_id="kc-external-id")
+
+    candidates = migrate_and_sync_users.Command()._get_candidates(limit=None)  # noqa: SLF001
+
+    assert user in candidates
+
+
+@pytest.mark.django_db
 def test_dry_run_classifies_without_syncing(mocker, tmp_path):
     """Dry run reports classification tiers and never calls the sync API"""
     mock_sync = mocker.patch(
@@ -287,6 +301,34 @@ def test_verifies_matching_response_body(mocker, tmp_path):
 
     assert [row["user_id"] for row in report["verified"]] == [user.id]
     assert report["mismatched"] == []
+
+
+@pytest.mark.django_db
+def test_matched_via_search_is_reported_as_unverified_not_verified(mocker, tmp_path):
+    """A user matched to an existing Keycloak user via search (response_body
+    is None - nothing was created, so nothing was echoed back) must not be
+    counted as verified - nothing was actually checked against their current
+    Keycloak name, which could be stale or blank.
+    """
+    user = UserFactory.create(name="Joe Smith", global_id=None)
+    user.legal_address.first_name = "Joe"
+    user.legal_address.last_name = "Smith"
+    user.legal_address.save()
+
+    mocker.patch(
+        "users.management.commands.migrate_and_sync_users.scim_api.sync_users_to_scim_remote",
+        return_value=[_state(user, response_body=None)],
+    )
+
+    report = _run(
+        tmp_path, dry_run=False, skip_edx_migration=False, force=False, limit=None
+    )
+
+    assert report["verified"] == []
+    assert report["mismatched"] == []
+    matched_row = report["matched_unverified"][0]
+    assert matched_row["user_id"] == user.id
+    assert matched_row["outcome"] == "matched_not_verified"
 
 
 @pytest.mark.django_db

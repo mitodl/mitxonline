@@ -109,13 +109,14 @@ class Command(BaseCommand):
                     "blocked": [self._report_row(row) for row in blocked],
                     "verified": [],
                     "mismatched": [],
+                    "matched_unverified": [],
                 },
                 report_path,
             )
             return
 
         self.stdout.write(f"Stage 3: syncing {len(to_sync)} users to Keycloak...")
-        verified, mismatched = [], []
+        verified, mismatched, matched_unverified = [], [], []
         for start in range(0, len(to_sync), batch_size):
             batch = to_sync[start : start + batch_size]
             # sync_users_to_scim_remote is a generator - it does nothing
@@ -146,13 +147,17 @@ class Command(BaseCommand):
                     blocked.append(row)
                     continue
 
-                row["outcome"] = "synced"
                 if state.response_body is None:
                     # matched an existing remote user via search, not a fresh
-                    # create - nothing to verify against, since nothing new
-                    # was sent
-                    verified.append(row)
+                    # create - nothing was sent, so there's nothing to check
+                    # the current Keycloak name against. Report this
+                    # distinctly from a real verification, rather than
+                    # counting an unchecked name as confirmed-correct.
+                    row["outcome"] = "matched_not_verified"
+                    matched_unverified.append(row)
                     continue
+
+                row["outcome"] = "synced"
 
                 sent_name = row["given_name"], row["family_name"]
                 # Keycloak may omit "name" entirely, or echo it back as an
@@ -183,12 +188,16 @@ class Command(BaseCommand):
             self.style.SUCCESS(
                 f"  {len(verified)} synced and verified, "
                 f"{len(blocked)} blocked/failed, "
-                f"{len(mismatched)} verified-but-mismatched"
+                f"{len(mismatched)} verified-but-mismatched, "
+                f"{len(matched_unverified)} matched but not verified"
             )
         )
         self._write_report(
             {
                 "verified": [self._report_row(row) for row in verified],
+                "matched_unverified": [
+                    self._report_row(row) for row in matched_unverified
+                ],
                 "blocked": [self._report_row(row) for row in blocked],
                 "mismatched": [self._report_row(row) for row in mismatched],
             },
@@ -243,7 +252,11 @@ class Command(BaseCommand):
         """
         queryset = (
             User.objects.filter(is_active=True)
-            .filter(Q(global_id="") | Q(scim_external_id=None))
+            .filter(
+                Q(global_id="")
+                | Q(global_id__isnull=True)
+                | Q(scim_external_id=None)
+            )
             .select_related("legal_address", "user_profile")
             .prefetch_related("openedx_users")
             .order_by("id")
