@@ -17,14 +17,21 @@ class LearnUserAdapter(UserAdapter):
     django_scim library.
     """
 
+    # name.givenName/familyName are deliberately absent here. django_scim's
+    # handle_replace() resolves a PATCH path through this map with a plain
+    # setattr(self.obj, ATTR_MAP[path], value) - it never walks a "__"
+    # double-underscore path into a related object, so a mapping to
+    # "legal_address__first_name" would silently set a bogus flat attribute
+    # of that literal name on the user instead of touching
+    # legal_address.first_name, and never raise. from_dict() (used for a
+    # full create/replace) already handles name.givenName/familyName
+    # correctly by writing to self.legal_address directly - a PATCH-by-path
+    # replace of just the name is not supported and correctly falls through
+    # to handle_replace's NotImplementedError instead.
     ATTR_MAP = {
         ("active", None, None): "is_active",
         ("userName", None, None): "username",
         ("fullName", None, None): "name",
-        ("name", "givenName", None): "legal_address__first_name",
-        ("givenName", None, None): "legal_address__first_name",
-        ("name", "familyName", None): "legal_address__last_name",
-        ("familyName", None, None): "legal_address__last_name",
     }
 
     obj: "User"

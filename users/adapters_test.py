@@ -14,6 +14,22 @@ def _adapter(user):
     return LearnUserAdapter(user, InMemoryHttpRequest.stub())
 
 
+def test_attr_map_has_no_orm_style_double_underscore_paths():
+    """ATTR_MAP values are consumed via a plain setattr() by both
+    django_scim's (django_scim.adapters.SCIMUser.handle_replace) and mitol's
+    (mitol.scim.adapters.UserAdapter._handle_resplace_nested_path) PATCH
+    add/replace dispatch - neither walks a "__" double-underscore path into
+    a related object. A mapped value containing "__" (e.g. the
+    "legal_address__first_name" this PR removed) would silently set a
+    bogus flat attribute of that literal name on the user instead of
+    updating legal_address.first_name, and never raise - a real SCIM PATCH
+    to name.givenName would corrupt nothing visibly while doing nothing
+    useful either.
+    """
+    for target in LearnUserAdapter.ATTR_MAP.values():
+        assert "__" not in target
+
+
 def test_learn_user_adapter_to_dict_uses_legal_address_name():
     """to_dict() should use legal_address first/last name when both are set"""
     user = UserFactory.create(name="Joe Smith")
