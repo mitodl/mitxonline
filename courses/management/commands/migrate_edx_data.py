@@ -255,6 +255,7 @@ class Command(BaseCommand):
         Create users in bulk, skipping those with existing emails.
         """
         new_users = []
+        new_emails = []
         for row in rows:
             email = row.get("user_email")
             if not email or email in existing_emails:
@@ -269,9 +270,25 @@ class Command(BaseCommand):
             )
             user.set_unusable_password()
             new_users.append(user)
-        return User.objects.bulk_create(
+            new_emails.append(email)
+
+        User.objects.bulk_create(
             new_users, batch_size=batch_size, ignore_conflicts=True
         )
+
+        if not new_emails:
+            return []
+
+        # bulk_create never populates .pk on the returned objects when
+        # ignore_conflicts=True is used - on any database backend, per
+        # Django's own documented behavior, since it can't reliably map a
+        # generated id back to a specific input object once some rows may
+        # have been silently skipped on conflict. Re-fetch by email (unique
+        # per users_user_email_unique) to get real ids for
+        # _bulk_create_legal_addresses/_bulk_create_user_profiles to key off
+        # of - without this, those two methods filter on ids that are all
+        # None, match zero rows, and silently never create anything.
+        return list(User.objects.filter(email__in=new_emails))
 
     @staticmethod
     def _bulk_create_legal_addresses(created_users, row_lookup_by_id, batch_size):
