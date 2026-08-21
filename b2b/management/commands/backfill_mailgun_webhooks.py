@@ -10,13 +10,21 @@ from mitol.common.utils import now_in_utc
 
 from b2b.api import is_later_event, is_trackable_event_type
 from b2b.models import (
+    MAILGUN_EMAIL_EVENT_TYPES,
     DiscountContractAttachmentRedemption,
 )
 
 MAILGUN_LOGS_API_URL = "https://api.mailgun.net/v1/analytics/logs"
 MAILGUN_LOGS_PAGE_LIMIT = 300
+MAILGUN_LOGS_DESC = "timestamp:desc"
 # Mailgun only retains log data for 30 days on paid plans, so there's no point asking further back than that.
-MAILGUN_LOGS_RETENTION_DAYS = 30
+MAILGUN_LOGS_RETENTION_DAYS = "30d"
+
+
+# Normalize the response to have fields expected from webhooks. At the moment, its just timestamp which is misnamed
+def _unpack_event_data_from_api_response(mailgun_log_response):
+    mailgun_log_response["timestamp"] = mailgun_log_response["@timestamp"]
+    return mailgun_log_response
 
 
 class Command(BaseCommand):
@@ -40,18 +48,24 @@ class Command(BaseCommand):
             help="When specified, persist the retrieved events to the database. Otherwise, just print them.",
         )
 
-    def get_latest_event_for_message_ids(self, message_ids):
-        pass
+    def get_events_for_message_ids(self, message_ids):
+        events_by_message_id = {}
+        for message_id in message_ids:
+            events_by_message_id[message_id] = [
+                _unpack_event_data_from_api_response(event)
+                for event in self.fetch_logs_for_message(message_id)
+            ]
+        return events_by_message_id
 
     def fetch_logs_for_message(self, message_id):
         """Page through POST /v1/analytics/logs for a single message_id."""
         items = []
-        pagination = {"sort": "timestamp:asc", "limit": 100}
+        pagination = {"sort": MAILGUN_LOGS_DESC, "limit": MAILGUN_LOGS_PAGE_LIMIT}
 
         while True:
             body = {
                 "end": email.utils.format_datetime(now_in_utc()),
-                "duration": "30d",
+                "duration": MAILGUN_LOGS_RETENTION_DAYS,
                 "filter": {
                     "AND": [
                         {
@@ -61,6 +75,7 @@ class Command(BaseCommand):
                         }
                     ]
                 },
+                "events": MAILGUN_EMAIL_EVENT_TYPES,
                 "include_subaccounts": True,
                 "pagination": pagination,
             }
@@ -82,7 +97,11 @@ class Command(BaseCommand):
             if not next_token or not page_items:
                 break
 
-            pagination = {"sort": "timestamp:asc", "limit": 100, "token": next_token}
+            pagination = {
+                "sort": MAILGUN_LOGS_DESC,
+                "limit": MAILGUN_LOGS_PAGE_LIMIT,
+                "token": next_token,
+            }
 
         return items
 
@@ -111,28 +130,29 @@ class Command(BaseCommand):
             filtered_record.email_message_id: filtered_record
             for filtered_record in filtered_records
         }
-        latest_events_by_message_id = self.get_latest_event_for_message_ids(
+        latest_events_by_message_id = self.get_events_for_message_ids(
             list(message_id_to_filtered_record.keys())
         )
         # Technically we aren't getting events back, we're getting logs.
         # We'll have to munge it into a format consistent w/ the webhooks
         for message_id, record in message_id_to_filtered_record.items():
-            event = latest_events_by_message_id.get(message_id)
-            if not event:
+            events = latest_events_by_message_id.get(message_id)
+            if not events:
                 self.stdout.write(f"Skipping record {record}, no event found.")
                 continue
-
-            if self.should_persist_event(record, event):
-                if kwargs["execute"]:
-                    self.stdout.write(
-                        f"Persisting event status {event['event']} to record {record}."
-                    )
-                    record.email_status = event["event"]
-                    record.email_status_event_timestamp = datetime.fromtimestamp(
-                        event["timestamp"], tz=UTC
-                    )
-                    record.save()
-                else:
-                    self.stdout.write(
-                        f"DRY RUN - Found event status {event['event']} to record {record}."
-                    )
+            for event in events:
+                if self.should_persist_event(record, event):
+                    if kwargs["execute"]:
+                        self.stdout.write(
+                            f"Persisting event status {event['event']} to record {record}."
+                        )
+                        record.email_status = event["event"]
+                        record.email_status_event_timestamp = datetime.fromtimestamp(
+                            event["timestamp"], tz=UTC
+                        )
+                        record.save()
+                    else:
+                        self.stdout.write(
+                            f"DRY RUN - Found event status {event['event']} to record {record}."
+                        )
+                    break
