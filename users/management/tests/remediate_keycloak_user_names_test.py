@@ -101,8 +101,8 @@ def test_apply_patches_and_verifies(mocker):
     client.save.assert_called_once_with(
         "users/kc-1",
         {
-            "firstName": "Joe",
-            "lastName": "Smith",
+            "first_name": "Joe",
+            "last_name": "Smith",
             "attributes": {"fullName": ["Joe Smith"]},
         },
     )
@@ -213,8 +213,8 @@ def test_patch_preserves_other_keycloak_attributes(mocker):
     client.save.assert_called_once_with(
         "users/kc-1",
         {
-            "firstName": "Joe",
-            "lastName": "Smith",
+            "first_name": "Joe",
+            "last_name": "Smith",
             "attributes": {"someOtherAttr": ["keep-me"], "fullName": ["Joe Smith"]},
         },
     )
