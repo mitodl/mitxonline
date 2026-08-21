@@ -99,8 +99,8 @@ class Command(BaseCommand):
 
             current_full_name = _keycloak_full_name(keycloak_user)
             names_match = not have_split_name or (
-                (keycloak_user.firstName or "") == given_name
-                and (keycloak_user.lastName or "") == family_name
+                (keycloak_user.first_name or "") == given_name
+                and (keycloak_user.last_name or "") == family_name
             )
             full_name_matches = not full_name or current_full_name == full_name
 
@@ -133,8 +133,8 @@ class Command(BaseCommand):
             # verify - don't just trust a 2xx
             refetched = client.retrieve(f"users/{keycloak_user.id}", UserRepresentation)
             names_verified = not have_split_name or (
-                (refetched.firstName or "") == given_name
-                and (refetched.lastName or "") == family_name
+                (refetched.first_name or "") == given_name
+                and (refetched.last_name or "") == family_name
             )
             full_name_verified = (
                 not full_name or _keycloak_full_name(refetched) == full_name
@@ -200,8 +200,8 @@ class Command(BaseCommand):
             "keycloak_id": keycloak_user.id,
             "user_id": user.id,
             "email": user.email,
-            "keycloak_first_name": keycloak_user.firstName,
-            "keycloak_last_name": keycloak_user.lastName,
+            "keycloak_first_name": keycloak_user.first_name,
+            "keycloak_last_name": keycloak_user.last_name,
             "keycloak_full_name": _keycloak_full_name(keycloak_user) or None,
             "resolved_given_name": given_name,
             "resolved_family_name": family_name,
