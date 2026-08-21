@@ -30,6 +30,7 @@ from courses.factories import (
 )
 from ecommerce.api import (
     ANONYMOUS_BASKET_SESSION_KEY,
+    _retrieve_pending_cybersource_orders,
     apply_discount_to_basket,
     check_and_process_pending_orders_for_resolution,
     check_for_duplicate_discount_redemptions,
@@ -53,6 +54,19 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
     STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED,
+    STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
+    STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
+    STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+    STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+    STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
+    STRIPE_PAYMENT_INTENT_STATUS_CANCELLED,
+    STRIPE_PAYMENT_INTENT_STATUS_PROCESSING,
+    STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_ACTION,
+    STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_CAPTURE,
+    STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_CONFIRMATION,
+    STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_PAYMENT_METHOD,
+    STRIPE_PAYMENT_INTENT_STATUS_SUCCEEDED,
+    STRIPE_PAYMENT_STATUS_NPR,
     STRIPE_PAYMENT_STATUS_PAID,
     STRIPE_PAYMENT_STATUS_UNPAID,
     TRANSACTION_TYPE_PAYMENT,
@@ -71,7 +85,11 @@ from ecommerce.factories import (
     TransactionFactory,
     UnlimitedUseDiscountFactory,
 )
-from ecommerce.fixtures import stripe_checkout_session, stripe_event
+from ecommerce.fixtures import (
+    stripe_checkout_session,
+    stripe_event,
+    stripe_payment_intent,
+)
 from ecommerce.models import (
     Basket,
     BasketDiscount,
@@ -694,7 +712,9 @@ def test_check_and_process_pending_orders_for_resolution(mocker, test_type):
         return_value=retval,
     )
 
-    (fulfilled, cancelled, errored) = check_and_process_pending_orders_for_resolution()
+    (fulfilled, cancelled, errored) = check_and_process_pending_orders_for_resolution(
+        []
+    )
 
     if test_type == "empty":
         assert not mocked_gateway_func.called
@@ -707,6 +727,36 @@ def test_check_and_process_pending_orders_for_resolution(mocker, test_type):
         order.refresh_from_db()
         assert order.state == OrderStatus.FULFILLED
         assert (fulfilled, cancelled, errored) == (1, 0, 0)
+
+
+def test_check_and_process_pending_orders_options(mocker):
+    """
+    Test that the flags for no-check and no-fulfill do what we expect.
+
+    If we set check=False, we shouldn't check the status of the request with
+    the payment processor. If skip_fulfillment=True, we shouldn't try to fulfill
+    the order. These don't depend on each other so they're being tested together.
+    """
+
+    order = OrderFactory.create(state=OrderStatus.PENDING)
+    mocked_gateway_func = mocker.patch(
+        "mitol.payment_gateway.api.CyberSourcePaymentGateway.find_and_get_transactions"
+    )
+    mocked_create_enrollments = mocker.patch(
+        "ecommerce.models.OrderFlow.create_enrollments", return_value=True
+    )
+
+    (fulfilled, cancelled, errored) = check_and_process_pending_orders_for_resolution(
+        [],
+        check_status=False,
+        skip_fulfillment=True,
+    )
+
+    order.refresh_from_db()
+    assert order.state == OrderStatus.FULFILLED
+    assert (fulfilled, cancelled, errored) == (1, 0, 0)
+    mocked_gateway_func.assert_not_called()
+    mocked_create_enrollments.assert_not_called()
 
 
 @pytest.mark.parametrize("peruser", [True, False])
@@ -1501,17 +1551,171 @@ def _configure_checkout_session_object(
     return event
 
 
+class MockedCheckoutSessionClient:
+    """Mocked Stripe CheckoutSession client"""
+
+    session_status = ""
+    payment_status = ""
+    payment_intent_status = ""
+    cancel_reason = ""
+    reference_number = ""
+
+    def __init__(
+        self,
+        session_status,
+        payment_status,
+        payment_intent_status,
+        cancel_reason,
+        ref_no,
+    ):
+        """Set up the session with the noted statuses."""
+
+        self.session_status = session_status
+        self.payment_status = payment_status
+        self.reference_number = ref_no
+        # These get ignored later on if expand doesn't get set.
+        self.payment_intent_status = payment_intent_status
+        self.cancel_reason = cancel_reason
+
+    def retrieve(self, session_id, options=None):
+        """Retrieve the (fake) checkout session."""
+
+        session = stripe_checkout_session()
+        session.id = session_id
+        session.status = self.session_status
+        session.payment_status = self.payment_status
+        session.client_reference_id = self.reference_number
+
+        if (
+            isinstance(options, dict)
+            and "expand" in options
+            and "payment_intent" in options["expand"]
+            and len(self.payment_intent_status) > 0
+        ):
+            session.payment_intent = stripe_payment_intent()
+            session.payment_intent.status = self.payment_intent_status
+            if self.cancel_reason:
+                session.payment_intent.cancellation_reason = self.cancel_reason
+
+        return session
+
+
 @pytest.mark.parametrize(
-    "was_successful",
+    (
+        "cs_status",
+        "cs_payment_status",
+        "pi_status",
+        "pi_cancel_reason",
+        "expected_status",
+    ),
     [
-        True,
-        False,
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            "",
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_PAID,
+            "",
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_NPR,
+            "",
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            "",
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            STRIPE_PAYMENT_INTENT_STATUS_PROCESSING,
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            STRIPE_PAYMENT_INTENT_STATUS_PROCESSING,
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            STRIPE_PAYMENT_INTENT_STATUS_SUCCEEDED,
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_PAID,
+            STRIPE_PAYMENT_INTENT_STATUS_SUCCEEDED,
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            STRIPE_PAYMENT_INTENT_STATUS_CANCELLED,
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_ACTION,
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_CAPTURE,
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_CONFIRMATION,
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_PAYMENT_METHOD,
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
+        ),
     ],
 )
-def test_process_stripe_checkout_completed(
-    bootstrapped_verified_program, was_successful
+def test_process_stripe_checkout_completed(  # noqa: PLR0913
+    mocker,
+    bootstrapped_verified_program,
+    cs_status,
+    cs_payment_status,
+    pi_status,
+    pi_cancel_reason,
+    expected_status,
 ):
-    """Test that the checkout processing works."""
+    """
+    Test that the checkout processing works.
+
+    As a side effect, this also tests process_stripe_checkout_session_status.
+    """
 
     *_, cr_product = bootstrapped_verified_program
 
@@ -1521,22 +1725,44 @@ def test_process_stripe_checkout_completed(
         order__gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
     )
 
-    event = _configure_checkout_session_object(
-        order_line, was_successful=was_successful
+    mocked_cs_client = mocker.patch(
+        "ecommerce.api._get_stripe_checkout_session_v1",
+        side_effect=lambda: MockedCheckoutSessionClient(
+            cs_status,
+            cs_payment_status,
+            pi_status,
+            pi_cancel_reason,
+            order_line.order.reference_number,
+        ),
     )
+
+    event = _configure_checkout_session_object(order_line)
 
     updated_order = process_stripe_checkout_completed(event)
 
+    mocked_cs_client.assert_called()
     assert updated_order
     assert updated_order.id == order_line.order.id
-    if was_successful:
+    if expected_status in [
+        STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+        STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
+    ]:
+        assert updated_order.state == OrderStatus.PENDING
+    elif expected_status == STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
         assert updated_order.state == OrderStatus.FULFILLED
+    elif expected_status == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED:
+        assert updated_order.state == OrderStatus.CANCELED
     else:
         assert updated_order.state == OrderStatus.ERRORED
 
 
 def test_process_stripe_checkout_expired(bootstrapped_verified_program):
-    """Test that expiry works as expected."""
+    """
+    Test that expiry works as expected.
+
+    This works a bit differenty than the completed webhook; a hit here signifies
+    that the order is effectively cancelled so we can do less processing.
+    """
 
     *_, cr_product = bootstrapped_verified_program
 
@@ -1553,3 +1779,36 @@ def test_process_stripe_checkout_expired(bootstrapped_verified_program):
     assert updated_order
     assert updated_order.id == order_line.order.id
     assert updated_order.state == OrderStatus.CANCELED
+
+
+@pytest.mark.parametrize("test_type", ["empty", "completed", "cancelled"])
+def test_retrieve_pending_cs_orders(mocker, test_type):
+    """Test that pending CyberSource order get pulled successfully."""
+
+    if test_type == "empty":
+        order = []
+        return_value = {}
+    else:
+        order = [OrderFactory.create(state=OrderStatus.PENDING)]
+        return_value = {
+            order[0].reference_number: {
+                "req_reference_number": order[0].reference_number,
+                "reason_code": 100 if test_type == "completed" else 999,
+            }
+        }
+
+    mocked_cs_gateway = mocker.patch(
+        "mitol.payment_gateway.api.CyberSourcePaymentGateway.find_and_get_transactions",
+        return_value=return_value,
+    )
+
+    completed, cancelled = _retrieve_pending_cybersource_orders(order)
+
+    if test_type == "empty":
+        mocked_cs_gateway.asesrt_not_called()
+        assert len(completed.keys()) == 0
+        assert len(cancelled.keys()) == 0
+    else:
+        mocked_cs_gateway.assert_called()
+        assert len(completed.keys()) == (0 if test_type == "cancelled" else 1)
+        assert len(cancelled.keys()) == (0 if test_type == "completed" else 1)

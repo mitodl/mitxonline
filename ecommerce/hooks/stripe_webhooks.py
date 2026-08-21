@@ -5,6 +5,8 @@ import logging
 import pluggy
 from stripe import Event
 
+from ecommerce import constants
+
 hookimpl = pluggy.HookimplMarker("mitxonline")
 log = logging.getLogger(__name__)
 
@@ -43,10 +45,10 @@ class CheckoutSessionEvents:
             process_stripe_checkout_expired,
         )
 
-        if event.type == "checkout.session.completed":
+        if event.type == constants.STRIPE_EVENT_CHECKOUT_SESSION_COMPLETED:
             return process_stripe_checkout_completed(event)
 
-        if event.type == "checkout.session.expired":
+        if event.type == constants.STRIPE_EVENT_CHECKOUT_SESSION_EXPIRED:
             return process_stripe_checkout_expired(event)
 
         return True

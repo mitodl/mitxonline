@@ -1,106 +1,374 @@
+// Styles for the "requirement groups" builder in the Program admin's
+// Requirements field. Colors are pulled from Django admin's own CSS custom
+// properties (defined in django/contrib/admin/static/admin/css/base.css and
+// overridden by dark_mode.css) so this follows the admin's light/dark theme
+// automatically instead of hardcoding a palette.
+
 .program-requirements-field {
-    button {
-        background: var(--hairline-color);
-        color: var(--body-fg);
-        border-radius: 15px;
-        border: 0;
-        font-weight: 400;
-        font-size: 11px;
-        letter-spacing: 0.5px;
-        padding: 3px 12px;
-        margin: 2px 2px 10px;
+    max-width: 780px;
+
+    .req-summary {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        background: var(--darkened-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 12px 14px;
+        margin-bottom: 14px;
+
+        &__icon {
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        p {
+            margin: 0;
+            font-size: 13.5px;
+            color: var(--body-fg);
+        }
     }
 
-    div[data-schemaid="root"] {
-        & > .je-indented-panel {
-            border: 0;
-            margin: 0;
+    .req-groups {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .req-group {
+        background: var(--body-bg);
+        border: 1px solid var(--border-color);
+        border-left: 4px solid var(--secondary);
+        border-radius: 6px;
+        padding: 12px 14px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+
+        &--nested {
+            border-left-color: var(--body-quiet-color);
+            background: var(--darkened-bg);
         }
-        & > h3 {
+
+        &[data-mode="choose"] {
+            border-left-color: var(--req-elective-color, #a1662f);
+        }
+
+        &__head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        &__handle {
+            color: var(--body-quiet-color);
+            cursor: grab;
+            user-select: none;
+        }
+
+        &__title {
+            flex: 1;
+            min-width: 0;
+            font-size: 14px;
+            font-weight: 700;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            padding: 3px 6px;
+            background: transparent;
+            color: var(--body-fg);
+
+            &:hover {
+                background: var(--darkened-bg);
+            }
+            &:focus {
+                outline: none;
+                border-color: var(--border-color);
+                background: var(--darkened-bg);
+            }
+        }
+
+        &__pill {
+            font-size: 10.5px;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            padding: 3px 8px;
+            border-radius: 99px;
+            white-space: nowrap;
+
+            &--all {
+                background: color-mix(in srgb, var(--secondary) 18%, transparent);
+                color: var(--secondary);
+            }
+            &--choose {
+                background: color-mix(in srgb, var(--req-elective-color, #a1662f) 18%, transparent);
+                color: var(--req-elective-color, #a1662f);
+            }
+        }
+
+        &__remove {
+            border: none;
+            background: transparent;
+            color: var(--body-quiet-color);
+            font-size: 13px;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+            line-height: 1;
+
+            &:hover {
+                background: var(--message-error-bg);
+                color: var(--error-fg);
+            }
+        }
+
+        &__sentence {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--body-quiet-color);
+
+            b {
+                color: var(--body-fg);
+                font-weight: 600;
+            }
+        }
+    }
+
+    .req-segmented {
+        display: inline-flex;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        overflow: hidden;
+
+        button {
+            border: none;
+            background: var(--body-bg);
+            color: var(--body-quiet-color);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 10px;
+            cursor: pointer;
+
+            & + button {
+                border-left: 1px solid var(--border-color);
+            }
+
+            &.active {
+                background: var(--secondary);
+                color: var(--primary-fg);
+            }
+        }
+    }
+
+    .req-group[data-mode="choose"] .req-segmented button.active {
+        background: var(--req-elective-color, #a1662f);
+    }
+
+    .req-stepper {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        overflow: hidden;
+
+        button {
+            border: none;
+            background: var(--body-bg);
+            color: var(--body-fg);
+            width: 22px;
+            height: 22px;
+            font-size: 13px;
+            cursor: pointer;
+            line-height: 1;
+
+            &:hover {
+                background: var(--darkened-bg);
+            }
+        }
+
+        &__n {
+            min-width: 18px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 12.5px;
+            font-variant-numeric: tabular-nums;
+        }
+    }
+
+    .req-picker {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .req-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+
+        &:empty {
             display: none;
         }
     }
 
-    div[data-schemapath$=".data"],
-    div[data-schemapath$=".children"] {
-        & > .je-header label {
-            color: var(--body-quiet-color);
-        }
-    }
-    div[data-schemapath$=".children"] .je-indented-panel {
-        padding: 0;
-        border: 0;
-    }
+    .req-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--darkened-bg);
+        border: 1px solid var(--border-color);
+        color: var(--body-fg);
+        border-radius: 5px;
+        padding: 4px 4px 4px 9px;
+        font-size: 12px;
 
-    &, .editor-container .row  {
-        clear: both;
-    }
-
-    .je-object__controls {
-        display: none;
-    }
-
-    .je-child-editor-holder {
-        border: 1px solid rgb(221, 221, 221);
-        clear: both;
-
-        & > span {
-            display: block;
-            padding: 5px;
-            border-top: 1px solid var(--hairline-color);
-        }
-
-        & > span > button{
-            margin: 0;
-        }
-    }
-
-    .je-table {
-        width: 100%;
-    }
-
-    .row {
-        div[data-schematype="array"] > div {
-            margin: 15px;
-        }
-
-        & > div > .je-header {
-            border-bottom: 2px solid var(--border-color);
-            background: #fff;
-        }
-    }
-
-    .je-indented-panel {
-        border: 0;
-        margin: 0;
-
-        select.je-switcher {
-            margin: 5px;
-        }
-    }
-
-    .je-header {
-        margin: 0;
-        padding: 0;
-        width: 100%;
-
-        label {
-            color: var(--primary-fg);
-            margin: 5px;
+        &__badge {
+            font-size: 9.5px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            color: var(--secondary);
+            background: color-mix(in srgb, var(--secondary) 14%, transparent);
+            border-radius: 4px;
+            padding: 1px 5px;
         }
 
         button {
-            float: right;
-            margin: 10px;
-        }
+            border: none;
+            background: transparent;
+            color: var(--body-quiet-color);
+            cursor: pointer;
+            font-size: 11px;
+            padding: 1px 3px;
+            border-radius: 3px;
+            line-height: 1;
 
+            &:hover {
+                background: var(--message-error-bg);
+                color: var(--error-fg);
+            }
+        }
     }
 
-    .je-object__container > h3.je-object__title {
-        background: var(--primary);
+    .req-combobox {
+        position: relative;
 
-        label {
-            color: var(--primary-fg);
+        input {
+            width: 100%;
+            padding: 6px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            background: var(--body-bg);
+            color: var(--body-fg);
+            font-size: 12.5px;
+
+            &:focus {
+                outline: none;
+                border-color: var(--secondary);
+            }
         }
+
+        &__list {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: calc(100% + 4px);
+            background: var(--body-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+            max-height: 220px;
+            overflow-y: auto;
+            z-index: 5;
+            display: none;
+
+            &.open {
+                display: block;
+            }
+        }
+
+        &__opt {
+            padding: 6px 10px;
+            font-size: 12.5px;
+            cursor: pointer;
+            display: flex;
+            gap: 8px;
+            color: var(--body-fg);
+
+            &:hover {
+                background: var(--darkened-bg);
+            }
+        }
+
+        &__code {
+            font-family: var(--font-family-monospace);
+            font-size: 11px;
+            color: var(--body-quiet-color);
+        }
+
+        &__empty {
+            padding: 8px 10px;
+            font-size: 12px;
+            color: var(--body-quiet-color);
+        }
+    }
+
+    .req-subgroups {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 4px;
+    }
+
+    .req-add-row {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+    }
+
+    .req-add-btn,
+    .req-add-nested-btn {
+        border: 1.5px dashed var(--border-color);
+        background: transparent;
+        color: var(--body-quiet-color);
+        border-radius: 6px;
+        padding: 8px 12px;
+        font-size: 12.5px;
+        font-weight: 600;
+        cursor: pointer;
+
+        &:hover {
+            border-color: var(--secondary);
+            color: var(--secondary);
+            background: var(--darkened-bg);
+        }
+    }
+
+    .req-add-row .req-add-btn {
+        flex: 1;
+    }
+
+    .req-add-btn--elective:hover {
+        border-color: var(--req-elective-color, #a1662f);
+        color: var(--req-elective-color, #a1662f);
+    }
+
+    .req-add-nested-btn {
+        align-self: flex-start;
+        font-size: 11.5px;
+        padding: 5px 10px;
+    }
+}
+
+// The elective accent has no equivalent in Django admin's own token set, so
+// it gets its own light/dark values instead of hardcoding one hex for both.
+html[data-theme="dark"] .program-requirements-field {
+    --req-elective-color: #d99a5c;
+}
+
+@media (prefers-color-scheme: dark) {
+    html[data-theme="auto"] .program-requirements-field {
+        --req-elective-color: #d99a5c;
     }
 }

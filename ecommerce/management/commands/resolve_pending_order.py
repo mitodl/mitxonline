@@ -1,31 +1,28 @@
 """
-Looks up pending orders in CyberSource, and changes the status of the order if
-necessary.
+Forcibly resolves a pending order.
 
-Occasionally, there may be a breakdown of communication between MITx Online and
-CyberSource, and orders that have gone through on the CyberSource end may not
-have their updated status reflected in MITx Online. This command will find those
-orders (or, alternatively, look at the specified order) and then will either
-fulfill or cancel the order as necessary.
-
+An order may be sitting in the Pending state, even if the order is completed and
+payment has been received. This command can be used to resolve those orders,
+either by querying the payment processor for the status and acting appropriately,
+or by forcing the order to the Fulfilled state.
 """
 
 from django.core.management import BaseCommand
-from mitol.payment_gateway.api import PaymentGateway
 
 from ecommerce.api import check_and_process_pending_orders_for_resolution
 from ecommerce.models import PendingOrder
-from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 
 
 class Command(BaseCommand):
     """
-    Looks up pending orders in CyberSource, and changes the status of the order if necessary.
+    Resolve a pending order.
     """
 
-    help = "Looks up pending orders in CyberSource, and changes the status of the order if necessary."
+    help = "Resolve a pending order."
 
     def add_arguments(self, parser) -> None:
+        """Add arguments to the command."""
+
         parser.add_argument(
             "--order",
             type=str,
@@ -37,9 +34,19 @@ class Command(BaseCommand):
             "--all", action="store_true", help="Use all pending orders."
         )
 
-    def handle(self, *args, **kwargs):  # noqa: ARG002
-        gateway = PaymentGateway.get_gateway_class(ECOMMERCE_DEFAULT_PAYMENT_GATEWAY)  # noqa: F841
+        parser.add_argument(
+            "--no-check",
+            action="store_true",
+            help="Don't check with the payment processor, just mark the order as Fulfilled.",
+        )
 
+        parser.add_argument(
+            "--no-fulfillment",
+            action="store_true",
+            help="Only mark the order as Fulfilled. Don't perform any fulfillment actions.",
+        )
+
+    def handle(self, *args, **kwargs):  # noqa: ARG002
         if not kwargs["all"] and not kwargs["order"]:
             self.stderr.write(self.style.ERROR("Please specify an order."))
             return
@@ -64,13 +71,18 @@ class Command(BaseCommand):
                 )
                 return
         else:
-            pending_orders = None
+            pending_orders = []
+
+        check = not kwargs.get("no_check", False)
+        skip_fulfill = kwargs.get("no_fulfillment", False)
 
         (
             fulfilled_count,
             cancel_count,
             error_count,
-        ) = check_and_process_pending_orders_for_resolution(pending_orders)
+        ) = check_and_process_pending_orders_for_resolution(
+            pending_orders, check_status=check, skip_fulfillment=skip_fulfill
+        )
 
         self.stdout.write(
             self.style.SUCCESS(

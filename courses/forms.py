@@ -13,187 +13,41 @@ from courses.serializers.v1.programs import ProgramRequirementTreeSerializer
 from courses.widgets import ProgramRequirementsInput
 
 
-def program_requirements_schema():
-    # here, you can create a schema dynamically
-    # such as read data from database and populate choices
+def program_requirements_catalog():
+    """
+    Build the course/program catalog the requirements builder searches over.
+
+    The requirements-admin.js widget renders its own "requirement groups" UI
+    client-side; this just hands it the raw data it needs to populate course
+    and program pickers, plus the operator choices for a group's "all of" /
+    "choose N of" toggle.
+    """
 
     courses = Course.objects.live().order_by("title")
     programs = Program.objects.live().order_by("title")
 
     return {
-        "title": "Requirements",
-        "type": "array",
-        "items": {
-            "$ref": "#/$defs/node",
-            "title": "Section",
-            "headerTemplate": "{{ self.data.title }}",
-            "options": {
-                "disable_collapse": False,
-                "collapsed": True,
-            },
-            "properties": {
-                "data": {
-                    "type": "object",
-                    "properties": {
-                        "node_type": {
-                            "type": "string",
-                            "default": ProgramRequirementNodeType.OPERATOR.value,
-                            "options": {
-                                "hidden": True,
-                            },
-                        }
-                    },
-                },
-                "children": {
-                    "type": "array",
-                    "title": "Requirements",
-                    "items": {
-                        "title": "Requirement",
-                        "$ref": "#/$defs/node",
-                        "properties": {
-                            "children": {
-                                "type": "array",
-                                "title": "Courses",
-                                "format": "table",
-                                "options": {
-                                    "dependencies": {
-                                        "data.node_type": ProgramRequirementNodeType.OPERATOR.value,
-                                    }
-                                },
-                                "items": {
-                                    "$ref": "#/$defs/node",
-                                    "title": "Course",
-                                    "properties": {
-                                        "data": {
-                                            "title": "Courses",
-                                            "properties": {
-                                                "node_type": {
-                                                    "type": "string",
-                                                    "default": ProgramRequirementNodeType.COURSE.value,
-                                                    "options": {
-                                                        "hidden": True,
-                                                    },
-                                                }
-                                            },
-                                        },
-                                    },
-                                },
-                            }
-                        },
-                    },
-                },
-            },
+        "nodeTypes": {
+            "course": ProgramRequirementNodeType.COURSE.value,
+            "operator": ProgramRequirementNodeType.OPERATOR.value,
+            "program": ProgramRequirementNodeType.PROGRAM.value,
         },
-        "$defs": {
-            "node": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": ["number", "null"],
-                        "default": None,
-                        "options": {
-                            "hidden": True,
-                        },
-                    },
-                    "data": {
-                        "type": "object",
-                        "title": "Details",
-                        "propertyOrder": 1,
-                        "properties": {
-                            "node_type": {
-                                "type": "string",
-                                "title": "Type",
-                                "enum": [
-                                    ProgramRequirementNodeType.COURSE.value,
-                                    ProgramRequirementNodeType.OPERATOR.value,
-                                    ProgramRequirementNodeType.PROGRAM.value,
-                                ],
-                                "options": {
-                                    "enum_titles": [
-                                        ProgramRequirementNodeType.COURSE.label,
-                                        ProgramRequirementNodeType.OPERATOR.label,
-                                        ProgramRequirementNodeType.PROGRAM.label,
-                                    ],
-                                },
-                            },
-                            "title": {
-                                "type": "string",
-                                "title": "Title",
-                                "options": {
-                                    "dependencies": {
-                                        "node_type": ProgramRequirementNodeType.OPERATOR.value,
-                                    }
-                                },
-                            },
-                            "operator": {
-                                "type": "string",
-                                "title": "Operation",
-                                "enum": ProgramRequirement.Operator.values,
-                                "options": {
-                                    "dependencies": {
-                                        "node_type": ProgramRequirementNodeType.OPERATOR.value,
-                                    },
-                                    "enum_titles": ProgramRequirement.Operator.labels,
-                                },
-                            },
-                            "operator_value": {
-                                "type": "string",
-                                "format": "number",
-                                "title": "Value",
-                                "default": 1,
-                                "minimum": 0,
-                                "options": {
-                                    "dependencies": {
-                                        "node_type": ProgramRequirementNodeType.OPERATOR.value,
-                                        "operator": ProgramRequirement.Operator.MIN_NUMBER_OF.value,
-                                    },
-                                },
-                            },
-                            "elective_flag": {
-                                "type": "boolean",
-                                "title": "Contains Electives",
-                                "default": False,
-                                "options": {
-                                    "dependencies": {
-                                        "node_type": ProgramRequirementNodeType.OPERATOR.value,
-                                    },
-                                },
-                            },
-                            # course fields
-                            "course": {
-                                "type": "number",
-                                "title": "Course",
-                                "enum": [course.id for course in courses],
-                                "options": {
-                                    "dependencies": {
-                                        "node_type": ProgramRequirementNodeType.COURSE.value
-                                    },
-                                    "enum_titles": [
-                                        f"{course.readable_id} | {course.title}"
-                                        for course in courses
-                                    ],
-                                },
-                            },
-                            # program fields
-                            "required_program": {
-                                "type": "number",
-                                "title": "Required Program",
-                                "enum": [program.id for program in programs],
-                                "options": {
-                                    "dependencies": {
-                                        "node_type": ProgramRequirementNodeType.PROGRAM.value
-                                    },
-                                    "enum_titles": [
-                                        f"{program.readable_id} | {program.title}"
-                                        for program in programs
-                                    ],
-                                },
-                            },
-                        },
-                    },
-                },
-            },
+        "operators": [
+            {"value": value, "label": label}
+            for value, label in ProgramRequirement.Operator.choices
+        ],
+        "operatorValues": {
+            "allOf": ProgramRequirement.Operator.ALL_OF.value,
+            "minNumberOf": ProgramRequirement.Operator.MIN_NUMBER_OF.value,
         },
+        "courses": [
+            {"id": course.id, "code": course.readable_id, "title": course.title}
+            for course in courses
+        ],
+        "programs": [
+            {"id": program.id, "code": program.readable_id, "title": program.title}
+            for program in programs
+        ],
     }
 
 
@@ -201,7 +55,7 @@ class ProgramAdminForm(ModelForm):
     """Custom form for handling requirements data"""
 
     requirements = JSONField(
-        widget=ProgramRequirementsInput(schema=program_requirements_schema)
+        widget=ProgramRequirementsInput(catalog=program_requirements_catalog)
     )
 
     def __init__(self, *args, **kwargs):
