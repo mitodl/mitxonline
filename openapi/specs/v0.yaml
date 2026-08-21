@@ -7571,6 +7571,11 @@ components:
           format: date-time
           nullable: true
           readOnly: true
+        refund_reviewed_on:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
       required:
       - created_on
       - discounts
@@ -7580,6 +7585,7 @@ components:
       - refund_deadline
       - refund_eligible
       - refund_requested_on
+      - refund_reviewed_on
       - refund_status
       - refunds
       - state
