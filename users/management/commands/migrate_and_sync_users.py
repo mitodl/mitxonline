@@ -253,9 +253,7 @@ class Command(BaseCommand):
         queryset = (
             User.objects.filter(is_active=True)
             .filter(
-                Q(global_id="")
-                | Q(global_id__isnull=True)
-                | Q(scim_external_id=None)
+                Q(global_id="") | Q(global_id__isnull=True) | Q(scim_external_id=None)
             )
             .select_related("legal_address", "user_profile")
             .prefetch_related("openedx_users")
