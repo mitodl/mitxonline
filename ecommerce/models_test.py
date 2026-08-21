@@ -12,15 +12,19 @@ from freezegun import freeze_time
 from mitol.common.utils import now_in_utc
 from reversion.models import Version
 
+from b2b.factories import ContractPageFactory
+from courses.factories import CourseRunFactory
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
+    REFUND_WINDOW_DAYS,
     ZERO_PAYMENT_DATA,
 )
 from ecommerce.factories import (
     BasketFactory,
     BasketItemFactory,
+    LineFactory,
     OneTimeDiscountFactory,
     OneTimePerUserDiscountFactory,
     OrderFactory,
@@ -38,9 +42,12 @@ from ecommerce.models import (
     FulfilledOrder,
     Line,
     Order,
+    OrderRefundStatus,
     OrderStatus,
     PendingOrder,
     Product,
+    RefundRequest,
+    RefundRequestStatus,
     StripeEventLog,
     Transaction,
     UserDiscount,
@@ -954,3 +961,219 @@ def test_stripe_event_log_resave():
     assert event.id == logged_event.event_id
     assert logged_event.related_order == order
     assert logged_event.event_data == event.to_dict(for_json=True)
+
+
+def _add_purchased_run(order, start_date):
+    """Attach a purchased course run to an order, the way a real purchase does."""
+    run = CourseRunFactory.create(start_date=start_date)
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run)
+    LineFactory.create(
+        order=order,
+        purchased_object=run,
+        product_version=Version.objects.get_for_object(product).last(),
+    )
+    return run
+
+
+def test_refund_deadline_defaults_to_purchase_date():
+    """With no run starting after the purchase, the window runs from the purchase."""
+    order = OrderFactory.create()
+    _add_purchased_run(order, order.created_on - timedelta(days=30))
+
+    assert order.refund_deadline == order.created_on + timedelta(
+        days=REFUND_WINDOW_DAYS
+    )
+
+
+def test_refund_deadline_extends_to_later_course_start():
+    """A run starting after the purchase pushes the deadline out to its start date."""
+    order = OrderFactory.create()
+    start_date = order.created_on + timedelta(days=60)
+    _add_purchased_run(order, start_date)
+
+    assert order.refund_deadline == start_date + timedelta(days=REFUND_WINDOW_DAYS)
+
+
+def test_refund_deadline_uses_the_latest_run():
+    """With several qualifying runs, the latest start date wins."""
+    order = OrderFactory.create()
+    for offset in (30, 90, 60):
+        _add_purchased_run(order, order.created_on + timedelta(days=offset))
+
+    assert order.refund_deadline == order.created_on + timedelta(
+        days=90 + REFUND_WINDOW_DAYS
+    )
+
+
+@pytest.mark.parametrize("days_since_purchase", [0, REFUND_WINDOW_DAYS - 1])
+def test_within_refund_window_until_it_closes(days_since_purchase):
+    """The window stays open right up to the deadline."""
+    order = OrderFactory.create()
+
+    with freeze_time(order.created_on + timedelta(days=days_since_purchase)):
+        assert order.is_within_refund_window
+
+
+def test_not_within_refund_window_after_it_closes():
+    """The window is shut once the deadline passes."""
+    order = OrderFactory.create()
+
+    with freeze_time(order.created_on + timedelta(days=REFUND_WINDOW_DAYS, seconds=1)):
+        assert not order.is_within_refund_window
+
+
+def test_refund_window_extends_for_a_course_starting_after_purchase():
+    """
+    A purchase made well before the course starts stays in window into the
+    course, even though the purchase-date window has long closed.
+    """
+    order = OrderFactory.create()
+    start_date = order.created_on + timedelta(days=60)
+    _add_purchased_run(order, start_date)
+
+    with freeze_time(start_date + timedelta(days=REFUND_WINDOW_DAYS - 1)):
+        assert order.is_within_refund_window
+
+    with freeze_time(start_date + timedelta(days=REFUND_WINDOW_DAYS, seconds=1)):
+        assert not order.is_within_refund_window
+
+
+def test_is_refund_eligible_only_when_a_request_would_be_accepted():
+    """
+    `is_refund_eligible` answers "could the learner request a refund now", not
+    "is the window open" — being in window is necessary but not sufficient.
+    """
+    fulfilled = OrderFactory.create(state=OrderStatus.FULFILLED)
+    assert fulfilled.is_refund_eligible
+
+    pending = OrderFactory.create(state=OrderStatus.PENDING)
+    assert pending.is_within_refund_window
+    assert not pending.is_refund_eligible
+
+
+def test_is_refund_eligible_false_once_a_request_exists(user):
+    """A learner with a request outstanding cannot make another."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    assert order.is_refund_eligible
+
+    RefundRequest.objects.create(order=order, user=user, consent_given=True)
+    del order.latest_refund_request  # clear the cached_property
+
+    assert not order.is_refund_eligible
+
+
+def test_refund_status_eligible():
+    """A fulfilled order inside the window can be refunded on request."""
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+
+    assert order.refund_status == OrderRefundStatus.ELIGIBLE
+
+
+def test_refund_status_window_closed():
+    """Past the window the learner may still ask, but through a review."""
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+
+    with freeze_time(order.created_on + timedelta(days=REFUND_WINDOW_DAYS, seconds=1)):
+        assert order.refund_status == OrderRefundStatus.WINDOW_CLOSED
+
+
+@pytest.mark.parametrize(
+    "state",
+    [OrderStatus.PENDING, OrderStatus.CANCELED, OrderStatus.DECLINED],
+)
+def test_refund_status_ineligible_for_unfulfilled_orders(state):
+    """Only a fulfilled order can be refunded."""
+    order = OrderFactory.create(state=state)
+
+    assert order.refund_status == OrderRefundStatus.INELIGIBLE
+
+
+@pytest.mark.skip_nplusone_check
+def test_refund_status_ineligible_for_b2b_orders():
+    """B2B contract orders are handled off the self-service path."""
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+    run = CourseRunFactory.create(b2b_contract=ContractPageFactory.create())
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run)
+    LineFactory.create(
+        order=order,
+        purchased_object=run,
+        product_version=Version.objects.get_for_object(product).last(),
+    )
+
+    assert order.refund_status == OrderRefundStatus.INELIGIBLE
+
+
+@pytest.mark.parametrize(
+    ("request_status", "expected"),
+    [
+        (RefundRequestStatus.PENDING, OrderRefundStatus.REQUESTED),
+        # Nothing marks the refund itself as done, so an approved request still
+        # reads as outstanding until the order state changes.
+        (RefundRequestStatus.APPROVED, OrderRefundStatus.REQUESTED),
+        (RefundRequestStatus.DENIED, OrderRefundStatus.DENIED),
+    ],
+)
+def test_refund_status_reflects_an_existing_request(user, request_status, expected):
+    """An existing request outranks the learner's eligibility to make one."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    RefundRequest.objects.create(
+        order=order, user=user, consent_given=True, status=request_status
+    )
+
+    assert order.refund_status == expected
+
+
+def test_refund_status_uses_the_latest_request(user):
+    """A fresh request after a denial supersedes it."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    RefundRequest.objects.create(
+        order=order, user=user, consent_given=True, status=RefundRequestStatus.DENIED
+    )
+    RefundRequest.objects.create(
+        order=order, user=user, consent_given=True, status=RefundRequestStatus.PENDING
+    )
+
+    assert order.refund_status == OrderRefundStatus.REQUESTED
+
+
+@pytest.mark.parametrize(
+    "state", [OrderStatus.REFUNDED, OrderStatus.PARTIALLY_REFUNDED]
+)
+def test_refund_status_completed_outranks_everything(user, state):
+    """Once the money is back, no other state matters."""
+    order = OrderFactory.create(purchaser=user, state=state)
+    RefundRequest.objects.create(
+        order=order, user=user, consent_given=True, status=RefundRequestStatus.PENDING
+    )
+
+    assert order.refund_status == OrderRefundStatus.COMPLETED
+
+
+def test_refund_reviewed_on_is_none_while_pending(user):
+    """A request nobody has acted on has no review date."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    RefundRequest.objects.create(order=order, user=user, consent_given=True)
+
+    assert order.refund_reviewed_on is None
+
+
+@pytest.mark.parametrize(
+    "status", [RefundRequestStatus.APPROVED, RefundRequestStatus.DENIED]
+)
+def test_refund_reviewed_on_is_set_once_decided(user, status):
+    """Deciding a request stamps it, and that is the review date."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    request = RefundRequest.objects.create(
+        order=order, user=user, consent_given=True, status=status
+    )
+
+    assert order.refund_reviewed_on == request.updated_on
+
+
+def test_refund_reviewed_on_is_none_without_a_request():
+    """An order nobody has asked to refund has no review date."""
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+
+    assert order.refund_reviewed_on is None

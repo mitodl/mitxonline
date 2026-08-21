@@ -24,9 +24,12 @@ from ecommerce.models import (
     Basket,
     BasketItem,
     Order,
+    OrderRefundStatus,
     OrderStatus,
     Product,
+    RefundReasonChoices,
     RefundRequest,
+    RefundRequestStatus,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from main.constants import (
@@ -83,6 +86,7 @@ class TransactionLineSerializer(serializers.Serializer):
     total_paid = serializers.CharField()
     discount = serializers.CharField()
     price = serializers.CharField()
+    has_free_audit = serializers.BooleanField()
 
     def to_representation(self, instance):
         """Returns the representation of the object."""
@@ -125,6 +129,10 @@ class TransactionLineSerializer(serializers.Serializer):
             # object was deleted; the receipt still has to serialize.
             start_date=content_object.start_date if content_object else None,
             end_date=content_object.end_date if content_object else None,
+            # Refunding drops the learner to the audit track, unless there is
+            # no audit track, in which case they lose access altogether. The
+            # refund modal warns about whichever applies.
+            has_free_audit=(content_object.has_free_audit if content_object else False),
         )
 
         return line  # noqa: RET504
@@ -501,10 +509,31 @@ class OrderSerializer(serializers.ModelSerializer):
     transactions = serializers.SerializerMethodField()
     street_address = serializers.SerializerMethodField()
     refund_eligible = serializers.SerializerMethodField()
+    refund_deadline = serializers.SerializerMethodField()
+    refund_status = serializers.SerializerMethodField()
+    refund_requested_on = serializers.SerializerMethodField()
+    refund_reviewed_on = serializers.SerializerMethodField()
 
     @extend_schema_field(serializers.BooleanField())
     def get_refund_eligible(self, instance):
         return instance.is_refund_eligible
+
+    @extend_schema_field(serializers.DateTimeField())
+    def get_refund_deadline(self, instance):
+        return instance.refund_deadline
+
+    @extend_schema_field(serializers.ChoiceField(choices=OrderRefundStatus.choices))
+    def get_refund_status(self, instance):
+        return instance.refund_status
+
+    @extend_schema_field(serializers.DateTimeField(allow_null=True))
+    def get_refund_requested_on(self, instance):
+        request = instance.latest_refund_request
+        return request.created_on if request else None
+
+    @extend_schema_field(serializers.DateTimeField(allow_null=True))
+    def get_refund_reviewed_on(self, instance):
+        return instance.refund_reviewed_on
 
     @extend_schema_field(TransactionLineSerializer(many=True))
     def get_lines(self, instance):
@@ -657,6 +686,10 @@ class OrderSerializer(serializers.ModelSerializer):
             "transactions",
             "street_address",
             "refund_eligible",
+            "refund_deadline",
+            "refund_status",
+            "refund_requested_on",
+            "refund_reviewed_on",
         ]
         model = models.Order
 
@@ -1062,8 +1095,6 @@ class RefundRequestSerializer(serializers.ModelSerializer):
         fields = ["order", "refund_reason", "refund_reason_text", "consent_given"]
 
     def validate_order(self, order):
-        from courses.utils import is_contract_order  # noqa: PLC0415
-
         user = self.context["request"].user
         if order.purchaser != user:
             msg = "You can only request a refund for your own orders."
@@ -1071,10 +1102,15 @@ class RefundRequestSerializer(serializers.ModelSerializer):
         if order.state != OrderStatus.FULFILLED:
             msg = "Refund requests can only be submitted for fulfilled orders."
             raise serializers.ValidationError(msg)
-        if is_contract_order(order):
+        # Same property `refund_status` reports on, so what the receipt advertises
+        # and what this endpoint accepts cannot drift apart.
+        if order.is_b2b_order:
             msg = (
                 "B2B contract orders are not eligible for self-service refund requests."
             )
+            raise serializers.ValidationError(msg)
+        if order.refund_requests.filter(status=RefundRequestStatus.PENDING).exists():
+            msg = "A refund request for this order is already awaiting review."
             raise serializers.ValidationError(msg)
         return order
 
@@ -1083,6 +1119,25 @@ class RefundRequestSerializer(serializers.ModelSerializer):
             msg = "You must acknowledge the consequences of requesting a refund."
             raise serializers.ValidationError(msg)
         return value
+
+    def validate(self, attrs):
+        """
+        Require free text when no preset reason identifies the request.
+
+        Requests made after the refund window offer no preset reasons at all, and
+        "Other" says nothing on its own, so both cases need the learner's own
+        words for customer service to act on.
+        """
+        reason = attrs.get("refund_reason", "")
+        if (
+            reason in ("", RefundReasonChoices.OTHER)
+            and not attrs.get("refund_reason_text", "").strip()
+        ):
+            msg = {
+                "refund_reason_text": "Please tell us why you are requesting a refund."
+            }
+            raise serializers.ValidationError(msg)
+        return attrs
 
     def create(self, validated_data):
         validated_data["user"] = self.context["request"].user

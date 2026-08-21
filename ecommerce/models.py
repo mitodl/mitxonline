@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import List  # noqa: UP035
 from zoneinfo import ZoneInfo
@@ -38,6 +38,7 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPES,
     REFERENCE_NUMBER_PREFIX,
+    REFUND_WINDOW_DAYS,
     TRANSACTION_TYPE_PAYMENT,
     TRANSACTION_TYPE_REFUND,
     TRANSACTION_TYPES,
@@ -601,6 +602,23 @@ class OrderStatus(TextChoices):
     PARTIALLY_REFUNDED = "partially_refunded"
 
 
+class OrderRefundStatus(TextChoices):
+    """
+    Where an order sits in the self-service refund flow.
+
+    Derived state, not stored: it combines the order's own status, any refund
+    request the learner has already made, and the refund window. Consumers get
+    one value to branch on instead of reassembling those rules themselves.
+    """
+
+    COMPLETED = "completed"
+    REQUESTED = "requested"
+    DENIED = "denied"
+    ELIGIBLE = "eligible"
+    WINDOW_CLOSED = "window_closed"
+    INELIGIBLE = "ineligible"
+
+
 class OrderFlow:
     state = State(OrderStatus, default=OrderStatus.PENDING)
 
@@ -833,26 +851,104 @@ class Order(TimestampedModel):
     def is_fulfilled(self):
         return self.state == OrderStatus.FULFILLED
 
+    @cached_property
+    def refund_deadline(self):
+        """
+        Return the moment the standard refund window closes:
+        - REFUND_WINDOW_DAYS after purchase, OR
+        - REFUND_WINDOW_DAYS after the course start date, if the user purchased
+          before the course started.
+
+        Whichever is later, since either one on its own makes the order eligible.
+        """
+        window = timedelta(days=REFUND_WINDOW_DAYS)
+        return max(
+            [
+                self.created_on + window,
+                *[
+                    run.start_date + window
+                    for run in self.purchased_runs
+                    if run.start_date and run.start_date > self.created_on
+                ],
+            ]
+        )
+
+    @property
+    def is_within_refund_window(self):
+        """Return True if the standard refund window has not closed yet."""
+        return now_in_utc() <= self.refund_deadline
+
     @property
     def is_refund_eligible(self):
-        """
-        Returns True if the order is within the standard refund window:
-        - Within 7 days of purchase, OR
-        - Within 7 days of the course start date, if the user purchased before the course started.
-        """
-        from datetime import timedelta  # noqa: PLC0415
+        """Return True if the learner could request a refund for this order now."""
+        return self.refund_status == OrderRefundStatus.ELIGIBLE
 
-        now = now_in_utc()
-        if now <= self.created_on + timedelta(days=7):
-            return True
-        for run in self.purchased_runs:
-            if (
-                run.start_date
-                and run.start_date > self.created_on
-                and now <= run.start_date + timedelta(days=7)
-            ):
-                return True
-        return False
+    @cached_property
+    def is_b2b_order(self):
+        """
+        Return True if any purchased run belongs to a B2B contract.
+
+        Reads the line's denormalized `purchased_object` rather than resolving
+        `product.purchasable_object` through reversion. The two identify the same
+        object: `Line` rows are created with `purchased_object_id` and
+        `purchased_content_type_id` copied straight off the product, and that
+        triple is the line's uniqueness constraint.
+        """
+        return any(run.b2b_contract_id for run in self.purchased_runs)
+
+    @cached_property
+    def latest_refund_request(self):
+        """Return the learner's most recent refund request for this order, if any."""
+        return self.refund_requests.order_by("-created_on").first()
+
+    @property
+    def refund_reviewed_on(self):
+        """
+        Return when the latest refund request was decided, or None if it is
+        still pending.
+
+        `RefundRequest` carries no dedicated review timestamp. A request only
+        leaves `pending` when someone acts on it, so `updated_on` is that moment.
+        """
+        request = self.latest_refund_request
+        if request and request.status != RefundRequestStatus.PENDING:
+            return request.updated_on
+        return None
+
+    @property
+    def refund_status(self):
+        """
+        Return where this order sits in the self-service refund flow.
+
+        Precedence matters: a refund that already happened settles the question,
+        then any request the learner has made, and only then whether they could
+        make one right now.
+
+        The final branch deliberately mirrors what `RefundRequestSerializer`
+        accepts, so anything but `eligible` or `window_closed` means a request
+        would be rejected.
+        """
+        if self.state in (OrderStatus.REFUNDED, OrderStatus.PARTIALLY_REFUNDED):
+            return OrderRefundStatus.COMPLETED
+
+        latest_request = self.latest_refund_request
+        if latest_request:
+            # An approved request still reads as "requested" until the money moves,
+            # since nothing marks the refund itself as done.
+            return (
+                OrderRefundStatus.DENIED
+                if latest_request.status == RefundRequestStatus.DENIED
+                else OrderRefundStatus.REQUESTED
+            )
+
+        if self.state != OrderStatus.FULFILLED or self.is_b2b_order:
+            return OrderRefundStatus.INELIGIBLE
+
+        return (
+            OrderRefundStatus.ELIGIBLE
+            if self.is_within_refund_window
+            else OrderRefundStatus.WINDOW_CLOSED
+        )
 
     def _generate_reference_number(self):
         return f"{REFERENCE_NUMBER_PREFIX}{settings.ENVIRONMENT}-{self.id}"
@@ -1337,14 +1433,27 @@ class StripeEventLog(TimestampedModel):
 
 
 class RefundReasonChoices(models.TextChoices):
+    """
+    Reasons a learner can give for requesting a refund.
+
+    The first seven are the choices the refund modal offers, in the order it
+    shows them. The last two predate that design and are kept so existing
+    requests still resolve to a label; nothing submits them any more.
+    """
+
+    NOT_ENOUGH_TIME = "not_enough_time", "I do not have enough time"
+    COURSE_NOT_AS_EXPECTED = "course_not_as_expected", "Course is not what I expected"
+    TECHNICAL_DIFFICULTIES = "technical_difficulties", "I had a technical issue"
+    COURSE_TOO_DIFFICULT = "course_too_difficult", "Course is too difficult"
+    PURCHASED_BY_MISTAKE = "purchased_by_mistake", "I purchased by mistake"
+    PREFER_NOT_TO_SAY = "prefer_not_to_say", "Prefer not to say"
+    OTHER = "other", "Other"
+
     ENROLLED_IN_ANOTHER_COURSE = (
         "enrolled_in_another_course",
         "I enrolled in another course",
     )
-    COURSE_NOT_AS_EXPECTED = "course_not_as_expected", "Course is not what I expected"
-    TECHNICAL_DIFFICULTIES = "technical_difficulties", "Technical difficulties"
     FINANCIAL_REASONS = "financial_reasons", "Financial reasons"
-    OTHER = "other", "Other"
 
 
 class RefundRequestStatus(models.TextChoices):
@@ -1371,7 +1480,7 @@ class RefundRequest(TimestampedModel):
         choices=RefundReasonChoices,
         blank=True,
     )
-    refund_reason_text = models.TextField(blank=True)
+    refund_reason_text = models.TextField(blank=True, max_length=1000)
     consent_given = models.BooleanField(default=False)
     status = models.CharField(
         max_length=20,
