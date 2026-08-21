@@ -11,13 +11,13 @@ class ProgramRequirementsInput(TextInput):
     template_name = "forms/widgets/program-requirements-input.html"
 
     def __init__(self, *args, **kwargs):
-        self.schema = kwargs.pop("schema", None)
+        self.catalog = kwargs.pop("catalog", None)
         super().__init__(*args, **kwargs)
 
-    def _get_schema(self):
-        return self.schema() if callable(self.schema) else self.schema
+    def _get_catalog(self):
+        return self.catalog() if callable(self.catalog) else self.catalog
 
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
-        context["widget"]["schema"] = self._get_schema()
+        context["widget"]["catalog"] = self._get_catalog()
         return context
