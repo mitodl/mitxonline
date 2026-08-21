@@ -111,6 +111,12 @@ def queue_fastly_surrogate_key_purge(surrogate_key, service_id=None):
 
     Key format: mitxonline:course:<readable_id> or mitxonline:program:<readable_id>
 
+    This is a *hard* purge. A soft purge only marks objects stale, so each cache
+    node serves the outdated page once more before refreshing. For the events
+    this task reacts to -- publishing, unpublishing, flipping `live` -- that
+    response is not merely stale but wrong: a cached 404 for a page that now
+    exists, or a page that should no longer be reachable.
+
     Args:
         surrogate_key (str): The surrogate key to purge, e.g.
             "mitxonline:course:course-v1:MITx+6.00.1x"
@@ -149,10 +155,7 @@ def queue_fastly_surrogate_key_purge(surrogate_key, service_id=None):
         settings.FASTLY_URL,
         f"/service/{service_id}/purge/{surrogate_key}",
     )
-    headers = {
-        "Fastly-Key": settings.FASTLY_AUTH_TOKEN,
-        "fastly-soft-purge": "1",
-    }
+    headers = {"Fastly-Key": settings.FASTLY_AUTH_TOKEN}
 
     resp = requests.post(api_url, headers=headers, timeout=10)
 
