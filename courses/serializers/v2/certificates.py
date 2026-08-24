@@ -151,7 +151,10 @@ class BaseCertificateSerializer(serializers.ModelSerializer):
     certificate_page = serializers.SerializerMethodField()
     verifiable_credential_json = serializers.SerializerMethodField()
 
-    @extend_schema_field(CertificatePageModelSerializer)
+    # allow_null: certificate_page_revision is nullable, so this is null for a
+    # certificate issued without one. Without it the generated clients type the
+    # field as always present and dereference it unguarded.
+    @extend_schema_field(CertificatePageModelSerializer(allow_null=True))
     def get_certificate_page(self, instance):
         """
         Retrieve the certificate page. For certificates, we want to return the
@@ -161,12 +164,13 @@ class BaseCertificateSerializer(serializers.ModelSerializer):
         definition itself is slightly different.)
         """
 
-        if hasattr(instance, "certificate_page_revision"):
-            cert = instance.certificate_page_revision.as_object()
+        # certificate_page_revision is a nullable FK, so hasattr is always True
+        # and the attribute is None for a certificate issued without one.
+        revision = getattr(instance, "certificate_page_revision", None)
+        if revision is None:
+            return None
 
-            return CertificatePageModelSerializer(cert).data
-
-        return None
+        return CertificatePageModelSerializer(revision.as_object()).data
 
     @extend_schema_field(serializers.JSONField)
     def get_verifiable_credential_json(self, instance):

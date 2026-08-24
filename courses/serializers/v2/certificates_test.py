@@ -101,3 +101,35 @@ def test_serialize_certificate(is_program, mock_context):
         ).data
 
     assert_drf_json_equal(expected_data, serialized_data, ignore_order=True)
+
+
+@pytest.mark.parametrize(
+    "is_program",
+    [
+        True,
+        False,
+    ],
+)
+def test_serialize_certificate_without_page_revision(is_program, mock_context):
+    """
+    A certificate with no certificate_page_revision serializes, it does not raise.
+
+    certificate_page_revision is a nullable FK on both certificate models, so the
+    old `hasattr` guard was always True and the attribute was None, giving
+    AttributeError: 'NoneType' object has no attribute 'as_object'. The guard is on
+    the shared base serializer, so both certificate types are affected.
+    """
+
+    if is_program:
+        certificate = ProgramCertificateFactory.create(certificate_page_revision=None)
+        serialized_data = ProgramCertificateSerializer(
+            certificate, context=mock_context
+        ).data
+    else:
+        certificate = CourseRunCertificateFactory.create(certificate_page_revision=None)
+        serialized_data = CourseRunCertificateSerializer(
+            certificate, context=mock_context
+        ).data
+
+    assert serialized_data["certificate_page"] is None
+    assert str(serialized_data["uuid"]) == str(certificate.uuid)

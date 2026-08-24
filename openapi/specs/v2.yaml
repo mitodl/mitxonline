@@ -10620,6 +10620,7 @@ components:
         certificate_page:
           allOf:
           - $ref: '#/components/schemas/CertificatePageModel'
+          nullable: true
           readOnly: true
         verifiable_credential_json:
           readOnly: true
@@ -11240,6 +11241,7 @@ components:
         certificate_page:
           allOf:
           - $ref: '#/components/schemas/CertificatePageModel'
+          nullable: true
           readOnly: true
         verifiable_credential_json:
           readOnly: true
