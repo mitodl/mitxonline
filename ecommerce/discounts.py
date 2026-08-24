@@ -12,6 +12,19 @@ from ecommerce.constants import (
 from ecommerce.models import Discount, Product
 
 
+def _product_from_version(version):
+    """Reconstruct a Product, as stored in this Version, without the live row."""
+    field_dict = version.field_dict
+    return Product(
+        id=field_dict["id"],
+        content_type_id=field_dict["content_type_id"],
+        object_id=field_dict["object_id"],
+        price=field_dict["price"],
+        description=field_dict["description"],
+        is_active=field_dict["is_active"],
+    )
+
+
 def resolve_product_version(product: Product, product_version=None):
     """
     Resolves the specified version of the product. Specify None to indicate the
@@ -30,14 +43,7 @@ def resolve_product_version(product: Product, product_version=None):
 
     for test_version in versions.all():
         if test_version == product_version:
-            return Product(
-                id=test_version.field_dict["id"],
-                content_type_id=test_version.field_dict["content_type_id"],
-                object_id=test_version.field_dict["object_id"],
-                price=test_version.field_dict["price"],
-                description=test_version.field_dict["description"],
-                is_active=test_version.field_dict["is_active"],
-            )
+            return _product_from_version(test_version)
 
     raise TypeError("Invalid product version specified")  # noqa: EM101
 
@@ -47,16 +53,15 @@ def resolve_product_from_version(product_version):
     Resolve a Product from its reversion Version.
 
     Uses the live product when it still exists (so resolve_product_version can
-    pick the right historical snapshot). Falls back to version.object when the
-    product row has been deleted, reconstructing the purchased state from the
-    serialized revision data without touching the live table.
+    pick the right historical snapshot). When the product row has been deleted,
+    reconstructs the purchased state from the version's stored fields instead.
     """
     if product_version is None:
         return None
     product = Product.all_objects.filter(pk=product_version.object_id).first()
     if product:
         return resolve_product_version(product, product_version=product_version)
-    return product_version.object
+    return _product_from_version(product_version)
 
 
 @dataclass
