@@ -1168,7 +1168,10 @@ class Line(TimestampedModel):
     @cached_property
     def discounted_price(self):
         """Return the price of the product with discounts"""
-        from ecommerce.discounts import DiscountType, resolve_product_from_version  # noqa: PLC0415
+        from ecommerce.discounts import (  # noqa: PLC0415
+            DiscountType,
+            resolve_product_from_version,
+        )
 
         discounts = [
             discount_redemption.redeemed_discount

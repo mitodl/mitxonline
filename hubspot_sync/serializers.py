@@ -15,7 +15,6 @@ from courses.models import (
 from ecommerce import models
 from ecommerce.constants import DISCOUNT_TYPE_DOLLARS_OFF, DISCOUNT_TYPE_PERCENT_OFF
 from ecommerce.discounts import resolve_product_from_version
-from ecommerce.models import Product
 from hubspot_sync.api import format_product_name, get_hubspot_id_for_object
 from main.utils import format_decimal
 from users.serializers import UserSerializer
