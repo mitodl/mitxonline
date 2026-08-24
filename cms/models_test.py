@@ -4,7 +4,7 @@ import json
 import uuid
 from datetime import timedelta
 from unittest.mock import Mock, patch
-from urllib.parse import quote_plus
+from urllib.parse import parse_qs, quote_plus, urlparse
 
 import factory
 import pytest
@@ -271,41 +271,34 @@ def generate_flexible_pricing_response(mocker, request_user, flexible_pricing_fo
     return response
 
 
-@pytest.mark.parametrize(
-    "is_authed,has_submission",  # noqa: PT006
-    [[False, False], [True, False], [True, True]],  # noqa: PT007
-)
-def test_flex_pricing_form_display(mocker, is_authed, has_submission):
+@pytest.mark.parametrize("has_submission", [False, True])
+def test_flex_pricing_form_display(mocker, has_submission):
     """
-    Tests the initial display of the flexible pricing form. If the user is not
-    authenticated, they should see the guest text. If they are, they should
-    see the form if they don't have an in-progress submission.
+    Tests the initial display of the flexible pricing form. An authenticated
+    user sees the form itself unless they have an in-progress submission, in
+    which case they see its status instead. Anonymous users never reach the
+    template - see test_flexible_pricing_form_serve_redirects_anonymous_user_to_login.
     """
     course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
     flex_form = FlexiblePricingFormFactory(selected_course=course_page.course)
 
-    if not is_authed:
-        request_user = AnonymousUser()
-    else:
-        request_user = UserFactory.create()
-        if has_submission:
-            submission = FlexiblePricingRequestSubmission.objects.create(
-                form_data=json.dumps([]), page=flex_form, user=request_user
-            )
-            flexprice = FlexiblePrice.objects.create(  # noqa: F841
-                user=request_user,
-                cms_submission=submission,
-                courseware_object=flex_form.selected_course,
-            )
+    request_user = UserFactory.create()
+    if has_submission:
+        submission = FlexiblePricingRequestSubmission.objects.create(
+            form_data=json.dumps([]), page=flex_form, user=request_user
+        )
+        flexprice = FlexiblePrice.objects.create(  # noqa: F841
+            user=request_user,
+            cms_submission=submission,
+            courseware_object=flex_form.selected_course,
+        )
 
     response = generate_flexible_pricing_response(mocker, request_user, flex_form)
 
     # simple string checking for the rendered content
     # should match what's in the factory
 
-    if not is_authed:
-        assert "Not Logged In" in response.rendered_content
-    elif has_submission:
+    if has_submission:
         assert "Application Processing" in response.rendered_content
     else:
         assert "csrfmiddlewaretoken" in response.rendered_content
@@ -1618,3 +1611,43 @@ def test_fp_request_form_get_context_absolute_last_submission():
 
     assert context["country_of_income"] == "MX"
     assert context["country_of_residence"] == "MX"
+
+
+def test_flexible_pricing_form_serve_redirects_anonymous_user_to_login(settings):
+    """
+    An anonymous visitor cannot apply for financial assistance, so serve() sends
+    them through the gateway login route and back to the form afterwards.
+    """
+    course_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    form_path = "/courses/course-v1:MITxT+3.024x/financial-assistance-request/"
+    request = RequestFactory().get(form_path, {"ecom-service": "true"})
+    request.user = AnonymousUser()
+
+    response = flex_form.serve(request)
+
+    assert response.status_code == 302
+    location = urlparse(response.url)
+    assert location.path == reverse(settings.LOGIN_URL)
+
+    query = parse_qs(location.query)
+    # The whole path comes back, query string included, so a visitor arriving
+    # from Learn returns to the same chrome-less view they started in.
+    assert query["next"] == [f"{form_path}?ecom-service=true"]
+    # Nothing on this form needs the MITxOnline profile, so don't detour through
+    # onboarding on the way back.
+    assert query["skip_onboarding"] == ["1"]
+
+
+def test_flexible_pricing_form_serve_renders_for_authenticated_user():
+    """An authenticated visitor gets the form itself, not a redirect."""
+    course_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    request = RequestFactory().get("/courses/a-course/financial-assistance-request/")
+    request.user = UserFactory.create()
+
+    response = flex_form.serve(request)
+
+    assert response.status_code == 200
