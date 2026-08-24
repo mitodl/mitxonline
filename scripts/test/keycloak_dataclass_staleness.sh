@@ -4,7 +4,10 @@ set -eo pipefail
 TMPDIR="$(mktemp -d)"
 SPEC_FILE="${KEYCLOAK_OPENAPI_SPEC_FILE:-$TMPDIR/keycloak-openapi.yaml}"
 
-if [ ! -s "$SPEC_FILE" ]; then
+if [ -s "$SPEC_FILE" ]; then
+	echo "Found cached Keycloak OpenAPI spec at $SPEC_FILE, skipping download"
+else
+	echo "No cached Keycloak OpenAPI spec found at $SPEC_FILE, downloading"
 	mkdir -p "$(dirname "$SPEC_FILE")"
 	curl -sSL -o "$SPEC_FILE" https://www.keycloak.org/docs-api/latest/rest-api/openapi.yaml
 fi
