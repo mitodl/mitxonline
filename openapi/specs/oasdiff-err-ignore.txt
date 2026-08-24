@@ -189,3 +189,14 @@ GET /api/v0/orders/receipt/{id}/ the 'purchaser' response's property type/format
 PATCH /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ the 'redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '200'
 POST /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ the 'redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '201'
 PUT /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ the 'redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '200'
+
+# certificate_page became nullable. Unlike the entries above this is NOT merely a
+# spec correction - the API's behaviour changes, and deliberately so. A certificate
+# with no certificate_page_revision currently returns 500 (AttributeError on a
+# nullable FK); it will now return 200 with certificate_page: null. No consumer has
+# ever received a null here, because the old behaviour was an exception, so nothing
+# regresses that previously worked - but a consumer that dereferences the field
+# unguarded will now get a null instead of a failed request. The one known consumer
+# is mit-learn, guarded in mitodl/mit-learn#3829, which lands with this.
+in API GET /api/v2/course_certificates/{uuid}/ the response property `certificate_page` became nullable for the status `200`
+in API GET /api/v2/program_certificates/{uuid}/ the response property `certificate_page` became nullable for the status `200`
