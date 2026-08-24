@@ -14,7 +14,7 @@ from courses.models import (
 )
 from ecommerce import models
 from ecommerce.constants import DISCOUNT_TYPE_DOLLARS_OFF, DISCOUNT_TYPE_PERCENT_OFF
-from ecommerce.discounts import resolve_product_version
+from ecommerce.discounts import resolve_product_from_version
 from ecommerce.models import Product
 from hubspot_sync.api import format_product_name, get_hubspot_id_for_object
 from main.utils import format_decimal
@@ -47,17 +47,6 @@ def _get_prefetched_first_related(instance, relation_name: str):
     if related_items is None:
         return None
     return related_items[0] if related_items else None
-
-
-def _resolve_product_from_version(version):
-    """Resolve a product from a ProductVersion while preserving previous behavior."""
-    if version is None:
-        return None
-
-    product = Product.all_objects.filter(id=version.object_id).first()
-    if product:
-        return resolve_product_version(product, product_version=version)
-    return version.object
 
 
 def _get_line_enrollment(instance):
@@ -109,7 +98,7 @@ class LineSerializer(serializers.ModelSerializer):
         if hasattr(instance, cache_attr):
             return getattr(instance, cache_attr)
 
-        product = _resolve_product_from_version(instance.product_version)
+        product = resolve_product_from_version(instance.product_version)
         setattr(instance, cache_attr, product)
         return product
 
@@ -207,7 +196,7 @@ class OrderToDealSerializer(serializers.ModelSerializer):
 
         first_line = _get_first_order_line(instance)
         product = (
-            _resolve_product_from_version(first_line.product_version)
+            resolve_product_from_version(first_line.product_version)
             if first_line is not None
             else None
         )

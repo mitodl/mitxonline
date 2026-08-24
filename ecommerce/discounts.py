@@ -42,6 +42,23 @@ def resolve_product_version(product: Product, product_version=None):
     raise TypeError("Invalid product version specified")  # noqa: EM101
 
 
+def resolve_product_from_version(product_version):
+    """
+    Resolve a Product from its reversion Version.
+
+    Uses the live product when it still exists (so resolve_product_version can
+    pick the right historical snapshot). Falls back to version.object when the
+    product row has been deleted, reconstructing the purchased state from the
+    serialized revision data without touching the live table.
+    """
+    if product_version is None:
+        return None
+    product = Product.all_objects.filter(pk=product_version.object_id).first()
+    if product:
+        return resolve_product_version(product, product_version=product_version)
+    return product_version.object
+
+
 @dataclass
 class DiscountType(abc.ABC):
     _CLASSES = {}
