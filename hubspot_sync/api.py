@@ -1185,6 +1185,8 @@ def make_contact_sync_message_from_user(
     contact_properties_map = {
         "email": "email",
         "name": "name",
+        "first_name": "firstname",
+        "last_name": "lastname",
         "country": "country",
         "state": "state",
         "year_of_birth": "yearofbirth",
