@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.163.2 (Released August 24, 2026)
+---------------
+
+- Sync HubSpot on LegalAddress save (#3862)
+
 Version 1.163.1 (Released August 24, 2026)
 ---------------
 
