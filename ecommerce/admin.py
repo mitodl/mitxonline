@@ -15,8 +15,6 @@ from mitol.common.admin import TimestampedModelAdmin
 from reversion.admin import VersionAdmin
 from viewflow import fsm
 
-log = logging.getLogger(__name__)
-
 from ecommerce.api import refund_order
 from ecommerce.forms import AdminRefundOrderForm
 from ecommerce.models import (
@@ -41,6 +39,8 @@ from ecommerce.models import (
     UserDiscount,
 )
 from main.admin import ReadOnlyModelAdmin
+
+log = logging.getLogger(__name__)
 
 
 @admin.register(Transaction)
