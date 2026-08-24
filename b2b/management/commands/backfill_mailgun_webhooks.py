@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 import requests
 from django.conf import settings
-from django.core.management import BaseCommand
+from django.core.management import BaseCommand, CommandError
 from mitol.common.utils import now_in_utc
 
 from b2b.api import is_later_event, is_trackable_event_type
@@ -41,6 +41,7 @@ class Command(BaseCommand):
             "--record-ids",
             type=str,
             default="",
+            required=True,
             help="Comma-separated list of IDs of the DiscountContractAttachmentRedemption records to send webhooks for.",
         )
         parser.add_argument(
@@ -116,7 +117,13 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):  # noqa: ARG002
 
-        record_ids = [int(record_id) for record_id in kwargs["record_ids"].split(",")]
+        try:
+            record_ids = [
+                int(record_id) for record_id in kwargs["record_ids"].split(",")
+            ]
+        except ValueError:
+            err = "Individual record IDs must be an integer."
+            raise CommandError(err) from None
 
         records = DiscountContractAttachmentRedemption.objects.filter(pk__in=record_ids)
         filtered_records = []
