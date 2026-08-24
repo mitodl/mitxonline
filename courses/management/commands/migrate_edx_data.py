@@ -878,8 +878,11 @@ class Command(BaseCommand):
                         if line.product_version_id != product_version.id:
                             line.product_version = product_version
                             line.save(update_fields=["product_version"])
+                            # product_version just moved, so the recorded price
+                            # is stale.
+                            line.record_discounted_unit_price()
                             order.total_price_paid = line.discounted_price
-                            order.save(update_fields=["total_price_paid"])
+                            order.save(update_fields=["total_price_paid", "updated_on"])
                         fulfill_completed_order(
                             order,
                             payment_data=ZERO_PAYMENT_DATA,

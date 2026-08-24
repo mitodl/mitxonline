@@ -225,7 +225,12 @@ class OrderLineInline(admin.TabularInline):
     """Inline editor for lines"""
 
     model = Line
-    readonly_fields = ["unit_price", "total_price", "discounted_price"]
+    readonly_fields = [
+        "unit_price",
+        "total_price",
+        "discounted_price",
+        "discounted_unit_price",
+    ]
     min_num = 1
     extra = 0
 

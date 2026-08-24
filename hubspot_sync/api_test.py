@@ -1,6 +1,7 @@
 """Tests for hubspot_sync.api"""
 
 import json
+from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
@@ -22,7 +23,7 @@ from courses.factories import (
     ProgramFactory,
 )
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
-from ecommerce.models import Product
+from ecommerce.models import Line, Product
 from hubspot_sync import api
 from hubspot_sync.api import get_hubspot_id_for_object
 from hubspot_sync.conftest import FAKE_HUBSPOT_ID
@@ -1411,3 +1412,28 @@ def test_get_program_certificate_hubspot_property_removes_semicolons():
     assert ";" not in option["label"]
     # Check that the readable_id is present (this should always be there)
     assert program_with_semicolon.readable_id in option["label"]
+
+
+def test_track_cart_add_records_the_line_price(settings, mocker, user):
+    """The cart-add tracker creates a Line outside the pricing pass; it must stamp."""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "mitx-token"  # noqa: S105
+    with reversion.create_revision():
+        product = ProductFactory.create(price=Decimal("100.00"))
+
+    # Everything between the entry point and the Line.objects.create in
+    # track_cart_add_with_hubspot talks to HubSpot; this is the patch set from
+    # test_track_cart_add_with_hubspot_uses_uai_account.
+    mocker.patch("hubspot_sync.api.HubspotApi")
+    mocker.patch("hubspot_sync.api._ensure_target_hubspot_contact_properties")
+    mocker.patch(
+        "hubspot_sync.api._ensure_hubspot_contact_for_user", return_value="contact-id"
+    )
+    mocker.patch("hubspot_sync.api._sync_cart_add_deal_with_hubspot")
+
+    # track_cart_add_with_hubspot swallows every exception and returns False, so
+    # assert the return value: otherwise a failure inside the try reads as a
+    # missing Line and sends you hunting in the wrong place.
+    assert api.track_cart_add_with_hubspot(user, product, is_uai_course=False) is True
+
+    line = Line.objects.get(order__purchaser=user)
+    assert line.discounted_unit_price == Decimal("100.00")
