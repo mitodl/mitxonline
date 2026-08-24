@@ -6,11 +6,12 @@ import pytest
 import reversion
 from django.test import Client, RequestFactory
 from django.urls import reverse
+from reversion.models import Version
 
 from courses.models import CourseRun, Program
 from ecommerce.api import generate_checkout_payload
-from ecommerce.factories import ProductFactory, ProgramProductFactory
-from ecommerce.models import Order, OrderStatus
+from ecommerce.factories import OrderFactory, ProductFactory, ProgramProductFactory
+from ecommerce.models import Line, Order, OrderStatus
 from ecommerce.serializers.v0 import TransactionLineSerializer
 from ecommerce.views.legacy.views_test import create_basket
 
@@ -51,13 +52,8 @@ def create_order(mocker, user, products):
 
 def build_expected_line(instance):
     """Build the expected serialized line dict for a given order line."""
-    coupon_redemption = instance.order.discounts.first()
-    discount = 0.0
-
-    if coupon_redemption:
-        discount = instance.product.price - instance.discounted_price
-
-    total_paid = (instance.product.price - Decimal(discount)) * instance.quantity
+    total_paid = instance.get_discounted_unit_price() * instance.quantity
+    discount = instance.product.price * instance.quantity - total_paid
 
     content_object = instance.product.purchasable_object
     (content_title, readable_id) = (None, None)
@@ -138,3 +134,47 @@ def test_order_lines_serializer_tolerates_deleted_courseware_object(
     assert serialized_data[0]["start_date"] is None
     assert serialized_data[0]["end_date"] is None
     assert serialized_data[0]["content_title"] is None
+
+
+def _fulfilled_line(price, *, quantity=1, discounted_unit_price=None):
+    """
+    A fulfilled order carrying one line, priced independently of any discount row.
+
+    Re-fetched so the serializer sees the column's numeric(20,5) read-back
+    rather than the value handed to create().
+    """
+    with reversion.create_revision():
+        product = ProductFactory.create(price=price)
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+    line = Line.objects.create(
+        order=order,
+        purchased_object_id=product.object_id,
+        purchased_content_type_id=product.content_type_id,
+        product_version=Version.objects.get_for_object(product).first(),
+        quantity=quantity,
+        discounted_unit_price=discounted_unit_price,
+    )
+    return Line.objects.get(pk=line.pk)
+
+
+def test_receipt_line_reports_the_recorded_price():
+    """The receipt reports the recorded price; discount is the line total off list."""
+    line = _fulfilled_line(
+        Decimal("300.00"), quantity=2, discounted_unit_price=Decimal("200.00")
+    )
+
+    data = TransactionLineSerializer(instance=line).data
+
+    assert data["price"] == "300.00"
+    assert data["discount"] == "200.00"
+    assert data["total_paid"] == "400.00"
+
+
+def test_receipt_line_shows_no_discount_when_none_was_recorded():
+    """A line with no recorded price reports full price and a zero discount."""
+    line = _fulfilled_line(Decimal("300.00"))
+
+    data = TransactionLineSerializer(instance=line).data
+
+    assert data["discount"] == "0.00"
+    assert data["total_paid"] == "300.00"

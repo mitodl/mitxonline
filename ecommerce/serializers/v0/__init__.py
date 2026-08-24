@@ -88,13 +88,8 @@ class TransactionLineSerializer(serializers.Serializer):
     def to_representation(self, instance):
         """Returns the representation of the object."""
 
-        coupon_redemption = instance.order.discounts.first()
-        discount = 0.0
-
-        if coupon_redemption:
-            discount = instance.product.price - instance.discounted_price
-
-        total_paid = (instance.product.price - Decimal(discount)) * instance.quantity
+        total_paid = instance.discounted_price
+        discount = instance.product.price * instance.quantity - total_paid
 
         content_object = instance.product.purchasable_object
         (content_title, readable_id) = (None, None)
