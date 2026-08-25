@@ -1168,7 +1168,10 @@ class Line(TimestampedModel):
     @cached_property
     def discounted_price(self):
         """Return the price of the product with discounts"""
-        from ecommerce.discounts import DiscountType  # noqa: PLC0415
+        from ecommerce.discounts import (  # noqa: PLC0415
+            DiscountType,
+            product_from_version,
+        )
 
         discounts = [
             discount_redemption.redeemed_discount
@@ -1178,20 +1181,16 @@ class Line(TimestampedModel):
         return (
             DiscountType.get_discounted_price(
                 discounts,
-                Product.all_objects.get(pk=self.product_version.object_id),
-                product_version=self.product_version,
+                product_from_version(self.product_version),
             ).quantize(Decimal("0.01"))
             * self.quantity
         )
 
     @cached_property
     def product(self):
-        from ecommerce.discounts import resolve_product_version  # noqa: PLC0415
+        from ecommerce.discounts import product_from_version  # noqa: PLC0415
 
-        return resolve_product_version(
-            Product.all_objects.get(pk=self.product_version.field_dict["id"]),
-            self.product_version,
-        )
+        return product_from_version(self.product_version)
 
     @cached_property
     def courseware(self):

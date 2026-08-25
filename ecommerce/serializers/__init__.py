@@ -19,6 +19,7 @@ from ecommerce.constants import (
     PAYMENT_TYPES,
     TRANSACTION_TYPE_REFUND,
 )
+from ecommerce.discounts import product_from_version
 from ecommerce.models import (
     Basket,
     BasketItem,
@@ -385,11 +386,9 @@ class LineSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(ProductSerializer)
     def get_product(self, instance):
-        product = models.Product.all_objects.get(
-            pk=instance.product_version.field_dict["id"]
-        )
-
-        return ProductSerializer(instance=product).data
+        return ProductSerializer(
+            instance=product_from_version(instance.product_version)
+        ).data
 
     class Meta:
         fields = [
@@ -586,9 +585,7 @@ class OrderHistorySerializer(serializers.ModelSerializer):
         titles = []
 
         for line in instance.lines.all():
-            product = models.Product.all_objects.get(
-                pk=line.product_version.field_dict["id"]
-            )
+            product = product_from_version(line.product_version)
             if product.content_type.model == "courserun":
                 titles.append(product.purchasable_object.course.title)
             elif product.content_type.model == "programrun":
