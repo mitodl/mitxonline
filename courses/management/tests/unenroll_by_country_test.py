@@ -26,7 +26,9 @@ def mock_bulk_unenroll(mocker):
 
 def _enrollment_for_country(country, **kwargs):
     """Create a CourseRunEnrollment (active by default) for a user whose legal address is in `country`"""
-    user = UserFactory.create()  # UserFactory creates a legal_address via RelatedFactory
+    user = (
+        UserFactory.create()
+    )  # UserFactory creates a legal_address via RelatedFactory
     user.legal_address.country = country
     user.legal_address.save()
     kwargs.setdefault("active", True)
@@ -92,9 +94,7 @@ class TestUnenrollByCountry:
     def test_invalid_country_code(self):
         """A country code that isn't 2 characters should raise CommandError"""
         with pytest.raises(CommandError, match="ISO 3166-1 alpha-2"):
-            call_command(
-                "unenroll_by_country", country="IRAN", stdout=StringIO()
-            )
+            call_command("unenroll_by_country", country="IRAN", stdout=StringIO())
 
     def test_no_matching_enrollments(self):
         """A country with no active enrollments should raise CommandError"""
