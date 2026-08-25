@@ -67,6 +67,19 @@ jobs:
           SECRET_KEY: local_unsafe_key  # pragma: allowlist secret
           MITOL_PAYMENT_GATEWAY_STRIPE_API_KEY: skc_test_123456  # pragma: allowlist secret
 
+      - name: Get current date
+        id: date
+        run: echo "date=$(date -u +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Keycloak OpenAPI spec
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ runner.temp }}/keycloak-openapi.yaml
+          key: keycloak-openapi-spec-${{ steps.date.outputs.date }}
+
+      - name: Set Keycloak OpenAPI spec path
+        run: echo "KEYCLOAK_OPENAPI_SPEC_FILE=${{ runner.temp }}/keycloak-openapi.yaml" >> "$GITHUB_ENV"
+
       - name: Migration and OpenAPI spec checks
         run: ./scripts/test/python_checks.sh
         env: *django-env-vars

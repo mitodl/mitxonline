@@ -22,5 +22,6 @@ function run_test {
 run_test ./scripts/test/detect_missing_migrations.sh
 run_test ./scripts/test/no_auto_migrations.sh
 run_test ./scripts/test/openapi_spec_check.sh
+run_test ./scripts/test/keycloak_dataclass_staleness.sh
 
 exit $status
