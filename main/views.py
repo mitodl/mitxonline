@@ -6,17 +6,13 @@ from django.conf import settings
 from django.contrib.auth.views import redirect_to_login
 from django.http import (
     HttpResponseNotFound,
-    HttpResponseRedirect,
     HttpResponseServerError,
 )
 from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.cache import never_cache
-from mitol.olposthog.features import is_enabled
 from rest_framework.pagination import LimitOffsetPagination
-
-from main import features
 
 
 def get_base_context(request):  # noqa: ARG001
