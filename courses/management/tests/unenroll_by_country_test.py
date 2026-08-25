@@ -25,11 +25,12 @@ def mock_bulk_unenroll(mocker):
 
 
 def _enrollment_for_country(country, **kwargs):
-    """Create an active CourseRunEnrollment for a user whose legal address is in `country`"""
+    """Create a CourseRunEnrollment (active by default) for a user whose legal address is in `country`"""
     user = UserFactory.create()  # UserFactory creates a legal_address via RelatedFactory
     user.legal_address.country = country
     user.legal_address.save()
-    return CourseRunEnrollmentFactory.create(user=user, active=True, **kwargs)
+    kwargs.setdefault("active", True)
+    return CourseRunEnrollmentFactory.create(user=user, **kwargs)
 
 
 @pytest.mark.django_db()
