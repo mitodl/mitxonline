@@ -222,3 +222,52 @@ jobs:
           yarn workspaces foreach run build --bail --mode production
         env:
           NODE_ENV: production
+
+  # ONE required status check standing for this whole workflow.
+  #
+  # GitHub's required status checks take an exact list of context names -- no
+  # wildcards, no "all checks must pass" option -- so requiring these jobs directly
+  # means restating their names in mitodl/ol-infrastructure, where the ruleset lives.
+  # That list then goes stale in two ways, and `python-tests` has already hit the
+  # worse one:
+  #
+  #   A matrix job's checks are named `python-tests (1)`..`(4)`, so the shard count is
+  #   part of the context name. This suite was a single `python-tests` job until
+  #   2026-07-23 (63ded115). Had it been required by name, that commit would have
+  #   blocked itself, and once merged every later PR would have waited forever on a
+  #   check GitHub was never going to report again -- with the cause in this repo and
+  #   the fix in another one.
+  #
+  #   A newly added job is not required until somebody remembers to go and add it, so
+  #   new CI silently cannot block a merge.
+  #
+  # Requiring `ci-gate` instead keeps the list of what must pass in the same file as
+  # the jobs it names, so resizing the matrix or adding a job is one edit in one repo.
+  # `needs` on a matrix job aggregates every shard, so no shard count appears anywhere.
+  ci-gate:
+    needs: [python-checks, python-tests, javascript-tests]
+    # Without this the gate is skipped when a dependency fails, and a skipped required
+    # check leaves the PR pending rather than failing it.
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Evaluate CI result
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          # Read from `needs` rather than naming each job again: adding a job to the
+          # list above is then the only edit, which is the entire point of this job.
+          # `skipped` passes so that a job legitimately gated behind an `if:` does not
+          # wedge the branch; `failure` and `cancelled` do not.
+          failed=$(echo "$NEEDS" | jq -r '
+            to_entries[]
+            | select(.value.result != "success" and .value.result != "skipped")
+            | .key')
+          if [ -n "$failed" ]; then
+            echo "::error::CI did not succeed: $(echo "$failed" | paste -sd, -)"
+            exit 1
+          fi
+          echo "All CI jobs succeeded."
