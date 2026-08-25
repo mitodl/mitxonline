@@ -43,17 +43,17 @@ def dashboard(request, **kwargs):
     Dashboard view - redirects to the new learn frontend if the feature flag
     is enabled for this user, otherwise serves the legacy React app.
     """
-    # if request.user.is_authenticated:
-    #     global_id = request.user.global_id
-    #     if global_id and is_enabled(
-    #         features.REDIRECT_LEARN_DASHBOARD,
-    #         default=False,
-    #         opt_unique_id=global_id,
-    #     ):
-    #         redirect_url = settings.MIT_LEARN_DASHBOARD_URL
-    #         if qs := request.META.get("QUERY_STRING"):
-    #             redirect_url = f"{redirect_url}?{qs}"
-    #         return HttpResponseRedirect(redirect_url)
+    if request.user.is_authenticated:
+        global_id = request.user.global_id
+        if global_id and is_enabled(
+            features.REDIRECT_LEARN_DASHBOARD,
+            default=False,
+            opt_unique_id=global_id,
+        ):
+            redirect_url = settings.MIT_LEARN_DASHBOARD_URL
+            if qs := request.META.get("QUERY_STRING"):
+                redirect_url = f"{redirect_url}?{qs}"
+            return HttpResponseRedirect(redirect_url)
     return index(request, **kwargs)
 
 
