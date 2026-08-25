@@ -86,5 +86,5 @@ class DollarsOffDiscount(DiscountType, discount_type=DISCOUNT_TYPE_DOLLARS_OFF):
 
 
 class FixedPriceDiscount(DiscountType, discount_type=DISCOUNT_TYPE_FIXED_PRICE):
-    def get_product_version_price(self, product: Product):
+    def get_product_version_price(self, product: Product):  # noqa: ARG002
         return Decimal(self.discount.amount)
