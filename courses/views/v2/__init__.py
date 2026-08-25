@@ -34,9 +34,9 @@ from rest_framework.response import Response
 from cms.models import CoursePage
 from compliance.exceptions import ExportComplianceCheckError
 from courses.api import (
-    create_program_enrollments,
     create_run_enrollments,
     deactivate_run_enrollment,
+    reconcile_verified_program_enrollments,
 )
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.exceptions import EnrollmentCreationFailedError, EnrollmentError
@@ -837,52 +837,6 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
     )
 
 
-def _reconcile_verified_program_enrollments(
-    request, courserun_id, root_program, verified_program_enrollments, programs
-):
-    """
-    Create audit/verified program enrollments as needed to reconcile the
-    learner's verified enrollment state before enrolling them in the course run.
-
-    Raises:
-        EnrollmentError: if reconciliation failed
-    """
-    try:
-        if len(verified_program_enrollments) == 0:
-            # No verified enrollments, so it doesn't matter - the user will get an
-            # audit one. (But make the audit enrollment to not confuse the course run
-            # process later.)
-            create_program_enrollments(
-                request.user, programs, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
-            )
-        elif (
-            len(verified_program_enrollments) == 1
-            and verified_program_enrollments[0].program == root_program
-        ):
-            # The verified enrollment that's here is for the root program, so we can
-            # create a verified enrollment for the other program.
-            create_program_enrollments(
-                request.user, programs, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
-            )
-        elif (
-            len(verified_program_enrollments) == 1
-            and verified_program_enrollments[0].program != root_program
-        ):
-            # The verified enrollment that's here is _not_ for the root program, so
-            # we should stop.
-            log.error(
-                "add_verified_program_course_enrollment: user %s enrolling in %s has no verified enrollment in %s",
-                request.user,
-                courserun_id,
-                root_program,
-            )
-            raise EnrollmentError
-    except ExportComplianceCheckError as exc:
-        # Don't propagate the specifics of the compliance decision to the
-        # client - the underlying cause is logged where it's raised.
-        raise EnrollmentError from exc
-
-
 @extend_schema(
     request=list[str],
     responses={
@@ -983,8 +937,8 @@ def add_verified_program_course_enrollment(request, courserun_id: str):
         if enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
     ]
 
-    _reconcile_verified_program_enrollments(
-        request, courserun_id, root_program, verified_program_enrollments, programs
+    reconcile_verified_program_enrollments(
+        request.user, courserun_id, root_program, verified_program_enrollments, programs
     )
 
     # If we fell out the bottom, we have all verified enrollments, or we've made

@@ -33,7 +33,7 @@ from rest_framework.status import HTTP_404_NOT_FOUND
 from b2b.api import process_add_org_membership
 from cms.api import create_default_courseware_page
 from compliance.api import verify_user_with_exports
-from compliance.exceptions import ExportComplianceError
+from compliance.exceptions import ExportComplianceCheckError, ExportComplianceError
 from courses import mail_api
 from courses.constants import (
     COURSE_KEY_PATTERN,
@@ -41,6 +41,7 @@ from courses.constants import (
     ENROLL_CHANGE_STATUS_UNENROLLED,
     PROGRAM_TEXT_ID_PREFIX,
 )
+from courses.exceptions import EnrollmentError
 from courses.models import (
     BlockedCountry,
     Course,
@@ -357,6 +358,52 @@ def create_program_enrollments(
         else:
             successful_enrollments.append(enrollment)
     return successful_enrollments
+
+
+def reconcile_verified_program_enrollments(
+    user, courserun_id, root_program, verified_program_enrollments, programs
+):
+    """
+    Create audit/verified program enrollments as needed to reconcile the
+    learner's verified enrollment state before enrolling them in the course run.
+
+    Raises:
+        EnrollmentError: if reconciliation failed
+    """
+    try:
+        if len(verified_program_enrollments) == 0:
+            # No verified enrollments, so it doesn't matter - the user will get an
+            # audit one. (But make the audit enrollment to not confuse the course run
+            # process later.)
+            create_program_enrollments(
+                user, programs, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+            )
+        elif (
+            len(verified_program_enrollments) == 1
+            and verified_program_enrollments[0].program == root_program
+        ):
+            # The verified enrollment that's here is for the root program, so we can
+            # create a verified enrollment for the other program.
+            create_program_enrollments(
+                user, programs, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+            )
+        elif (
+            len(verified_program_enrollments) == 1
+            and verified_program_enrollments[0].program != root_program
+        ):
+            # The verified enrollment that's here is _not_ for the root program, so
+            # we should stop.
+            log.error(
+                "reconcile_verified_program_enrollments: user %s enrolling in %s has no verified enrollment in %s",
+                user,
+                courserun_id,
+                root_program,
+            )
+            raise EnrollmentError
+    except ExportComplianceCheckError as exc:
+        # Don't propagate the specifics of the compliance decision to the
+        # client - the underlying cause is logged where it's raised.
+        raise EnrollmentError from exc
 
 
 def upgrade_audit_run_enrollments_for_program_purchase(user, program):

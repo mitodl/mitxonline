@@ -2460,7 +2460,7 @@ def test_add_nested_verified_program_course_enrollment_export_compliance_blocked
     )
 
     exc = ExportComplianceError(user, "REJECT", "102")
-    mocker.patch("courses.views.v2.create_program_enrollments", side_effect=exc)
+    mocker.patch("courses.api.create_program_enrollments", side_effect=exc)
 
     resp = user_drf_client.post(
         reverse(
