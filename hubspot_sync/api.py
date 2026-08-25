@@ -47,7 +47,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
 )
-from ecommerce.discounts import resolve_product_version
+from ecommerce.discounts import resolve_product_from_version
 from ecommerce.models import Line, Order, Product
 from hubspot_sync.rate_limiter import wait_for_hubspot_rate_limit
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
@@ -2330,13 +2330,7 @@ def _build_target_line_item_message(
 
 def _get_product_from_line(line: Line) -> Product | None:
     """Resolve the line's product similarly to serializer logic used for HubSpot payloads."""
-    if not line.product_version:
-        return None
-    version = line.product_version
-    product = Product.all_objects.filter(id=version.object_id).first()
-    if product:
-        return resolve_product_version(product, product_version=version)
-    return version.object
+    return resolve_product_from_version(line.product_version)
 
 
 def _find_target_product_id_by_unique_app_id(

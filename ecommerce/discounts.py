@@ -2,8 +2,6 @@ import abc
 from dataclasses import dataclass
 from decimal import Decimal
 
-from reversion.models import Version
-
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
@@ -12,51 +10,29 @@ from ecommerce.constants import (
 from ecommerce.models import Discount, Product
 
 
-def resolve_product_version(product: Product, product_version=None):
-    """
-    Resolves the specified version of the product. Specify None to indicate the
-    current version. (This should probably move to the model.)
-
-    Returns: Product; either the product you passed in or the version of the product
-    you requested.
-    """
-    if product_version is None:
-        return product
-
-    versions = Version.objects.get_for_object(product)
-
-    if versions.count() == 0:
-        return product
-
-    for test_version in versions.all():
-        if test_version == product_version:
-            return Product(
-                id=test_version.field_dict["id"],
-                content_type_id=test_version.field_dict["content_type_id"],
-                object_id=test_version.field_dict["object_id"],
-                price=test_version.field_dict["price"],
-                description=test_version.field_dict["description"],
-                is_active=test_version.field_dict["is_active"],
-            )
-
-    raise TypeError("Invalid product version specified")  # noqa: EM101
+def _product_from_version(version):
+    """Reconstruct a Product from its reversion Version's serialized data."""
+    field_dict = version.field_dict
+    return Product(
+        id=field_dict["id"],
+        content_type_id=field_dict["content_type_id"],
+        object_id=field_dict["object_id"],
+        price=field_dict["price"],
+        description=field_dict["description"],
+        is_active=field_dict["is_active"],
+    )
 
 
 def resolve_product_from_version(product_version):
     """
     Resolve a Product from its reversion Version.
 
-    Uses the live product when it still exists (so resolve_product_version can
-    pick the right historical snapshot). Falls back to version.object when the
-    product row has been deleted, reconstructing the purchased state from the
-    serialized revision data without touching the live table.
+    Always reconstructs from the serialized revision data so the result reflects
+    the state at purchase time, regardless of whether the live row still exists.
     """
     if product_version is None:
         return None
-    product = Product.all_objects.filter(pk=product_version.object_id).first()
-    if product:
-        return resolve_product_version(product, product_version=product_version)
-    return product_version.object
+    return _product_from_version(product_version)
 
 
 @dataclass
@@ -81,11 +57,8 @@ class DiscountType(abc.ABC):
         return DiscountTypeCls(discount)
 
     @staticmethod
-    def get_discounted_price(discounts, product, *, product_version=None):
+    def get_discounted_price(discounts, product):
         """Return the price of the product with discounts"""
-        if product_version is not None:
-            product = resolve_product_version(product, product_version)
-
         # apply discount to product using the best discount
         # in practice, orders will only have one discount
         # but JUST IN CASE this ever changes
@@ -98,36 +71,30 @@ class DiscountType(abc.ABC):
         return price
 
     def get_product_price(self, product: Product):
-        # original spec had this tracking versions differently than the way it is now
-        # need to build in some logic to check on reversion for a given version but it should be the latest one
         return self.get_product_version_price(product)
 
     @abc.abstractmethod
-    def get_product_version_price(self, product: Product, version):
+    def get_product_version_price(self, product: Product):
         pass
 
 
 class PercentDiscount(DiscountType, discount_type=DISCOUNT_TYPE_PERCENT_OFF):
-    def get_product_version_price(self, product: Product, version=None):
-        version = resolve_product_version(product, version)
-
+    def get_product_version_price(self, product: Product):
         return round(
-            Decimal(version.price)
-            - (version.price * Decimal(self.discount.amount / 100)),
+            Decimal(product.price)
+            - (product.price * Decimal(self.discount.amount / 100)),
             2,
         )
 
 
 class DollarsOffDiscount(DiscountType, discount_type=DISCOUNT_TYPE_DOLLARS_OFF):
-    def get_product_version_price(self, product: Product, version=None):
-        version = resolve_product_version(product, version)
-
-        if version.price < self.discount.amount:
+    def get_product_version_price(self, product: Product):
+        if product.price < self.discount.amount:
             return Decimal(0)
 
-        return version.price - self.discount.amount
+        return product.price - self.discount.amount
 
 
 class FixedPriceDiscount(DiscountType, discount_type=DISCOUNT_TYPE_FIXED_PRICE):
-    def get_product_version_price(self, product: Product, version=None):  # noqa: ARG002
+    def get_product_version_price(self, product: Product):
         return Decimal(self.discount.amount)
