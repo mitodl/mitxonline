@@ -1170,7 +1170,7 @@ class Line(TimestampedModel):
         """Return the price of the product with discounts"""
         from ecommerce.discounts import (  # noqa: PLC0415
             DiscountType,
-            resolve_product_from_version,
+            product_from_version,
         )
 
         discounts = [
@@ -1181,16 +1181,16 @@ class Line(TimestampedModel):
         return (
             DiscountType.get_discounted_price(
                 discounts,
-                resolve_product_from_version(self.product_version),
+                product_from_version(self.product_version),
             ).quantize(Decimal("0.01"))
             * self.quantity
         )
 
     @cached_property
     def product(self):
-        from ecommerce.discounts import resolve_product_from_version  # noqa: PLC0415
+        from ecommerce.discounts import product_from_version  # noqa: PLC0415
 
-        return resolve_product_from_version(self.product_version)
+        return product_from_version(self.product_version)
 
     @cached_property
     def courseware(self):

@@ -10,8 +10,10 @@ from ecommerce.constants import (
 from ecommerce.models import Discount, Product
 
 
-def _product_from_version(version):
+def product_from_version(version):
     """Reconstruct a Product from its reversion Version's serialized data."""
+    if version is None:
+        return None
     field_dict = version.field_dict
     return Product(
         id=field_dict["id"],
@@ -21,18 +23,6 @@ def _product_from_version(version):
         description=field_dict["description"],
         is_active=field_dict["is_active"],
     )
-
-
-def resolve_product_from_version(product_version):
-    """
-    Resolve a Product from its reversion Version.
-
-    Always reconstructs from the serialized revision data so the result reflects
-    the state at purchase time, regardless of whether the live row still exists.
-    """
-    if product_version is None:
-        return None
-    return _product_from_version(product_version)
 
 
 @dataclass
