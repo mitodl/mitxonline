@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 1.163.3
+---------------
+
+- CI step to check for stale keycloak api spec (#3867)
+- Require login to view a financial assistance form (#3865)
+- Mailgun event disaster recovery management command (#3870)
+- feat(scim): add migrate_and_sync_users orchestrator command (#3837)
+- fix(courses): re-fetch created users by email after bulk_create in migrate_edx_data (#3843)
+- Remove ATTR_MAP entries that silently corrupt data on SCIM PATCH replace (#3874)
+
 Version 1.163.2 (Released August 24, 2026)
 ---------------
 
