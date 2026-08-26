@@ -166,6 +166,7 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
         ),
         "assigned_email",
         "assigned_name",
+        "email_status",
     ]
     date_hierarchy = "created_on"
     fields = [
