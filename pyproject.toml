@@ -370,6 +370,7 @@ env = [
   "RECAPTCHA_SECRET_KEY=",
   "POSTHOG_ENABLED=True",
   "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN=",
+  "MITOL_PAYMENT_GATEWAY_STRIPE_API_KEY=not-a-real-key",
 ]
 markers = [
   "dont_mock_enrollments",
