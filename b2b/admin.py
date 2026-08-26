@@ -184,6 +184,8 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
         "assigned_name",
     ]
 
+    actions = ["backfill_email_events"]
+
     @admin.display(description="Discount Code")
     def discount_code(self, instance):
         """Return the discount code"""
@@ -211,6 +213,20 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
 
         namestr = f"<br />{instance.assigned_name}" if instance.assigned_name else ""
         return format_html(f"{instance.assigned_email}{namestr}")
+
+    @admin.action(
+        description="Backfill most recent email event within last 30d for records with email message IDs"
+    )
+    def backfill_email_events(self, request, queryset):  # noqa: ARG002
+        """Admin action to regenerate verifiable credentials for a program"""
+        dcar_ids = queryset.values_list("id", flat=True)
+        # Filter out anything which doesn't have a tracked message ID
+        dcars = list(  # noqa: F841
+            DiscountContractAttachmentRedemption.objects.filter(
+                id__in=dcar_ids
+            ).exclude(email_message_id="")
+        )
+        # Restructure some of backfill_mailgun_webhooks out into reusable helper, reference here
 
 
 @admin.register(ContractPage)
