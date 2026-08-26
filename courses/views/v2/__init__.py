@@ -76,6 +76,7 @@ from courses.utils import (
     get_enrollable_courses,
     get_program_certificate_by_enrollment,
     get_unenrollable_courses,
+    live_certificate_page_exists,
 )
 from ecommerce.api import create_verified_program_course_run_enrollment
 from ecommerce.models import Product
@@ -233,6 +234,7 @@ class ProgramViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
         return (
             Program.objects.filter()
             .select_related("page", "page__feature_image")
+            .annotate(has_live_certificate_page=live_certificate_page_exists())
             .prefetch_related(
                 "enrollment_modes",
                 Prefetch("departments", queryset=Department.objects.only("id", "name")),
@@ -472,6 +474,9 @@ class CourseViewSet(
                     courseruns__enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
                 ),
             )
+        )
+        queryset = queryset.annotate(
+            has_live_certificate_page=live_certificate_page_exists()
         )
         queryset = queryset.prefetch_related(
             Prefetch(

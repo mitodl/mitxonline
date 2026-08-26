@@ -1058,25 +1058,27 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
         return None, False, (delete_count > 0)
 
     elif should_create:
+        course = course_run.course
+        if course.certificates_disabled:
+            log.warning(
+                "Skipping certificate creation for user=%s run=%s: "
+                "certificates are disabled for course %s",
+                user.id,
+                course_run.courseware_id,
+                course.readable_id,
+            )
+            return None, False, False
+        if not course.certificate_page:
+            log.warning(
+                "Skipping certificate creation for user=%s run=%s: no live certificate page",
+                user.id,
+                course_run.courseware_id,
+            )
+            return None, False, False
         try:
             certificate, created = CourseRunCertificate.objects.get_or_create(
                 user=user, course_run=course_run
             )
-            if not certificate.certificate_page_revision:
-                course = course_run.course
-                course_page = course.course_page
-                if not course_page:
-                    log.warning(
-                        "Skipping certificate page revision for user=%s run=%s because course page is missing",
-                        user.id,
-                        course_run.courseware_id,
-                    )
-                elif not course_page.certificate_page:
-                    log.warning(
-                        "Skipping certificate page revision for user=%s run=%s because certificate page is missing",
-                        user.id,
-                        course_run.courseware_id,
-                    )
             sync_hubspot_user(user)
             if not certificate.verifiable_credential_id:
                 create_verifiable_credential(certificate)
@@ -1418,6 +1420,23 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
     if not force_create and not _has_earned_program_cert(user, program):
         return None, False
 
+    if program.certificates_disabled:
+        log.warning(
+            "Skipping program certificate creation for user=%s program=%s: "
+            "certificates are disabled for this program",
+            user.id,
+            program.readable_id,
+        )
+        return None, False
+    if not program.certificate_page:
+        log.warning(
+            "Skipping program certificate creation for user=%s program=%s: "
+            "no live certificate page",
+            user.id,
+            program.readable_id,
+        )
+        return None, False
+
     program_cert, created = ProgramCertificate.all_objects.get_or_create(
         user=user,
         program=program,
@@ -1428,20 +1447,6 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
             user.edx_username,
             program.title,
         )
-        if not program_cert.certificate_page_revision:
-            program_page = program.program_page
-            if not program_page:
-                log.warning(
-                    "Skipping program certificate page revision for user=%s program=%s because program page is missing",
-                    user.id,
-                    program.readable_id,
-                )
-            elif not program_page.certificate_page:
-                log.warning(
-                    "Skipping program certificate page revision for user=%s program=%s because certificate page is missing",
-                    user.id,
-                    program.readable_id,
-                )
         sync_hubspot_user(user)
         if not program_cert.verifiable_credential_id:
             create_verifiable_credential(program_cert)

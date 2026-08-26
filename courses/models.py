@@ -187,6 +187,13 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     b2b_only = models.BooleanField(
         default=False, help_text="Indicates if the program is B2B only"
     )
+    certificates_disabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "If set, no certificates will be generated for this program, "
+            "even if a live certificate page exists."
+        ),
+    )
     products = GenericRelation("ecommerce.Product", related_query_name="programs")
 
     @cached_property
@@ -952,6 +959,13 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     )
     live = models.BooleanField(default=False, db_index=True)
     departments = models.ManyToManyField(Department, blank=True, related_name="courses")
+    certificates_disabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "If set, no certificates will be generated for this course, "
+            "even if a live certificate page exists."
+        ),
+    )
     flexible_prices = GenericRelation(
         "flexiblepricing.FlexiblePrice",
         object_id_field="courseware_object_id",

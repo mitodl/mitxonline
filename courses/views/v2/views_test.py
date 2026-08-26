@@ -456,6 +456,42 @@ def test_filter_with_org_id_anonymous():
     assert response.data["results"] == []
 
 
+def test_courses_list_certificate_available_gated_via_annotation():
+    """
+    certificate_available in the list endpoint must reflect the annotated
+    has_live_certificate_page queryset field, not just the model flag, since
+    the list serializer never falls back to the (N+1-prone) certificate_page
+    property.
+    """
+    client = APIClient()
+    course = CourseRunFactory.create().course
+
+    response = client.get(reverse("v2:courses_api-list"))
+    result = next(r for r in response.data["results"] if r["id"] == course.id)
+    assert result["certificate_available"] is True
+
+    course.page.certificate_page.delete()
+    response = client.get(reverse("v2:courses_api-list"))
+    result = next(r for r in response.data["results"] if r["id"] == course.id)
+    assert result["certificate_available"] is False
+
+
+def test_programs_list_certificate_available_gated_via_annotation():
+    """certificate_available in the program list endpoint must reflect certificates_disabled and the live certificate page."""
+    client = APIClient()
+    program = ProgramFactory.create()
+
+    response = client.get(reverse("v2:programs_api-list"))
+    result = next(r for r in response.data["results"] if r["id"] == program.id)
+    assert result["certificate_available"] is True
+
+    program.certificates_disabled = True
+    program.save()
+    response = client.get(reverse("v2:programs_api-list"))
+    result = next(r for r in response.data["results"] if r["id"] == program.id)
+    assert result["certificate_available"] is False
+
+
 @pytest.mark.django_db
 @pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_returns_contracted_course(
