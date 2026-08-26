@@ -6,6 +6,7 @@ from dateutil.parser import parse
 from django.test import RequestFactory
 from django.urls import reverse
 from mitol.common.utils import now_in_utc
+from reversion.models import Version
 
 from courses.factories import CourseRunFactory, ProgramFactory, ProgramRunFactory
 from courses.models import CourseRun, ProgramRun
@@ -18,11 +19,12 @@ from ecommerce.constants import (
 from ecommerce.discounts import DiscountType
 from ecommerce.factories import (
     BasketItemFactory,
+    OrderFactory,
     ProductFactory,
     ProgramProductFactory,
     UnlimitedUseDiscountFactory,
 )
-from ecommerce.models import BasketDiscount, Order, OrderStatus
+from ecommerce.models import BasketDiscount, Line, Order, OrderStatus
 from ecommerce.serializers import (
     BaseProductSerializer,
     BasketItemSerializer,
@@ -471,13 +473,8 @@ def test_order_receipt_lines_serializer(settings, mocker, user, products, user_c
     )
 
     for instance in order.lines.all():
-        coupon_redemption = instance.order.discounts.first()
-        discount = 0.0
-
-        if coupon_redemption:
-            discount = instance.product.price - instance.discounted_price
-
-        total_paid = (instance.product.price - Decimal(discount)) * instance.quantity
+        total_paid = instance.get_discounted_unit_price() * instance.quantity
+        discount = instance.product.price * instance.quantity - total_paid
 
         content_object = instance.product.purchasable_object
         (content_title, readable_id) = (None, None)
@@ -518,13 +515,8 @@ def test_program_order_receipt_lines_serializer(settings, mocker, user, user_cli
     )
 
     for instance in order.lines.all():
-        coupon_redemption = instance.order.discounts.first()
-        discount = 0.0
-
-        if coupon_redemption:
-            discount = instance.product.price - instance.discounted_price
-
-        total_paid = (instance.product.price - Decimal(discount)) * instance.quantity
+        total_paid = instance.get_discounted_unit_price() * instance.quantity
+        discount = instance.product.price * instance.quantity - total_paid
 
         content_object = instance.product.purchasable_object
 
@@ -547,3 +539,34 @@ def test_program_order_receipt_lines_serializer(settings, mocker, user, user_cli
 
     serialized_data = TransactionLineSerializer(instance=order.lines, many=True).data
     assert serialized_data == test_data["lines"]
+
+
+def _fulfilled_line(price, *, discounted_unit_price=None):
+    """A fulfilled order carrying one line, priced independently of any discount row."""
+    with reversion.create_revision():
+        product = ProductFactory.create(price=price)
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+    line = Line.objects.create(
+        order=order,
+        purchased_object_id=product.object_id,
+        purchased_content_type_id=product.content_type_id,
+        product_version=Version.objects.get_for_object(product).first(),
+        quantity=1,
+        discounted_unit_price=discounted_unit_price,
+    )
+    return Line.objects.get(pk=line.pk)
+
+
+@pytest.mark.django_db
+def test_legacy_receipt_line_reports_the_recorded_price():
+    """
+    The emailed receipt and /api/orders/receipt/ read the recorded price, not a
+    recompute from whatever discounts are on the order now.
+    """
+    line = _fulfilled_line(Decimal("300.00"), discounted_unit_price=Decimal("200.00"))
+
+    data = TransactionLineSerializer(instance=line).data
+
+    assert data["price"] == "300.00"
+    assert data["discount"] == "100.00"
+    assert data["total_paid"] == "200.00"

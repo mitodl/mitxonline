@@ -21,6 +21,7 @@ from ecommerce.constants import (
 from ecommerce.factories import (
     BasketFactory,
     BasketItemFactory,
+    DiscountFactory,
     OneTimeDiscountFactory,
     OneTimePerUserDiscountFactory,
     OrderFactory,
@@ -954,3 +955,152 @@ def test_stripe_event_log_resave():
     assert event.id == logged_event.event_id
     assert logged_event.related_order == order
     assert logged_event.event_data == event.to_dict(for_json=True)
+
+
+def _line_for(price, *, quantity=1, discounted_unit_price=None):
+    """Build a fulfilled order carrying one line at the given product price."""
+    with reversion.create_revision():
+        product = ProductFactory.create(price=price)
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+    return Line.objects.create(
+        order=order,
+        purchased_object_id=product.object_id,
+        purchased_content_type_id=product.content_type_id,
+        product_version=Version.objects.get_for_object(product).first(),
+        quantity=quantity,
+        discounted_unit_price=discounted_unit_price,
+    )
+
+
+def test_discounted_price_survives_a_discount_edited_after_purchase(user):
+    """The price read back does not move when the discount is edited."""
+    discount = DiscountFactory.create(
+        amount=Decimal("25"), discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    with reversion.create_revision():
+        product = ProductFactory.create(price=Decimal("100.00"))
+    order = PendingOrder.create_from_product(product, user, discount=discount)
+    line = order.lines.get()
+    assert line.discounted_price == Decimal("75.00")
+
+    discount.amount = Decimal("50")
+    discount.save()
+
+    assert Line.objects.get(pk=line.pk).discounted_price == Decimal("75.00")
+
+
+def test_discounted_price_falls_back_when_nothing_was_recorded():
+    """A NULL column keeps today's recompute-on-read behaviour."""
+    line = _line_for(Decimal("100.00"))
+
+    assert line.discounted_unit_price is None
+    assert line.discounted_price == Decimal("100.00")
+
+
+def test_record_discounted_unit_price_stores_the_per_unit_price():
+    """Recording stores a per-unit price; discounted_price reflects it at once."""
+    line = _line_for(
+        Decimal("100.00"), quantity=3, discounted_unit_price=Decimal("30.00")
+    )
+    assert line.discounted_price == Decimal("90.00")
+
+    line.record_discounted_unit_price()
+
+    assert line.discounted_unit_price == Decimal("100.00")
+    assert line.discounted_price == Decimal("300.00")
+
+
+def test_recording_an_unchanged_price_does_not_rewrite_the_line():
+    """Re-pricing at the same value skips the save, leaving updated_on alone."""
+    line = _line_for(Decimal("100.00"))
+    line.record_discounted_unit_price()
+    line = Line.objects.get(pk=line.pk)
+    before = line.updated_on
+
+    line.record_discounted_unit_price()
+
+    assert Line.objects.get(pk=line.pk).updated_on == before
+
+
+def test_discounted_price_reads_back_at_two_decimal_places():
+    """A re-read line renders discounted_price at two decimal places."""
+    line = _line_for(Decimal("999.00"))
+    line.record_discounted_unit_price()
+
+    line = Line.objects.get(pk=line.pk)
+    assert str(line.discounted_price) == "999.00"
+
+
+def test_pending_order_records_the_discounted_price_it_charges(user):
+    """Pricing stamps the discounted unit price and sums the order total from it."""
+    discount = DiscountFactory.create(
+        amount=Decimal("25"), discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    with reversion.create_revision():
+        product = ProductFactory.create(price=Decimal("100.00"))
+
+    order = PendingOrder.create_from_product(product, user, discount=discount)
+
+    line = order.lines.get()
+    assert line.discounted_unit_price == Decimal("75.00")
+    assert order.total_price_paid == Decimal("75.00")
+
+
+def test_pricing_reads_the_line_product_version_not_the_live_product(user):
+    """A line pinned to an older version is priced at that version's price."""
+    with reversion.create_revision():
+        product = ProductFactory.create(price=Decimal("100.00"))
+    original_version = Version.objects.get_for_object(product).first()
+    with reversion.create_revision():
+        product.price = Decimal("200.00")
+        product.save()
+
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+    line = Line.objects.create(
+        order=order,
+        purchased_object_id=product.object_id,
+        purchased_content_type_id=product.content_type_id,
+        product_version=original_version,
+        quantity=1,
+    )
+
+    assert line.record_discounted_unit_price() == Decimal("100.00")
+
+
+def test_repricing_a_pending_order_refreshes_the_recorded_price(basket):
+    """A reused pending order re-prices its existing lines."""
+    with reversion.create_revision():
+        product = ProductFactory.create(price=Decimal("100.00"))
+    BasketItem.objects.create(product=product, basket=basket, quantity=1)
+
+    first = PendingOrder.create_from_basket(basket)
+    first.lines.update(discounted_unit_price=Decimal("1.00"))
+
+    second = PendingOrder.create_from_basket(basket)
+
+    assert second.pk == first.pk
+    assert second.lines.get().discounted_unit_price == Decimal("100.00")
+
+
+def test_repricing_a_pending_order_applies_a_newly_added_discount(basket):
+    """A discount added before a second checkout is what the line records."""
+    with reversion.create_revision():
+        product = ProductFactory.create(price=Decimal("100.00"))
+    BasketItem.objects.create(product=product, basket=basket, quantity=1)
+    order = PendingOrder.create_from_basket(basket)
+    assert order.lines.get().discounted_unit_price == Decimal("100.00")
+
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=basket.user,
+        redeemed_discount=DiscountFactory.create(
+            amount=Decimal("25"), discount_type=DISCOUNT_TYPE_PERCENT_OFF
+        ),
+        redeemed_basket=basket,
+    )
+
+    reprised = PendingOrder.create_from_basket(basket)
+
+    assert reprised.pk == order.pk
+    assert reprised.lines.get().discounted_unit_price == Decimal("75.00")
+    assert reprised.total_price_paid == Decimal("75.00")
