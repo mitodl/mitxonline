@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 1.163.4
+---------------
+
+- Record the post-discount unit price on order lines (#3884)
+- Uneroll learners management command (#3883)
+- Enforce export compliance verification on course/program enrollment (#3786)
+- Add a default (fake) Stripe key for testing use (#3885)
+- ci: add a ci-gate job so one required check can cover the whole suite (#3876)
+- Handle deleted products from versioned lines (#3878)
+- Sync HubSpot first and last names (#3880)
+
 Version 1.163.3 (Released August 26, 2026)
 ---------------
 
