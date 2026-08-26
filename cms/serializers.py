@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import bleach
 from drf_spectacular.utils import extend_schema_field
+from mitol.common.utils.queryset import is_prefetched
 from rest_framework import serializers
 
 from cms import models
@@ -220,17 +221,20 @@ class CoursePageSerializer(BaseCoursePageSerializer):
     @extend_schema_field(list)
     def get_instructors(self, instance):
         """Get instructor information"""
-        # Handle both QuerySet and prefetched list cases
-        linked_instructors = instance.linked_instructors
-
-        if hasattr(linked_instructors, "all"):
-            # It's a Manager/QuerySet - apply select_related and get all
-            instructor_links = linked_instructors.select_related(
+        # linked_instructors is always a related manager, so the old
+        # hasattr(.., "all") test was always true and the select_related()
+        # branch always ran - building a fresh queryset and ignoring any
+        # prefetch cache, one query per page.
+        #
+        # Read the cache when it is there; keep select_related() for the
+        # callers that do not prefetch (v1 courses, ecommerce), where dropping
+        # it would turn one query into one per instructor link.
+        if is_prefetched(instance, "linked_instructors"):
+            instructor_links = instance.linked_instructors.all()
+        else:
+            instructor_links = instance.linked_instructors.select_related(
                 "linked_instructor_page"
             ).all()
-        else:
-            # It's already a prefetched list - use directly
-            instructor_links = linked_instructors
 
         return [
             {

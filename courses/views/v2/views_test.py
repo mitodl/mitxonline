@@ -17,6 +17,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import connection
 from django.db.models import Exists, Q
 from django.test import RequestFactory
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from faker import Faker
 from mitol.common.serializers import THIS_IS_NOT_AN_API
@@ -29,6 +30,7 @@ from b2b.api import create_contract_run
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.models import ContractProgramItem
 from cms.factories import CoursePageFactory, ProgramPageFactory
+from cms.models import CoursePage
 from cms.serializers import ProgramPageSerializer
 from compliance.exceptions import ExportComplianceError
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
@@ -50,6 +52,7 @@ from courses.models import (
     Program,
     ProgramEnrollment,
 )
+from courses.serializers.utils import get_topics_from_page
 from courses.serializers.v1.base import EnrollmentModeSerializer
 from courses.serializers.v2.certificates import (
     CourseRunCertificateSerializer,
@@ -88,6 +91,12 @@ from users.factories import UserFactory
 pytestmark = [pytest.mark.django_db]
 logger = logging.getLogger(__name__)
 faker = Faker()
+
+# Ceiling for GET /api/v2/courses/. This is a per-request budget, not a
+# per-course one: it must stay constant as the number of courses on the page
+# grows. Tighten it as the remaining N+1s are removed; never scale it by row
+# count.
+COURSES_LIST_QUERY_BUDGET = 18
 
 
 @pytest.mark.skip_nplusone_check
@@ -267,7 +276,6 @@ def test_course_queryset_avoids_courserun_aggregate_annotations():
     assert {"count_b2b_courseruns", "count_courseruns"}.isdisjoint(annotations)
 
 
-@pytest.mark.skip_nplusone_check
 @pytest.mark.usefixtures("course_catalog_data")
 @pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [2], indirect=True)
@@ -501,7 +509,6 @@ def test_programs_list_certificate_available_gated_via_annotation():
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_returns_contracted_course(
     mocker, contract_ready_course, mock_course_run_clone
 ):
@@ -530,7 +537,6 @@ def test_filter_with_org_id_returns_contracted_course(
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_user_not_associated_with_org_returns_no_courses(
     contract_ready_course, mock_course_run_clone
 ):
@@ -555,7 +561,6 @@ def test_filter_with_org_id_user_not_associated_with_org_returns_no_courses(
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_multiple_courses_same_org(
     contract_ready_course, mock_course_run_clone
 ):
@@ -602,7 +607,6 @@ def test_filter_with_org_id_multiple_courses_same_org(
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_inactive_contract_excluded(
     contract_ready_course, mock_course_run_clone
 ):
@@ -630,7 +634,6 @@ def test_filter_with_org_id_inactive_contract_excluded(
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_multiple_orgs(contract_ready_course, mock_course_run_clone):
     """Test that filtering by org_id returns courses only for that specific org"""
     org1 = OrganizationPageFactory(name="Test Org 1")
@@ -671,7 +674,6 @@ def test_filter_with_org_id_multiple_orgs(contract_ready_course, mock_course_run
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_user_in_org_but_no_contract(
     contract_ready_course, mock_course_run_clone
 ):
@@ -709,7 +711,6 @@ def test_filter_with_org_id_nonexistent_org_id(user_drf_client):
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_returns_detail_view(
     contract_ready_course, mock_course_run_clone
 ):
@@ -736,7 +737,6 @@ def test_filter_with_org_id_returns_detail_view(
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_detail_view_unauthorized_user(
     contract_ready_course, mock_course_run_clone
 ):
@@ -761,7 +761,6 @@ def test_filter_with_org_id_detail_view_unauthorized_user(
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_respects_course_live_status(
     contract_ready_course, mock_course_run_clone
 ):
@@ -792,7 +791,6 @@ def test_filter_with_org_id_respects_course_live_status(
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_pagination(contract_ready_course, mock_course_run_clone):
     """Test that org_id filter works correctly with pagination"""
     org = OrganizationPageFactory(name="Test Org")
@@ -827,7 +825,6 @@ def test_filter_with_org_id_pagination(contract_ready_course, mock_course_run_cl
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_combined_with_other_filters(
     contract_ready_course, mock_course_run_clone
 ):
@@ -866,7 +863,6 @@ def test_filter_with_org_id_combined_with_other_filters(
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_without_org_id_authenticated_user(user_drf_client):
     course_with_contract = CourseFactory(title="Contract Course")
     contract = ContractPageFactory(active=True)
@@ -1644,7 +1640,6 @@ def test_filter_programs_by_org_and_contract_no_duplicates(
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 @pytest.mark.usefixtures("mock_course_run_clone")
 def test_filter_courses_with_contract_id_authenticated_user(make_contract_ready_course):
     """Test that filtering courses by contract_id returns contracted courses for authorized users"""
@@ -2628,7 +2623,6 @@ def test_get_courses_b2b_runs(with_b2b, single, user_drf_client):
         )
 
 
-@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize(
     "with_b2b",
     [
@@ -2832,16 +2826,18 @@ def test_course_run_and_product_prefetch_optimized(
         data = resp.json()["results"]
         assert len(data) == 1
         assert len(data[0]["courseruns"]) == num_courseruns
-    # Check that products are queried only once/twice
-    # not sure why there is a second query
+    # Products are fetched exactly once, by the courseruns prefetch. This used
+    # to be twice: Course.active_products re-queried them because
+    # first_unexpired_run came from its own query and so carried no
+    # prefetched_products. It now reads the prefetch cache, so the second
+    # query is gone.
     queries_after = connection.queries[num_queries_before:]
 
     product_queries = [
         q for q in queries_after if 'FROM "ecommerce_product"' in q.get("sql", "")
     ]
-    # increased below from 2 to 3 - the M2M for b2b_contracts adds some queries
-    assert len(product_queries) == 3, (
-        f"Expected 3 product query, got {len(product_queries)}: {[q['sql'] for q in product_queries]}"
+    assert len(product_queries) == 1, (
+        f"Expected 1 product query, got {len(product_queries)}: {[q['sql'] for q in product_queries]}"
     )
 
 
