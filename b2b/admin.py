@@ -1,10 +1,8 @@
 """B2B model admin. Only for convenience; you should use the Wagtail interface instead."""
 
 from django.contrib import admin
-from django.contrib.admin.templatetags.admin_urls import admin_urlname
 from django.contrib.contenttypes.admin import GenericTabularInline
-from django.db.models import Count, Model
-from django.shortcuts import resolve_url
+from django.db.models import Count
 from django.utils.html import format_html
 
 from b2b.models import (
@@ -15,15 +13,7 @@ from b2b.models import (
     UserOrganization,
 )
 from courses.models import CourseRun
-from main.admin import DisplayOnlyAdminMixin, ReadOnlyModelAdmin
-
-
-def get_model_admin_url(model: Model):
-    if model:
-        url = resolve_url(admin_urlname(model._meta, "change"), model.pk)  # noqa: SLF001
-        return format_html('<a href="{}">{}</a>', url, str(model))
-    else:
-        return "-"
+from main.admin import DisplayOnlyAdminMixin, ReadOnlyModelAdmin, get_model_admin_url
 
 
 class UserOrganizationAdminInline(DisplayOnlyAdminMixin, admin.TabularInline):
