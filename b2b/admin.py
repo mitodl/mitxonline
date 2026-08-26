@@ -144,6 +144,9 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
         "user_link",
         "assignee",
         "contract_link",
+        "email_status",
+        "email_message_id",
+        "email_status_event_timestamp",
         "created_on",
         "redeemed_on",
         "last_reminder_sent_on",
@@ -172,6 +175,9 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
         "assigned_by",
         "contract",
         "discount",
+        "email_status",
+        "email_message_id",
+        "email_status_event_timestamp",
         "created_on",
         "redeemed_on",
         "last_reminder_sent_on",
@@ -180,6 +186,9 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
         "user",
         "contract",
         "discount",
+        "email_status",
+        "email_message_id",
+        "email_status_event_timestamp",
         "assigned_by",
         "created_on",
         "redeemed_on",
@@ -192,6 +201,8 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
         "discount__discount_code",
         "assigned_email",
         "assigned_name",
+        "email_status",
+        "email_message_id",
     ]
 
     @admin.display(description="Discount Code")
