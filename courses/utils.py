@@ -24,12 +24,19 @@ from courses.models import (
 log = logging.getLogger(__name__)
 
 
-def verified_courserun_exists():
-    """Build an Exists() annotation for whether a course has a verified run."""
+def verified_courserun_exists(manager=None):
+    """
+    Build an Exists() annotation for whether a course has a verified run.
+
+    Args:
+        manager: CourseRun manager to search. Defaults to ``CourseRun.objects``,
+            which excludes source runs. The ETL views pass ``all_objects``
+            because they report on source runs too.
+    """
     from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE  # noqa: PLC0415
 
     return Exists(
-        CourseRun.objects.filter(
+        (manager or CourseRun.objects).filter(
             course_id=OuterRef("pk"),
             enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
         )

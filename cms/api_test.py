@@ -6,6 +6,8 @@ import pytest
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from mitol.common.utils.datetime import now_in_utc
 from wagtail.models import Page
 from wagtail_factories import PageFactory
@@ -21,9 +23,15 @@ from cms.api import (
     ensure_resource_pages,
     get_home_page,
     get_wagtail_img_src,
+    resolve_financial_assistance_form_urls,
 )
 from cms.exceptions import WagtailSpecificPageError
-from cms.factories import CoursePageFactory, HomePageFactory, ProgramPageFactory
+from cms.factories import (
+    CoursePageFactory,
+    FlexiblePricingFormFactory,
+    HomePageFactory,
+    ProgramPageFactory,
+)
 from cms.models import (
     CourseIndexPage,
     CoursePage,
@@ -35,6 +43,12 @@ from cms.models import (
 )
 from courses.factories import CourseFactory, CourseRunFactory, ProgramFactory
 from main.utils import get_learn_product_url
+
+# resolve_financial_assistance_form_urls does a fixed number of queries:
+# course pages, programs, related programs, program pages, live forms. This is
+# an upper bound; the property that matters is that it does not scale with the
+# number of courses asked for.
+FINANCIAL_ASSISTANCE_QUERY_COUNT = 6
 
 
 @pytest.mark.django_db
@@ -615,3 +629,112 @@ def test_create_featured_items_cache_no_expiry():
         if ttl == -2
         else f"Unexpected ttl value `{ttl}` for `{cms_utils.get_featured_items_cache_key()}`"
     )
+
+
+def _url_for(course):
+    """The resolved financial assistance form URL for one course."""
+    return resolve_financial_assistance_form_urls([course.id])[course.id]
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_child_form():
+    """
+    A form that is a child page of the course page.
+
+    Exercises the treebeard path arithmetic standing in for Wagtail's
+    ``get_children()``.
+    """
+    page = CoursePageFactory()
+    page.product.program = None
+    form = FlexiblePricingFormFactory(parent=page)
+
+    assert _url_for(page.product).endswith(f"{form.slug}/")
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_course_specific_form():
+    """A form linked to the course via ``selected_course``."""
+    page = CoursePageFactory()
+    form = FlexiblePricingFormFactory(
+        parent=CoursePageFactory(), selected_course=page.product
+    )
+
+    assert _url_for(page.product).endswith(f"{form.slug}/")
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_own_program_form():
+    """A form linked to one of the course's own programs."""
+    program = ProgramFactory()
+    page = CoursePageFactory()
+    program.add_requirement(page.product)
+    form = FlexiblePricingFormFactory(
+        parent=CoursePageFactory(), selected_program=program
+    )
+
+    assert _url_for(page.product).endswith(f"{form.slug}/")
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_related_program_form():
+    """A form linked to a program *related* to the course's program."""
+    program = ProgramFactory()
+    related = ProgramFactory()
+    program.add_related_program(related)
+    page = CoursePageFactory()
+    program.add_requirement(page.product)
+    form = FlexiblePricingFormFactory(
+        parent=CoursePageFactory(), selected_program=related
+    )
+
+    assert _url_for(page.product).endswith(f"{form.slug}/")
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_absent_when_no_form():
+    """No form anywhere yields an empty string."""
+    page = CoursePageFactory()
+    page.product.program = None
+
+    assert _url_for(page.product) == ""
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_query_count_is_flat(django_assert_max_num_queries):
+    """
+    The resolver's query count must not grow with the number of courses.
+
+    That is the whole reason it exists: the cascade costs 4-8 queries per course
+    when resolved one at a time. Asserting that two cardinalities cost the same
+    tests that property directly, and unlike a fixed number it cannot be thrown
+    off by which test happens to warm Wagtail's cached site-root paths.
+    """
+
+    def make_courses(count):
+        courses = []
+        for _ in range(count):
+            page = CoursePageFactory()
+            FlexiblePricingFormFactory(parent=page)
+            # A program with a related program, so the whole cascade runs - a
+            # course with no programs short-circuits two of the queries.
+            program = ProgramFactory()
+            program.add_related_program(ProgramFactory())
+            program.add_requirement(page.product)
+            courses.append(page.product)
+        return [course.id for course in courses]
+
+    one = make_courses(1)
+    many = make_courses(10)
+
+    # The first get_url() in the process fetches the site root paths and caches
+    # them; warm that here so it lands in neither measurement.
+    resolve_financial_assistance_form_urls(one)
+
+    with CaptureQueriesContext(connection) as one_ctx:
+        assert resolve_financial_assistance_form_urls(one)
+    with django_assert_max_num_queries(FINANCIAL_ASSISTANCE_QUERY_COUNT) as many_ctx:
+        urls = resolve_financial_assistance_form_urls(many)
+
+    assert len(urls) == len(many)
+    assert all(url for url in urls.values())
+    assert len(many_ctx.captured_queries) == len(one_ctx.captured_queries)
