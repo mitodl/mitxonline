@@ -177,8 +177,6 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
         "user",
         "contract",
         "discount",
-        "email_status",
-        "email_message_id",
         "email_status_event_timestamp",
         "assigned_by",
         "created_on",
