@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.163.3
+Version 1.163.3 (Released August 26, 2026)
 ---------------
 
 - CI step to check for stale keycloak api spec (#3867)
