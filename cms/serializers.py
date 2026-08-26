@@ -71,140 +71,14 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
 class CoursePageSerializer(BaseCoursePageSerializer):
     """Course page model serializer"""
 
-    financial_assistance_form_url = serializers.SerializerMethodField()
+    # A plain attribute read. The view's queryset resolves it via
+    # Course.objects.prefetch("financial_assistance_form_url"); CoursePage's
+    # same-named cached_property is the fallback for non-API callers.
+    # URLField, not CharField: it preserves the "format: uri" the previous
+    # @extend_schema_field(URLField) put in the checked-in OpenAPI specs.
+    financial_assistance_form_url = serializers.URLField(read_only=True)
     instructors = serializers.SerializerMethodField()
     current_price = serializers.SerializerMethodField()
-
-    def _get_financial_assistance_url(self, page, slug):
-        """Helper method to construct financial assistance URL"""
-        return f"{page.get_url()}{slug}/" if page and slug else ""
-
-    def _get_course_specific_form(self, instance):
-        """Get financial assistance form specific to the course."""
-        return (
-            FlexiblePricingRequestForm.objects.filter(selected_course=instance.product)
-            .live()
-            .first()
-        )
-
-    def _get_child_form(self, instance):
-        """Get financial assistance form from child pages."""
-        return instance.get_children().type(FlexiblePricingRequestForm).live().first()
-
-    def _get_program_form(self, program_ids, all_program_ids):
-        """Get financial assistance form from program relationships."""
-        # Check for program page with child form first
-        program_page = (
-            ProgramPage.objects.filter(program_id__in=program_ids)
-            .prefetch_related("get_children__flexiblepricingrequestform")
-            .first()
-        )
-
-        if program_page:
-            child_form = (
-                program_page.get_children()
-                .type(FlexiblePricingRequestForm)
-                .live()
-                .first()
-            )
-            if child_form:
-                return program_page, child_form
-
-        # Check for form by program selection
-        if all_program_ids:
-            form = (
-                FlexiblePricingRequestForm.objects.filter(
-                    selected_program_id__in=all_program_ids
-                )
-                .select_related("selected_program")
-                .live()
-                .first()
-            )
-            if form:
-                return None, form
-
-        return None, None
-
-    def _get_program_ids(self, programs):
-        """Extract program IDs and related program IDs."""
-        program_ids = [program.id for program in programs]
-        related_program_ids = []
-        for program in programs:
-            related_programs = program.related_programs
-            related_program_ids.extend([rp.id for rp in related_programs])
-
-        return program_ids, program_ids + related_program_ids
-
-    def _handle_form_logic(self, instance, program_page, form, program_ids):
-        """
-        Handle the form logic and return appropriate URL.
-
-        Priority:
-        1. Use program page if available (form is child of program page)
-        2. If form is for a different program, use that program's page
-        3. If form is for current program, use current instance page
-        4. Return empty string if no valid page found
-        """
-        # Case 1: Form is a child of a program page
-        if program_page:
-            return self._get_financial_assistance_url(program_page, form.slug)
-
-        # Case 2: Form is for a different program - find its page
-        if form.selected_program_id not in program_ids:
-            try:
-                different_program_page = ProgramPage.objects.get(
-                    program=form.selected_program
-                )
-                return self._get_financial_assistance_url(
-                    different_program_page, form.slug
-                )
-            except ProgramPage.DoesNotExist:
-                # If the different program doesn't have a page, fall through to default
-                pass
-
-        # Case 3: Form is for current program - use current instance
-        if form.selected_program_id in program_ids:
-            return self._get_financial_assistance_url(instance, form.slug)
-
-        # Case 4: No valid page found
-        return ""
-
-    @extend_schema_field(serializers.URLField)
-    def get_financial_assistance_form_url(self, instance):
-        """
-        Returns URL of the Financial Assistance Form.
-        """
-        if not hasattr(instance, "product") or not instance.product:
-            return ""
-
-        # Cache program IDs to avoid repeated access
-        programs_relation = instance.product.programs
-        programs = list(programs_relation) if programs_relation else []
-
-        if not programs:
-            # Handle case with no programs
-            form = self._get_course_specific_form(instance)
-            if form is None:
-                form = self._get_child_form(instance)
-            return (
-                self._get_financial_assistance_url(instance, form.slug) if form else ""
-            )
-
-        program_ids, all_program_ids = self._get_program_ids(programs)
-
-        program_page, form = self._get_program_form(program_ids, all_program_ids)
-
-        if form:
-            result = self._handle_form_logic(instance, program_page, form, program_ids)
-            if result:
-                return result
-
-        # Fallback to course-specific or child form
-        form = self._get_course_specific_form(instance)
-        if form is None:
-            form = self._get_child_form(instance)
-
-        return self._get_financial_assistance_url(instance, form.slug) if form else ""
 
     def get_current_price(self, instance) -> int | None:
         """Get the current price of the course product."""

@@ -69,6 +69,10 @@ class CourseSerializer(BaseCourseSerializer):
     required_prefetches: list[str] = [
         *BaseCourseSerializer.required_prefetches,
         "programs",
+        # Resolved by CourseFinancialAssistanceFormUrlPrefetcher in the view's
+        # queryset; without it CoursePageSerializer would fall back to the lazy
+        # per-page cascade.
+        "financial_assistance_form_url",
     ]
 
     departments = DepartmentSerializer(many=True, read_only=True)

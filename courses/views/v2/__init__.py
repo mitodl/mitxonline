@@ -486,6 +486,10 @@ class CourseViewSet(
             )
         )
         queryset = queryset.prefetch(
+            # Resolved in the queryset so nothing queries during serialization.
+            # Applies to the detail route too, since ReadableIdLookupMixin.
+            # get_object filters this same queryset.
+            "financial_assistance_form_url",
             PrefetchOption(
                 "programs",
                 queryset=Program.objects.filter(self.get_program_filters())
@@ -683,6 +687,7 @@ class UserEnrollmentsApiViewSet(
         .prefetch(
             "certificate",
             "grades",
+            "run__course__financial_assistance_form_url",
             PrefetchOption(
                 "run__course__programs", queryset=Program.objects.filter(b2b_only=False)
             ),
@@ -835,10 +840,7 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
             raise EnrollmentError from exc
         if len(enrollments) == 0:
             raise EnrollmentCreationFailedError
-        return Response(
-            CourseRunEnrollmentSerializer(enrollments[0]).data,
-            status=status.HTTP_201_CREATED,
-        )
+        return _created_enrollment_response(enrollments[0])
 
     # Everything checks out for a verified enrollment, so generate one.
     # This requires generating an order.
@@ -847,8 +849,23 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
         request, run, program_enrollment.program
     )
 
+    return _created_enrollment_response(enrollment)
+
+
+def _created_enrollment_response(enrollment):
+    """
+    Serialize a just-created enrollment the way a GET would.
+
+    create_run_enrollments and create_verified_program_course_run_enrollment
+    return plain instances, so the nested CourseSerializer would resolve its
+    prefetched fields lazily, one query at a time. Reading the row back through
+    UserEnrollmentsApiViewSet.queryset costs one query on a POST and keeps the
+    response identical in shape to the list and detail routes.
+    """
     return Response(
-        CourseRunEnrollmentSerializer(enrollment).data,
+        CourseRunEnrollmentSerializer(
+            UserEnrollmentsApiViewSet.queryset.get(pk=enrollment.pk)
+        ).data,
         status=status.HTTP_201_CREATED,
     )
 
@@ -1000,10 +1017,11 @@ class CourseCertificateRetrieveViewSet(_BaseCertificateRetrieveViewSet):
 
     serializer_class = CourseRunCertificateSerializer
     queryset = CourseRunCertificate.objects.prefetch(
+        "course_run__course__financial_assistance_form_url",
         PrefetchOption(
             "course_run__course__programs",
             queryset=Program.objects.filter(b2b_only=False),
-        )
+        ),
     ).prefetch_related("user")
 
 
@@ -1060,7 +1078,10 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                     )
                     .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
                     .select_related("run__course__page", "run__b2b_contract")
-                    .prefetch("run__course__programs")
+                    .prefetch(
+                        "run__course__programs",
+                        "run__course__financial_assistance_form_url",
+                    )
                     .order_by("-id"),
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),

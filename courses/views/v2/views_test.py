@@ -2935,3 +2935,104 @@ def test_correct_courserun_languages(user_drf_client, primary):
     assert (
         regular_run.id if primary == "transreg" else translated_regular_run.id
     ) not in seen_run_ids
+
+
+@pytest.mark.usefixtures("course_catalog_data")
+@pytest.mark.parametrize("course_catalog_program_count", [3], indirect=True)
+@pytest.mark.parametrize("course_catalog_course_count", [1, 5, 12], indirect=True)
+def test_get_courses_query_count_is_flat_in_course_count(
+    user_drf_client,
+    django_assert_max_num_queries,
+    course_catalog_course_count,
+):
+    """
+    The list endpoint's query count must not grow with the number of courses.
+
+    A constant bound that holds at 1, 5 and 12 courses is the assertion that
+    actually pins the N+1s down - a budget computed from the row count (see
+    courses.views.test_utils.num_queries_from_course) can never fail for one.
+    """
+    with django_assert_max_num_queries(COURSES_LIST_QUERY_BUDGET) as context:
+        resp = user_drf_client.get(reverse("v2:courses_api-list"), {"page_size": 12})
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert len(resp.json()["results"]) == course_catalog_course_count
+    logger.info(
+        "test_get_courses_query_count_is_flat_in_course_count: %s courses, %s queries",
+        course_catalog_course_count,
+        len(context.captured_queries),
+    )
+
+
+@pytest.mark.usefixtures("course_catalog_data")
+@pytest.mark.parametrize("course_catalog_program_count", [3], indirect=True)
+@pytest.mark.parametrize("course_catalog_course_count", [10], indirect=True)
+@pytest.mark.parametrize(
+    "params",
+    [
+        {},
+        {"page_size": 5},
+        {"page_size": 5, "page": 2},
+        {"courserun_is_enrollable": True},
+        {"courserun_is_enrollable": False},
+        {"include_approved_financial_aid": True},
+    ],
+)
+def test_get_courses_ordering_is_unchanged_by_prefetching(user_drf_client, params):
+    """
+    Every array in the response must keep its exact order.
+
+    The previous attempt at this optimization (#3169) was reverted by #3213
+    because it silently reordered and deduplicated the ``topics`` array. This
+    asserts order explicitly - note the absence of ``ignore_order`` - by
+    comparing the prefetched response against the same courses serialized
+    without any of the prefetches the viewset adds.
+    """
+    resp = user_drf_client.get(reverse("v2:courses_api-list"), params)
+    assert resp.status_code == status.HTTP_200_OK
+    results = resp.json()["results"]
+
+    for course_data in results:
+        # Re-serialize from a bare queryset: no select_related, no
+        # prefetch_related, no annotations - so every fallback path runs.
+        bare = Course.objects.get(pk=course_data["id"])
+        assert course_data["topics"] == get_topics_from_page(bare.course_page)
+        assert course_data["availability"] == (
+            "dated" if bare.has_dated_courseruns else "anytime"
+        )
+        expected_run = bare.first_unexpired_run
+        assert course_data["next_run_id"] == (expected_run.id if expected_run else None)
+        if course_data["page"] is not None:
+            # The batched finaid cascade must agree with the per-page
+            # cached_property it replaced, branch for branch.
+            expected_url = CoursePage.objects.get(
+                pk=bare.course_page.pk
+            ).financial_assistance_form_url
+            assert course_data["page"]["financial_assistance_form_url"] == expected_url
+
+
+@pytest.mark.usefixtures("course_catalog_data")
+@pytest.mark.parametrize("course_catalog_program_count", [2], indirect=True)
+@pytest.mark.parametrize("course_catalog_course_count", [8], indirect=True)
+def test_courses_list_count_query_is_pk_only(user_drf_client):
+    """
+    The paginator's COUNT must not carry the body's columns or aggregates.
+
+    A count query that wraps a DISTINCT subquery selecting every column - and
+    the aggregates that exist only to build the response - is the shape that
+    caused the 2026-03-24 MIT Learn outage. It should select the pk and nothing
+    else.
+    """
+    with CaptureQueriesContext(connection) as ctx:
+        resp = user_drf_client.get(reverse("v2:courses_api-list"))
+    assert resp.status_code == status.HTTP_200_OK
+
+    count_queries = [q["sql"] for q in ctx.captured_queries if "COUNT(*)" in q["sql"]]
+    assert len(count_queries) == 1, count_queries
+    count_sql = count_queries[0]
+
+    # values("pk") masks the annotations out, so no aggregate and no GROUP BY.
+    assert "GROUP BY" not in count_sql, count_sql
+    # order_by() was cleared, so the compiler cannot append the ordering
+    # column to the DISTINCT select list.
+    assert "title" not in count_sql, count_sql
