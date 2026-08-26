@@ -30,6 +30,7 @@ from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.models import ContractProgramItem
 from cms.factories import CoursePageFactory, ProgramPageFactory
 from cms.serializers import ProgramPageSerializer
+from compliance.exceptions import ExportComplianceError
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
     CourseFactory,
@@ -1198,6 +1199,26 @@ def test_user_enrollments_create_closed_run_existing_enrollment_v2(
     patched_enroll.assert_called_once()
 
 
+def test_user_enrollments_create_export_compliance_blocked_v2(
+    mocker, user_drf_client, user
+):
+    """v2 enrollments API should fail closed when the export compliance check rejects the user."""
+    run = CourseRunFactory.create()
+    exc = ExportComplianceError(user, "REJECT", "102")
+    mocker.patch(
+        "courses.serializers.v2.courses.create_run_enrollments",
+        side_effect=exc,
+    )
+    resp = user_drf_client.post(
+        reverse("v2:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Please contact support."
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
 def test_program_filter_for_b2b_org(user, mock_course_run_clone):
     """Test that filtering programs by org works as expected."""
 
@@ -2187,6 +2208,52 @@ def test_add_verified_program_course_enrollment_closed_run_existing_enrollment(
 
 @pytest.mark.skip_nplusone_check
 @responses.activate
+def test_add_verified_program_course_enrollment_export_compliance_blocked(
+    mocker, user, user_drf_client
+):
+    """
+    A single-program audit enrollment should fail closed (400) when the export
+    compliance check rejects the user, instead of creating an enrollment.
+    """
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/enrollment/v1/enrollments",
+        json={
+            "results": [
+                {"mode": EDX_ENROLLMENT_AUDIT_MODE, "is_active": True},
+            ],
+        },
+        status=status.HTTP_200_OK,
+    )
+
+    prog_enrollment = ProgramEnrollmentFactory.create(
+        user=user, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+    program = prog_enrollment.program
+
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+
+    exc = ExportComplianceError(user, "REJECT", "102")
+    mocker.patch("courses.views.v2.create_run_enrollments", side_effect=exc)
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={"courserun_id": course_run.courseware_id},
+        ),
+        data=[program.readable_id],
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Please contact support."
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
+
+
+@pytest.mark.skip_nplusone_check
+@responses.activate
 @pytest.mark.parametrize(
     "crogram_unrelated",
     [
@@ -2361,6 +2428,53 @@ def test_add_nested_verified_program_course_enrollment(
             ).count()
             == 2
         )
+
+
+@responses.activate
+def test_add_nested_verified_program_course_enrollment_export_compliance_blocked(
+    mocker, user, user_drf_client
+):
+    """
+    Reconciling program enrollments across a multi-program request should fail
+    closed (400) when the export compliance check rejects the user.
+    """
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/enrollment/v1/enrollments",
+        json={"results": [{"mode": EDX_ENROLLMENT_AUDIT_MODE, "is_active": True}]},
+        status=status.HTTP_200_OK,
+    )
+
+    base_program = ProgramFactory.create(display_mode=None)
+    crogram = ProgramFactory.create(display_mode="course")
+    course_run = CourseRunFactory.create()
+
+    crogram.add_requirement(course_run.course)
+    base_program.add_requirement(crogram)
+
+    # Neither program has a verified enrollment, so reconciliation will try to
+    # create audit program enrollments via create_program_enrollments - which
+    # is where the export compliance check happens.
+    ProgramEnrollmentFactory.create(
+        program=base_program, user=user, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+
+    exc = ExportComplianceError(user, "REJECT", "102")
+    mocker.patch("courses.api.create_program_enrollments", side_effect=exc)
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={"courserun_id": course_run.courseware_id},
+        ),
+        data=[base_program.readable_id, crogram.readable_id],
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Please contact support."
+    }
+    assert not ProgramEnrollment.objects.filter(user=user, program=crogram).exists()
 
 
 @pytest.mark.skip_nplusone_check

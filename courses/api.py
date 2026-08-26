@@ -32,6 +32,8 @@ from rest_framework.status import HTTP_404_NOT_FOUND
 
 from b2b.api import process_add_org_membership
 from cms.api import create_default_courseware_page
+from compliance.api import verify_user_with_exports
+from compliance.exceptions import ExportComplianceCheckError, ExportComplianceError
 from courses import mail_api
 from courses.constants import (
     COURSE_KEY_PATTERN,
@@ -39,6 +41,7 @@ from courses.constants import (
     ENROLL_CHANGE_STATUS_UNENROLLED,
     PROGRAM_TEXT_ID_PREFIX,
 )
+from courses.exceptions import EnrollmentError
 from courses.models import (
     BlockedCountry,
     Course,
@@ -205,6 +208,8 @@ def create_run_enrollments(  # noqa: C901
             created in mitxonline, paired with a boolean indicating whether or not the edX enrollment API call was successful
             for all of the given course runs
     """
+    _verify_exports_compliance_for_enrollment(user, runs[0])
+
     if keep_failed_enrollments is None:
         keep_failed_enrollments = settings.FEATURES.get(
             features.IGNORE_EDX_FAILURES, False
@@ -323,6 +328,8 @@ def create_program_enrollments(
     """
     successful_enrollments = []
     for program in programs:
+        _verify_exports_compliance_for_enrollment(user, program)
+
         try:
             enrollment, created = ProgramEnrollment.all_objects.get_or_create(
                 user=user,
@@ -339,7 +346,7 @@ def create_program_enrollments(
 
             if not created and enrollment.enrollment_mode != enrollment_mode:
                 enrollment.update_mode_and_save(enrollment_mode)
-        except:  # pylint: disable=bare-except  # noqa: PERF203, E722
+        except:  # pylint: disable=bare-except  # noqa: E722
             mail_api.send_enrollment_failure_message(
                 user, program, details=format_exc()
             )
@@ -351,6 +358,52 @@ def create_program_enrollments(
         else:
             successful_enrollments.append(enrollment)
     return successful_enrollments
+
+
+def reconcile_verified_program_enrollments(
+    user, courserun_id, root_program, verified_program_enrollments, programs
+):
+    """
+    Create audit/verified program enrollments as needed to reconcile the
+    learner's verified enrollment state before enrolling them in the course run.
+
+    Raises:
+        EnrollmentError: if reconciliation failed
+    """
+    try:
+        if len(verified_program_enrollments) == 0:
+            # No verified enrollments, so it doesn't matter - the user will get an
+            # audit one. (But make the audit enrollment to not confuse the course run
+            # process later.)
+            create_program_enrollments(
+                user, programs, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+            )
+        elif (
+            len(verified_program_enrollments) == 1
+            and verified_program_enrollments[0].program == root_program
+        ):
+            # The verified enrollment that's here is for the root program, so we can
+            # create a verified enrollment for the other program.
+            create_program_enrollments(
+                user, programs, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+            )
+        elif (
+            len(verified_program_enrollments) == 1
+            and verified_program_enrollments[0].program != root_program
+        ):
+            # The verified enrollment that's here is _not_ for the root program, so
+            # we should stop.
+            log.error(
+                "reconcile_verified_program_enrollments: user %s enrolling in %s has no verified enrollment in %s",
+                user,
+                courserun_id,
+                root_program,
+            )
+            raise EnrollmentError
+    except ExportComplianceCheckError as exc:
+        # Don't propagate the specifics of the compliance decision to the
+        # client - the underlying cause is logged where it's raised.
+        raise EnrollmentError from exc
 
 
 def upgrade_audit_run_enrollments_for_program_purchase(user, program):
@@ -397,6 +450,25 @@ def upgrade_audit_run_enrollments_for_program_purchase(user, program):
         keep_failed_enrollments=True,
     )
     return upgraded_enrollments
+
+
+def _verify_exports_compliance_for_enrollment(user, courseware_object) -> None:
+    """Verify users with CyberSource before creating enrollments."""
+    if not settings.FEATURES.get(features.EXPORT_COMPLIANCE_CHECK_ENABLED, False):
+        return
+
+    result = verify_user_with_exports(user, courseware_object)
+    if result.accepted:
+        return
+
+    log.warning(
+        "Export compliance check did not accept enrollment for user=%s: "
+        "decision=%r, reason_code=%r",
+        user.id,
+        result.decision,
+        result.reason_code,
+    )
+    raise ExportComplianceError(user, result.decision, result.reason_code)
 
 
 def downgrade_learner(enrollment):

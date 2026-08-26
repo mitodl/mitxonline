@@ -13,3 +13,4 @@ STRIPE_ENABLE_FEATURE_FLAG = "mitxonline-enable-stripe-payments"
 ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS = (
     "mitxonline-12321-program-specific-pathway-schools"
 )
+EXPORT_COMPLIANCE_CHECK_ENABLED = "EXPORT_COMPLIANCE_CHECK_ENABLED"
