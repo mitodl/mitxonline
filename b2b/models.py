@@ -537,7 +537,9 @@ class ContractPage(Page, ClusterableModel):
         from courses.models import CourseRun  # noqa: PLC0415
 
         return (
-            CourseRun.objects.prefetch_related("course").filter(b2b_contract=self).all()
+            CourseRun.objects.prefetch_related("course")
+            .filter(b2b_contracts=self)
+            .all()
         )
 
     def get_variant_courses(self, *, only_relevant=False):

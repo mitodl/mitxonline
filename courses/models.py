@@ -196,6 +196,17 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         ),
     )
     products = GenericRelation("ecommerce.Product", related_query_name="programs")
+    b2b_contracts = models.ManyToManyField(
+        "b2b.ContractPage",
+        blank=True,
+        related_name="course_runs",
+        help_text="B2B contracts this course run is attached to.",
+    )
+    is_b2b = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Indicates if this course run is B2B-only (hidden from public catalog).",
+    )
 
     @cached_property
     def num_courses(self):
@@ -1040,7 +1051,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         # Use the CourseRunQuerySet.enrollable() method to eliminate code duplication
         # First try to find non-past enrollable runs (end_date is None or in the future)
         best_run = (
-            self.courseruns.filter(b2b_contract__isnull=True)
+            self.courseruns.filter(is_b2b=False)
             .enrollable()
             .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
             .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
@@ -1051,7 +1062,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         # If no non-past runs found, look for any enrollable runs (including archived)
         if best_run is None:
             best_run = (
-                self.courseruns.filter(b2b_contract__isnull=True)
+                self.courseruns.filter(is_b2b=False)
                 .enrollable()
                 .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
                 .order_by("start_date", "-is_primary_language")
@@ -1112,7 +1123,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         # Use the CourseRunQuerySet.enrollable() method to eliminate code duplication
         # First try to find non-past enrollable runs (end_date is None or in the future)
         best_run = (
-            self.courseruns.filter(b2b_contract__in=user_contracts)
+            self.courseruns.filter(b2b_contracts__in=user_contracts)
             .enrollable()
             .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
             .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
@@ -1123,7 +1134,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         # If no non-past runs found, look for any enrollable runs (including archived)
         if best_run is None:
             best_run = (
-                self.courseruns.filter(b2b_contract__in=user_contracts)
+                self.courseruns.filter(b2b_contracts__in=user_contracts)
                 .enrollable()
                 .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
                 .order_by("start_date", "-is_primary_language")
@@ -1252,13 +1263,13 @@ class CourseRunQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):  # pylint: 
     def exclude_b2b(self):
         """Exclude B2B course runs."""
 
-        return self.filter(b2b_contract__isnull=True)
+        return self.filter(is_b2b=False)
 
     def live(self, *, include_b2b=False):
         """Applies a filter for Course runs with live=True"""
 
         queryset = self.filter(live=True)
-        return queryset if include_b2b else queryset.filter(b2b_contract__isnull=True)
+        return queryset if include_b2b else queryset.filter(is_b2b=False)
 
     def available(self, *, include_b2b=False):
         """Applies a filter for Course runs with end_date in future"""
@@ -1267,7 +1278,7 @@ class CourseRunQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):  # pylint: 
 
         if include_b2b:
             return self.filter(q_filter)
-        return self.filter(b2b_contract__isnull=True).filter(q_filter)
+        return self.filter(is_b2b=False).filter(q_filter)
 
     def enrollable(self, enrollment_end_date=None):
         """
