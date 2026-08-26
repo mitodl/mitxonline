@@ -15,7 +15,7 @@ from courses.factories import (
     EnrollmentModeFactory,
     ProgramFactory,
 )
-from courses.models import CourseRunEnrollment, CoursesTopic, Department
+from courses.models import Course, CourseRunEnrollment, CoursesTopic, Department
 from courses.serializers.v1.base import BaseProgramSerializer
 from courses.serializers.v2.courses import (
     CourseRunEnrollmentSerializer,
@@ -84,12 +84,12 @@ def test_serialize_course(
         run=courseRun1, **({} if is_anonymous else {"user": user})
     )
 
-    # Fake out a "verified_courserun_count" attribute - this is an annotation that the
-    # viewset adds, but won't be here because we're just passing it in a straight
-    # Course object.
-    course.verified_courserun_count = course.courseruns.filter(
+    # Fake out a "has_verified_courserun" attribute - this is an annotation that
+    # the viewset adds, but won't be here because we're just passing it in a
+    # straight Course object.
+    course.has_verified_courserun = course.courseruns.filter(
         enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
-    ).count()
+    ).exists()
 
     data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
 
@@ -131,22 +131,36 @@ def test_serialize_course(
     )
 
 
+def _mark_verified_courserun(course):
+    """
+    Stand in for CourseViewSet's ``has_verified_courserun`` annotation so a bare
+    serializer sees the same precondition the list endpoint would.
+    """
+    course.has_verified_courserun = course.courseruns.filter(
+        enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+    ).exists()
+    return course
+
+
 def _course_eligible_for_certificate():
     """Build a course with a verified, unexpired run (certificate_available preconditions met)."""
     course_run = CourseRunFactory.create()
     course_run.enrollment_modes.add(
         EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
     )
-    course = course_run.course
-    course.verified_courserun_count = course.courseruns.filter(
-        enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
-    ).count()
-    return course
+    return _mark_verified_courserun(course_run.course)
 
 
 def test_serialize_course_certificate_available_certificates_disabled(mock_context):
     """certificate_available should be False when certificates are disabled for the course."""
     course = _course_eligible_for_certificate()
+    assert (
+        CourseWithCourseRunsSerializer(instance=course, context=mock_context).data[
+            "certificate_available"
+        ]
+        is True
+    )
+
     course.certificates_disabled = True
     course.save()
 
@@ -158,7 +172,18 @@ def test_serialize_course_certificate_available_certificates_disabled(mock_conte
 def test_serialize_course_certificate_available_no_certificate_page(mock_context):
     """certificate_available should be False when the course has no live certificate page."""
     course = _course_eligible_for_certificate()
+    assert (
+        CourseWithCourseRunsSerializer(instance=course, context=mock_context).data[
+            "certificate_available"
+        ]
+        is True
+    )
+
     course.page.certificate_page.delete()
+
+    # Course.certificate_page is a cached_property and the assertion above warmed
+    # it, so re-read the course to let the serializer see the deletion.
+    course = _mark_verified_courserun(Course.objects.get(pk=course.pk))
 
     data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
 

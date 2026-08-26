@@ -8,7 +8,7 @@ from functools import cached_property
 import django_filters
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Exists, OuterRef, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -23,7 +23,6 @@ from rest_framework.decorators import (
     api_view,
     permission_classes,
 )
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import (
     AllowAny,
     IsAuthenticated,
@@ -81,6 +80,7 @@ from courses.utils import (
 from ecommerce.api import create_verified_program_course_run_enrollment
 from ecommerce.models import Product
 from main import features
+from main.pagination import Pagination
 from openapi.utils import extend_schema_get_queryset
 from openedx.api import sync_enrollments_with_edx
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
@@ -88,15 +88,6 @@ from variants.models import SupportedVariant
 
 log = logging.getLogger(__name__)
 VPE_MAX_PROGRAMS = 2
-
-
-class Pagination(PageNumberPagination):
-    """Paginator class for infinite loading"""
-
-    page_size = 12
-    page_size_query_param = "page_size"
-    max_page_size = 100
-    ordering = "-created_on"
 
 
 def user_has_org_access(user, org_id):
@@ -435,7 +426,7 @@ class CourseViewSet(
 
     def get_queryset(self):
         """Get the queryset for the viewset."""
-        queryset = Course.objects.select_related("page")
+        queryset = Course.objects.select_related("page", "page__feature_image")
         # Use Prefetch for reverse GenericRelation (products on CourseRun)
         # 1. Get the ContentType object for the CourseRun model
         courserun_content_type = ContentType.objects.get_for_model(CourseRun)
@@ -460,23 +451,30 @@ class CourseViewSet(
             .select_related("b2b_contract")
             .prefetch_related(modes_prefetch, products_prefetch),
         )
+        # Topics are serialized per course along with their parent topics, whose
+        # sort key is CoursesTopic.Meta.ordering == ["parent__name", "name"] -
+        # hence select_related down to the grandparent.
+        topics_prefetch = Prefetch(
+            "page__topics",
+            queryset=CoursesTopic.objects.select_related("parent", "parent__parent"),
+        )
         queryset = queryset.prefetch_related(
-            "departments", "in_programs", course_runs_prefetch
+            "departments",
+            "in_programs",
+            course_runs_prefetch,
+            topics_prefetch,
+            "page__linked_instructors__linked_instructor_page",
         )
+        # Only booleans are ever read from these, so Exists() beats an aggregate:
+        # it needs no GROUP BY, which also keeps the paginator's COUNT cheap.
         queryset = queryset.annotate(
-            count_b2b_courseruns=Count("courseruns__b2b_contract__id")
-        )
-        queryset = queryset.annotate(count_courseruns=Count("courseruns"))
-        queryset = queryset.annotate(
-            verified_courserun_count=Count(
-                "courseruns__enrollment_modes",
-                filter=Q(
-                    courseruns__enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
-                ),
-            )
-        )
-        queryset = queryset.annotate(
-            has_live_certificate_page=live_certificate_page_exists()
+            has_verified_courserun=Exists(
+                CourseRun.objects.filter(
+                    course_id=OuterRef("pk"),
+                    enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+                )
+            ),
+            has_live_certificate_page=live_certificate_page_exists(),
         )
         queryset = queryset.prefetch_related(
             Prefetch(
@@ -495,8 +493,8 @@ class CourseViewSet(
                     live=True,
                     page__live=True,
                 )
-                .only("id", "readable_id", "title", "display_mode"),
-            )
+                .only("id", "readable_id", "title", "display_mode", "program_type"),
+            ),
         )
 
         return queryset.order_by("title").distinct()
@@ -730,9 +728,22 @@ class UserEnrollmentsApiViewSet(
         operation_id="user_enrollments_create_v2",
         description="Create a new user enrollment - API v2",
     )
-    def create(self, request, *args, **kwargs):
+    def create(self, request, *args, **kwargs):  # noqa: ARG002
         """Create a new enrollment."""
-        return super().create(request, *args, **kwargs)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        enrollment = serializer.save()
+        if enrollment is not None:
+            # serializer.save() hands back a plain instance, so the nested
+            # CourseSerializer would have to resolve its prefetched fields one
+            # query at a time. Read it back through this viewset's queryset
+            # instead: one query, and the response matches the list route.
+            serializer = self.get_serializer(self.queryset.get(pk=enrollment.pk))
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED,
+            headers=self.get_success_headers(serializer.data),
+        )
 
     @extend_schema(
         operation_id="user_enrollments_destroy_v2",

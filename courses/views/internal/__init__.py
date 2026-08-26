@@ -1,7 +1,7 @@
 """Internal-only views for courses."""
 
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Exists, OuterRef, Prefetch
 from prefetch import PrefetchOption
 from rest_framework import viewsets
 from rest_framework_api_key.permissions import HasAPIKey
