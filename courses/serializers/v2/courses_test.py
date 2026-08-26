@@ -253,17 +253,19 @@ def test_serialize_course_with_no_page(mock_context):
 class TestCourseRunEnrollmentSerializerV2:
     """Test the v2 CourseRunEnrollmentSerializer."""
 
-    def test_serializer_without_b2b_contract(self):
+    def test_serializer_without_b2b_contract(self, mock_context):
         """Test serialization without B2B contract."""
         enrollment = CourseRunEnrollmentFactory.create()
-        serialized_data = CourseRunEnrollmentSerializer(enrollment).data
+        serialized_data = CourseRunEnrollmentSerializer(
+            enrollment, context=mock_context
+        ).data
 
         assert "b2b_organization_id" in serialized_data
         assert "b2b_contract_id" in serialized_data
         assert serialized_data["b2b_organization_id"] is None
         assert serialized_data["b2b_contract_id"] is None
 
-    def test_serializer_with_b2b_contract(self):
+    def test_serializer_with_b2b_contract(self, mock_context):
         """Test serialization with B2B contract."""
         org = OrganizationPageFactory.create()
         contract = ContractPageFactory.create(organization=org)
@@ -272,14 +274,18 @@ class TestCourseRunEnrollmentSerializerV2:
         enrollment.run.b2b_contract = contract
         enrollment.run.save()
 
-        serialized_data = CourseRunEnrollmentSerializer(enrollment).data
+        serialized_data = CourseRunEnrollmentSerializer(
+            enrollment, context=mock_context
+        ).data
         assert serialized_data["b2b_organization_id"] == org.id
         assert serialized_data["b2b_contract_id"] == contract.id
 
-    def test_serializer_fields(self):
+    def test_serializer_fields(self, mock_context):
         """Test that all expected fields are present."""
         enrollment = CourseRunEnrollmentFactory.create()
-        serialized_data = CourseRunEnrollmentSerializer(enrollment).data
+        serialized_data = CourseRunEnrollmentSerializer(
+            enrollment, context=mock_context
+        ).data
 
         expected_fields = {
             "run",

@@ -74,18 +74,23 @@ class IngestibleCourseViewSet(viewsets.ReadOnlyModelViewSet):
             course_runs_prefetch,
             dated_runs_prefetch,
         )
+        # Only a boolean is ever read from this (CourseSerializer.
+        # get_certificate_available), so Exists() beats an aggregate - no
+        # GROUP BY on the main query or on the paginator's COUNT. all_objects
+        # keeps this view's ETL semantics, which include source runs.
         queryset = queryset.annotate(
-            has_verified_courserun=verified_courserun_exists(),
+            has_verified_courserun=verified_courserun_exists(CourseRun.all_objects),
             has_live_certificate_page=live_certificate_page_exists(),
         )
         queryset = queryset.prefetch(
+            "financial_assistance_form_url",
             PrefetchOption(
                 "programs",
                 queryset=Program.objects.filter(
                     live=True,
                     page__live=True,
-                ).only("id", "readable_id", "title", "display_mode"),
-            )
+                ).only("id", "readable_id", "title", "display_mode", "program_type"),
+            ),
         )
 
         return queryset.order_by("title").distinct()

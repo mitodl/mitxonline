@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import random
+from collections import defaultdict
 from datetime import timedelta
 from typing import Tuple, Union  # noqa: UP035
 from urllib.parse import urlencode, urljoin
@@ -11,10 +12,11 @@ from urllib.parse import urlencode, urljoin
 import requests
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.postgres.aggregates import ArrayAgg
 from django.core.cache import caches
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.files.base import ContentFile
-from django.db.models import Case, IntegerField, When
+from django.db.models import Case, IntegerField, Q, When
 from django.utils.text import slugify
 from mitol.common.utils import now_in_utc
 from wagtail.blocks import StreamValue
@@ -30,7 +32,12 @@ from cms.constants import (
 )
 from cms.exceptions import WagtailSpecificPageError
 from cms.models import Page
-from courses.models import Course, Program
+from courses.models import (
+    Course,
+    Program,
+    ProgramRequirementNodeType,
+    RelatedProgram,
+)
 from courses.utils import (
     get_enrollable_courseruns_qs,
 )
@@ -559,3 +566,248 @@ def create_featured_items():
         .prefetch_related("courseruns")
         .order_by(ordering)
     )
+
+
+def _form_url(page, slug) -> str:
+    """Build the financial assistance form URL hung off ``page``."""
+    return f"{page.get_url()}{slug}/" if page and slug else ""
+
+
+def _min_pk(rows):
+    """
+    Lowest-pk element, or None.
+
+    ``QuerySet.first()`` applies ``order_by("pk")`` when the queryset is
+    unordered, so every ``.first()`` this replaces means "min pk". For a Wagtail
+    page under multi-table inheritance ``pk == page_ptr_id == Page.pk``, so this
+    matches whether the row came from the concrete model or from ``Page``.
+    """
+    return min(rows, key=lambda row: row.pk, default=None)
+
+
+class _FinancialAssistanceForms:
+    """
+    Everything the financial assistance cascade needs, fetched once.
+
+    Five queries regardless of how many courses are asked for. Resolving a
+    single course is just this with a one-element list, so there is exactly one
+    implementation of the cascade rather than a batched one and a per-page one
+    that have to be kept in agreement.
+    """
+
+    def __init__(self, course_ids):
+        self.pages_by_course_id = {
+            page.course_id: page
+            for page in cms_models.CoursePage.objects.filter(
+                course_id__in=course_ids
+            ).select_related("course")
+        }
+        self.programs_by_course_id = self._load_programs(course_ids)
+
+        own_program_ids = {
+            program.id
+            for programs in self.programs_by_course_id.values()
+            for program in programs
+        }
+        self.related_by_program_id = self._load_related_programs(own_program_ids)
+
+        every_program_id = set(own_program_ids)
+        for related_ids in self.related_by_program_id.values():
+            every_program_id.update(related_ids)
+        self.program_pages_by_program_id = self._load_program_pages(every_program_id)
+
+        (
+            self.forms_by_parent_path,
+            self.forms_by_course_id,
+            self.forms_by_program_id,
+        ) = self._load_forms()
+
+    @staticmethod
+    def _load_programs(course_ids):
+        """
+        Programs per course, matching ``Course.programs``.
+
+        Every program linked through a COURSE requirement node, unfiltered.
+        ArrayAgg lets one program row carry all the course ids it belongs to.
+        """
+        programs_by_course_id = defaultdict(list)
+        wanted = set(course_ids)
+        for program in Program.objects.filter(
+            all_requirements__course_id__in=course_ids
+        ).annotate(
+            course_ids=ArrayAgg(
+                "all_requirements__course_id",
+                distinct=True,
+                filter=Q(all_requirements__node_type=ProgramRequirementNodeType.COURSE),
+            )
+        ):
+            for course_id in program.course_ids or []:
+                if course_id in wanted:
+                    programs_by_course_id[course_id].append(program)
+        return programs_by_course_id
+
+    @staticmethod
+    def _load_related_programs(program_ids):
+        """
+        Related programs for every program in play, in one query.
+
+        ``Program.related_programs`` runs an OR across two FKs per program.
+        """
+        related_by_program_id = defaultdict(list)
+        if not program_ids:
+            return related_by_program_id
+
+        pairs = RelatedProgram.objects.filter(
+            Q(first_program_id__in=program_ids) | Q(second_program_id__in=program_ids)
+        ).values_list("first_program_id", "second_program_id")
+        for first_id, second_id in pairs:
+            if first_id in program_ids:
+                related_by_program_id[first_id].append(second_id)
+            if second_id in program_ids:
+                related_by_program_id[second_id].append(first_id)
+        return related_by_program_id
+
+    @staticmethod
+    def _load_program_pages(program_ids):
+        """
+        Every ProgramPage a URL might hang off, keyed by program.
+
+        ``select_related("program")`` because ``ProductPage.get_url_parts``
+        reads ``product.readable_id`` when building the URL. ``order_by("pk")``
+        plus ``setdefault`` reproduces ``.first()``'s min-pk pick when several
+        pages point at one program.
+        """
+        program_pages_by_program_id = {}
+        if not program_ids:
+            return program_pages_by_program_id
+
+        for program_page in (
+            cms_models.ProgramPage.objects.filter(program_id__in=program_ids)
+            .select_related("program")
+            .order_by("pk")
+        ):
+            program_pages_by_program_id.setdefault(
+                program_page.program_id, program_page
+            )
+        return program_pages_by_program_id
+
+    @staticmethod
+    def _load_forms():
+        """
+        Every live form, bucketed the three ways the cascade asks for them.
+
+        The live-form table is small (tens of rows), so fetching it whole beats
+        one query per course.
+        """
+        by_parent_path = defaultdict(list)
+        by_course_id = defaultdict(list)
+        by_program_id = defaultdict(list)
+        for form in cms_models.FlexiblePricingRequestForm.objects.live():
+            # Treebeard gives children a fixed-width path suffix, so a page's
+            # parent path is its own path minus one step. This is the batched
+            # equivalent of get_children(), which filters
+            # path__startswith=parent.path AND depth=parent.depth + 1.
+            by_parent_path[form.path[: -Page.steplen]].append(form)
+            if form.selected_course_id:
+                by_course_id[form.selected_course_id].append(form)
+            if form.selected_program_id:
+                by_program_id[form.selected_program_id].append(form)
+        return by_parent_path, by_course_id, by_program_id
+
+    def child_form(self, page):
+        """The lowest-pk live form that is a direct child of ``page``."""
+        return _min_pk(self.forms_by_parent_path.get(page.path, []))
+
+    def _fallback_url(self, page, course_id) -> str:
+        """Course-specific form, else a child form, else nothing."""
+        form = _min_pk(self.forms_by_course_id.get(course_id, [])) or self.child_form(
+            page
+        )
+        return _form_url(page, form.slug) if form else ""
+
+    def _program_url(self, page, program_page, form, program_ids) -> str:
+        """
+        Turn a program-linked form into a URL.
+
+        Priority:
+        1. the form is a child of a program page - use that page
+        2. the form belongs to some *other* program - use that program's page
+        3. the form belongs to one of this course's programs - use this page
+        """
+        if program_page:
+            return _form_url(program_page, form.slug)
+
+        if form.selected_program_id not in program_ids:
+            other_page = self.program_pages_by_program_id.get(form.selected_program_id)
+            if other_page:
+                return _form_url(other_page, form.slug)
+
+        if form.selected_program_id in program_ids:
+            return _form_url(page, form.slug)
+
+        return ""
+
+    def url_for(self, course_id) -> str:
+        """The financial assistance form URL for one course."""
+        page = self.pages_by_course_id.get(course_id)
+        if page is None:
+            return ""
+
+        programs = self.programs_by_course_id.get(course_id, [])
+        if not programs:
+            return self._fallback_url(page, course_id)
+
+        program_ids = [program.id for program in programs]
+        all_program_ids = list(program_ids)
+        for program in programs:
+            all_program_ids.extend(self.related_by_program_id.get(program.id, []))
+
+        program_page = min(
+            (
+                self.program_pages_by_program_id[program_id]
+                for program_id in program_ids
+                if program_id in self.program_pages_by_program_id
+            ),
+            key=lambda candidate: candidate.pk,
+            default=None,
+        )
+        form = self.child_form(program_page) if program_page else None
+        if not form:
+            program_page = None
+            form = _min_pk(
+                [
+                    candidate
+                    for program_id in all_program_ids
+                    for candidate in self.forms_by_program_id.get(program_id, [])
+                ]
+            )
+
+        if form:
+            url = self._program_url(page, program_page, form, program_ids)
+            if url:
+                return url
+
+        return self._fallback_url(page, course_id)
+
+
+def resolve_financial_assistance_form_urls(course_ids) -> dict[int, str]:
+    """
+    Financial assistance form URL per course id, in a fixed number of queries.
+
+    Callers on an API path should not call this directly - the view's queryset
+    assembles the value via ``Course.objects.prefetch(...)`` so that nothing
+    queries during serialization. This is the single implementation behind both
+    that prefetcher and ``CoursePage.financial_assistance_form_url``.
+
+    Args:
+        course_ids: iterable of Course ids
+
+    Returns:
+        dict: {course_id: url}, with "" for courses that have no form
+    """
+    course_ids = [course_id for course_id in course_ids if course_id]
+    if not course_ids:
+        return {}
+
+    forms = _FinancialAssistanceForms(course_ids)
+    return {course_id: forms.url_for(course_id) for course_id in course_ids}
