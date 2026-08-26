@@ -176,7 +176,7 @@ def test_build_message(mocker, settings):
     """
     Tests that build_message correctly builds a message object using the Anymail APIs
     """
-    settings.MAILGUN_FROM_EMAIL = "from-email@example.com"
+    settings.MIT_LEARN_FROM_EMAIL = "from-email@example.com"
     settings.MITX_ONLINE_REPLY_TO_ADDRESS = "reply-email@example.com"
     subject = "subject"
     text_body = "body"
@@ -199,7 +199,7 @@ def test_build_message(mocker, settings):
         subject=subject,
         body=text_body,
         to=[recipient_email],
-        from_email=settings.MAILGUN_FROM_EMAIL,
+        from_email=settings.MIT_LEARN_FROM_EMAIL,
         connection=mock_connection,
         headers={"Reply-To": settings.MITX_ONLINE_REPLY_TO_ADDRESS},
     )
