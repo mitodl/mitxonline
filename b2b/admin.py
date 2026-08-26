@@ -1,8 +1,10 @@
 """B2B model admin. Only for convenience; you should use the Wagtail interface instead."""
 
 from django.contrib import admin
+from django.contrib.admin.templatetags.admin_urls import admin_urlname
 from django.contrib.contenttypes.admin import GenericTabularInline
-from django.db.models import Count
+from django.db.models import Count, Model
+from django.shortcuts import resolve_url
 from django.utils.html import format_html
 
 from b2b.models import (
@@ -14,6 +16,14 @@ from b2b.models import (
 )
 from courses.models import CourseRun
 from main.admin import DisplayOnlyAdminMixin, ReadOnlyModelAdmin
+
+
+def get_model_admin_url(model: Model):
+    if model:
+        url = resolve_url(admin_urlname(model._meta, "change"), model.pk)  # noqa: SLF001
+        return format_html('<a href="{}">{}</a>', url, str(model))
+    else:
+        return "-"
 
 
 class UserOrganizationAdminInline(DisplayOnlyAdminMixin, admin.TabularInline):
@@ -131,9 +141,9 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
     list_display = [
         "discount_code",
         "status",
-        "user",
+        "user_link",
         "assignee",
-        "contract",
+        "contract_link",
         "created_on",
         "redeemed_on",
         "last_reminder_sent_on",
@@ -211,6 +221,14 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
 
         namestr = f"<br />{instance.assigned_name}" if instance.assigned_name else ""
         return format_html(f"{instance.assigned_email}{namestr}")
+
+    @admin.display(description="User")
+    def user_link(self, instance):
+        return get_model_admin_url(instance.user)
+
+    @admin.display(description="Contract")
+    def contract_link(self, instance):
+        return get_model_admin_url(instance.contract)
 
 
 @admin.register(ContractPage)
