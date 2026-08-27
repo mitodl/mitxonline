@@ -655,7 +655,7 @@ else:
 MIT_LEARN_FROM_EMAIL = get_string(
     name="MIT_LEARN_FROM_EMAIL",
     default="MIT Learn <mitlearn-support@mit.edu>",
-    description="From email address for UAI enrollment emails",
+    description="From email address for outgoing application emails",
 )
 
 MIT_LEARN_REPLY_TO_EMAIL = get_string(
@@ -767,8 +767,8 @@ USE_X_FORWARDED_HOST = get_bool(
 )
 SITE_NAME = get_string(
     name="SITE_NAME",
-    default="MITx Online",
-    description="Name of the site. e.g MITx Online",
+    default="MIT Learn",
+    description="Name of the site. e.g MIT Learn",
 )
 WAGTAIL_SITE_NAME = SITE_NAME
 
@@ -1198,7 +1198,7 @@ CYBERSOURCE_INQUIRY_LOG_NACL_ENCRYPTION_KEY = get_string(
 MITOL_COMMON_USER_FACTORY = "users.factories.UserFactory"
 
 # mitol-django-mail
-MITOL_MAIL_FROM_EMAIL = MAILGUN_FROM_EMAIL
+MITOL_MAIL_FROM_EMAIL = MIT_LEARN_FROM_EMAIL
 MITOL_MAIL_REPLY_TO_ADDRESS = MITX_ONLINE_REPLY_TO_ADDRESS
 MITOL_MAIL_MESSAGE_CLASSES = ["b2b.mail.EnrollmentCodeAssignmentMessage"]
 MITOL_MAIL_RECIPIENT_OVERRIDE = MAILGUN_RECIPIENT_OVERRIDE
@@ -1211,7 +1211,7 @@ MITOL_MAIL_ENABLE_EMAIL_DEBUGGER = get_bool(  # NOTE: this will override the leg
 )
 
 # mitol-django-authentication
-MITOL_AUTHENTICATION_FROM_EMAIL = MAILGUN_FROM_EMAIL
+MITOL_AUTHENTICATION_FROM_EMAIL = MIT_LEARN_FROM_EMAIL
 MITOL_AUTHENTICATION_REPLY_TO_EMAIL = MITX_ONLINE_REPLY_TO_ADDRESS
 
 OPENEDX_OAUTH_PROVIDER = get_string(
