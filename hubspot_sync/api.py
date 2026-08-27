@@ -2755,14 +2755,17 @@ def track_cart_add_with_hubspot(
                 purchaser=user,
                 total_price_paid=0,
             )
-            line = Line.objects.create(
+            line = Line(
                 order=order,
                 purchased_object_id=product.object_id,
                 purchased_content_type_id=product.content_type_id,
                 product_version=product_version,
                 quantity=1,
             )
-            line.record_discounted_unit_price()
+            # discounted_unit_price is non-null, so it has to be set before the
+            # INSERT rather than recorded afterwards.
+            line.discounted_unit_price = line.compute_discounted_unit_price()
+            line.save()
             order.total_price_paid = line.discounted_price
             # auto_now fields are skipped when update_fields excludes them, so
             # updated_on has to be listed to move.

@@ -1,5 +1,5 @@
 import faker
-from factory import SubFactory, fuzzy
+from factory import LazyAttribute, SubFactory, fuzzy
 from factory.django import DjangoModelFactory
 
 from courses.factories import CourseRunFactory, ProgramFactory
@@ -135,6 +135,13 @@ class LineFactory(DjangoModelFactory):
     quantity = 1
     order = SubFactory(OrderFactory)
     purchased_object = SubFactory(CourseRunFactory)
+    # discounted_unit_price is non-null, so price the line the way the app does:
+    # under whatever discounts the order carries when the line is built.
+    discounted_unit_price = LazyAttribute(
+        lambda line: models.Line(
+            order=line.order, product_version=line.product_version
+        ).compute_discounted_unit_price()
+    )
 
     class Meta:
         model = models.Line

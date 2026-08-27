@@ -141,7 +141,8 @@ def _fulfilled_line(price, *, quantity=1, discounted_unit_price=None):
     A fulfilled order carrying one line, priced independently of any discount row.
 
     Re-fetched so the serializer sees the column's numeric(20,5) read-back
-    rather than the value handed to create().
+    rather than the value handed to create(). discounted_unit_price defaults to
+    the undiscounted price.
     """
     with reversion.create_revision():
         product = ProductFactory.create(price=price)
@@ -152,7 +153,9 @@ def _fulfilled_line(price, *, quantity=1, discounted_unit_price=None):
         purchased_content_type_id=product.content_type_id,
         product_version=Version.objects.get_for_object(product).first(),
         quantity=quantity,
-        discounted_unit_price=discounted_unit_price,
+        discounted_unit_price=(
+            price if discounted_unit_price is None else discounted_unit_price
+        ),
     )
     return Line.objects.get(pk=line.pk)
 
@@ -170,8 +173,8 @@ def test_receipt_line_reports_the_recorded_price():
     assert data["total_paid"] == "400.00"
 
 
-def test_receipt_line_shows_no_discount_when_none_was_recorded():
-    """A line with no recorded price reports full price and a zero discount."""
+def test_receipt_line_shows_no_discount_when_the_price_was_not_discounted():
+    """A line recorded at list price reports full price and a zero discount."""
     line = _fulfilled_line(Decimal("300.00"))
 
     data = TransactionLineSerializer(instance=line).data
