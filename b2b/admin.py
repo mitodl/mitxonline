@@ -234,8 +234,7 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
     @admin.display(description="Contract")
     def contract_link(self, instance):
         return get_model_admin_url(instance.contract)
-    
-    
+
     @admin.action(
         description="Backfill most recent email event within last 30d for records with email message IDs"
     )
@@ -267,7 +266,6 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
             request,
             f"Updated email status for {updated} of {len(dcars)} record(s).",
         )
-
 
 
 @admin.register(ContractPage)
