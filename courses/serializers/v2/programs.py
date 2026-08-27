@@ -16,6 +16,7 @@ from courses.models import (
     ProgramRequirementNodeType,
 )
 from courses.serializers.base import BaseProgramRequirementTreeSerializer
+from courses.serializers.utils import has_live_certificate_page
 from courses.serializers.v1.base import (
     BaseProgramSerializer,
     EnrollmentModeSerializer,
@@ -382,16 +383,10 @@ class ProgramSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(bool)
     def get_certificate_available(self, instance) -> bool:
-        has_live_certificate_page = (
-            instance.has_live_certificate_page
-            if hasattr(instance, "has_live_certificate_page")
-            else instance.certificate_page is not None
-        )
-
         return (
             any(mode.requires_payment for mode in instance.enrollment_modes.all())
             and not instance.certificates_disabled
-            and has_live_certificate_page
+            and has_live_certificate_page(instance)
         )
 
     def get_min_weekly_hours(self, instance) -> str | None:

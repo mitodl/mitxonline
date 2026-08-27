@@ -23,17 +23,11 @@ from courses.models import (
 log = logging.getLogger(__name__)
 
 
-def live_certificate_page_exists(
-    page_path_field="page__path", page_depth_field="page__depth"
-):
+def live_certificate_page_exists():
     """
     Build an Exists() subquery annotation for whether a live CertificatePage
-    is a direct child of the course/program page referenced by
-    page_path_field/page_depth_field on the outer queryset.
-
-    Args:
-        page_path_field (str): outer queryset field pointing at the course/program page's path
-        page_depth_field (str): outer queryset field pointing at the course/program page's depth
+    is a direct child of the course/program page (`page`) on the outer
+    queryset.
 
     Returns:
         Exists: subquery expression suitable for QuerySet.annotate()
@@ -43,8 +37,8 @@ def live_certificate_page_exists(
     return Exists(
         CertificatePage.objects.filter(
             live=True,
-            path__startswith=OuterRef(page_path_field),
-            depth=OuterRef(page_depth_field) + 1,
+            path__startswith=OuterRef("page__path"),
+            depth=OuterRef("page__depth") + 1,
         )
     )
 

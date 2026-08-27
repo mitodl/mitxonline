@@ -16,7 +16,7 @@ from compliance.exceptions import ExportComplianceCheckError
 from courses import models
 from courses.api import create_run_enrollments
 from courses.exceptions import EnrollmentError
-from courses.serializers.utils import get_topics_from_page
+from courses.serializers.utils import get_topics_from_page, has_live_certificate_page
 from courses.serializers.v1.base import (
     BaseCourseRunEnrollmentWithFlexiblePriceSerializer,
     BaseCourseRunSerializer,
@@ -165,18 +165,12 @@ class CourseSerializer(BaseCourseSerializer):
     def get_certificate_available(self, instance) -> bool:
         """Return if there is a certificate available for the course."""
 
-        has_live_certificate_page = (
-            instance.has_live_certificate_page
-            if hasattr(instance, "has_live_certificate_page")
-            else instance.certificate_page is not None
-        )
-
         return (
             instance.first_unexpired_run is not None
             and hasattr(instance, "verified_courserun_count")
             and instance.verified_courserun_count > 0
             and not instance.certificates_disabled
-            and has_live_certificate_page
+            and has_live_certificate_page(instance)
         )
 
     @extend_schema_field(str)
