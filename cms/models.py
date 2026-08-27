@@ -1174,6 +1174,15 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         blank=True,
         help_text="*Required for Verifiable Credential generation. What you will learn from this course.",
     )
+    hubspot_form_id = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        help_text=(
+            "HubSpot form ID for this page's 'Stay Updated' sign-up form. "
+            "Set to show the form on this page; leave blank to hide it."
+        ),
+    )
 
     # How You'll Learn choice fields - these toggle on or off components on the
     # Learn product pages.
@@ -1245,6 +1254,7 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         FieldPanel("max_price"),
         FieldPanel("prerequisites"),
         FieldPanel("faq_url"),
+        FieldPanel("hubspot_form_id"),
         FieldPanel("about"),
         FieldPanel("what_you_learn"),
         MultiFieldPanel(
@@ -1303,6 +1313,7 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         APIField("max_price"),
         APIField("prerequisites", serializer=RichTextSerializer()),
         APIField("faq_url"),
+        APIField("hubspot_form_id"),
         APIField("about", serializer=RichTextSerializer()),
         APIField("what_you_learn", serializer=RichTextSerializer()),
         APIField("feature_image", serializer=ImageSerializer()),
@@ -1445,11 +1456,6 @@ class CoursePage(ProductPage):
         null=True,
         help_text="If true, allow the AI chatbots to ingest the course's content files.",
     )
-    show_stay_updated = models.BooleanField(
-        default=False,
-        null=True,
-        help_text="If true, show the 'Stay Updated' sign-up form on this course page.",
-    )
 
     template = "product_page.html"
     search_fields = Page.search_fields + [  # noqa: RUF005
@@ -1466,7 +1472,6 @@ class CoursePage(ProductPage):
         *ProductPage.content_panels,
         FieldPanel("include_in_learn_catalog"),
         FieldPanel("ingest_content_files_for_ai"),
-        FieldPanel("show_stay_updated"),
     ]
     api_fields = [
         *ProductPage.api_fields,
@@ -1474,7 +1479,6 @@ class CoursePage(ProductPage):
         APIField("topic_list"),
         APIField("include_in_learn_catalog"),
         APIField("ingest_content_files_for_ai"),
-        APIField("show_stay_updated"),
     ]
 
     @cached_property
@@ -1593,11 +1597,6 @@ class ProgramPage(ProductPage):
         null=True,
         help_text="If true, Learn should include this in its catalog.",
     )
-    show_stay_updated = models.BooleanField(
-        default=False,
-        null=True,
-        help_text="If true, show the 'Stay Updated' sign-up form on this program page.",
-    )
     list_price = models.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -1623,7 +1622,6 @@ class ProgramPage(ProductPage):
         + ProductPage.content_panels
         + [
             FieldPanel("include_in_learn_catalog"),
-            FieldPanel("show_stay_updated"),
         ]
     )
     api_fields = [
@@ -1631,7 +1629,6 @@ class ProgramPage(ProductPage):
         APIField("program_details"),
         APIField("list_price"),
         APIField("include_in_learn_catalog"),
-        APIField("show_stay_updated"),
     ]
 
     @property

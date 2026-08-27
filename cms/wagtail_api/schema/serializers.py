@@ -187,6 +187,7 @@ class CoursePageItemSerializer(serializers.ModelSerializer):
             "max_price",
             "prerequisites",
             "faq_url",
+            "hubspot_form_id",
             "about",
             "what_you_learn",
             "feature_image",
@@ -198,7 +199,6 @@ class CoursePageItemSerializer(serializers.ModelSerializer):
             "topic_list",
             "include_in_learn_catalog",
             "ingest_content_files_for_ai",
-            "show_stay_updated",
             "how_youll_learn",
         ]
 
@@ -250,6 +250,7 @@ class ProgramPageItemSerializer(serializers.ModelSerializer):
             "max_price",
             "prerequisites",
             "faq_url",
+            "hubspot_form_id",
             "about",
             "what_you_learn",
             "feature_image",
@@ -258,7 +259,6 @@ class ProgramPageItemSerializer(serializers.ModelSerializer):
             "faculty",
             "certificate_page",
             "program_details",
-            "show_stay_updated",
             "how_youll_learn",
         ]
 
