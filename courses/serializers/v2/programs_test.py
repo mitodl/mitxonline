@@ -354,6 +354,30 @@ def test_serialize_program_certificate_available(
     assert data["certificate_available"] is expected
 
 
+def test_serialize_program_certificate_available_certificates_disabled(
+    mock_context,
+    program_with_empty_requirements,  # noqa: F811
+):
+    """certificate_available should be False when certificates are disabled for the program."""
+    program_with_empty_requirements.certificates_disabled = True
+    program_with_empty_requirements.save()
+
+    data = ProgramSerializer(
+        instance=program_with_empty_requirements, context=mock_context
+    ).data
+
+    assert data["certificate_available"] is False
+
+
+def test_serialize_program_certificate_available_no_certificate_page(mock_context):
+    """certificate_available should be False when the program has no live certificate page."""
+    program = ProgramFactory.create(page=None)
+
+    data = ProgramSerializer(instance=program, context=mock_context).data
+
+    assert data["certificate_available"] is False
+
+
 def test_serialize_program_with_no_page(mock_context):
     """Test that a program with no CMS page serializes page as None."""
     program = ProgramFactory.create(page=None)

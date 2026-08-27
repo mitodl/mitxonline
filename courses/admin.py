@@ -175,8 +175,16 @@ class ProgramAdmin(VerifiableCredentialBackfillAdminMixin, admin.ModelAdmin):
         "readable_id",
         "program_type",
         "display_mode",
+        "certificates_disabled",
     )
-    list_filter = ["live", "b2b_only", "program_type", "display_mode", "departments"]
+    list_filter = [
+        "live",
+        "b2b_only",
+        "program_type",
+        "display_mode",
+        "departments",
+        "certificates_disabled",
+    ]
     inlines = [ProgramContractPageInline]
     actions = ["populate_verifiable_credentials_for_program"]
 
@@ -217,8 +225,9 @@ class CourseAdmin(admin.ModelAdmin):
         "title",
         "readable_id",
         "check_link",
+        "certificates_disabled",
     )
-    list_filter = ["live", "departments"]
+    list_filter = ["live", "departments", "certificates_disabled"]
     inlines = [
         SourceCourseRunInline,
         EnrollableCourseRunInline,

@@ -35,6 +35,7 @@ from b2b.factories import (
     OrganizationPageFactory,
 )
 from cms.factories import CourseIndexPageFactory
+from cms.models import CoursePage, ProgramPage
 from compliance.api import ExportComplianceResult
 from compliance.exceptions import ExportComplianceError
 from courses.api import (
@@ -1638,6 +1639,113 @@ def test_course_run_certificate_not_passing(
     assert deleted
 
 
+@pytest.mark.parametrize("should_force_create", [True, False])
+def test_course_run_certificate_no_course_page(
+    passed_grade_with_enrollment, should_force_create
+):
+    """No certificate should be created when the course has no CMS page at all."""
+    course = passed_grade_with_enrollment.course_run.course
+    # Deleted via a queryset, not `course.page`, so we don't leave a stale
+    # cached reverse-OneToOne reference on the `course` instance that the
+    # function under test also operates on.
+    CoursePage.objects.filter(course=course).delete()
+
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment, should_force_create=should_force_create
+    )
+    assert certificate is None
+    assert created is False
+    assert deleted is False
+    assert not CourseRunCertificate.objects.exists()
+
+
+@pytest.mark.parametrize("should_force_create", [True, False])
+def test_course_run_certificate_no_certificate_child_page(
+    passed_grade_with_enrollment, should_force_create
+):
+    """No certificate should be created when the course page has no certificate child page."""
+    course = passed_grade_with_enrollment.course_run.course
+    course.course_page.certificate_page.delete()
+
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment, should_force_create=should_force_create
+    )
+    assert certificate is None
+    assert created is False
+    assert deleted is False
+    assert not CourseRunCertificate.objects.exists()
+
+
+@pytest.mark.parametrize("should_force_create", [True, False])
+def test_course_run_certificate_unpublished_certificate_page(
+    passed_grade_with_enrollment, should_force_create
+):
+    """No certificate should be created when the certificate page exists but is unpublished."""
+    course = passed_grade_with_enrollment.course_run.course
+    certificate_page = course.course_page.certificate_page
+    certificate_page.live = False
+    certificate_page.save()
+
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment, should_force_create=should_force_create
+    )
+    assert certificate is None
+    assert created is False
+    assert deleted is False
+    assert not CourseRunCertificate.objects.exists()
+
+
+@pytest.mark.parametrize("should_force_create", [True, False])
+def test_course_run_certificate_certificates_disabled(
+    passed_grade_with_enrollment, should_force_create
+):
+    """No certificate should be created when certificates are disabled for the course."""
+    course = passed_grade_with_enrollment.course_run.course
+    course.certificates_disabled = True
+    course.save()
+
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment, should_force_create=should_force_create
+    )
+    assert certificate is None
+    assert created is False
+    assert deleted is False
+    assert not CourseRunCertificate.objects.exists()
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_course_run_certificate_deletable_after_certificate_page_removed(
+    mock_upsert_custom_properties, passed_grade_with_enrollment, mocker
+):
+    """
+    An existing certificate must still be deletable (grade -> 0.0) even after
+    its certificate page has been removed or the course flag has been set,
+    so revocation is never blocked by the creation gate.
+    """
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment
+    )
+    assert certificate
+    assert created
+    assert not deleted
+
+    course = passed_grade_with_enrollment.course_run.course
+    course.certificates_disabled = True
+    course.save()
+
+    passed_grade_with_enrollment.grade = 0.0
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment
+    )
+    assert certificate is None
+    assert created is False
+    assert deleted is True
+    assert not CourseRunCertificate.objects.exists()
+
+
 def test_generate_course_certificates_no_valid_course_run(settings, courses_api_logs):
     """Test that a proper message is logged when there is no valid course run to generate certificates"""
     generate_course_run_certificates()
@@ -2447,6 +2555,92 @@ def test_generate_program_certificate_existing_revoked_returns_existing(
         ).count()
         == 1
     )
+
+
+@pytest.mark.parametrize("force_create", [True, False])
+def test_generate_program_certificate_no_program_page(
+    user,
+    program_with_empty_requirements,  # noqa: F811
+    force_create,
+):
+    """No program certificate should be created when the program has no CMS page at all."""
+    program = program_with_empty_requirements
+    ProgramEnrollment.objects.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    # Deleted via a queryset, not `program.page`, so we don't leave a stale
+    # cached reverse-OneToOne reference on the `program` instance that the
+    # function under test also operates on.
+    ProgramPage.objects.filter(program=program).delete()
+
+    result = generate_program_certificate(
+        user=user, program=program, force_create=force_create
+    )
+    assert result == (None, False)
+    assert not ProgramCertificate.all_objects.exists()
+
+
+@pytest.mark.parametrize("force_create", [True, False])
+def test_generate_program_certificate_no_certificate_child_page(
+    user,
+    program_with_empty_requirements,  # noqa: F811
+    force_create,
+):
+    """No program certificate should be created when the program page has no certificate child page."""
+    program = program_with_empty_requirements
+    ProgramEnrollment.objects.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    program.program_page.certificate_page.delete()
+
+    result = generate_program_certificate(
+        user=user, program=program, force_create=force_create
+    )
+    assert result == (None, False)
+    assert not ProgramCertificate.all_objects.exists()
+
+
+@pytest.mark.parametrize("force_create", [True, False])
+def test_generate_program_certificate_unpublished_certificate_page(
+    user,
+    program_with_empty_requirements,  # noqa: F811
+    force_create,
+):
+    """No program certificate should be created when the certificate page exists but is unpublished."""
+    program = program_with_empty_requirements
+    ProgramEnrollment.objects.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    certificate_page = program.program_page.certificate_page
+    certificate_page.live = False
+    certificate_page.save()
+
+    result = generate_program_certificate(
+        user=user, program=program, force_create=force_create
+    )
+    assert result == (None, False)
+    assert not ProgramCertificate.all_objects.exists()
+
+
+@pytest.mark.parametrize("force_create", [True, False])
+def test_generate_program_certificate_certificates_disabled(
+    user,
+    program_with_empty_requirements,  # noqa: F811
+    force_create,
+):
+    """No program certificate should be created when certificates are disabled for the program."""
+    program = program_with_empty_requirements
+    ProgramEnrollment.objects.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    program.certificates_disabled = True
+    program.save()
+
+    result = generate_program_certificate(
+        user=user, program=program, force_create=force_create
+    )
+    assert result == (None, False)
+    assert not ProgramCertificate.all_objects.exists()
 
 
 def test_program_certificates_access():
