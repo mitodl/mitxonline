@@ -16,6 +16,7 @@ from rest_framework.response import Response
 
 from courses.api import create_local_enrollment, generate_course_run_certificates
 from courses.models import CourseRun, CourseRunCertificate
+from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE
 from users.models import User
 
 log = logging.getLogger(__name__)
@@ -35,9 +36,10 @@ def edx_enrollment_webhook(request):
     """
     Webhook endpoint that receives enrollment notifications from Open edX.
 
-    When a user needs to be enrolled in a course (e.g., staff/instructor role added),
-    the Open edX plugin POSTs to this endpoint so MITx Online can enroll them as an
-    auditor in the corresponding course run.
+    When a user needs to be enrolled in a course (e.g., staff/instructor role added,
+    or a course team manually enrolls learners from the instructor dashboard), the
+    Open edX plugin POSTs to this endpoint so MITx Online can mirror the enrollment
+    in the corresponding course run.
 
     Authentication: OAuth2 Bearer token (Django OAuth Toolkit access token).
 
@@ -45,13 +47,18 @@ def edx_enrollment_webhook(request):
         {
             "email": "instructor@example.com",
             "course_id": "course-v1:MITx+1.001x+2025_T1",
-            "role": "instructor"
+            "role": "instructor",
+            "mode": "audit"
         }
+
+    Both "role" and "mode" are optional. "mode" defaults to the default edX
+    enrollment mode when it is absent or empty.
     """
     # --- Validate payload ---
     email = request.data.get("email")
     course_id = request.data.get("course_id")
     role = request.data.get("role", "")
+    mode = request.data.get("mode") or EDX_DEFAULT_ENROLLMENT_MODE
 
     if not email or not course_id:
         return Response(
@@ -91,7 +98,7 @@ def edx_enrollment_webhook(request):
 
     # --- Create local enrollment ---
     try:
-        enrollment, created = create_local_enrollment(user, course_run)
+        enrollment, created = create_local_enrollment(user, course_run, mode=mode)
     except Exception:
         log.exception(
             "Webhook: Error creating enrollment for user %s in course run %s",
@@ -104,9 +111,10 @@ def edx_enrollment_webhook(request):
         )
 
     log.info(
-        "Webhook: Successfully enrolled user %s in course run %s as auditor (role: %s, created: %s)",
+        "Webhook: Successfully enrolled user %s in course run %s (mode: %s, role: %s, created: %s)",
         email,
         course_id,
+        enrollment.enrollment_mode,
         role,
         created,
     )
