@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.163.4
+Version 1.163.4 (Released August 27, 2026)
 ---------------
 
 - Record the post-discount unit price on order lines (#3884)
