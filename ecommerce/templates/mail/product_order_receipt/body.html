@@ -9,7 +9,7 @@
             You have been enrolled{% if content_title %} in {{ content_title }}{% endif %}.
             The {% if lines and lines.0.content_type %}
                 {% if lines.0.content_type == "program" %}program{% else %}course{% endif %}
-            {% endif %} should now appear on your MITxOnline <a href="{{ base_url }}{% url 'user-dashboard' %}" style="color: #0070DA">dashboard</a>. You can also access your receipt by <a style="color: #0070DA" href="{{ base_url }}/orders/receipt/{{order.id }}/">clicking here</a>.
+            {% endif %} should now appear on your {{ site_name }} <a href="{{ base_url }}{% url 'user-dashboard' %}" style="color: #0070DA">dashboard</a>. You can also access your receipt by <a style="color: #0070DA" href="{{ base_url }}/orders/receipt/{{order.id }}/">clicking here</a>.
         </p>
         <p style="font-weight: normal; margin: 0 0 20px;">Below you will find a copy of your receipt:</p>
     </td>

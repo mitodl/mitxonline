@@ -16,7 +16,7 @@ from b2b.models import (
     UserOrganization,
 )
 from courses.models import CourseRun
-from main.admin import DisplayOnlyAdminMixin, ReadOnlyModelAdmin
+from main.admin import DisplayOnlyAdminMixin, ReadOnlyModelAdmin, get_model_admin_url
 
 
 class UserOrganizationAdminInline(DisplayOnlyAdminMixin, admin.TabularInline):
@@ -134,9 +134,12 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
     list_display = [
         "discount_code",
         "status",
-        "user",
+        "user_link",
         "assignee",
-        "contract",
+        "contract_link",
+        "email_status",
+        "email_message_id",
+        "email_status_event_timestamp",
         "created_on",
         "redeemed_on",
         "last_reminder_sent_on",
@@ -156,6 +159,7 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
         ),
         "assigned_email",
         "assigned_name",
+        "email_status",
     ]
     date_hierarchy = "created_on"
     fields = [
@@ -165,6 +169,9 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
         "assigned_by",
         "contract",
         "discount",
+        "email_status",
+        "email_message_id",
+        "email_status_event_timestamp",
         "created_on",
         "redeemed_on",
         "last_reminder_sent_on",
@@ -173,6 +180,7 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
         "user",
         "contract",
         "discount",
+        "email_status_event_timestamp",
         "assigned_by",
         "created_on",
         "redeemed_on",
@@ -185,6 +193,8 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
         "discount__discount_code",
         "assigned_email",
         "assigned_name",
+        "email_status",
+        "email_message_id",
     ]
 
     actions = ["backfill_email_events"]
@@ -217,6 +227,15 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
         namestr = f"<br />{instance.assigned_name}" if instance.assigned_name else ""
         return format_html(f"{instance.assigned_email}{namestr}")
 
+    @admin.display(description="User")
+    def user_link(self, instance):
+        return get_model_admin_url(instance.user)
+
+    @admin.display(description="Contract")
+    def contract_link(self, instance):
+        return get_model_admin_url(instance.contract)
+    
+    
     @admin.action(
         description="Backfill most recent email event within last 30d for records with email message IDs"
     )
@@ -248,6 +267,7 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
             request,
             f"Updated email status for {updated} of {len(dcars)} record(s).",
         )
+
 
 
 @admin.register(ContractPage)

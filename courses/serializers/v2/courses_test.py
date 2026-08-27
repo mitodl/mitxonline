@@ -131,6 +131,40 @@ def test_serialize_course(
     )
 
 
+def _course_eligible_for_certificate():
+    """Build a course with a verified, unexpired run (certificate_available preconditions met)."""
+    course_run = CourseRunFactory.create()
+    course_run.enrollment_modes.add(
+        EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
+    )
+    course = course_run.course
+    course.verified_courserun_count = course.courseruns.filter(
+        enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+    ).count()
+    return course
+
+
+def test_serialize_course_certificate_available_certificates_disabled(mock_context):
+    """certificate_available should be False when certificates are disabled for the course."""
+    course = _course_eligible_for_certificate()
+    course.certificates_disabled = True
+    course.save()
+
+    data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
+
+    assert data["certificate_available"] is False
+
+
+def test_serialize_course_certificate_available_no_certificate_page(mock_context):
+    """certificate_available should be False when the course has no live certificate page."""
+    course = _course_eligible_for_certificate()
+    course.page.certificate_page.delete()
+
+    data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
+
+    assert data["certificate_available"] is False
+
+
 @pytest.mark.parametrize("prerequisites_cms_value", ["mock value", None, ""])
 def test_serialize_course_required_prerequisites(
     mocker, mock_context, prerequisites_cms_value, settings

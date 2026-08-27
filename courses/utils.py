@@ -5,7 +5,7 @@ import re
 from urllib.parse import urljoin
 
 from django.conf import settings
-from django.db.models import Prefetch, Q
+from django.db.models import Exists, OuterRef, Prefetch, Q
 from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError
 
@@ -21,6 +21,26 @@ from courses.models import (
 )
 
 log = logging.getLogger(__name__)
+
+
+def live_certificate_page_exists():
+    """
+    Build an Exists() subquery annotation for whether a live CertificatePage
+    is a direct child of the course/program page (`page`) on the outer
+    queryset.
+
+    Returns:
+        Exists: subquery expression suitable for QuerySet.annotate()
+    """
+    from cms.models import CertificatePage  # noqa: PLC0415
+
+    return Exists(
+        CertificatePage.objects.filter(
+            live=True,
+            path__startswith=OuterRef("page__path"),
+            depth=OuterRef("page__depth") + 1,
+        )
+    )
 
 
 def exception_logging_generator(generator):

@@ -13,6 +13,7 @@ from courses.models import (
 )
 from courses.permissions import IsEtlUser
 from courses.serializers.internal import IngestibleCourseWithCourseRunsSerializer
+from courses.utils import live_certificate_page_exists
 from courses.views.utils import Pagination
 from ecommerce.models import Product
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
@@ -85,6 +86,9 @@ class IngestibleCourseViewSet(viewsets.ReadOnlyModelViewSet):
                     courseruns__enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
                 ),
             )
+        )
+        queryset = queryset.annotate(
+            has_live_certificate_page=live_certificate_page_exists()
         )
         queryset = queryset.prefetch(
             PrefetchOption(

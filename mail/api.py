@@ -266,7 +266,7 @@ def build_message(connection, template_name, recipient, context, metadata=None):
         subject=subject,
         body=text_body,
         to=[recipient],
-        from_email=settings.MAILGUN_FROM_EMAIL,
+        from_email=settings.MIT_LEARN_FROM_EMAIL,
         connection=connection,
         headers={"Reply-To": settings.MITX_ONLINE_REPLY_TO_ADDRESS},
     )

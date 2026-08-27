@@ -303,6 +303,7 @@ class ProgramAdminForm(ModelForm):
             "b2b_only",
             "display_mode",
             "enrollment_modes",
+            "certificates_disabled",
         ]
 
     class Media:

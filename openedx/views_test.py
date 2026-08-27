@@ -242,6 +242,57 @@ class TestEdxEnrollmentWebhook:
             == 1
         )
 
+    @pytest.mark.parametrize(
+        ("payload_mode", "expected_mode"),
+        [
+            (EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_VERIFIED_MODE),
+            (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_AUDIT_MODE),
+            (None, EDX_ENROLLMENT_AUDIT_MODE),
+            ("", EDX_ENROLLMENT_AUDIT_MODE),
+        ],
+    )
+    def test_enrollment_mode(
+        self, api_client, oauth_token, payload_mode, expected_mode
+    ):
+        """The payload mode is honored, falling back to the default mode"""
+        user = UserFactory.create()
+        course_run = CourseRunFactory.create()
+
+        payload = {
+            "email": user.email,
+            "course_id": course_run.courseware_id,
+        }
+        if payload_mode is not None:
+            payload["mode"] = payload_mode
+
+        response = self._post_webhook(api_client, payload, token=oauth_token.token)
+
+        assert response.status_code == status.HTTP_201_CREATED
+        enrollment = CourseRunEnrollment.all_objects.get(user=user, run=course_run)
+        assert enrollment.enrollment_mode == expected_mode
+
+    def test_mode_does_not_change_existing_enrollment(self, api_client, oauth_token):
+        """An existing enrollment keeps its mode; the webhook only mirrors state"""
+        user = UserFactory.create()
+        course_run = CourseRunFactory.create()
+        CourseRunEnrollment.all_objects.create(
+            user=user,
+            run=course_run,
+            edx_enrolled=True,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+
+        payload = {
+            "email": user.email,
+            "course_id": course_run.courseware_id,
+            "mode": EDX_ENROLLMENT_AUDIT_MODE,
+        }
+        response = self._post_webhook(api_client, payload, token=oauth_token.token)
+
+        assert response.status_code == status.HTTP_200_OK
+        enrollment = CourseRunEnrollment.all_objects.get(user=user, run=course_run)
+        assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+
     def test_no_edx_api_call(self, api_client, oauth_token):
         """Test that the webhook does NOT call back to edX API"""
         user = UserFactory.create()

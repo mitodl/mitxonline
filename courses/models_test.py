@@ -75,6 +75,18 @@ def test_program_num_courses():
     assert program.num_courses == 2
 
 
+def test_course_certificates_disabled_defaults_false():
+    """Course.certificates_disabled should default to False"""
+    course = CourseFactory.create()
+    assert course.certificates_disabled is False
+
+
+def test_program_certificates_disabled_defaults_false():
+    """Program.certificates_disabled should default to False"""
+    program = ProgramFactory.create()
+    assert program.certificates_disabled is False
+
+
 def test_courseware_url(settings):
     """Test that the courseware_url property yields the correct values"""
     settings.OPENEDX_COURSE_BASE_URL = "http://example.com"

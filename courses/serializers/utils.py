@@ -3,6 +3,19 @@
 from courses.models import CoursesTopic
 
 
+def has_live_certificate_page(instance) -> bool:
+    """
+    Return whether a course/program has a live certificate page, preferring
+    the queryset-annotated `has_live_certificate_page` field (avoids N+1)
+    and falling back to the `certificate_page` property when unannotated.
+    """
+    return (
+        instance.has_live_certificate_page
+        if hasattr(instance, "has_live_certificate_page")
+        else instance.certificate_page is not None
+    )
+
+
 def get_topics_from_page(page_instance) -> list[dict]:
     """
     Extract topics from a page instance, including parent topics.
