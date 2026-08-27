@@ -1,10 +1,13 @@
 """B2B model admin. Only for convenience; you should use the Wagtail interface instead."""
 
+from datetime import UTC, datetime
+
 from django.contrib import admin
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.db.models import Count
 from django.utils.html import format_html
 
+from b2b.api import get_events_for_message_ids, should_persist_event
 from b2b.models import (
     ContractPage,
     ContractProgramItem,
@@ -217,16 +220,34 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
     @admin.action(
         description="Backfill most recent email event within last 30d for records with email message IDs"
     )
-    def backfill_email_events(self, request, queryset):  # noqa: ARG002
-        """Admin action to regenerate verifiable credentials for a program"""
-        dcar_ids = queryset.values_list("id", flat=True)
-        # Filter out anything which doesn't have a tracked message ID
-        dcars = list(  # noqa: F841
-            DiscountContractAttachmentRedemption.objects.filter(
-                id__in=dcar_ids
-            ).exclude(email_message_id="")
+    def backfill_email_events(self, request, queryset):
+        """Admin action to backfill email deliverability status from Mailgun logs."""
+        dcars = list(queryset.exclude(email_message_id=""))
+
+        message_id_to_record = {dcar.email_message_id: dcar for dcar in dcars}
+        events_by_message_id = get_events_for_message_ids(
+            list(message_id_to_record.keys())
         )
-        # Restructure some of backfill_mailgun_webhooks out into reusable helper, reference here
+
+        updated = 0
+        for message_id, record in message_id_to_record.items():
+            events = events_by_message_id.get(message_id)
+            if not events:
+                continue
+            for event in events:
+                if should_persist_event(record, event):
+                    record.email_status = event["event"]
+                    record.email_status_event_timestamp = datetime.fromtimestamp(
+                        event["timestamp"], tz=UTC
+                    )
+                    record.save()
+                    updated += 1
+                    break
+
+        self.message_user(
+            request,
+            f"Updated email status for {updated} of {len(dcars)} record(s).",
+        )
 
 
 @admin.register(ContractPage)
