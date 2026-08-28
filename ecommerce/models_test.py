@@ -664,6 +664,7 @@ def test_pending_order_is_reused_if_multiple_exist(basket, settings):
         purchased_content_type_id=product.content_type_id,
         product_version=product_version,
         quantity=1,
+        discounted_unit_price=product.price,
     )
     order2 = Order.objects.create(
         state=OrderStatus.PENDING,
@@ -677,6 +678,7 @@ def test_pending_order_is_reused_if_multiple_exist(basket, settings):
         purchased_content_type_id=product.content_type_id,
         product_version=product_version,
         quantity=1,
+        discounted_unit_price=product.price,
     )
 
     basket_item = BasketItem(product=product, basket=basket, quantity=1)
@@ -958,7 +960,11 @@ def test_stripe_event_log_resave():
 
 
 def _line_for(price, *, quantity=1, discounted_unit_price=None):
-    """Build a fulfilled order carrying one line at the given product price."""
+    """
+    Build a fulfilled order carrying one line at the given product price.
+
+    discounted_unit_price defaults to the undiscounted price.
+    """
     with reversion.create_revision():
         product = ProductFactory.create(price=price)
     order = OrderFactory.create(state=OrderStatus.FULFILLED)
@@ -968,7 +974,9 @@ def _line_for(price, *, quantity=1, discounted_unit_price=None):
         purchased_content_type_id=product.content_type_id,
         product_version=Version.objects.get_for_object(product).first(),
         quantity=quantity,
-        discounted_unit_price=discounted_unit_price,
+        discounted_unit_price=(
+            price if discounted_unit_price is None else discounted_unit_price
+        ),
     )
 
 
@@ -989,14 +997,6 @@ def test_discounted_price_survives_a_discount_edited_after_purchase(user):
     assert Line.objects.get(pk=line.pk).discounted_price == Decimal("75.00")
 
 
-def test_discounted_price_falls_back_when_nothing_was_recorded():
-    """A NULL column keeps today's recompute-on-read behaviour."""
-    line = _line_for(Decimal("100.00"))
-
-    assert line.discounted_unit_price is None
-    assert line.discounted_price == Decimal("100.00")
-
-
 def test_record_discounted_unit_price_stores_the_per_unit_price():
     """Recording stores a per-unit price; discounted_price reflects it at once."""
     line = _line_for(
@@ -1012,7 +1012,7 @@ def test_record_discounted_unit_price_stores_the_per_unit_price():
 
 def test_recording_an_unchanged_price_does_not_rewrite_the_line():
     """Re-pricing at the same value skips the save, leaving updated_on alone."""
-    line = _line_for(Decimal("100.00"))
+    line = _line_for(Decimal("100.00"), discounted_unit_price=Decimal("1.00"))
     line.record_discounted_unit_price()
     line = Line.objects.get(pk=line.pk)
     before = line.updated_on
@@ -1025,7 +1025,6 @@ def test_recording_an_unchanged_price_does_not_rewrite_the_line():
 def test_discounted_price_reads_back_at_two_decimal_places():
     """A re-read line renders discounted_price at two decimal places."""
     line = _line_for(Decimal("999.00"))
-    line.record_discounted_unit_price()
 
     line = Line.objects.get(pk=line.pk)
     assert str(line.discounted_price) == "999.00"
@@ -1062,6 +1061,7 @@ def test_pricing_reads_the_line_product_version_not_the_live_product(user):
         purchased_content_type_id=product.content_type_id,
         product_version=original_version,
         quantity=1,
+        discounted_unit_price=Decimal("200.00"),
     )
 
     assert line.record_discounted_unit_price() == Decimal("100.00")
