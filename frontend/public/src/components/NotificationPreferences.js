@@ -176,12 +176,12 @@ const NotificationPreferences = ({
   showEmailPreferences,
   onChange
 }: Props) => {
-  const groups = Object.entries(preferences || {}).filter(
-    // eslint-disable-next-line no-unused-vars
-    ([app, group]) => group.enabled
-  )
+  const byApp = preferences || {}
+  // Object.keys + indexed access, not Object.entries: Flow types entries as
+  // Array<[string, mixed]>, which loses PreferenceGroup.
+  const apps = Object.keys(byApp).filter(app => byApp[app].enabled)
 
-  if (groups.length === 0) {
+  if (apps.length === 0) {
     return (
       <section className="notification-preferences" id="notifications">
         <h2>Notifications</h2>
@@ -199,24 +199,29 @@ const NotificationPreferences = ({
         Choose how you hear about activity in your courses.
       </p>
 
-      {groups.map(([app, group]) => (
-        <div className="notification-preference-group" key={app}>
-          <h3 className="notification-preference-group-title">
-            {labelForApp(app)}
-          </h3>
-          {Object.entries(group.notification_types).map(([type, config]) => (
-            <PreferenceRow
-              key={type}
-              notificationApp={app}
-              notificationType={type}
-              config={config}
-              nonEditable={lockedChannelsFor(group, type)}
-              showEmail={showEmailPreferences}
-              onChange={onChange}
-            />
-          ))}
-        </div>
-      ))}
+      {apps.map(app => {
+        const group = byApp[app]
+        const types = group.notification_types || {}
+
+        return (
+          <div className="notification-preference-group" key={app}>
+            <h3 className="notification-preference-group-title">
+              {labelForApp(app)}
+            </h3>
+            {Object.keys(types).map(type => (
+              <PreferenceRow
+                key={type}
+                notificationApp={app}
+                notificationType={type}
+                config={types[type]}
+                nonEditable={lockedChannelsFor(group, type)}
+                showEmail={showEmailPreferences}
+                onChange={onChange}
+              />
+            ))}
+          </div>
+        )
+      })}
     </section>
   )
 }
