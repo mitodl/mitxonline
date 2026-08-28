@@ -408,9 +408,9 @@ class Discount(TimestampedModel):
         """
         Check if the discount is valid for the basket.
 
-        Performs the basket-specific checks (the finaid gate, product scope,
-        and user-tied discount) and delegates the redemption-limit and date
-        window rules to check_validity.
+        Performs the finaid gate and user-tied-discount checks, then delegates
+        product scope to check_validity_with_products and the redemption-limit
+        and date-window rules to check_validity.
 
         Financial assistance discounts are excluded by default, because this
         check is used for discount codes that are submitted by the user, and
@@ -427,19 +427,6 @@ class Discount(TimestampedModel):
 
         """
 
-        def _discount_product_in_basket() -> bool:
-            """
-            Check if the discount is associated to the product in the basket.
-
-            Returns:
-                bool: True if the discount is associated to the product in the basket,
-                or not associated with any product.
-            """
-            return (
-                self.products.count() == 0
-                or self.products.filter(product__in=basket.get_products()).count() > 0
-            )
-
         def _discount_user_has_discount() -> bool:
             """
             Check if the discount is associated with the basket's user.
@@ -455,7 +442,7 @@ class Discount(TimestampedModel):
 
         return (
             (allow_finaid or self.payment_type != PAYMENT_TYPE_FINANCIAL_ASSISTANCE)
-            and _discount_product_in_basket()
+            and self.check_validity_with_products(basket.get_products())
             and _discount_user_has_discount()
             and self.check_validity(basket.user)
         )
