@@ -176,3 +176,60 @@ export const NODETYPE_COURSE = "course"
 
 export const NODEOPER_ALL = "all_of"
 export const NODEOPER_MIN = "min_number_of"
+
+// Notification preferences. The Open edX API returns machine names for
+// notification apps and types, so display strings live here. Anything the API
+// adds later falls back to its raw key rather than rendering blank.
+export const NOTIFICATION_APP_LABELS = {
+  discussion: "Discussions",
+  grading:    "Grading",
+  updates:    "Updates"
+}
+
+export const NOTIFICATION_TYPE_LABELS = {
+  grouped_notification:             "Activity notifications",
+  new_discussion_post:              "New discussion posts",
+  new_question_post:                "New question posts",
+  new_instructor_all_learners_post: "New posts from instructors",
+  new_comment_on_response:          "Comments on your responses",
+  new_comment:                      "Comments on your posts",
+  new_response:                     "Responses to your posts",
+  response_on_followed_post:        "Responses on posts you follow",
+  comment_on_followed_post:         "Comments on posts you follow",
+  response_endorsed_on_thread:      "Endorsements on your posts",
+  response_endorsed:                "Endorsements of your responses",
+  content_reported:                 "Reported content",
+  course_updates:                   "Course updates",
+  ora_grade_assigned:               "Essay assignment grade received",
+  ora_reminder:                     "Essay assignment reminders",
+  ora_staff_notifications:          "Essay assignments awaiting grading"
+}
+
+// The API only returns an `info` string for a couple of types, so descriptions
+// live here to keep every row consistent. The component still falls back to
+// the API's `info` for any type added upstream that we do not know about yet.
+export const NOTIFICATION_TYPE_DESCRIPTIONS = {
+  grouped_notification:
+    "Responses, comments and endorsements on your posts and on posts you follow.",
+  new_discussion_post: "When someone starts a new discussion in your courses.",
+  new_question_post:   "When someone posts a new question in your courses.",
+  new_instructor_all_learners_post:
+    "When the course team posts an update to everyone.",
+  new_comment_on_response:   "When someone comments on one of your responses.",
+  new_comment:               "When someone comments on one of your posts.",
+  new_response:              "When someone responds to one of your posts.",
+  response_on_followed_post: "When someone responds to a post you follow.",
+  comment_on_followed_post:  "When someone comments on a post you follow.",
+  response_endorsed_on_thread:
+    "When the course team endorses a response on your post.",
+  response_endorsed: "When the course team endorses one of your responses.",
+  content_reported:  "When a learner reports a post for review.",
+  course_updates:    "Announcements and updates from the course team.",
+  ora_grade_assigned:
+    "When a peer or the course team grades your essay assignment.",
+  ora_reminder: "When you still have peer or self reviews to complete.",
+  ora_staff_notifications:
+    "When an essay assignment is waiting for your review."
+}
+
+export const NOTIFICATION_EMAIL_CADENCES = ["Daily", "Weekly", "Immediately"]
