@@ -6353,25 +6353,20 @@ components:
       - quantity
     CreateBasketWithProductsRequest:
       type: object
-      description: Serializer for creating a basket with products. (For OpenAPI spec.)
+      description: Serializer for creating a basket with products.
       properties:
-        system_slug:
-          type: string
-          minLength: 1
         product_ids:
           type: array
           items:
             $ref: '#/components/schemas/CreateBasketWithProductIDRequest'
         checkout:
           type: boolean
+          default: false
         discount_code:
           type: string
-          minLength: 1
+          nullable: true
       required:
-      - checkout
-      - discount_code
       - product_ids
-      - system_slug
     Department:
       type: object
       description: Department model serializer

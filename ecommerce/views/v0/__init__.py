@@ -371,27 +371,35 @@ def create_basket_from_product_with_discount(
 def create_basket_with_products(request):
     """
     Create new basket items for the currently logged in user. Reuse the existing
-    basket object if it exists. Optionally apply the specified discount.
+    basket object if it exists. Optionally apply the supplied discount code.
+
+    Eligible auto-apply and financial assistance discounts are applied whether
+    or not a discount code is supplied.
 
     If the checkout flag is set in the POST data, then this will create the
     basket, then immediately flip the user to the checkout interstitial (which
     then redirects to the payment gateway).
 
-    If any of the products aren't found, this will return a 404 error. If
-    the discount code is invalid, the discount won't be applied and an error
-    will be logged, but the basket will still be updated.
+    If any of the products aren't found, this will return a 404 error. A
+    discount code that isn't found, isn't redeemable, or doesn't beat a
+    discount already on the basket is dropped silently, and the basket is
+    still updated.
 
     POST Args:
+        product_ids (list[dict]): products to add to the basket, each
+            ``{"product_id": int, "quantity": int}`` (required)
         checkout (bool): redirect to checkout interstitial (defaults to False)
-        product_ids (list[(str, int)]): list of product SKUs to add to the basket with quantity
-        discount_code (str): discount code to apply to the basket
+        discount_code (str): discount code to apply to the basket (optional)
 
     Returns:
         Response: HTTP response
     """
-    checkout = request.data.get("checkout", False)
-    discount_code = request.data.get("discount_code", None)
-    product_ids = request.data.get("product_ids", [])
+    serializer = requests.CreateBasketWithProductsSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    checkout = serializer.validated_data["checkout"]
+    discount_code = serializer.validated_data["discount_code"]
+    product_ids = serializer.validated_data["product_ids"]
 
     basket = establish_basket(request)
     products = []
@@ -399,10 +407,10 @@ def create_basket_with_products(request):
     try:
         products = [
             (
-                Product.objects.get(id=product_id["product_id"]),
-                product_id["quantity"],
+                Product.objects.get(id=item["product_id"]),
+                item["quantity"],
             )
-            for product_id in product_ids
+            for item in product_ids
         ]
     except Product.DoesNotExist:
         return Response(
@@ -467,9 +475,6 @@ def create_basket_with_products(request):
 def clear_basket(request):
     """
     Clear the basket for the current user.
-
-    Args:
-        system_slug (str): system slug
 
     Returns:
         Response: HTTP response

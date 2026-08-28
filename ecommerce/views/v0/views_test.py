@@ -388,6 +388,66 @@ def test_create_basket_with_products(
 
 
 @pytest.mark.parametrize(
+    "payload",
+    [
+        pytest.param({}, id="product_ids-missing"),
+        pytest.param({"product_ids": [5]}, id="product_ids-not-objects"),
+        pytest.param(
+            {"product_ids": [{"product_id": 5, "quantity": 0}]},
+            id="quantity-below-minimum",
+        ),
+    ],
+)
+def test_create_basket_with_products_rejects_malformed_body(user_client, payload):
+    """A body that doesn't match the request serializer is rejected with a 400."""
+
+    response = user_client.post(
+        reverse("v0:baskets_api-create_with_products"),
+        data=payload,
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+
+
+@pytest.mark.parametrize("discount_code", ["", None], ids=["blank", "null"])
+def test_create_basket_with_products_empty_discount_code(user_client, discount_code):
+    """An empty discount code means "no discount", not a validation error."""
+
+    product = ProductFactory.create()
+
+    response = user_client.post(
+        reverse("v0:baskets_api-create_with_products"),
+        data={
+            "product_ids": [{"product_id": product.id, "quantity": 1}],
+            "discount_code": discount_code,
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert Basket.objects.get(id=response.data["id"]).discounts.count() == 0
+
+
+def test_create_basket_with_products_checkout_redirects(user_client):
+    """The checkout flag sends the user to the checkout interstitial."""
+
+    product = ProductFactory.create()
+
+    response = user_client.post(
+        reverse("v0:baskets_api-create_with_products"),
+        data={
+            "product_ids": [{"product_id": product.id, "quantity": 1}],
+            "checkout": True,
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 302
+    assert response.url == reverse("checkout_interstitial_page")
+
+
+@pytest.mark.parametrize(
     (
         "existing_basket",
         "add_discount",
