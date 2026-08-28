@@ -781,6 +781,31 @@ def test_discount_with_user_value_is_valid_for_basket(is_none):
     assert discount.is_valid(basket_item.basket)
 
 
+def test_discount_with_null_max_redemptions_is_valid_for_basket():
+    """A NULL max_redemptions means unlimited, not a TypeError."""
+    basket_item = BasketItemFactory.create()
+    discount = UnlimitedUseDiscountFactory.create(max_redemptions=None)
+
+    assert discount.is_valid(basket_item.basket)
+
+
+def test_discount_with_unfulfilled_redemption_is_valid_for_basket():
+    """Redemptions on unfulfilled orders don't consume the limit, matching check_validity."""
+    basket_item = BasketItemFactory.create()
+    discount = UnlimitedUseDiscountFactory.create(max_redemptions=1)
+    order = OrderFactory.create(
+        purchaser=basket_item.basket.user, state=OrderStatus.PENDING
+    )
+    DiscountRedemption.objects.create(
+        redeemed_discount=discount,
+        redeemed_by=basket_item.basket.user,
+        redeemed_order=order,
+        redemption_date=now_in_utc(),
+    )
+
+    assert discount.is_valid(basket_item.basket)
+
+
 @pytest.mark.parametrize("is_none", [True, False])
 def test_discount_with_max_redemptions_is_valid_for_basket(is_none):
     """Test that a discount is valid for a basket."""
@@ -861,7 +886,9 @@ def test_discount_with_max_redemptions_is_not_valid_for_basket():
         amount=10,
     )
 
-    order = OrderFactory.create(purchaser=basket_item.basket.user)
+    order = OrderFactory.create(
+        purchaser=basket_item.basket.user, state=OrderStatus.FULFILLED
+    )
     DiscountRedemption.objects.create(
         redeemed_discount=discount,
         redeemed_by=basket_item.basket.user,
@@ -894,6 +921,69 @@ def test_discount_with_expiration_date_in_past_is_not_valid_for_basket():
         )
 
     assert not discount.is_valid(basket_item.basket)
+
+
+def test_one_time_discount_with_fulfilled_redemption_is_not_valid_for_basket():
+    """A one-time discount already redeemed on a fulfilled order can't be reused."""
+    basket_item = BasketItemFactory.create()
+    discount = OneTimeDiscountFactory.create()
+    order = OrderFactory.create(
+        purchaser=basket_item.basket.user, state=OrderStatus.FULFILLED
+    )
+    DiscountRedemption.objects.create(
+        redeemed_discount=discount,
+        redeemed_by=basket_item.basket.user,
+        redeemed_order=order,
+        redemption_date=now_in_utc(),
+    )
+    assert not discount.is_valid(basket_item.basket)
+
+
+def test_one_time_discount_with_pending_redemption_is_valid_for_basket():
+    """A one-time discount redeemed only on a pending order hasn't been consumed yet."""
+    basket_item = BasketItemFactory.create()
+    discount = OneTimeDiscountFactory.create()
+    order = OrderFactory.create(
+        purchaser=basket_item.basket.user, state=OrderStatus.PENDING
+    )
+    DiscountRedemption.objects.create(
+        redeemed_discount=discount,
+        redeemed_by=basket_item.basket.user,
+        redeemed_order=order,
+        redemption_date=now_in_utc(),
+    )
+    assert discount.is_valid(basket_item.basket)
+
+
+def test_one_time_per_user_discount_redeemed_by_basket_user_is_not_valid_for_basket():
+    """A one-time-per-user discount already redeemed by this user can't be reused by them."""
+    basket_item = BasketItemFactory.create()
+    discount = OneTimePerUserDiscountFactory.create()
+    order = OrderFactory.create(
+        purchaser=basket_item.basket.user, state=OrderStatus.FULFILLED
+    )
+    DiscountRedemption.objects.create(
+        redeemed_discount=discount,
+        redeemed_by=basket_item.basket.user,
+        redeemed_order=order,
+        redemption_date=now_in_utc(),
+    )
+    assert not discount.is_valid(basket_item.basket)
+
+
+def test_one_time_per_user_discount_redeemed_by_other_user_is_valid_for_basket():
+    """A one-time-per-user discount redeemed by someone else is still available to this user."""
+    basket_item = BasketItemFactory.create()
+    discount = OneTimePerUserDiscountFactory.create()
+    other_user = UserFactory.create()
+    order = OrderFactory.create(purchaser=other_user, state=OrderStatus.FULFILLED)
+    DiscountRedemption.objects.create(
+        redeemed_discount=discount,
+        redeemed_by=other_user,
+        redeemed_order=order,
+        redemption_date=now_in_utc(),
+    )
+    assert discount.is_valid(basket_item.basket)
 
 
 @pytest.mark.skip_nplusone_check

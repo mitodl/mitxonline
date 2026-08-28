@@ -409,6 +409,10 @@ class Discount(TimestampedModel):
         """
         Check if the discount is valid for the basket.
 
+        Performs the basket-specific checks (the finaid gate, product scope,
+        and user-tied discount) and delegates the redemption-limit and date
+        window rules to check_validity.
+
         Financial assistance discounts are excluded by default, because this
         check is used for discount codes that are submitted by the user, and
         those discounts can't be applied manually. When this is used to check
@@ -450,47 +454,11 @@ class Discount(TimestampedModel):
                 or self.user_discount_discount.filter(user=basket.user).count() > 0
             )
 
-        def _discount_redemption_limit_valid() -> bool:
-            """
-            Check if the discount has been redeemed less than the maximum number
-            of times.
-
-            Returns:
-                bool: True if the discount has been redeemed less than the maximum
-                number of times, or the maximum number of redemptions is 0.
-            """
-            return (
-                self.max_redemptions == 0
-                or self.order_redemptions.count() < self.max_redemptions
-            )
-
-        def _discount_activation_date_valid() -> bool:
-            """
-            Check if the discount's activation date is in the past.
-
-            Returns:
-                bool: True if the discount's activation date is in the past, or the
-                activation date is None.
-            """
-            return self.activation_date is None or now_in_utc() >= self.activation_date
-
-        def _discount_expiration_date_valid() -> bool:
-            """
-            Check if the discount's expiration date is in the future.
-
-            Returns:
-                bool: True if the discount's expiration date is in the future, or the
-                expiration date is None.
-            """
-            return self.expiration_date is None or now_in_utc() <= self.expiration_date
-
         return (
             (allow_finaid or self.payment_type != PAYMENT_TYPE_FINANCIAL_ASSISTANCE)
             and _discount_product_in_basket()
             and _discount_user_has_discount()
-            and _discount_redemption_limit_valid()
-            and _discount_activation_date_valid()
-            and _discount_expiration_date_valid()
+            and self.check_validity(basket.user)
         )
 
     def friendly_format(self):
