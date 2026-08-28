@@ -454,7 +454,11 @@ def upgrade_audit_run_enrollments_for_program_purchase(user, program):
 
 def _verify_exports_compliance_for_enrollment(user, courseware_object) -> None:
     """Verify users with CyberSource before creating enrollments."""
-    if not settings.FEATURES.get(features.EXPORT_COMPLIANCE_CHECK_ENABLED, False):
+    if not is_enabled(
+        features.EXPORT_COMPLIANCE_CHECK_ENABLED,
+        default=False,
+        opt_unique_id=user.global_id,
+    ):
         return
 
     result = verify_user_with_exports(user, courseware_object)
