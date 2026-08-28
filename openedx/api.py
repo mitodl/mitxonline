@@ -2022,10 +2022,17 @@ def _notification_preferences_headers(user):
         NoEdxApiAuthError: if the user has no usable Open edX auth
     """
     # create_edx_auth_token and the token refresh both call raise_for_status
-    # internally, so a revoked refresh token or a broken OAuth handshake
-    # surfaces as HTTPError/OpenEdXOAuth2Error. For this endpoint all of those
-    # mean the same thing to the learner: we have no usable Open edX identity
-    # for them right now. Collapse them rather than 500ing.
+    # internally, so failures arrive as HTTPError / OpenEdXOAuth2Error. Those
+    # are not all the same thing, and the difference matters to the learner:
+    #
+    #   * no OpenEdxUser / no OpenEdxApiAuth row, or the token endpoint
+    #     rejecting the grant with a 400 -> this learner has no usable Open edX
+    #     identity, which is the "still being set up" case (NoEdxApiAuthError).
+    #   * anything else -- a 5xx from the token endpoint, bad client
+    #     credentials, a handshake that never came back with a code -> the
+    #     token service or its configuration is at fault, not this learner's
+    #     account. Surface it as an upstream failure so a synced learner gets
+    #     an accurate, retryable status instead of a misleading 409.
     try:
         if create_edx_auth_token(user) is None:
             raise NoEdxApiAuthError(f"{user!s} is not yet synced with edX")  # noqa: EM102
@@ -2034,9 +2041,21 @@ def _notification_preferences_headers(user):
         raise NoEdxApiAuthError(  # noqa: B904
             f"{user!s} does not have an associated OpenEdxApiAuth"  # noqa: EM102
         )
-    except (HTTPError, OpenEdXOAuth2Error) as exc:
-        raise NoEdxApiAuthError(  # noqa: B904
-            f"Could not obtain an Open edX token for {user!s}: {exc!s}"  # noqa: EM102
+    except HTTPError as exc:
+        upstream_status = getattr(exc.response, "status_code", None)
+        if upstream_status == status.HTTP_400_BAD_REQUEST:
+            # The grant itself was rejected (a revoked or invalid refresh
+            # token), so there is no usable auth for this learner.
+            raise NoEdxApiAuthError(  # noqa: B904
+                f"Open edX rejected the token grant for {user!s}: {exc!s}"  # noqa: EM102
+            )
+        raise EdxApiNotificationPreferencesError(  # noqa: B904
+            f"Open edX token service failed for {user!s}: {exc!s}",  # noqa: EM102
+            status_code=upstream_status,
+        )
+    except OpenEdXOAuth2Error as exc:
+        raise EdxApiNotificationPreferencesError(  # noqa: B904
+            f"Open edX OAuth2 handshake failed for {user!s}: {exc!s}"  # noqa: EM102
         )
 
     return {"Authorization": f"Bearer {auth.access_token}"}
