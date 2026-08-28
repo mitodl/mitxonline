@@ -720,9 +720,7 @@ def downgrade_learner_from_order(order_id):
     active_runs = [
         run
         for run in order.purchased_runs
-        if CourseRunEnrollment.objects.filter(
-            user=order.purchaser, run=run
-        ).exists()
+        if CourseRunEnrollment.objects.filter(user=order.purchaser, run=run).exists()
     ]
 
     if not active_runs:
