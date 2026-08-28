@@ -800,19 +800,25 @@ class Order(TimestampedModel):
     # Immutable identifier for this order, shared with the payment gateway.
     # Generated once on first save (see save/_generate_reference_number) and
     # never regenerated, so it stays valid even if the generation scheme
-    # changes. Unique because the payment gateway callbacks look orders up by
-    # it rather than by PK; the unique constraint supplies the index and
-    # guarantees that lookup resolves to at most one order. Postgres allows
-    # duplicate NULLs, so the initial insert in save() still works.
-    reference_number = models.CharField(
-        max_length=255, null=True, blank=True, unique=True
-    )
+    # changes. Uniqueness is enforced by the constraint in Meta rather than
+    # unique=True on the field: a field-level unique also pulls in a
+    # varchar_pattern_ops index for LIKE queries that nothing here issues.
+    # Postgres allows duplicate NULLs, so the initial insert in save() still works.
+    reference_number = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
     gateway_type = models.CharField(
         max_length=32,
         blank=True,
         default=MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
         help_text="The payment gateway used for this order. Must match one of the supported payment gateways in ol-django.",
     )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["reference_number"],
+                name="unique_order_reference_number",
+            )
+        ]
 
     def get_object_flow(self):
         """Instantiate the flow without default constructor"""
