@@ -335,7 +335,7 @@ class Discount(TimestampedModel):
         """Returns True if the discount has been redeemed"""
         return DiscountRedemption.objects.filter(redeemed_discount=self).exists()
 
-    def check_validity(self, user: User):
+    def is_redeemable_by(self, user: User):
         """
         Enforces the redemption rules for a given discount.
 
@@ -410,7 +410,7 @@ class Discount(TimestampedModel):
 
         Performs the finaid gate and user-tied-discount checks, then delegates
         product scope to check_validity_with_products and the redemption-limit
-        and date-window rules to check_validity.
+        and date-window rules to is_redeemable_by.
 
         Financial assistance discounts are excluded by default, because this
         check is used for discount codes that are submitted by the user, and
@@ -444,7 +444,7 @@ class Discount(TimestampedModel):
             (allow_finaid or self.payment_type != PAYMENT_TYPE_FINANCIAL_ASSISTANCE)
             and self.check_validity_with_products(basket.get_products())
             and _discount_user_has_discount()
-            and self.check_validity(basket.user)
+            and self.is_redeemable_by(basket.user)
         )
 
     def friendly_format(self):
@@ -471,7 +471,7 @@ class Discount(TimestampedModel):
         """
         from ecommerce.discounts import DiscountType  # noqa: PLC0415
 
-        if (user is None and self.valid_now()) or self.check_validity(user):
+        if (user is None and self.valid_now()) or self.is_redeemable_by(user):
             return DiscountType.get_discounted_price([self], product).quantize(
                 Decimal("0.01")
             )
