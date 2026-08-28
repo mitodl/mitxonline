@@ -1183,7 +1183,7 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
     Keyword Args:
         allow_finaid (bool): Allow a financial assistance discount through.
     """
-    if discount.is_valid(basket, allow_finaid=allow_finaid):
+    if discount.is_valid_for_basket(basket, allow_finaid=allow_finaid):
         defaults = {
             "redeemed_discount": discount,
             "redemption_date": now_in_utc(),

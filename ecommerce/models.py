@@ -404,7 +404,7 @@ class Discount(TimestampedModel):
 
         return True
 
-    def is_valid(self, basket, *, allow_finaid=False) -> bool:
+    def is_valid_for_basket(self, basket, *, allow_finaid=False) -> bool:
         """
         Check if the discount is valid for the basket.
 
