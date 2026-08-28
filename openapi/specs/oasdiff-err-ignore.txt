@@ -190,10 +190,9 @@ PATCH /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ the 
 POST /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ the 'redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '201'
 PUT /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ the 'redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '200'
 
-# Intended removal (hq#12992): the per-page `hubspot_form_id` field replaces the
-# `show_stay_updated` boolean, which is dropped from CoursePage and ProgramPage.
-# Removing the field drops it from these read-only page responses; the frontend
-# (mitodl/mit-learn) now keys the "Stay Updated" button off `hubspot_form_id`.
+# Intended removal (hq#12992): per-page `hubspot_form_id` replaces the
+# `show_stay_updated` boolean on CoursePage/ProgramPage. Frontend keys the
+# "Stay Updated" button off `hubspot_form_id` now.
 GET /api/v2/pages/?fields=*&type=cms.coursepage removed the required property `items/items/show_stay_updated` from the response with the `200` status
 GET /api/v2/pages/?fields=*&type=cms.programpage removed the required property `items/items/show_stay_updated` from the response with the `200` status
 GET /api/v2/pages/{id}/ removed the required property `oneOf[#/components/schemas/CoursePageItem]/show_stay_updated` from the response with the `200` status
