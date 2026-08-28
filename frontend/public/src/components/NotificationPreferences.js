@@ -183,7 +183,7 @@ const NotificationPreferences = ({
 
   if (groups.length === 0) {
     return (
-      <section className="notification-preferences">
+      <section className="notification-preferences" id="notifications">
         <h2>Notifications</h2>
         <p className="notification-preferences-intro">
           You have no notification settings to manage yet.
@@ -193,7 +193,7 @@ const NotificationPreferences = ({
   }
 
   return (
-    <section className="notification-preferences">
+    <section className="notification-preferences" id="notifications">
       <h2>Notifications</h2>
       <p className="notification-preferences-intro">
         Choose how you hear about activity in your courses.

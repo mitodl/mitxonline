@@ -122,6 +122,16 @@ describe("NotificationPreferences", () => {
     assert.lengthOf(wrapper.find(PreferenceRow), 0)
   })
 
+  it("anchors the section at #notifications", () => {
+    // The Open edX notifications drawer gear links to
+    // /account-settings/#notifications (mitodl/hq#12930).
+    assert.equal(render().find("section").props().id, "notifications")
+    assert.equal(
+      render({ preferences: {} }).find("section").props().id,
+      "notifications"
+    )
+  })
+
   it("shows an empty state when there is nothing to manage", () => {
     const wrapper = render({ preferences: {} })
 
