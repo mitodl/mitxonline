@@ -763,7 +763,7 @@ def test_discount_with_product_value_is_valid_for_basket(is_none):
     discount = UnlimitedUseDiscountFactory.create(amount=10)
     if product:
         DiscountProduct.objects.create(discount=discount, product=product)
-    assert discount.is_valid(basket_item.basket)
+    assert discount.is_valid_for_basket(basket_item.basket)
 
 
 @pytest.mark.parametrize("is_none", [True, False])
@@ -778,7 +778,7 @@ def test_discount_with_user_value_is_valid_for_basket(is_none):
             user=basket_item.basket.user,
         )
         basket_item.basket.user.user_discount_user.add(user_discount)
-    assert discount.is_valid(basket_item.basket)
+    assert discount.is_valid_for_basket(basket_item.basket)
 
 
 def test_discount_with_null_max_redemptions_is_valid_for_basket():
@@ -786,7 +786,7 @@ def test_discount_with_null_max_redemptions_is_valid_for_basket():
     basket_item = BasketItemFactory.create()
     discount = UnlimitedUseDiscountFactory.create(max_redemptions=None)
 
-    assert discount.is_valid(basket_item.basket)
+    assert discount.is_valid_for_basket(basket_item.basket)
 
 
 def test_discount_with_unfulfilled_redemption_is_valid_for_basket():
@@ -803,7 +803,7 @@ def test_discount_with_unfulfilled_redemption_is_valid_for_basket():
         redemption_date=now_in_utc(),
     )
 
-    assert discount.is_valid(basket_item.basket)
+    assert discount.is_valid_for_basket(basket_item.basket)
 
 
 @pytest.mark.parametrize("is_none", [True, False])
@@ -823,7 +823,7 @@ def test_discount_with_max_redemptions_is_valid_for_basket(is_none):
             redeemed_order=order,
             redemption_date=now_in_utc(),
         )
-    assert discount.is_valid(basket_item.basket)
+    assert discount.is_valid_for_basket(basket_item.basket)
 
 
 @pytest.mark.parametrize("is_none", [True, False])
@@ -835,7 +835,7 @@ def test_discount_with_activation_date_in_past_is_valid_for_basket(is_none):
         activation_date=activation_date,
         amount=10,
     )
-    assert discount.is_valid(basket_item.basket)
+    assert discount.is_valid_for_basket(basket_item.basket)
 
 
 @pytest.mark.parametrize("is_none", [True, False])
@@ -847,7 +847,7 @@ def test_discount_with_expiration_date_in_future_is_valid_for_basket(is_none):
         expiration_date=expiration_date,
         amount=10,
     )
-    assert discount.is_valid(basket_item.basket)
+    assert discount.is_valid_for_basket(basket_item.basket)
 
 
 def test_discount_with_unmatched_product_value_is_not_valid_for_basket():
@@ -862,7 +862,7 @@ def test_discount_with_unmatched_product_value_is_not_valid_for_basket():
         discount=discount,
         product=product,
     )
-    assert not discount.is_valid(basket_item.basket)
+    assert not discount.is_valid_for_basket(basket_item.basket)
 
 
 def test_discount_with_unmatched_user_value_is_not_valid_for_basket():
@@ -874,7 +874,7 @@ def test_discount_with_unmatched_user_value_is_not_valid_for_basket():
     )
     user = UserFactory.create()
     UserDiscount.objects.create(discount=discount, user=user)
-    assert not discount.is_valid(basket_item.basket)
+    assert not discount.is_valid_for_basket(basket_item.basket)
 
 
 def test_discount_with_max_redemptions_is_not_valid_for_basket():
@@ -895,7 +895,7 @@ def test_discount_with_max_redemptions_is_not_valid_for_basket():
         redeemed_order=order,
         redemption_date=now_in_utc(),
     )
-    assert not discount.is_valid(basket_item.basket)
+    assert not discount.is_valid_for_basket(basket_item.basket)
 
 
 def test_discount_with_activation_date_in_future_is_not_valid_for_basket():
@@ -906,7 +906,7 @@ def test_discount_with_activation_date_in_future_is_not_valid_for_basket():
         activation_date=activation_date,
         amount=10,
     )
-    assert not discount.is_valid(basket_item.basket)
+    assert not discount.is_valid_for_basket(basket_item.basket)
 
 
 def test_discount_with_expiration_date_in_past_is_not_valid_for_basket():
@@ -920,7 +920,7 @@ def test_discount_with_expiration_date_in_past_is_not_valid_for_basket():
             amount=10,
         )
 
-    assert not discount.is_valid(basket_item.basket)
+    assert not discount.is_valid_for_basket(basket_item.basket)
 
 
 def test_one_time_discount_with_fulfilled_redemption_is_not_valid_for_basket():
@@ -936,7 +936,7 @@ def test_one_time_discount_with_fulfilled_redemption_is_not_valid_for_basket():
         redeemed_order=order,
         redemption_date=now_in_utc(),
     )
-    assert not discount.is_valid(basket_item.basket)
+    assert not discount.is_valid_for_basket(basket_item.basket)
 
 
 def test_one_time_discount_with_pending_redemption_is_valid_for_basket():
@@ -952,7 +952,7 @@ def test_one_time_discount_with_pending_redemption_is_valid_for_basket():
         redeemed_order=order,
         redemption_date=now_in_utc(),
     )
-    assert discount.is_valid(basket_item.basket)
+    assert discount.is_valid_for_basket(basket_item.basket)
 
 
 def test_one_time_per_user_discount_redeemed_by_basket_user_is_not_valid_for_basket():
@@ -968,7 +968,7 @@ def test_one_time_per_user_discount_redeemed_by_basket_user_is_not_valid_for_bas
         redeemed_order=order,
         redemption_date=now_in_utc(),
     )
-    assert not discount.is_valid(basket_item.basket)
+    assert not discount.is_valid_for_basket(basket_item.basket)
 
 
 def test_one_time_per_user_discount_redeemed_by_other_user_is_valid_for_basket():
@@ -983,7 +983,7 @@ def test_one_time_per_user_discount_redeemed_by_other_user_is_valid_for_basket()
         redeemed_order=order,
         redemption_date=now_in_utc(),
     )
-    assert discount.is_valid(basket_item.basket)
+    assert discount.is_valid_for_basket(basket_item.basket)
 
 
 @pytest.mark.skip_nplusone_check
