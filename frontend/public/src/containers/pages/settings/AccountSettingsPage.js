@@ -6,14 +6,19 @@ import { ACCOUNT_SETTINGS_PAGE_TITLE } from "../../../constants"
 import { compose } from "redux"
 import { connect } from "react-redux"
 import { mutateAsync } from "redux-query"
+import { connectRequest } from "redux-query-react"
 
 import { addUserNotification } from "../../../actions"
 import auth from "../../../lib/queries/auth"
+import notificationPreferencesQueries, {
+  notificationPreferencesSelector
+} from "../../../lib/queries/notificationPreferences"
 import { routes } from "../../../lib/urls"
 import { ALERT_TYPE_TEXT } from "../../../constants"
 
 import ChangePasswordForm from "../../../components/forms/ChangePasswordForm"
 import ChangeEmailForm from "../../../components/forms/ChangeEmailForm"
+import NotificationPreferences from "../../../components/NotificationPreferences"
 
 import type { User } from "../../../flow/authTypes"
 
@@ -33,7 +38,15 @@ type Props = {
   ) => Promise<any>,
   changeEmail: (newEmail: string, password: string) => Promise<any>,
   addUserNotification: Function,
-  currentUser: User
+  currentUser: User,
+  notificationPreferences: ?Object,
+  updateNotificationPreference: (
+    notificationApp: string,
+    notificationType: string,
+    notificationChannel: string,
+    payload: Object
+  ) => Promise<any>,
+  forceRequest: () => Promise<any>
 }
 
 export class AccountSettingsPage extends React.Component<Props> {
@@ -117,8 +130,41 @@ export class AccountSettingsPage extends React.Component<Props> {
     }
   }
 
+  async onChangeNotificationPreference(
+    notificationApp: string,
+    notificationType: string,
+    notificationChannel: string,
+    payload: Object
+  ) {
+    const { updateNotificationPreference, addUserNotification, forceRequest } =
+      this.props
+
+    const response = await updateNotificationPreference(
+      notificationApp,
+      notificationType,
+      notificationChannel,
+      payload
+    )
+
+    if (response.status !== 200) {
+      addUserNotification({
+        "notification-preference-change": {
+          type:  ALERT_TYPE_TEXT,
+          color: "danger",
+          props: {
+            text: "We could not save that notification setting. Please try again."
+          }
+        }
+      })
+    }
+
+    // Re-read rather than patching local state: the LMS fans a grouped change
+    // out to several types, so the response is not enough to render from.
+    await forceRequest()
+  }
+
   render() {
-    const { currentUser } = this.props
+    const { currentUser, notificationPreferences } = this.props
 
     return (
       <DocumentTitle
@@ -172,6 +218,20 @@ export class AccountSettingsPage extends React.Component<Props> {
                 )}
               </div>
             </div>
+
+            {notificationPreferences ? (
+              <div className="std-card std-card-auth">
+                <div className="std-card-body my-account-page">
+                  <NotificationPreferences
+                    preferences={notificationPreferences.data}
+                    showEmailPreferences={
+                      notificationPreferences.show_email_preferences !== false
+                    }
+                    onChange={this.onChangeNotificationPreference.bind(this)}
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
         </>
       </DocumentTitle>
@@ -186,15 +246,37 @@ const changeEmail = (newEmail: string, password: string) =>
   mutateAsync(auth.changeEmailMutation(newEmail, password))
 
 const mapStateToProps = createStructuredSelector({
-  currentUser: currentUserSelector
+  currentUser:             currentUserSelector,
+  notificationPreferences: notificationPreferencesSelector
 })
+
+const updateNotificationPreference = (
+  notificationApp: string,
+  notificationType: string,
+  notificationChannel: string,
+  payload: Object
+) =>
+  mutateAsync(
+    notificationPreferencesQueries.updateNotificationPreferenceMutation(
+      notificationApp,
+      notificationType,
+      notificationChannel,
+      payload
+    )
+  )
+
+const mapPropsToConfig = () => [
+  notificationPreferencesQueries.notificationPreferencesQuery()
+]
 
 const mapDispatchToProps = {
   changePassword,
   changeEmail,
+  updateNotificationPreference,
   addUserNotification
 }
 
-export default compose(connect(mapStateToProps, mapDispatchToProps))(
-  AccountSettingsPage
-)
+export default compose(
+  connect(mapStateToProps, mapDispatchToProps),
+  connectRequest(mapPropsToConfig)
+)(AccountSettingsPage)
