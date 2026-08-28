@@ -18,7 +18,10 @@ from courses.factories import CourseRunFactory
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
+    REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+    REDEMPTION_TYPE_UNLIMITED,
     REFUND_WINDOW_DAYS,
     ZERO_PAYMENT_DATA,
 )
@@ -40,6 +43,7 @@ from ecommerce.models import (
     Basket,
     BasketDiscount,
     BasketItem,
+    Discount,
     DiscountProduct,
     DiscountRedemption,
     FulfilledOrder,
@@ -1447,3 +1451,36 @@ def test_a_source_line_is_protected_once_it_funds_a_redemption():
 
     with pytest.raises(ProtectedError):
         line.delete()
+
+
+def test_db_constraint_rejects_paid_amount_off_without_program_child_purchase():
+    """The DB backstop holds even for writes that skip model validation."""
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Discount.objects.bulk_create(
+            [
+                Discount(
+                    amount=0,
+                    discount_code="constraint-bypass",
+                    discount_type=DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+                    redemption_type=REDEMPTION_TYPE_UNLIMITED,
+                )
+            ]
+        )
+
+
+def test_db_constraint_allows_program_child_purchase_redemption_with_standard_type():
+    """The constraint is one-way on purpose: a standard calculation may pair
+    with the program-child-purchase redemption rules (future fractional offers).
+    """
+    Discount.objects.bulk_create(
+        [
+            Discount(
+                amount=10,
+                discount_code="reverse-pairing",
+                discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+                redemption_type=REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+            )
+        ]
+    )
+
+    assert Discount.objects.filter(discount_code="reverse-pairing").exists()
