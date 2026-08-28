@@ -639,7 +639,7 @@ class CheckoutApiViewSet(ViewSet):
             if not api.check_discount_for_products(discount, basket):
                 raise ObjectDoesNotExist()  # noqa: RSE102, TRY301
 
-            if not discount.check_validity(request.user):
+            if not discount.is_redeemable_by(request.user):
                 log.error(
                     f"Discount code {request.data['discount']} has already been redeemed"  # noqa: G004
                 )

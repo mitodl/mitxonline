@@ -308,7 +308,7 @@ def check_basket_discounts_for_validity(request):
     basket = establish_basket(request)
 
     for basket_discount in basket.discounts.all():
-        if not basket_discount.redeemed_discount.check_validity(
+        if not basket_discount.redeemed_discount.is_redeemable_by(
             basket.user
         ) or not check_discount_for_products(basket_discount.redeemed_discount, basket):
             return False
@@ -361,7 +361,7 @@ def apply_user_discounts(request):
         # check for product specificity in the discount
         if not check_discount_for_products(
             discount, basket
-        ) or not discount.check_validity(user):
+        ) or not discount.is_redeemable_by(user):
             return
 
         bd = BasketDiscount(

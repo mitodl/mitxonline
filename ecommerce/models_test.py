@@ -109,11 +109,11 @@ def test_one_time_discount(user, onetime_discount):
     again.
     """
 
-    assert onetime_discount.check_validity(user) is True
+    assert onetime_discount.is_redeemable_by(user) is True
 
     perform_discount_redemption(user, onetime_discount)
 
-    assert onetime_discount.check_validity(user) is False
+    assert onetime_discount.is_redeemable_by(user) is False
 
 
 def test_one_time_per_user_discount(users, onetime_per_user_discount):
@@ -123,11 +123,11 @@ def test_one_time_per_user_discount(users, onetime_per_user_discount):
     """
 
     for user in users:
-        assert onetime_per_user_discount.check_validity(user) is True
+        assert onetime_per_user_discount.is_redeemable_by(user) is True
 
         perform_discount_redemption(user, onetime_per_user_discount)
 
-        assert onetime_per_user_discount.check_validity(user) is False
+        assert onetime_per_user_discount.is_redeemable_by(user) is False
 
 
 def test_unlimited_discounts(users, unlimited_discount):
@@ -139,11 +139,11 @@ def test_unlimited_discounts(users, unlimited_discount):
 
     for user in users:
         for i in range(random.randrange(1, 15, 1)):  # noqa: S311, B007
-            assert unlimited_discount.check_validity(user) is True
+            assert unlimited_discount.is_redeemable_by(user) is True
 
             perform_discount_redemption(user, unlimited_discount)
 
-            assert unlimited_discount.check_validity(user) is True
+            assert unlimited_discount.is_redeemable_by(user) is True
 
 
 def test_set_limit_discount_single_user(user, set_limited_use_discount):
@@ -154,11 +154,11 @@ def test_set_limit_discount_single_user(user, set_limited_use_discount):
     """
 
     for i in range(set_limited_use_discount.max_redemptions):  # noqa: B007
-        assert set_limited_use_discount.check_validity(user) is True
+        assert set_limited_use_discount.is_redeemable_by(user) is True
 
         perform_discount_redemption(user, set_limited_use_discount)
 
-    assert set_limited_use_discount.check_validity(user) is False
+    assert set_limited_use_discount.is_redeemable_by(user) is False
 
 
 def test_set_limit_discount_multiple_users(users, set_limited_use_discount):
@@ -170,14 +170,14 @@ def test_set_limit_discount_multiple_users(users, set_limited_use_discount):
 
     for user in users:
         for i in range(int(set_limited_use_discount.max_redemptions / 2)):  # noqa: B007
-            assert set_limited_use_discount.check_validity(user) is True
+            assert set_limited_use_discount.is_redeemable_by(user) is True
 
             perform_discount_redemption(user, set_limited_use_discount)
 
     if set_limited_use_discount.max_redemptions % 2:
         perform_discount_redemption(user, set_limited_use_discount)
 
-    assert set_limited_use_discount.check_validity(user) is False
+    assert set_limited_use_discount.is_redeemable_by(user) is False
 
 
 def test_basket_discount_conversion(user, unlimited_discount):
@@ -790,7 +790,7 @@ def test_discount_with_null_max_redemptions_is_valid_for_basket():
 
 
 def test_discount_with_unfulfilled_redemption_is_valid_for_basket():
-    """Redemptions on unfulfilled orders don't consume the limit, matching check_validity."""
+    """Redemptions on unfulfilled orders don't consume the limit, matching is_redeemable_by."""
     basket_item = BasketItemFactory.create()
     discount = UnlimitedUseDiscountFactory.create(max_redemptions=1)
     order = OrderFactory.create(
