@@ -30,10 +30,12 @@ from courses.utils import is_contract_order, is_uai_order
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_LINKED_PURCHASE,
     DISCOUNT_TYPE_PERCENT_OFF,
     DISCOUNT_TYPES,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     PAYMENT_TYPES,
+    REDEMPTION_TYPE_LINKED_PURCHASE,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPES,
@@ -300,6 +302,18 @@ class Discount(TimestampedModel):
         max_length=10,
         help_text="The location of this code in the B2B contract's code sheet.",
     )
+
+    class Meta:
+        # One-way on purpose: a linked-purchase redemption may pair with a
+        # standard calculation (e.g. a fractional-purchase offer), but the
+        # linked-purchase calculation needs the redemption rules that go with it.
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(discount_type=DISCOUNT_TYPE_LINKED_PURCHASE)
+                | models.Q(redemption_type=REDEMPTION_TYPE_LINKED_PURCHASE),
+                name="linked_purchase_discount_type_requires_redemption_type",
+            )
+        ]
 
     def __str__(self):
         return f"{self.amount} {self.discount_type} {self.redemption_type} - {self.discount_code}"
