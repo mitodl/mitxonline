@@ -247,6 +247,7 @@ class ContractPageAdmin(ReadOnlyModelAdmin):
     ]
     list_filter = ["membership_type", "organization", "contract_start", "contract_end"]
     date_hierarchy = "contract_start"
+    search_fields = ["title", "slug", "organization__name"]
     fields = [
         "id",
         "active",
@@ -265,6 +266,17 @@ class ContractPageAdmin(ReadOnlyModelAdmin):
         ContractPageProgramInline,
         ContractPagePossibleVariantInline,
     ]
+
+    def get_queryset(self, request):  # noqa: ARG002
+        """
+        Use the unfiltered manager.
+
+        ContractPage's default manager (active_objects) filters to
+        active=True, which would make inactive contracts unsearchable via
+        the autocomplete widget used by UserContractPageInline.
+        """
+
+        return ContractPage.objects.get_queryset()
 
 
 @admin.register(OrganizationPage)

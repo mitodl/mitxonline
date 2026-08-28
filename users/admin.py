@@ -109,6 +109,26 @@ class UserContractPageInline(admin.TabularInline):
 
     model = User.b2b_contracts.through
     extra = 0
+    autocomplete_fields = ("contractpage",)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """
+        Show inactive contracts in the contract dropdown.
+
+        See CourseRunAdmin.formfield_for_foreignkey for the full explanation:
+        ContractPage's default manager is ActiveContractManager, so without
+        this override a user already linked to an inactive contract would
+        render with an empty selection here.
+        """
+
+        if db_field.name == "contractpage":
+            from b2b.models import ContractPage  # noqa: PLC0415
+
+            kwargs["queryset"] = ContractPage.objects.order_by(
+                "organization__name", "name"
+            )
+
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 class UserOrganizationInline(admin.TabularInline):
