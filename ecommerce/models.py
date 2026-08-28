@@ -797,7 +797,14 @@ class Order(TimestampedModel):
         decimal_places=5,
         max_digits=20,
     )
-    reference_number = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
+    # Immutable identifier for this order, shared with the payment gateway.
+    # Generated once on first save (see save/_generate_reference_number) and
+    # never regenerated, so it stays valid even if the generation scheme
+    # changes. Indexed because the payment gateway callbacks look orders up by
+    # it rather than by PK.
+    reference_number = models.CharField(  # noqa: DJ001
+        max_length=255, null=True, blank=True, db_index=True
+    )
     gateway_type = models.CharField(
         max_length=32,
         blank=True,
@@ -870,10 +877,6 @@ class Order(TimestampedModel):
 
     def __str__(self):
         return f"{self.state.capitalize()} Order for {self.purchaser.name} ({self.purchaser.email})"
-
-    @staticmethod
-    def decode_reference_number(refno):
-        return refno.replace(f"{REFERENCE_NUMBER_PREFIX}{settings.ENVIRONMENT}-", "")
 
     def send_ecommerce_order_receipt(self):
         send_ecommerce_order_receipt.delay(self.id)
