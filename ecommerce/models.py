@@ -975,14 +975,14 @@ class PendingOrder(Order):
                     "product_version": product_versions[i],
                     "quantity": 1,
                     # The column is non-null, so the price has to be in hand
-                    # before the INSERT; an unsaved Line can compute it, since
-                    # compute_discounted_unit_price() reads only order.discounts
-                    # and product_version. get_or_create resolves a callable in
+                    # before the INSERT. get_or_create resolves a callable in
                     # `defaults` only when it creates, so the reuse path below
                     # doesn't pay for a value it would discard.
-                    "discounted_unit_price": lambda i=i: Line(
-                        order=order, product_version=product_versions[i], quantity=1
-                    ).compute_discounted_unit_price(),
+                    "discounted_unit_price": lambda i=i: (
+                        Line.compute_discounted_unit_price_for(
+                            order, product_versions[i]
+                        )
+                    ),
                 },
             )
             if not created:
@@ -1184,8 +1184,9 @@ class Line(TimestampedModel):
         """Return the price of the product"""
         return self.unit_price * self.quantity
 
-    def compute_discounted_unit_price(self):
-        """Price of one unit under the discounts currently on the order."""
+    @staticmethod
+    def compute_discounted_unit_price_for(order, product_version):
+        """Price of one unit of product_version under the discounts currently on order."""
         from ecommerce.discounts import (  # noqa: PLC0415
             DiscountType,
             product_from_version,
@@ -1193,13 +1194,17 @@ class Line(TimestampedModel):
 
         discounts = [
             discount_redemption.redeemed_discount
-            for discount_redemption in self.order.discounts.all()
+            for discount_redemption in order.discounts.all()
         ]
 
         return DiscountType.get_discounted_price(
             discounts,
-            product_from_version(self.product_version),
+            product_from_version(product_version),
         ).quantize(Decimal("0.01"))
+
+    def compute_discounted_unit_price(self):
+        """Price of one unit under the discounts currently on the order."""
+        return Line.compute_discounted_unit_price_for(self.order, self.product_version)
 
     def get_discounted_unit_price(self):
         """

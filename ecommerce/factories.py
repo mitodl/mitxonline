@@ -138,9 +138,9 @@ class LineFactory(DjangoModelFactory):
     # discounted_unit_price is non-null, so price the line the way the app does:
     # under whatever discounts the order carries when the line is built.
     discounted_unit_price = LazyAttribute(
-        lambda line: models.Line(
-            order=line.order, product_version=line.product_version
-        ).compute_discounted_unit_price()
+        lambda line: models.Line.compute_discounted_unit_price_for(
+            line.order, line.product_version
+        )
     )
 
     class Meta:
