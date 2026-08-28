@@ -1,5 +1,7 @@
 """Transfer course-related user records from one user to another."""
 
+from argparse import RawTextHelpFormatter
+
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -17,14 +19,22 @@ User = get_user_model()
 
 
 class Command(BaseCommand):
-    """Transfer course-related records between two users."""
+    """
+    Transfer course-related records between two users.
 
-    help = (
-        "Transfer course run/program enrollments, grades, and certificates from one "
-        "user to another by email."
-    )
+    Moves course run/program enrollments, grades, and certificates from one
+    user to another, matching users by email address. The transfer is
+    aborted if the destination user already has any overlapping records.
+
+    Example: transfer_user_course_records --from_email=old@example.com --to_email=new@example.com
+    Example: transfer_user_course_records --from-email=old@example.com --to-email=new@example.com
+    """
+
+    help = __doc__
 
     def add_arguments(self, parser):
+        """Add command line arguments."""
+        parser.formatter_class = RawTextHelpFormatter
         parser.add_argument(
             "--from_email",
             "--from-email",
