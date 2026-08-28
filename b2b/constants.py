@@ -41,3 +41,9 @@ ORG_KEY_MAX_LENGTH = 30
 RETIREMENT_ORG_KEY = "RETIRED"
 RETIREMENT_ORG_NAME = "Retired Runs"
 RETIREMENT_CONTRACT_NAME = "Retired Runs Holding Contract"
+
+MAILGUN_LOGS_API_URL = "https://api.mailgun.net/v1/analytics/logs"
+MAILGUN_LOGS_PAGE_LIMIT = 100
+MAILGUN_LOGS_DESC = "timestamp:desc"
+# Mailgun only retains log data for 30 days, so there's no point asking further back than that.
+MAILGUN_LOGS_RETENTION_DAYS = "30d"
