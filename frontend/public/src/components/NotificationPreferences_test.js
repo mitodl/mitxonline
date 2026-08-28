@@ -122,6 +122,24 @@ describe("NotificationPreferences", () => {
     assert.lengthOf(wrapper.find(PreferenceRow), 0)
   })
 
+  it("renders a notice instead of controls when one is given", () => {
+    const wrapper = render({ notice: "Loading your notification settings..." })
+
+    assert.lengthOf(wrapper.find(PreferenceRow), 0)
+    assert.include(wrapper.text(), "Loading your notification settings...")
+  })
+
+  it("keeps the #notifications anchor while showing a notice", () => {
+    // The Open edX gear links to /account-settings/#notifications, so the
+    // anchor has to resolve even when there is nothing to show.
+    const wrapper = render({
+      preferences: null,
+      notice:      "Your course account is still being set up."
+    })
+
+    assert.equal(wrapper.find("section").props().id, "notifications")
+  })
+
   it("anchors the section at #notifications", () => {
     // The Open edX notifications drawer gear links to
     // /account-settings/#notifications (mitodl/hq#12930).

@@ -161,8 +161,11 @@ export const PreferenceRow = ({
 }
 
 type Props = {
-  preferences: { [string]: PreferenceGroup },
+  preferences: ?{ [string]: PreferenceGroup },
   showEmailPreferences: boolean,
+  // When set, the section renders this line instead of controls (loading,
+  // not-yet-provisioned, disabled upstream, or failed to load).
+  notice?: ?string,
   onChange: (
     notificationApp: string,
     notificationType: string,
@@ -174,8 +177,18 @@ type Props = {
 const NotificationPreferences = ({
   preferences,
   showEmailPreferences,
-  onChange
+  onChange,
+  notice
 }: Props) => {
+  if (notice) {
+    return (
+      <section className="notification-preferences" id="notifications">
+        <h2>Notifications</h2>
+        <p className="notification-preferences-intro">{notice}</p>
+      </section>
+    )
+  }
+
   const byApp = preferences || {}
   // Object.keys + indexed access, not Object.entries: Flow types entries as
   // Array<[string, mixed]>, which loses PreferenceGroup.
