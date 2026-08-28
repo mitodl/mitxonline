@@ -800,10 +800,12 @@ class Order(TimestampedModel):
     # Immutable identifier for this order, shared with the payment gateway.
     # Generated once on first save (see save/_generate_reference_number) and
     # never regenerated, so it stays valid even if the generation scheme
-    # changes. Indexed because the payment gateway callbacks look orders up by
-    # it rather than by PK.
-    reference_number = models.CharField(  # noqa: DJ001
-        max_length=255, null=True, blank=True, db_index=True
+    # changes. Unique because the payment gateway callbacks look orders up by
+    # it rather than by PK; the unique constraint supplies the index and
+    # guarantees that lookup resolves to at most one order. Postgres allows
+    # duplicate NULLs, so the initial insert in save() still works.
+    reference_number = models.CharField(
+        max_length=255, null=True, blank=True, unique=True
     )
     gateway_type = models.CharField(
         max_length=32,
