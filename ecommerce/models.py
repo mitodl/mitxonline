@@ -1410,6 +1410,19 @@ class DiscountRedemption(TimestampedModel):
     redeemed_order = models.ForeignKey(
         Order, on_delete=models.CASCADE, related_name="discounts"
     )
+    # PROTECT: once a line funds a redemption its order is part of another
+    # order's price history and must stay reconstructible. No production path
+    # deletes Lines/Orders today.
+    source_line = models.ForeignKey(
+        Line,
+        on_delete=models.PROTECT,
+        related_name="funded_redemptions",
+        null=True,
+        blank=True,
+        help_text=(
+            "The prior purchase line that funds this linked-purchase redemption."
+        ),
+    )
 
     def __str__(self):
         return f"{self.redemption_date}: {self.redeemed_discount}, {self.redeemed_by}"

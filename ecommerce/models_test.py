@@ -7,6 +7,7 @@ import pytest
 import reversion
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import ProtectedError
 from django.urls import reverse
 from freezegun import freeze_time
 from mitol.common.utils import now_in_utc
@@ -25,6 +26,7 @@ from ecommerce.factories import (
     BasketFactory,
     BasketItemFactory,
     DiscountFactory,
+    DiscountRedemptionFactory,
     LineFactory,
     OneTimeDiscountFactory,
     OneTimePerUserDiscountFactory,
@@ -1417,3 +1419,12 @@ def test_refund_reviewed_on_is_none_without_a_request():
     order = OrderFactory.create(state=OrderStatus.FULFILLED)
 
     assert order.refund_reviewed_on is None
+
+
+def test_a_source_line_is_protected_once_it_funds_a_redemption():
+    """PROTECT: deleting purchase history out from under a redemption is an error."""
+    line = _line_for(Decimal("100.00"))
+    DiscountRedemptionFactory.create(source_line=line)
+
+    with pytest.raises(ProtectedError):
+        line.delete()
