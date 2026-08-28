@@ -3,6 +3,7 @@
 import React from "react"
 import DocumentTitle from "react-document-title"
 import { ACCOUNT_SETTINGS_PAGE_TITLE } from "../../../constants"
+import { pathOr } from "ramda"
 import { compose } from "redux"
 import { connect } from "react-redux"
 import { mutateAsync } from "redux-query"
@@ -40,6 +41,7 @@ type Props = {
   addUserNotification: Function,
   currentUser: User,
   notificationPreferences: ?Object,
+  notificationPreferencesRequest: ?Object,
   updateNotificationPreference: (
     notificationApp: string,
     notificationType: string,
@@ -152,15 +154,53 @@ export class AccountSettingsPage extends React.Component<Props> {
           type:  ALERT_TYPE_TEXT,
           color: "danger",
           props: {
-            text: "We could not save that notification setting. Please try again."
+            text:
+              response.status === 429 ?
+                "Too many changes at once. Please wait a moment and try again." :
+                "We could not save that notification setting. Please try again."
           }
         }
       })
+      // Deliberately no re-read here. Nothing changed upstream, and on a 429
+      // an immediate GET would spend the throttle we were just asked to back
+      // off from. Dispatching the alert re-renders the page, which resyncs the
+      // controlled inputs from props.
+      return
     }
 
     // Re-read rather than patching local state: the LMS fans a grouped change
     // out to several types, so the response is not enough to render from.
     await forceRequest()
+  }
+
+  /**
+   * Why the notification controls cannot be shown, or null to show them.
+   *
+   * The section itself always renders so that /account-settings/#notifications
+   * -- the target the Open edX notifications gear links to -- resolves even
+   * when we have no preferences to display.
+   */
+  notificationsNotice() {
+    const { notificationPreferences, notificationPreferencesRequest } =
+      this.props
+    const request = notificationPreferencesRequest || {}
+
+    if (notificationPreferences) {
+      // The LMS gates the whole feature with show_preferences.
+      return notificationPreferences.show_preferences === false ?
+        "Notifications are not enabled for your courses." :
+        null
+    }
+
+    if (!request.isFinished) {
+      return "Loading your notification settings..."
+    }
+
+    if (request.status === 409) {
+      return "Your course account is still being set up. Please check back shortly."
+    }
+
+    return "We could not load your notification settings. Please try again later."
   }
 
   render() {
@@ -219,19 +259,23 @@ export class AccountSettingsPage extends React.Component<Props> {
               </div>
             </div>
 
-            {notificationPreferences ? (
-              <div className="std-card std-card-auth">
-                <div className="std-card-body my-account-page">
-                  <NotificationPreferences
-                    preferences={notificationPreferences.data}
-                    showEmailPreferences={
-                      notificationPreferences.show_email_preferences !== false
-                    }
-                    onChange={this.onChangeNotificationPreference.bind(this)}
-                  />
-                </div>
+            <div className="std-card std-card-auth">
+              <div className="std-card-body my-account-page">
+                <NotificationPreferences
+                  preferences={
+                    notificationPreferences ?
+                      notificationPreferences.data :
+                      null
+                  }
+                  showEmailPreferences={
+                    !notificationPreferences ||
+                    notificationPreferences.show_email_preferences !== false
+                  }
+                  notice={this.notificationsNotice()}
+                  onChange={this.onChangeNotificationPreference.bind(this)}
+                />
               </div>
-            ) : null}
+            </div>
           </div>
         </>
       </DocumentTitle>
@@ -245,9 +289,15 @@ const changePassword = (oldPassword: string, newPassword: string) =>
 const changeEmail = (newEmail: string, password: string) =>
   mutateAsync(auth.changeEmailMutation(newEmail, password))
 
+const notificationPreferencesRequestSelector = pathOr(null, [
+  "queries",
+  "notificationPreferences"
+])
+
 const mapStateToProps = createStructuredSelector({
-  currentUser:             currentUserSelector,
-  notificationPreferences: notificationPreferencesSelector
+  currentUser:                    currentUserSelector,
+  notificationPreferences:        notificationPreferencesSelector,
+  notificationPreferencesRequest: notificationPreferencesRequestSelector
 })
 
 const updateNotificationPreference = (
