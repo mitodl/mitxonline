@@ -967,18 +967,29 @@ class PendingOrder(Order):
         # Create or get Line for each product.  Calculate the Order total based on Lines and discount.
         total = 0
         for i, product in enumerate(products):
-            line, _ = Line.objects.get_or_create(
+            line, created = Line.objects.get_or_create(
                 order=order,
                 purchased_object_id=product.object_id,
                 purchased_content_type_id=product.content_type_id,
                 defaults={
                     "product_version": product_versions[i],
                     "quantity": 1,
+                    # The column is non-null, so the price has to be in hand
+                    # before the INSERT. get_or_create resolves a callable in
+                    # `defaults` only when it creates, so the reuse path below
+                    # doesn't pay for a value it would discard.
+                    "discounted_unit_price": lambda i=i: (
+                        Line.compute_discounted_unit_price_for(
+                            order, product_versions[i]
+                        )
+                    ),
                 },
             )
-            # get_or_create skips `defaults` on an existing line, so a reused
-            # pending order carries the price from the last attempt until re-priced.
-            line.record_discounted_unit_price()
+            if not created:
+                # get_or_create skips `defaults` on an existing line, so a reused
+                # pending order carries the price from the last attempt until
+                # re-priced.
+                line.record_discounted_unit_price()
             total += line.discounted_price
 
         order.total_price_paid = total
@@ -1132,8 +1143,6 @@ class Line(TimestampedModel):
     discounted_unit_price = models.DecimalField(
         decimal_places=5,
         max_digits=20,
-        null=True,
-        blank=True,
         help_text="Post-discount price of one unit, recorded when the order was priced.",
     )
 
@@ -1175,8 +1184,9 @@ class Line(TimestampedModel):
         """Return the price of the product"""
         return self.unit_price * self.quantity
 
-    def compute_discounted_unit_price(self):
-        """Price of one unit under the discounts currently on the order."""
+    @staticmethod
+    def compute_discounted_unit_price_for(order, product_version):
+        """Price of one unit of product_version under the discounts currently on order."""
         from ecommerce.discounts import (  # noqa: PLC0415
             DiscountType,
             product_from_version,
@@ -1184,21 +1194,24 @@ class Line(TimestampedModel):
 
         discounts = [
             discount_redemption.redeemed_discount
-            for discount_redemption in self.order.discounts.all()
+            for discount_redemption in order.discounts.all()
         ]
 
         return DiscountType.get_discounted_price(
             discounts,
-            product_from_version(self.product_version),
+            product_from_version(product_version),
         ).quantize(Decimal("0.01"))
+
+    def compute_discounted_unit_price(self):
+        """Price of one unit under the discounts currently on the order."""
+        return Line.compute_discounted_unit_price_for(self.order, self.product_version)
 
     def get_discounted_unit_price(self):
         """
         Price of one unit after discount, quantized to cents.
 
-        Prefers the price recorded when the order was priced; falls back to
-        recomputing from the order's current discounts, which drifts if one has
-        been edited since.
+        Reads the price recorded when the order was priced, so it does not drift
+        when a discount is edited afterwards.
 
         The column is numeric(20,5), and discounted_price is str()'d into the
         signed CyberSource payload, which must be 2dp — so quantize on the way
@@ -1206,18 +1219,17 @@ class Line(TimestampedModel):
 
         This is a price, not a receipt: an unpaid order still carries a value.
         """
-        if self.discounted_unit_price is not None:
-            return self.discounted_unit_price.quantize(Decimal("0.01"))
-
-        return self.compute_discounted_unit_price()
+        return self.discounted_unit_price.quantize(Decimal("0.01"))
 
     def record_discounted_unit_price(self):
         """
         Record the post-discount unit price and save it.
 
-        Call this from every path that creates or re-prices a Line, once
-        product_version is final. Skips the write when the price is unchanged,
-        so re-pricing an untouched pending order does not churn updated_on.
+        Call this from every path that re-prices a saved Line, once
+        product_version is final; a path that creates one sets the price in the
+        INSERT instead, because the column is non-null. Skips the write when the
+        price is unchanged, so re-pricing an untouched pending order does not
+        churn updated_on.
         """
         new_price = self.compute_discounted_unit_price()
         if new_price != self.discounted_unit_price:

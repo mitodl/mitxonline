@@ -542,7 +542,11 @@ def test_program_order_receipt_lines_serializer(settings, mocker, user, user_cli
 
 
 def _fulfilled_line(price, *, discounted_unit_price=None):
-    """A fulfilled order carrying one line, priced independently of any discount row."""
+    """
+    A fulfilled order carrying one line, priced independently of any discount row.
+
+    discounted_unit_price defaults to the undiscounted price.
+    """
     with reversion.create_revision():
         product = ProductFactory.create(price=price)
     order = OrderFactory.create(state=OrderStatus.FULFILLED)
@@ -552,7 +556,9 @@ def _fulfilled_line(price, *, discounted_unit_price=None):
         purchased_content_type_id=product.content_type_id,
         product_version=Version.objects.get_for_object(product).first(),
         quantity=1,
-        discounted_unit_price=discounted_unit_price,
+        discounted_unit_price=(
+            price if discounted_unit_price is None else discounted_unit_price
+        ),
     )
     return Line.objects.get(pk=line.pk)
 

@@ -2761,8 +2761,10 @@ def track_cart_add_with_hubspot(
                 purchased_content_type_id=product.content_type_id,
                 product_version=product_version,
                 quantity=1,
+                discounted_unit_price=Line.compute_discounted_unit_price_for(
+                    order, product_version
+                ),
             )
-            line.record_discounted_unit_price()
             order.total_price_paid = line.discounted_price
             # auto_now fields are skipped when update_fields excludes them, so
             # updated_on has to be listed to move.
