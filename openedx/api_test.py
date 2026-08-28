@@ -2217,34 +2217,72 @@ def test_notification_preferences_missing_auth_record(mocker, user):
         get_notification_preferences(user)
 
 
-@pytest.mark.parametrize(
-    "exc",
-    [
-        HTTPError("401 from the token endpoint"),
-        OpenEdXOAuth2Error("redirected somewhere unexpected"),
-    ],
-)
-def test_notification_preferences_token_failure_is_not_a_500(mocker, user, exc):
+def _http_error(status_code):
+    """An HTTPError carrying a response, the way raise_for_status raises it"""
+    response = MockResponse({}, status_code=status_code)
+    return HTTPError(f"{status_code} from the token endpoint", response=response)
+
+
+def test_notification_preferences_rejected_grant_is_a_409(mocker, user):
     """
-    A revoked refresh token or a broken OAuth handshake must surface as
-    NoEdxApiAuthError, not leak an HTTPError to the view (which would 500).
+    A 400 from the token endpoint means the grant itself was rejected (revoked
+    or invalid refresh token), so this learner genuinely has no usable auth.
     """
-    mocker.patch("openedx.api.create_edx_auth_token", side_effect=exc)
+    mocker.patch("openedx.api.create_edx_auth_token", side_effect=_http_error(400))
 
     with pytest.raises(NoEdxApiAuthError):
         get_notification_preferences(user)
 
 
-def test_notification_preferences_refresh_failure_is_not_a_500(mocker, user):
-    """A token that cannot be refreshed is treated as no usable auth"""
-    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+@pytest.mark.parametrize("upstream_status", [401, 403, 500, 502, 503])
+def test_notification_preferences_token_service_failure_is_not_a_409(
+    mocker, user, upstream_status
+):
+    """
+    A token-service or credentials failure is not this learner's account being
+    unprovisioned -- it must not masquerade as the 409 "still being set up"
+    state, or a synced learner gets a permanent, non-retryable message.
+    """
     mocker.patch(
-        "openedx.api.get_valid_edx_api_auth",
-        side_effect=HTTPError("400 invalid_grant"),
+        "openedx.api.create_edx_auth_token",
+        side_effect=_http_error(upstream_status),
     )
 
+    with pytest.raises(EdxApiNotificationPreferencesError) as exc_info:
+        get_notification_preferences(user)
+
+    assert exc_info.value.status_code == upstream_status
+
+
+def test_notification_preferences_oauth_handshake_failure_is_not_a_409(mocker, user):
+    """An incomplete OAuth handshake is a configuration/flow fault, not a 409"""
+    mocker.patch(
+        "openedx.api.create_edx_auth_token",
+        side_effect=OpenEdXOAuth2Error("redirected somewhere unexpected"),
+    )
+
+    with pytest.raises(EdxApiNotificationPreferencesError):
+        get_notification_preferences(user)
+
+
+def test_notification_preferences_refresh_rejected_is_a_409(mocker, user):
+    """A refresh the LMS rejects with a 400 leaves no usable auth"""
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    mocker.patch("openedx.api.get_valid_edx_api_auth", side_effect=_http_error(400))
+
     with pytest.raises(NoEdxApiAuthError):
         get_notification_preferences(user)
+
+
+def test_notification_preferences_refresh_outage_is_not_a_409(mocker, user):
+    """A 503 while refreshing is transient, so it must not read as a 409"""
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    mocker.patch("openedx.api.get_valid_edx_api_auth", side_effect=_http_error(503))
+
+    with pytest.raises(EdxApiNotificationPreferencesError) as exc_info:
+        get_notification_preferences(user)
+
+    assert exc_info.value.status_code == 503
 
 
 @responses.activate
