@@ -276,7 +276,7 @@ class KeycloakAdminClient:
         - requests.HTTPError if the request fails.
         """
 
-        response = self.realm_request("POST", endpoint, data=target_id)
+        response = self.realm_request("POST", endpoint, json=target_id)
         response.raise_for_status()
 
         return True
