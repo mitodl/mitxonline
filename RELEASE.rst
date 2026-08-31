@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.164.1
+---------------
+
+- add command to trasfer grades to another account (#3627)
+- Expose refund state on the order receipt payload (#3873)
+
 Version 1.164.0 (Released August 31, 2026)
 ---------------
 
