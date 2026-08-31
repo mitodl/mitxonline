@@ -360,18 +360,30 @@ class Discount(TimestampedModel):
     )
 
     class Meta:
-        # A storage-layer backstop for the clause validate_linked_purchase_shape
-        # also enforces, because bulk_create skips save().
+        # A storage-layer backstop for the row-local clauses of
+        # validate_linked_purchase_shape, because bulk_create and queryset
+        # update() skip save(). The cross-table program-products clause can't
+        # be expressed here.
         #
-        # One-way on purpose: a linked-purchase redemption may pair with a
-        # standard calculation (e.g. a fractional-purchase offer), but the
-        # linked-purchase calculation needs the redemption rules that go with it.
+        # The type constraint is one-way on purpose: a linked-purchase
+        # redemption may pair with a standard calculation (e.g. a
+        # fractional-purchase offer), but the linked-purchase calculation needs
+        # the redemption rules that go with it — and its stored amount is
+        # meaningless, so anything nonzero is a lie some reader might believe.
         constraints = [
             models.CheckConstraint(
                 condition=~models.Q(discount_type=DISCOUNT_TYPE_LINKED_PURCHASE)
-                | models.Q(redemption_type=REDEMPTION_TYPE_LINKED_PURCHASE),
-                name="linked_purchase_discount_type_requires_redemption_type",
-            )
+                | (
+                    models.Q(redemption_type=REDEMPTION_TYPE_LINKED_PURCHASE)
+                    & models.Q(amount=0)
+                ),
+                name="linked_purchase_discount_type_shape",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(redemption_type=REDEMPTION_TYPE_LINKED_PURCHASE)
+                | models.Q(automatic=True),
+                name="linked_purchase_redemption_requires_automatic",
+            ),
         ]
 
     def __str__(self):

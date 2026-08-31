@@ -1436,24 +1436,49 @@ def test_a_source_line_is_protected_once_it_funds_a_redemption():
         line.delete()
 
 
-def test_db_constraint_rejects_linked_type_without_linked_redemption():
+@pytest.mark.parametrize(
+    "row",
+    [
+        pytest.param(
+            {
+                "amount": 0,
+                "discount_type": DISCOUNT_TYPE_LINKED_PURCHASE,
+                "redemption_type": REDEMPTION_TYPE_UNLIMITED,
+                "automatic": True,
+            },
+            id="linked-type-without-linked-redemption",
+        ),
+        pytest.param(
+            {
+                "amount": 10,
+                "discount_type": DISCOUNT_TYPE_LINKED_PURCHASE,
+                "redemption_type": REDEMPTION_TYPE_LINKED_PURCHASE,
+                "automatic": True,
+            },
+            id="nonzero-amount",
+        ),
+        pytest.param(
+            {
+                "amount": 0,
+                "discount_type": DISCOUNT_TYPE_LINKED_PURCHASE,
+                "redemption_type": REDEMPTION_TYPE_LINKED_PURCHASE,
+                "automatic": False,
+            },
+            id="not-automatic",
+        ),
+    ],
+)
+def test_db_constraint_rejects_malformed_linked_purchase(row):
     """The DB backstop holds even for writes that skip model validation."""
     with pytest.raises(IntegrityError), transaction.atomic():
         Discount.objects.bulk_create(
-            [
-                Discount(
-                    amount=0,
-                    discount_code="constraint-bypass",
-                    discount_type=DISCOUNT_TYPE_LINKED_PURCHASE,
-                    redemption_type=REDEMPTION_TYPE_UNLIMITED,
-                )
-            ]
+            [Discount(discount_code="constraint-bypass", **row)]
         )
 
 
 def test_db_constraint_allows_linked_redemption_with_standard_type():
-    """The constraint is one-way on purpose: a standard calculation may pair
-    with the linked-purchase redemption rules (future fractional offers).
+    """The type constraint is one-way on purpose: a standard calculation may
+    pair with the linked-purchase redemption rules (future fractional offers).
     """
     Discount.objects.bulk_create(
         [
@@ -1462,6 +1487,7 @@ def test_db_constraint_allows_linked_redemption_with_standard_type():
                 discount_code="reverse-pairing",
                 discount_type=DISCOUNT_TYPE_PERCENT_OFF,
                 redemption_type=REDEMPTION_TYPE_LINKED_PURCHASE,
+                automatic=True,
             )
         ]
     )
