@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.164.0
+Version 1.164.0 (Released August 31, 2026)
 ---------------
 
 - Add per-page hubspot_form_id to product pages, drop show_stay_updated (#3893)
