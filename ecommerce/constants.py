@@ -8,6 +8,11 @@ from mitol.payment_gateway.constants import (
 
 REFERENCE_NUMBER_PREFIX = "mitxonline-"
 
+# Standard self-service refund window, per the terms of service: learners may
+# request a refund within this many days of purchase, or of the course start
+# when they purchased before the course began.
+REFUND_WINDOW_DAYS = 7
+
 DISCOUNT_TYPE_PERCENT_OFF = "percent-off"
 DISCOUNT_TYPE_DOLLARS_OFF = "dollars-off"
 DISCOUNT_TYPE_FIXED_PRICE = "fixed-price"

@@ -3,55 +3,55 @@ revision = 3
 requires-python = "==3.11.*"
 
 [options]
-exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
+exclude-newer = "2026-08-24T14:08:08.404727548Z"
 exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
-mitol-django-google-sheets = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-uai-content-customization = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-canvas-integration = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-concourse = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-olposthog = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-oauth-toolkit-extensions = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-social-auth = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-payment-gateway = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-ai-static-translations = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-google-sheets-refunds = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-chat-xblock = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-events-handler = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-feedback = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-logging = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-rapid-response-reports = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-observability = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-authentication = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-lti-utilities = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-checkout-external = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-geoip = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-git-auto-export = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-chat = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-hubspot-api = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-openedx-companion-auth = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-course-sync = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-digitalcredentials = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-common = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-sentry = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-rapid-response-xblock = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-mail = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-google-sheets-deferrals = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-course-translations = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-course-outline-api = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-transcoding = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-edx-username-changer = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-auto-select-language = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-apigateway = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-course-structure-api = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-drf-lint = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-django-aqueduct = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-otel-monitoring = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-edx-sysadmin = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-course-export = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-openedx = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-scim = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-google-sheets = { timestamp = "2026-08-31T14:08:08.404953529Z", span = "PT0S" }
+ol-openedx-uai-content-customization = { timestamp = "2026-08-31T14:08:08.404949069Z", span = "PT0S" }
+ol-openedx-canvas-integration = { timestamp = "2026-08-31T14:08:08.404943217Z", span = "PT0S" }
+ol-concourse = { timestamp = "2026-08-31T14:08:08.40493635Z", span = "PT0S" }
+mitol-django-olposthog = { timestamp = "2026-08-31T14:08:08.404955264Z", span = "PT0S" }
+mitol-django-oauth-toolkit-extensions = { timestamp = "2026-08-31T14:08:08.404954944Z", span = "PT0S" }
+ol-social-auth = { timestamp = "2026-08-31T14:08:08.404949386Z", span = "PT0S" }
+mitol-django-payment-gateway = { timestamp = "2026-08-31T14:08:08.404955911Z", span = "PT0S" }
+ol-openedx-ai-static-translations = { timestamp = "2026-08-31T14:08:08.404942426Z", span = "PT0S" }
+mitol-django-google-sheets-refunds = { timestamp = "2026-08-31T14:08:08.404954234Z", span = "PT0S" }
+ol-openedx-chat-xblock = { timestamp = "2026-08-31T14:08:08.404944036Z", span = "PT0S" }
+ol-openedx-events-handler = { timestamp = "2026-08-31T14:08:08.4049465Z", span = "PT0S" }
+ol-openedx-feedback = { timestamp = "2026-08-31T14:08:08.404946812Z", span = "PT0S" }
+ol-openedx-logging = { timestamp = "2026-08-31T14:08:08.404947444Z", span = "PT0S" }
+ol-openedx-rapid-response-reports = { timestamp = "2026-08-31T14:08:08.404948423Z", span = "PT0S" }
+mitol-django-observability = { timestamp = "2026-08-31T14:08:08.404956881Z", span = "PT0S" }
+mitol-django-authentication = { timestamp = "2026-08-31T14:08:08.404952582Z", span = "PT0S" }
+ol-openedx-lti-utilities = { timestamp = "2026-08-31T14:08:08.404947767Z", span = "PT0S" }
+ol-openedx-checkout-external = { timestamp = "2026-08-31T14:08:08.404944379Z", span = "PT0S" }
+mitol-django-geoip = { timestamp = "2026-08-31T14:08:08.40495322Z", span = "PT0S" }
+ol-openedx-git-auto-export = { timestamp = "2026-08-31T14:08:08.404947142Z", span = "PT0S" }
+ol-openedx-chat = { timestamp = "2026-08-31T14:08:08.404943555Z", span = "PT0S" }
+mitol-django-hubspot-api = { timestamp = "2026-08-31T14:08:08.404954563Z", span = "PT0S" }
+openedx-companion-auth = { timestamp = "2026-08-31T14:08:08.404949722Z", span = "PT0S" }
+ol-openedx-course-sync = { timestamp = "2026-08-31T14:08:08.404945658Z", span = "PT0S" }
+mitol-django-digitalcredentials = { timestamp = "2026-08-31T14:08:08.404952911Z", span = "PT0S" }
+mitol-django-common = { timestamp = "2026-08-31T14:08:08.404950369Z", span = "PT0S" }
+ol-openedx-sentry = { timestamp = "2026-08-31T14:08:08.404948726Z", span = "PT0S" }
+rapid-response-xblock = { timestamp = "2026-08-31T14:08:08.404950047Z", span = "PT0S" }
+mitol-django-mail = { timestamp = "2026-08-31T14:08:08.404950681Z", span = "PT0S" }
+mitol-django-google-sheets-deferrals = { timestamp = "2026-08-31T14:08:08.404953866Z", span = "PT0S" }
+ol-openedx-course-translations = { timestamp = "2026-08-31T14:08:08.404945964Z", span = "PT0S" }
+ol-openedx-course-outline-api = { timestamp = "2026-08-31T14:08:08.404945034Z", span = "PT0S" }
+mitol-django-transcoding = { timestamp = "2026-08-31T14:08:08.404956257Z", span = "PT0S" }
+edx-username-changer = { timestamp = "2026-08-31T14:08:08.40494188Z", span = "PT0S" }
+ol-openedx-auto-select-language = { timestamp = "2026-08-31T14:08:08.404942837Z", span = "PT0S" }
+mitol-django-apigateway = { timestamp = "2026-08-31T14:08:08.404956572Z", span = "PT0S" }
+ol-openedx-course-structure-api = { timestamp = "2026-08-31T14:08:08.404945354Z", span = "PT0S" }
+mitol-drf-lint = { timestamp = "2026-08-31T14:08:08.404957504Z", span = "PT0S" }
+django-aqueduct = { timestamp = "2026-08-31T14:08:08.404941143Z", span = "PT0S" }
+ol-openedx-otel-monitoring = { timestamp = "2026-08-31T14:08:08.404948085Z", span = "PT0S" }
+edx-sysadmin = { timestamp = "2026-08-31T14:08:08.404941532Z", span = "PT0S" }
+ol-openedx-course-export = { timestamp = "2026-08-31T14:08:08.404944695Z", span = "PT0S" }
+mitol-django-openedx = { timestamp = "2026-08-31T14:08:08.404955579Z", span = "PT0S" }
+mitol-django-scim = { timestamp = "2026-08-31T14:08:08.40495718Z", span = "PT0S" }
 
 [[package]]
 name = "amqp"
@@ -1758,7 +1758,7 @@ name = "jinxed"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ansicon" },
+    { name = "ansicon", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/20/d0/59b2b80e7a52d255f9e0ad040d2e826342d05580c4b1d7d7747cfb8db731/jinxed-1.3.0.tar.gz", hash = "sha256:1593124b18a41b7a3da3b078471442e51dbad3d77b4d4f2b0c26ab6f7d660dbf", size = 80981, upload-time = "2024-07-31T22:39:18.854Z" }
 wheels = [
@@ -2418,7 +2418,7 @@ dev = [
     { name = "django-debug-toolbar", specifier = ">=6.0.0,<7" },
     { name = "django-zeal", specifier = ">=2.0.4,<3" },
     { name = "factory-boy", specifier = ">=3.2.0,<4" },
-    { name = "faker", specifier = "<=40.15.0,>=40.15.0" },
+    { name = "faker", specifier = ">=40.15.0,<=40.15.0" },
     { name = "flaky", specifier = ">=3.7.0,<4" },
     { name = "freezegun", specifier = ">=1.2,<2" },
     { name = "granian", extras = ["reload"], specifier = ">=2.5.4,<3" },

@@ -7558,13 +7558,35 @@ components:
         refund_eligible:
           type: boolean
           readOnly: true
+        refund_deadline:
+          type: string
+          format: date-time
+          readOnly: true
+        refund_status:
+          allOf:
+          - $ref: '#/components/schemas/RefundStatusEnum'
+          readOnly: true
+        refund_requested_on:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
+        refund_reviewed_on:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
       required:
       - created_on
       - discounts
       - id
       - lines
       - purchaser
+      - refund_deadline
       - refund_eligible
+      - refund_requested_on
+      - refund_reviewed_on
+      - refund_status
       - refunds
       - state
       - street_address
@@ -8967,24 +8989,36 @@ components:
       - unlimited
     RefundReasonEnum:
       enum:
-      - enrolled_in_another_course
+      - not_enough_time
       - course_not_as_expected
       - technical_difficulties
-      - financial_reasons
+      - course_too_difficult
+      - purchased_by_mistake
+      - prefer_not_to_say
       - other
+      - enrolled_in_another_course
+      - financial_reasons
       type: string
       description: |-
-        * `enrolled_in_another_course` - I enrolled in another course
+        * `not_enough_time` - I do not have enough time
         * `course_not_as_expected` - Course is not what I expected
-        * `technical_difficulties` - Technical difficulties
-        * `financial_reasons` - Financial reasons
+        * `technical_difficulties` - I had a technical issue
+        * `course_too_difficult` - Course is too difficult
+        * `purchased_by_mistake` - I purchased by mistake
+        * `prefer_not_to_say` - Prefer not to say
         * `other` - Other
+        * `enrolled_in_another_course` - I enrolled in another course
+        * `financial_reasons` - Financial reasons
       x-enum-descriptions:
-      - I enrolled in another course
+      - I do not have enough time
       - Course is not what I expected
-      - Technical difficulties
-      - Financial reasons
+      - I had a technical issue
+      - Course is too difficult
+      - I purchased by mistake
+      - Prefer not to say
       - Other
+      - I enrolled in another course
+      - Financial reasons
     RefundRequest:
       type: object
       description: Serializer for creating learner-submitted refund requests.
@@ -8997,6 +9031,7 @@ components:
           - $ref: '#/components/schemas/BlankEnum'
         refund_reason_text:
           type: string
+          maxLength: 1000
         consent_given:
           type: boolean
       required:
@@ -9013,10 +9048,34 @@ components:
           - $ref: '#/components/schemas/BlankEnum'
         refund_reason_text:
           type: string
+          maxLength: 1000
         consent_given:
           type: boolean
       required:
       - order
+    RefundStatusEnum:
+      enum:
+      - completed
+      - requested
+      - denied
+      - eligible
+      - window_closed
+      - ineligible
+      type: string
+      description: |-
+        * `completed` - Completed
+        * `requested` - Requested
+        * `denied` - Denied
+        * `eligible` - Eligible
+        * `window_closed` - Window Closed
+        * `ineligible` - Ineligible
+      x-enum-descriptions:
+      - Completed
+      - Requested
+      - Denied
+      - Eligible
+      - Window Closed
+      - Ineligible
     ResultEnum:
       enum:
       - b2b-disallowed
@@ -9292,12 +9351,15 @@ components:
           type: string
         price:
           type: string
+        has_free_audit:
+          type: boolean
       required:
       - CEUs
       - content_title
       - content_type
       - discount
       - end_date
+      - has_free_audit
       - price
       - quantity
       - readable_id
