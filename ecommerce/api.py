@@ -38,6 +38,7 @@ from ecommerce.constants import (
     ALL_REDEMPTION_TYPES,
     CHECKOUT_CANCEL_ROUTE_MAP,
     CHECKOUT_SUCCESS_ROUTE_MAP,
+    DISCOUNT_TYPE_LINKED_PURCHASE,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     PAYMENT_TYPE_SALES,
@@ -1062,6 +1063,10 @@ def generate_discount_code(**kwargs):  # noqa: C901
 
     if kwargs["discount_type"] not in ALL_DISCOUNT_TYPES:
         raise Exception(f"Discount type {kwargs['discount_type']} is not valid.")  # noqa: EM102, TRY002
+
+    if kwargs["discount_type"] == DISCOUNT_TYPE_LINKED_PURCHASE:
+        msg = "linked-purchase discounts cannot be bulk-generated."
+        raise Exception(msg)  # noqa: TRY002
 
     if payment_type not in ALL_PAYMENT_TYPES:
         raise Exception(f"Payment type {payment_type} is not valid.")  # noqa: EM102, TRY002

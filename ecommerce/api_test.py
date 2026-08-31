@@ -41,6 +41,7 @@ from ecommerce.api import (
     establish_basket,
     establish_basket_for_request,
     generate_checkout_payload,
+    generate_discount_code,
     get_anonymous_basket_id,
     get_auto_apply_discounts_for_basket,
     log_stripe_event,
@@ -52,6 +53,8 @@ from ecommerce.api import (
 )
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_LINKED_PURCHASE,
+    PAYMENT_TYPE_SALES,
     STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
     STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED,
     STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
@@ -1837,3 +1840,15 @@ def test_retrieve_pending_cs_orders(mocker, test_type):
         mocked_cs_gateway.assert_called()
         assert len(completed.keys()) == (0 if test_type == "cancelled" else 1)
         assert len(cancelled.keys()) == (0 if test_type == "completed" else 1)
+
+
+def test_generate_discount_code_rejects_linked_purchase():
+    """linked-purchase discounts are automatic offers, not generated codes."""
+    with pytest.raises(Exception, match="cannot be bulk-generated"):
+        generate_discount_code(
+            discount_type=DISCOUNT_TYPE_LINKED_PURCHASE,
+            payment_type=PAYMENT_TYPE_SALES,
+            amount=0,
+            count=1,
+            codes=["linked-code"],
+        )

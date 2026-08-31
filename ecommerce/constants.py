@@ -16,25 +16,44 @@ REFUND_WINDOW_DAYS = 7
 DISCOUNT_TYPE_PERCENT_OFF = "percent-off"
 DISCOUNT_TYPE_DOLLARS_OFF = "dollars-off"
 DISCOUNT_TYPE_FIXED_PRICE = "fixed-price"
+DISCOUNT_TYPE_LINKED_PURCHASE = "linked-purchase"
 
 ALL_DISCOUNT_TYPES = [
     DISCOUNT_TYPE_PERCENT_OFF,
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_LINKED_PURCHASE,
 ]
 DISCOUNT_TYPES = list(zip(ALL_DISCOUNT_TYPES, ALL_DISCOUNT_TYPES))
+
+# A linked-purchase discount has a fixed shape (amount 0, automatic, the
+# matching redemption type, program products only), so anything that fuzzes a
+# discount or generates one in bulk has to stay off it.
+STANDARD_DISCOUNT_TYPES = [
+    discount_type
+    for discount_type in ALL_DISCOUNT_TYPES
+    if discount_type != DISCOUNT_TYPE_LINKED_PURCHASE
+]
 
 REDEMPTION_TYPE_ONE_TIME = "one-time"
 REDEMPTION_TYPE_ONE_TIME_PER_USER = "one-time-per-user"
 REDEMPTION_TYPE_UNLIMITED = "unlimited"
+REDEMPTION_TYPE_LINKED_PURCHASE = "linked-purchase"
 
 ALL_REDEMPTION_TYPES = [
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
+    REDEMPTION_TYPE_LINKED_PURCHASE,
 ]
 
 REDEMPTION_TYPES = list(zip(ALL_REDEMPTION_TYPES, ALL_REDEMPTION_TYPES))
+
+STANDARD_REDEMPTION_TYPES = [
+    redemption_type
+    for redemption_type in ALL_REDEMPTION_TYPES
+    if redemption_type != REDEMPTION_TYPE_LINKED_PURCHASE
+]
 
 PAYMENT_TYPE_MARKETING = "marketing"
 PAYMENT_TYPE_SALES = "sales"
