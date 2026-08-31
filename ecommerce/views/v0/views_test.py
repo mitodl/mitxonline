@@ -29,10 +29,12 @@ from courses.models import PaidCourseRun, PaidProgram, ProgramEnrollment
 from ecommerce.api import fulfill_completed_order
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_CUSTOMER_SUPPORT,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     REDEMPTION_TYPE_ONE_TIME,
+    REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
     REDEMPTION_TYPE_UNLIMITED,
     ZERO_PAYMENT_DATA,
 )
@@ -1124,6 +1126,43 @@ def test_bulk_discount_create_rejects_ambiguous_code_sources(admin_drf_client, e
 
     assert resp.status_code == 400
     assert not Discount.objects.exists()
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        pytest.param(
+            {"discount_type": DISCOUNT_TYPE_PAID_AMOUNT_OFF}, id="calculation"
+        ),
+        pytest.param(
+            {"redemption_type": REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE}, id="redemption"
+        ),
+    ],
+)
+def test_bulk_discount_create_rejects_the_new_discount_and_redemption_types(
+    admin_drf_client, override
+):
+    """
+    A paid-amount-off discount needs the matching redemption type, and a
+    program-child-purchase discount needs automatic plus the program product
+    links, so bulk generation refuses both rather than raising its way to a 500.
+    """
+    resp = admin_drf_client.post(
+        reverse("v0:discounts_api-create_batch"),
+        {
+            "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+            "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
+            "count": 5,
+            "amount": 50,
+            "prefix": "Generated-Code-",
+            **override,
+        },
+    )
+
+    assert resp.status_code == 400
+    assert not Discount.objects.filter(
+        discount_code__startswith="Generated-Code-"
+    ).exists()
 
 
 # Checkout tests

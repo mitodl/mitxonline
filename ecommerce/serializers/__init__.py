@@ -12,10 +12,10 @@ from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses.models import Course, CourseRun, Program, ProgramRun
 from ecommerce import models
 from ecommerce.constants import (
+    BULK_GENERATION_DISCOUNT_TYPES,
+    BULK_GENERATION_REDEMPTION_TYPES,
     CYBERSOURCE_CARD_TYPES,
-    DISCOUNT_TYPES,
     PAYMENT_TYPES,
-    REDEMPTION_TYPES,
     TRANSACTION_TYPE_REFUND,
 )
 from ecommerce.discounts import product_from_version
@@ -727,8 +727,10 @@ class BulkDiscountSerializer(serializers.Serializer):
     # views pass validated_data, so an undeclared key is dropped rather than
     # reaching the function. redemption_type in particular is load-bearing —
     # the staff dashboard's bulk form sends it.
-    discount_type = serializers.ChoiceField(choices=DISCOUNT_TYPES)
-    redemption_type = serializers.ChoiceField(choices=REDEMPTION_TYPES, required=False)
+    discount_type = serializers.ChoiceField(choices=BULK_GENERATION_DISCOUNT_TYPES)
+    redemption_type = serializers.ChoiceField(
+        choices=BULK_GENERATION_REDEMPTION_TYPES, required=False
+    )
     payment_type = serializers.ChoiceField(choices=PAYMENT_TYPES)
     amount = serializers.DecimalField(max_digits=9, decimal_places=2)
     one_time = serializers.BooleanField(default=False)
