@@ -1534,6 +1534,17 @@ def test_linked_purchase_discount_tolerates_a_product_less_link_row():
     discount.save()
 
 
+def test_linked_purchase_discount_is_not_redeemable_by_anyone(user):
+    """
+    Eligibility is per qualifying purchase and has no resolver yet, so the
+    generic redemption check has to refuse rather than treat the discount as
+    unlimited-use.
+    """
+    discount = LinkedPurchaseDiscountFactory.create()
+
+    assert discount.is_redeemable_by(user) is False
+
+
 def test_friendly_format_for_linked_purchase():
     """The label carries no amount — the true value is per-user."""
     discount = LinkedPurchaseDiscountFactory.create()

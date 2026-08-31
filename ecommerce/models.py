@@ -431,6 +431,15 @@ class Discount(TimestampedModel):
         Returns:
             - boolean
         """
+        # A linked-purchase discount is redeemable only by a learner holding
+        # the qualifying purchase, and that eligibility is decided per source
+        # line — a question this method has no way to answer until the resolver
+        # lands (hq#11846). Refuse rather than fall through to the unlimited
+        # semantics at the bottom, which would let any code-redemption endpoint
+        # attach one.
+        if self.redemption_type == REDEMPTION_TYPE_LINKED_PURCHASE:
+            return False
+
         if (
             self.redemption_type == REDEMPTION_TYPE_ONE_TIME
             and DiscountRedemption.objects.filter(

@@ -43,6 +43,7 @@ from ecommerce.factories import (
 )
 from ecommerce.models import (
     Basket,
+    BasketDiscount,
     BasketItem,
     Discount,
     DiscountProduct,
@@ -312,6 +313,32 @@ def test_redeem_discount(  # noqa: PLR0913
     else:
         assert "message" in resp_json
         assert resp_json["message"] == "Discount applied"
+
+
+def test_redeem_discount_refuses_a_linked_purchase_code(
+    user, user_drf_client, products, discounts
+):
+    """
+    The endpoint clears the basket's existing discount only once validation has
+    passed, so a refused code has to leave the standing discount in place.
+    """
+    basket = create_basket(user, products)
+    standing_discount = discounts[0]
+    BasketDiscount.objects.create(
+        redeemed_basket=basket,
+        redeemed_by=user,
+        redeemed_discount=standing_discount,
+        redemption_date=now_in_utc(),
+    )
+    linked_purchase_discount = LinkedPurchaseDiscountFactory.create()
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"),
+        {"discount": linked_purchase_discount.discount_code},
+    )
+
+    assert resp.status_code == 404
+    assert basket.discounts.get().redeemed_discount == standing_discount
 
 
 @pytest.mark.parametrize("try_product_discount", [True, False])
