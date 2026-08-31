@@ -5,6 +5,7 @@ from decimal import Decimal
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_LINKED_PURCHASE,
     DISCOUNT_TYPE_PERCENT_OFF,
 )
 from ecommerce.models import Discount, Product
@@ -30,6 +31,7 @@ class DiscountType(abc.ABC):
     _CLASSES = {}
 
     discount: Discount
+    resolved_amount: Decimal | None = None
 
     def __init_subclass__(cls, *, discount_type, **kwargs):
         super().__init_subclass__()
@@ -41,21 +43,28 @@ class DiscountType(abc.ABC):
         cls._CLASSES[discount_type] = cls
 
     @classmethod
-    def for_discount(cls, discount: Discount):
+    def for_discount(
+        cls, discount: Discount, *, resolved_amount: Decimal | None = None
+    ):
         DiscountTypeCls = cls._CLASSES[discount.discount_type]
 
-        return DiscountTypeCls(discount)
+        return DiscountTypeCls(discount, resolved_amount=resolved_amount)
 
     @staticmethod
-    def get_discounted_price(discounts, product):
+    def get_discounted_price(
+        discounts, product, *, resolved_amounts: dict[int, Decimal] | None = None
+    ):
         """Return the price of the product with discounts"""
         # apply discount to product using the best discount
         # in practice, orders will only have one discount
         # but JUST IN CASE this ever changes
         # we want to have this be deterministic
         price = product.price
+        resolved_amounts = resolved_amounts or {}
         for discount in discounts:
-            discount_cls = DiscountType.for_discount(discount)
+            discount_cls = DiscountType.for_discount(
+                discount, resolved_amount=resolved_amounts.get(discount.id)
+            )
             price = min(discount_cls.get_product_price(product), price)
 
         return price
@@ -78,13 +87,33 @@ class PercentDiscount(DiscountType, discount_type=DISCOUNT_TYPE_PERCENT_OFF):
 
 
 class DollarsOffDiscount(DiscountType, discount_type=DISCOUNT_TYPE_DOLLARS_OFF):
-    def get_product_version_price(self, product: Product):
-        if product.price < self.discount.amount:
-            return Decimal(0)
+    @property
+    def amount_off(self) -> Decimal:
+        return Decimal(self.discount.amount)
 
-        return product.price - self.discount.amount
+    def get_product_version_price(self, product: Product):
+        return max(Decimal(0), Decimal(product.price) - self.amount_off)
 
 
 class FixedPriceDiscount(DiscountType, discount_type=DISCOUNT_TYPE_FIXED_PRICE):
     def get_product_version_price(self, product: Product):  # noqa: ARG002
         return Decimal(self.discount.amount)
+
+
+class LinkedPurchaseDiscount(
+    DollarsOffDiscount, discount_type=DISCOUNT_TYPE_LINKED_PURCHASE
+):
+    """
+    Dollars-off by the amount the learner paid for a linked prior purchase.
+
+    The amount is resolved outside this module and injected via
+    resolved_amounts; without one nothing comes off, so an unresolved discount
+    can never undercharge. The discount's own stored amount is always 0.
+    """
+
+    @property
+    def amount_off(self) -> Decimal:
+        if self.resolved_amount is None:
+            return Decimal(0)
+
+        return self.resolved_amount
