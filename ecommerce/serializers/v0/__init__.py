@@ -28,7 +28,6 @@ from ecommerce.models import (
     RefundRequestStatus,
 )
 from ecommerce.serializers import (
-    BulkDiscountSerializer,  # noqa: F401  re-exported for ecommerce.views.v0
     LinkedPurchaseShapeMixin,
     discount_is_price_neutral,
 )

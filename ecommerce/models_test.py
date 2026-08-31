@@ -1514,7 +1514,7 @@ def test_converting_a_discount_with_a_courserun_product_is_rejected():
     An existing discount cannot become linked-purchase while a course-run
     product is still attached.
     """
-    discount = DiscountFactory.create(automatic=False)
+    discount = DiscountFactory.create()
     DiscountProduct.objects.create(discount=discount, product=ProductFactory.create())
 
     discount.discount_type = DISCOUNT_TYPE_LINKED_PURCHASE

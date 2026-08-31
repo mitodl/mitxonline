@@ -51,7 +51,7 @@ class DiscountFactory(DjangoModelFactory):
         model = models.Discount
 
 
-# Four factories here to test the redemption ruleset
+# One factory per redemption type, so tests can name the ruleset they exercise.
 
 
 class OneTimeDiscountFactory(DiscountFactory):
