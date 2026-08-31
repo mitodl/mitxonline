@@ -30,9 +30,7 @@ from ecommerce.models import (
 from ecommerce.serializers import (
     BulkDiscountSerializer,  # noqa: F401  re-exported for ecommerce.views.v0
     LinkedPurchaseShapeMixin,
-    basket_discounted_price,
-    basket_discounts_are_visible,
-    basket_total_price,
+    discount_is_price_neutral,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from main.constants import (
@@ -409,22 +407,41 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
     @extend_schema_field(Decimal)
     def get_total_price(self, instance) -> Decimal:
         """Get total price of all items in basket before discounts"""
-        return basket_total_price(instance)
+        return Decimal(
+            sum(
+                basket_item.base_price
+                for basket_item in instance.basket_items.select_related("product")
+            )
+        )
 
     @extend_schema_field(Decimal)
     def get_discounted_price(self, instance) -> Decimal:
         """Get total price after any discounts are applied"""
-        return basket_discounted_price(instance)
+        discounts = instance.discounts.all()
+        if discounts.count() == 0:
+            return self.get_total_price(instance)
+        return Decimal(
+            sum(
+                basket_item.discounted_price
+                for basket_item in instance.basket_items.select_related("product")
+            )
+        )
 
     @extend_schema_field(BasketDiscountSerializer(many=True))
     def get_discounts(self, instance) -> list[BasketDiscountSerializer]:
-        """Get the basket's discounts, when they are worth showing."""
-        if not basket_discounts_are_visible(instance):
-            return []
+        """
+        Serialize the basket's discounts, skipping the price-neutral ones.
 
+        Args:
+            instance: Basket instance
+
+        Returns:
+            List of serialized basket discount records
+        """
         return [
             BasketDiscountSerializer(discount_record, context=self.context).data
             for discount_record in instance.discounts.all()
+            if not discount_is_price_neutral(discount_record.redeemed_discount)
         ]
 
     class Meta:

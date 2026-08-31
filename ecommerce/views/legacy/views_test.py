@@ -58,7 +58,6 @@ from ecommerce.serializers import (
     DiscountSerializer,
     ProductSerializer,
 )
-from ecommerce.test_utils import reprice_product
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from main import features
@@ -369,9 +368,6 @@ def test_redeem_discount_with_higher_discount(
     ID so this doesn't just do json_equal.)
     """
     product = products[random.randrange(0, len(products), 1)]  # noqa: S311
-    # The tier discount below is $50 and may be a fixed-price one, so the price
-    # has to stay above it.
-    reprice_product(product)
     course = product.purchasable_object.course
     tier = FlexiblePriceTierFactory.create(
         courseware_object=course,

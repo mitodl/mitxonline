@@ -15,6 +15,9 @@ from ecommerce.constants import (
     BULK_GENERATION_DISCOUNT_TYPES,
     BULK_GENERATION_REDEMPTION_TYPES,
     CYBERSOURCE_CARD_TYPES,
+    DISCOUNT_TYPE_DOLLARS_OFF,
+    DISCOUNT_TYPE_LINKED_PURCHASE,
+    DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPES,
     TRANSACTION_TYPE_REFUND,
 )
@@ -179,50 +182,25 @@ class ProductSerializer(BaseProductSerializer):
         model = models.Product
 
 
-def basket_total_price(basket) -> Decimal:
-    """Total of the basket's items before discounts."""
-    cache_attr = "_serialized_total_price"
-    if not hasattr(basket, cache_attr):
-        setattr(
-            basket,
-            cache_attr,
-            Decimal(
-                sum(
-                    basket_item.base_price
-                    for basket_item in basket.basket_items.select_related("product")
-                )
-            ),
-        )
-    return getattr(basket, cache_attr)
-
-
-def basket_discounted_price(basket) -> Decimal:
-    """Total of the basket's items after any discounts are applied."""
-    cache_attr = "_serialized_discounted_price"
-    if not hasattr(basket, cache_attr):
-        if not basket.discounts.exists():
-            price = basket_total_price(basket)
-        else:
-            price = Decimal(
-                sum(
-                    basket_item.discounted_price
-                    for basket_item in basket.basket_items.select_related("product")
-                )
-            )
-        setattr(basket, cache_attr, price)
-    return getattr(basket, cache_attr)
-
-
-def basket_discounts_are_visible(basket) -> bool:
+def discount_is_price_neutral(discount) -> bool:
     """
-    Whether to list the basket's discounts at all: hide them when they don't
-    actually change the price (a basket carries at most one discount per user,
-    so comparing the basket totals is exact). A $0 basket keeps its discounts
-    visible — B2B products are often $0 yet require a code, and the shopper
-    needs confirmation it was accepted.
+    Whether a discount is display noise in a cart: one of the shapes that can
+    never move a price.
+
+    A percent-off or dollars-off discount of 0 subtracts nothing. A
+    linked-purchase discount stores 0 too, and its real per-user value is
+    resolved elsewhere (hq#11846), so nothing renderable exists for it yet;
+    the resolver revisits its visibility.
+
+    A fixed-price discount is not in this set even at 0 — it sets the price
+    rather than reducing it, and a fixed price equal to the product price is a
+    real B2B-contract shape the shopper needs to see confirmed.
     """
-    total_price = basket_total_price(basket)
-    return not (total_price > 0 and basket_discounted_price(basket) >= total_price)
+    return discount.discount_type == DISCOUNT_TYPE_LINKED_PURCHASE or (
+        discount.amount == 0
+        and discount.discount_type
+        in (DISCOUNT_TYPE_PERCENT_OFF, DISCOUNT_TYPE_DOLLARS_OFF)
+    )
 
 
 class LinkedPurchaseShapeMixin:
@@ -395,22 +373,37 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
     @extend_schema_field(Decimal)
     def get_total_price(self, instance) -> Decimal:
         """Get total price of all items in basket before discounts"""
-        return basket_total_price(instance)
+        return sum(
+            basket_item.base_price
+            for basket_item in instance.basket_items.select_related("product")
+        )
 
     @extend_schema_field(Decimal)
     def get_discounted_price(self, instance) -> Decimal:
         """Get total price after any discounts are applied"""
-        return basket_discounted_price(instance)
+        discounts = instance.discounts.all()
+        if discounts.count() == 0:
+            return self.get_total_price(instance)
+        return sum(
+            basket_item.discounted_price
+            for basket_item in instance.basket_items.select_related("product")
+        )
 
     @extend_schema_field(BasketDiscountSerializer(many=True))
     def get_discounts(self, instance) -> list[dict[str, any]]:
-        """Get the basket's discounts, when they are worth showing."""
-        if not basket_discounts_are_visible(instance):
-            return []
+        """
+        Serialize the basket's discounts, skipping the price-neutral ones.
 
+        Args:
+            instance: Basket instance
+
+        Returns:
+            List of serialized basket discount records
+        """
         return [
             BasketDiscountSerializer(discount_record, context=self.context).data
             for discount_record in instance.discounts.all()
+            if not discount_is_price_neutral(discount_record.redeemed_discount)
         ]
 
     class Meta:
