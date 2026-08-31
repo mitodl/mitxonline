@@ -543,6 +543,9 @@ class Discount(TimestampedModel):
             return f"${amount} off"
         elif self.discount_type == DISCOUNT_TYPE_FIXED_PRICE:
             return f"a fixed price of ${amount}"
+        elif self.discount_type == DISCOUNT_TYPE_LINKED_PURCHASE:
+            # The real value is resolved per user; no amount is renderable here.
+            return "credit for a linked purchase"
 
         return "Indeterminate Discount"
 

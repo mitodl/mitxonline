@@ -13,8 +13,6 @@ from courses.models import Course, CourseRun, Program, ProgramRun
 from ecommerce import models
 from ecommerce.constants import (
     CYBERSOURCE_CARD_TYPES,
-    DISCOUNT_TYPE_DOLLARS_OFF,
-    DISCOUNT_TYPE_PERCENT_OFF,
     TRANSACTION_TYPE_REFUND,
 )
 from ecommerce.discounts import product_from_version
@@ -29,7 +27,12 @@ from ecommerce.models import (
     RefundRequest,
     RefundRequestStatus,
 )
-from ecommerce.serializers import LinkedPurchaseShapeMixin
+from ecommerce.serializers import (
+    LinkedPurchaseShapeMixin,
+    basket_discounted_price,
+    basket_discounts_are_visible,
+    basket_total_price,
+)
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from main.constants import (
     USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
@@ -405,51 +408,23 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
     @extend_schema_field(Decimal)
     def get_total_price(self, instance) -> Decimal:
         """Get total price of all items in basket before discounts"""
-        return Decimal(
-            sum(
-                basket_item.base_price
-                for basket_item in instance.basket_items.select_related("product")
-            )
-        )
+        return basket_total_price(instance)
 
     @extend_schema_field(Decimal)
     def get_discounted_price(self, instance) -> Decimal:
         """Get total price after any discounts are applied"""
-        discounts = instance.discounts.all()
-        if discounts.count() == 0:
-            return self.get_total_price(instance)
-        return Decimal(
-            sum(
-                basket_item.discounted_price
-                for basket_item in instance.basket_items.select_related("product")
-            )
-        )
+        return basket_discounted_price(instance)
 
     @extend_schema_field(BasketDiscountSerializer(many=True))
     def get_discounts(self, instance) -> list[BasketDiscountSerializer]:
-        """
-        Exclude zero value discounts and return applicable discounts on the basket.
+        """Get the basket's discounts, when they are worth showing."""
+        if not basket_discounts_are_visible(instance):
+            return []
 
-        Args:
-            instance: Basket instance
-
-        Returns:
-            List of serialized basket discount records
-        """
-        discounts = []
-        for discount_record in instance.discounts.all():
-            discount = discount_record.redeemed_discount
-            if discount.amount == 0 and discount.discount_type in [
-                DISCOUNT_TYPE_PERCENT_OFF,
-                DISCOUNT_TYPE_DOLLARS_OFF,
-            ]:
-                continue
-
-            discounts.append(
-                BasketDiscountSerializer(discount_record, context=self.context).data
-            )
-
-        return discounts
+        return [
+            BasketDiscountSerializer(discount_record, context=self.context).data
+            for discount_record in instance.discounts.all()
+        ]
 
     class Meta:
         model = models.Basket

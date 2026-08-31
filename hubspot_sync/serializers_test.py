@@ -24,6 +24,7 @@ from ecommerce.constants import (
 from ecommerce.factories import (
     DiscountFactory,
     DiscountRedemptionFactory,
+    LinkedPurchaseDiscountFactory,
     ProductFactory,
 )
 from ecommerce.models import OrderStatus, Product
@@ -34,6 +35,7 @@ from hubspot_sync.serializers import (
     ProductSerializer,
     format_product_name,
 )
+from main.utils import format_decimal
 
 pytestmark = [pytest.mark.django_db]
 
@@ -180,6 +182,9 @@ def test_serialize_order_with_coupon(  # noqa: PLR0913
         redeemed_by=hubspot_order.purchaser,
         redemption_date=now_in_utc(),
     )
+    # The fixture builds the line before this discount exists, and the deal
+    # reports the price recorded on the line, so re-price it as checkout does.
+    hubspot_order.lines.first().record_discounted_unit_price()
 
     serialized_data = OrderToDealSerializer(instance=hubspot_order).data
 
@@ -212,3 +217,23 @@ def test_serialize_order_with_coupon(  # noqa: PLR0913
         "pipeline": settings.HUBSPOT_PIPELINE_ID,
         "unique_app_id": expected_unique_app_id,
     }
+
+
+def test_serialize_order_with_linked_purchase_coupon(hubspot_order):
+    """The deal reports the credit actually applied, not the stored amount of 0."""
+    discount = LinkedPurchaseDiscountFactory.create()
+    DiscountRedemptionFactory(
+        redeemed_discount=discount,
+        redeemed_order=hubspot_order,
+        redeemed_by=hubspot_order.purchaser,
+        redemption_date=now_in_utc(),
+    )
+    line = hubspot_order.lines.first()
+    credit = line.unit_price / 4
+    hubspot_order.lines.update(discounted_unit_price=line.unit_price - credit)
+
+    serialized_data = OrderToDealSerializer(instance=hubspot_order).data
+
+    assert serialized_data["discount_amount"] == format_decimal(credit)
+    assert serialized_data["discount_percent"] == "25.00"
+    assert serialized_data["discount_type"] == "linked-purchase"

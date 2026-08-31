@@ -1532,3 +1532,10 @@ def test_linked_purchase_discount_tolerates_a_product_less_link_row():
     DiscountProduct.objects.create(discount=discount, product=None)
 
     discount.save()
+
+
+def test_friendly_format_for_linked_purchase():
+    """The label carries no amount — the true value is per-user."""
+    discount = LinkedPurchaseDiscountFactory.create()
+
+    assert discount.friendly_format() == "credit for a linked purchase"

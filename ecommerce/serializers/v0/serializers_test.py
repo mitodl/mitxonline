@@ -6,15 +6,19 @@ import pytest
 import reversion
 from django.test import Client, RequestFactory
 from django.urls import reverse
+from mitol.common.utils import now_in_utc
 from reversion.models import Version
 
 from courses.models import CourseRun, EnrollmentMode, Program
 from ecommerce.api import generate_checkout_payload
 from ecommerce.constants import (
+    DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_LINKED_PURCHASE,
     REDEMPTION_TYPE_LINKED_PURCHASE,
 )
 from ecommerce.factories import (
+    BasketFactory,
+    BasketItemFactory,
     DiscountFactory,
     LinkedPurchaseDiscountFactory,
     OrderFactory,
@@ -22,12 +26,14 @@ from ecommerce.factories import (
     ProgramProductFactory,
 )
 from ecommerce.models import (
+    BasketDiscount,
     DiscountProduct,
     Line,
     Order,
     OrderStatus,
 )
 from ecommerce.serializers.v0 import (
+    BasketWithProductSerializer,
     TransactionLineSerializer,
     V0DiscountSerializer,
 )
@@ -318,3 +324,94 @@ def test_v0_discount_serializer_rejects_converting_a_discount_with_a_courserun_p
 
     assert not serializer.is_valid()
     assert "program products" in str(serializer.errors)
+
+
+def test_basket_serializer_hides_a_discount_that_does_not_change_the_price(user):
+    """An applied discount worth $0 (e.g. unresolved) is display noise."""
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket)
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=LinkedPurchaseDiscountFactory.create(),
+        redeemed_basket=basket,
+    )
+
+    data = BasketWithProductSerializer(instance=basket).data
+
+    assert data["discounts"] == []
+
+
+def test_basket_serializer_shows_a_discount_on_a_zero_price_product(user):
+    """B2B products are often $0 yet require a code, which must confirm as applied."""
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=ProductFactory.create(price=0))
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=DiscountFactory.create(),
+        redeemed_basket=basket,
+    )
+
+    data = BasketWithProductSerializer(instance=basket).data
+
+    assert len(data["discounts"]) == 1
+
+
+def test_basket_serializer_shows_a_full_discount(user):
+    """A fixed-price-0 discount changes the price to $0 and must stay visible."""
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket)
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=DiscountFactory.create(
+            amount=0, discount_type=DISCOUNT_TYPE_FIXED_PRICE
+        ),
+        redeemed_basket=basket,
+    )
+
+    data = BasketWithProductSerializer(instance=basket).data
+
+    assert len(data["discounts"]) == 1
+
+
+def test_basket_serializer_shows_a_discount_on_an_empty_basket(user):
+    """
+    An empty basket has no price to compare against, so its discount stays
+    listed for the same reason a $0 product's does — the shopper still needs
+    confirmation the code was accepted.
+    """
+    basket = BasketFactory.create(user=user)
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=DiscountFactory.create(),
+        redeemed_basket=basket,
+    )
+
+    data = BasketWithProductSerializer(instance=basket).data
+
+    assert data["total_price"] == 0
+    assert len(data["discounts"]) == 1
+
+
+def test_basket_totals_are_priced_once_per_basket(user, django_assert_num_queries):
+    """
+    total_price, discounted_price and the discounts display rule all need the
+    basket totals, and this runs on the checkout path.
+    """
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket)
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=DiscountFactory.create(),
+        redeemed_basket=basket,
+    )
+    serializer = BasketWithProductSerializer(instance=basket)
+    assert serializer.data
+
+    with django_assert_num_queries(0):
+        serializer.get_total_price(basket)
+        serializer.get_discounted_price(basket)
