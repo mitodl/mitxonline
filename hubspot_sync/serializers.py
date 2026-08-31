@@ -251,11 +251,7 @@ class OrderToDealSerializer(serializers.ModelSerializer):
         stored amount is always 0.
         """
         line = _get_first_order_line(instance)
-        if (
-            not self._get_discount(instance)
-            or line is None
-            or line.product_version is None
-        ):
+        if not self._get_discount(instance) or line is None:
             return None
 
         return (Decimal(line.unit_price), line.get_discounted_unit_price())

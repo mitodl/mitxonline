@@ -296,7 +296,7 @@ def test_v0_discount_serializer_rejects_converting_a_discount_with_a_courserun_p
     Django ValidationError out of save() is not converted, so it 500s and leaves
     the row un-PATCHable.
     """
-    discount = DiscountFactory.create(automatic=False)
+    discount = DiscountFactory.create()
     DiscountProduct.objects.create(discount=discount, product=ProductFactory.create())
 
     serializer = V0DiscountSerializer(
