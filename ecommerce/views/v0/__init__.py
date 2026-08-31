@@ -5,6 +5,7 @@ MITx Online API-ready views, migrated from Unified Ecommerce.
 import logging
 
 import django_filters
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
@@ -243,6 +244,10 @@ def _create_basket_from_product(
     with transaction.atomic():
         basket = establish_basket_for_request(request, for_update=True)
 
+        if not getattr(settings, "ENABLE_MULTIPLE_CART_ITEMS", False):
+            basket.basket_items.all().delete()
+            BasketDiscount.objects.filter(redeemed_basket=basket).delete()
+
         # FUTURE: This is where the basket_add hook was called.
 
         (_, created) = BasketItem.objects.update_or_create(
@@ -408,6 +413,16 @@ def create_basket_with_products(request):
         return Response(
             {"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND
         )
+
+    allow_multiple_items = getattr(settings, "ENABLE_MULTIPLE_CART_ITEMS", False)
+    if not allow_multiple_items:
+        if len(products) > 1:
+            return Response(
+                {"error": "Multiple cart items are not enabled."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        basket.basket_items.all().delete()
+        BasketDiscount.objects.filter(redeemed_basket=basket).delete()
 
     try:
         for product, quantity in products:
