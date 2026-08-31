@@ -1525,13 +1525,14 @@ def test_program_child_purchase_discount_links_a_program_product():
         discount=discount, product=ProgramProductFactory.create()
     )
 
-    discount.save()
+    discount.clean()
 
 
 def test_converting_a_discount_with_a_courserun_product_is_rejected():
     """
     An existing discount cannot become program-child-purchase while a course-run
-    product is still attached.
+    product is still attached. The cross-table clause lives in clean() (and the
+    serializers), not save(), so save() stays row-local.
     """
     discount = DiscountFactory.create()
     DiscountProduct.objects.create(discount=discount, product=ProductFactory.create())
@@ -1542,7 +1543,7 @@ def test_converting_a_discount_with_a_courserun_product_is_rejected():
     discount.automatic = True
 
     with pytest.raises(ValidationError):
-        discount.save()
+        discount.clean()
 
 
 def test_program_child_purchase_discount_tolerates_a_product_less_link_row():
@@ -1550,7 +1551,7 @@ def test_program_child_purchase_discount_tolerates_a_product_less_link_row():
     discount = PaidAmountOffDiscountFactory.create()
     DiscountProduct.objects.create(discount=discount, product=None)
 
-    discount.save()
+    discount.clean()
 
 
 def test_program_child_purchase_discount_is_not_redeemable_by_anyone(user):
