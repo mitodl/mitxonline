@@ -1551,3 +1551,10 @@ def test_program_child_purchase_discount_tolerates_a_product_less_link_row():
     DiscountProduct.objects.create(discount=discount, product=None)
 
     discount.save()
+
+
+def test_friendly_format_for_paid_amount_off():
+    """The label carries no amount — the true value is per-user."""
+    discount = PaidAmountOffDiscountFactory.create()
+
+    assert discount.friendly_format() == "the amount paid for a prior purchase"
