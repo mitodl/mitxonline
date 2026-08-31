@@ -396,25 +396,31 @@ class Discount(TimestampedModel):
 
         return True
 
-    def check_linked_purchase_validity(self):
+    def check_linked_purchase_validity(self, *, include_linked_products=False):
         validate_linked_purchase_shape(
             discount_type=self.discount_type,
             redemption_type=self.redemption_type,
             amount=self.amount,
             automatic=self.automatic,
-            discount=self,
+            discount=self if include_linked_products else None,
         )
 
         return True
 
     def save(self, *args, **kwargs):
         self.check_date_validity()
+        # Row-local rules only. The cross-table program-products clause is
+        # deliberately not checked here: a stray non-program link (bulk_create,
+        # a data migration) would otherwise make every unrelated save() of this
+        # row fail with an error about products. clean() and the serializers
+        # enforce that clause where the edit is actually being made, and
+        # DiscountProduct.save() guards the attach direction.
         self.check_linked_purchase_validity()
         super().save(*args, **kwargs)
 
     def clean(self, *args, **kwargs):
         self.check_date_validity()
-        self.check_linked_purchase_validity()
+        self.check_linked_purchase_validity(include_linked_products=True)
         super().clean(*args, **kwargs)
 
     @cached_property
