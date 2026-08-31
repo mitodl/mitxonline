@@ -207,13 +207,15 @@ def get_or_create_retirement_contract() -> ContractPage:
 
 def check_retirement_contract_collision(run: CourseRun, contract: ContractPage) -> None:
     """
-    Check that moving the run into the holding contract won't break a constraint.
+    Check that moving the run into the holding contract won't break a rule.
 
-    ``CourseRun`` has two unique constraints that include ``b2b_contract`` with
-    ``nulls_distinct=False`` - ``unique_primary_language_per_group`` and
-    ``unique_language_per_group``. Collisions are unlikely in practice because
-    the B2B run tag embeds the source contract ID and year, but an
-    ``IntegrityError`` mid-command is a much worse outcome than a clear refusal.
+    ``CourseRun`` enforces two uniqueness rules per contract group -
+    ``unique_primary_language_per_group`` and ``unique_language_per_group``
+    (formerly database constraints, now validated in
+    ``CourseRun.validate_b2b_contract_group_uniqueness``). Collisions are
+    unlikely in practice because the B2B run tag embeds the source contract ID
+    and year, but a ``ValidationError`` mid-command is a much worse outcome
+    than a clear refusal.
 
     Args:
         run (CourseRun): the run being moved.
@@ -226,7 +228,7 @@ def check_retirement_contract_collision(run: CourseRun, contract: ContractPage) 
         course=run.course,
         run_tag=run.run_tag,
         is_source_run=run.is_source_run,
-        b2b_contract=contract,
+        b2b_contracts=contract,
     ).exclude(pk=run.pk)
 
     if (
@@ -268,13 +270,14 @@ def move_run_to_retirement_contract(run: CourseRun) -> ContractPage:
 
     contract = get_or_create_retirement_contract()
 
-    if run.b2b_contract_id == contract.id:
+    if run.b2b_contracts.filter(pk=contract.pk).exists():
         return contract
 
     check_retirement_contract_collision(run, contract)
 
     run.b2b_contract = contract
     run.save()
+    run.b2b_contracts.add(contract)
 
     log.info("Moved course run %s to %s", run.courseware_id, contract)
 
