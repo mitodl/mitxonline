@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("ecommerce", "0046_alter_product_unique_purchasable_object_pt3"),
+        ("ecommerce", "0049_line_discounted_unit_price_not_null"),
     ]
 
     operations = [
