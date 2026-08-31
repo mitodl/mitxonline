@@ -27,7 +27,6 @@ class Command(BaseCommand):
     aborted if the destination user already has any overlapping records.
 
     Example: transfer_user_course_records --from_email=old@example.com --to_email=new@example.com
-    Example: transfer_user_course_records --from-email=old@example.com --to-email=new@example.com
     """
 
     help = __doc__
@@ -85,9 +84,8 @@ class Command(BaseCommand):
         try:
             return fetch_user(email)
         except User.DoesNotExist as exc:
-            raise CommandError(
-                f"Could not find user for --{option_name}={email}."
-            ) from exc
+            msg = f"Could not find user for --{option_name}={email}."
+            raise CommandError(msg) from exc
 
     def _load_source_records(self, source_user):
         """Load all transfer candidates for the source user."""
