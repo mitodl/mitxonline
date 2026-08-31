@@ -1455,24 +1455,49 @@ def test_a_source_line_is_protected_once_it_funds_a_redemption():
         line.delete()
 
 
-def test_db_constraint_rejects_paid_amount_off_without_program_child_purchase():
+@pytest.mark.parametrize(
+    "row",
+    [
+        pytest.param(
+            {
+                "amount": 0,
+                "discount_type": DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+                "redemption_type": REDEMPTION_TYPE_UNLIMITED,
+                "automatic": True,
+            },
+            id="paid-amount-off-without-program-child-purchase",
+        ),
+        pytest.param(
+            {
+                "amount": 10,
+                "discount_type": DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+                "redemption_type": REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+                "automatic": True,
+            },
+            id="nonzero-amount",
+        ),
+        pytest.param(
+            {
+                "amount": 0,
+                "discount_type": DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+                "redemption_type": REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+                "automatic": False,
+            },
+            id="not-automatic",
+        ),
+    ],
+)
+def test_db_constraint_rejects_a_malformed_discount_shape(row):
     """The DB backstop holds even for writes that skip model validation."""
     with pytest.raises(IntegrityError), transaction.atomic():
         Discount.objects.bulk_create(
-            [
-                Discount(
-                    amount=0,
-                    discount_code="constraint-bypass",
-                    discount_type=DISCOUNT_TYPE_PAID_AMOUNT_OFF,
-                    redemption_type=REDEMPTION_TYPE_UNLIMITED,
-                )
-            ]
+            [Discount(discount_code="constraint-bypass", **row)]
         )
 
 
 def test_db_constraint_allows_program_child_purchase_redemption_with_standard_type():
-    """The constraint is one-way on purpose: a standard calculation may pair
-    with the program-child-purchase redemption rules (future fractional offers).
+    """The type constraint is one-way on purpose: a standard calculation may
+    pair with the program-child-purchase redemption rules (future fractional offers).
     """
     Discount.objects.bulk_create(
         [
@@ -1481,6 +1506,7 @@ def test_db_constraint_allows_program_child_purchase_redemption_with_standard_ty
                 discount_code="reverse-pairing",
                 discount_type=DISCOUNT_TYPE_PERCENT_OFF,
                 redemption_type=REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+                automatic=True,
             )
         ]
     )
