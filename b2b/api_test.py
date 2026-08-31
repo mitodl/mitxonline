@@ -11,7 +11,6 @@ import pytest
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
 from django.test import RequestFactory
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
@@ -1794,41 +1793,44 @@ def test_create_contract_run_duplicate_language_source_raises(mocker, in_contrac
     """
     Test that you can't create two source runs with the same run tag and language.
 
-    This is enforced as a unique constraint so trying to do this should fail,
-    unless the runs are in different contracts (or one is in a contract and the
-    other isn't).
+    This is enforced in application code (see
+    ``CourseRun.validate_b2b_contract_group_uniqueness``) so trying to do this
+    should fail, unless the runs are in different contracts (or one is in a
+    contract and the other isn't).
     """
     contract = None if in_contract == "no" else ContractPageFactory.create()
     course = CourseFactory.create()
-    CourseRunFactory.create(
+    first_run = CourseRunFactory.create(
         course=course,
         run_tag="1T2026",
         language="en",
         is_source_run=True,
         is_primary_language=True,
         courseware_id=f"{course.readable_id}+1T2026-en",
-        b2b_contract=contract if in_contract in ["first", "both"] else None,
+    )
+    if in_contract in ["first", "both"]:
+        first_run.b2b_contracts.add(contract)
+
+    second_run = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en-copy",
     )
 
-    if in_contract in ["no", "both"]:
-        with pytest.raises(IntegrityError, match="unique_language_per_group"):
-            CourseRunFactory.create(
-                course=course,
-                run_tag="1T2026",
-                language="en",
-                is_source_run=True,
-                courseware_id=f"{course.readable_id}+1T2026-en-copy",
-                b2b_contract=contract,
-            )
+    if in_contract == "both":
+        with pytest.raises(ValidationError):
+            second_run.b2b_contracts.add(contract)
+    elif in_contract == "no":
+        # Both runs are public, so re-validating the existing row surfaces the
+        # collision.
+        with pytest.raises(ValidationError):
+            second_run.save()
     else:
-        CourseRunFactory.create(
-            course=course,
-            run_tag="1T2026",
-            language="en",
-            is_source_run=True,
-            courseware_id=f"{course.readable_id}+1T2026-en-copy",
-            b2b_contract=contract if in_contract == "second" else None,
-        )
+        if in_contract == "second":
+            second_run.b2b_contracts.add(contract)
+        second_run.save()
 
 
 def test_create_contract_run_single_language_legacy(mocker):

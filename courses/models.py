@@ -1450,7 +1450,9 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
     )
     b2b_contracts = models.ManyToManyField(
         "b2b.ContractPage",
+        blank=True,
         related_name="course_runs",
+        help_text="B2B contracts this course run is attached to.",
     )
     b2b_only = models.BooleanField(
         default=False, help_text="Indicates if the course run is B2B only"
@@ -1479,29 +1481,17 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
         return format_html(f'{self.courseware_id} <a href="{dj_change_url}">Admin</a>')
 
     class Meta:
+        # The ``unique_primary_language_per_group`` and
+        # ``unique_language_per_group`` rules used to live here as database
+        # UniqueConstraints that included the now-deprecated ``b2b_contract``
+        # FK. A run can now belong to multiple contracts through the
+        # ``b2b_contracts`` ManyToManyField, and M2M fields cannot participate
+        # in a UniqueConstraint, so the rules are enforced in application code
+        # instead - see ``CourseRun.validate_b2b_contract_group_uniqueness``,
+        # which runs from ``clean()``/``save()`` and from the ``m2m_changed``
+        # handler in ``courses/signals.py`` (which covers direct mutations such
+        # as ``run.b2b_contracts.add(contract)``).
         unique_together = ("course", "courseware_id", "run_tag")
-        constraints = [
-            UniqueConstraint(
-                fields=["course", "run_tag", "is_source_run", "b2b_contract"],
-                condition=Q(is_primary_language=True),
-                nulls_distinct=False,
-                name="unique_primary_language_per_group",
-            ),
-            UniqueConstraint(
-                fields=[
-                    "course",
-                    "run_tag",
-                    "language",
-                    "is_source_run",
-                    "b2b_contract",
-                    "variant_length",
-                    "variant_industry",
-                ],
-                condition=~Q(language=""),
-                nulls_distinct=False,
-                name="unique_language_per_group",
-            ),
-        ]
 
     @property
     def is_past(self):
@@ -1687,8 +1677,24 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
         Validate that the expiration date is:
         1. Later than end_date if end_date is set
         2. Later than start_date if start_date is set
+
+        Also enforces the B2B contract group uniqueness rules that used to be
+        database constraints.
         """
         self.clean_language()
+
+        if self.pk:
+            self.validate_b2b_contract_group_uniqueness(
+                self.b2b_contracts.values_list("id", flat=True)
+            )
+        elif not self.b2b_only and not self.b2b_contract_id:
+            # An unsaved row has no primary key, so `b2b_contracts` can't be
+            # queried yet - B2B runs get their contracts attached immediately
+            # after this first save. Only rows that are unambiguously public
+            # are checked here (against the public group); everything else is
+            # validated by the `m2m_changed` handler in courses/signals once
+            # its contracts are attached.
+            self.validate_b2b_contract_group_uniqueness([])
 
         if not self.expiration_date:
             return
@@ -1716,6 +1722,74 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
             using=using,
             update_fields=update_fields,
         )
+
+    def validate_b2b_contract_group_uniqueness(self, contract_ids):
+        """
+        Enforce, in application code, the uniqueness rules that used to be the
+        ``unique_primary_language_per_group`` and ``unique_language_per_group``
+        database constraints.
+
+        Those constraints grouped runs by contract using the deprecated
+        ``b2b_contract`` FK. Now that a run can be attached to several
+        contracts via ``b2b_contracts``, the rules are applied once per
+        contract group: within a given contract (or within the "no contract"
+        group) no two runs may share the same
+        ``(course, run_tag, is_source_run)`` combination as the primary
+        language run, nor the same
+        ``(course, run_tag, is_source_run, language, variant_length, variant_industry)``
+        combination.
+
+        Args:
+            contract_ids (Collection): the ``ContractPage`` ids this run is (or
+                is about to be) associated with. An empty collection checks the
+                "no contract" group.
+
+        Raises:
+            ValidationError: if another run already occupies the same slot in
+                any of the contract groups being checked.
+        """
+        # `None` stands for the "no contract" group, which is a valid group in
+        # its own right and must be checked when the run has no contracts.
+        groups_to_check = list(contract_ids) or [None]
+
+        for contract_id in groups_to_check:
+            siblings = CourseRun.all_objects.filter(
+                course=self.course,
+                run_tag=self.run_tag,
+                is_source_run=self.is_source_run,
+            ).exclude(pk=self.pk)
+
+            siblings = (
+                siblings.filter(b2b_contracts__id=contract_id)
+                if contract_id is not None
+                else siblings.filter(b2b_contracts__isnull=True)
+            )
+
+            if (
+                self.is_primary_language
+                and siblings.filter(is_primary_language=True).exists()
+            ):
+                msg = (
+                    f"A primary-language run for {self.course.readable_id} with "
+                    f"run tag '{self.run_tag}' already exists in this contract group."
+                )
+                raise ValidationError(msg)
+
+            if (
+                self.language
+                and siblings.filter(
+                    language=self.language,
+                    variant_length=self.variant_length,
+                    variant_industry=self.variant_industry,
+                ).exists()
+            ):
+                msg = (
+                    f"A run for {self.course.readable_id} with run tag "
+                    f"'{self.run_tag}', language '{self.language}' and variant "
+                    f"'{self.variant_length}/{self.variant_industry}' already "
+                    "exists in this contract group."
+                )
+                raise ValidationError(msg)
 
 
 def limit_to_certificate_pages():

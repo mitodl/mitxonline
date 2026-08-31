@@ -1315,7 +1315,7 @@ def test_courserun_language_unique_constraint():
         language="en",
         courseware_id="course-v1:X+Y+R1-en",
     )
-    with pytest.raises(IntegrityError):
+    with pytest.raises(ValidationError):
         CourseRunFactory.create(
             course=course,
             run_tag="R1",
@@ -1590,10 +1590,10 @@ def _run_primary_lang_run_test(  # noqa: PLR0913
         }
         log.info("run_data is: %s", run_data)
 
-        with pytest.raises(IntegrityError) as exc, transaction.atomic():
+        with pytest.raises(ValidationError) as exc, transaction.atomic():
             CourseRun.all_objects.create(**run_data)
 
-        assert "violates unique constraint" in str(exc)
+        assert "primary-language run" in str(exc)
 
 
 @pytest.mark.parametrize(
@@ -1815,3 +1815,160 @@ def test_partner_school_default_ordering_is_alphabetical():
     names = list(PartnerSchool.objects.values_list("name", flat=True))
 
     assert names == sorted(names)
+
+
+def test_b2b_contract_group_uniqueness_within_same_contract():
+    """Two runs in the same contract can't share a run tag/language/variant."""
+    contract = ContractPageFactory.create()
+    course = CourseFactory.create()
+
+    first = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en",
+    )
+    first.b2b_contracts.add(contract)
+
+    second = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en-copy",
+    )
+
+    with pytest.raises(ValidationError):
+        second.b2b_contracts.add(contract)
+
+
+def test_b2b_contract_group_uniqueness_across_different_contracts():
+    """The same run tag/language is fine when the runs are in different contracts."""
+    course = CourseFactory.create()
+    first_contract = ContractPageFactory.create()
+    second_contract = ContractPageFactory.create()
+
+    first = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en",
+    )
+    first.b2b_contracts.add(first_contract)
+
+    second = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en-copy",
+    )
+    second.b2b_contracts.add(second_contract)
+
+    assert second.b2b_contracts.count() == 1
+
+
+def test_b2b_contract_group_uniqueness_checks_every_contract():
+    """A collision in any one of a run's contracts is enough to fail."""
+    course = CourseFactory.create()
+    shared_contract = ContractPageFactory.create()
+    other_contract = ContractPageFactory.create()
+
+    first = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en",
+    )
+    first.b2b_contracts.add(shared_contract)
+
+    second = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en-copy",
+    )
+    second.b2b_contracts.add(other_contract)
+
+    with pytest.raises(ValidationError):
+        second.b2b_contracts.add(shared_contract)
+
+
+def test_b2b_contract_group_uniqueness_primary_language():
+    """Only one primary-language run is allowed per contract group."""
+    contract = ContractPageFactory.create()
+    course = CourseFactory.create()
+
+    first = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_primary_language=True,
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en",
+    )
+    first.b2b_contracts.add(contract)
+
+    second = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="es",
+        is_primary_language=True,
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-es",
+    )
+
+    with pytest.raises(ValidationError):
+        second.b2b_contracts.add(contract)
+
+
+def test_b2b_contract_group_uniqueness_reverse_add():
+    """Adding runs from the contract side is validated too."""
+    contract = ContractPageFactory.create()
+    course = CourseFactory.create()
+
+    first = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en",
+    )
+    first.b2b_contracts.add(contract)
+
+    second = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en-copy",
+    )
+
+    with pytest.raises(ValidationError):
+        contract.course_runs.add(second)
+
+
+def test_b2b_contract_group_uniqueness_public_runs():
+    """Two public (contract-less) runs still can't share a group."""
+    course = CourseFactory.create()
+
+    CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en",
+    )
+
+    with pytest.raises(ValidationError):
+        CourseRunFactory.create(
+            course=course,
+            run_tag="1T2026",
+            language="en",
+            is_source_run=True,
+            courseware_id=f"{course.readable_id}+1T2026-en-copy",
+        )
