@@ -1341,6 +1341,7 @@ paths:
         schema:
           type: string
           enum:
+          - linked-purchase
           - one-time
           - one-time-per-user
           - unlimited
@@ -1348,6 +1349,7 @@ paths:
           * `one-time` - one-time
           * `one-time-per-user` - one-time-per-user
           * `unlimited` - unlimited
+          * `linked-purchase` - linked-purchase
       tags:
       - discounts
       responses:
@@ -4691,9 +4693,9 @@ components:
       description: For validating bulk discount requests.
       properties:
         discount_type:
-          $ref: '#/components/schemas/DiscountTypeEnum'
+          $ref: '#/components/schemas/BulkGenerationDiscountTypeEnum'
         redemption_type:
-          $ref: '#/components/schemas/RedemptionTypeEnum'
+          $ref: '#/components/schemas/BulkGenerationRedemptionTypeEnum'
         payment_type:
           $ref: '#/components/schemas/PaymentTypeEnum'
         amount:
@@ -4729,6 +4731,34 @@ components:
       - amount
       - discount_type
       - payment_type
+    BulkGenerationDiscountTypeEnum:
+      enum:
+      - percent-off
+      - dollars-off
+      - fixed-price
+      type: string
+      description: |-
+        * `percent-off` - percent-off
+        * `dollars-off` - dollars-off
+        * `fixed-price` - fixed-price
+      x-enum-descriptions:
+      - percent-off
+      - dollars-off
+      - fixed-price
+    BulkGenerationRedemptionTypeEnum:
+      enum:
+      - one-time
+      - one-time-per-user
+      - unlimited
+      type: string
+      description: |-
+        * `one-time` - one-time
+        * `one-time-per-user` - one-time-per-user
+        * `unlimited` - unlimited
+      x-enum-descriptions:
+      - one-time
+      - one-time-per-user
+      - unlimited
     CertificatePage:
       type: object
       description: Serializer for certificate pages, including overrides and signatory
@@ -6488,6 +6518,7 @@ components:
       - detail
     Discount:
       type: object
+      description: Serializes a discount.
       properties:
         id:
           type: integer
@@ -6604,15 +6635,18 @@ components:
       - percent-off
       - dollars-off
       - fixed-price
+      - linked-purchase
       type: string
       description: |-
         * `percent-off` - percent-off
         * `dollars-off` - dollars-off
         * `fixed-price` - fixed-price
+        * `linked-purchase` - linked-purchase
       x-enum-descriptions:
       - percent-off
       - dollars-off
       - fixed-price
+      - linked-purchase
     DisplayModeEnum:
       enum:
       - course
@@ -9018,15 +9052,18 @@ components:
       - one-time
       - one-time-per-user
       - unlimited
+      - linked-purchase
       type: string
       description: |-
         * `one-time` - one-time
         * `one-time-per-user` - one-time-per-user
         * `unlimited` - unlimited
+        * `linked-purchase` - linked-purchase
       x-enum-descriptions:
       - one-time
       - one-time-per-user
       - unlimited
+      - linked-purchase
     RefundReasonEnum:
       enum:
       - not_enough_time

@@ -216,3 +216,61 @@ POST /api/v0/discounts/create_batch/ removed `#/components/schemas/PaymentTypeEn
 POST /api/v0/discounts/create_batch/ the `payment_type` request property `type` changed from `any` to `string` (media type: application/json)
 POST /api/v0/discounts/create_batch/ removed the success response with the status `200`
 POST /api/v0/discounts/create_batch/ request property `payment_type` was restricted to a list of enum values (media type: multipart/form-data)
+# mitodl/hq#11846: discount_type and redemption_type gained the linked-purchase
+# value. A linked-purchase discount is created by staff, applies automatically,
+# and serializes through the same Discount schema, so the value shows up in
+# every response embedding a discount. Additive enum growth, not a contract break.
+GET /api/v0/baskets/ added the new `linked-purchase` enum value to the `items/discounts/items/redeemed_discount/discount_type` response property for the response status `200`
+GET /api/v0/baskets/ added the new `linked-purchase` enum value to the `items/discounts/items/redeemed_discount/redemption_type` response property for the response status `200`
+GET /api/v0/baskets/{id}/ added the new `linked-purchase` enum value to the `discounts/items/redeemed_discount/discount_type` response property for the response status `200`
+GET /api/v0/baskets/{id}/ added the new `linked-purchase` enum value to the `discounts/items/redeemed_discount/redemption_type` response property for the response status `200`
+GET /api/v0/discounts/ added the new `linked-purchase` enum value to the `results/items/discount_type` response property for the response status `200`
+GET /api/v0/discounts/ added the new `linked-purchase` enum value to the `results/items/redemption_type` response property for the response status `200`
+GET /api/v0/discounts/{id}/ added the new `linked-purchase` enum value to the `discount_type` response property for the response status `200`
+GET /api/v0/discounts/{id}/ added the new `linked-purchase` enum value to the `redemption_type` response property for the response status `200`
+GET /api/v0/discounts/{parent_lookup_discount}/assignees/ added the new `linked-purchase` enum value to the `results/items/discount/discount_type` response property for the response status `200`
+GET /api/v0/discounts/{parent_lookup_discount}/assignees/ added the new `linked-purchase` enum value to the `results/items/discount/redemption_type` response property for the response status `200`
+GET /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ added the new `linked-purchase` enum value to the `discount/discount_type` response property for the response status `200`
+GET /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ added the new `linked-purchase` enum value to the `discount/redemption_type` response property for the response status `200`
+GET /api/v0/discounts/{parent_lookup_discount}/products/ added the new `linked-purchase` enum value to the `results/items/discount/discount_type` response property for the response status `200`
+GET /api/v0/discounts/{parent_lookup_discount}/products/ added the new `linked-purchase` enum value to the `results/items/discount/redemption_type` response property for the response status `200`
+GET /api/v0/discounts/{parent_lookup_discount}/products/{id}/ added the new `linked-purchase` enum value to the `discount/discount_type` response property for the response status `200`
+GET /api/v0/discounts/{parent_lookup_discount}/products/{id}/ added the new `linked-purchase` enum value to the `discount/redemption_type` response property for the response status `200`
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ added the new `linked-purchase` enum value to the `results/items/redeemed_discount/discount_type` response property for the response status `200`
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ added the new `linked-purchase` enum value to the `results/items/redeemed_discount/redemption_type` response property for the response status `200`
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ added the new `linked-purchase` enum value to the `redeemed_discount/discount_type` response property for the response status `200`
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ added the new `linked-purchase` enum value to the `redeemed_discount/redemption_type` response property for the response status `200`
+PATCH /api/v0/discounts/{id}/ added the new `linked-purchase` enum value to the `discount_type` response property for the response status `200`
+PATCH /api/v0/discounts/{id}/ added the new `linked-purchase` enum value to the `redemption_type` response property for the response status `200`
+PATCH /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ added the new `linked-purchase` enum value to the `discount/discount_type` response property for the response status `200`
+PATCH /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ added the new `linked-purchase` enum value to the `discount/redemption_type` response property for the response status `200`
+PATCH /api/v0/discounts/{parent_lookup_discount}/products/{id}/ added the new `linked-purchase` enum value to the `discount/discount_type` response property for the response status `200`
+PATCH /api/v0/discounts/{parent_lookup_discount}/products/{id}/ added the new `linked-purchase` enum value to the `discount/redemption_type` response property for the response status `200`
+PATCH /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ added the new `linked-purchase` enum value to the `redeemed_discount/discount_type` response property for the response status `200`
+PATCH /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ added the new `linked-purchase` enum value to the `redeemed_discount/redemption_type` response property for the response status `200`
+POST /api/v0/baskets/add_discount/ added the new `linked-purchase` enum value to the `discounts/items/redeemed_discount/discount_type` response property for the response status `200`
+POST /api/v0/baskets/add_discount/ added the new `linked-purchase` enum value to the `discounts/items/redeemed_discount/redemption_type` response property for the response status `200`
+POST /api/v0/baskets/create_from_product/{product_id}/ added the new `linked-purchase` enum value to the `discounts/items/redeemed_discount/discount_type` response property for the response status `200`
+POST /api/v0/baskets/create_from_product/{product_id}/ added the new `linked-purchase` enum value to the `discounts/items/redeemed_discount/redemption_type` response property for the response status `200`
+POST /api/v0/baskets/create_from_product/{product_id}/{discount_code}/ added the new `linked-purchase` enum value to the `discounts/items/redeemed_discount/discount_type` response property for the response status `200`
+POST /api/v0/baskets/create_from_product/{product_id}/{discount_code}/ added the new `linked-purchase` enum value to the `discounts/items/redeemed_discount/redemption_type` response property for the response status `200`
+POST /api/v0/baskets/create_with_products/ added the new `linked-purchase` enum value to the `discounts/items/redeemed_discount/discount_type` response property for the response status `200`
+POST /api/v0/baskets/create_with_products/ added the new `linked-purchase` enum value to the `discounts/items/redeemed_discount/redemption_type` response property for the response status `200`
+POST /api/v0/discounts/ added the new `linked-purchase` enum value to the `discount_type` response property for the response status `201`
+POST /api/v0/discounts/ added the new `linked-purchase` enum value to the `redemption_type` response property for the response status `201`
+POST /api/v0/discounts/create_batch/ added the new `linked-purchase` enum value to the `items/discount_type` response property for the response status `201`
+POST /api/v0/discounts/create_batch/ added the new `linked-purchase` enum value to the `items/redemption_type` response property for the response status `201`
+POST /api/v0/discounts/{parent_lookup_discount}/assignees/ added the new `linked-purchase` enum value to the `discount/discount_type` response property for the response status `201`
+POST /api/v0/discounts/{parent_lookup_discount}/assignees/ added the new `linked-purchase` enum value to the `discount/redemption_type` response property for the response status `201`
+POST /api/v0/discounts/{parent_lookup_discount}/products/ added the new `linked-purchase` enum value to the `discount/discount_type` response property for the response status `201`
+POST /api/v0/discounts/{parent_lookup_discount}/products/ added the new `linked-purchase` enum value to the `discount/redemption_type` response property for the response status `201`
+POST /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ added the new `linked-purchase` enum value to the `redeemed_discount/discount_type` response property for the response status `201`
+POST /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ added the new `linked-purchase` enum value to the `redeemed_discount/redemption_type` response property for the response status `201`
+PUT /api/v0/discounts/{id}/ added the new `linked-purchase` enum value to the `discount_type` response property for the response status `200`
+PUT /api/v0/discounts/{id}/ added the new `linked-purchase` enum value to the `redemption_type` response property for the response status `200`
+PUT /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ added the new `linked-purchase` enum value to the `discount/discount_type` response property for the response status `200`
+PUT /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ added the new `linked-purchase` enum value to the `discount/redemption_type` response property for the response status `200`
+PUT /api/v0/discounts/{parent_lookup_discount}/products/{id}/ added the new `linked-purchase` enum value to the `discount/discount_type` response property for the response status `200`
+PUT /api/v0/discounts/{parent_lookup_discount}/products/{id}/ added the new `linked-purchase` enum value to the `discount/redemption_type` response property for the response status `200`
+PUT /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ added the new `linked-purchase` enum value to the `redeemed_discount/discount_type` response property for the response status `200`
+PUT /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ added the new `linked-purchase` enum value to the `redeemed_discount/redemption_type` response property for the response status `200`
