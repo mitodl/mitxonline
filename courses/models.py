@@ -199,13 +199,8 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     b2b_contracts = models.ManyToManyField(
         "b2b.ContractPage",
         blank=True,
-        related_name="course_runs",
-        help_text="B2B contracts this course run is attached to.",
-    )
-    is_b2b = models.BooleanField(
-        default=False,
-        db_index=True,
-        help_text="Indicates if this course run is B2B-only (hidden from public catalog).",
+        related_name="programs",
+        help_text="B2B contracts this program is attached to.",
     )
 
     @cached_property
@@ -1451,7 +1446,14 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
         null=True,
         blank=True,
         on_delete=models.DO_NOTHING,
+        related_name="+",
+    )
+    b2b_contracts = models.ManyToManyField(
+        "b2b.ContractPage",
         related_name="course_runs",
+    )
+    b2b_only = models.BooleanField(
+        default=False, help_text="Indicates if the course run is B2B only"
     )
     is_source_run = models.BooleanField(
         default=False,
