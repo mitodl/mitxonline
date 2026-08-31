@@ -679,11 +679,14 @@ def create_contract_run(  # noqa: PLR0913
         if (
             CourseRun.objects.filter(
                 course=course,
-                b2b_contract=contract,
                 language=clone_course_run.language,
                 variant_industry=clone_course_run.variant_industry,
                 variant_length=clone_course_run.variant_length,
-            ).exists()
+            )
+            .filter(
+                Q(b2b_contract=contract) | Q(b2b_contracts__in=contract),
+            )
+            .exists()
             and no_reruns
         ):
             msg = (
@@ -712,6 +715,8 @@ def create_contract_run(  # noqa: PLR0913
             variant_industry=clone_course_run.variant_industry,
         )
         course_run.save()
+
+        course_run.b2b_contracts.add(contract)
 
         required_modes = EnrollmentMode.objects.filter(
             mode_slug__in=[EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE]
