@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.164.1
+Version 1.164.1 (Released August 31, 2026)
 ---------------
 
 - add command to trasfer grades to another account (#3627)
