@@ -29,9 +29,11 @@ from courses.models import PaidCourseRun, PaidProgram, ProgramEnrollment
 from ecommerce.api import fulfill_completed_order
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_LINKED_PURCHASE,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_CUSTOMER_SUPPORT,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    REDEMPTION_TYPE_LINKED_PURCHASE,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_UNLIMITED,
     ZERO_PAYMENT_DATA,
@@ -1033,6 +1035,41 @@ def test_bulk_discount_create_rejects_a_percent_off_above_100(admin_drf_client):
             "count": 5,
             "amount": 101,
             "prefix": "Generated-Code-",
+        },
+    )
+
+    assert resp.status_code == 400
+    assert not Discount.objects.filter(
+        discount_code__startswith="Generated-Code-"
+    ).exists()
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        pytest.param(
+            {"discount_type": DISCOUNT_TYPE_LINKED_PURCHASE}, id="calculation"
+        ),
+        pytest.param(
+            {"redemption_type": REDEMPTION_TYPE_LINKED_PURCHASE}, id="redemption"
+        ),
+    ],
+)
+def test_bulk_discount_create_rejects_linked_purchase(admin_drf_client, override):
+    """
+    A linked-purchase discount also needs the matching redemption type and the
+    product links tying it to the qualifying purchase, so bulk generation has to
+    turn it away rather than raise its way to a 500.
+    """
+    resp = admin_drf_client.post(
+        reverse("v0:discounts_api-create_batch"),
+        {
+            "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+            "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
+            "count": 5,
+            "amount": 50,
+            "prefix": "Generated-Code-",
+            **override,
         },
     )
 

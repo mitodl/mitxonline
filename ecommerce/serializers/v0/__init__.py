@@ -28,6 +28,7 @@ from ecommerce.models import (
     RefundRequestStatus,
 )
 from ecommerce.serializers import (
+    BulkDiscountSerializer,  # noqa: F401  re-exported for ecommerce.views.v0
     LinkedPurchaseShapeMixin,
     basket_discounted_price,
     basket_discounts_are_visible,
