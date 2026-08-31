@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.163.5 (Released August 31, 2026)
+---------------
+
+- updating emails to use MIT Learn branding (#3892)
+- feat(certificates): gate certificate creation on CMS certificate page and disabled flag (#3888)
+- Punch up admin page for DiscountContractAttachmentRedemption records (#3889)
+- Honor the enrollment mode in the Open edX enrollment webhook (#3840)
+
 Version 1.163.4 (Released August 27, 2026)
 ---------------
 
