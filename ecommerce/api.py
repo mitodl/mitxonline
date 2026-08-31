@@ -307,7 +307,7 @@ def check_basket_discounts_for_validity(request):
     basket = establish_basket(request)
 
     for basket_discount in basket.discounts.all():
-        if not basket_discount.redeemed_discount.check_validity(
+        if not basket_discount.redeemed_discount.is_redeemable_by(
             basket.user
         ) or not check_discount_for_products(basket_discount.redeemed_discount, basket):
             return False
@@ -360,7 +360,7 @@ def apply_user_discounts(request):
         # check for product specificity in the discount
         if not check_discount_for_products(
             discount, basket
-        ) or not discount.check_validity(user):
+        ) or not discount.is_redeemable_by(user):
             return
 
         bd = BasketDiscount(
@@ -1188,7 +1188,7 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
     Keyword Args:
         allow_finaid (bool): Allow a financial assistance discount through.
     """
-    if discount.is_valid(basket, allow_finaid=allow_finaid):
+    if discount.is_valid_for_basket(basket, allow_finaid=allow_finaid):
         defaults = {
             "redeemed_discount": discount,
             "redemption_date": now_in_utc(),
@@ -1248,7 +1248,7 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
 
                 for item in basket.basket_items.all():
                     test_price = discount.discount_product(item.product, basket.user)
-                    if test_price and item.discounted_price >= test_price:
+                    if test_price is not None and item.discounted_price >= test_price:
                         found_better = True
                         break
 
