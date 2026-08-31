@@ -26,6 +26,7 @@ from ecommerce.models import (
     BasketItem,
     Order,
     Product,
+    validate_linked_purchase_shape,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from main.settings import TIME_ZONE
@@ -180,7 +181,35 @@ class ProductSerializer(BaseProductSerializer):
         model = models.Product
 
 
-class DiscountSerializer(serializers.ModelSerializer):
+class LinkedPurchaseShapeMixin:
+    """
+    Runs the linked-purchase shape rules over the merged field values, so a
+    PATCH that would make the stored row invalid is a 400 rather than an
+    unconverted ValidationError out of Model.save().
+
+    Mix into any serializer that writes a Discount.
+    """
+
+    def validate(self, attrs):
+        def _value(name, default=None):
+            if name in attrs:
+                return attrs[name]
+            return getattr(self.instance, name, default)
+
+        validate_linked_purchase_shape(
+            discount_type=_value("discount_type"),
+            redemption_type=_value("redemption_type"),
+            amount=_value("amount"),
+            automatic=_value("automatic", default=False),
+            discount=self.instance,
+        )
+
+        return super().validate(attrs)
+
+
+class DiscountSerializer(LinkedPurchaseShapeMixin, serializers.ModelSerializer):
+    """Serializes a discount."""
+
     class Meta:
         model = models.Discount
         fields = [

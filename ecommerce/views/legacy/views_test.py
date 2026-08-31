@@ -36,7 +36,9 @@ from ecommerce.factories import (
     BasketItemFactory,
     DiscountFactory,
     LineFactory,
+    LinkedPurchaseDiscountFactory,
     ProductFactory,
+    ProgramProductFactory,
     UnlimitedUseDiscountFactory,
 )
 from ecommerce.models import (
@@ -1295,6 +1297,58 @@ def test_discount_rest_api(admin_drf_client, user_drf_client):
 
     assert resp.status_code == 204
     assert Discount.objects.filter(pk=discount_payload["id"]).count() == 0
+
+
+def test_attaching_a_non_program_product_to_a_linked_purchase_discount_is_a_400(
+    admin_drf_client,
+):
+    """Linked-purchase discounts only ever link to program products."""
+    discount = LinkedPurchaseDiscountFactory.create()
+    product = ProductFactory.create()  # course-run product
+
+    resp = admin_drf_client.patch(
+        reverse("discounts_api-products-detail", args=[discount.id, product.id]),
+        {"product_id": product.id},
+    )
+
+    assert resp.status_code == 400
+    assert not DiscountProduct.objects.filter(
+        discount=discount, product=product
+    ).exists()
+
+
+def test_attaching_a_deactivated_product_still_links_it(admin_drf_client):
+    """
+    Product.delete() is a soft delete that only clears is_active, and staff
+    still administer discounts on deactivated products.
+    """
+    discount = DiscountFactory.create()
+    product = ProductFactory.create()
+    product.delete()
+
+    resp = admin_drf_client.patch(
+        reverse("discounts_api-products-detail", args=[discount.id, product.id]),
+        {"product_id": product.id},
+    )
+
+    assert resp.status_code == 201
+    assert DiscountProduct.objects.filter(discount=discount, product=product).exists()
+
+
+def test_attaching_a_program_product_to_a_linked_purchase_discount_succeeds(
+    admin_drf_client,
+):
+    """The guard leaves the intended attach path working."""
+    discount = LinkedPurchaseDiscountFactory.create()
+    product = ProgramProductFactory.create()
+
+    resp = admin_drf_client.patch(
+        reverse("discounts_api-products-detail", args=[discount.id, product.id]),
+        {"product_id": product.id},
+    )
+
+    assert resp.status_code == 201
+    assert DiscountProduct.objects.filter(discount=discount, product=product).exists()
 
 
 @pytest.mark.parametrize(

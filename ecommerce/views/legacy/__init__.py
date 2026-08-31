@@ -9,6 +9,7 @@ import django_filters
 from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Count, Q
 from django.http import Http404, HttpResponse, HttpResponseRedirect
@@ -25,7 +26,11 @@ from rest_framework import mixins, serializers, status
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.decorators import action
 from rest_framework.exceptions import ParseError
-from rest_framework.generics import ListCreateAPIView, RetrieveAPIView
+from rest_framework.generics import (
+    ListCreateAPIView,
+    RetrieveAPIView,
+    get_object_or_404,
+)
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -41,7 +46,9 @@ from b2b.api import is_product_courserun, is_product_program
 from courses.models import Course, CourseRun, Program, ProgramRun
 from courses.utils import is_uai_course_run, is_uai_program
 from ecommerce import api
-from ecommerce.constants import PAYMENT_TYPE_FINANCIAL_ASSISTANCE
+from ecommerce.constants import (
+    PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+)
 from ecommerce.discounts import DiscountType
 from ecommerce.models import (
     Basket,
@@ -441,9 +448,18 @@ class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
     def partial_update(self, request, **kwargs):
         discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
 
-        (_, created) = DiscountProduct.objects.get_or_create(
-            discount=discount, product_id=request.data["product_id"]
-        )
+        # all_objects, not objects: a deactivated product is soft-deleted, and
+        # staff still administer discounts on it.
+        product = get_object_or_404(Product.all_objects, pk=request.data["product_id"])
+
+        try:
+            (_, created) = DiscountProduct.objects.get_or_create(
+                discount=discount, product=product
+            )
+        except DjangoValidationError as exc:
+            return Response(
+                {"error": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         return Response(
             DiscountProductSerializer(

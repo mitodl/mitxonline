@@ -8,6 +8,7 @@ import django_filters
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Count, Q
 from django.http import Http404
@@ -26,7 +27,7 @@ from rest_framework import status
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import ParseError
-from rest_framework.generics import CreateAPIView, RetrieveAPIView
+from rest_framework.generics import CreateAPIView, RetrieveAPIView, get_object_or_404
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
@@ -750,9 +751,18 @@ class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
 
         discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
 
-        (_, created) = DiscountProduct.objects.get_or_create(
-            discount=discount, product_id=request.data["product_id"]
-        )
+        # all_objects, not objects: a deactivated product is soft-deleted, and
+        # staff still administer discounts on it.
+        product = get_object_or_404(Product.all_objects, pk=request.data["product_id"])
+
+        try:
+            (_, created) = DiscountProduct.objects.get_or_create(
+                discount=discount, product=product
+            )
+        except DjangoValidationError as exc:
+            return Response(
+                {"error": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         return Response(
             DiscountProductSerializer(

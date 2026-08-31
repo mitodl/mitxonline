@@ -55,6 +55,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_LINKED_PURCHASE,
     PAYMENT_TYPE_SALES,
+    REDEMPTION_TYPE_LINKED_PURCHASE,
     STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
     STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED,
     STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
@@ -81,6 +82,7 @@ from ecommerce.exceptions import (
 from ecommerce.factories import (
     DiscountRedemptionFactory,
     LineFactory,
+    LinkedPurchaseDiscountFactory,
     OneTimeDiscountFactory,
     OneTimePerUserDiscountFactory,
     OrderFactory,
@@ -1842,13 +1844,44 @@ def test_retrieve_pending_cs_orders(mocker, test_type):
         assert len(cancelled.keys()) == (0 if test_type == "completed" else 1)
 
 
-def test_generate_discount_code_rejects_linked_purchase():
-    """linked-purchase discounts are automatic offers, not generated codes."""
+def test_auto_apply_skips_linked_purchase_discounts(user):
+    """
+    A linked-purchase discount is automatic by shape, and a discount with no
+    product links applies to every product, so an unlinked one would attach to
+    every basket in the system.
+    """
+    basket, _ = Basket.objects.get_or_create(user=user)
+    BasketItem.objects.create(
+        basket=basket, product=ProductFactory.create(), quantity=1
+    )
+    LinkedPurchaseDiscountFactory.create()
+
+    assert get_auto_apply_discounts_for_basket(basket.id).count() == 0
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        pytest.param(
+            {"discount_type": DISCOUNT_TYPE_LINKED_PURCHASE}, id="calculation"
+        ),
+        pytest.param(
+            {"redemption_type": REDEMPTION_TYPE_LINKED_PURCHASE}, id="redemption"
+        ),
+    ],
+)
+def test_generate_discount_code_rejects_linked_purchase(override):
+    """
+    linked-purchase discounts are automatic offers, not generated codes — the
+    redemption rules are as incompatible with bulk generation as the
+    calculation is. The guard fires before any other argument is read.
+    """
+    kwargs = {
+        "discount_type": DISCOUNT_TYPE_FIXED_PRICE,
+        "payment_type": PAYMENT_TYPE_SALES,
+        "amount": 10,
+        **override,
+    }
+
     with pytest.raises(Exception, match="cannot be bulk-generated"):
-        generate_discount_code(
-            discount_type=DISCOUNT_TYPE_LINKED_PURCHASE,
-            payment_type=PAYMENT_TYPE_SALES,
-            amount=0,
-            count=1,
-            codes=["linked-code"],
-        )
+        generate_discount_code(**kwargs)

@@ -31,10 +31,12 @@ from ecommerce.factories import (
     DiscountFactory,
     DiscountRedemptionFactory,
     LineFactory,
+    LinkedPurchaseDiscountFactory,
     OneTimeDiscountFactory,
     OneTimePerUserDiscountFactory,
     OrderFactory,
     ProductFactory,
+    ProgramProductFactory,
     SetLimitDiscountFactory,
     UnlimitedUseDiscountFactory,
 )
@@ -1465,3 +1467,68 @@ def test_db_constraint_allows_linked_redemption_with_standard_type():
     )
 
     assert Discount.objects.filter(discount_code="reverse-pairing").exists()
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        pytest.param(
+            {"redemption_type": REDEMPTION_TYPE_UNLIMITED}, id="wrong-redemption-type"
+        ),
+        pytest.param({"amount": 10}, id="nonzero-amount"),
+        pytest.param({"automatic": False}, id="not-automatic"),
+    ],
+)
+def test_linked_purchase_discount_shape_is_enforced_on_save(override):
+    """Saving a malformed linked-purchase discount raises instead of hitting the DB constraint."""
+    with pytest.raises(ValidationError):
+        LinkedPurchaseDiscountFactory.create(**override)
+
+
+def test_linked_purchase_discount_only_links_program_products():
+    """
+    Enforced on the link row rather than only on Discount.save(), so every write
+    path is covered — Django admin's DiscountProduct form included.
+    """
+    discount = LinkedPurchaseDiscountFactory.create()
+
+    with pytest.raises(ValidationError):
+        DiscountProduct.objects.create(
+            discount=discount, product=ProductFactory.create()
+        )
+
+
+def test_linked_purchase_discount_links_a_program_product():
+    """The intended attach path stays open."""
+    discount = LinkedPurchaseDiscountFactory.create()
+
+    DiscountProduct.objects.create(
+        discount=discount, product=ProgramProductFactory.create()
+    )
+
+    discount.save()
+
+
+def test_converting_a_discount_with_a_courserun_product_is_rejected():
+    """
+    An existing discount cannot become linked-purchase while a course-run
+    product is still attached.
+    """
+    discount = DiscountFactory.create(automatic=False)
+    DiscountProduct.objects.create(discount=discount, product=ProductFactory.create())
+
+    discount.discount_type = DISCOUNT_TYPE_LINKED_PURCHASE
+    discount.redemption_type = REDEMPTION_TYPE_LINKED_PURCHASE
+    discount.amount = 0
+    discount.automatic = True
+
+    with pytest.raises(ValidationError):
+        discount.save()
+
+
+def test_linked_purchase_discount_tolerates_a_product_less_link_row():
+    """DiscountProduct.product is nullable, and a null row is not a non-program product."""
+    discount = LinkedPurchaseDiscountFactory.create()
+    DiscountProduct.objects.create(discount=discount, product=None)
+
+    discount.save()

@@ -263,6 +263,62 @@ class BasketItem(TimestampedModel):
         return self.product.price * self.quantity
 
 
+LINKED_PURCHASE_PROGRAM_PRODUCTS_ONLY_ERROR = (
+    "Linked-purchase discounts can only be linked to program products."
+)
+
+
+def validate_linked_purchase_shape(
+    *, discount_type, redemption_type, amount, automatic, discount=None
+):
+    """
+    Enforce the linked-purchase shape on values that may not be stored yet.
+
+    Raises django.core.exceptions.ValidationError. DRF's Serializer.run_validation
+    turns that into a 400 when it comes from validate(), so serializers call this
+    rather than restating the rules; the same error raised later, from save(), is
+    not converted and 500s instead.
+
+    Pass discount to also check the product links already stored against it —
+    the clause a PATCH that converts an existing discount has to satisfy.
+    """
+    if discount_type == DISCOUNT_TYPE_LINKED_PURCHASE:
+        if redemption_type != REDEMPTION_TYPE_LINKED_PURCHASE:
+            raise ValidationError(
+                "A linked-purchase discount requires the linked-purchase redemption type."  # noqa: EM101
+            )
+        if amount != 0:
+            raise ValidationError(
+                "A linked-purchase discount's amount is resolved per learner; store 0."  # noqa: EM101
+            )
+
+    if redemption_type == REDEMPTION_TYPE_LINKED_PURCHASE:
+        if not automatic:
+            raise ValidationError(
+                "Linked-purchase discounts must be automatic."  # noqa: EM101
+            )
+        # One query rather than a fetch of every link row; the per-row form of
+        # the same rule is validate_linked_purchase_product.
+        if (
+            discount is not None
+            and discount.pk
+            and discount.products.filter(product__isnull=False)
+            .exclude(product__content_type__model="program")
+            .exists()
+        ):
+            raise ValidationError(LINKED_PURCHASE_PROGRAM_PRODUCTS_ONLY_ERROR)
+
+
+def validate_linked_purchase_product(*, redemption_type, product):
+    """Enforce the program-products clause for a single product link."""
+    if (
+        redemption_type == REDEMPTION_TYPE_LINKED_PURCHASE
+        and product is not None
+        and product.content_type.model != "program"
+    ):
+        raise ValidationError(LINKED_PURCHASE_PROGRAM_PRODUCTS_ONLY_ERROR)
+
+
 class Discount(TimestampedModel):
     """Discount model"""
 
@@ -304,6 +360,9 @@ class Discount(TimestampedModel):
     )
 
     class Meta:
+        # A storage-layer backstop for the clause validate_linked_purchase_shape
+        # also enforces, because bulk_create skips save().
+        #
         # One-way on purpose: a linked-purchase redemption may pair with a
         # standard calculation (e.g. a fractional-purchase offer), but the
         # linked-purchase calculation needs the redemption rules that go with it.
@@ -337,12 +396,25 @@ class Discount(TimestampedModel):
 
         return True
 
+    def check_linked_purchase_validity(self):
+        validate_linked_purchase_shape(
+            discount_type=self.discount_type,
+            redemption_type=self.redemption_type,
+            amount=self.amount,
+            automatic=self.automatic,
+            discount=self,
+        )
+
+        return True
+
     def save(self, *args, **kwargs):
-        if self.check_date_validity():
-            super().save(*args, **kwargs)
+        self.check_date_validity()
+        self.check_linked_purchase_validity()
+        super().save(*args, **kwargs)
 
     def clean(self, *args, **kwargs):
         self.check_date_validity()
+        self.check_linked_purchase_validity()
         super().clean(*args, **kwargs)
 
     @cached_property
@@ -493,12 +565,6 @@ class Discount(TimestampedModel):
 
         return None
 
-    @property
-    def is_full_discount(self):
-        return (
-            self.discount_type == DISCOUNT_TYPE_PERCENT_OFF and self.amount == 100  # noqa: PLR2004
-        ) or (self.discount_type == DISCOUNT_TYPE_FIXED_PRICE and self.amount == 0)
-
     def b2b_contracts(self):
         """Return the applicable B2B contract(s), if any."""
         from b2b.models import ContractPage  # noqa: PLC0415
@@ -532,6 +598,21 @@ class DiscountProduct(TimestampedModel):
         blank=True,
         null=True,
     )
+
+    def _check_linked_purchase_validity(self):
+        # A blank discount is the FK field's own validation error to report.
+        if self.discount_id:
+            validate_linked_purchase_product(
+                redemption_type=self.discount.redemption_type, product=self.product
+            )
+
+    def clean(self, *args, **kwargs):
+        self._check_linked_purchase_validity()
+        super().clean(*args, **kwargs)
+
+    def save(self, *args, **kwargs):
+        self._check_linked_purchase_validity()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         purchaseable_object = (

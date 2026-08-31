@@ -42,6 +42,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     PAYMENT_TYPE_SALES,
+    REDEMPTION_TYPE_LINKED_PURCHASE,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
@@ -1064,7 +1065,10 @@ def generate_discount_code(**kwargs):  # noqa: C901
     if kwargs["discount_type"] not in ALL_DISCOUNT_TYPES:
         raise Exception(f"Discount type {kwargs['discount_type']} is not valid.")  # noqa: EM102, TRY002
 
-    if kwargs["discount_type"] == DISCOUNT_TYPE_LINKED_PURCHASE:
+    if (
+        kwargs["discount_type"] == DISCOUNT_TYPE_LINKED_PURCHASE
+        or kwargs.get("redemption_type") == REDEMPTION_TYPE_LINKED_PURCHASE
+    ):
         msg = "linked-purchase discounts cannot be bulk-generated."
         raise Exception(msg)  # noqa: TRY002
 
@@ -1159,13 +1163,21 @@ def get_auto_apply_discounts_for_basket(basket_id: int) -> QuerySet[Discount]:
         if finaid_discount:
             finaid_discounts.append(finaid_discount.id)
 
-    return Discount.objects.filter(
-        Q(activation_date__lte=now_in_utc()) | Q(activation_date=None),
-        Q(expiration_date__gt=now_in_utc()) | Q(expiration_date=None),
-    ).filter(
-        Q(user_discount_discount__user=basket.user)
-        | Q(pk__in=finaid_discounts)
-        | Q(automatic=True)
+    return (
+        Discount.objects.filter(
+            Q(activation_date__lte=now_in_utc()) | Q(activation_date=None),
+            Q(expiration_date__gt=now_in_utc()) | Q(expiration_date=None),
+        )
+        # A linked-purchase discount is automatic by shape, and a discount with
+        # no product links applies to every product, so without the per-learner
+        # resolver these attach to every basket and change no price. Drop the
+        # exclusion when the resolver lands (mitodl/hq#11846).
+        .exclude(redemption_type=REDEMPTION_TYPE_LINKED_PURCHASE)
+        .filter(
+            Q(user_discount_discount__user=basket.user)
+            | Q(pk__in=finaid_discounts)
+            | Q(automatic=True)
+        )
     )
 
 
