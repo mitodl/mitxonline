@@ -965,6 +965,28 @@ def test_bulk_discount_create(admin_drf_client, use_redemption_type_flags):
     assert discounts[0].is_bulk
 
 
+def test_bulk_discount_create_rejects_a_percent_off_above_100(admin_drf_client):
+    """
+    generate_discount_code enforces this ceiling with a bare Exception, so the
+    serializer has to answer 400 before the view reaches it.
+    """
+    resp = admin_drf_client.post(
+        reverse("v0:discounts_api-create_batch"),
+        {
+            "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+            "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
+            "count": 5,
+            "amount": 101,
+            "prefix": "Generated-Code-",
+        },
+    )
+
+    assert resp.status_code == 400
+    assert not Discount.objects.filter(
+        discount_code__startswith="Generated-Code-"
+    ).exists()
+
+
 # Checkout tests
 
 

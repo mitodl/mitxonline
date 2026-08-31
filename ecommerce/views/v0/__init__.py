@@ -64,10 +64,10 @@ from ecommerce.models import (
     Product,
     UserDiscount,
 )
+from ecommerce.serializers import BulkDiscountSerializer
 from ecommerce.serializers.v0 import (
     BasketItemSerializer,
     BasketWithProductSerializer,
-    BulkDiscountSerializer,
     CheckoutPayloadSerializer,
     DiscountProductSerializer,
     DiscountRedemptionSerializer,
@@ -709,7 +709,7 @@ class DiscountViewSet(ModelViewSet):
         otherSerializer = BulkDiscountSerializer(data=request.data)
 
         if otherSerializer.is_valid():
-            generated_codes = generate_discount_code(**request.data)
+            generated_codes = generate_discount_code(**otherSerializer.validated_data)
 
             discounts = V0DiscountSerializer(generated_codes, many=True)
 
