@@ -234,3 +234,30 @@ def test_listing_response_includes_live_in_meta(user_drf_client):
     assert len(items) > 0
     assert "live" in items[0]["meta"]
     assert "last_published_at" in items[0]["meta"]
+
+
+# --- hubspot_form_id field tests ---
+
+
+def test_course_page_detail_exposes_hubspot_form_id(user_drf_client):
+    """CoursePage detail returns hubspot_form_id and no longer returns show_stay_updated."""
+    page = CoursePageFactory.create(hubspot_form_id="course-form-123")
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["hubspot_form_id"] == "course-form-123"
+    assert "show_stay_updated" not in body
+
+
+def test_program_page_detail_exposes_hubspot_form_id(user_drf_client):
+    """ProgramPage detail returns hubspot_form_id and no longer returns show_stay_updated."""
+    page = ProgramPageFactory.create(hubspot_form_id="program-form-456")
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["hubspot_form_id"] == "program-form-456"
+    assert "show_stay_updated" not in body
