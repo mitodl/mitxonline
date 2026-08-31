@@ -211,8 +211,8 @@ class DiscountRedemptionAdmin(admin.ModelAdmin):
         "redeemed_discount",
         "redeemed_by",
         "redeemed_order",
+        "source_line",
     )
-    raw_id_fields = ("source_line",)
 
 
 @admin.register(BasketDiscount)
@@ -240,8 +240,12 @@ class OrderDiscountInline(admin.TabularInline):
     """Inline editor for DiscountRedemptions in an Order"""
 
     model = DiscountRedemption
-    readonly_fields = ["redemption_date", "redeemed_by", "redeemed_discount"]
-    raw_id_fields = ("source_line",)
+    readonly_fields = [
+        "redemption_date",
+        "redeemed_by",
+        "redeemed_discount",
+        "source_line",
+    ]
     min_num = 0
     extra = 0
 

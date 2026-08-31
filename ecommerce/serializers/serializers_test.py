@@ -298,7 +298,10 @@ def test_basket_product_serializer_with_zero_value_discount(
     """
     Tests serialization of a basket with the attached products and different discount values and types.
     """
-    basket_item = BasketItemFactory.create()
+    # The price has to stay above every discount amount under test: the cart
+    # hides discounts that leave the basket total unchanged, so a fixed-price
+    # discount at or above the product price would empty "discounts".
+    basket_item = BasketItemFactory.create(product__price=Decimal("100.00"))
     discount = UnlimitedUseDiscountFactory.create(
         amount=discount_amount, discount_type=discount_type
     )

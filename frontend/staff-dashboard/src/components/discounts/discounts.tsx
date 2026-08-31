@@ -46,7 +46,6 @@ export const DiscountForm = (props: IDiscountFormProps) => {
                 { label: 'Percent Off', value: 'percent-off' },
                 { label: 'Dollars Off', value: 'dollars-off' },
                 { label: 'Fixed Price', value: 'fixed-price' },
-                { label: 'Paid Amount Off', value: 'paid-amount-off' },
             ]}></Select>
         </Form.Item>
         <Form.Item label="Amount" name="amount">
