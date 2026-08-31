@@ -26,7 +26,6 @@ from courses.serializers.v1.base import (
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import (
     get_approved_flexible_price_exists,
-    get_dated_courseruns,
 )
 from ecommerce.serializers.v0 import BaseProductSerializer
 from main import features
@@ -70,6 +69,10 @@ class CourseSerializer(BaseCourseSerializer):
     required_prefetches: list[str] = [
         *BaseCourseSerializer.required_prefetches,
         "programs",
+        # Resolved by CourseFinancialAssistanceFormUrlPrefetcher in the view's
+        # queryset; without it CoursePageSerializer would fall back to the lazy
+        # per-page cascade.
+        "financial_assistance_form_url",
     ]
 
     departments = DepartmentSerializer(many=True, read_only=True)
@@ -165,10 +168,14 @@ class CourseSerializer(BaseCourseSerializer):
     def get_certificate_available(self, instance) -> bool:
         """Return if there is a certificate available for the course."""
 
+        # has_verified_courserun is annotated by CourseViewSet, but this
+        # serializer is also nested in CourseRunWithCourseSerializer (v2
+        # enrollments, certificates) and instantiated bare in cms.models, where
+        # no annotation is present. Defaulting to False keeps those callers
+        # returning what they returned when this read an absent attribute.
         return (
             instance.first_unexpired_run is not None
-            and hasattr(instance, "verified_courserun_count")
-            and instance.verified_courserun_count > 0
+            and bool(getattr(instance, "has_verified_courserun", False))
             and not instance.certificates_disabled
             and has_live_certificate_page(instance)
         )
@@ -176,10 +183,7 @@ class CourseSerializer(BaseCourseSerializer):
     @extend_schema_field(str)
     def get_availability(self, instance):
         """Get course availability"""
-        dated_courseruns = get_dated_courseruns(instance.courseruns)
-        if dated_courseruns.count() == 0:
-            return "anytime"
-        return "dated"
+        return "dated" if instance.has_dated_courseruns else "anytime"
 
     def get_min_weeks(self, instance) -> int | None:
         """
@@ -282,6 +286,18 @@ class CourseRunSerializer(BaseCourseRunSerializer):
 @extend_schema_serializer(component_name="CourseWithCourseRunsSerializerV2")
 class CourseWithCourseRunsSerializer(CourseSerializer):
     """Course model serializer - also serializes child course runs"""
+
+    # Declared here rather than on CourseSerializer: that class is also nested
+    # in CourseRunWithCourseSerializer (v2 enrollments, certificates) and
+    # instantiated bare in cms.models, none of which prefetch these. This
+    # subclass has exactly one caller, CourseViewSet.
+    required_prefetches: list[str] = [
+        *CourseSerializer.required_prefetches,
+        "page",
+        "departments",
+        "courseruns",
+        "possible_variant_sets",
+    ]
 
     courseruns = serializers.SerializerMethodField()
 

@@ -1486,6 +1486,26 @@ class CoursePage(ProductPage):
         """Gets the product associated with this page"""
         return self.course
 
+    @cached_property
+    def financial_assistance_form_url(self) -> str:
+        """
+        URL of the financial assistance form for this course.
+
+        This is the lazy path, for callers that reach a CoursePage without going
+        through a Course queryset (ecommerce, v1 programs). API paths should
+        instead let the view's queryset resolve it -
+        ``Course.objects.prefetch("financial_assistance_form_url")`` writes this
+        name into the instance ``__dict__``, which shadows this property so
+        nothing queries during serialization.
+        """
+        from cms.api import resolve_financial_assistance_form_urls  # noqa: PLC0415
+
+        if self.course_id is None:
+            return ""
+        return resolve_financial_assistance_form_urls([self.course_id]).get(
+            self.course_id, ""
+        )
+
     def _get_current_finaid(self, request):
         """
         Returns information about financial aid for the current learner.
@@ -1571,7 +1591,9 @@ class CoursePage(ProductPage):
         if self.course_id is None:
             return None
 
-        course = Course.objects.prefetch("programs").get(id=self.course_id)
+        course = Course.objects.prefetch(
+            "programs", "financial_assistance_form_url"
+        ).get(id=self.course_id)
 
         return CourseSerializer(course).data
 

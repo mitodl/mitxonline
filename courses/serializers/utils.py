@@ -1,6 +1,15 @@
 """Utility functions for serializers"""
 
-from courses.models import CoursesTopic
+
+def _parent_topic_sort_key(topic):
+    """
+    Sort key reproducing ``CoursesTopic.Meta.ordering == ["parent__name", "name"]``.
+
+    Postgres sorts NULLs last for ASC, and ``False < True``, so the leading
+    ``topic.parent is None`` term puts parentless topics at the end just as the
+    database does.
+    """
+    return (topic.parent is None, topic.parent.name if topic.parent else "", topic.name)
 
 
 def has_live_certificate_page(instance) -> bool:
@@ -23,6 +32,13 @@ def get_topics_from_page(page_instance) -> list[dict]:
     This function handles the common logic for extracting topics from course/program pages,
     including fetching parent topics to avoid duplication across serializers.
 
+    The parent topics are derived in Python from the direct topics' ``parent``
+    relation rather than queried, so a caller that prefetches the topics (see
+    ``CourseViewSet.get_queryset``, which selects ``parent`` and
+    ``parent__parent``) pays no query per page. The output is unchanged: direct
+    topics sorted by name, then the distinct parents in the model's own
+    ordering, and parents are *not* deduplicated against the direct topics.
+
     Args:
         page_instance: The page instance that has a topics relationship
 
@@ -35,10 +51,11 @@ def get_topics_from_page(page_instance) -> list[dict]:
     # Get direct topics from the page
     direct_topics = page_instance.topics.all()
 
-    # Get parent topics for the direct topics
-    parent_topics = CoursesTopic.objects.filter(
-        child_topics__in=direct_topics
-    ).distinct()
+    # Get parent topics for the direct topics, deduplicated by pk the way the
+    # equivalent .distinct() query was.
+    parents_by_pk = {
+        topic.parent.pk: topic.parent for topic in direct_topics if topic.parent
+    }
 
     # Create list of topic names, starting with direct topics
     all_topics = sorted(
@@ -47,7 +64,7 @@ def get_topics_from_page(page_instance) -> list[dict]:
     )
 
     # Add parent topics
-    for parent_topic in parent_topics:
+    for parent_topic in sorted(parents_by_pk.values(), key=_parent_topic_sort_key):
         all_topics.append({"name": parent_topic.name})
 
     return all_topics

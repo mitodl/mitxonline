@@ -5,6 +5,7 @@ Course models
 
 import logging
 import uuid
+from collections import namedtuple
 from decimal import ROUND_HALF_EVEN, Decimal
 
 from django.contrib import admin
@@ -936,6 +937,75 @@ class CourseProgramPrefetcher(Prefetcher):
         course.programs = programs or []
 
 
+FinancialAssistanceFormUrl = namedtuple(  # noqa: PYI024
+    "FinancialAssistanceFormUrl", ["course_id", "url"]
+)
+
+
+class _PrefetchRows(list):
+    """
+    Rows returned from a ``Prefetcher.filter()``.
+
+    django-prefetch calls ``.using()`` on the return value when the queryset was
+    bound to a database (prefetch.py:262). These rows are computed rather than
+    fetched, so there is nothing to rebind.
+    """
+
+    def using(self, _db):
+        """Nothing to rebind; these rows were computed, not fetched."""
+        return self
+
+
+class CourseFinancialAssistanceFormUrlPrefetcher(Prefetcher):
+    """
+    Resolve each course's financial assistance form URL in the view's queryset.
+
+    The URL is chosen by a priority cascade over Wagtail child pages, program
+    pages and related programs, which costs 4-8 queries per course if done
+    during serialization. Resolving it here means the serializer only ever reads
+    an attribute.
+
+    Deliberately holds no state on ``self``: ``PrefetchQuerySet._clone()`` shares
+    the ``_prefetch`` dict by reference, so a class-level ``queryset =
+    ...prefetch(...)`` reuses one Prefetcher instance across every request in the
+    process. Results are carried in ``filter()``'s return value instead.
+    """
+
+    @staticmethod
+    def mapper(course):
+        """Map each course to Course.id"""
+        return course.id
+
+    @staticmethod
+    def filter(course_ids):
+        """Resolve every id at once, one row per id."""
+        # Local import: cms.api imports courses.models at module scope.
+        from cms.api import resolve_financial_assistance_form_urls  # noqa: PLC0415
+
+        course_ids = list(course_ids)
+        urls = resolve_financial_assistance_form_urls(course_ids)
+        # A row for every id, including courses with no form, so each one
+        # reaches the two-arg decorator() call - the one-arg pass runs before
+        # filter() and so cannot see these results.
+        return _PrefetchRows(
+            FinancialAssistanceFormUrl(course_id, urls.get(course_id, ""))
+            for course_id in course_ids
+        )
+
+    @staticmethod
+    def reverse_mapper(row):
+        return [row.course_id]
+
+    @staticmethod
+    def decorator(course, rows=None):
+        url = rows[0].url if rows else ""
+        # On the course so required_prefetches can see it, and on the page
+        # because that is the instance CoursePageSerializer receives.
+        course.financial_assistance_form_url = url
+        if course.course_page is not None:
+            course.course_page.financial_assistance_form_url = url
+
+
 class CourseManager(models.Manager.from_queryset(CourseQuerySet), PrefetchManagerMixin):
     """Manager for Course"""
 
@@ -943,7 +1013,10 @@ class CourseManager(models.Manager.from_queryset(CourseQuerySet), PrefetchManage
     def get_queryset_class(cls):
         return CourseQuerySet
 
-    prefetch_definitions = {"programs": CourseProgramPrefetcher}
+    prefetch_definitions = {
+        "programs": CourseProgramPrefetcher,
+        "financial_assistance_form_url": CourseFinancialAssistanceFormUrlPrefetcher,
+    }
 
 
 class Course(TimestampedModel, ValidateOnSaveMixin):
@@ -1020,6 +1093,51 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             return [p for p in relevant_run.prefetched_products if p.is_active]
         return list(relevant_run.products.filter(is_active=True).all())
 
+    @staticmethod
+    def _select_first_unexpired_run(runs):
+        """
+        Pick the first unexpired/enrollable run from an in-memory iterable.
+
+        This works over already-loaded runs so it can use the ``courseruns``
+        prefetch cache instead of issuing a query per course. It mirrors the SQL
+        it replaces: enrollable runs in a usable language, preferring runs that
+        have not ended, ordered by start date with primary-language runs winning
+        ties.
+
+        ``CourseRun.is_enrollable`` is exactly equivalent to
+        ``CourseRunQuerySet.get_enrollable_filter()`` - same four conditions
+        against the same ``now_in_utc()`` - which is what makes this a faithful
+        translation rather than an approximation.
+
+        Args:
+            runs: iterable of CourseRun objects to choose from
+
+        Returns:
+            CourseRun or None: An unexpired/enrollable course run
+        """
+        candidates = [
+            run
+            for run in runs
+            if run.is_enrollable
+            and (run.is_primary_language or run.language in ["", "en"])
+        ]
+        if not candidates:
+            return None
+
+        # is_enrollable guarantees start_date is not None, so this never
+        # compares None. The trailing id makes ties deterministic, where the
+        # SQL .first() left them up to the database.
+        def sort_key(run):
+            return (run.start_date, not run.is_primary_language, run.id)
+
+        now = now_in_utc()
+        unended = [
+            run for run in candidates if run.end_date is None or run.end_date > now
+        ]
+
+        # Prefer runs that have not ended; fall back to any enrollable run.
+        return min(unended or candidates, key=sort_key)
+
     @cached_property
     def first_unexpired_run(self):
         """
@@ -1029,28 +1147,22 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         Returns:
             CourseRun or None: An unexpired/enrollable course run
         """
-        # Use the CourseRunQuerySet.enrollable() method to eliminate code duplication
-        # First try to find non-past enrollable runs (end_date is None or in the future)
-        best_run = (
-            self.courseruns.filter(b2b_contract__isnull=True)
-            .enrollable()
-            .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
-            .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
-            .order_by("start_date", "-is_primary_language")
-            .first()
+        return self._select_first_unexpired_run(
+            run for run in self.courseruns.all() if run.b2b_contract_id is None
         )
 
-        # If no non-past runs found, look for any enrollable runs (including archived)
-        if best_run is None:
-            best_run = (
-                self.courseruns.filter(b2b_contract__isnull=True)
-                .enrollable()
-                .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
-                .order_by("start_date", "-is_primary_language")
-                .first()
-            )
+    @cached_property
+    def has_dated_courseruns(self) -> bool:
+        """
+        Whether this course has at least one enrollable, non-self-paced run.
 
-        return best_run
+        Mirrors ``courses.utils.get_dated_courseruns``, which filters on
+        ``get_enrollable_filter() & Q(is_self_paced=False)``. Reads the
+        ``courseruns`` prefetch cache rather than issuing a COUNT per course.
+        """
+        return any(
+            run.is_enrollable and not run.is_self_paced for run in self.courseruns.all()
+        )
 
     @cached_property
     def include_in_learn_catalog(self) -> bool:
@@ -1101,28 +1213,12 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         Returns:
             CourseRun or None: An unexpired/enrollable course run
         """
-        # Use the CourseRunQuerySet.enrollable() method to eliminate code duplication
-        # First try to find non-past enrollable runs (end_date is None or in the future)
-        best_run = (
-            self.courseruns.filter(b2b_contract__in=user_contracts)
-            .enrollable()
-            .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
-            .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
-            .order_by("start_date", "-is_primary_language")
-            .first()
+        contract_ids = {
+            getattr(contract, "id", contract) for contract in (user_contracts or [])
+        }
+        return self._select_first_unexpired_run(
+            run for run in self.courseruns.all() if run.b2b_contract_id in contract_ids
         )
-
-        # If no non-past runs found, look for any enrollable runs (including archived)
-        if best_run is None:
-            best_run = (
-                self.courseruns.filter(b2b_contract__in=user_contracts)
-                .enrollable()
-                .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
-                .order_by("start_date", "-is_primary_language")
-                .first()
-            )
-
-        return best_run
 
     @cached_property
     def programs(self) -> list[Program]:

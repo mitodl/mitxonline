@@ -45,6 +45,7 @@ from courses.models import (
     ProgramRequirementNodeType,
     limit_to_certificate_pages,
 )
+from courses.utils import get_dated_courseruns
 from ecommerce.factories import OrderFactory, ProductFactory
 from ecommerce.models import OrderStatus
 from main.test_utils import format_as_iso8601
@@ -1815,3 +1816,99 @@ def test_partner_school_default_ordering_is_alphabetical():
     names = list(PartnerSchool.objects.values_list("name", flat=True))
 
     assert names == sorted(names)
+
+
+@pytest.mark.parametrize(
+    "run_kwargs",
+    [
+        pytest.param({"past_start": True}, id="past_start"),
+        pytest.param({"in_progress": True}, id="in_progress"),
+        pytest.param({"in_future": True}, id="in_future"),
+        pytest.param({"completed": True}, id="ended"),
+        pytest.param({"in_progress": True, "is_self_paced": True}, id="self_paced"),
+        pytest.param(
+            {"in_progress": True, "is_primary_language": False, "language": "fr"},
+            id="non_primary_other_language",
+        ),
+        pytest.param(
+            {"in_progress": True, "is_primary_language": False, "language": "en"},
+            id="non_primary_english",
+        ),
+    ],
+)
+def test_first_unexpired_run_matches_prefetched_and_unprefetched(run_kwargs):
+    """
+    ``first_unexpired_run`` must agree whether or not ``courseruns`` is prefetched.
+
+    It now selects the run in Python off the prefetch cache instead of running
+    two queries, which is only safe because ``CourseRun.is_enrollable`` is
+    exactly equivalent to ``CourseRunQuerySet.get_enrollable_filter()``. This
+    asserts that equivalence through the public property rather than trusting
+    it, so the two can't drift apart.
+    """
+    course = CourseFactory.create()
+    CourseRunFactory.create(course=course, **run_kwargs)
+
+    unprefetched = Course.objects.get(pk=course.pk).first_unexpired_run
+
+    prefetched = (
+        Course.objects.filter(pk=course.pk)
+        .prefetch_related(
+            Prefetch("courseruns", queryset=CourseRun.objects.order_by("id"))
+        )
+        .get()
+    )
+    with CaptureQueriesContext(connection) as ctx:
+        from_cache = prefetched.first_unexpired_run
+
+    assert from_cache == unprefetched
+    # The point of the rewrite: reading it off the prefetch costs nothing.
+    assert len(ctx.captured_queries) == 0, ctx.captured_queries
+
+
+def test_first_unexpired_run_prefers_unended_then_earliest_start():
+    """
+    Ordering must match ``order_by("start_date", "-is_primary_language")``.
+
+    Runs that have not ended win over ended ones; among those, the earliest
+    start wins, and a primary-language run beats a non-primary one on a tie.
+    """
+    course = CourseFactory.create()
+    # An ended run and a later-starting one, so the in-progress run is the only
+    # correct answer under "prefer unended, then earliest start".
+    CourseRunFactory.create(course=course, completed=True)
+    CourseRunFactory.create(course=course, in_future=True)
+    earlier = CourseRunFactory.create(course=course, in_progress=True)
+
+    selected = Course.objects.get(pk=course.pk).first_unexpired_run
+    assert selected == earlier
+
+
+def test_first_unexpired_run_excludes_b2b_runs():
+    """B2B runs are never the public ``next_run_id``."""
+    course = CourseFactory.create()
+    CourseRunFactory.create(
+        course=course, in_progress=True, b2b_contract=ContractPageFactory.create()
+    )
+
+    assert Course.objects.get(pk=course.pk).first_unexpired_run is None
+
+
+def test_has_dated_courseruns_matches_get_dated_courseruns():
+    """
+    ``has_dated_courseruns`` must agree with the queryset it replaced.
+
+    ``get_availability`` used to run ``get_dated_courseruns(...).count()`` per
+    course; this property answers the same question off the prefetch cache.
+    """
+    course = CourseFactory.create()
+    CourseRunFactory.create(course=course, in_progress=True, is_self_paced=True)
+
+    fresh = Course.objects.get(pk=course.pk)
+    expected = get_dated_courseruns(fresh.courseruns).exists()
+    assert fresh.has_dated_courseruns == expected
+
+    CourseRunFactory.create(course=course, in_progress=True, is_self_paced=False)
+    fresh = Course.objects.get(pk=course.pk)
+    assert get_dated_courseruns(fresh.courseruns).exists() is True
+    assert fresh.has_dated_courseruns is True

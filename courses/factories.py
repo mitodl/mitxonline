@@ -227,6 +227,12 @@ class CourseRunFactory(DjangoModelFactory):
         model = CourseRun
 
     class Params:
+        # Dates that move into the future use an explicit "+1d" floor rather than
+        # Faker's future_datetime, which starts one second from now. A run whose
+        # start_date or end_date falls inside a test's own runtime changes state
+        # mid-test - is_archived flips, first_unexpired_run moves on - which makes
+        # any expected-vs-actual comparison flaky. past_datetime needs no such
+        # floor: it moves further into the past as the test runs.
         past_start = factory.Trait(
             start_date=factory.Faker("past_datetime", tzinfo=ZoneInfo("UTC"))
         )
@@ -235,10 +241,20 @@ class CourseRunFactory(DjangoModelFactory):
         )
         in_progress = factory.Trait(
             start_date=factory.Faker("past_datetime", tzinfo=ZoneInfo("UTC")),
-            end_date=factory.Faker("future_datetime", tzinfo=ZoneInfo("UTC")),
+            end_date=factory.Faker(
+                "date_time_between",
+                start_date="+1d",
+                end_date="+1y",
+                tzinfo=ZoneInfo("UTC"),
+            ),
         )
         in_future = factory.Trait(
-            start_date=factory.Faker("future_datetime", tzinfo=ZoneInfo("UTC")),
+            start_date=factory.Faker(
+                "date_time_between",
+                start_date="+1d",
+                end_date="+30d",
+                tzinfo=ZoneInfo("UTC"),
+            ),
             end_date=None,
         )
         completed = factory.Trait(
