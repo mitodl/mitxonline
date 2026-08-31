@@ -375,31 +375,25 @@ def _make_http_error(status_code):
     return error
 
 
-def test_exception_logging_generator_downgrades_404_to_warning(caplog):
-    """A 404 from edX (stale/deleted course run) should log a warning, not an error, and not stop iteration."""
+@pytest.mark.parametrize(
+    ("status_code", "expected_level"),
+    [
+        (404, "WARNING"),  # stale/deleted course run - shouldn't page Sentry
+        (500, "ERROR"),  # real edX API failure - should still page Sentry
+    ],
+)
+def test_exception_logging_generator_http_error_log_level(
+    caplog, status_code, expected_level
+):
+    """HTTPErrors should log at WARNING for 404s and ERROR otherwise, without stopping iteration."""
 
     def gen():
         yield 1
-        raise _make_http_error(404)
+        raise _make_http_error(status_code)
 
     with caplog.at_level("WARNING"):
         results = list(exception_logging_generator(gen()))
 
     assert results == [1]
     assert len(caplog.records) == 1
-    assert caplog.records[0].levelname == "WARNING"
-
-
-def test_exception_logging_generator_keeps_other_http_errors_as_exceptions(caplog):
-    """A non-404 HTTPError (e.g. 500) should still be logged as an error/exception."""
-
-    def gen():
-        yield 1
-        raise _make_http_error(500)
-
-    with caplog.at_level("WARNING"):
-        results = list(exception_logging_generator(gen()))
-
-    assert results == [1]
-    assert len(caplog.records) == 1
-    assert caplog.records[0].levelname == "ERROR"
+    assert caplog.records[0].levelname == expected_level
