@@ -1112,6 +1112,7 @@ def test_repricing_a_pending_order_applies_a_newly_added_discount(basket):
     assert reprised.lines.get().discounted_unit_price == Decimal("75.00")
     assert reprised.total_price_paid == Decimal("75.00")
 
+
 def _add_purchased_run(order, start_date):
     """Attach a purchased course run to an order, the way a real purchase does."""
     run = CourseRunFactory.create(start_date=start_date)

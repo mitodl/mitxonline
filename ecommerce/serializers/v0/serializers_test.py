@@ -184,6 +184,7 @@ def test_receipt_line_shows_no_discount_when_the_price_was_not_discounted():
     assert data["discount"] == "0.00"
     assert data["total_paid"] == "300.00"
 
+
 @pytest.mark.skip_nplusone_check
 def test_order_line_reports_a_free_audit_track(settings, mocker, user):
     """A run with an audit mode tells the receipt the learner can fall back to it."""
