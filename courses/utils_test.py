@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 from mitol.common.utils import now_in_utc
+from requests.exceptions import HTTPError
 
 from courses.factories import (
     CourseFactory,
@@ -20,6 +21,7 @@ from courses.factories import (
 )
 from courses.models import Course, CourseRun
 from courses.utils import (
+    exception_logging_generator,
     get_dated_courseruns,
     get_enrollable_courseruns_qs,
     get_enrollable_courses,
@@ -365,3 +367,39 @@ def test_is_uai_order_uses_purchased_object_when_available():
     order = SimpleNamespace(lines=SimpleNamespace(all=lambda: [line]))
 
     assert is_uai_order(order) is True
+
+
+def _make_http_error(status_code):
+    error = HTTPError(f"{status_code} error")
+    error.response = SimpleNamespace(status_code=status_code)
+    return error
+
+
+def test_exception_logging_generator_downgrades_404_to_warning(caplog):
+    """A 404 from edX (stale/deleted course run) should log a warning, not an error, and not stop iteration."""
+
+    def gen():
+        yield 1
+        raise _make_http_error(404)
+
+    with caplog.at_level("WARNING"):
+        results = list(exception_logging_generator(gen()))
+
+    assert results == [1]
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelname == "WARNING"
+
+
+def test_exception_logging_generator_keeps_other_http_errors_as_exceptions(caplog):
+    """A non-404 HTTPError (e.g. 500) should still be logged as an error/exception."""
+
+    def gen():
+        yield 1
+        raise _make_http_error(500)
+
+    with caplog.at_level("WARNING"):
+        results = list(exception_logging_generator(gen()))
+
+    assert results == [1]
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelname == "ERROR"
