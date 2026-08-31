@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 1.164.0 (Released August 31, 2026)
+---------------
+
+- Add per-page hubspot_form_id to product pages, drop show_stay_updated (#3893)
+- Make Line.discounted_unit_price non-null (#3896)
+- Site name for emails should be MIT Learn (#3900)
+- Change export compliance flag to posthog (#3895)
+- Add backfill action to DiscountContractAttachmentRedemption admin page (#3891)
+- Make the user admin's contract picker searchable (#3856)
+- fix: hard purge Fastly surrogate keys instead of soft purge (#3792)
+
 Version 1.163.5 (Released August 31, 2026)
 ---------------
 
