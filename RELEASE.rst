@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.163.5
+Version 1.163.5 (Released August 31, 2026)
 ---------------
 
 - updating emails to use MIT Learn branding (#3892)
