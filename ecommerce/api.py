@@ -2,7 +2,7 @@
 
 import logging
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from urllib.parse import urljoin
 
@@ -1032,6 +1032,17 @@ def check_for_duplicate_discount_redemptions():
     return seen
 
 
+def _coerce_supplied_date(value):
+    """
+    Normalize a date reaching generate_discount_code either as a management
+    command's raw string or as a datetime BulkDiscountSerializer already parsed.
+    """
+    if value is None or isinstance(value, datetime):
+        return value
+
+    return parse_supplied_date(value)
+
+
 def generate_discount_code(**kwargs):  # noqa: C901
     """
     Generates a discount code (or a batch of discount codes) as specified by the
@@ -1041,7 +1052,7 @@ def generate_discount_code(**kwargs):  # noqa: C901
     UUID - if you want one (the convention is a -), you need to ensure it's
     there in the prefix (and that counts against the limit)
 
-    If you specify redemption_type, specifying one_time or one_time_per_user will not be
+    If you specify redemption_type, specifying one_time or once_per_user will not be
     honored.
 
     Keyword Args:
@@ -1050,11 +1061,12 @@ def generate_discount_code(**kwargs):  # noqa: C901
     * redemption_type - one of the valid redemption types (overrules use of the flags)
     * amount - the value of the discount
     * one_time - boolean; discount can only be redeemed once
-    * one_time_per_user - boolean; discount can only be redeemed once per user
+    * once_per_user - boolean; discount can only be redeemed once per user
     * activates - date to activate
     * expires - date to expire the code
     * count - number of codes to create (requires prefix)
     * prefix - prefix to append to the codes (max 63 characters)
+    * codes - the exact codes to create; used when count is 1
 
     Returns:
     * List of generated codes, with the following fields:
@@ -1110,15 +1122,8 @@ def generate_discount_code(**kwargs):  # noqa: C901
     ):
         redemption_type = kwargs["redemption_type"]
 
-    if "expires" in kwargs and kwargs["expires"] is not None:
-        expiration_date = parse_supplied_date(kwargs["expires"])
-    else:
-        expiration_date = None
-
-    if "activates" in kwargs and kwargs["activates"] is not None:
-        activation_date = parse_supplied_date(kwargs["activates"])
-    else:
-        activation_date = None
+    expiration_date = _coerce_supplied_date(kwargs.get("expires"))
+    activation_date = _coerce_supplied_date(kwargs.get("activates"))
 
     generated_codes = []
 
