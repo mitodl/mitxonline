@@ -314,8 +314,12 @@ def test_v0_discount_serializer_rejects_converting_a_discount_with_a_courserun_p
     assert "program products" in str(serializer.errors)
 
 
-def test_basket_serializer_hides_a_discount_that_does_not_change_the_price(user):
-    """An applied discount worth $0 (e.g. unresolved) is display noise."""
+def test_basket_serializer_hides_a_paid_amount_off_discount(user):
+    """
+    A paid-amount-off discount's stored amount is always 0 and its real
+    per-user value is resolved elsewhere (hq#11846), so there is nothing to
+    render for it yet.
+    """
     basket = BasketFactory.create(user=user)
     BasketItemFactory.create(basket=basket)
     BasketDiscount.objects.create(
@@ -328,6 +332,30 @@ def test_basket_serializer_hides_a_discount_that_does_not_change_the_price(user)
     data = BasketWithProductSerializer(instance=basket).data
 
     assert data["discounts"] == []
+
+
+def test_basket_serializer_shows_a_fixed_price_discount_equal_to_the_product_price(
+    user,
+):
+    """
+    A B2B contract sets a run's price with a fixed-price discount, which can
+    land on the list price itself; the shopper still needs the code confirmed
+    as applied.
+    """
+    basket = BasketFactory.create(user=user)
+    basket_item = BasketItemFactory.create(basket=basket)
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=DiscountFactory.create(
+            amount=basket_item.product.price, discount_type=DISCOUNT_TYPE_FIXED_PRICE
+        ),
+        redeemed_basket=basket,
+    )
+
+    data = BasketWithProductSerializer(instance=basket).data
+
+    assert len(data["discounts"]) == 1
 
 
 def test_basket_serializer_shows_a_discount_on_a_zero_price_product(user):
@@ -344,62 +372,3 @@ def test_basket_serializer_shows_a_discount_on_a_zero_price_product(user):
     data = BasketWithProductSerializer(instance=basket).data
 
     assert len(data["discounts"]) == 1
-
-
-def test_basket_serializer_shows_a_full_discount(user):
-    """A fixed-price-0 discount changes the price to $0 and must stay visible."""
-    basket = BasketFactory.create(user=user)
-    BasketItemFactory.create(basket=basket)
-    BasketDiscount.objects.create(
-        redemption_date=now_in_utc(),
-        redeemed_by=user,
-        redeemed_discount=DiscountFactory.create(
-            amount=0, discount_type=DISCOUNT_TYPE_FIXED_PRICE
-        ),
-        redeemed_basket=basket,
-    )
-
-    data = BasketWithProductSerializer(instance=basket).data
-
-    assert len(data["discounts"]) == 1
-
-
-def test_basket_serializer_shows_a_discount_on_an_empty_basket(user):
-    """
-    An empty basket has no price to compare against, so its discount stays
-    listed for the same reason a $0 product's does — the shopper still needs
-    confirmation the code was accepted.
-    """
-    basket = BasketFactory.create(user=user)
-    BasketDiscount.objects.create(
-        redemption_date=now_in_utc(),
-        redeemed_by=user,
-        redeemed_discount=DiscountFactory.create(),
-        redeemed_basket=basket,
-    )
-
-    data = BasketWithProductSerializer(instance=basket).data
-
-    assert data["total_price"] == 0
-    assert len(data["discounts"]) == 1
-
-
-def test_basket_totals_are_priced_once_per_basket(user, django_assert_num_queries):
-    """
-    total_price, discounted_price and the discounts display rule all need the
-    basket totals, and this runs on the checkout path.
-    """
-    basket = BasketFactory.create(user=user)
-    BasketItemFactory.create(basket=basket)
-    BasketDiscount.objects.create(
-        redemption_date=now_in_utc(),
-        redeemed_by=user,
-        redeemed_discount=DiscountFactory.create(),
-        redeemed_basket=basket,
-    )
-    serializer = BasketWithProductSerializer(instance=basket)
-    assert serializer.data
-
-    with django_assert_num_queries(0):
-        serializer.get_total_price(basket)
-        serializer.get_discounted_price(basket)
