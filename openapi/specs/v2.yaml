@@ -2276,20 +2276,22 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/V0DiscountRequest'
+              $ref: '#/components/schemas/BulkDiscountRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/V0DiscountRequest'
+              $ref: '#/components/schemas/BulkDiscountRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/V0DiscountRequest'
+              $ref: '#/components/schemas/BulkDiscountRequest'
         required: true
       responses:
-        '200':
+        '201':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/V0Discount'
+                type: array
+                items:
+                  $ref: '#/components/schemas/V0Discount'
           description: ''
   /api/v0/orders/history/:
     get:
@@ -4684,6 +4686,40 @@ components:
       required:
       - assigned
       - errors
+    BulkDiscountRequest:
+      type: object
+      description: For validating bulk discount requests.
+      properties:
+        discount_type:
+          $ref: '#/components/schemas/DiscountTypeEnum'
+        payment_type:
+          $ref: '#/components/schemas/PaymentTypeEnum'
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,2})?$
+        one_time:
+          type: boolean
+          default: false
+        one_time_per_user:
+          type: boolean
+          default: false
+        activates:
+          type: string
+          format: date-time
+        expires:
+          type: string
+          format: date-time
+        count:
+          type: integer
+        prefix:
+          type: string
+          minLength: 1
+          maxLength: 63
+      required:
+      - amount
+      - discount_type
+      - payment_type
     CertificatePage:
       type: object
       description: Serializer for certificate pages, including overrides and signatory

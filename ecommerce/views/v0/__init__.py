@@ -686,7 +686,20 @@ class DiscountViewSet(ModelViewSet):
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
     filterset_class = DiscountFilterSet
 
-    @action(url_name="create_batch", detail=False, methods=["post"])
+    # filters=False and pagination_class=None because the schema otherwise
+    # inherits the viewset's filter and pagination query params, which this
+    # POST action never reads.
+    @extend_schema(
+        request=BulkDiscountSerializer,
+        responses={201: V0DiscountSerializer(many=True)},
+        filters=False,
+    )
+    @action(
+        url_name="create_batch",
+        detail=False,
+        methods=["post"],
+        pagination_class=None,
+    )
     def create_batch(self, request):
         """
         Create a batch of codes. This is used in the staff-dashboard.
