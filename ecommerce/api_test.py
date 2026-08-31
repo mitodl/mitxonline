@@ -82,6 +82,7 @@ from ecommerce.factories import (
     OneTimeDiscountFactory,
     OneTimePerUserDiscountFactory,
     OrderFactory,
+    PaidAmountOffDiscountFactory,
     ProductFactory,
     TransactionFactory,
     UnlimitedUseDiscountFactory,
@@ -1888,3 +1889,18 @@ def test_retrieve_pending_cs_orders(mocker, test_type):
         mocked_cs_gateway.assert_called()
         assert len(completed.keys()) == (0 if test_type == "cancelled" else 1)
         assert len(cancelled.keys()) == (0 if test_type == "completed" else 1)
+
+
+def test_auto_apply_skips_program_child_purchase_discounts(user):
+    """
+    A program-child-purchase discount is automatic by shape, and a discount with no
+    product links applies to every product, so an unlinked one would attach to
+    every basket in the system.
+    """
+    basket, _ = Basket.objects.get_or_create(user=user)
+    BasketItem.objects.create(
+        basket=basket, product=ProductFactory.create(), quantity=1
+    )
+    PaidAmountOffDiscountFactory.create()
+
+    assert get_auto_apply_discounts_for_basket(basket.id).count() == 0

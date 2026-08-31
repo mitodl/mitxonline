@@ -29,6 +29,7 @@ from ecommerce.models import (
     RefundRequest,
     RefundRequestStatus,
 )
+from ecommerce.serializers import ProgramChildPurchaseShapeMixin
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from main.constants import (
     USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
@@ -48,7 +49,7 @@ from users.serializers import (
 User = get_user_model()
 
 
-class V0DiscountSerializer(serializers.ModelSerializer):
+class V0DiscountSerializer(ProgramChildPurchaseShapeMixin, serializers.ModelSerializer):
     """Serializes a discount."""
 
     class Meta:

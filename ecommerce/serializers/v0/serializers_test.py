@@ -10,9 +10,27 @@ from reversion.models import Version
 
 from courses.models import CourseRun, EnrollmentMode, Program
 from ecommerce.api import generate_checkout_payload
-from ecommerce.factories import OrderFactory, ProductFactory, ProgramProductFactory
-from ecommerce.models import Line, Order, OrderStatus
-from ecommerce.serializers.v0 import TransactionLineSerializer
+from ecommerce.constants import (
+    DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+    REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+)
+from ecommerce.factories import (
+    DiscountFactory,
+    OrderFactory,
+    PaidAmountOffDiscountFactory,
+    ProductFactory,
+    ProgramProductFactory,
+)
+from ecommerce.models import (
+    DiscountProduct,
+    Line,
+    Order,
+    OrderStatus,
+)
+from ecommerce.serializers.v0 import (
+    TransactionLineSerializer,
+    V0DiscountSerializer,
+)
 from ecommerce.views.legacy.views_test import create_basket
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE
 
@@ -216,3 +234,75 @@ def test_order_line_reports_no_free_audit_track(settings, mocker, user):
     serialized = TransactionLineSerializer(instance=order.lines, many=True).data
 
     assert serialized[0]["has_free_audit"] is False
+
+
+def test_v0_discount_serializer_rejects_a_malformed_paid_amount_off_discount():
+    """
+    The API mirror of Discount.check_program_child_purchase_validity returns a 400,
+    not a 500. The individual shape clauses are pinned in models_test.
+    """
+    data = {
+        "amount": "0",
+        "automatic": True,
+        "discount_type": "paid-amount-off",
+        "redemption_type": "unlimited",
+        "discount_code": "linked-serializer-test",
+    }
+    serializer = V0DiscountSerializer(data=data)
+
+    assert not serializer.is_valid()
+    assert "program-child-purchase redemption type" in str(serializer.errors)
+
+
+def test_v0_discount_serializer_accepts_a_well_formed_paid_amount_off_discount():
+    """Without this, a validate() that rejected every paid-amount-off discount would pass."""
+    serializer = V0DiscountSerializer(
+        data={
+            "amount": "0",
+            "automatic": True,
+            "discount_type": DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+            "redemption_type": REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+            "discount_code": "linked-serializer-test",
+        }
+    )
+
+    assert serializer.is_valid(), serializer.errors
+
+
+def test_v0_discount_serializer_rejects_a_patch_that_sets_an_amount():
+    """
+    The rules read through to the stored row, so a PATCH carrying only the
+    amount is still judged as a paid-amount-off discount.
+    """
+    discount = PaidAmountOffDiscountFactory.create()
+
+    serializer = V0DiscountSerializer(
+        instance=discount, data={"amount": "10"}, partial=True
+    )
+
+    assert not serializer.is_valid()
+    assert "store 0" in str(serializer.errors)
+
+
+def test_v0_discount_serializer_rejects_converting_a_discount_with_a_courserun_product():
+    """
+    The program-products clause has to fail validation rather than save(): a
+    Django ValidationError out of save() is not converted, so it 500s and leaves
+    the row un-PATCHable.
+    """
+    discount = DiscountFactory.create(automatic=False)
+    DiscountProduct.objects.create(discount=discount, product=ProductFactory.create())
+
+    serializer = V0DiscountSerializer(
+        instance=discount,
+        data={
+            "discount_type": DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+            "redemption_type": REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+            "amount": "0",
+            "automatic": True,
+        },
+        partial=True,
+    )
+
+    assert not serializer.is_valid()
+    assert "program products" in str(serializer.errors)

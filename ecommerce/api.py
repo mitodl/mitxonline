@@ -44,6 +44,7 @@ from ecommerce.constants import (
     PAYMENT_TYPE_SALES,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
+    REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
     REDEMPTION_TYPE_UNLIMITED,
     REFUND_SUCCESS_STATES,
     STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
@@ -1178,13 +1179,21 @@ def get_auto_apply_discounts_for_basket(basket_id: int) -> QuerySet[Discount]:
         if finaid_discount:
             finaid_discounts.append(finaid_discount.id)
 
-    return Discount.objects.filter(
-        Q(activation_date__lte=now_in_utc()) | Q(activation_date=None),
-        Q(expiration_date__gt=now_in_utc()) | Q(expiration_date=None),
-    ).filter(
-        Q(user_discount_discount__user=basket.user)
-        | Q(pk__in=finaid_discounts)
-        | Q(automatic=True)
+    return (
+        Discount.objects.filter(
+            Q(activation_date__lte=now_in_utc()) | Q(activation_date=None),
+            Q(expiration_date__gt=now_in_utc()) | Q(expiration_date=None),
+        )
+        # A program-child-purchase discount is automatic by shape, and a discount with
+        # no product links applies to every product, so without the per-learner
+        # resolver these attach to every basket and change no price. Drop the
+        # exclusion when the resolver lands (mitodl/hq#11846).
+        .exclude(redemption_type=REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE)
+        .filter(
+            Q(user_discount_discount__user=basket.user)
+            | Q(pk__in=finaid_discounts)
+            | Q(automatic=True)
+        )
     )
 
 
