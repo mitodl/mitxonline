@@ -30,6 +30,7 @@ from b2b.api import (
 )
 from courses.api import create_run_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
+from courses.models import CourseRunEnrollment
 from courses.utils import is_uai_course_run
 from ecommerce.constants import (
     ADMIN_FULFILLED_PAYMENT_DATA,
@@ -717,11 +718,24 @@ def downgrade_learner_from_order(order_id):
 
     order = Order.objects.get(pk=order_id)
 
+    # Only downgrade runs the learner still has an active enrollment in. If they
+    # unenrolled themselves entirely (e.g. via the dashboard) before the refund
+    # was processed, we leave their enrollment status alone rather than forcing
+    # them back into the course as an audit learner. (See ticket #3696.)
+    active_runs = [
+        run
+        for run in order.purchased_runs
+        if CourseRunEnrollment.objects.filter(user=order.purchaser, run=run).exists()
+    ]
+
+    if not active_runs:
+        return
+
     # Forcing the enrollment here - if the refund comes after the end date
     # for the course for whatever reason, we still want to revert the mode.
     create_run_enrollments(
         user=order.purchaser,
-        runs=order.purchased_runs,
+        runs=active_runs,
         keep_failed_enrollments=True,
         mode=EDX_ENROLLMENT_AUDIT_MODE,
     )
