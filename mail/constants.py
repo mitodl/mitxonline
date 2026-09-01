@@ -1,5 +1,10 @@
 """Constants for the mail app"""
 
+# The brand name shown in emails (subject lines, "site_name" template context,
+# etc.), independent of settings.SITE_NAME, which also drives non-email UI
+# and can be overridden per-environment.
+EMAIL_SITE_NAME = "MIT Learn"
+
 EMAIL_VERIFICATION = "verification"
 EMAIL_PW_RESET = "password_reset"
 EMAIL_CHANGE_EMAIL = "change_email"
