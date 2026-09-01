@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.164.2
+---------------
+
+- Email context updates (#3911)
+
 Version 1.164.1 (Released August 31, 2026)
 ---------------
 
