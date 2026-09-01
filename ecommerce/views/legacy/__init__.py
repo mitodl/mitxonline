@@ -400,7 +400,9 @@ class DiscountViewSet(ModelViewSet):
         otherSerializer = BulkDiscountSerializer(data=request.data)
 
         if otherSerializer.is_valid():
-            generated_codes = api.generate_discount_code(**request.data)
+            generated_codes = api.generate_discount_code(
+                **otherSerializer.validated_data
+            )
 
             discounts = DiscountSerializer(generated_codes, many=True)
 

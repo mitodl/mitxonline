@@ -38,11 +38,13 @@ from ecommerce.api import (
     create_verified_program_course_run_enrollment,
     create_verified_program_discount,
     cull_anonymous_baskets,
+    downgrade_learner_from_order,
     establish_basket,
     establish_basket_for_request,
     generate_checkout_payload,
     get_anonymous_basket_id,
     get_auto_apply_discounts_for_basket,
+    get_order_from_cybersource_payment_response,
     log_stripe_event,
     process_cybersource_payment_response,
     process_stripe_checkout_completed,
@@ -106,7 +108,7 @@ from ecommerce.models import (
 )
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
-from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.factories import OpenEdxUserFactory
 from users.factories import UserFactory
 
@@ -538,6 +540,56 @@ def test_unenrollment_unenrolls_learner(mocker, user):
     unenroll_mock.assert_called()
 
 
+def test_downgrade_learner_from_order_downgrades_active_enrollment(mocker, user):
+    """
+    downgrade_learner_from_order should force an audit enrollment for runs the
+    learner is still actively enrolled in.
+    """
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    version = Version.objects.get_for_object(product).first()
+    enrollment = CourseRunEnrollmentFactory.create(user=user, active=True)
+    LineFactory.create(
+        order=order, purchased_object=enrollment.run, product_version=version
+    )
+
+    create_run_enrollments_mock = mocker.patch(
+        "ecommerce.api.create_run_enrollments",
+    )
+    downgrade_learner_from_order(order_id=order.id)
+
+    create_run_enrollments_mock.assert_called_once()
+    _, kwargs = create_run_enrollments_mock.call_args
+    assert kwargs["runs"] == [enrollment.run]
+    assert kwargs["mode"] == EDX_ENROLLMENT_AUDIT_MODE
+
+
+def test_downgrade_learner_from_order_skips_unenrolled_learner(mocker, user):
+    """
+    If the learner has unenrolled entirely (inactive enrollment) before the
+    refund is processed, downgrade_learner_from_order should leave their
+    enrollment alone rather than re-enrolling them as audit.
+
+    Regression test for ticket #3696.
+    """
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    version = Version.objects.get_for_object(product).first()
+    enrollment = CourseRunEnrollmentFactory.create(user=user, active=False)
+    LineFactory.create(
+        order=order, purchased_object=enrollment.run, product_version=version
+    )
+
+    create_run_enrollments_mock = mocker.patch(
+        "ecommerce.api.create_run_enrollments",
+    )
+    downgrade_learner_from_order(order_id=order.id)
+
+    create_run_enrollments_mock.assert_not_called()
+
+
 @pytest.mark.skip_nplusone_check
 def test_process_cybersource_payment_response(settings, rf, mocker, user, products):
     """Test that ensures the response from Cybersource for an ACCEPTed payment updates the orders state"""
@@ -571,6 +623,53 @@ def test_process_cybersource_payment_response(settings, rf, mocker, user, produc
     assert order.state == OrderStatus.PENDING
     result = process_cybersource_payment_response(request, order)
     assert result == OrderStatus.FULFILLED
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize("stored_reference_number", [None, "someotherprefix-dev-9999"])
+def test_get_order_from_cybersource_payment_response(
+    rf, user, products, stored_reference_number
+):
+    """
+    The CyberSource callback should resolve the order by its stored reference
+    number, whatever scheme that reference number was generated under - the
+    prefix can change, but the stored value never does.
+    """
+    create_basket(user, products)
+    create_pending_order(user)
+
+    order = Order.objects.get(state=OrderStatus.PENDING, purchaser=user)
+
+    if stored_reference_number is not None:
+        # simulate an order created under a different reference number scheme
+        Order.objects.filter(pk=order.pk).update(
+            reference_number=stored_reference_number
+        )
+        order.refresh_from_db()
+
+    payload = {
+        "req_reference_number": order.reference_number,
+        "req_consumer_id": user.edx_username,
+        "req_customer_ip_address": "127.0.0.1",
+        "req_line_item_count": 0,
+    }
+    request = rf.post(reverse("checkout_result_api"), payload)
+
+    assert get_order_from_cybersource_payment_response(request) == order
+
+
+@pytest.mark.skip_nplusone_check
+def test_get_order_from_cybersource_payment_response_unknown_reference(rf):
+    """An unrecognized reference number should return None, not raise."""
+    payload = {
+        "req_reference_number": "mitxonline-dev-does-not-exist",
+        "req_consumer_id": "someone",
+        "req_customer_ip_address": "127.0.0.1",
+        "req_line_item_count": 0,
+    }
+    request = rf.post(reverse("checkout_result_api"), payload)
+
+    assert get_order_from_cybersource_payment_response(request) is None
 
 
 @pytest.mark.skip_nplusone_check

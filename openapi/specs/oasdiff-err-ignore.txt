@@ -197,3 +197,22 @@ GET /api/v2/pages/?fields=*&type=cms.coursepage removed the required property `i
 GET /api/v2/pages/?fields=*&type=cms.programpage removed the required property `items/items/show_stay_updated` from the response with the `200` status
 GET /api/v2/pages/{id}/ removed the required property `oneOf[#/components/schemas/CoursePageItem]/show_stay_updated` from the response with the `200` status
 GET /api/v2/pages/{id}/ removed the required property `oneOf[#/components/schemas/ProgramPageItem]/show_stay_updated` from the response with the `200` status
+# Spec correction: create_batch's schema previously advertised the wrong request
+# serializer (V0DiscountRequest) and a single 200 response. The endpoint has
+# always required a valid payment_type (generate_discount_code raises on any
+# other input) and always returned 201 with an array. The spec now tells the
+# truth; the API's behavior is unchanged.
+POST /api/v0/discounts/create_batch/ request property `payment_type` was restricted to a list of enum values (media type: application/json)
+POST /api/v0/discounts/create_batch/ request property `payment_type` was restricted to a list of enum values (media type: application/x-www-form-urlencoded)
+POST /api/v0/discounts/create_batch/ the request property `payment_type` became not nullable (media type: application/json)
+POST /api/v0/discounts/create_batch/ the request property `payment_type` became not nullable (media type: application/x-www-form-urlencoded)
+POST /api/v0/discounts/create_batch/ the request property `payment_type` became not nullable (media type: multipart/form-data)
+POST /api/v0/discounts/create_batch/ the request property `payment_type` became required (media type: application/x-www-form-urlencoded)
+POST /api/v0/discounts/create_batch/ the request property `payment_type` became required (media type: application/json)
+POST /api/v0/discounts/create_batch/ the request property `payment_type` became required (media type: multipart/form-data)
+POST /api/v0/discounts/create_batch/ removed `#/components/schemas/PaymentTypeEnum, #/components/schemas/NullEnum` from the `payment_type` request property `oneOf` list (media type: application/x-www-form-urlencoded)
+POST /api/v0/discounts/create_batch/ removed `#/components/schemas/PaymentTypeEnum, #/components/schemas/NullEnum` from the `payment_type` request property `oneOf` list (media type: application/json)
+POST /api/v0/discounts/create_batch/ removed `#/components/schemas/PaymentTypeEnum, #/components/schemas/NullEnum` from the `payment_type` request property `oneOf` list (media type: multipart/form-data)
+POST /api/v0/discounts/create_batch/ the `payment_type` request property `type` changed from `any` to `string` (media type: application/json)
+POST /api/v0/discounts/create_batch/ removed the success response with the status `200`
+POST /api/v0/discounts/create_batch/ request property `payment_type` was restricted to a list of enum values (media type: multipart/form-data)

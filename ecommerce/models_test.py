@@ -378,6 +378,25 @@ def test_order_update_reference_number(user):
     )
 
 
+def test_order_reference_number_is_immutable(settings, user):
+    """
+    Once set, an order's reference_number should survive later saves even if the
+    generation scheme changes - it's the identifier we share with the payment
+    gateway and look the order up by on the callback.
+    """
+    order = Order(purchaser=user, total_price_paid=10)
+    order.save()
+
+    original_reference_number = order.reference_number
+
+    settings.ENVIRONMENT = "some-other-environment"
+    order.total_price_paid = 20
+    order.save()
+    order.refresh_from_db()
+
+    assert order.reference_number == original_reference_number
+
+
 def test_duplicated_product_lines_validation(basket):
     """Test that creating multiple lines for the same product in the same order are deduped automatically"""
 

@@ -2276,20 +2276,22 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/V0DiscountRequest'
+              $ref: '#/components/schemas/BulkDiscountRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/V0DiscountRequest'
+              $ref: '#/components/schemas/BulkDiscountRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/V0DiscountRequest'
+              $ref: '#/components/schemas/BulkDiscountRequest'
         required: true
       responses:
-        '200':
+        '201':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/V0Discount'
+                type: array
+                items:
+                  $ref: '#/components/schemas/V0Discount'
           description: ''
   /api/v0/orders/history/:
     get:
@@ -4684,6 +4686,52 @@ components:
       required:
       - assigned
       - errors
+    BulkDiscountRequest:
+      type: object
+      description: For validating bulk discount requests.
+      properties:
+        discount_type:
+          $ref: '#/components/schemas/DiscountTypeEnum'
+        redemption_type:
+          $ref: '#/components/schemas/RedemptionTypeEnum'
+        payment_type:
+          $ref: '#/components/schemas/PaymentTypeEnum'
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,2})?$
+        one_time:
+          type: boolean
+          default: false
+        once_per_user:
+          type: boolean
+          default: false
+        activates:
+          type: string
+          format: date-time
+        expires:
+          type: string
+          format: date-time
+        prefix:
+          type: string
+          minLength: 1
+          description: Generate codes from this prefix plus a UUID.
+          maxLength: 63
+        count:
+          type: integer
+          minimum: 1
+          description: How many codes to generate from prefix. Defaults to 1.
+        codes:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+          description: The exact codes to create, instead of generating from a prefix.
+      required:
+      - amount
+      - discount_type
+      - payment_type
     CertificatePage:
       type: object
       description: Serializer for certificate pages, including overrides and signatory
@@ -6353,25 +6401,20 @@ components:
       - quantity
     CreateBasketWithProductsRequest:
       type: object
-      description: Serializer for creating a basket with products. (For OpenAPI spec.)
+      description: Serializer for creating a basket with products.
       properties:
-        system_slug:
-          type: string
-          minLength: 1
         product_ids:
           type: array
           items:
             $ref: '#/components/schemas/CreateBasketWithProductIDRequest'
         checkout:
           type: boolean
+          default: false
         discount_code:
           type: string
-          minLength: 1
+          nullable: true
       required:
-      - checkout
-      - discount_code
       - product_ids
-      - system_slug
     Department:
       type: object
       description: Department model serializer

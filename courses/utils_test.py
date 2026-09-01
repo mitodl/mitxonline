@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 from mitol.common.utils import now_in_utc
+from requests.exceptions import HTTPError
 
 from courses.factories import (
     CourseFactory,
@@ -20,6 +21,7 @@ from courses.factories import (
 )
 from courses.models import Course, CourseRun
 from courses.utils import (
+    exception_logging_generator,
     get_dated_courseruns,
     get_enrollable_courseruns_qs,
     get_enrollable_courses,
@@ -365,3 +367,33 @@ def test_is_uai_order_uses_purchased_object_when_available():
     order = SimpleNamespace(lines=SimpleNamespace(all=lambda: [line]))
 
     assert is_uai_order(order) is True
+
+
+def _make_http_error(status_code):
+    error = HTTPError(f"{status_code} error")
+    error.response = SimpleNamespace(status_code=status_code)
+    return error
+
+
+@pytest.mark.parametrize(
+    ("status_code", "expected_level"),
+    [
+        (404, "WARNING"),  # stale/deleted course run - shouldn't page Sentry
+        (500, "ERROR"),  # real edX API failure - should still page Sentry
+    ],
+)
+def test_exception_logging_generator_http_error_log_level(
+    caplog, status_code, expected_level
+):
+    """HTTPErrors should log at WARNING for 404s and ERROR otherwise, without stopping iteration."""
+
+    def gen():
+        yield 1
+        raise _make_http_error(status_code)
+
+    with caplog.at_level("WARNING"):
+        results = list(exception_logging_generator(gen()))
+
+    assert results == [1]
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelname == expected_level

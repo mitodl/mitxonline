@@ -2,6 +2,7 @@
 
 import logging
 import re
+from http import HTTPStatus
 from urllib.parse import urljoin
 
 from django.conf import settings
@@ -51,7 +52,19 @@ def exception_logging_generator(generator):
         except StopIteration:  # noqa: PERF203
             return
         except HTTPError as exc:
-            log.exception("EdX API error for fetching user grades %s:", exc)  # noqa: TRY401
+            if (
+                exc.response is not None
+                and exc.response.status_code == HTTPStatus.NOT_FOUND
+            ):
+                # Course run no longer exists in edX (e.g. an old run that was
+                # removed). This is expected for stale runs and shouldn't page
+                # Sentry every hour - see mitodl/hq#12729.
+                log.warning(
+                    "EdX API 404 fetching user grades, course run may no longer exist in edX: %s",
+                    exc,
+                )
+            else:
+                log.exception("EdX API error for fetching user grades %s:", exc)  # noqa: TRY401
         except Exception as exp:  # pylint: disable=broad-except
             log.exception("Error fetching user grades from edX %s:", exp)  # noqa: TRY401
 
