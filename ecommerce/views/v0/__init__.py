@@ -246,7 +246,8 @@ def _create_basket_from_product(
 
         if not getattr(settings, "ENABLE_MULTIPLE_CART_ITEMS", False):
             basket.basket_items.all().delete()
-            BasketDiscount.objects.filter(redeemed_basket=basket).delete()
+            # Don't clear discounts here — the read→delete→reapply logic below
+            # already preserves and re-checks them correctly.
 
         # FUTURE: This is where the basket_add hook was called.
 
