@@ -2,7 +2,7 @@
 
 import logging
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from urllib.parse import urljoin
 
@@ -1032,6 +1032,17 @@ def check_for_duplicate_discount_redemptions():
     return seen
 
 
+def _coerce_supplied_date(value):
+    """
+    Normalize a date reaching generate_discount_code either as a management
+    command's raw string or as a datetime BulkDiscountSerializer already parsed.
+    """
+    if value is None or isinstance(value, datetime):
+        return value
+
+    return parse_supplied_date(value)
+
+
 def generate_discount_code(**kwargs):  # noqa: C901
     """
     Generates a discount code (or a batch of discount codes) as specified by the
@@ -1041,7 +1052,7 @@ def generate_discount_code(**kwargs):  # noqa: C901
     UUID - if you want one (the convention is a -), you need to ensure it's
     there in the prefix (and that counts against the limit)
 
-    If you specify redemption_type, specifying one_time or one_time_per_user will not be
+    If you specify redemption_type, specifying one_time or once_per_user will not be
     honored.
 
     Keyword Args:
@@ -1050,18 +1061,18 @@ def generate_discount_code(**kwargs):  # noqa: C901
     * redemption_type - one of the valid redemption types (overrules use of the flags)
     * amount - the value of the discount
     * one_time - boolean; discount can only be redeemed once
-    * one_time_per_user - boolean; discount can only be redeemed once per user
+    * once_per_user - boolean; discount can only be redeemed once per user
     * activates - date to activate
     * expires - date to expire the code
-    * count - number of codes to create (requires prefix)
-    * prefix - prefix to append to the codes (max 63 characters)
+    * prefix - prefix to append to generated codes (max 63 characters)
+    * count - how many codes to generate from prefix; defaults to 1
+    * codes - the exact codes to create, instead of generating from a prefix
 
     Returns:
     * List of generated codes, with the following fields:
       code, type, amount, expiration_date
 
     """
-    codes_to_generate = []
     discount_type = kwargs["discount_type"]
     redemption_type = REDEMPTION_TYPE_UNLIMITED
     payment_type = kwargs["payment_type"]
@@ -1078,25 +1089,36 @@ def generate_discount_code(**kwargs):  # noqa: C901
             f"Discount amount {amount} not valid for discount type {DISCOUNT_TYPE_PERCENT_OFF}."  # noqa: EM102
         )
 
-    if kwargs["count"] > 1 and "prefix" not in kwargs:
-        raise Exception("You must specify a prefix to create a batch of codes.")  # noqa: EM101, TRY002
+    count = kwargs.get("count")
+    prefix = kwargs.get("prefix")
+    codes = kwargs.get("codes")
 
-    if kwargs["count"] > 1:
-        prefix = kwargs["prefix"]
+    # A caller either names the codes to create or asks for some to be generated
+    # from a prefix. Honoring both at once has no unambiguous reading, so they are
+    # mutually exclusive, and count only means anything in the generated case.
+    if bool(codes) == bool(prefix):
+        msg = "Supply either codes, or a prefix to generate them from."
+        raise Exception(msg)  # noqa: TRY002
+
+    if codes:
+        if count is not None:
+            msg = "count applies only when generating codes from a prefix."
+            raise Exception(msg)  # noqa: TRY002
+
+        codes_to_generate = codes
+    else:
+        count = 1 if count is None else count
+
+        if count < 1:
+            msg = f"count must be at least 1, got {count}."
+            raise Exception(msg)  # noqa: TRY002
 
         # upped the discount code limit to 100 characters - this used to be 13 (50 - 37 for the UUID)
         if len(prefix) > 63:  # noqa: PLR2004
-            raise Exception(  # noqa: TRY002
-                f"Prefix {prefix} is {len(prefix)} - prefixes must be 63 characters or less."  # noqa: EM102
-            )
+            msg = f"Prefix {prefix} is {len(prefix)} - prefixes must be 63 characters or less."
+            raise Exception(msg)  # noqa: TRY002
 
-        for i in range(kwargs["count"]):  # noqa: B007
-            generated_uuid = uuid.uuid4()
-            code = f"{prefix}{generated_uuid}"
-
-            codes_to_generate.append(code)
-    else:
-        codes_to_generate = kwargs["codes"]
+        codes_to_generate = [f"{prefix}{uuid.uuid4()}" for _ in range(count)]
 
     if kwargs.get("one_time"):
         redemption_type = REDEMPTION_TYPE_ONE_TIME
@@ -1110,15 +1132,8 @@ def generate_discount_code(**kwargs):  # noqa: C901
     ):
         redemption_type = kwargs["redemption_type"]
 
-    if "expires" in kwargs and kwargs["expires"] is not None:
-        expiration_date = parse_supplied_date(kwargs["expires"])
-    else:
-        expiration_date = None
-
-    if "activates" in kwargs and kwargs["activates"] is not None:
-        activation_date = parse_supplied_date(kwargs["activates"])
-    else:
-        activation_date = None
+    expiration_date = _coerce_supplied_date(kwargs.get("expires"))
+    activation_date = _coerce_supplied_date(kwargs.get("activates"))
 
     generated_codes = []
 

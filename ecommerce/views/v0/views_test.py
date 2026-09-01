@@ -388,6 +388,66 @@ def test_create_basket_with_products(
 
 
 @pytest.mark.parametrize(
+    "payload",
+    [
+        pytest.param({}, id="product_ids-missing"),
+        pytest.param({"product_ids": [5]}, id="product_ids-not-objects"),
+        pytest.param(
+            {"product_ids": [{"product_id": 5, "quantity": 0}]},
+            id="quantity-below-minimum",
+        ),
+    ],
+)
+def test_create_basket_with_products_rejects_malformed_body(user_client, payload):
+    """A body that doesn't match the request serializer is rejected with a 400."""
+
+    response = user_client.post(
+        reverse("v0:baskets_api-create_with_products"),
+        data=payload,
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+
+
+@pytest.mark.parametrize("discount_code", ["", None], ids=["blank", "null"])
+def test_create_basket_with_products_empty_discount_code(user_client, discount_code):
+    """An empty discount code means "no discount", not a validation error."""
+
+    product = ProductFactory.create()
+
+    response = user_client.post(
+        reverse("v0:baskets_api-create_with_products"),
+        data={
+            "product_ids": [{"product_id": product.id, "quantity": 1}],
+            "discount_code": discount_code,
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert Basket.objects.get(id=response.data["id"]).discounts.count() == 0
+
+
+def test_create_basket_with_products_checkout_redirects(user_client):
+    """The checkout flag sends the user to the checkout interstitial."""
+
+    product = ProductFactory.create()
+
+    response = user_client.post(
+        reverse("v0:baskets_api-create_with_products"),
+        data={
+            "product_ids": [{"product_id": product.id, "quantity": 1}],
+            "checkout": True,
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 302
+    assert response.url == reverse("checkout_interstitial_page")
+
+
+@pytest.mark.parametrize(
     (
         "existing_basket",
         "add_discount",
@@ -903,6 +963,102 @@ def test_bulk_discount_create(admin_drf_client, use_redemption_type_flags):
     assert discounts[0].redemption_type == REDEMPTION_TYPE_ONE_TIME
     assert discounts[0].amount == 50
     assert discounts[0].is_bulk
+
+
+def test_bulk_discount_create_rejects_a_percent_off_above_100(admin_drf_client):
+    """
+    generate_discount_code enforces this ceiling with a bare Exception, so the
+    serializer has to answer 400 before the view reaches it.
+    """
+    resp = admin_drf_client.post(
+        reverse("v0:discounts_api-create_batch"),
+        {
+            "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+            "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
+            "count": 5,
+            "amount": 101,
+            "prefix": "Generated-Code-",
+        },
+    )
+
+    assert resp.status_code == 400
+    assert not Discount.objects.filter(
+        discount_code__startswith="Generated-Code-"
+    ).exists()
+
+
+@pytest.mark.parametrize("count", [None, 1], ids=["count-omitted", "count-1"])
+def test_bulk_discount_create_generates_one_code_from_a_prefix(admin_drf_client, count):
+    """A prefix generates codes whether or not the caller asks for more than one."""
+    payload = {
+        "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+        "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
+        "amount": 50,
+        "prefix": "Generated-Code-",
+    }
+
+    if count is not None:
+        payload["count"] = count
+
+    resp = admin_drf_client.post(
+        reverse("v0:discounts_api-create_batch"),
+        payload,
+    )
+
+    assert resp.status_code == 201
+    assert (
+        Discount.objects.filter(discount_code__startswith="Generated-Code-").count()
+        == 1
+    )
+
+
+def test_bulk_discount_create_with_explicit_codes(admin_drf_client):
+    """Named codes are created verbatim, with no prefix involved."""
+    resp = admin_drf_client.post(
+        reverse("v0:discounts_api-create_batch"),
+        {
+            "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+            "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
+            "amount": 50,
+            "codes": ["FIRST-CODE", "SECOND-CODE"],
+        },
+    )
+
+    assert resp.status_code == 201
+    assert sorted(Discount.objects.values_list("discount_code", flat=True)) == [
+        "FIRST-CODE",
+        "SECOND-CODE",
+    ]
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        pytest.param(
+            {"prefix": "Generated-Code-", "codes": ["A-CODE"]}, id="prefix-and-codes"
+        ),
+        pytest.param({}, id="neither-prefix-nor-codes"),
+        pytest.param({"codes": ["A-CODE"], "count": 2}, id="codes-with-count"),
+        pytest.param({"prefix": "Generated-Code-", "count": 0}, id="count-below-one"),
+    ],
+)
+def test_bulk_discount_create_rejects_ambiguous_code_sources(admin_drf_client, extra):
+    """
+    generate_discount_code takes codes or a prefix, never both and never neither,
+    and count only applies to a prefix. The serializer answers 400 for the rest.
+    """
+    resp = admin_drf_client.post(
+        reverse("v0:discounts_api-create_batch"),
+        {
+            "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+            "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
+            "amount": 50,
+            **extra,
+        },
+    )
+
+    assert resp.status_code == 400
+    assert not Discount.objects.exists()
 
 
 # Checkout tests

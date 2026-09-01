@@ -17,6 +17,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_PERCENT_OFF,
     DISCOUNT_TYPES,
     PAYMENT_TYPES,
+    REDEMPTION_TYPES,
     TRANSACTION_TYPE_REFUND,
 )
 from ecommerce.discounts import product_from_version
@@ -667,22 +668,62 @@ class DiscountProductSerializer(serializers.ModelSerializer):
         ]
 
 
+MAX_PERCENT_OFF = Decimal(100)
+
+
 class BulkDiscountSerializer(serializers.Serializer):
     """For validating bulk discount requests."""
 
+    # Every field generate_discount_code honors has to be declared here: the
+    # views pass validated_data, so an undeclared key is dropped rather than
+    # reaching the function. redemption_type in particular is load-bearing —
+    # the staff dashboard's bulk form sends it.
     discount_type = serializers.ChoiceField(choices=DISCOUNT_TYPES)
+    redemption_type = serializers.ChoiceField(choices=REDEMPTION_TYPES, required=False)
     payment_type = serializers.ChoiceField(choices=PAYMENT_TYPES)
     amount = serializers.DecimalField(max_digits=9, decimal_places=2)
     one_time = serializers.BooleanField(default=False)
-    one_time_per_user = serializers.BooleanField(default=False)
+    once_per_user = serializers.BooleanField(default=False)
     activates = serializers.DateTimeField(
         required=False, default_timezone=ZoneInfo(TIME_ZONE)
     )
     expires = serializers.DateTimeField(
         required=False, default_timezone=ZoneInfo(TIME_ZONE)
     )
-    count = serializers.IntegerField(required=False)
-    prefix = serializers.CharField(max_length=63, required=False)
+    prefix = serializers.CharField(
+        max_length=63,
+        required=False,
+        help_text="Generate codes from this prefix plus a UUID.",
+    )
+    count = serializers.IntegerField(
+        required=False,
+        min_value=1,
+        help_text="How many codes to generate from prefix. Defaults to 1.",
+    )
+    codes = serializers.ListField(
+        child=serializers.CharField(max_length=100),
+        required=False,
+        help_text="The exact codes to create, instead of generating from a prefix.",
+    )
+
+    def validate(self, attrs):
+        """Reject the input shapes generate_discount_code raises a bare Exception on."""
+        if (
+            attrs["discount_type"] == DISCOUNT_TYPE_PERCENT_OFF
+            and attrs["amount"] > MAX_PERCENT_OFF
+        ):
+            msg = f"A percent-off discount cannot exceed {MAX_PERCENT_OFF}%."
+            raise serializers.ValidationError({"amount": msg})
+
+        if bool(attrs.get("codes")) == bool(attrs.get("prefix")):
+            msg = "Supply either codes, or a prefix to generate them from."
+            raise serializers.ValidationError({"codes": msg})
+
+        if attrs.get("codes") and "count" in attrs:
+            msg = "count applies only when generating codes from a prefix."
+            raise serializers.ValidationError({"count": msg})
+
+        return attrs
 
 
 class UserDiscountSerializer(serializers.ModelSerializer):

@@ -91,8 +91,7 @@ class Command(BaseCommand):
             "--count",
             type=int,
             nargs="?",
-            help="Number of codes to produce",
-            default=1,
+            help="Number of codes to generate from --prefix (default 1)",
         )
 
         parser.add_argument(
@@ -111,14 +110,15 @@ class Command(BaseCommand):
             "codes",
             nargs="*",
             type=str,
-            help="Discount codes to generate (ignored if --count is specified)",
+            help="The exact codes to create; mutually exclusive with --prefix",
         )
 
     def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG002
         try:
             generated_codes = generate_discount_code(**kwargs)
         except Exception as e:  # noqa: BLE001
-            self.stderr.write(self.style.ERROR(e))
+            self.stderr.write(self.style.ERROR(str(e)))
+            return
 
         with open("generated-codes.csv", mode="w") as output_file:  # noqa: PTH123
             writer = csv.DictWriter(
