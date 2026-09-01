@@ -43,6 +43,7 @@ from openedx.exceptions import (
     EdxApiCourseOutlineError,
     EdxApiEmailSettingsErrorException,
     EdxApiEnrollErrorException,
+    EdxApiNotificationPreferencesError,
     EdxApiRegistrationValidationException,
     EdxApiUserUpdateError,
     NoEdxApiAuthError,
@@ -61,6 +62,7 @@ User = get_user_model()
 OPENEDX_REGISTER_USER_PATH = "/user_api/v1/account/registration/"
 OPENEDX_REGISTRATION_VALIDATION_PATH = "/api/user/v1/validation/registration"
 OPENEDX_UPDATE_USER_PATH = "/api/user/v1/accounts/"
+OPENEDX_NOTIFICATION_PREFERENCES_PATH = "/api/notifications/v3/configurations/"
 OPENEDX_REQUEST_DEFAULTS = dict(honor_code=True)  # noqa: C408
 
 OPENEDX_SOCIAL_LOGIN_PATH = settings.OPENEDX_SOCIAL_LOGIN_PATH
@@ -1999,3 +2001,128 @@ def push_edx_modes_from_run(course_run: CourseRun, *, edx_client=None) -> int:
             created_count += 1
 
     return created_count
+
+
+def _notification_preferences_headers(user):
+    """
+    Build Authorization headers that let us call the LMS as the learner.
+
+    create_edx_auth_token() is called first as a safety net: it is idempotent
+    (get_or_create internally), so a user provisioned purely through the API
+    gateway still ends up with an OpenEdxApiAuth record before we read it.
+    This mirrors get_edx_api_client().
+
+    Args:
+        user (users.models.User): the learner whose identity to borrow
+
+    Returns:
+        dict: request headers carrying the learner's bearer token
+
+    Raises:
+        NoEdxApiAuthError: if the user has no usable Open edX auth
+    """
+    # create_edx_auth_token and the token refresh both call raise_for_status
+    # internally, so failures arrive as HTTPError / OpenEdXOAuth2Error. Those
+    # are not all the same thing, and the difference matters to the learner:
+    #
+    #   * no OpenEdxUser / no OpenEdxApiAuth row, or the token endpoint
+    #     rejecting the grant with a 400 -> this learner has no usable Open edX
+    #     identity, which is the "still being set up" case (NoEdxApiAuthError).
+    #   * anything else -- a 5xx from the token endpoint, bad client
+    #     credentials, a handshake that never came back with a code -> the
+    #     token service or its configuration is at fault, not this learner's
+    #     account. Surface it as an upstream failure so a synced learner gets
+    #     an accurate, retryable status instead of a misleading 409.
+    try:
+        if create_edx_auth_token(user) is None:
+            raise NoEdxApiAuthError(f"{user!s} is not yet synced with edX")  # noqa: EM102
+        auth = get_valid_edx_api_auth(user)
+    except OpenEdxApiAuth.DoesNotExist:
+        raise NoEdxApiAuthError(  # noqa: B904
+            f"{user!s} does not have an associated OpenEdxApiAuth"  # noqa: EM102
+        )
+    except HTTPError as exc:
+        upstream_status = getattr(exc.response, "status_code", None)
+        if upstream_status == status.HTTP_400_BAD_REQUEST:
+            # The grant itself was rejected (a revoked or invalid refresh
+            # token), so there is no usable auth for this learner.
+            raise NoEdxApiAuthError(  # noqa: B904
+                f"Open edX rejected the token grant for {user!s}: {exc!s}"  # noqa: EM102
+            )
+        raise EdxApiNotificationPreferencesError(  # noqa: B904
+            f"Open edX token service failed for {user!s}: {exc!s}",  # noqa: EM102
+            status_code=upstream_status,
+        )
+    except OpenEdXOAuth2Error as exc:
+        raise EdxApiNotificationPreferencesError(  # noqa: B904
+            f"Open edX OAuth2 handshake failed for {user!s}: {exc!s}"  # noqa: EM102
+        )
+
+    return {"Authorization": f"Bearer {auth.access_token}"}
+
+
+def get_notification_preferences(user):
+    """
+    Fetch the learner's notification preferences from Open edX.
+
+    Args:
+        user (users.models.User): the learner
+
+    Returns:
+        dict: the LMS response body
+
+    Raises:
+        NoEdxApiAuthError: if the user has no usable Open edX auth
+        EdxApiNotificationPreferencesError: if the LMS rejects the request
+    """
+    resp = requests.get(
+        edx_url(OPENEDX_NOTIFICATION_PREFERENCES_PATH),
+        headers=_notification_preferences_headers(user),
+        timeout=settings.EDX_API_CLIENT_TIMEOUT,
+    )
+
+    if resp.status_code != status.HTTP_200_OK:
+        raise EdxApiNotificationPreferencesError(
+            f"Error fetching Open edX notification preferences. {get_error_response_summary(resp)}",  # noqa: EM102
+            status_code=resp.status_code,
+        )
+
+    return resp.json()
+
+
+def update_notification_preference(user, preference):
+    """
+    Update a single notification preference field for the learner.
+
+    The upstream API is deliberately one-field-at-a-time; `preference` is the
+    already-validated body (notification_app, notification_type,
+    notification_channel and either value or email_cadence).
+
+    Args:
+        user (users.models.User): the learner
+        preference (dict): the validated single-field update
+
+    Returns:
+        dict: the LMS response body
+
+    Raises:
+        NoEdxApiAuthError: if the user has no usable Open edX auth
+        EdxApiNotificationPreferencesError: if the LMS rejects the request
+    """
+    resp = requests.put(
+        edx_url(OPENEDX_NOTIFICATION_PREFERENCES_PATH),
+        json=preference,
+        headers={
+            **_notification_preferences_headers(user),
+            "Content-Type": "application/json",
+        },
+        timeout=settings.EDX_API_CLIENT_TIMEOUT,
+    )
+
+    if resp.status_code != status.HTTP_200_OK:
+        raise EdxApiNotificationPreferencesError(
+            f"Error updating Open edX notification preferences. {get_error_response_summary(resp)}",  # noqa: EM102
+            status_code=resp.status_code,
+        )
+
+    return resp.json()
