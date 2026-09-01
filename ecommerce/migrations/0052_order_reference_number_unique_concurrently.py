@@ -39,7 +39,7 @@ class Migration(migrations.Migration):
     atomic = False
 
     dependencies = [
-        ("ecommerce", "0048_backfill_line_discounted_unit_price"),
+        ("ecommerce", "0051_refund_reason_choices_from_design"),
     ]
 
     operations = [

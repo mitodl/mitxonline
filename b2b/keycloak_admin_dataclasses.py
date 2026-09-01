@@ -1211,7 +1211,9 @@ class OrganizationInvitationRepresentation(BaseModel):
     sent_date: Annotated[int | None, Field(alias='sentDate')] = None
     expires_at: Annotated[int | None, Field(alias='expiresAt')] = None
     status: Status | None = None
-    invite_link: Annotated[str | None, Field(alias='inviteLink')] = None
+    invite_link: Annotated[str | None, Field(alias='inviteLink', deprecated=True)] = (
+        None
+    )
 
 
 class OrganizationRepresentation(BaseModel):
