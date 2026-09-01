@@ -43,6 +43,7 @@ from ecommerce.api import (
     generate_checkout_payload,
     get_anonymous_basket_id,
     get_auto_apply_discounts_for_basket,
+    get_order_from_cybersource_payment_response,
     log_stripe_event,
     process_cybersource_payment_response,
     process_stripe_checkout_completed,
@@ -571,6 +572,53 @@ def test_process_cybersource_payment_response(settings, rf, mocker, user, produc
     assert order.state == OrderStatus.PENDING
     result = process_cybersource_payment_response(request, order)
     assert result == OrderStatus.FULFILLED
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize("stored_reference_number", [None, "someotherprefix-dev-9999"])
+def test_get_order_from_cybersource_payment_response(
+    rf, user, products, stored_reference_number
+):
+    """
+    The CyberSource callback should resolve the order by its stored reference
+    number, whatever scheme that reference number was generated under - the
+    prefix can change, but the stored value never does.
+    """
+    create_basket(user, products)
+    create_pending_order(user)
+
+    order = Order.objects.get(state=OrderStatus.PENDING, purchaser=user)
+
+    if stored_reference_number is not None:
+        # simulate an order created under a different reference number scheme
+        Order.objects.filter(pk=order.pk).update(
+            reference_number=stored_reference_number
+        )
+        order.refresh_from_db()
+
+    payload = {
+        "req_reference_number": order.reference_number,
+        "req_consumer_id": user.edx_username,
+        "req_customer_ip_address": "127.0.0.1",
+        "req_line_item_count": 0,
+    }
+    request = rf.post(reverse("checkout_result_api"), payload)
+
+    assert get_order_from_cybersource_payment_response(request) == order
+
+
+@pytest.mark.skip_nplusone_check
+def test_get_order_from_cybersource_payment_response_unknown_reference(rf):
+    """An unrecognized reference number should return None, not raise."""
+    payload = {
+        "req_reference_number": "mitxonline-dev-does-not-exist",
+        "req_consumer_id": "someone",
+        "req_customer_ip_address": "127.0.0.1",
+        "req_line_item_count": 0,
+    }
+    request = rf.post(reverse("checkout_result_api"), payload)
+
+    assert get_order_from_cybersource_payment_response(request) is None
 
 
 @pytest.mark.skip_nplusone_check
