@@ -184,7 +184,7 @@ class TestMultipleCartItems:
 
     @override_settings(ENABLE_MULTIPLE_CART_ITEMS=False)
     def test_create_basket_with_products_single_item_mode_rejects_multiple(
-        self, user_drf_client, user
+        self, user_drf_client, user  # noqa: ARG002
     ):
         """With flag disabled, create_basket_with_products rejects multiple products"""
         product1 = ProductFactory.create()
