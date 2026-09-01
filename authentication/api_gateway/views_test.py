@@ -234,3 +234,42 @@ def test_account_action_callback(client):
     resp = client.get(f"{reverse('account-action-complete')}?{quote('/dashboard')}")
     assert resp.status_code == status.HTTP_302_FOUND
     assert resp.headers["Location"] == "/dashboard"
+
+
+@pytest.mark.parametrize(
+    ("query", "expected"),
+    [
+        # The hand-off Learn actually sends.
+        ({"next": "/cart/", "ecom-service": "true"}, "/cart/?ecom-service=true"),
+        # `next` alone.
+        ({"next": "/cart/"}, "/cart/"),
+        # No `next` at all falls back to the cart rather than the dashboard.
+        ({}, "/cart/"),
+        # An off-site `next` is rejected by ALLOWED_REDIRECT_HOSTS, not followed.
+        ({"next": "https://evil.example/steal"}, "/cart/"),
+        # Protocol-relative URLs are the open-redirect shape a gateway-side
+        # regex rewrite would have allowed through.
+        ({"next": "//evil.example/steal"}, "/cart/"),
+    ],
+)
+def test_switch_session_redirect_target(client, query, expected):
+    """switch-session forwards to a safe `next`, carrying other params along."""
+    url = reverse("switch-session")
+    if query:
+        url = f"{url}?{urlencode(query)}"
+
+    resp = client.get(url)
+
+    assert resp.status_code == status.HTTP_302_FOUND
+    assert resp.url == expected
+
+
+def test_switch_session_drops_django_session(client, user):
+    """switch-session ends the Django session the browser arrived with."""
+    client.force_login(user)
+    assert "_auth_user_id" in client.session
+
+    resp = client.get(reverse("switch-session"))
+
+    assert resp.status_code == status.HTTP_302_FOUND
+    assert "_auth_user_id" not in client.session
