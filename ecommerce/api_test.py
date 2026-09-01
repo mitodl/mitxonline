@@ -38,6 +38,7 @@ from ecommerce.api import (
     create_verified_program_course_run_enrollment,
     create_verified_program_discount,
     cull_anonymous_baskets,
+    downgrade_learner_from_order,
     establish_basket,
     establish_basket_for_request,
     generate_checkout_payload,
@@ -107,7 +108,7 @@ from ecommerce.models import (
 )
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
-from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.factories import OpenEdxUserFactory
 from users.factories import UserFactory
 
@@ -537,6 +538,56 @@ def test_unenrollment_unenrolls_learner(mocker, user):
     )
     unenroll_learner_from_order(order_id=order.id)
     unenroll_mock.assert_called()
+
+
+def test_downgrade_learner_from_order_downgrades_active_enrollment(mocker, user):
+    """
+    downgrade_learner_from_order should force an audit enrollment for runs the
+    learner is still actively enrolled in.
+    """
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    version = Version.objects.get_for_object(product).first()
+    enrollment = CourseRunEnrollmentFactory.create(user=user, active=True)
+    LineFactory.create(
+        order=order, purchased_object=enrollment.run, product_version=version
+    )
+
+    create_run_enrollments_mock = mocker.patch(
+        "ecommerce.api.create_run_enrollments",
+    )
+    downgrade_learner_from_order(order_id=order.id)
+
+    create_run_enrollments_mock.assert_called_once()
+    _, kwargs = create_run_enrollments_mock.call_args
+    assert kwargs["runs"] == [enrollment.run]
+    assert kwargs["mode"] == EDX_ENROLLMENT_AUDIT_MODE
+
+
+def test_downgrade_learner_from_order_skips_unenrolled_learner(mocker, user):
+    """
+    If the learner has unenrolled entirely (inactive enrollment) before the
+    refund is processed, downgrade_learner_from_order should leave their
+    enrollment alone rather than re-enrolling them as audit.
+
+    Regression test for ticket #3696.
+    """
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    version = Version.objects.get_for_object(product).first()
+    enrollment = CourseRunEnrollmentFactory.create(user=user, active=False)
+    LineFactory.create(
+        order=order, purchased_object=enrollment.run, product_version=version
+    )
+
+    create_run_enrollments_mock = mocker.patch(
+        "ecommerce.api.create_run_enrollments",
+    )
+    downgrade_learner_from_order(order_id=order.id)
+
+    create_run_enrollments_mock.assert_not_called()
 
 
 @pytest.mark.skip_nplusone_check
