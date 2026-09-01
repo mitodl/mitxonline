@@ -5,7 +5,7 @@
 MITx Online is a Django-based web platform for managing MIT online courses and programs. It integrates with Open edX for course delivery, Wagtail CMS for content management, and includes features for ecommerce, B2B provisioning, flexible pricing, and certificate generation.
 
 **Tech Stack:**
-- Backend: Django 5.1, Python 3.11+
+- Backend: Django 5.2, Python 3.11+
 - Frontend: React 16, Webpack, Yarn workspaces
 - CMS: Wagtail 7.2
 - Database: PostgreSQL 15
