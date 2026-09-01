@@ -690,10 +690,20 @@ class BulkDiscountSerializer(serializers.Serializer):
     expires = serializers.DateTimeField(
         required=False, default_timezone=ZoneInfo(TIME_ZONE)
     )
-    count = serializers.IntegerField(required=False, default=1)
-    prefix = serializers.CharField(max_length=63, required=False)
+    prefix = serializers.CharField(
+        max_length=63,
+        required=False,
+        help_text="Generate codes from this prefix plus a UUID.",
+    )
+    count = serializers.IntegerField(
+        required=False,
+        min_value=1,
+        help_text="How many codes to generate from prefix. Defaults to 1.",
+    )
     codes = serializers.ListField(
-        child=serializers.CharField(max_length=100), required=False
+        child=serializers.CharField(max_length=100),
+        required=False,
+        help_text="The exact codes to create, instead of generating from a prefix.",
     )
 
     def validate(self, attrs):
@@ -705,13 +715,13 @@ class BulkDiscountSerializer(serializers.Serializer):
             msg = f"A percent-off discount cannot exceed {MAX_PERCENT_OFF}%."
             raise serializers.ValidationError({"amount": msg})
 
-        if attrs["count"] > 1:
-            if not attrs.get("prefix"):
-                msg = "A prefix is required to generate a batch of codes."
-                raise serializers.ValidationError({"prefix": msg})
-        elif not attrs.get("codes"):
-            msg = "Supply the codes to create, or a count above 1 with a prefix."
+        if bool(attrs.get("codes")) == bool(attrs.get("prefix")):
+            msg = "Supply either codes, or a prefix to generate them from."
             raise serializers.ValidationError({"codes": msg})
+
+        if attrs.get("codes") and "count" in attrs:
+            msg = "count applies only when generating codes from a prefix."
+            raise serializers.ValidationError({"count": msg})
 
         return attrs
 

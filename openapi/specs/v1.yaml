@@ -4712,19 +4712,22 @@ components:
         expires:
           type: string
           format: date-time
-        count:
-          type: integer
-          default: 1
         prefix:
           type: string
           minLength: 1
+          description: Generate codes from this prefix plus a UUID.
           maxLength: 63
+        count:
+          type: integer
+          minimum: 1
+          description: How many codes to generate from prefix. Defaults to 1.
         codes:
           type: array
           items:
             type: string
             minLength: 1
             maxLength: 100
+          description: The exact codes to create, instead of generating from a prefix.
       required:
       - amount
       - discount_type
