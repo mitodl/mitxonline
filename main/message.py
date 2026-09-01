@@ -1,9 +1,9 @@
 """Main message classes"""
 
-from mitol.mail.messages import TemplatedMessage
+from mail.messages import SiteTemplatedMessage
 
 
-class SupportMessage(TemplatedMessage):
+class SupportMessage(SiteTemplatedMessage):
     """Support email message"""
 
     template_name = "mail/support"
