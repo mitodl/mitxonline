@@ -440,6 +440,11 @@ class Command(BaseCommand):
             purchased_object_id=run.id,
             purchased_content_type=ContentType.objects.get_for_model(CourseRun),
             quantity=1,
+            # Non-null since 0049, and derived rather than copied from PRICE so
+            # these lines price the same way `create_from_basket` does.
+            discounted_unit_price=Line.compute_discounted_unit_price_for(
+                order, version
+            ),
         )
 
         purchased_at = now + timedelta(days=scenario["purchased"])
