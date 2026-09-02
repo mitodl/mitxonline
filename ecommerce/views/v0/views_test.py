@@ -593,7 +593,7 @@ def test_create_basket_with_product(  # noqa: PLR0913
 # django_db marker silently masks a missing atomic() block by wrapping the
 # whole test in its own outer transaction, so this is the only way to
 # actually exercise (and catch regressions in) that requirement.
-@pytest.mark.django_db(transaction=True, serialized_rollback=True)
+@pytest.mark.django_db(transaction=True)
 def test_create_basket_from_product_anonymous(mocker):
     """
     Test that an anonymous caller can create a basket via create_from_product,
@@ -620,7 +620,7 @@ def test_create_basket_from_product_anonymous(mocker):
     mock_sync.assert_not_called()
 
 
-@pytest.mark.django_db(transaction=True, serialized_rollback=True)
+@pytest.mark.django_db(transaction=True)
 def test_create_basket_from_product_anonymous_checkout_redirect(mocker):
     """Test that checkout=True redirects an anonymous caller to the anonymous checkout flow"""
     mocker.patch("ecommerce.views.v0.sync_hubspot_cart_add")
@@ -638,7 +638,7 @@ def test_create_basket_from_product_anonymous_checkout_redirect(mocker):
     assert response.url == reverse("checkout-anonymous")
 
 
-@pytest.mark.django_db(transaction=True, serialized_rollback=True)
+@pytest.mark.django_db(transaction=True)
 def test_clear_basket_anonymous():
     """Test that an anonymous caller can clear their own anonymous basket"""
     client = Client()
@@ -657,7 +657,7 @@ def test_clear_basket_anonymous():
     assert not Basket.objects.filter(id=basket_id).exists()
 
 
-@pytest.mark.django_db(transaction=True, serialized_rollback=True)
+@pytest.mark.django_db(transaction=True)
 def test_clear_basket_anonymous_with_no_basket_yet():
     """Test that clearing with no prior basket is a harmless no-op"""
     client = Client()
