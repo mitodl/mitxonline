@@ -1073,14 +1073,19 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
             )
             return None, False, False
         course_page = course.course_page
-        if not course_page or not course_page.certificate_page:
-            # course_page.certificate_page is a plain (uncached) property, so
-            # this re-checks live status on every call instead of trusting
-            # the Course.certificate_page cached_property, which would go
-            # stale across a batch that reuses the same Course/CourseRun
-            # object for many users (e.g. the certificate generation cron).
+        # course_page.certificate_page is a plain (uncached) property, so this
+        # re-checks live status on every call instead of trusting the
+        # Course.certificate_page cached_property, which would go stale
+        # across a batch that reuses the same Course/CourseRun object for
+        # many users (e.g. the certificate generation cron).
+        certificate_page = course_page.certificate_page if course_page else None
+        if not certificate_page or not certificate_page.get_latest_revision():
+            # certificate_page_revision is non-nullable, so a certificate can
+            # only be created once the certificate page has a saved revision
+            # to point to - a live page alone isn't enough.
             log.warning(
-                "Skipping certificate creation for user=%s run=%s: no live certificate page",
+                "Skipping certificate creation for user=%s run=%s: no live, "
+                "revisioned certificate page",
                 user.id,
                 course_run.courseware_id,
             )
@@ -1439,15 +1444,19 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
         )
         return None, False
     program_page = program.program_page
-    if not program_page or not program_page.certificate_page:
-        # program_page.certificate_page is a plain (uncached) property, so
-        # this re-checks live status on every call instead of trusting the
-        # Program.certificate_page cached_property, which would go stale
-        # across a batch that reuses the same Program object for many users
-        # (e.g. manage_program_certificates bulk mode).
+    # program_page.certificate_page is a plain (uncached) property, so this
+    # re-checks live status on every call instead of trusting the
+    # Program.certificate_page cached_property, which would go stale across a
+    # batch that reuses the same Program object for many users (e.g.
+    # manage_program_certificates bulk mode).
+    certificate_page = program_page.certificate_page if program_page else None
+    if not certificate_page or not certificate_page.get_latest_revision():
+        # certificate_page_revision is non-nullable, so a certificate can
+        # only be created once the certificate page has a saved revision to
+        # point to - a live page alone isn't enough.
         log.warning(
             "Skipping program certificate creation for user=%s program=%s: "
-            "no live certificate page",
+            "no live, revisioned certificate page",
             user.id,
             program.readable_id,
         )

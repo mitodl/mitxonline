@@ -324,12 +324,26 @@ class CoursesTopicFactory(DjangoModelFactory):
         model = CoursesTopic
 
 
+def _certificate_page_revision(certificate_page):
+    """
+    Return a revision for the given certificate page, creating one if it
+    doesn't have one yet. certificate_page_revision is non-nullable, and
+    wagtail_factories doesn't save a revision when it builds a page, so
+    certificate factories need this to produce a valid certificate by default.
+    """
+    if certificate_page is None:
+        return None
+    return certificate_page.get_latest_revision() or certificate_page.save_revision()
+
+
 class ProgramCertificateFactory(DjangoModelFactory):
     """Factory for ProgramCertificate"""
 
     program = factory.SubFactory(ProgramFactory)
     user = factory.SubFactory(UserFactory)
-    certificate_page_revision = None
+    certificate_page_revision = factory.LazyAttribute(
+        lambda cert: _certificate_page_revision(cert.program.certificate_page)
+    )
 
     class Meta:
         model = ProgramCertificate
@@ -368,7 +382,9 @@ class CourseRunCertificateFactory(DjangoModelFactory):
 
     course_run = factory.SubFactory(CourseRunFactory)
     user = factory.SubFactory(UserFactory)
-    certificate_page_revision = None
+    certificate_page_revision = factory.LazyAttribute(
+        lambda cert: _certificate_page_revision(cert.course_run.course.certificate_page)
+    )
 
     class Meta:
         model = CourseRunCertificate

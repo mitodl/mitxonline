@@ -21,6 +21,14 @@ Check the usages of this command below:
 4. Same operations, but for a program
 ./manage.py migrate_certificate_revisions --program=<program_readable_id>
 ./manage.py migrate_certificate_revisions --program=<program_readable_id> --all
+
+5. Update certificates with no revision associated, across every course and
+   program that has a live certificate page (used to backfill in bulk before
+   making certificate_page_revision non-nullable). Courses/programs whose
+   certificate page has no revision to backfill from are reported and
+   skipped rather than failing the whole run - use
+   report_certificates_missing_revision afterwards to see what's left.
+./manage.py migrate_certificate_revisions --all-missing
 """
 
 from django.core.management.base import BaseCommand, CommandError
@@ -45,7 +53,8 @@ class Command(BaseCommand):
         "Migrate certificates of a course/course run/program to the latest "
         "certificate page revision. By default only certificates with no revision "
         "associated are updated; use --all to update every certificate for the "
-        "course/run/program."
+        "course/run/program; use --all-missing to backfill missing revisions "
+        "across every course and program at once."
     )
 
     def add_arguments(self, parser):
@@ -67,6 +76,18 @@ class Command(BaseCommand):
                 "Update all certificates for the course/run/program to the latest "
                 "revision. By default, only certificates with no revision "
                 "associated are updated."
+            ),
+        )
+        parser.add_argument(
+            "--all-missing",
+            dest="all_missing",
+            action="store_true",
+            required=False,
+            help=(
+                "Backfill certificate_page_revision for every certificate that's "
+                "missing one, across every course and program with a live "
+                "certificate page. Cannot be combined with --course/--courserun/"
+                "--program/--all."
             ),
         )
 
@@ -112,6 +133,80 @@ class Command(BaseCommand):
             ProgramCertificate.all_objects.filter(program=program),
         )
 
+    def _backfill_all_missing(self):
+        """
+        Backfill certificate_page_revision, across every course and program
+        with a live certificate page, for certificates that don't have one.
+
+        Courses/programs whose certificate page has no revision to backfill
+        from are reported and skipped rather than aborting the whole run -
+        those need a human to fix the CertificatePage first (see
+        report_certificates_missing_revision).
+        """
+        total_updated = 0
+
+        for course in Course.objects.all():
+            certificate_page = course.certificate_page
+            if not certificate_page:
+                continue
+
+            latest_revision = certificate_page.get_latest_revision()
+            if not latest_revision:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Skipping course {course.readable_id}: certificate page "
+                        f"'{certificate_page.title}' (id={certificate_page.pk}) has "
+                        "no revisions."
+                    )
+                )
+                continue
+
+            updated_count = CourseRunCertificate.all_objects.filter(
+                course_run__course=course, certificate_page_revision__isnull=True
+            ).update(certificate_page_revision=latest_revision)
+
+            if updated_count:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Updated {updated_count} certificate(s) for course "
+                        f"{course.readable_id} to revision {latest_revision.pk}."
+                    )
+                )
+            total_updated += updated_count
+
+        for program in Program.objects.all():
+            certificate_page = program.certificate_page
+            if not certificate_page:
+                continue
+
+            latest_revision = certificate_page.get_latest_revision()
+            if not latest_revision:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Skipping program {program.readable_id}: certificate page "
+                        f"'{certificate_page.title}' (id={certificate_page.pk}) has "
+                        "no revisions."
+                    )
+                )
+                continue
+
+            updated_count = ProgramCertificate.all_objects.filter(
+                program=program, certificate_page_revision__isnull=True
+            ).update(certificate_page_revision=latest_revision)
+
+            if updated_count:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Updated {updated_count} certificate(s) for program "
+                        f"{program.readable_id} to revision {latest_revision.pk}."
+                    )
+                )
+            total_updated += updated_count
+
+        self.stdout.write(
+            self.style.SUCCESS(f"Updated {total_updated} certificate(s) in total.")
+        )
+
     def handle(self, *args, **options):  # noqa: ARG002
         """Handle command execution"""
 
@@ -119,8 +214,20 @@ class Command(BaseCommand):
         run_id = options.get("courserun")
         program_id = options.get("program")
         update_all = options.get("update_all")
+        all_missing = options.get("all_missing")
 
         provided = [value for value in (course_id, run_id, program_id) if value]
+
+        if all_missing:
+            if provided or update_all:
+                message = (
+                    "--all-missing cannot be combined with --course, --courserun, "
+                    "--program, or --all."
+                )
+                raise CommandError(message)
+            self._backfill_all_missing()
+            return
+
         if not provided:
             message = "The command needs one of --course, --courserun, or --program."
             raise CommandError(message)

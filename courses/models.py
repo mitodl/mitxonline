@@ -1797,8 +1797,8 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
     )
     certificate_page_revision = models.ForeignKey(
         Revision,
-        null=True,
-        blank=True,
+        null=False,
+        blank=False,
         on_delete=models.CASCADE,
         limit_choices_to=limit_to_certificate_pages,
     )
@@ -1839,10 +1839,6 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
     def clean(self):
         from cms.models import CertificatePage, CoursePage  # noqa: PLC0415
 
-        # Skip validation if certificate_page_revision is not set (e.g., when revoking)
-        if self.certificate_page_revision is None:
-            return
-
         certpage = CertificatePage.objects.filter(
             pk=int(self.certificate_page_revision.object_id),
         )
@@ -1867,7 +1863,11 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
             )
 
     def save(self, *args, **kwargs):  # noqa: DJ012
-        if not self.certificate_page_revision:
+        # Check the raw FK id, not self.certificate_page_revision: now that
+        # the field is non-nullable, accessing an unset FK through the
+        # descriptor raises RelatedObjectDoesNotExist instead of returning
+        # None, which would break this exact "is it set yet?" check.
+        if not self.certificate_page_revision_id:
             certificate_page = self.course_run.course.certificate_page
             if certificate_page:
                 self.certificate_page_revision = certificate_page.get_latest_revision()
@@ -1883,8 +1883,8 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
     program = models.ForeignKey(Program, null=False, on_delete=models.CASCADE)
     certificate_page_revision = models.ForeignKey(
         Revision,
-        null=True,
-        blank=True,
+        null=False,
+        blank=False,
         on_delete=models.CASCADE,
         limit_choices_to=limit_to_certificate_pages,
     )
@@ -1932,10 +1932,6 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
     def clean(self):
         from cms.models import CertificatePage, ProgramPage  # noqa: PLC0415
 
-        # Skip validation if certificate_page_revision is not set (e.g., when revoking)
-        if self.certificate_page_revision is None:
-            return
-
         certpage = CertificatePage.objects.filter(
             pk=int(self.certificate_page_revision.object_id),
         )
@@ -1960,7 +1956,11 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
             )
 
     def save(self, *args, **kwargs):  # pylint: disable=signature-differs  # noqa: DJ012
-        if not self.certificate_page_revision:
+        # Check the raw FK id, not self.certificate_page_revision: now that
+        # the field is non-nullable, accessing an unset FK through the
+        # descriptor raises RelatedObjectDoesNotExist instead of returning
+        # None, which would break this exact "is it set yet?" check.
+        if not self.certificate_page_revision_id:
             certificate_page = self.program.certificate_page
             if certificate_page:
                 self.certificate_page_revision = certificate_page.get_latest_revision()
