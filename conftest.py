@@ -131,3 +131,113 @@ def fake() -> Faker:
     """Fixture to provide a Faker instance"""
 
     return Faker()
+
+
+# Tests marked django_db(transaction=True) get TransactionTestCase semantics:
+# teardown flushes (TRUNCATEs) every table, wiping rows created by data
+# migrations (Wagtail's default Locale, the root Pages). Nothing recreates
+# those rows on a reused test database, so a run containing any transactional
+# test leaves the DB unusable for the next `--reuse-db` run (mass
+# Locale.DoesNotExist). Django accepted this as a bug but never landed a fix
+# (https://code.djangoproject.com/ticket/25251), and pytest-django's
+# serialized_rollback only restores *before* a test that declares it, never
+# after the session's last flush. So: snapshot the freshly migrated DB once
+# per session and restore it after every transactional test's flush.
+_migration_data = SimpleNamespace(snapshot=None, blocker=None, db_name=None)
+
+# Sentinel for detecting a DB that lost its data-migration rows. Any row that
+# exists only because a data migration created it works here; the repair
+# machinery itself is agnostic about which rows the migrations create. This
+# one is Wagtail's default Locale, whose absence is also the first loud
+# symptom of the broken state (Locale.DoesNotExist).
+_DATA_MIGRATION_ROW_SENTINEL = '"model": "wagtailcore.locale"'
+
+
+def _is_transactional_db_test(item) -> bool:
+    """Mirror the detection in pytest_django.plugin.pytest_collection_modifyitems."""
+    import django.test  # noqa: PLC0415
+    from pytest_django.fixtures import validate_django_db  # noqa: PLC0415
+
+    cls = getattr(item, "cls", None)
+    if cls is not None and issubclass(cls, django.test.TransactionTestCase):
+        return not issubclass(cls, django.test.TestCase)
+    marker = item.get_closest_marker("django_db")
+    if marker:
+        transaction, reset_sequences, *_ = validate_django_db(marker)
+        if transaction or reset_sequences:
+            return True
+    fixturenames = getattr(item, "fixturenames", ())
+    return bool(
+        {"transactional_db", "live_server", "django_db_reset_sequences"}.intersection(
+            fixturenames
+        )
+    )
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _snapshot_migration_data(request, django_db_blocker):
+    """Serialize the post-migration DB state for the pytest_runtest_teardown wrapper."""
+    if not any(_is_transactional_db_test(item) for item in request.session.items):
+        return
+    from django.db import connection  # noqa: PLC0415
+
+    request.getfixturevalue("django_db_setup")
+    with django_db_blocker.unblock():
+        snapshot = connection.creation.serialize_db_to_string()
+    # A missing sentinel row means a previous run died mid-repair and left the
+    # DB truncated; snapshot nothing rather than cement the broken state.
+    if _DATA_MIGRATION_ROW_SENTINEL not in snapshot:
+        pytest.exit(
+            "Test database is missing data-migration rows (a previous run was "
+            "killed mid-repair). Re-run with --create-db.",
+            returncode=3,
+        )
+    _migration_data.snapshot = snapshot
+    _migration_data.blocker = django_db_blocker
+    _migration_data.db_name = connection.settings_dict["NAME"]
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_teardown(item):
+    """Restore data-migration rows after a transactional test's flush.
+
+    This must be a hook wrapper, not a fixture: the flush runs in
+    pytest-django's fixture finalizer, and fixture teardown ordering (LIFO)
+    cannot guarantee running after it.
+    """
+    # try/finally, because a failing finalizer in any *other* fixture
+    # propagates through this yield after pytest-django's flush has already
+    # run — skipping the restore then is exactly the state this hook exists
+    # to prevent.
+    try:
+        return (yield)
+    finally:
+        if _migration_data.snapshot is not None and _is_transactional_db_test(item):
+            from django.core.management import call_command  # noqa: PLC0415
+            from django.db import connection  # noqa: PLC0415
+
+            # On the session's last item, the default teardown impl also
+            # finalizes session fixtures, so django_db_setup may have already
+            # dropped the test DB and pointed the connection back at the real
+            # database (it does unless --reuse-db/--keepdb kept the test DB).
+            # Flushing *that* would truncate the dev database.
+            if connection.settings_dict["NAME"] == _migration_data.db_name:
+                with _migration_data.blocker.unblock():
+                    # TransactionTestCase's own flush re-fires post_migrate,
+                    # which recreates content types and permissions under new
+                    # pks; those rows collide with the snapshot's on their
+                    # natural unique keys. Flush again without post_migrate so
+                    # deserialize starts empty, the same pairing
+                    # TransactionTestCase uses for serialized_rollback
+                    # (django/test/testcases.py `_fixture_teardown`).
+                    call_command(
+                        "flush",
+                        verbosity=0,
+                        interactive=False,
+                        database=connection.alias,
+                        reset_sequences=False,
+                        inhibit_post_migrate=True,
+                    )
+                    connection.creation.deserialize_db_from_string(
+                        _migration_data.snapshot
+                    )
