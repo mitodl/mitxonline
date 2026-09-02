@@ -1,79 +1,35 @@
 """
-Add the unique constraint on Order.reference_number, building it concurrently.
+Retired: this migration is intentionally a no-op.
 
-AddConstraint for a plain UniqueConstraint emits
+It originally added a unique constraint on Order.reference_number to back the
+reference-number order lookup from #3899. That change is reverted, so there is
+nothing left to add - and 0053 drops the constraint from any database that
+already has it.
 
-    ALTER TABLE ecommerce_order ADD CONSTRAINT ... UNIQUE (reference_number);
+The file has to stay. It shipped as
+0049_order_reference_number_unique_concurrently and was renamed to 0052 in #3908
+to resolve a leaf conflict, which left two populations of databases:
 
-which holds ACCESS EXCLUSIVE on ecommerce_order for the whole index build -
-measured at ~3s over 537k rows. An ACCESS EXCLUSIVE request also queues behind
-any in-flight transaction and blocks everything arriving after it, so one slow
-query at deploy time turns that into an outage.
+  - migrated before the rename: django_migrations records the 0049 name, and the
+    constraint is already on the table
+  - migrated after the rename, or created fresh: 0052 is recorded as applied
 
-Build the index with CONCURRENTLY instead and then attach it to the constraint.
-ADD CONSTRAINT ... USING INDEX is a catalog-only operation: it adopts the index
-that already exists rather than rebuilding it, which drops the ACCESS EXCLUSIVE
-window from ~3s to ~3ms at the same row count.
+Deleting the file would strand the second group with an orphan history row, and
+keeping the original body would break the first - Django replays 0052 as
+unapplied there and "ADD CONSTRAINT ... USING INDEX" fails with "index is
+already associated with a constraint". Emptying it satisfies both: the replay
+does nothing, and 0053 handles the leftover constraint either way.
 
-The end state is byte-for-byte what AddConstraint would have produced - a
-UNIQUE constraint backed by a unique btree index of the same name - so a future
-migration that alters or drops it lines up with what is actually here.
-
-Recovery: CREATE INDEX CONCURRENTLY leaves an INVALID index behind if it fails
-(most likely on a duplicate reference_number). Re-running this migration will
-not fix that - IF NOT EXISTS sees the invalid index and skips the build, and the
-ADD CONSTRAINT then fails because the index is not valid. Drop it first:
-
-    DROP INDEX CONCURRENTLY unique_order_reference_number;
-
-then resolve the duplicates and re-run.
+Also nothing in state_operations, so migration state carries no constraint for
+either population and matches the reverted Order model.
 """
 
-from django.db import migrations, models
-
-CONSTRAINT_NAME = "unique_order_reference_number"
+from django.db import migrations
 
 
 class Migration(migrations.Migration):
-    # CREATE INDEX CONCURRENTLY cannot run inside a transaction block.
-    atomic = False
-
     dependencies = [
         ("ecommerce", "0051_refund_reason_choices_from_design"),
     ]
 
-    operations = [
-        migrations.SeparateDatabaseAndState(
-            database_operations=[
-                # Each statement is its own RunSQL so that neither gets bundled
-                # into an implicit transaction block.
-                migrations.RunSQL(
-                    sql=(
-                        f"CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS {CONSTRAINT_NAME} "
-                        f"ON ecommerce_order (reference_number)"
-                    ),
-                    reverse_sql=f"DROP INDEX CONCURRENTLY IF EXISTS {CONSTRAINT_NAME}",
-                ),
-                migrations.RunSQL(
-                    sql=(
-                        f"ALTER TABLE ecommerce_order ADD CONSTRAINT {CONSTRAINT_NAME} "
-                        f"UNIQUE USING INDEX {CONSTRAINT_NAME}"
-                    ),
-                    # Dropping the constraint drops the index it adopted, so the
-                    # reverse of the statement above becomes a no-op.
-                    reverse_sql=(
-                        f"ALTER TABLE ecommerce_order "
-                        f"DROP CONSTRAINT IF EXISTS {CONSTRAINT_NAME}"
-                    ),
-                ),
-            ],
-            state_operations=[
-                migrations.AddConstraint(
-                    model_name="order",
-                    constraint=models.UniqueConstraint(
-                        fields=["reference_number"], name=CONSTRAINT_NAME
-                    ),
-                ),
-            ],
-        ),
-    ]
+    operations = []
