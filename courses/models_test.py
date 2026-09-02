@@ -1252,7 +1252,6 @@ def test_courserun_qs_b2b_flags():
 
     past_start_date = now_in_utc() - timedelta(days=1)
 
-    b2b_contract = ContractPageFactory.create()
     CourseRunFactory.create_batch(
         3, start_date=past_start_date, end_date=None, live=True
     )
@@ -1261,15 +1260,27 @@ def test_courserun_qs_b2b_flags():
         start_date=past_start_date,
         end_date=None,
         live=True,
-        b2b_contract=b2b_contract,
+        b2b_only=True,
     )
 
-    assert CourseRun.objects.live().count() == 3
-    assert CourseRun.objects.live(include_b2b=True).count() == 6
-    assert CourseRun.objects.available().count() == 3
-    assert CourseRun.objects.available(include_b2b=True).count() == 6
-    assert CourseRun.objects.count() == 6
-    assert CourseRun.objects.exclude_b2b().count() == 3
+    assert CourseRun.objects.filter(start_date=past_start_date).live().count() == 3
+    assert (
+        CourseRun.objects.filter(start_date=past_start_date)
+        .live(include_b2b=True)
+        .count()
+        == 6
+    )
+    assert CourseRun.objects.filter(start_date=past_start_date).available().count() == 3
+    assert (
+        CourseRun.objects.filter(start_date=past_start_date)
+        .available(include_b2b=True)
+        .count()
+        == 6
+    )
+    assert CourseRun.objects.filter(start_date=past_start_date).count() == 6
+    assert (
+        CourseRun.objects.filter(start_date=past_start_date).exclude_b2b().count() == 3
+    )
 
 
 def test_program_requirements_root_node_collation():
@@ -1427,7 +1438,8 @@ def test_course_next_run_multiple_languages(primary, include_translations, b2b):
         )
 
     if b2b:
-        main_run.b2b_contract = contract
+        main_run.b2b_contracts.add(contract)
+        main_run.b2b_only = True
         main_run.save()
 
         nc_run = CourseRunFactory.create(
@@ -1443,8 +1455,10 @@ def test_course_next_run_multiple_languages(primary, include_translations, b2b):
         )
 
         if include_translations:
-            secondary_run_1.b2b_contract = contract
-            secondary_run_2.b2b_contract = contract
+            secondary_run_1.b2b_contracts.add(contract)
+            secondary_run_1.b2b_only = True
+            secondary_run_2.b2b_contracts.add(contract)
+            secondary_run_2.b2b_only = True
             secondary_run_1.save()
             secondary_run_2.save()
 

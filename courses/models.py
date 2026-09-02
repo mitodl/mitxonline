@@ -196,12 +196,6 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         ),
     )
     products = GenericRelation("ecommerce.Product", related_query_name="programs")
-    b2b_contracts = models.ManyToManyField(
-        "b2b.ContractPage",
-        blank=True,
-        related_name="programs",
-        help_text="B2B contracts this program is attached to.",
-    )
 
     @cached_property
     def num_courses(self):
@@ -1046,7 +1040,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         # Use the CourseRunQuerySet.enrollable() method to eliminate code duplication
         # First try to find non-past enrollable runs (end_date is None or in the future)
         best_run = (
-            self.courseruns.filter(is_b2b=False)
+            self.courseruns.filter(b2b_only=False)
             .enrollable()
             .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
             .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
@@ -1057,7 +1051,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         # If no non-past runs found, look for any enrollable runs (including archived)
         if best_run is None:
             best_run = (
-                self.courseruns.filter(is_b2b=False)
+                self.courseruns.filter(b2b_only=False)
                 .enrollable()
                 .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
                 .order_by("start_date", "-is_primary_language")
@@ -1258,13 +1252,13 @@ class CourseRunQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):  # pylint: 
     def exclude_b2b(self):
         """Exclude B2B course runs."""
 
-        return self.filter(is_b2b=False)
+        return self.filter(b2b_only=False)
 
     def live(self, *, include_b2b=False):
         """Applies a filter for Course runs with live=True"""
 
         queryset = self.filter(live=True)
-        return queryset if include_b2b else queryset.filter(is_b2b=False)
+        return queryset if include_b2b else queryset.filter(b2b_only=False)
 
     def available(self, *, include_b2b=False):
         """Applies a filter for Course runs with end_date in future"""
@@ -1273,7 +1267,7 @@ class CourseRunQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):  # pylint: 
 
         if include_b2b:
             return self.filter(q_filter)
-        return self.filter(is_b2b=False).filter(q_filter)
+        return self.filter(b2b_only=False).filter(q_filter)
 
     def enrollable(self, enrollment_end_date=None):
         """
@@ -1574,21 +1568,11 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
     def is_enrollable_for_b2b(self):
         """Determine if the run is enrollable for B2B purchases."""
 
-        if not self.b2b_contract:
-            return False
+        # A run can be in more than one contract, so we really need more context
+        # to determine if this is an enrollable run. But we can at least see
+        # if there's contracts associated with the run.
 
-        if not self.b2b_contract.max_learners:
-            return self.is_enrollable
-
-        contract_enrollments = self.enrollments.filter(
-            active=True, change_status=None
-        ).count()
-
-        return (
-            self.b2b_contract.max_learners > 0
-            and self.b2b_contract.max_learners > contract_enrollments
-            and self.is_enrollable
-        )
+        return self.b2b_contracts.exists() and self.is_enrollable
 
     @property
     def is_fake_course_run(self):
@@ -1790,6 +1774,20 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
                     "exists in this contract group."
                 )
                 raise ValidationError(msg)
+
+    def enrollable_for_contract(self, contract) -> bool:
+        """Determine if the run is enrollable for the specified contract."""
+
+        if not self.b2b_contracts.filter(pk=contract.id).exists():
+            return False
+
+        if (
+            contract.max_learners
+            and contract.get_enrollments.count() >= contract.max_learners
+        ):
+            return False
+
+        return self.is_enrollable
 
 
 def limit_to_certificate_pages():

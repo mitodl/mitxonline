@@ -687,7 +687,7 @@ def create_contract_run(  # noqa: PLR0913
                 variant_length=clone_course_run.variant_length,
             )
             .filter(
-                Q(b2b_contract=contract) | Q(b2b_contracts__in=contract),
+                Q(b2b_contract=contract) | Q(b2b_contracts__in=[contract]),
             )
             .exists()
             and no_reruns
@@ -712,6 +712,7 @@ def create_contract_run(  # noqa: PLR0913
             is_self_paced=True,
             live=True,
             b2b_contract=contract,
+            b2b_only=True,
             language=clone_course_run.language,
             is_primary_language=clone_course_run.is_primary_language,
             variant_length=clone_course_run.variant_length,
@@ -865,10 +866,8 @@ def get_active_contracts_from_basket_items(basket: Basket):
     for item in items:
         purchasable = item.product.purchasable_object
         if hasattr(purchasable, "b2b_contracts") and purchasable.b2b_contracts.exists():
-            item_contract_ids = purchasable.b2b_contracts.values_list(
-                "id", flat=True
-            ).__dict__
-            contract_ids.extend(item_contract_ids)
+            item_contract_ids = purchasable.b2b_contracts.values_list("id", flat=True)
+            contract_ids.extend([id for id in item_contract_ids])
 
     if contract_ids:
         return list(ContractPage.objects.filter(id__in=contract_ids, active=True))
@@ -1348,7 +1347,7 @@ def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict
         return {"result": main_constants.USER_MSG_TYPE_B2B_DISALLOWED}
 
     purchasable_object = product.purchasable_object
-    if not purchasable_object or not purchasable_object.b2b_contract:
+    if not purchasable_object:
         log.error(
             "B2B enroll: attempted to use %s but product has no purchasable object",
             product,
@@ -1367,7 +1366,7 @@ def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
 
     if not ContractPage.active_objects.filter(
-        id=purchasable_object.b2b_contract.id
+        id__in=purchasable_object.b2b_contracts.values_list("id", flat=True)
     ).exists():
         log.error(
             "B2B enroll: %s attempted to use %s but contract %s either doesn't exist or is invalid",
@@ -1592,8 +1591,9 @@ def _enroll_in_program_for_b2b(user, product: Product, program_id: str):
     """
     Enroll the user in the specified program as part of a B2B course enrollment.
 
-    Validates that the program belongs to the same contract as the course run
-    being enrolled in, then creates a ProgramEnrollment if one doesn't exist.
+    Validates that the program belongs to a contract that the specified course
+    also belongs to, and creates a verified ProgramEnrollment if one doesn't
+    exist.
 
     Args:
     - user: The user to enroll.
@@ -1604,7 +1604,10 @@ def _enroll_in_program_for_b2b(user, product: Product, program_id: str):
     from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE  # noqa: PLC0415
 
     purchasable_object = product.purchasable_object
-    contract = purchasable_object.b2b_contract
+
+    if not isinstance(purchasable_object, CourseRun):
+        msg = f"Product {purchasable_object} is not for a course run."
+        raise ValueError(msg)
 
     try:
         program = Program.objects.get(readable_id=program_id)
@@ -1617,12 +1620,12 @@ def _enroll_in_program_for_b2b(user, product: Product, program_id: str):
 
     # Validate the program belongs to the same contract as the course run
     if not ContractProgramItem.objects.filter(
-        contract=contract, program=program
+        contract__in=purchasable_object.b2b_contracts.all(), program=program
     ).exists():
         log.warning(
-            "B2B enroll: program %s is not in contract %s, skipping program enrollment",
+            "B2B enroll: program %s and course %s do not share a contract, skipping program enrollment",
             program_id,
-            contract,
+            purchasable_object.courseware_id,
         )
         return
 

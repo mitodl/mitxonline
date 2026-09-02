@@ -25,16 +25,6 @@ class Migration(migrations.Migration):
                 default=False, help_text="Indicates if the course run is B2B only"
             ),
         ),
-        migrations.AddField(
-            model_name="program",
-            name="b2b_contracts",
-            field=models.ManyToManyField(
-                blank=True,
-                help_text="B2B contracts this program is attached to.",
-                related_name="programs",
-                to="b2b.contractpage",
-            ),
-        ),
         migrations.AlterField(
             model_name="courserun",
             name="b2b_contract",

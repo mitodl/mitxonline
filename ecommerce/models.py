@@ -499,7 +499,7 @@ class Discount(TimestampedModel):
         courserun_ids = products_qs.all().values_list("product__object_id", flat=True)
 
         return ContractPage.objects.filter(
-            pk__in=CourseRun.objects.filter(pk__in=courserun_ids, is_b2b=True)
+            pk__in=CourseRun.objects.filter(pk__in=courserun_ids, b2b_only=True)
             .all()
             .values_list("b2b_contracts__id", flat=True)
         ).all()

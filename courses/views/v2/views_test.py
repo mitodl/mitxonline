@@ -1083,10 +1083,12 @@ def test_next_run_id_with_org_filter(  # noqa: PLR0915
     # create a run for the other org, same course, and starting before b2b_run
     second_eligible_b2b_run = CourseRunFactory.create(
         b2b_contract=third_contract_first_org,
+        b2b_only=True,
         start_date=one_month_prior - timedelta(days=5),
         enrollment_start=one_month_prior - timedelta(days=5),
         course=b2b_run.course,
     )
+    second_eligible_b2b_run.b2b_contracts.add(third_contract_first_org)
 
     # we're not in this contract so we should get the b2b_run id next
     resp = auth_api_client.get(f"{url}?org_id={contract.organization.id}")
