@@ -867,7 +867,7 @@ def get_active_contracts_from_basket_items(basket: Basket):
         purchasable = item.product.purchasable_object
         if hasattr(purchasable, "b2b_contracts") and purchasable.b2b_contracts.exists():
             item_contract_ids = purchasable.b2b_contracts.values_list("id", flat=True)
-            contract_ids.extend([id for id in item_contract_ids])
+            contract_ids.extend(item_contract_ids.list())
 
     if contract_ids:
         return list(ContractPage.objects.filter(id__in=contract_ids, active=True))
@@ -1354,10 +1354,26 @@ def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT}
 
-    if (
-        isinstance(purchasable_object, CourseRun)
-        and not purchasable_object.is_enrollable_for_b2b
-    ):
+    contract = None
+    if isinstance(purchasable_object, CourseRun):
+        if purchasable_object.b2b_contracts.count() > 1:
+            # More than one contract attached to this run, so this is ambiguous.
+            # This should be updated to accept a particular contract but for now it
+            # will just bail out if there's more than one to consider.
+            log.error(
+                "B2B enroll: run %s has more than one contract", purchasable_object
+            )
+            return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
+        contract = purchasable_object.b2b_contracts.first()
+
+    if not contract:
+        log.error("B2B enroll: run %s has no contract", purchasable_object)
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
+    if isinstance(
+        purchasable_object, CourseRun
+    ) and not purchasable_object.enrollable_for_contract(contract):
         log.error(
             "B2B enroll: attempted to use %s but %s is not enrollable for B2B",
             product,
@@ -1365,23 +1381,21 @@ def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
 
-    if not ContractPage.active_objects.filter(
-        id__in=purchasable_object.b2b_contracts.values_list("id", flat=True)
-    ).exists():
+    if not ContractPage.active_objects.filter(id=contract.id).exists():
         log.error(
             "B2B enroll: %s attempted to use %s but contract %s either doesn't exist or is invalid",
             user,
             product,
-            purchasable_object.b2b_contract,
+            contract,
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
 
-    if not user.b2b_contracts.filter(id=purchasable_object.b2b_contract.id).exists():
+    if not user.b2b_contracts.filter(id=contract.id).exists():
         log.error(
             "B2B enroll: attempted to use %s but %s is not in the contract %s",
             product,
             user,
-            purchasable_object.b2b_contract,
+            contract,
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
 
@@ -1465,16 +1479,16 @@ def _apply_available_discount(request, product: Product, basket: Basket) -> None
 
         if (
             not product.purchasable_object
-            or not product.purchasable_object.b2b_contract
+            or product.purchasable_object.b2b_contracts.count() != 1
         ):
-            msg = f"Product {product} has no purchasable object or the purchasable object has no B2B contract"
+            msg = f"Product {product} has no purchasable object or the purchasable object has <> 1 B2B contract"
             raise ValueError(msg)
 
-        discount_amount = product.purchasable_object.b2b_contract.enrollment_fixed_price
+        contract = product.purchasable_object.b2b_contracts.first()
+        discount_amount = contract.enrollment_fixed_price
         redemption_type = (
             REDEMPTION_TYPE_ONE_TIME
-            if product.purchasable_object.b2b_contract.max_learners
-            and product.purchasable_object.b2b_contract.max_learners > 0
+            if contract.max_learners and contract.max_learners > 0
             else REDEMPTION_TYPE_UNLIMITED
         )
 
@@ -1607,7 +1621,7 @@ def _enroll_in_program_for_b2b(user, product: Product, program_id: str):
 
     if not isinstance(purchasable_object, CourseRun):
         msg = f"Product {purchasable_object} is not for a course run."
-        raise ValueError(msg)
+        raise TypeError(msg)
 
     try:
         program = Program.objects.get(readable_id=program_id)
