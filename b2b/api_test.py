@@ -206,7 +206,8 @@ def test_b2b_basket_validation(user, run_contract, apply_code):
     if run_contract:
         contract = factories.ContractPageFactory.create()
 
-        product.purchasable_object.b2b_contract = contract
+        product.purchasable_object.b2b_contracts.add(contract)
+        product.purchasable_object.b2b_only = True
         product.purchasable_object.save()
         product.refresh_from_db()
 
@@ -378,7 +379,8 @@ def test_ensure_enrollment_codes_clears_extras():
         max_learners=10,
         membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
     product = ProductFactory.create(purchasable_object=run)
 
     created, updated, errors = ensure_enrollment_codes_exist(contract)
@@ -561,7 +563,8 @@ def test_enroll_in_program_for_b2b(program_in_contract, program_exists):
 
     user = UserFactory.create()
     course = CourseFactory.create()
-    run = CourseRunFactory.create(course=course, b2b_contract=contract)
+    run = CourseRunFactory.create(course=course, b2b_only=True)
+    run.b2b_contracts.add(contract)
 
     product = ProductFactory.create(purchasable_object=run)
 
@@ -621,10 +624,11 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
             course=course,
             courseware_id=target_course_id,
             run_tag=CourseKey.from_string(target_course_id).run,
-            b2b_contract=contract,
+            b2b_only=True,
             language="en",
             is_primary_language=True,
         )
+        collision_run.b2b_contracts.add(contract)
 
         [(new_run, _)] = create_contract_run(contract, course)
 
@@ -1148,7 +1152,8 @@ def test_b2b_contract_removal_keeps_enrollments(mocked_b2b_org_attach):
         name="Contract Auto",
     )
 
-    courserun = CourseRunFactory.create(b2b_contract=contract_auto)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract_auto)
 
     process_add_org_membership(user, org)
 
@@ -1398,7 +1403,8 @@ def test_get_runs_without_products():
 
     contract = ContractPageFactory.create()
 
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
 
     assert run in get_contract_runs_without_products(contract)
 
@@ -1408,7 +1414,9 @@ def test_get_contract_products_with_bad_pricing():
 
     contract = ContractPageFactory.create(enrollment_fixed_price=19)
 
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
+
     product = ProductFactory.create(price=76, purchasable_object=run)
 
     assert product in get_contract_products_with_bad_pricing(contract)
@@ -1419,7 +1427,8 @@ def test_ensure_contract_run_products():
 
     contract = ContractPageFactory.create()
 
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
 
     created_products = ensure_contract_run_products(contract)
 
@@ -1432,7 +1441,9 @@ def test_ensure_contract_run_pricing():
 
     contract = ContractPageFactory.create(enrollment_fixed_price=19)
 
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
+
     product = ProductFactory.create(price=76, purchasable_object=run)
 
     ensure_contract_run_pricing(contract)
@@ -1454,7 +1465,9 @@ def test_remove_extra_codes():
         membership_type=CONTRACT_MEMBERSHIP_CODE,
         max_learners=5,
     )
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
+
     product = ProductFactory.create(price=76, purchasable_object=run)
 
     ensure_enrollment_codes_exist(contract)
@@ -1591,7 +1604,9 @@ def test_apply_available_discount_seat_limit():
         max_learners=2,
         membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
-    CourseRunFactory.create_batch(2, b2b_contract=contract)
+    contract_runs = CourseRunFactory.create_batch(2, b2b_only=True)
+    for contract_run in contract_runs:
+        contract_run.b2b_contracts.add(contract)
     user_orgs = factories.UserOrganizationFactory.create_batch(
         3, organization=contract.organization
     )
@@ -1670,7 +1685,7 @@ def test_apply_available_discount_unlimited_seats(existing_discounts):
         max_learners=0,
         membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
-    CourseRunFactory.create_batch(2, b2b_contract=contract)
+    contract_runs = CourseRunFactory.create_batch(2)
     user_orgs = factories.UserOrganizationFactory.create_batch(
         3, organization=contract.organization
     )
@@ -1809,6 +1824,8 @@ def test_create_contract_run_duplicate_language_source_raises(mocker, in_contrac
         courseware_id=f"{course.readable_id}+1T2026-en",
     )
     if in_contract in ["first", "both"]:
+        first_run.b2b_only = True
+        first_run.save()
         first_run.b2b_contracts.add(contract)
 
     second_run = CourseRunFactory.create(
@@ -1821,6 +1838,8 @@ def test_create_contract_run_duplicate_language_source_raises(mocker, in_contrac
 
     if in_contract == "both":
         with pytest.raises(ValidationError):
+            second_run.b2b_only = True
+            second_run.save()
             second_run.b2b_contracts.add(contract)
     elif in_contract == "no":
         # Both runs are public, so re-validating the existing row surfaces the
@@ -1829,6 +1848,8 @@ def test_create_contract_run_duplicate_language_source_raises(mocker, in_contrac
             second_run.save()
     else:
         if in_contract == "second":
+            second_run.b2b_only = True
+            second_run.save()
             second_run.b2b_contracts.add(contract)
         second_run.save()
 
@@ -2222,7 +2243,8 @@ def test_enroll_prereqs_existing_enrollment(mocker, change_status):
     """
 
     contract = ContractPageFactory.create()
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
     product = ProductFactory.create(purchasable_object=run)
 
     user = UserFactory.create()

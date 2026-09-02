@@ -128,7 +128,9 @@ class CourseFactory(DjangoModelFactory):
     """Factory for Courses"""
 
     title = fuzzy.FuzzyText(prefix="Course ")
-    readable_id = factory.Sequence("course-v1:PyT+Course{0}".format)
+    readable_id = factory.LazyFunction(
+        lambda: f"course-v1:PyT+{''.join(FAKE.words(nb=3, unique=True))}"
+    )
     live = True
     departments = factory.SubFactory(DepartmentFactory)
 
@@ -196,6 +198,7 @@ class CourseRunFactory(DjangoModelFactory):
 
     live = True
     b2b_contract = None
+    b2b_only = False
     is_source_run = False
     language = ""
     is_primary_language = False
