@@ -514,7 +514,7 @@ def test_create_basket_with_product(  # noqa: PLR0913
                 max_redemptions=1,
                 redemption_type=REDEMPTION_TYPE_UNLIMITED,
             )
-            order = OrderFactory.create()
+            order = OrderFactory.create(state=OrderStatus.FULFILLED)
             DiscountRedemption.objects.create(
                 redeemed_by=order.purchaser,
                 redemption_date=order.created_on,

@@ -32,6 +32,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.template.loader import render_to_string
 
+from mail.constants import EMAIL_SITE_NAME
 from mail.exceptions import EmailSendFailureException, MultiEmailValidationError
 
 log = logging.getLogger()
@@ -97,7 +98,7 @@ def get_base_context():
     """Returns a dict of context variables that are needed in all emails"""
     return {
         "base_url": settings.SITE_BASE_URL,
-        "site_name": "MIT Learn",
+        "site_name": EMAIL_SITE_NAME,
         "mit_learn_terms_url": settings.MIT_LEARN_TERMS_URL,
         "mit_learn_privacy_url": settings.MIT_LEARN_PRIVACY_URL,
         "mit_learn_honor_code_url": settings.MIT_LEARN_HONOR_CODE_URL,

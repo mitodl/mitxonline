@@ -1089,6 +1089,31 @@ def test_apply_discount_to_basket(user, better_discount, is_valid, _count):
         assert basket.discounts.filter(redeemed_discount=existing_discount).exists()
 
 
+def test_apply_discount_to_basket_prefers_a_full_credit_discount(user):
+    """A discount that prices the item at $0.00 must win the best-price comparison."""
+    run = CourseRunFactory.create()
+    product = ProductFactory.create(purchasable_object=run)
+    basket, _ = Basket.objects.get_or_create(user=user)
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+
+    existing_discount = UnlimitedUseDiscountFactory.create(
+        amount=50, discount_type="percent-off"
+    )
+    BasketDiscount.objects.create(
+        redeemed_by=user,
+        redemption_date=now_in_utc(),
+        redeemed_discount=existing_discount,
+        redeemed_basket=basket,
+    )
+    full_credit = UnlimitedUseDiscountFactory.create(
+        amount=100, discount_type="percent-off"
+    )
+
+    apply_discount_to_basket(basket, full_credit)
+
+    assert basket.discounts.get().redeemed_discount == full_credit
+
+
 @pytest.mark.parametrize(
     "is_better",
     [

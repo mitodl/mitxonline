@@ -4,16 +4,16 @@ import uuid
 from django.conf import settings
 from mitol.common.utils.datetime import now_in_utc
 from mitol.mail.api import get_message_sender
-from mitol.mail.messages import TemplatedMessage
 
 from b2b.models import ContractPage, DiscountContractAttachmentRedemption
+from mail.messages import SiteTemplatedMessage
 
 log = logging.getLogger(__name__)
 
 ENROLLMENT_CODE_ASSINGMENT_TAG = "enrollment-code-assignment"
 
 
-class BaseEnrollmentCodeAssignmentMessage(TemplatedMessage):
+class BaseEnrollmentCodeAssignmentMessage(SiteTemplatedMessage):
     template_name = "mail/enrollment_code_assignment"
     name = "Enrollment Code Assignment"
 
@@ -21,7 +21,7 @@ class BaseEnrollmentCodeAssignmentMessage(TemplatedMessage):
 class EnrollmentCodeAssignmentMessage(BaseEnrollmentCodeAssignmentMessage):
     @staticmethod
     def get_default_headers() -> dict:
-        base_headers = TemplatedMessage.get_default_headers()
+        base_headers = SiteTemplatedMessage.get_default_headers()
         headers = base_headers.copy()
         headers["X-Mailgun-Tag"] = ENROLLMENT_CODE_ASSINGMENT_TAG
         return headers

@@ -119,7 +119,7 @@ class Command(BaseCommand):
                 )
             )
 
-        if not discount.check_validity(user):
+        if not discount.is_redeemable_by(user):
             raise CommandError(
                 "That enrollment code {} for course with courseware_id={} is invalid for user {}".format(  # noqa: EM103
                     options["code"], options["run"], options["user"]
