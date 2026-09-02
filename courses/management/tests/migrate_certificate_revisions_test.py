@@ -37,9 +37,7 @@ def _make_course_run_cert():
     course = CourseFactory.create(page__certificate_page__product_name="product")
     certificate_page = course.certificate_page
     run = CourseRunFactory.create(course=course)
-    cert = CourseRunCertificateFactory.create(
-        course_run=run, user=UserFactory.create()
-    )
+    cert = CourseRunCertificateFactory.create(course_run=run, user=UserFactory.create())
     return certificate_page, cert, {"courserun": run.courseware_id}
 
 
@@ -47,9 +45,7 @@ def _make_program_cert():
     """Create a program with one certificate"""
     program = ProgramFactory.create(page__certificate_page__product_name="product")
     certificate_page = program.certificate_page
-    cert = ProgramCertificateFactory.create(
-        program=program, user=UserFactory.create()
-    )
+    cert = ProgramCertificateFactory.create(program=program, user=UserFactory.create())
     return certificate_page, cert, {"program": program.readable_id}
 
 
