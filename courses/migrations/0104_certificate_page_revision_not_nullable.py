@@ -50,9 +50,7 @@ def backfill_certificate_page_revision(apps, schema_editor):
     page are left alone. The AlterField operations below then fail with a
     NOT NULL violation if any remain, aborting this migration (and, since
     Postgres DDL is transactional, rolling back everything this function
-    just wrote) rather than silently dropping data - see
-    courses/management/commands/report_certificates_missing_revision.py to
-    find those before retrying.
+    just wrote) rather than silently dropping data.
     """
     from cms.models import CoursePage, ProgramPage  # noqa: PLC0415
 
