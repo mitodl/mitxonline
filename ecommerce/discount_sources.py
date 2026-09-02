@@ -217,6 +217,11 @@ def resolve_for_discount(discount, user, products) -> SourceResolution | None:
     )
 
 
+def has_paid_amount_off(discounts) -> bool:
+    """Whether any of ``discounts`` spends a source, i.e. needs resolving."""
+    return any(spends_source(discount) for discount in discounts)
+
+
 def resolved_amounts_for_user(user, discounts, products) -> dict[int, Decimal]:
     """
     {discount_id: amount} for the paid-amount-off discounts in ``discounts``.
@@ -229,7 +234,7 @@ def resolved_amounts_for_user(user, discounts, products) -> dict[int, Decimal]:
     resolutions = {
         discount.id: resolve_for_discount(discount, user, products)
         for discount in discounts
-        if discount.discount_type == DISCOUNT_TYPE_PAID_AMOUNT_OFF
+        if spends_source(discount)
     }
     return {
         discount_id: resolution.amount
@@ -243,8 +248,9 @@ def resolved_amounts_from_redemptions(redemptions) -> dict[int, Decimal]:
     {discount_id: amount} read back from persisted source_line FKs — zero
     resolver queries, frozen at order creation.
 
-    Callers should select_related("redeemed_discount", "source_line"); both are
-    read for every row.
+    Callers should select_related("redeemed_discount", "source_line"):
+    redeemed_discount is read on every row, source_line on the paid-amount-off
+    rows.
 
     Keying on source_line_id alone would be wrong: a standard redemption may
     legally carry one, and DiscountType.for_discount raises TypeError when a
@@ -254,7 +260,7 @@ def resolved_amounts_from_redemptions(redemptions) -> dict[int, Decimal]:
         redemption.redeemed_discount_id: redemption.source_line.get_discounted_unit_price()
         for redemption in redemptions
         if redemption.source_line_id is not None
-        and redemption.redeemed_discount.discount_type == DISCOUNT_TYPE_PAID_AMOUNT_OFF
+        and spends_source(redemption.redeemed_discount)
     }
 
 

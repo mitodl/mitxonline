@@ -597,6 +597,25 @@ def test_create_basket_with_product(  # noqa: PLR0913
 # whole test in its own outer transaction, so this is the only way to
 # actually exercise (and catch regressions in) that requirement.
 @pytest.mark.django_db(transaction=True)
+def test_create_basket_from_product_lists_the_paid_amount_off_credit(
+    mocker, user_drf_client, paid_amount_off_source
+):
+    """The cart shows the automatic credit as a discount line, not just a lower total."""
+    mocker.patch("ecommerce.views.v0.sync_hubspot_cart_add")
+    url = reverse(
+        "v0:baskets_api-create_from_product",
+        kwargs={"product_id": paid_amount_off_source.program_product.id},
+    )
+
+    response = user_drf_client.post(url)
+
+    assert response.status_code == 201
+    assert Decimal(response.data["discounted_price"]) == Decimal("899.00")
+    assert [d["redeemed_discount"]["id"] for d in response.data["discounts"]] == [
+        paid_amount_off_source.discount.id
+    ]
+
+
 def test_create_basket_from_product_anonymous(mocker):
     """
     Test that an anonymous caller can create a basket via create_from_product,

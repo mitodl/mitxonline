@@ -240,8 +240,13 @@ class BasketItem(TimestampedModel):
     @cached_property
     def discounted_price(self):
         """Return the price of the product with discounts"""
+        from ecommerce.discount_sources import (  # noqa: PLC0415
+            has_paid_amount_off,
+            resolved_amounts_for_user,
+        )
         from ecommerce.discounts import DiscountType  # noqa: PLC0415
 
+        products = self.basket.get_products()
         discounts = [
             discount_redemption.redeemed_discount
             for discount_redemption in self.basket.discounts.prefetch_related(
@@ -253,6 +258,14 @@ class BasketItem(TimestampedModel):
             DiscountType.get_discounted_price(
                 discounts,
                 self.product,
+                # basket.user is a lazy FK: touch it only when a paid-amount-off
+                # discount is on the basket, so an ordinary cart pays no
+                # resolver cost at all.
+                resolved_amounts=(
+                    resolved_amounts_for_user(self.basket.user, discounts, products)
+                    if has_paid_amount_off(discounts)
+                    else {}
+                ),
             ).quantize(Decimal("0.01"))
             * self.quantity
         )
@@ -1365,19 +1378,25 @@ class Line(TimestampedModel):
     @staticmethod
     def compute_discounted_unit_price_for(order, product_version):
         """Price of one unit of product_version under the discounts currently on order."""
+        from ecommerce.discount_sources import (  # noqa: PLC0415
+            resolved_amounts_from_redemptions,
+        )
         from ecommerce.discounts import (  # noqa: PLC0415
             DiscountType,
             product_from_version,
         )
 
-        discounts = [
-            discount_redemption.redeemed_discount
-            for discount_redemption in order.discounts.all()
-        ]
+        # source_line is joined for the paid-amount-off rows rather than
+        # fetched lazily per row.
+        redemptions = list(
+            order.discounts.select_related("redeemed_discount", "source_line")
+        )
+        discounts = [redemption.redeemed_discount for redemption in redemptions]
 
         return DiscountType.get_discounted_price(
             discounts,
             product_from_version(product_version),
+            resolved_amounts=resolved_amounts_from_redemptions(redemptions),
         ).quantize(Decimal("0.01"))
 
     def compute_discounted_unit_price(self):

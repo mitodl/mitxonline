@@ -6,8 +6,9 @@ from decimal import Decimal
 import pytest
 import reversion
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import ProtectedError
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from freezegun import freeze_time
 from mitol.common.utils import now_in_utc
@@ -1596,3 +1597,90 @@ def test_friendly_format_for_paid_amount_off():
     discount = PaidAmountOffDiscountFactory.create()
 
     assert discount.friendly_format() == "the amount paid for a prior purchase"
+
+
+def test_basket_pricing_applies_the_resolved_paid_amount_off_credit(
+    paid_amount_off_source,
+):
+    """The cart shows the program at price minus what the child purchase cost."""
+    basket = BasketFactory.create(user=paid_amount_off_source.user)
+    item = BasketItem.objects.create(
+        basket=basket, product=paid_amount_off_source.program_product, quantity=1
+    )
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=paid_amount_off_source.user,
+        redeemed_discount=paid_amount_off_source.discount,
+        redeemed_basket=basket,
+    )
+
+    assert item.discounted_price == Decimal("899.00")
+
+
+def test_an_ordinary_basket_never_touches_the_resolver(user):
+    """Without a paid-amount-off discount, pricing does not even load the user."""
+    basket = BasketFactory.create(user=user)
+    item = BasketItem.objects.create(
+        basket=basket, product=ProductFactory.create(), quantity=1
+    )
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=DiscountFactory.create(),
+        redeemed_basket=basket,
+    )
+    item = BasketItem.objects.get(id=item.id)
+
+    with CaptureQueriesContext(connection) as queries:
+        item.discounted_price  # noqa: B018
+
+    assert not [q["sql"] for q in queries if "users_user" in q["sql"]]
+
+
+def test_line_pricing_reads_the_persisted_source_line(paid_amount_off_source):
+    """
+    Order pricing uses the frozen FK, not a fresh resolve: the source stays
+    credited even after another fulfilled order has consumed it.
+    """
+    DiscountRedemptionFactory.create(
+        redeemed_by=paid_amount_off_source.user,
+        redeemed_discount=PaidAmountOffDiscountFactory.create(),
+        redeemed_order=OrderFactory.create(
+            purchaser=paid_amount_off_source.user, state=OrderStatus.FULFILLED
+        ),
+        source_line=paid_amount_off_source.source_line,
+    )
+    order = OrderFactory.create(
+        purchaser=paid_amount_off_source.user, state=OrderStatus.PENDING
+    )
+    DiscountRedemptionFactory.create(
+        redeemed_by=paid_amount_off_source.user,
+        redeemed_discount=paid_amount_off_source.discount,
+        redeemed_order=order,
+        source_line=paid_amount_off_source.source_line,
+    )
+
+    assert Line.compute_discounted_unit_price_for(
+        order, paid_amount_off_source.program_product_version
+    ) == Decimal("899.00")
+
+
+def test_a_source_line_on_a_standard_discount_is_ignored(paid_amount_off_source):
+    """A percent-off redemption may legally carry a source_line; pricing must
+    ignore it rather than hand a resolved amount to a type with no field for one.
+    """
+    order = OrderFactory.create(
+        purchaser=paid_amount_off_source.user, state=OrderStatus.PENDING
+    )
+    DiscountRedemptionFactory.create(
+        redeemed_by=paid_amount_off_source.user,
+        redeemed_discount=DiscountFactory.create(
+            amount=Decimal("10"), discount_type=DISCOUNT_TYPE_PERCENT_OFF
+        ),
+        redeemed_order=order,
+        source_line=paid_amount_off_source.source_line,
+    )
+
+    assert Line.compute_discounted_unit_price_for(
+        order, paid_amount_off_source.program_product_version
+    ) == Decimal("899.10")
