@@ -262,7 +262,7 @@ class OrderTransactionInline(admin.TabularInline):
     can_add = False
 
 
-class BaseOrderAdmin(fsm.FlowAdminMixin, TimestampedModelAdmin):
+class BaseOrderAdmin(TimestampedModelAdmin):
     """Base admin for Order"""
 
     include_timestamps_in_list = True
@@ -277,13 +277,6 @@ class BaseOrderAdmin(fsm.FlowAdminMixin, TimestampedModelAdmin):
     list_filter = ["state"]
     inlines = [OrderLineInline, OrderDiscountInline, OrderTransactionInline]
     readonly_fields = ["reference_number"]
-    flow_state = OrderFlow.state
-
-    def get_transition_fields(self, request, obj, slug):  # noqa: ARG002
-        return ["state"]
-
-    def get_object_flow(self, request, obj):
-        return OrderFlow(obj, user=request.user)
 
     def has_change_permission(self, request, obj=None):  # noqa: ARG002
         return False
@@ -299,6 +292,23 @@ class BaseOrderAdmin(fsm.FlowAdminMixin, TimestampedModelAdmin):
             .get_queryset(request)
             .prefetch_related("purchaser", "lines__product_version")
         )
+
+
+class FlowOrderAdmin(fsm.FlowAdminMixin, BaseOrderAdmin):
+    """Order admin with viewflow FSM state-transition controls.
+
+    Deliberately not used for the generic Order admin: the only transition it
+    would surface there is `refund`, which is post-gateway bookkeeping and blows
+    up when triggered directly from a button.
+    """
+
+    flow_state = OrderFlow.state
+
+    def get_transition_fields(self, request, obj, slug):  # noqa: ARG002
+        return ["state"]
+
+    def get_object_flow(self, request, obj):
+        return OrderFlow(obj, user=request.user)
 
 
 @admin.register(Order)
@@ -310,7 +320,7 @@ class OrderAdmin(BaseOrderAdmin):
 
 
 @admin.register(PendingOrder)
-class PendingOrderAdmin(BaseOrderAdmin):
+class PendingOrderAdmin(FlowOrderAdmin):
     """Admin for PendingOrder"""
 
     model = PendingOrder
@@ -321,7 +331,7 @@ class PendingOrderAdmin(BaseOrderAdmin):
 
 
 @admin.register(CanceledOrder)
-class CanceledOrderAdmin(BaseOrderAdmin):
+class CanceledOrderAdmin(FlowOrderAdmin):
     """Admin for CanceledOrder"""
 
     model = CanceledOrder
@@ -332,46 +342,14 @@ class CanceledOrderAdmin(BaseOrderAdmin):
 
 
 @admin.register(FulfilledOrder)
-class FulfilledOrderAdmin(TimestampedModelAdmin):
+class FulfilledOrderAdmin(BaseOrderAdmin):
     """Admin for FulfilledOrder"""
 
-    include_timestamps_in_list = True
-    readonly_fields = ["reference_number"]
-    search_fields = [
-        "id",
-        "purchaser__email",
-        "purchaser__username",
-        "reference_number",
-    ]
-    list_display = ["id", "state", "get_purchaser", "total_price_paid"]
-    list_fields = ["state"]
-    list_filter = ["state"]
-    inlines = [OrderLineInline, OrderDiscountInline, OrderTransactionInline]
     model = FulfilledOrder
-
-    def has_change_permission(self, request, obj=None):  # noqa: ARG002
-        return False
-
-    @display(description="Purchaser")
-    def get_purchaser(self, obj: Order):
-        return f"{obj.purchaser.name} ({obj.purchaser.email})"
 
     def get_queryset(self, request):
         """Filter only to fulfilled orders"""
-        return (
-            super()
-            .get_queryset(request)
-            .prefetch_related("purchaser", "lines__product_version")
-            .filter(state=OrderStatus.FULFILLED)
-        )
-
-    def response_change(self, request, obj):
-        if "refund" in request.POST:
-            return HttpResponseRedirect(
-                "%s/?order=%s" % (reverse("refund-order"), obj.id)  # noqa: UP031
-            )
-
-        return super().response_change(request, obj)
+        return super().get_queryset(request).filter(state=OrderStatus.FULFILLED)
 
 
 @admin.register(RefundRequest)
@@ -408,7 +386,7 @@ class RefundRequestAdmin(TimestampedModelAdmin):
 
 
 @admin.register(RefundedOrder)
-class RefundedOrderAdmin(BaseOrderAdmin):
+class RefundedOrderAdmin(FlowOrderAdmin):
     """Admin for RefundedOrder"""
 
     model = RefundedOrder
