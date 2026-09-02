@@ -1,7 +1,5 @@
 """Tests for migrate_certificate_revisions management command"""
 
-from io import StringIO
-
 import pytest
 from django.core.management.base import CommandError
 
@@ -56,12 +54,6 @@ CERT_SETUPS = {
 }
 
 
-def _run_all_missing():
-    out = StringIO()
-    migrate_certificate_revisions.Command(stdout=out).handle(all_missing=True)
-    return out.getvalue()
-
-
 @pytest.mark.parametrize(
     "handle_kwargs, expected_message",  # noqa: PT006
     [
@@ -95,22 +87,6 @@ def test_migrate_certificate_revisions_validation_errors(
     with pytest.raises(CommandError) as command_error:
         migrate_certificate_revisions.Command().handle(**handle_kwargs)
     assert str(command_error.value) == expected_message
-
-
-@pytest.mark.parametrize(
-    "handle_kwargs",
-    [
-        {"all_missing": True, "course": "a"},
-        {"all_missing": True, "courserun": "a"},
-        {"all_missing": True, "program": "a"},
-        {"all_missing": True, "update_all": True},
-    ],
-)
-def test_migrate_certificate_revisions_all_missing_rejects_other_flags(handle_kwargs):
-    """--all-missing can't be combined with --course/--courserun/--program/--all"""
-    with pytest.raises(CommandError) as command_error:
-        migrate_certificate_revisions.Command().handle(**handle_kwargs)
-    assert "--all-missing cannot be combined with" in str(command_error.value)
 
 
 def test_migrate_certificate_revisions_course_no_certificate_page():
@@ -172,36 +148,3 @@ def test_migrate_certificate_revisions_all_confirmation(mocker, kind, confirm_an
         assert cert.certificate_page_revision == new_revision
     else:
         assert cert.certificate_page_revision == old_revision
-
-
-def test_migrate_certificate_revisions_all_missing_is_a_noop_when_nothing_is_missing():
-    """
-    --all-missing shouldn't touch certificates that already have a revision.
-
-    certificate_page_revision is non-nullable, so a "missing revision" row
-    can't actually be constructed in a fully-migrated database - this just
-    confirms the bulk pass leaves well-formed data alone.
-    """
-    _certificate_page, cert, _handle_kwargs = _make_course_cert()
-    old_revision = cert.certificate_page_revision
-
-    output = _run_all_missing()
-
-    cert.refresh_from_db()
-    assert cert.certificate_page_revision == old_revision
-    assert "Updated 0 certificate(s) in total." in output
-
-
-def test_migrate_certificate_revisions_all_missing_reports_pages_without_revisions():
-    """--all-missing should report, not crash on, certificate pages with no revisions"""
-    course = CourseFactory.create(page__certificate_page__product_name="product")
-    course.certificate_page.revisions.all().delete()
-
-    program = ProgramFactory.create(page__certificate_page__product_name="product")
-    program.certificate_page.revisions.all().delete()
-
-    output = _run_all_missing()
-
-    assert f"Skipping course {course.readable_id}" in output
-    assert f"Skipping program {program.readable_id}" in output
-    assert "has no revisions" in output

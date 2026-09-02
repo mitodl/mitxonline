@@ -6,13 +6,106 @@ from django.db import migrations, models
 import courses.models
 
 
+def _live_certificate_page_revision_id(page_model, fk_field, obj_id):
+    """
+    Return the id of the latest revision of the live CertificatePage child of
+    the CoursePage/ProgramPage that has `fk_field=obj_id`, or None.
+
+    Returns a plain id, not the Revision instance: the CourseRunCertificate/
+    ProgramCertificate we assign it to are historical models from this
+    migration's own `apps` registry, so their certificate_page_revision FK
+    descriptor only accepts a matching *historical* Revision instance - not
+    the real one get_latest_revision() returns below. Setting `..._id`
+    directly sidesteps that type check; bulk_update() reads by attname, so
+    this is all it needs.
+
+    page_model/CertificatePage are imported for real (not looked up via
+    `apps.get_model`) because this needs actual Wagtail Page/Revision
+    behavior - get_children(), .live(), .specific, get_latest_revision() -
+    which a migration's historical, field-only model reconstruction doesn't
+    carry over. That's safe here: we only ever *read* through these classes,
+    never save() them, and Wagtail's page-tree/revision API is stable
+    infrastructure this app doesn't version via its own migrations.
+    """
+    from cms.models import CertificatePage  # noqa: PLC0415
+
+    page = page_model.objects.filter(**{fk_field: obj_id}).first()
+    if page is None:
+        return None
+    certificate_page = page.get_children().type(CertificatePage).live().first()
+    if certificate_page is None:
+        return None
+    latest_revision = certificate_page.specific.get_latest_revision()
+    return latest_revision.id if latest_revision else None
+
+
+def backfill_certificate_page_revision(apps, schema_editor):
+    """
+    Backfill certificate_page_revision for any CourseRunCertificate/
+    ProgramCertificate that's missing one, using the latest revision of its
+    course/program's live certificate page - the same lookup
+    courses.models.CourseRunCertificate.save()/ProgramCertificate.save() do.
+
+    Certificates whose course/program has no live, revisioned certificate
+    page are left alone. The AlterField operations below then fail with a
+    NOT NULL violation if any remain, aborting this migration (and, since
+    Postgres DDL is transactional, rolling back everything this function
+    just wrote) rather than silently dropping data - see
+    courses/management/commands/report_certificates_missing_revision.py to
+    find those before retrying.
+    """
+    from cms.models import CoursePage, ProgramPage  # noqa: PLC0415
+
+    CourseRunCertificate = apps.get_model("courses", "CourseRunCertificate")
+    ProgramCertificate = apps.get_model("courses", "ProgramCertificate")
+
+    course_run_certificates = list(
+        CourseRunCertificate.objects.select_related("course_run__course").filter(
+            certificate_page_revision__isnull=True
+        )
+    )
+    revision_id_by_course_id = {}
+    for cert in course_run_certificates:
+        course_id = cert.course_run.course_id
+        if course_id not in revision_id_by_course_id:
+            revision_id_by_course_id[course_id] = _live_certificate_page_revision_id(
+                CoursePage, "course_id", course_id
+            )
+        cert.certificate_page_revision_id = revision_id_by_course_id[course_id]
+    CourseRunCertificate.objects.bulk_update(
+        course_run_certificates, ["certificate_page_revision"]
+    )
+
+    program_certificates = list(
+        ProgramCertificate.objects.filter(certificate_page_revision__isnull=True)
+    )
+    revision_id_by_program_id = {}
+    for cert in program_certificates:
+        program_id = cert.program_id
+        if program_id not in revision_id_by_program_id:
+            revision_id_by_program_id[program_id] = _live_certificate_page_revision_id(
+                ProgramPage, "program_id", program_id
+            )
+        cert.certificate_page_revision_id = revision_id_by_program_id[program_id]
+    ProgramCertificate.objects.bulk_update(
+        program_certificates, ["certificate_page_revision"]
+    )
+
+
 class Migration(migrations.Migration):
     dependencies = [
         ("courses", "0103_gate_certificate_creation"),
         ("wagtailcore", "0097_baselogentry_uuid_action_timestamp_indexes"),
+        (
+            "cms",
+            "0023_certificateindexpage_certificatepage_signatoryindexpage_signatorypage",
+        ),
     ]
 
     operations = [
+        migrations.RunPython(
+            backfill_certificate_page_revision, migrations.RunPython.noop
+        ),
         migrations.AlterField(
             model_name="courseruncertificate",
             name="certificate_page_revision",

@@ -28,15 +28,15 @@ def test_report_certificates_missing_revision_no_rows():
     certificate_page_revision is non-nullable at the DB level, so a "missing
     revision" row can't be constructed here the way it could pre-migration
     (see migrate_certificate_revisions_test.py, which predates the
-    constraint) - this command's non-zero path is exercised against real
-    pre-migration data during rollout, not in this test suite.
+    constraint) - this command's non-zero path is exercised against a real
+    pre-migration snapshot during rollout, not in this test suite.
     """
     CourseRunCertificateFactory.create()
     ProgramCertificateFactory.create()
 
     output = _run_command()
 
-    assert "CourseRunCertificates missing a revision: 0" in output
-    assert "ProgramCertificates missing a revision: 0" in output
+    assert "CourseRunCertificates the migration can't fix: 0" in output
+    assert "ProgramCertificates the migration can't fix: 0" in output
     assert "CourseRunCertificate details:" not in output
     assert "ProgramCertificate details:" not in output

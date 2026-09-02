@@ -1,17 +1,16 @@
 """
-Report certificates that still have no certificate_page_revision after
-running migrate_certificate_revisions --all-missing.
+Preview certificates that would still have no certificate_page_revision
+after the automatic backfill in
+courses/migrations/0104_certificate_page_revision_not_nullable.py runs.
 
-These are certificates whose course/program has no live certificate page at
-all, or whose certificate page has never had a revision saved - neither of
-which migrate_certificate_revisions can fix on its own, since certificate
-pages are never auto-created. Each row here needs a human to publish/fix the
-underlying CertificatePage.
-
-This command is meant as the pre-deploy gate for making
-certificate_page_revision non-nullable: it should report zero rows in an
-environment before that environment's migration to add the NOT NULL
-constraint is run.
+Run this against a database snapshot BEFORE deploying that migration: it
+applies the same "does this course/program have a live certificate page with
+a saved revision" lookup the migration's backfill uses, and reports only the
+certificates for which that lookup still comes up empty. Those need a human
+to publish/fix the underlying CertificatePage - certificate pages are never
+auto-created - before the migration can succeed in that environment (the
+migration's AlterField will otherwise fail with a NOT NULL violation and
+roll back).
 """
 
 from django.core.management.base import BaseCommand
@@ -20,32 +19,42 @@ from courses.models import CourseRunCertificate, ProgramCertificate
 
 
 class Command(BaseCommand):
-    """Print a report of certificates with no certificate_page_revision."""
+    """Print a report of certificates the upcoming migration can't fix."""
 
     help = (
-        "Report CourseRunCertificates/ProgramCertificates that have no "
-        "certificate_page_revision and cannot be backfilled because their "
-        "course/program has no live, revisioned certificate page."
+        "Preview which CourseRunCertificates/ProgramCertificates would still "
+        "have no certificate_page_revision after the "
+        "certificate_page_revision_not_nullable migration's automatic "
+        "backfill runs - i.e. whose course/program has no live, revisioned "
+        "certificate page."
     )
 
     def handle(self, *args, **options):  # noqa: ARG002
-        course_run_certificates = CourseRunCertificate.all_objects.filter(
-            certificate_page_revision__isnull=True
-        ).select_related("user", "course_run__course")
-        program_certificates = ProgramCertificate.all_objects.filter(
-            certificate_page_revision__isnull=True
-        ).select_related("user", "program")
+        course_run_certificates = [
+            cert
+            for cert in CourseRunCertificate.all_objects.filter(
+                certificate_page_revision__isnull=True
+            ).select_related("user", "course_run__course")
+            if not self._resolvable(cert.course_run.course.certificate_page)
+        ]
+        program_certificates = [
+            cert
+            for cert in ProgramCertificate.all_objects.filter(
+                certificate_page_revision__isnull=True
+            ).select_related("user", "program")
+            if not self._resolvable(cert.program.certificate_page)
+        ]
 
         self.stdout.write(
             self.style.WARNING(
-                "CourseRunCertificates missing a revision: "
-                f"{course_run_certificates.count()}"
+                "CourseRunCertificates the migration can't fix: "
+                f"{len(course_run_certificates)}"
             )
         )
         self.stdout.write(
             self.style.WARNING(
-                "ProgramCertificates missing a revision: "
-                f"{program_certificates.count()}"
+                "ProgramCertificates the migration can't fix: "
+                f"{len(program_certificates)}"
             )
         )
 
@@ -66,6 +75,10 @@ class Command(BaseCommand):
                 for cert in program_certificates
             ),
         )
+
+    def _resolvable(self, certificate_page):
+        """Would the migration's backfill find a revision to use here?"""
+        return bool(certificate_page and certificate_page.get_latest_revision())
 
     def _print_items(self, label, lines):
         """Print a list of description lines under a label, if there are any."""
