@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.165.1
+Version 1.165.1 (Released September 02, 2026)
 ---------------
 
 - Revert "Look up orders by reference_number on the CyberSource callback (#3899)" (#3918)
