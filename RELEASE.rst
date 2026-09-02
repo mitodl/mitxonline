@@ -1,6 +1,20 @@
 Release Notes
 =============
 
+Version 1.165.1
+---------------
+
+- Revert "Look up orders by reference_number on the CyberSource callback (#3899)" (#3918)
+- fix: Repair the reused test DB after transaction=True tests (which do not use pytest's normal transaction) (#3917)
+- Fix AGENTS.md Django version (5.1 -> 5.2) (#3910)
+- Email context updates (#3911)
+- fix: basket api discount-related bugfixes (#3898)
+- fix: OpenAPI / Serializer improvements for BulkDiscountSerializer, CreateBasketWithProductsSerializer (#3902)
+- fix: unbreak python-checks — ecommerce migration leaf conflict + stale Keycloak dataclasses (#3908)
+- Skip downgrade for unenrolled learners on refund (#3901)
+- fix: downgrade stale course run 404 errors from error to warning (#3904)
+- Look up orders by reference_number on the CyberSource callback (#3899)
+
 Version 1.164.1 (Released August 31, 2026)
 ---------------
 
