@@ -397,16 +397,11 @@ def get_order_from_cybersource_payment_response(request):
     converted_order = PaymentGateway.get_gateway_class(
         settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
     ).convert_to_order(payment_data)
+    order_id = Order.decode_reference_number(converted_order.reference)
+
     try:
-        order = Order.objects.select_for_update().get(
-            reference_number=converted_order.reference
-        )
+        order = Order.objects.select_for_update().get(pk=order_id)
     except ObjectDoesNotExist:
-        log.warning(
-            "get_order_from_cybersource_payment_response: no order found for "
-            "reference number %s",
-            converted_order.reference,
-        )
         order = None
     return order
 
