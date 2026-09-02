@@ -160,7 +160,7 @@ class Enroll(APIView):
 
         course_run_content_type = ContentType.objects.get_for_model(CourseRun)
         courserun = CourseRun.objects.filter(
-            courseware_id=readable_id, b2b_contract__isnull=False
+            courseware_id=readable_id, b2b_contracts__isnull=False
         ).get()
         product = Product.objects.filter(
             content_type=course_run_content_type, object_id=courserun.id

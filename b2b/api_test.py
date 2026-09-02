@@ -85,7 +85,6 @@ from main.constants import (
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
     USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED,
     USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT,
-    USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT,
     USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE,
     USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
 )
@@ -499,7 +498,7 @@ def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
             assert Basket.objects.filter(user=user).count() == assert_test
 
         if not product_in_contract:
-            assert result["result"] == USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT
+            assert result["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT
             return
 
         if not user_in_contract:
@@ -1685,12 +1684,16 @@ def test_apply_available_discount_unlimited_seats(existing_discounts):
         max_learners=0,
         membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
-    contract_runs = CourseRunFactory.create_batch(2)
+    contract_runs = CourseRunFactory.create_batch(2, b2b_only=True)
+    for run in contract_runs:
+        run.b2b_contracts.add(contract)
     user_orgs = factories.UserOrganizationFactory.create_batch(
         3, organization=contract.organization
     )
 
     products = ensure_contract_run_products(contract)
+    assert products
+
     if existing_discounts:
         # Testing for existing discounts means we should create some orders where
         # the discount is used, to make sure we don't end up with extras.
@@ -1837,9 +1840,10 @@ def test_create_contract_run_duplicate_language_source_raises(mocker, in_contrac
     )
 
     if in_contract == "both":
+        second_run.b2b_only = True
+        second_run.save()
+
         with pytest.raises(ValidationError):
-            second_run.b2b_only = True
-            second_run.save()
             second_run.b2b_contracts.add(contract)
     elif in_contract == "no":
         # Both runs are public, so re-validating the existing row surfaces the

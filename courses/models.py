@@ -1783,7 +1783,8 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
 
         if (
             contract.max_learners
-            and contract.get_enrollments.count() >= contract.max_learners
+            and contract.max_learners > 0
+            and contract.get_enrollments().count() >= contract.max_learners
         ):
             return False
 

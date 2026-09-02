@@ -613,7 +613,7 @@ class ContractPage(Page, ClusterableModel):
 
         return (
             CourseRunEnrollment.objects.prefetch_related("run", "run__course")
-            .filter(run__b2b_contract=self, change_status__isnull=True)
+            .filter(run__b2b_contracts=self, change_status__isnull=True)
             .all()
         )
 
