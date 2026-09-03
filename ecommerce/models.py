@@ -752,6 +752,7 @@ class OrderRefundStatus(TextChoices):
     REQUESTED = "requested"
     DENIED = "denied"
     ELIGIBLE = "eligible"
+    REVIEW_REQUIRED = "review_required"
     WINDOW_CLOSED = "window_closed"
     INELIGIBLE = "ineligible"
 
@@ -1025,7 +1026,12 @@ class Order(TimestampedModel):
 
     @property
     def is_refund_eligible(self):
-        """Return True if the learner could request a refund for this order now."""
+        """
+        True when `refund_status` is `eligible`: the in-window self-service case.
+
+        A `review_required` or `window_closed` order is still submittable
+        through the free-text request path; see `refund_status`.
+        """
         return self.refund_status == OrderRefundStatus.ELIGIBLE
 
     @cached_property
@@ -1040,6 +1046,18 @@ class Order(TimestampedModel):
         triple is the line's uniqueness constraint.
         """
         return any(run.b2b_contract_id for run in self.purchased_runs)
+
+    @property
+    def funds_fulfilled_redemption(self):
+        """
+        True when a line of this order funds a paid-amount-off redemption on a
+        fulfilled order (hq#11846).
+        """
+        from ecommerce.discount_sources import (  # noqa: PLC0415
+            fulfilled_redemptions_funded_by,
+        )
+
+        return fulfilled_redemptions_funded_by(self).exists()
 
     @cached_property
     def latest_refund_request(self):
@@ -1066,12 +1084,15 @@ class Order(TimestampedModel):
         Return where this order sits in the self-service refund flow.
 
         Precedence matters: a refund that already happened settles the question,
-        then any request the learner has made, and only then whether they could
-        make one right now.
+        then any request the learner has made, then whether the order is
+        refundable at all, then whether a person has to review it, and only then
+        the window.
 
-        The final branch deliberately mirrors what `RefundRequestSerializer`
-        accepts, so anything but `eligible` or `window_closed` means a request
-        would be rejected.
+        `eligible` means the in-window request form with preset reasons.
+        `review_required` and `window_closed` are both still submittable through
+        the free-text path — `RefundRequestSerializer` gates on ownership,
+        fulfilled state, B2B and an existing pending request, never on the
+        window — and land in the manual queue instead.
         """
         if self.state in (OrderStatus.REFUNDED, OrderStatus.PARTIALLY_REFUNDED):
             return OrderRefundStatus.COMPLETED
@@ -1088,6 +1109,12 @@ class Order(TimestampedModel):
 
         if self.state != OrderStatus.FULFILLED or self.is_b2b_order:
             return OrderRefundStatus.INELIGIBLE
+
+        # Refunding this order would leave the credit it funded in place —
+        # clawback is out of scope — so the request is accepted but reviewed
+        # by a person regardless of the window.
+        if self.funds_fulfilled_redemption:
+            return OrderRefundStatus.REVIEW_REQUIRED
 
         return (
             OrderRefundStatus.ELIGIBLE

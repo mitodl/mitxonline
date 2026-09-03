@@ -43,6 +43,7 @@ from ecommerce.factories import (
     BasketFactory,
     BasketItemFactory,
     DiscountFactory,
+    DiscountRedemptionFactory,
     LineFactory,
     OrderFactory,
     PaidAmountOffDiscountFactory,
@@ -58,6 +59,7 @@ from ecommerce.models import (
     DiscountProduct,
     DiscountRedemption,
     Order,
+    OrderRefundStatus,
     OrderStatus,
     RefundRequest,
     RefundRequestStatus,
@@ -1957,6 +1959,31 @@ def test_refund_request_duplicate_rejected(user, user_drf_client):
     assert resp.status_code == 400
     assert "order" in resp.json()["errors"]
     assert RefundRequest.objects.filter(order=order).count() == 1
+
+
+def test_refund_request_accepted_when_review_is_required(
+    paid_amount_off_source, user_drf_client
+):
+    """A used-source order can still request a refund — it just gets a human."""
+    order = paid_amount_off_source.source_line.order
+    DiscountRedemptionFactory.create(
+        redeemed_discount=paid_amount_off_source.discount,
+        source_line=paid_amount_off_source.source_line,
+        redeemed_order=OrderFactory.create(state=OrderStatus.FULFILLED),
+    )
+    assert order.refund_status == OrderRefundStatus.REVIEW_REQUIRED
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": "other",
+            "refund_reason_text": "I upgraded to the full program.",
+            "consent_given": True,
+        },
+    )
+
+    assert resp.status_code == 201
 
 
 def test_refund_request_allowed_after_denial(user, user_drf_client):

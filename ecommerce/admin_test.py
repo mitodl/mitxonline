@@ -7,7 +7,10 @@ from django.urls import reverse
 from reversion.models import Version
 
 from courses.factories import CourseRunFactory
-from ecommerce.factories import OrderFactory
+from ecommerce.factories import (
+    DiscountRedemptionFactory,
+    OrderFactory,
+)
 from ecommerce.models import OrderStatus, Product
 
 pytestmark = [pytest.mark.django_db]
@@ -222,3 +225,45 @@ def test_admin_product_create_generates_reversion(client, admin_user):
 
     product = Product.all_objects.get(description="Admin created versioned product")
     assert Version.objects.get_for_object(product).count() == 1
+
+
+def test_admin_refund_view_lists_the_credits_a_refund_would_leave_behind(
+    client, admin_user, paid_amount_off_source
+):
+    """Support sees which order the credit went to before knowingly refunding."""
+    _login_admin(client, admin_user)
+    order = paid_amount_off_source.source_line.order
+    redemption = DiscountRedemptionFactory.create(
+        redeemed_discount=paid_amount_off_source.discount,
+        source_line=paid_amount_off_source.source_line,
+        redeemed_order=OrderFactory.create(state=OrderStatus.FULFILLED),
+    )
+
+    response = client.get(f"{reverse('refund-order')}?order={order.id}")
+
+    assert response.status_code == 200
+    assert list(response.context["used_source_redemptions"]) == [redemption]
+    assert redemption.redeemed_order.reference_number in response.content.decode()
+
+
+def test_admin_refund_view_keeps_the_credit_warning_on_a_rejected_form(
+    client, admin_user, paid_amount_off_source
+):
+    """The re-rendered form after a validation error still carries the warning."""
+    _login_admin(client, admin_user)
+    order = paid_amount_off_source.source_line.order
+    redemption = DiscountRedemptionFactory.create(
+        redeemed_discount=paid_amount_off_source.discount,
+        source_line=paid_amount_off_source.source_line,
+        redeemed_order=OrderFactory.create(state=OrderStatus.FULFILLED),
+    )
+
+    response = client.post(
+        reverse("refund-order"),
+        data={"order": str(order.id), "_selected_action": str(order.id)},
+    )
+
+    assert response.status_code == 200
+    assert response.context["form_valid"] is False
+    assert list(response.context["used_source_redemptions"]) == [redemption]
+    assert redemption.redeemed_order.reference_number in response.content.decode()

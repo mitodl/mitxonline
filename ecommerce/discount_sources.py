@@ -375,6 +375,9 @@ def fulfilled_redemptions_funded_by(order) -> QuerySet[DiscountRedemption]:
         fulfilled_paid_amount_off_redemptions()
         .filter(source_line__order=order)
         .exclude(redeemed_order=order)
+        # Callers that read rows name the order the credit went to; an
+        # exists() caller pays nothing for the join.
+        .select_related("redeemed_order")
     )
 
 

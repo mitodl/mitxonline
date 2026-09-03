@@ -1309,10 +1309,10 @@ def test_refund_window_extends_for_a_course_starting_after_purchase():
         assert not order.is_within_refund_window
 
 
-def test_is_refund_eligible_only_when_a_request_would_be_accepted():
+def test_is_refund_eligible_means_the_in_window_self_service_case():
     """
-    `is_refund_eligible` answers "could the learner request a refund now", not
-    "is the window open" — being in window is necessary but not sufficient.
+    `is_refund_eligible` is `refund_status == eligible`, not "is the window
+    open" — being in window is necessary but not sufficient.
     """
     fulfilled = OrderFactory.create(state=OrderStatus.FULFILLED)
     assert fulfilled.is_refund_eligible
@@ -1419,6 +1419,54 @@ def test_refund_status_completed_outranks_everything(user, state):
     )
 
     assert order.refund_status == OrderRefundStatus.COMPLETED
+
+
+def test_refund_status_review_required_when_the_order_funded_a_credit():
+    """Refunding it would keep the credit alive — those requests need a human."""
+    line = _line_for(Decimal("100.00"))
+    order = line.order
+
+    assert order.refund_status == OrderRefundStatus.ELIGIBLE
+
+    redemption = DiscountRedemptionFactory.create(
+        redeemed_discount=PaidAmountOffDiscountFactory.create(),
+        source_line=line,
+        redeemed_order=OrderFactory.create(state=OrderStatus.PENDING),
+    )
+    # A pending consumer has not consumed anything yet.
+    assert order.refund_status == OrderRefundStatus.ELIGIBLE
+
+    redemption.redeemed_order.state = OrderStatus.FULFILLED
+    redemption.redeemed_order.save()
+
+    assert order.refund_status == OrderRefundStatus.REVIEW_REQUIRED
+    assert order.is_refund_eligible is False
+
+    # Review outranks the window: window_closed would hide the credit from support.
+    with freeze_time(order.created_on + timedelta(days=REFUND_WINDOW_DAYS, seconds=1)):
+        assert order.refund_status == OrderRefundStatus.REVIEW_REQUIRED
+
+
+def test_refund_status_ignores_redemptions_that_spent_nothing_of_this_order():
+    """
+    Only a paid-amount-off redemption on another order counts: a standard
+    redemption may legally carry a source_line, and an order's own redemption is
+    not a credit it funded for someone else.
+    """
+    line = _line_for(Decimal("100.00"))
+    order = line.order
+
+    DiscountRedemptionFactory.create(
+        source_line=line,
+        redeemed_order=OrderFactory.create(state=OrderStatus.FULFILLED),
+    )
+    DiscountRedemptionFactory.create(
+        redeemed_discount=PaidAmountOffDiscountFactory.create(),
+        source_line=line,
+        redeemed_order=order,
+    )
+
+    assert order.refund_status == OrderRefundStatus.ELIGIBLE
 
 
 def test_refund_reviewed_on_is_none_while_pending(user):
