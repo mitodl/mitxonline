@@ -16,6 +16,7 @@ from reversion.admin import VersionAdmin
 from viewflow import fsm
 
 from ecommerce.api import refund_order
+from ecommerce.discount_sources import fulfilled_redemptions_funded_by
 from ecommerce.forms import AdminRefundOrderForm
 from ecommerce.models import (
     Basket,
@@ -402,6 +403,11 @@ class RefundedOrderAdmin(FlowOrderAdmin):
         return super().get_queryset(request).filter(state=OrderStatus.REFUNDED)
 
 
+def _used_source_redemptions(order):
+    """Paid-amount-off credits a line of this order funded, which a refund leaves in place."""
+    return fulfilled_redemptions_funded_by(order)
+
+
 class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
     template_name = "refund_order_confirm.html"
     permission_required = "is_superuser"
@@ -476,6 +482,7 @@ class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, Template
                     "form_valid": refund_form.is_valid(),
                     "errors": errors,
                     "error_messages": error_messages,
+                    "used_source_redemptions": _used_source_redemptions(order),
                 },
             )
         except NotImplementedError:
@@ -521,6 +528,7 @@ class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, Template
                 "order": order,
                 "form_valid": True,
                 "errors": {},
+                "used_source_redemptions": _used_source_redemptions(order),
             },
         )
 

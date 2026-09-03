@@ -52,6 +52,7 @@ from ecommerce.api import (
     generate_discount_code,
     get_auto_apply_discounts_for_basket,
 )
+from ecommerce.discount_sources import funds_fulfilled_redemption_exists
 from ecommerce.exceptions import ProductBlockedError
 from ecommerce.models import (
     Basket,
@@ -998,6 +999,8 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
                     ).prefetch_related("purchased_object"),
                 ),
             )
+            # Read by Order.refund_status for every fulfilled row.
+            .annotate(funds_fulfilled_redemption=funds_fulfilled_redemption_exists())
             .order_by("-created_on")
             .all()
         )

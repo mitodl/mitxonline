@@ -367,17 +367,33 @@ def log_source_anomalies(order) -> None:
         )
 
 
+def _fulfilled_redemptions_funded_by(order) -> QuerySet[DiscountRedemption]:
+    """``order`` may be an Order or an OuterRef to one."""
+    return (
+        fulfilled_paid_amount_off_redemptions()
+        .filter(source_line__order=order)
+        .exclude(redeemed_order=order)
+    )
+
+
 def fulfilled_redemptions_funded_by(order) -> QuerySet[DiscountRedemption]:
     """
     FULFILLED paid-amount-off redemptions on other orders that a line of
     ``order`` funded — the credits that survive refunding ``order``, since
     OrderFlow.refund touches only transactions.
     """
-    return (
-        fulfilled_paid_amount_off_redemptions()
-        .filter(source_line__order=order)
-        .exclude(redeemed_order=order)
-    )
+    # Callers that read rows name the order the credit went to; an exists()
+    # caller pays nothing for the join.
+    return _fulfilled_redemptions_funded_by(order).select_related("redeemed_order")
+
+
+def funds_fulfilled_redemption_exists() -> Exists:
+    """
+    The question ``Order.funds_fulfilled_redemption`` asks, as an ``Exists``
+    for annotating an Order queryset under that same name, so a page of orders
+    answers it in the page query instead of once per row.
+    """
+    return Exists(_fulfilled_redemptions_funded_by(OuterRef("pk")))
 
 
 def double_spent_source_line_ids() -> list[int]:

@@ -21,6 +21,18 @@
         <li> Reference: {{ order.reference_number }}</li>
     </ul>
 
+    {% if used_source_redemptions %}
+    <ul class="messagelist">
+        {% for redemption in used_source_redemptions %}
+        <li class="warning">
+            A purchase on this order funded a paid-amount-off discount on order
+            {{ redemption.redeemed_order.reference_number }}. Refunding this order
+            will not claw that discount back.
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
     <form method="POST" id="refund_order_form" novalidate>
     {% csrf_token %}
     <input type="hidden" name="action" value="process_refund" />

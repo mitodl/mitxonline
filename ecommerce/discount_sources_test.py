@@ -14,6 +14,7 @@ from ecommerce.constants import (
 from ecommerce.discount_sources import (
     double_spent_source_line_ids,
     find_source_conflict,
+    funds_fulfilled_redemption_exists,
     released_source_lines,
     resolve_for_discount,
     resolve_program_child_purchase,
@@ -29,7 +30,7 @@ from ecommerce.factories import (
     ProgramProductFactory,
     make_purchase,
 )
-from ecommerce.models import DiscountProduct, OrderStatus
+from ecommerce.models import DiscountProduct, Order, OrderStatus
 
 pytestmark = [pytest.mark.django_db]
 
@@ -493,3 +494,35 @@ def test_double_spent_source_line_ids_counts_orders_not_rows(paid_amount_off_sou
         )
 
     assert double_spent_source_line_ids() == []
+
+
+def test_funds_fulfilled_redemption_exists_matches_the_property(
+    user, django_assert_num_queries
+):
+    """
+    The annotation answers exactly what Order.funds_fulfilled_redemption does,
+    and an annotated instance reads it without a query of its own.
+    """
+    funder = make_purchase(user, CourseRunFactory.create(), Decimal("100.00")).order
+    bystander = make_purchase(user, CourseRunFactory.create(), Decimal("100.00")).order
+    consumer = OrderFactory.create(state=OrderStatus.FULFILLED)
+    DiscountRedemptionFactory.create(
+        redeemed_discount=PaidAmountOffDiscountFactory.create(),
+        source_line=funder.lines.first(),
+        redeemed_order=consumer,
+    )
+
+    annotated = list(
+        Order.objects.annotate(
+            funds_fulfilled_redemption=funds_fulfilled_redemption_exists()
+        )
+    )
+    with django_assert_num_queries(0):
+        by_id = {order.id: order.funds_fulfilled_redemption for order in annotated}
+
+    assert by_id[funder.id] is True
+    assert by_id[bystander.id] is False
+    assert by_id == {
+        order.id: Order.objects.get(id=order.id).funds_fulfilled_redemption
+        for order in annotated
+    }
