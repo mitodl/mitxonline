@@ -9874,6 +9874,7 @@ components:
       - requested
       - denied
       - eligible
+      - review_required
       - window_closed
       - ineligible
       type: string
@@ -9882,6 +9883,7 @@ components:
         * `requested` - Requested
         * `denied` - Denied
         * `eligible` - Eligible
+        * `review_required` - Review Required
         * `window_closed` - Window Closed
         * `ineligible` - Ineligible
       x-enum-descriptions:
@@ -9889,6 +9891,7 @@ components:
       - Requested
       - Denied
       - Eligible
+      - Review Required
       - Window Closed
       - Ineligible
     ResultEnum:

@@ -45,6 +45,7 @@ from ecommerce.factories import (
     BasketFactory,
     BasketItemFactory,
     DiscountFactory,
+    DiscountRedemptionFactory,
     LineFactory,
     OrderFactory,
     PaidAmountOffDiscountFactory,
@@ -52,6 +53,7 @@ from ecommerce.factories import (
     ProgramProductFactory,
     TransactionFactory,
     UnlimitedUseDiscountFactory,
+    make_purchase,
 )
 from ecommerce.models import (
     Basket,
@@ -61,6 +63,7 @@ from ecommerce.models import (
     DiscountProduct,
     DiscountRedemption,
     Order,
+    OrderRefundStatus,
     OrderStatus,
     RefundRequest,
     RefundRequestStatus,
@@ -2041,6 +2044,62 @@ def test_refund_request_duplicate_rejected(user, user_drf_client):
     assert resp.status_code == 400
     assert "order" in resp.json()["errors"]
     assert RefundRequest.objects.filter(order=order).count() == 1
+
+
+def test_refund_request_accepted_when_review_is_required(
+    paid_amount_off_source, user_drf_client
+):
+    """A used-source order can still request a refund — it just gets a human."""
+    order = paid_amount_off_source.source_line.order
+    DiscountRedemptionFactory.create(
+        redeemed_discount=paid_amount_off_source.discount,
+        source_line=paid_amount_off_source.source_line,
+        redeemed_order=OrderFactory.create(state=OrderStatus.FULFILLED),
+    )
+    assert order.refund_status == OrderRefundStatus.REVIEW_REQUIRED
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": "other",
+            "refund_reason_text": "I upgraded to the full program.",
+            "consent_given": True,
+        },
+    )
+
+    assert resp.status_code == 201
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize("order_count", [2, 6])
+def test_order_history_answers_funded_credits_in_the_page_query(
+    user, user_drf_client, order_count
+):
+    """The funded-credit check is one EXISTS in the list query, not one per order."""
+    lines = [
+        make_purchase(user, CourseRunFactory.create(), Decimal("100.00"))
+        for _ in range(order_count)
+    ]
+    DiscountRedemptionFactory.create(
+        redeemed_discount=PaidAmountOffDiscountFactory.create(),
+        source_line=lines[0],
+        redeemed_order=OrderFactory.create(state=OrderStatus.FULFILLED),
+    )
+
+    with CaptureQueriesContext(connection) as ctx:
+        resp = user_drf_client.get(reverse("v0:orderhistory_api-list"))
+
+    assert resp.status_code == 200
+    eligible = {
+        order["id"]: order["refund_eligible"] for order in resp.json()["results"]
+    }
+    assert eligible[lines[0].order.id] is False
+    assert all(eligible[line.order.id] for line in lines[1:])
+    assert (
+        sum("ecommerce_discountredemption" in q["sql"] for q in ctx.captured_queries)
+        == 1
+    )
 
 
 def test_refund_request_allowed_after_denial(user, user_drf_client):
