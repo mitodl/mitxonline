@@ -194,7 +194,8 @@ def test_get_unused_discounts(user):
         max_learners=10,
     )
 
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=run)
 
     created, _, _ = ensure_enrollment_codes_exist(contract)

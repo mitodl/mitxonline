@@ -553,7 +553,7 @@ def test_start_checkout_with_discounts_and_b2b(
     with reversion.create_revision():
         product = ProductFactory.create(price=999)
 
-    product.purchasable_object.b2b_contract = contract
+    product.purchasable_object.b2b_contracts.add(contract)
     product.purchasable_object.save()
     product.refresh_from_db()
 

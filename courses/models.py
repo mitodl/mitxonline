@@ -1226,7 +1226,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             )
 
         if org_id is None and contract_id is None:
-            courseruns = filter(lambda run: run.b2b_contract_id is None, courseruns)
+            courseruns = filter(lambda run: not run.b2b_only, courseruns)
 
         return list(courseruns)
 
@@ -1668,10 +1668,12 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
         self.clean_language()
 
         if self.pk:
-            self.validate_b2b_contract_group_uniqueness(
-                self.b2b_contracts.values_list("id", flat=True)
-            )
-        elif not self.b2b_only and not self.b2b_contract_id:
+            self.validate_b2b_contract_group_uniqueness(self.contract_group_ids)
+        elif self.b2b_contract_id:
+            # The deprecated FK is populated before the first save, so the
+            # group it names is already known and can be checked now.
+            self.validate_b2b_contract_group_uniqueness([self.b2b_contract_id])
+        elif not self.b2b_only:
             # An unsaved row has no primary key, so `b2b_contracts` can't be
             # queried yet - B2B runs get their contracts attached immediately
             # after this first save. Only rows that are unambiguously public
@@ -1706,6 +1708,19 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
             using=using,
             update_fields=update_fields,
         )
+
+    @property
+    def contract_group_ids(self):
+        """
+        Return the ids of every contract group this run belongs to, combining
+        the ``b2b_contracts`` M2M with the deprecated ``b2b_contract`` FK.
+        """
+        ids = set(self.b2b_contracts.values_list("id", flat=True)) if self.pk else set()
+
+        if self.b2b_contract_id:
+            ids.add(self.b2b_contract_id)
+
+        return ids
 
     def validate_b2b_contract_group_uniqueness(self, contract_ids):
         """
@@ -1743,12 +1758,18 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
                 is_source_run=self.is_source_run,
             ).exclude(pk=self.pk)
 
+            # Runs can be linked to a contract through the M2M or through the
+            # deprecated FK (which is still written directly in places), so
+            # both have to be considered when building a group.
             siblings = (
-                siblings.filter(b2b_contracts__id=contract_id)
+                siblings.filter(
+                    Q(b2b_contracts__id=contract_id) | Q(b2b_contract_id=contract_id)
+                )
                 if contract_id is not None
-                else siblings.filter(b2b_contracts__isnull=True)
+                else siblings.filter(
+                    b2b_contracts__isnull=True, b2b_contract__isnull=True
+                )
             )
-
             if (
                 self.is_primary_language
                 and siblings.filter(is_primary_language=True).exists()

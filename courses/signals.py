@@ -149,13 +149,13 @@ def validate_course_run_b2b_contracts(
         # instance is a ContractPage, pk_set holds the CourseRun ids being added
         for run in CourseRun.all_objects.filter(pk__in=pk_set or []):
             run.validate_b2b_contract_group_uniqueness(
-                {*run.b2b_contracts.values_list("id", flat=True), instance.pk}
+                {*run.contract_group_ids, instance.pk}
             )
         return
 
     # instance is a CourseRun, pk_set holds the ContractPage ids being added
     instance.validate_b2b_contract_group_uniqueness(
-        {*instance.b2b_contracts.values_list("id", flat=True), *(pk_set or [])}
+        {*instance.contract_group_ids, *(pk_set or [])}
     )
 
 
