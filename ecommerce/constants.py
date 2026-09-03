@@ -16,25 +16,53 @@ REFUND_WINDOW_DAYS = 7
 DISCOUNT_TYPE_PERCENT_OFF = "percent-off"
 DISCOUNT_TYPE_DOLLARS_OFF = "dollars-off"
 DISCOUNT_TYPE_FIXED_PRICE = "fixed-price"
+DISCOUNT_TYPE_PAID_AMOUNT_OFF = "paid-amount-off"
 
 ALL_DISCOUNT_TYPES = [
     DISCOUNT_TYPE_PERCENT_OFF,
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PAID_AMOUNT_OFF,
 ]
 DISCOUNT_TYPES = list(zip(ALL_DISCOUNT_TYPES, ALL_DISCOUNT_TYPES))
+
+# paid-amount-off implies the program-child-purchase redemption type and a
+# stored amount of 0, so the randomized test factories and bulk code
+# generation draw from this subset instead.
+STANDARD_DISCOUNT_TYPES = [
+    discount_type
+    for discount_type in ALL_DISCOUNT_TYPES
+    if discount_type != DISCOUNT_TYPE_PAID_AMOUNT_OFF
+]
+BULK_GENERATION_DISCOUNT_TYPES = list(
+    zip(STANDARD_DISCOUNT_TYPES, STANDARD_DISCOUNT_TYPES)
+)
 
 REDEMPTION_TYPE_ONE_TIME = "one-time"
 REDEMPTION_TYPE_ONE_TIME_PER_USER = "one-time-per-user"
 REDEMPTION_TYPE_UNLIMITED = "unlimited"
+REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE = "program-child-purchase"
 
 ALL_REDEMPTION_TYPES = [
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
+    REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
 ]
 
 REDEMPTION_TYPES = list(zip(ALL_REDEMPTION_TYPES, ALL_REDEMPTION_TYPES))
+
+# program-child-purchase forces automatic=True and program-only product
+# links even when paired with a standard calculation, so the random draw
+# skips it too.
+STANDARD_REDEMPTION_TYPES = [
+    redemption_type
+    for redemption_type in ALL_REDEMPTION_TYPES
+    if redemption_type != REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE
+]
+BULK_GENERATION_REDEMPTION_TYPES = list(
+    zip(STANDARD_REDEMPTION_TYPES, STANDARD_REDEMPTION_TYPES)
+)
 
 PAYMENT_TYPE_MARKETING = "marketing"
 PAYMENT_TYPE_SALES = "sales"

@@ -2,6 +2,7 @@ from decimal import Decimal
 
 import pytest
 
+from ecommerce.constants import ALL_DISCOUNT_TYPES
 from ecommerce.discounts import (
     DiscountType,
     DollarsOffDiscount,
@@ -10,6 +11,7 @@ from ecommerce.discounts import (
 )
 from ecommerce.factories import (
     DiscountFactory,
+    PaidAmountOffDiscountFactory,
     ProductFactory,
     UnlimitedUseDiscountFactory,
 )
@@ -34,23 +36,16 @@ def users():
     return UserFactory.create_batch(2)
 
 
-def test_discount_factory_generation(discounts):
+def test_every_discount_type_has_a_calculation_class():
     """
-    Runs through discounts and makes sure all the ones that come out of the
-    factory are recognizable by the test suite. (This is a sort of sanity
-    check - if a new discount type gets added and the tests aren't updated, this
-    test will fail.)
+    A discount type with no registered class raises KeyError from every pricing
+    path, so adding one to ALL_DISCOUNT_TYPES without a DiscountType subclass
+    has to fail here.
     """
-    for discount in discounts:
-        discount_logic = DiscountType.for_discount(discount)
+    for discount_type in ALL_DISCOUNT_TYPES:
+        discount = DiscountFactory.build(discount_type=discount_type)
 
-        what_type = (
-            type(discount_logic) is DollarsOffDiscount,
-            type(discount_logic) is FixedPriceDiscount,
-            type(discount_logic) is PercentDiscount,
-        )
-
-        assert any(what_type)
+        assert DiscountType.for_discount(discount) is not None
 
 
 def test_discount_factory_adjustment(discounts, products):
@@ -154,3 +149,38 @@ def test_discounted_price_uses_best_price_across_multiple_discounts():
     assert DiscountType.get_discounted_price(applied_discounts, product) == min(
         [*discounted_prices, product.price]
     )
+
+
+@pytest.mark.parametrize(
+    ("resolved_amount", "expected_price"),
+    [
+        pytest.param(None, Decimal("100.00"), id="unresolved-is-full-price"),
+        pytest.param(Decimal("30.00"), Decimal("70.00"), id="subtracts-resolution"),
+        pytest.param(Decimal("150.00"), Decimal("0"), id="clamps-at-zero"),
+    ],
+)
+def test_paid_amount_off_discount_prices_from_the_resolved_amount(
+    resolved_amount, expected_price
+):
+    """The calculation is dollars-off over an injected amount; unresolved never undercharges."""
+    product = ProductFactory.create(price=Decimal("100.00"))
+    discount = PaidAmountOffDiscountFactory.create()
+
+    resolved_amounts = (
+        {discount.id: resolved_amount} if resolved_amount is not None else None
+    )
+    price = DiscountType.get_discounted_price(
+        [discount], product, resolved_amounts=resolved_amounts
+    )
+
+    assert price == expected_price
+
+
+def test_a_resolved_amount_on_a_standard_discount_is_an_error():
+    """Only PaidAmountOffDiscount declares the field; every other type rejects the
+    keyword, so a mapping keyed to the wrong discount fails instead of pricing.
+    """
+    discount = DiscountFactory.create()
+
+    with pytest.raises(TypeError, match="resolved_amount"):
+        DiscountType.for_discount(discount, resolved_amount=Decimal("10.00"))

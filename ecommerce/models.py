@@ -30,12 +30,14 @@ from courses.utils import is_contract_order, is_uai_order
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
     DISCOUNT_TYPES,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     PAYMENT_TYPES,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
+    REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
     REDEMPTION_TYPES,
     REFERENCE_NUMBER_PREFIX,
     REFUND_WINDOW_DAYS,
@@ -261,6 +263,62 @@ class BasketItem(TimestampedModel):
         return self.product.price * self.quantity
 
 
+PROGRAM_PRODUCTS_ONLY_ERROR = (
+    "Program-child-purchase discounts can only be linked to program products."
+)
+
+
+def validate_program_child_purchase_shape(
+    *, discount_type, redemption_type, amount, automatic, discount=None
+):
+    """
+    Enforce the paid-amount-off / program-child-purchase shape on unsaved values.
+
+    Raises django.core.exceptions.ValidationError. DRF's Serializer.run_validation
+    turns that into a 400 when it comes from validate(), so serializers call this
+    rather than restating the rules; the same error raised later, from save(), is
+    not converted and 500s instead.
+
+    Pass discount to also check the product links already stored against it —
+    the clause a PATCH that converts an existing discount has to satisfy.
+    """
+    if discount_type == DISCOUNT_TYPE_PAID_AMOUNT_OFF:
+        if redemption_type != REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE:
+            raise ValidationError(
+                "A paid-amount-off discount requires the program-child-purchase redemption type."  # noqa: EM101
+            )
+        if amount != 0:
+            raise ValidationError(
+                "A paid-amount-off discount's amount is resolved per learner; store 0."  # noqa: EM101
+            )
+
+    if redemption_type == REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE:
+        if not automatic:
+            raise ValidationError(
+                "Program-child-purchase discounts must be automatic."  # noqa: EM101
+            )
+        # One query rather than a fetch of every link row; the per-row form of
+        # the same rule is validate_program_child_purchase_product.
+        if (
+            discount is not None
+            and discount.pk
+            and discount.products.filter(product__isnull=False)
+            .exclude(product__content_type__model="program")
+            .exists()
+        ):
+            raise ValidationError(PROGRAM_PRODUCTS_ONLY_ERROR)
+
+
+def validate_program_child_purchase_product(*, redemption_type, product):
+    """Enforce the program-products clause for a single product link."""
+    if (
+        redemption_type == REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE
+        and product is not None
+        and product.content_type.model != "program"
+    ):
+        raise ValidationError(PROGRAM_PRODUCTS_ONLY_ERROR)
+
+
 class Discount(TimestampedModel):
     """Discount model"""
 
@@ -301,6 +359,35 @@ class Discount(TimestampedModel):
         help_text="The location of this code in the B2B contract's code sheet.",
     )
 
+    class Meta:
+        # A storage-layer backstop for the row-local clauses of
+        # validate_program_child_purchase_shape, because bulk_create and queryset
+        # update() skip save(). The cross-table program-products clause can't
+        # be expressed here.
+        #
+        # The type constraint is one-way on purpose: a program-child-purchase
+        # redemption may pair with a standard calculation (e.g. a
+        # fractional-purchase offer), but the paid-amount-off calculation needs
+        # the redemption rules that go with it — and its stored amount is
+        # meaningless, so anything nonzero is a lie some reader might believe.
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(discount_type=DISCOUNT_TYPE_PAID_AMOUNT_OFF)
+                | (
+                    models.Q(redemption_type=REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE)
+                    & models.Q(amount=0)
+                ),
+                name="paid_amount_off_discount_shape",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(
+                    redemption_type=REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE
+                )
+                | models.Q(automatic=True),
+                name="program_child_purchase_requires_automatic",
+            ),
+        ]
+
     def __str__(self):
         return f"{self.amount} {self.discount_type} {self.redemption_type} - {self.discount_code}"
 
@@ -323,12 +410,31 @@ class Discount(TimestampedModel):
 
         return True
 
+    def check_program_child_purchase_validity(self, *, include_product_links=False):
+        validate_program_child_purchase_shape(
+            discount_type=self.discount_type,
+            redemption_type=self.redemption_type,
+            amount=self.amount,
+            automatic=self.automatic,
+            discount=self if include_product_links else None,
+        )
+
+        return True
+
     def save(self, *args, **kwargs):
-        if self.check_date_validity():
-            super().save(*args, **kwargs)
+        self.check_date_validity()
+        # Row-local rules only. The cross-table program-products clause is
+        # deliberately not checked here: a stray non-program link (bulk_create,
+        # a data migration) would otherwise make every unrelated save() of this
+        # row fail with an error about products. clean() and the serializers
+        # enforce that clause where the edit is actually being made, and
+        # DiscountProduct.save() guards the attach direction.
+        self.check_program_child_purchase_validity()
+        super().save(*args, **kwargs)
 
     def clean(self, *args, **kwargs):
         self.check_date_validity()
+        self.check_program_child_purchase_validity(include_product_links=True)
         super().clean(*args, **kwargs)
 
     @cached_property
@@ -345,6 +451,15 @@ class Discount(TimestampedModel):
         Returns:
             - boolean
         """
+        # A program-child-purchase discount is redeemable only by a learner
+        # holding the qualifying purchase; that eligibility is decided per source
+        # line — a question this method has no way to answer until the resolver
+        # lands (hq#11846). Refuse rather than fall through to the unlimited
+        # semantics at the bottom, which would let any code-redemption endpoint
+        # attach one.
+        if self.redemption_type == REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE:
+            return False
+
         if (
             self.redemption_type == REDEMPTION_TYPE_ONE_TIME
             and DiscountRedemption.objects.filter(
@@ -457,6 +572,9 @@ class Discount(TimestampedModel):
             return f"${amount} off"
         elif self.discount_type == DISCOUNT_TYPE_FIXED_PRICE:
             return f"a fixed price of ${amount}"
+        elif self.discount_type == DISCOUNT_TYPE_PAID_AMOUNT_OFF:
+            # The real value is resolved per user; no amount is renderable here.
+            return "the amount paid for a prior purchase"
 
         return "Indeterminate Discount"
 
@@ -478,12 +596,6 @@ class Discount(TimestampedModel):
             )
 
         return None
-
-    @property
-    def is_full_discount(self):
-        return (
-            self.discount_type == DISCOUNT_TYPE_PERCENT_OFF and self.amount == 100  # noqa: PLR2004
-        ) or (self.discount_type == DISCOUNT_TYPE_FIXED_PRICE and self.amount == 0)
 
     def b2b_contracts(self):
         """Return the applicable B2B contract(s), if any."""
@@ -518,6 +630,21 @@ class DiscountProduct(TimestampedModel):
         blank=True,
         null=True,
     )
+
+    def _check_program_child_purchase_validity(self):
+        # A blank discount is the FK field's own validation error to report.
+        if self.discount_id:
+            validate_program_child_purchase_product(
+                redemption_type=self.discount.redemption_type, product=self.product
+            )
+
+    def clean(self, *args, **kwargs):
+        self._check_program_child_purchase_validity()
+        super().clean(*args, **kwargs)
+
+    def save(self, *args, **kwargs):
+        self._check_program_child_purchase_validity()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         purchaseable_object = (
@@ -1409,6 +1536,16 @@ class DiscountRedemption(TimestampedModel):
     )
     redeemed_order = models.ForeignKey(
         Order, on_delete=models.CASCADE, related_name="discounts"
+    )
+    # PROTECT: once a line funds a redemption its order is part of another
+    # order's price history and must stay reconstructible.
+    source_line = models.ForeignKey(
+        Line,
+        on_delete=models.PROTECT,
+        related_name="funded_redemptions",
+        null=True,
+        blank=True,
+        help_text="The prior purchase line that funds this redemption.",
     )
 
     def __str__(self):

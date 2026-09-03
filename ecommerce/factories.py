@@ -5,11 +5,13 @@ from factory.django import DjangoModelFactory
 from courses.factories import CourseRunFactory, ProgramFactory
 from ecommerce import models
 from ecommerce.constants import (
-    ALL_DISCOUNT_TYPES,
-    ALL_REDEMPTION_TYPES,
+    DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
+    REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
     REDEMPTION_TYPE_UNLIMITED,
+    STANDARD_DISCOUNT_TYPES,
+    STANDARD_REDEMPTION_TYPES,
     ZERO_PAYMENT_DATA,
 )
 from main.utils import now_datetime_with_tz
@@ -40,57 +42,40 @@ class ProgramProductFactory(DjangoModelFactory):
 
 class DiscountFactory(DjangoModelFactory):
     amount = fuzzy.FuzzyInteger(1, 49)
-    discount_type = fuzzy.FuzzyChoice(ALL_DISCOUNT_TYPES)
+    discount_type = fuzzy.FuzzyChoice(STANDARD_DISCOUNT_TYPES)
     discount_code = fuzzy.FuzzyText(length=20)
-    redemption_type = fuzzy.FuzzyChoice(ALL_REDEMPTION_TYPES)
+    redemption_type = fuzzy.FuzzyChoice(STANDARD_REDEMPTION_TYPES)
     payment_type = None
 
     class Meta:
         model = models.Discount
 
 
-# Four factories here to test the redemption ruleset
+# One factory per redemption type, so tests can name the ruleset they exercise.
 
 
-class OneTimeDiscountFactory(DjangoModelFactory):
-    amount = fuzzy.FuzzyInteger(1, 49)
-    discount_type = fuzzy.FuzzyChoice(ALL_DISCOUNT_TYPES)
-    discount_code = fuzzy.FuzzyText(length=20)
+class OneTimeDiscountFactory(DiscountFactory):
     redemption_type = REDEMPTION_TYPE_ONE_TIME
 
-    class Meta:
-        model = models.Discount
 
-
-class OneTimePerUserDiscountFactory(DjangoModelFactory):
-    amount = fuzzy.FuzzyInteger(1, 49)
-    discount_type = fuzzy.FuzzyChoice(ALL_DISCOUNT_TYPES)
-    discount_code = fuzzy.FuzzyText(length=20)
+class OneTimePerUserDiscountFactory(DiscountFactory):
     redemption_type = REDEMPTION_TYPE_ONE_TIME_PER_USER
 
-    class Meta:
-        model = models.Discount
 
-
-class UnlimitedUseDiscountFactory(DjangoModelFactory):
-    amount = fuzzy.FuzzyInteger(1, 49)
-    discount_type = fuzzy.FuzzyChoice(ALL_DISCOUNT_TYPES)
-    discount_code = fuzzy.FuzzyText(length=20)
+class UnlimitedUseDiscountFactory(DiscountFactory):
     redemption_type = REDEMPTION_TYPE_UNLIMITED
 
-    class Meta:
-        model = models.Discount
 
-
-class SetLimitDiscountFactory(DjangoModelFactory):
-    amount = fuzzy.FuzzyInteger(1, 49)
-    discount_type = fuzzy.FuzzyChoice(ALL_DISCOUNT_TYPES)
-    discount_code = fuzzy.FuzzyText(length=20)
+class SetLimitDiscountFactory(DiscountFactory):
     redemption_type = REDEMPTION_TYPE_UNLIMITED
     max_redemptions = fuzzy.FuzzyInteger(1, 4)
 
-    class Meta:
-        model = models.Discount
+
+class PaidAmountOffDiscountFactory(DiscountFactory):
+    amount = 0
+    discount_type = DISCOUNT_TYPE_PAID_AMOUNT_OFF
+    redemption_type = REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE
+    automatic = True
 
 
 class BasketFactory(DjangoModelFactory):

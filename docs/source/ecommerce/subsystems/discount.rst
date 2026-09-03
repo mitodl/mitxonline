@@ -15,6 +15,7 @@ Discount types would track how the discounted price is computed, some examples/i
 ``percent-off``: a percentage off the original price
 ``dollars-off``: a fixed dollar reduction in price (e.g. $30 off)
 ``fixed-price``: the price is discounted to the fixed price (e.g. a product would cost $100 regardless of what the original price was)
+``paid-amount-off``: the price is reduced by what the learner already paid for a qualifying prior purchase (e.g. a course bought before its program). The stored ``amount`` is 0; the real value is resolved per learner from their order history. Requires ``redemption_type=program-child-purchase``.
 
 Redemption Types
 ^^^^^^^^^^^^^^^^
@@ -23,6 +24,7 @@ There may be a few different ways we want to track discount usage, for example:
 ``one-time``: the discount can only be used once by anyone
 ``one-time-per-user``: the discount can be used once per user
 ``unlimited``: the discount can be used any number of times
+``program-child-purchase``: an eligibility rule rather than a usage limit — only a learner who has purchased a direct child of the discount's program may redeem it. Must be ``automatic`` and may only be linked to program products.
 
 Data Models
 ^^^^^^^^^^^

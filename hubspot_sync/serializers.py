@@ -13,7 +13,6 @@ from courses.models import (
     ProgramEnrollment,
 )
 from ecommerce import models
-from ecommerce.constants import DISCOUNT_TYPE_DOLLARS_OFF, DISCOUNT_TYPE_PERCENT_OFF
 from ecommerce.discounts import product_from_version
 from hubspot_sync.api import format_product_name, get_hubspot_id_for_object
 from main.utils import format_decimal
@@ -187,21 +186,6 @@ class OrderToDealSerializer(serializers.ModelSerializer):
     pipeline = serializers.ReadOnlyField(default=settings.HUBSPOT_PIPELINE_ID)
     status = serializers.ReadOnlyField(source="state")
 
-    def _get_product(self, instance):
-        """Retrieve the first line's product and cache it on the order instance."""
-        cache_attr = "_hubspot_order_product"
-        if hasattr(instance, cache_attr):
-            return getattr(instance, cache_attr)
-
-        first_line = _get_first_order_line(instance)
-        product = (
-            product_from_version(first_line.product_version)
-            if first_line is not None
-            else None
-        )
-        setattr(instance, cache_attr, product)
-        return product
-
     def _get_discount(self, instance):
         """Return the first redeemed discount for the order."""
         cache_attr = "_hubspot_order_discount"
@@ -256,37 +240,41 @@ class OrderToDealSerializer(serializers.ModelSerializer):
         """Get the amount paid after discount"""
         return format_decimal(instance.total_price_paid)
 
+    def _get_discounted_line_prices(self, instance):
+        """
+        The order's list and discounted unit prices as (list, discounted), or
+        None when there is no discount to report.
+
+        Both come from the price frozen onto the line when the order was priced,
+        so neither drifts if the discount is edited afterwards, and the
+        subtraction is right for every discount type — including one whose
+        stored amount is always 0.
+        """
+        line = _get_first_order_line(instance)
+        if not self._get_discount(instance) or line is None:
+            return None
+
+        return (Decimal(line.unit_price), line.get_discounted_unit_price())
+
     def get_discount_amount(self, instance):
         """Get the discount amount if any"""
-        discount = self._get_discount(instance)
-        if not discount:
+        prices = self._get_discounted_line_prices(instance)
+        if prices is None:
             return "0.00"
-        product_price = self._get_product(instance).price
-        if discount.discount_type == DISCOUNT_TYPE_PERCENT_OFF:
-            discount_amount = Decimal(product_price * (discount.amount / 100))
-        elif discount.discount_type == DISCOUNT_TYPE_DOLLARS_OFF:
-            discount_amount = discount.amount
-        else:
-            discount_amount = Decimal(product_price - discount.amount)
-        return format_decimal(discount_amount)
+        list_price, discounted_price = prices
+        return format_decimal(list_price - discounted_price)
 
     def get_discount_percent(self, instance):
         """Get the discount percentage if any"""
-        discount = self._get_discount(instance)
-        if not discount:
+        prices = self._get_discounted_line_prices(instance)
+        if prices is None:
             return "0"
-        product_price = self._get_product(instance).price
-        if discount.discount_type == DISCOUNT_TYPE_PERCENT_OFF:
-            discount_percent = discount.amount
-        elif discount.discount_type == DISCOUNT_TYPE_DOLLARS_OFF:
-            discount_percent = Decimal(discount.amount / product_price) * 100
-        elif discount.amount == 0 or product_price == 0:
-            discount_percent = Decimal(100)
-        else:
-            discount_percent = Decimal(
-                ((product_price - discount.amount) / product_price) * 100
-            )
-        return format_decimal(discount_percent)
+        list_price, discounted_price = prices
+        if list_price == 0:
+            # A $0 product carrying a discount code is fully discounted by
+            # convention (B2B enrollment codes).
+            return format_decimal(Decimal(100))
+        return format_decimal((list_price - discounted_price) / list_price * 100)
 
     def get_coupon_code(self, instance):
         """Get the coupon code used for the order if any"""
