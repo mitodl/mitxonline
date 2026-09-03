@@ -88,9 +88,32 @@ RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
 
 FROM code AS jupyter-notebook
 
-RUN uv pip install --force-reinstall jupyter
+USER root
+
+# Same operator/debugging tooling as local-dev/development, and for the same
+# reason: interactive-use-only (this stage backs docker-compose's `notebook`
+# service), so it stays out of `base`/production. See local-dev's comment
+# above for why update-passwd is needed before installing screen.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    update-passwd && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+      dnsutils \
+      htop \
+      iputils-ping \
+      less \
+      libcairo2-dev \
+      lsof \
+      nano \
+      ngrep \
+      procps \
+      screen \
+      wget
 
 USER mitodl
+
+RUN uv pip install --force-reinstall jupyter
 
 # ─── Development target (docker compose) ─────────────────────────────────────
 FROM django-server AS development
