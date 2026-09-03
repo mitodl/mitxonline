@@ -1581,15 +1581,146 @@ def test_program_child_purchase_discount_tolerates_a_product_less_link_row():
     discount.clean()
 
 
-def test_program_child_purchase_discount_is_not_redeemable_by_anyone(user):
+def test_program_child_purchase_discount_is_not_redeemable_without_products(user):
     """
-    Eligibility is per qualifying purchase and has no resolver yet, so the
-    generic redemption check has to refuse rather than treat the discount as
-    unlimited-use.
+    Without product context there is nothing to resolve a source against, and a
+    program-child-purchase discount is automatic-only — so the code-redemption
+    path and the CMS finaid quote, which pass no products, can never attach one.
     """
     discount = PaidAmountOffDiscountFactory.create()
 
     assert discount.is_redeemable_by(user) is False
+
+
+def test_discount_product_quotes_the_resolved_credit(paid_amount_off_source):
+    """Discount.discount_product carries the per-user resolution."""
+    quoted = paid_amount_off_source.discount.discount_product(
+        paid_amount_off_source.program_product, paid_amount_off_source.user
+    )
+
+    assert quoted == Decimal("899.00")
+
+
+def test_discount_product_quotes_full_price_without_a_user(paid_amount_off_source):
+    """With no user there is nothing to resolve against, so the quote is the list price."""
+    quoted = paid_amount_off_source.discount.discount_product(
+        paid_amount_off_source.program_product
+    )
+
+    assert quoted == Decimal("999.00")
+
+
+def test_discount_product_declines_without_a_source(paid_amount_off_source):
+    """No source, no quote — the guard and the price agree."""
+    quoted = paid_amount_off_source.discount.discount_product(
+        paid_amount_off_source.program_product, UserFactory.create()
+    )
+
+    assert quoted is None
+
+
+def test_is_redeemable_by_requires_a_resolvable_source(paid_amount_off_source):
+    """A program-child-purchase discount is redeemable only with an available source."""
+    discount = paid_amount_off_source.discount
+    products = [paid_amount_off_source.program_product]
+
+    assert discount.is_redeemable_by(paid_amount_off_source.user, products) is True
+    assert discount.is_redeemable_by(UserFactory.create(), products) is False
+
+
+def test_is_redeemable_by_still_honors_max_redemptions(paid_amount_off_source):
+    """The program-child-purchase guard falls through to the limit checks, not past them."""
+    discount = paid_amount_off_source.discount
+    discount.max_redemptions = 1
+    discount.save()
+    DiscountRedemptionFactory.create(
+        redeemed_discount=discount,
+        redeemed_order=OrderFactory.create(state=OrderStatus.FULFILLED),
+    )
+
+    assert (
+        discount.is_redeemable_by(
+            paid_amount_off_source.user, [paid_amount_off_source.program_product]
+        )
+        is False
+    )
+
+
+def test_is_redeemable_by_fails_closed_without_linked_products(paid_amount_off_source):
+    """A program-child-purchase discount with no DiscountProduct rows resolves nothing."""
+    unlinked = PaidAmountOffDiscountFactory.create()
+
+    assert (
+        unlinked.is_redeemable_by(
+            paid_amount_off_source.user, [paid_amount_off_source.program_product]
+        )
+        is False
+    )
+
+
+def test_is_redeemable_by_checks_the_product_in_hand_not_every_link(
+    paid_amount_off_source,
+):
+    """A source for one linked program does not unlock a different linked program."""
+    with reversion.create_revision():
+        other_program_product = ProgramProductFactory.create()
+    DiscountProduct.objects.create(
+        discount=paid_amount_off_source.discount, product=other_program_product
+    )
+
+    assert (
+        paid_amount_off_source.discount.is_redeemable_by(
+            paid_amount_off_source.user, [other_program_product]
+        )
+        is False
+    )
+
+
+def test_is_redeemable_by_keys_eligibility_on_the_redemption_type(
+    paid_amount_off_source,
+):
+    """
+    A percent-off discount with the program-child-purchase redemption type is
+    gated by the same source check: the arm reads the redemption type, so a
+    stranger is refused instead of falling through to unlimited semantics.
+    """
+    percent_off = DiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+        redemption_type=REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+        automatic=True,
+    )
+    DiscountProduct.objects.create(
+        discount=percent_off, product=paid_amount_off_source.program_product
+    )
+
+    assert (
+        percent_off.is_redeemable_by(
+            paid_amount_off_source.user, [paid_amount_off_source.program_product]
+        )
+        is True
+    )
+
+
+def test_is_valid_for_basket_inherits_the_program_child_purchase_guard(
+    paid_amount_off_source,
+):
+    """
+    The auto-apply/attach path hands the basket's products to the guard: the
+    learner holding the source passes, a stranger does not.
+    """
+    own_basket = BasketFactory.create(user=paid_amount_off_source.user)
+    BasketItem.objects.create(
+        basket=own_basket, product=paid_amount_off_source.program_product, quantity=1
+    )
+    stranger_basket = BasketFactory.create(user=UserFactory.create())
+    BasketItem.objects.create(
+        basket=stranger_basket,
+        product=paid_amount_off_source.program_product,
+        quantity=1,
+    )
+
+    assert paid_amount_off_source.discount.is_valid_for_basket(own_basket) is True
+    assert paid_amount_off_source.discount.is_valid_for_basket(stranger_basket) is False
 
 
 def test_friendly_format_for_paid_amount_off():

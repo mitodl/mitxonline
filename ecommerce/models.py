@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable  # noqa: TC003
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import List  # noqa: UP035
@@ -455,24 +456,40 @@ class Discount(TimestampedModel):
         """Returns True if the discount has been redeemed"""
         return DiscountRedemption.objects.filter(redeemed_discount=self).exists()
 
-    def is_redeemable_by(self, user: User):
+    def is_redeemable_by(self, user: User, products: Iterable[Product] | None = None):
         """
-        Enforces the redemption rules for a given discount.
+        Enforces the redemption rules for a given discount: how often it may be
+        redeemed, whether it is inside its date window, and — for a
+        program-child-purchase redemption — whether this user still holds an
+        unconsumed qualifying purchase for one of the products in hand.
+
+        Independent of check_validity_with_products (product scope and
+        liveness); is_valid_for_basket composes the two.
+
+        ``products`` is context for the program-child-purchase arm alone.
+        Omitting it means no product is in hand (a code redemption, the CMS
+        finaid quote), and a program-child-purchase discount is never
+        redeemable there.
 
         Args:
             - user (User): The user requesting the discount.
+            - products (Iterable[Product] or None): the products the discount is
+              being checked against — the basket's, or the one being priced.
         Returns:
             - boolean
         """
-        # A program-child-purchase discount is redeemable only by a learner
-        # holding the qualifying purchase; that eligibility is decided per source
-        # line — a question this method has no way to answer until the resolver
-        # lands (hq#11846). Refuse rather than fall through to the unlimited
-        # semantics at the bottom, which would let any code-redemption endpoint
-        # attach one.
         if self.redemption_type == REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE:
-            return False
+            from ecommerce.discount_sources import resolve_for_discount  # noqa: PLC0415
 
+            if products is None:
+                return False
+            if resolve_for_discount(self, user, products) is None:
+                return False
+
+        return self._within_redemption_limits(user)
+
+    def _within_redemption_limits(self, user: User) -> bool:
+        """The redemption-count and date-window rules, without the source check."""
         if (
             self.redemption_type == REDEMPTION_TYPE_ONE_TIME
             and DiscountRedemption.objects.filter(
@@ -538,8 +555,9 @@ class Discount(TimestampedModel):
         Check if the discount is valid for the basket.
 
         Performs the finaid gate and user-tied-discount checks, then delegates
-        product scope to check_validity_with_products and the redemption-limit
-        and date-window rules to is_redeemable_by.
+        product scope to check_validity_with_products and the redemption-limit,
+        date-window and program-child-purchase eligibility rules to
+        is_redeemable_by.
 
         Financial assistance discounts are excluded by default, because this
         check is used for discount codes that are submitted by the user, and
@@ -569,11 +587,13 @@ class Discount(TimestampedModel):
                 or self.user_discount_discount.filter(user=basket.user).count() > 0
             )
 
+        if not allow_finaid and self.payment_type == PAYMENT_TYPE_FINANCIAL_ASSISTANCE:
+            return False
+        products = basket.get_products()
         return (
-            (allow_finaid or self.payment_type != PAYMENT_TYPE_FINANCIAL_ASSISTANCE)
-            and self.check_validity_with_products(basket.get_products())
+            self.check_validity_with_products(products)
             and _discount_user_has_discount()
-            and self.is_redeemable_by(basket.user)
+            and self.is_redeemable_by(basket.user, products)
         )
 
     def friendly_format(self):
@@ -593,20 +613,42 @@ class Discount(TimestampedModel):
 
     def discount_product(self, product, user=None):
         """
-        Returns the calculated discount amount for a given product.
+        Returns the price of ``product`` after this discount.
 
         Args:
             product (Product): the product to discount
             user (User or None): the current user
         Returns:
-            Number; the calculated amount of the discounts
+            Decimal; the discounted price, or None when ``user`` may not redeem
+            this discount for ``product``
         """
+        from ecommerce.discount_sources import (  # noqa: PLC0415
+            resolve_for_discount,
+            spends_source,
+        )
         from ecommerce.discounts import DiscountType  # noqa: PLC0415
 
-        if (user is None and self.valid_now()) or self.is_redeemable_by(user):
-            return DiscountType.get_discounted_price([self], product).quantize(
-                Decimal("0.01")
-            )
+        resolved_amounts = {}
+        if user is None:
+            # No user bypasses the eligibility arm and resolves no amount, so a
+            # program-child-purchase discount quotes full price here; only
+            # callers that have already gated the discount on a real user may
+            # pass None.
+            if not self.valid_now():
+                return None
+        else:
+            if not self._within_redemption_limits(user):
+                return None
+            if self.redemption_type == REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE:
+                # One resolve serves both the eligibility check and the amount.
+                resolution = resolve_for_discount(self, user, [product])
+                if resolution is None:
+                    return None
+                if spends_source(self):
+                    resolved_amounts = {self.id: resolution.amount}
+        return DiscountType.get_discounted_price(
+            [self], product, resolved_amounts=resolved_amounts
+        ).quantize(Decimal("0.01"))
 
         return None
 
