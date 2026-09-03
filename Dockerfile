@@ -51,6 +51,20 @@ FROM django-server AS production
 
 COPY --from=node /src /src
 
+# Minimal live-process diagnostics (kubectl exec into a running prod pod to
+# check whether a script is still running, per mitodl/mitxonline#3258) --
+# unlike the rest of the operator tooling below, this is kept in production
+# itself. Doesn't need update-passwd: neither package's postinst touches a
+# group the hardened base is missing (only screen's utmp requirement does).
+USER root
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+      lsof \
+      procps
+USER mitodl
+
 # ─── Local-dev target (ol-infrastructure local-dev k8s/Tilt stack) ───────────
 # Runtime user owns /src (live-synced source), plus dev deps (pytest, ipdb, …)
 # and watchfiles for granian --reload.
