@@ -1188,6 +1188,8 @@ class PendingOrder(Order):
 
         # Apply any discounts to the PendingOrder
         if discounts:
+            from ecommerce.discount_sources import source_line_for  # noqa: PLC0415
+
             now = now_in_utc()
             for discount in discounts:
                 if discount:
@@ -1195,6 +1197,7 @@ class PendingOrder(Order):
                         redemption_date=now,
                         redeemed_by=user,
                         redeemed_discount=discount,
+                        source_line=source_line_for(discount, user, products),
                     )
 
         # Create or get Line for each product.  Calculate the Order total based on Lines and discount.

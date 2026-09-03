@@ -15,7 +15,7 @@ from mitol.common.utils import now_in_utc
 from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
-from courses.factories import CourseRunFactory
+from courses.factories import CourseRunFactory, ProgramFactory
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
@@ -26,6 +26,7 @@ from ecommerce.constants import (
     REFUND_WINDOW_DAYS,
     ZERO_PAYMENT_DATA,
 )
+from ecommerce.discount_sources import resolve_program_child_purchase
 from ecommerce.factories import (
     BasketFactory,
     BasketItemFactory,
@@ -40,6 +41,7 @@ from ecommerce.factories import (
     ProgramProductFactory,
     SetLimitDiscountFactory,
     UnlimitedUseDiscountFactory,
+    make_purchase,
 )
 from ecommerce.fixtures import stripe_event
 from ecommerce.models import (
@@ -1815,3 +1817,136 @@ def test_a_source_line_on_a_standard_discount_is_ignored(paid_amount_off_source)
     assert Line.compute_discounted_unit_price_for(
         order, paid_amount_off_source.program_product_version
     ) == Decimal("899.10")
+
+
+def test_pending_order_persists_the_resolved_source_line(paid_amount_off_source):
+    """The redemption freezes which purchase funded it, and pricing uses it."""
+    order = PendingOrder.create_from_product(
+        paid_amount_off_source.program_product,
+        paid_amount_off_source.user,
+        paid_amount_off_source.discount,
+    )
+
+    redemption = order.discounts.get()
+    assert redemption.source_line == paid_amount_off_source.source_line
+    assert order.total_price_paid == Decimal("899.00")
+
+
+def test_pending_order_records_a_source_only_for_paid_amount_off(
+    paid_amount_off_source,
+):
+    """
+    A percent-off discount with the program-child-purchase redemption type is
+    eligibility-only: it prices as percent-off and freezes no source line.
+    """
+    percent_off = DiscountFactory.create(
+        amount=20,
+        discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+        redemption_type=REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+        automatic=True,
+    )
+    DiscountProduct.objects.create(
+        discount=percent_off, product=paid_amount_off_source.program_product
+    )
+
+    order = PendingOrder.create_from_product(
+        paid_amount_off_source.program_product,
+        paid_amount_off_source.user,
+        percent_off,
+    )
+
+    assert order.discounts.get().source_line is None
+    assert order.total_price_paid == Decimal("799.20")
+
+
+def test_reused_pending_order_re_resolves_the_source(paid_amount_off_source):
+    """Redemptions are deleted and recreated on reuse, so a source consumed in
+    the meantime drops away and the order re-prices to full.
+    """
+    first = PendingOrder.create_from_product(
+        paid_amount_off_source.program_product,
+        paid_amount_off_source.user,
+        paid_amount_off_source.discount,
+    )
+    assert first.discounts.get().source_line == paid_amount_off_source.source_line
+
+    # Another order consumes the source before this checkout completes.
+    DiscountRedemptionFactory.create(
+        redeemed_by=paid_amount_off_source.user,
+        redeemed_discount=PaidAmountOffDiscountFactory.create(),
+        redeemed_order=OrderFactory.create(
+            purchaser=paid_amount_off_source.user, state=OrderStatus.FULFILLED
+        ),
+        source_line=paid_amount_off_source.source_line,
+    )
+
+    second = PendingOrder.create_from_product(
+        paid_amount_off_source.program_product,
+        paid_amount_off_source.user,
+        paid_amount_off_source.discount,
+    )
+
+    assert second.pk == first.pk
+    assert second.discounts.get().source_line is None
+    assert second.total_price_paid == Decimal("999.00")
+
+
+def test_a_non_fulfilled_program_order_re_arms_the_source(paid_amount_off_source):
+    """Emergent but intended: a redemption on a refunded order stops counting,
+    so the source funds a fresh purchase.
+    """
+    order = PendingOrder.create_from_product(
+        paid_amount_off_source.program_product,
+        paid_amount_off_source.user,
+        paid_amount_off_source.discount,
+    )
+    Order.objects.filter(pk=order.pk).update(state=OrderStatus.FULFILLED)
+
+    assert (
+        resolve_program_child_purchase(
+            paid_amount_off_source.user, paid_amount_off_source.program_product
+        )
+        is None
+    )
+
+    Order.objects.filter(pk=order.pk).update(state=OrderStatus.REFUNDED)
+
+    assert (
+        resolve_program_child_purchase(
+            paid_amount_off_source.user, paid_amount_off_source.program_product
+        ).source_line
+        == paid_amount_off_source.source_line
+    )
+
+
+def test_chaining_credits_each_dollar_at_most_once(user):
+    """Course funds the vertical; the vertical's own paid amount funds the parent."""
+    parent = ProgramFactory.create()
+    vertical = ProgramFactory.create()
+    parent.add_requirement(vertical)
+    run = CourseRunFactory.create()
+    vertical.add_requirement(run.course)
+
+    # Buy the course at $100.
+    make_purchase(user, run, Decimal("100.00"))
+
+    # Buy the vertical ($300 list) with the course credited: pay $200.
+    with reversion.create_revision():
+        vertical_product = ProgramProductFactory.create(
+            purchasable_object=vertical, price=Decimal("300.00")
+        )
+    vertical_discount = PaidAmountOffDiscountFactory.create()
+    DiscountProduct.objects.create(discount=vertical_discount, product=vertical_product)
+    vertical_order = PendingOrder.create_from_product(
+        vertical_product, user, vertical_discount
+    )
+    assert vertical_order.total_price_paid == Decimal("200.00")
+    Order.objects.filter(pk=vertical_order.pk).update(state=OrderStatus.FULFILLED)
+
+    # The parent program credits what was actually paid for the vertical.
+    with reversion.create_revision():
+        parent_product = ProgramProductFactory.create(purchasable_object=parent)
+
+    assert resolve_program_child_purchase(user, parent_product).amount == Decimal(
+        "200.00"
+    )

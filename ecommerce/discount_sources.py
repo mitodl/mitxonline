@@ -217,6 +217,19 @@ def resolve_for_discount(discount, user, products) -> SourceResolution | None:
     )
 
 
+def source_line_for(discount, user, products) -> Line | None:
+    """
+    The prior purchase line that funds ``discount`` for ``user``, to persist on
+    the redemption at order creation; None for a discount that spends no
+    source. Resolving for the same target product the eligibility guard uses
+    keeps the persisted source from disagreeing with is_redeemable_by.
+    """
+    if not spends_source(discount):
+        return None
+    resolution = resolve_for_discount(discount, user, products)
+    return resolution.source_line if resolution else None
+
+
 def has_paid_amount_off(discounts) -> bool:
     """Whether any of ``discounts`` spends a source, i.e. needs resolving."""
     return any(spends_source(discount) for discount in discounts)
