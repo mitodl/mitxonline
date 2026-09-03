@@ -9,6 +9,7 @@ from authentication.api_gateway.views import (
     OpenedxAndApiGatewayLogoutView,
     RegisterDetailsView,
     RegisterExtraDetailsView,
+    SwitchSessionView,
     logout_complete,
 )
 
@@ -24,6 +25,14 @@ urlpatterns = [
         name="profile-extra-api",
     ),
     path("login/", GatewayLoginView.as_view(), name="gateway-login"),
+    # Gateway session reset for hand-offs from MIT Learn.  The APISIX route for
+    # this path expires the gateway session cookie; this view drops Django's and
+    # forwards to `next`.
+    re_path(
+        r"^switch-session\/?$",
+        SwitchSessionView.as_view(),
+        name="switch-session",
+    ),
     re_path(
         r"^logout\/?$",
         OpenedxAndApiGatewayLogoutView.as_view(),
