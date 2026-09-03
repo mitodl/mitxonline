@@ -37,13 +37,38 @@ The core design decision is a substrate/tenant split:
 | Pulumi (`ol-infrastructure`) | realm, authentication flows, client scopes, clients, service-account role grants |
 | This API (`mitxonline/b2b`) | Keycloak organizations, organization domains, identity providers, IdP attribute mappers, org↔IdP links, organization groups, plus the `OrganizationPage` / `ContractPage` records and the onboarding state |
 
-Two systems currently believe they own per-customer Keycloak resources, and
-Pulumi is the one that deletes what it no longer sees declared. Nothing here
-works until that conflict is resolved in one direction. The migration is
-tracked separately (`tk-migrate-per-org-keycloak-resources-out-of-pulumi-632a53`)
-and its ordering constraint is hard: **the API must be able to read and manage
-the existing resources before Pulumi stops declaring them, and neither system
-may delete a live partner integration during the handover.**
+Two systems can currently write per-customer Keycloak resources. That sounds
+like it blocks everything here. It does not, and the reason is worth being
+precise about, because the original draft of this spec got it wrong.
+
+**Pulumi only deletes resources that are in its own state.** An organization
+created through this API was never in Pulumi state, so Pulumi does not see it,
+does not diff it, and will not delete it. Therefore:
+
+- New partners can be onboarded through this API immediately, with no migration
+  and no risk to the Pulumi-managed set.
+- The migration matters only for the organizations **already** in Pulumi state,
+  and only when someone wants to modify one of them outside Pulumi. Left alone
+  they keep working indefinitely.
+
+The real cross-system hazard is **alias collision, not deletion**. Keycloak
+organization and IdP aliases are realm-wide, so an alias this API creates will
+break a later Pulumi declaration of the same name — a failed `pulumi up` rather
+than a lost integration, but a production deploy failure all the same. That
+guard belongs here, not in the migration: reject an alias already present in the
+realm before creating anything.
+
+The handover itself is tracked separately
+(`tk-migrate-per-org-keycloak-resources-out-of-pulumi-632a53`). Its scope,
+measured against the Production stack on 2026-09-03, is 109 of 353 resources:
+24 organizations, 15 SAML IdPs, 10 OIDC IdPs, 59 attribute-importer mappers and
+one hardcoded-attribute mapper. Note the design assumed per-organization
+**groups** were part of the tenant set; they are not — the realm has exactly one
+group (`ol-mit-moira-group`).
+
+The ordering constraint that does hold: **the API must be able to read and
+manage the existing resources before Pulumi stops declaring them, and neither
+system may delete a live partner integration during the handover.**
 
 ## What already exists
 
@@ -65,14 +90,35 @@ from Keycloak's published OpenAPI spec and already contains
 `OrganizationDomainRepresentation` (`:506`) and `OrganizationRepresentation`
 (`:1219`). No new hand-written models are needed for the Keycloak side.
 
-**Service account permissions.** `mitxonline-b2b-client` holds `view-realm`,
-`view-users`, `query-users` and `manage-realm`. `manage-realm` covers Keycloak
-Organizations but not identity providers; `manage-identity-providers` and
-`view-identity-providers` are added by
-[ol-infrastructure#5730](https://github.com/mitodl/ol-infrastructure/pull/5730).
-**That change must be deployed and verified against the QA realm before any IdP
-endpoint below is implemented** — without it every IdP call returns 403, and
-the client cannot even list an organization's IdPs.
+**Service account permissions — verified, no longer a prerequisite.**
+`mitxonline-b2b-client` held only `view-realm`, `view-users`, `query-users` and
+`manage-realm`. `manage-realm` covers Keycloak Organizations but not identity
+providers, so every IdP call returned 403 and the client could not even list an
+organization's IdPs.
+[ol-infrastructure#5730](https://github.com/mitodl/ol-infrastructure/pull/5730)
+added `manage-identity-providers` and `view-identity-providers`; it merged and
+deployed to CI, QA and Production on 2026-09-03.
+
+Confirmed live against the QA realm the same day, as `mitxonline-b2b-client`:
+
+| Call | Result |
+| --- | --- |
+| `GET identity-provider/instances` | 200, 4 realm IdPs |
+| `GET identity-provider/instances/{alias}` | 200 |
+| `GET organizations/{id}/identity-providers` | 200 on every org; the `mit` org returns a real linked IdP |
+| `POST identity-provider/import-config` | 200, 16 parsed config keys |
+
+`import-config` was additionally confirmed against an **external** metadata URL
+(`https://sso.ol.mit.edu/realms/olapps/protocol/saml/descriptor`), returning a
+correctly parsed `idpEntityId`, `singleSignOnServiceUrl` and signing
+certificate. That matters separately from authorization: parsing the realm's own
+descriptor proves the permission, but only an external fetch proves Keycloak's
+outbound egress works, which is what partner onboarding actually depends on.
+
+One limit worth knowing: the service account **cannot introspect its own role
+mappings** — `GET clients?clientId=...` returns 403, since it holds `view-realm`
+but not `view-clients`. Verify capability by calling endpoints, not by reading a
+role list.
 
 **Declarative contract blueprint.** `b2b_contract export` / `import`
 (mitodl/mitxonline#3686) is the existing declarative primitive and the natural
@@ -225,9 +271,16 @@ out of band either — relevant to the phase-2 contract saga, not to phase 1.
 
 `PATCH` accepts `name`, `description`, `redirect_url` and `domains`. Domain
 changes are the interesting case: today every domain Pulumi declares is written
-with `verified=True` with no verification having occurred. Phase 1 preserves
-that behaviour — staff assert domains — and records the assertion. Actual
-DNS-TXT or email verification is C2 scope, and the field is where it will land.
+with `verified=True` with no verification having occurred
+(`org_sso_helpers.py:115` in ol-infrastructure). A partner asserting a domain
+they do not control is currently accepted on trust.
+
+Phase 1 preserves that behaviour — staff assert domains — and records the
+assertion, which is defensible only while the asserting party is MIT staff. It
+stops being defensible the moment C2 lets a partner assert their own domain, so
+DNS-TXT or email verification is a **precondition of C2, not a later
+enhancement**. Model the field now so that work is a fill-in rather than a
+migration.
 
 ### Identity providers
 
@@ -280,6 +333,37 @@ sequence. No enrollment-code endpoints, no manager designation — C4 handles
 manager designation through Keycloak Organization Groups (mitodl/hq#10594) and
 this API should not grow a second way to do it.
 
+## What comes after, and what gates what
+
+The RFC labels five capabilities, and the shorthand gets used as though it were
+self-evident. It is not: **C1** is this provisioning API, **C2** the
+partner-facing self-service SSO wizard, **C3** the contract orchestration saga,
+**C4** manager designation via Keycloak Organization Groups, **C5** entitlement
+automation. The phases interleave them rather than mapping one-to-one — phase 2
+is C3 *plus* a staff UI, and that staff UI has no capability letter of its own.
+
+Two sequencing decisions were made on 2026-09-03 that this API's consumers
+depend on:
+
+**The phase-2 staff UI gates deprecating the Pulumi path.** This API gives MITx
+Online the capability to provision organizations and IdPs, but an API is not an
+operational replacement for a process — someone has to drive it. Today a partner
+is onboarded by a reviewed PR against `olapps.py`, and that is the live path, not
+a legacy one. The Pulumi creation path is not retired until operators have a
+usable surface over this API.
+
+**The staff UI also ships before the C2 partner wizard,** so the staff surface
+proves out this API and the IdP lifecycle before the same machinery is exposed
+outside MIT. Two reasons that ordering is load-bearing: a bug in the staff UI is
+caught by an operator who knows the system, whereas the same bug in the wizard is
+hit by a partner engineer mid-onboarding; and the wizard is strictly a superset
+of the staff surface — the same calls plus identity, domain verification and an
+approval gate — so anything wrong underneath is cheaper to find on the smaller
+one.
+
+Neither decision changes phase 1's scope. Both are recorded here because they
+determine what this API has to be *good enough for* before anything else moves.
+
 ## The organization creation saga
 
 `POST /organizations/` writes to two systems. The ordering is what makes it
@@ -287,6 +371,9 @@ safe:
 
 1. Validate. Reject a duplicate `org_key` (the field is `unique=True`,
    `b2b/models.py:108`) and a duplicate Keycloak alias before writing anything.
+   The alias check must query the **realm**, not just `OrganizationPage`:
+   aliases are realm-wide and shared with the organizations Pulumi still
+   declares, so a name that is free in our database can still collide.
 2. Create the Keycloak organization with its domains, via
    `KeycloakAdminModel.create` on the `organizations` endpoint. This is the
    step that can fail for reasons outside our control, so it goes first.
@@ -334,15 +421,32 @@ reconciler for drift, not the primary path:
 
 ## Migration and data debt
 
-Two things have to be absorbed by phase 1 rather than deferred.
-
 **Pulumi handover.** Per-org Keycloak resources — organizations, domains, IdPs,
-mappers, org groups — must leave Pulumi state without being deleted from
-Keycloak. That is `retain_on_delete` plus state surgery, sequenced so the API
-can manage the existing resources before Pulumi stops declaring them. Tracked
-as `tk-migrate-per-org-keycloak-resources-out-of-pulumi-632a53`. Do not ship
-the write endpoints into an environment where Pulumi still declares the same
-resources: the next `pulumi up` reverts whatever the API wrote.
+mappers — must leave Pulumi state without being deleted from Keycloak. That is
+`retain_on_delete` plus state surgery, sequenced so the API can manage the
+existing resources before Pulumi stops declaring them. Tracked as
+`tk-migrate-per-org-keycloak-resources-out-of-pulumi-632a53`.
+
+This is **not** a phase-1 prerequisite — see the ownership boundary above for
+why an organization created through this API is invisible to Pulumi and safe.
+What does hold: do not *modify* an organization that Pulumi still declares. The
+next `pulumi up` reverts whatever the API wrote.
+
+Two risks belong to that task and are noted here because they shape when it can
+start:
+
+- **There is no rehearsal environment.** Every real partner org sits behind
+  `if stack_info.env_suffix == "production":` (`olapps.py:917`); CI and QA have
+  only `moira` and `company-x`, neither with an IdP. The state-surgery sequence
+  cannot be practiced anywhere, so the first real execution would be against
+  production partner SSO. A throwaway QA partner org is tracked separately as
+  the fix.
+- **The handover removes the review gate.** A partner's SSO config currently
+  changes only through a reviewed, merged PR. Afterwards it is an API call. For
+  SSO federation that is a real loss of control, and the staff UI is where it has
+  to be won back — an audit trail of who changed which partner's IdP and when, at
+  minimum. This API should emit what that trail needs from the start rather than
+  having it retrofitted.
 
 **Orphaned organizations.** As of April 2026 there were roughly 24
 `OrganizationPage` records with a null `sso_organization_id`, inherited from
@@ -377,24 +481,33 @@ instinct on a 500 is to run it again.
 - A test asserting `POST /organizations/` never produces an `OrganizationPage`
   with a null `sso_organization_id`, including when the Keycloak call fails.
 - Lifecycle transition tests, including the rejected `draft` → `active` skip.
-- Against the QA realm, before writing anything else: confirm the service
-  account can call `identity-provider/import-config` and
-  `GET organizations/{id}/identity-providers` without a 403. This is the
-  prerequisite check from ol-infrastructure#5730 and gates the whole IdP half
-  of this spec.
+- ~~Against the QA realm, confirm the service account can reach the IdP
+  endpoints.~~ Done 2026-09-03; results in the service-account section above.
+  Re-run it against **production** credentials before the handover, since only
+  QA has been exercised.
 
 ## Open decisions
 
-1. **Alias naming.** Keycloak IdP aliases are realm-wide. Derive from
-   `org_key` (collision-free by construction, since `org_key` is unique) or let
-   the operator choose and reject collisions? Deriving is safer; a partner with
-   two IdPs needs a suffix scheme either way.
+1. **Alias naming.** Keycloak organization and IdP aliases are realm-wide.
+   Derive from `org_key` (collision-free by construction, since `org_key` is
+   unique) or let the operator choose and reject collisions? Deriving is safer;
+   a partner with two IdPs needs a suffix scheme either way.
+
+   Whichever is chosen, the **collision guard is not optional**. Aliases are
+   shared with the resources Pulumi still declares, so an alias this API creates
+   will break a later `pulumi up` that declares the same name. Check the realm,
+   not just our own tables, before creating.
+
 2. **Where the invite token for C2 lives.** Phase 1 does not need it, but the
    `OrganizationOnboarding` row is the obvious home, and deciding now avoids a
    second migration.
+
 3. **Whether `parse-metadata` should be reachable by an org manager.** It
    creates nothing and leaks nothing about other customers, so it is the one
    endpoint that could safely move to the customer side early. It is also the
    endpoint most likely to be abused as an SSRF probe, since it makes the
-   server fetch an operator-supplied URL. Keep it staff-only in phase 1;
-   revisit with C2's threat model.
+   server fetch an operator-supplied URL — and that egress is confirmed
+   working, not theoretical: QA Keycloak fetched an arbitrary external HTTPS
+   host through `import-config` on 2026-09-03. Keep it staff-only in phase 1.
+   Exposing it to partners needs an allowlist or deny-private-ranges policy and
+   a rate limit, which belongs to C2's threat model.
