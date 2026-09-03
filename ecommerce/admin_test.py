@@ -221,9 +221,17 @@ def test_order_admin_shows_refund_order_link(client, admin_user):
 
 
 def test_state_specific_order_admins_keep_fsm_transition_urls():
-    """Pending/canceled/refunded admins keep their working state-transition controls."""
+    """Pending/refunded admins keep their working state-transition controls."""
 
     assert reverse("admin:ecommerce_pendingorder_transition", args=(1, "decline"))
+    assert reverse("admin:ecommerce_refundedorder_transition", args=(1, "refund"))
+
+
+def test_canceled_order_admin_has_no_fsm_transition_urls():
+    """A canceled order's state can't be altered further, so it drops FSM controls."""
+
+    with pytest.raises(NoReverseMatch):
+        reverse("admin:ecommerce_canceledorder_transition", args=(1, "errored"))
 
 
 def test_admin_product_create_generates_reversion(client, admin_user):

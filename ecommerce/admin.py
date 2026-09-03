@@ -331,8 +331,11 @@ class PendingOrderAdmin(FlowOrderAdmin):
 
 
 @admin.register(CanceledOrder)
-class CanceledOrderAdmin(FlowOrderAdmin):
-    """Admin for CanceledOrder"""
+class CanceledOrderAdmin(BaseOrderAdmin):
+    """Admin for CanceledOrder
+
+    Not a FlowOrderAdmin: a canceled order's state can't be altered further.
+    """
 
     model = CanceledOrder
 
