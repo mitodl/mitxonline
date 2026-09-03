@@ -4,25 +4,6 @@
 FROM mitodl/ol-python-base:3.11 AS base
 LABEL maintainer="ODL DevOps <mitx-devops@mit.edu>"
 
-# App-specific apt extras; common-core packages are in mitodl/ol-python-base:3.11.
-# Operator tooling (htop, ngrep, screen, etc.) is also kept here for parity
-# with the production image; trim this list if the production image diverges.
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-      dnsutils \
-      htop \
-      iputils-ping \
-      less \
-      libcairo2-dev \
-      lsof \
-      nano \
-      ngrep \
-      procps \
-      screen \
-      wget
-
 FROM base AS deps
 
 # Trusted certs (org PKI + local-dev mkcert root injected at deploy time).
@@ -76,7 +57,30 @@ COPY --from=node /src /src
 FROM production AS local-dev
 
 USER root
-RUN chown -R mitodl:mitodl /src
+
+# Operator/debugging tooling (interactive use only, e.g. via `kubectl exec`
+# in local-dev) -- not an app dependency, so it lives only in this
+# non-deployed stage rather than in `base`, keeping it out of the production
+# image entirely. update-passwd restores the standard system groups the
+# hardened base image omits (e.g. `utmp`), which screen's postinst
+# hard-requires and fails without.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    update-passwd && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+      dnsutils \
+      htop \
+      iputils-ping \
+      less \
+      libcairo2-dev \
+      lsof \
+      nano \
+      ngrep \
+      procps \
+      screen \
+      wget && \
+    chown -R mitodl:mitodl /src
 USER mitodl
 
 RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
@@ -90,6 +94,29 @@ USER mitodl
 
 # ─── Development target (docker compose) ─────────────────────────────────────
 FROM django-server AS development
+
+USER root
+
+# Same operator/debugging tooling as local-dev, and for the same reason:
+# interactive-use-only, so it stays out of `base`/production. See local-dev's
+# comment above for why update-passwd is needed before installing screen.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    update-passwd && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+      dnsutils \
+      htop \
+      iputils-ping \
+      less \
+      libcairo2-dev \
+      lsof \
+      nano \
+      ngrep \
+      procps \
+      screen \
+      wget
+USER mitodl
 
 RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
     uv sync --frozen --no-install-project
