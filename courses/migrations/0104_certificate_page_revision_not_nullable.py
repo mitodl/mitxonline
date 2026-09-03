@@ -6,6 +6,27 @@ from django.db import migrations, models
 import courses.models
 
 
+def _live_certificate_page(page_model, fk_field, obj_id):
+    """
+    Return the live CertificatePage child of the CoursePage/ProgramPage that
+    has `fk_field=obj_id`, or None.
+
+    page_model/CertificatePage are imported for real (not looked up via
+    `apps.get_model`) because this needs actual Wagtail Page behavior -
+    get_children(), .live() - which a migration's historical, field-only
+    model reconstruction doesn't carry over. That's safe here: we only ever
+    *read* through these classes, never save() them, and Wagtail's page-tree
+    API is stable infrastructure this app doesn't version via its own
+    migrations.
+    """
+    from cms.models import CertificatePage  # noqa: PLC0415
+
+    page = page_model.objects.filter(**{fk_field: obj_id}).first()
+    if page is None:
+        return None
+    return page.get_children().type(CertificatePage).live().first()
+
+
 def _live_certificate_page_revision_id(page_model, fk_field, obj_id):
     """
     Return the id of the latest revision of the live CertificatePage child of
@@ -18,25 +39,71 @@ def _live_certificate_page_revision_id(page_model, fk_field, obj_id):
     the real one get_latest_revision() returns below. Setting `..._id`
     directly sidesteps that type check; bulk_update() reads by attname, so
     this is all it needs.
-
-    page_model/CertificatePage are imported for real (not looked up via
-    `apps.get_model`) because this needs actual Wagtail Page/Revision
-    behavior - get_children(), .live(), .specific, get_latest_revision() -
-    which a migration's historical, field-only model reconstruction doesn't
-    carry over. That's safe here: we only ever *read* through these classes,
-    never save() them, and Wagtail's page-tree/revision API is stable
-    infrastructure this app doesn't version via its own migrations.
     """
-    from cms.models import CertificatePage  # noqa: PLC0415
-
-    page = page_model.objects.filter(**{fk_field: obj_id}).first()
-    if page is None:
-        return None
-    certificate_page = page.get_children().type(CertificatePage).live().first()
+    certificate_page = _live_certificate_page(page_model, fk_field, obj_id)
     if certificate_page is None:
         return None
     latest_revision = certificate_page.specific.get_latest_revision()
     return latest_revision.id if latest_revision else None
+
+
+def delete_certificates_without_certificate_page(apps, schema_editor):
+    """
+    Delete any CourseRunCertificate/ProgramCertificate that has no
+    certificate_page_revision and whose course/program has no live
+    certificate page at all - there's nothing to backfill from, and no
+    CertificatePage is ever auto-created, so these can never be resolved.
+
+    A course/program whose certificate page exists but has never had a
+    revision saved is a different, rarer case (an operator can fix it by
+    opening the page in Wagtail and publishing) and is deliberately NOT
+    covered here - those are left for backfill_certificate_page_revision to
+    leave null, so the AlterField below fails loudly instead of silently
+    deleting a certificate that content only needs one Wagtail click to fix.
+    """
+    from cms.models import CoursePage, ProgramPage  # noqa: PLC0415
+
+    CourseRunCertificate = apps.get_model("courses", "CourseRunCertificate")
+    ProgramCertificate = apps.get_model("courses", "ProgramCertificate")
+
+    course_ids_without_page = set()
+    course_run_cert_ids_to_delete = []
+    for cert in CourseRunCertificate.objects.filter(
+        certificate_page_revision__isnull=True
+    ).only("id", "course_run__course_id"):
+        course_id = cert.course_run.course_id
+        if course_id not in course_ids_without_page:
+            has_page = (
+                _live_certificate_page(CoursePage, "course_id", course_id) is not None
+            )
+            if not has_page:
+                course_ids_without_page.add(course_id)
+        if course_id in course_ids_without_page:
+            course_run_cert_ids_to_delete.append(cert.id)
+
+    program_ids_without_page = set()
+    program_cert_ids_to_delete = []
+    for cert in ProgramCertificate.objects.filter(
+        certificate_page_revision__isnull=True
+    ).only("id", "program_id"):
+        program_id = cert.program_id
+        if program_id not in program_ids_without_page:
+            has_page = (
+                _live_certificate_page(ProgramPage, "program_id", program_id)
+                is not None
+            )
+            if not has_page:
+                program_ids_without_page.add(program_id)
+        if program_id in program_ids_without_page:
+            program_cert_ids_to_delete.append(cert.id)
+
+    CourseRunCertificate.objects.filter(id__in=course_run_cert_ids_to_delete).delete()
+    ProgramCertificate.objects.filter(id__in=program_cert_ids_to_delete).delete()
+    print(  # noqa: T201
+        f"Deleted {len(course_run_cert_ids_to_delete)} CourseRunCertificate(s) "
+        f"and {len(program_cert_ids_to_delete)} ProgramCertificate(s) with no "
+        "certificate page."
+    )
 
 
 def backfill_certificate_page_revision(apps, schema_editor):
@@ -46,11 +113,14 @@ def backfill_certificate_page_revision(apps, schema_editor):
     course/program's live certificate page - the same lookup
     courses.models.CourseRunCertificate.save()/ProgramCertificate.save() do.
 
-    Certificates whose course/program has no live, revisioned certificate
-    page are left alone. The AlterField operations below then fail with a
-    NOT NULL violation if any remain, aborting this migration (and, since
-    Postgres DDL is transactional, rolling back everything this function
-    just wrote) rather than silently dropping data.
+    By the time this runs, delete_certificates_without_certificate_page has
+    already removed the certificates with no certificate page at all, so
+    anything still missing a revision here has a live certificate page with
+    no revision saved - a rarer case this leaves alone. The AlterField
+    operations below then fail with a NOT NULL violation if any remain,
+    aborting this migration (and, since Postgres DDL is transactional,
+    rolling back everything this function just wrote) rather than silently
+    dropping data.
     """
     from cms.models import CoursePage, ProgramPage  # noqa: PLC0415
 
@@ -101,6 +171,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(
+            delete_certificates_without_certificate_page, migrations.RunPython.noop
+        ),
         migrations.RunPython(
             backfill_certificate_page_revision, migrations.RunPython.noop
         ),
