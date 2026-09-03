@@ -122,7 +122,9 @@ def remap_blocks(blocks, old_id, new_id):
         else:
             # Write the new PK back in the same type as the block's stored value
             # (Wagtail stores ints, but match strings too for on-disk fidelity).
-            new_value = str(target_pk) if isinstance(block.get("value"), str) else target_pk
+            new_value = (
+                str(target_pk) if isinstance(block.get("value"), str) else target_pk
+            )
             remapped.append({**block, "value": new_value})
     return remapped, True
 
