@@ -12,7 +12,9 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
 )
 from ecommerce.discount_sources import (
+    double_spent_source_line_ids,
     find_source_conflict,
+    released_source_lines,
     resolve_for_discount,
     resolve_program_child_purchase,
     resolved_amounts_for_user,
@@ -354,6 +356,68 @@ def test_resolved_amounts_from_redemptions_ignores_standard_discounts(user):
     assert resolved_amounts_from_redemptions([redemption]) == {}
 
 
+def _redemption_on(order, source_line, discount=None):
+    return DiscountRedemptionFactory.create(
+        redeemed_by=order.purchaser,
+        redeemed_discount=discount or PaidAmountOffDiscountFactory.create(),
+        redeemed_order=order,
+        source_line=source_line,
+    )
+
+
+def test_find_source_conflict_reports_a_fulfilled_competitor(paid_amount_off_source):
+    """Another fulfilled order already spent this source: that redemption is the conflict."""
+    source_line = paid_amount_off_source.source_line
+    order = OrderFactory.create(
+        purchaser=paid_amount_off_source.user, state=OrderStatus.FULFILLED
+    )
+    _redemption_on(order, source_line, paid_amount_off_source.discount)
+    competitor = _redemption_on(
+        OrderFactory.create(
+            purchaser=paid_amount_off_source.user, state=OrderStatus.FULFILLED
+        ),
+        source_line,
+    )
+    # A standard redemption on a fulfilled order may carry the same line and is
+    # not a competitor.
+    _redemption_on(
+        OrderFactory.create(
+            purchaser=paid_amount_off_source.user, state=OrderStatus.FULFILLED
+        ),
+        source_line,
+        DiscountFactory.create(),
+    )
+
+    assert find_source_conflict(order) == competitor
+
+
+def test_released_source_lines_lists_each_refunded_source_once(
+    paid_amount_off_source,
+):
+    """
+    A source whose order was refunded after pricing is reported once, however
+    many paid-amount-off redemptions on this order it funds; a standard
+    redemption's source_line is not a source at all.
+    """
+    order = OrderFactory.create(
+        purchaser=paid_amount_off_source.user, state=OrderStatus.PENDING
+    )
+    refunded = paid_amount_off_source.source_line
+    refunded.order.state = OrderStatus.REFUNDED
+    refunded.order.save()
+    _redemption_on(order, refunded)
+    _redemption_on(order, refunded)
+    standard_source = make_purchase(
+        paid_amount_off_source.user,
+        CourseRunFactory.create(),
+        Decimal("50.00"),
+        state=OrderStatus.REFUNDED,
+    )
+    _redemption_on(order, standard_source, DiscountFactory.create())
+
+    assert list(released_source_lines(order)) == [refunded]
+
+
 def test_find_source_conflict_ignores_a_pending_competitor(paid_amount_off_source):
     """An abandoned checkout holding the same source is not a double spend."""
     order = OrderFactory.create(
@@ -393,3 +457,35 @@ def test_find_source_conflict_ignores_the_orders_own_redemption(paid_amount_off_
     )
 
     assert find_source_conflict(order) is None
+
+
+def test_double_spent_source_line_ids_ignores_standard_redemptions(
+    paid_amount_off_source,
+):
+    """A standard redemption may legally carry a source_line, but only a
+    paid-amount-off redemption spends one, so the pair is not a double spend.
+    """
+    source_line = paid_amount_off_source.source_line
+    for discount in (PaidAmountOffDiscountFactory.create(), DiscountFactory.create()):
+        DiscountRedemptionFactory.create(
+            redeemed_by=paid_amount_off_source.user,
+            redeemed_discount=discount,
+            redeemed_order=OrderFactory.create(state=OrderStatus.FULFILLED),
+            source_line=source_line,
+        )
+
+    assert double_spent_source_line_ids() == []
+
+
+def test_double_spent_source_line_ids_counts_orders_not_rows(paid_amount_off_source):
+    """Two redemptions on one fulfilled order are a re-priced order, not two spends."""
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+    for _ in range(2):
+        DiscountRedemptionFactory.create(
+            redeemed_by=paid_amount_off_source.user,
+            redeemed_discount=PaidAmountOffDiscountFactory.create(),
+            redeemed_order=order,
+            source_line=paid_amount_off_source.source_line,
+        )
+
+    assert double_spent_source_line_ids() == []

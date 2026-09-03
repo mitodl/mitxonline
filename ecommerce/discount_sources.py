@@ -29,6 +29,7 @@ paid-amount-off filter, which is why they are colocated.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from decimal import Decimal  # noqa: TC003
 
@@ -51,6 +52,8 @@ from courses.models import (
 from ecommerce.constants import DISCOUNT_TYPE_PAID_AMOUNT_OFF
 from ecommerce.models import DiscountRedemption, Line, OrderStatus
 
+log = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class SourceResolution:
@@ -71,7 +74,7 @@ def spends_source(discount) -> bool:
     return discount.discount_type == DISCOUNT_TYPE_PAID_AMOUNT_OFF
 
 
-def _fulfilled_paid_amount_off_redemptions() -> QuerySet[DiscountRedemption]:
+def fulfilled_paid_amount_off_redemptions() -> QuerySet[DiscountRedemption]:
     """
     Every FULFILLED redemption of a paid-amount-off discount.
 
@@ -173,7 +176,7 @@ def resolve_program_child_purchase(
         # relationships"). A correlated subquery holds both on the same row.
         candidates = candidates.exclude(
             Exists(
-                _fulfilled_paid_amount_off_redemptions().filter(
+                fulfilled_paid_amount_off_redemptions().filter(
                     source_line=OuterRef("pk")
                 )
             )
@@ -277,25 +280,32 @@ def resolved_amounts_from_redemptions(redemptions) -> dict[int, Decimal]:
     }
 
 
-def find_source_conflict(order) -> DiscountRedemption | None:
+def paid_amount_off_source_line_ids(order) -> list[int]:
+    """Ids of the source lines ``order``'s paid-amount-off redemptions were priced from."""
+    return [
+        redemption.source_line_id
+        for redemption in order.discounts.select_related("redeemed_discount")
+        if redemption.source_line_id is not None
+        and spends_source(redemption.redeemed_discount)
+    ]
+
+
+def find_source_conflict(order, source_line_ids=None) -> DiscountRedemption | None:
     """
     A FULFILLED redemption on another order that already consumed one of the
     source lines ``order`` was priced from, or None.
 
     Called at fulfillment time: nothing re-validates between pricing and
     payment, so one source line can otherwise deterministically fund two
-    different program purchases.
+    different program purchases. ``source_line_ids`` is
+    paid_amount_off_source_line_ids(order), for a caller that already has it.
     """
-    source_line_ids = [
-        redemption.source_line_id
-        for redemption in order.discounts.select_related("redeemed_discount")
-        if redemption.source_line_id is not None
-        and redemption.redeemed_discount.discount_type == DISCOUNT_TYPE_PAID_AMOUNT_OFF
-    ]
+    if source_line_ids is None:
+        source_line_ids = paid_amount_off_source_line_ids(order)
     if not source_line_ids:
         return None
     return (
-        _fulfilled_paid_amount_off_redemptions()
+        fulfilled_paid_amount_off_redemptions()
         .filter(source_line_id__in=source_line_ids)
         .exclude(redeemed_order=order)
         .select_related("redeemed_order")
@@ -315,8 +325,44 @@ def released_source_lines(order) -> QuerySet[Line]:
             funded_redemptions__redeemed_discount__discount_type=DISCOUNT_TYPE_PAID_AMOUNT_OFF,
         )
         .exclude(order__state=OrderStatus.FULFILLED)
+        .select_related("order")
         .distinct()
     )
+
+
+def log_source_anomalies(order) -> None:
+    """
+    At fulfillment, log the two states the double-spend window can leave
+    ``order`` in: a source line another FULFILLED order already spent, or a
+    source line whose own order was refunded between pricing and payment.
+
+    Nothing re-validates between pricing and payment, and the single-cart
+    checkout makes either state rare, so the credit is honored and the error is
+    made Sentry-visible for a manual refund rather than blocking a payment that
+    already went through. Each message names both orders and the source line.
+    """
+    source_line_ids = paid_amount_off_source_line_ids(order)
+    if not source_line_ids:
+        return
+    conflict = find_source_conflict(order, source_line_ids)
+    if conflict is not None:
+        log.error(
+            "Order %s fulfilled with paid-amount-off source line %s that "
+            "already funds fulfilled order %s — double credit honored; "
+            "review manually.",
+            order.reference_number,
+            conflict.source_line_id,
+            conflict.redeemed_order.reference_number,
+        )
+    for line in released_source_lines(order):
+        log.error(
+            "Order %s fulfilled with paid-amount-off source line %s whose "
+            "own order %s is no longer fulfilled — credit rests on a "
+            "purchase the learner no longer holds; review manually.",
+            order.reference_number,
+            line.id,
+            line.order.reference_number,
+        )
 
 
 def fulfilled_redemptions_funded_by(order) -> QuerySet[DiscountRedemption]:
@@ -326,7 +372,7 @@ def fulfilled_redemptions_funded_by(order) -> QuerySet[DiscountRedemption]:
     OrderFlow.refund touches only transactions.
     """
     return (
-        _fulfilled_paid_amount_off_redemptions()
+        fulfilled_paid_amount_off_redemptions()
         .filter(source_line__order=order)
         .exclude(redeemed_order=order)
     )
@@ -337,12 +383,11 @@ def double_spent_source_line_ids() -> list[int]:
     Source lines funding a FULFILLED paid-amount-off redemption on more than one
     order — the state the fulfillment-time check logs and honors.
 
-    Counted over distinct orders, not rows: a re-priced pending order that later
-    fulfills leaves one redemption, and two rows on the same order would not be
-    a double spend.
+    Counted over distinct orders, not rows: two paid-amount-off discounts on
+    one order resolving the same line are two rows but one spend.
     """
     return list(
-        _fulfilled_paid_amount_off_redemptions()
+        fulfilled_paid_amount_off_redemptions()
         .filter(source_line__isnull=False)
         .values("source_line")
         .annotate(order_count=Count("redeemed_order", distinct=True))

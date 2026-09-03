@@ -919,9 +919,17 @@ class OrderFlow:
         skip_fulfillment=False,  # noqa: FBT002
     ):
         """Fulfill the order - create a transaction, send email, trigger plugins."""
+        from ecommerce.discount_sources import log_source_anomalies  # noqa: PLC0415
 
         # record the transaction
         self.create_transaction(payment_data)
+
+        # Monitoring only: it logs and never raises, which is what keeps a
+        # charged order from being stranded (viewflow restores the initial
+        # state on any exception in a transition body, wherever it happens).
+        # Running after the transaction just keeps the Transaction row on a
+        # query failure.
+        log_source_anomalies(self.order)
 
         # record all the courseruns in the order (unless we're told not to)
         if not skip_fulfillment:

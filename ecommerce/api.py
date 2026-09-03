@@ -63,6 +63,10 @@ from ecommerce.constants import (
     STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
     ZERO_PAYMENT_DATA,
 )
+from ecommerce.discount_sources import (
+    double_spent_source_line_ids,
+    fulfilled_paid_amount_off_redemptions,
+)
 from ecommerce.exceptions import (
     VerifiedProgramInvalidBasketError,
     VerifiedProgramInvalidOrderError,
@@ -961,8 +965,8 @@ def check_and_process_pending_orders_for_resolution(
 
 def check_for_duplicate_discount_redemptions():
     """
-    Checks for multiple redemptions for discount codes, and makes noise if there
-    are any.
+    Checks for multiple redemptions for discount codes, and makes noise if
+    there are any.
 
     For discounts that are one-time or one-time-per-user redemptions, there's a
     possibility that the code can be redeemed more than once. This will check
@@ -1031,6 +1035,34 @@ def check_for_duplicate_discount_redemptions():
             seen.append(redemption.redeemed_discount.id)
 
     return seen
+
+
+def check_for_double_spent_sources():
+    """
+    The safety net behind OrderFlow.fulfill's source check: log every source
+    line funding a fulfilled paid-amount-off redemption on more than one order,
+    naming the orders to review.
+
+    Returns:
+    - List of the double-spent source line IDs
+    """
+    double_spent = double_spent_source_line_ids()
+    for source_line_id in double_spent:
+        reference_numbers = (
+            fulfilled_paid_amount_off_redemptions()
+            .filter(source_line_id=source_line_id)
+            .order_by("redeemed_order__reference_number")
+            .values_list("redeemed_order__reference_number", flat=True)
+            .distinct()
+        )
+        log.error(
+            "Line %s funds fulfilled paid-amount-off redemptions on more than one "
+            "order (%s); review manually.",
+            source_line_id,
+            ", ".join(reference_numbers),
+        )
+
+    return double_spent
 
 
 def _coerce_supplied_date(value):
