@@ -234,6 +234,40 @@ def test_canceled_order_admin_has_no_fsm_transition_urls():
         reverse("admin:ecommerce_canceledorder_transition", args=(1, "errored"))
 
 
+def test_transition_view_state_field_not_editable(client, admin_user):
+    """The transition confirmation form must not offer an editable state field.
+
+    The transition always forces its own hardcoded target state on save, so
+    letting the admin edit "state" in this form is misleading busywork.
+    """
+
+    _login_admin(client, admin_user)
+    order = OrderFactory.create(state=OrderStatus.PENDING)
+
+    response = client.get(
+        reverse("admin:ecommerce_pendingorder_transition", args=(order.id, "cancel"))
+    )
+
+    assert response.status_code == 200
+    assert 'name="state"' not in response.content.decode()
+
+
+def test_transition_view_ignores_posted_state(client, admin_user):
+    """The transition confirmation form can't be used to pick an arbitrary target state."""
+
+    _login_admin(client, admin_user)
+    order = OrderFactory.create(state=OrderStatus.PENDING)
+
+    response = client.post(
+        reverse("admin:ecommerce_pendingorder_transition", args=(order.id, "cancel")),
+        data={"state": OrderStatus.FULFILLED},
+    )
+
+    assert response.status_code == 302
+    order.refresh_from_db()
+    assert order.state == OrderStatus.CANCELED
+
+
 def test_admin_product_create_generates_reversion(client, admin_user):
     """Creating a Product via admin should create an initial reversion entry."""
 

@@ -304,9 +304,6 @@ class FlowOrderAdmin(fsm.FlowAdminMixin, BaseOrderAdmin):
 
     flow_state = OrderFlow.state
 
-    def get_transition_fields(self, request, obj, slug):  # noqa: ARG002
-        return ["state"]
-
     def get_object_flow(self, request, obj):
         return OrderFlow(obj, user=request.user)
 
