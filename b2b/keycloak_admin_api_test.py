@@ -558,7 +558,7 @@ def test_client_associate(settings, mocker):
     mocked_client_request.assert_called_once_with(
         "POST",
         urljoin(client.base_url, f"{client._realm}/realms/{fake_realm.id}/members"),
-        data=fake_uuid,
+        json=fake_uuid,
     )
     assert response
 
