@@ -32,7 +32,9 @@ from ecommerce.api import (
     ANONYMOUS_BASKET_SESSION_KEY,
     _retrieve_pending_cybersource_orders,
     apply_discount_to_basket,
+    apply_user_discounts,
     check_and_process_pending_orders_for_resolution,
+    check_basket_discounts_for_validity,
     check_for_duplicate_discount_redemptions,
     claim_anonymous_basket,
     create_verified_program_course_run_enrollment,
@@ -1888,3 +1890,50 @@ def test_retrieve_pending_cs_orders(mocker, test_type):
         mocked_cs_gateway.assert_called()
         assert len(completed.keys()) == (0 if test_type == "cancelled" else 1)
         assert len(cancelled.keys()) == (0 if test_type == "completed" else 1)
+
+
+def test_apply_user_discounts_validates_against_the_whole_basket(
+    paid_amount_off_source,
+):
+    """A user discount linked to the second basket item is applied, not refused against the first."""
+    request = RequestFactory().get("/")
+    request.user = paid_amount_off_source.user
+    basket = Basket.objects.create(user=paid_amount_off_source.user)
+    BasketItem.objects.create(
+        basket=basket, product=ProductFactory.create(), quantity=1
+    )
+    BasketItem.objects.create(
+        basket=basket, product=paid_amount_off_source.program_product, quantity=1
+    )
+    UserDiscount.objects.create(
+        user=paid_amount_off_source.user, discount=paid_amount_off_source.discount
+    )
+
+    apply_user_discounts(request)
+
+    assert basket.discounts.get().redeemed_discount == paid_amount_off_source.discount
+
+
+def test_revalidation_passes_a_resolvable_program_child_purchase_discount(
+    paid_amount_off_source,
+):
+    """
+    Both revalidation call sites hand the basket's products to is_redeemable_by.
+    Without them a program-child-purchase discount fails closed, and a False from
+    check_basket_discounts_for_validity wipes every basket discount and blocks
+    checkout.
+    """
+    request = RequestFactory().get("/")
+    request.user = paid_amount_off_source.user
+    basket = Basket.objects.create(user=paid_amount_off_source.user)
+    BasketItem.objects.create(
+        basket=basket, product=paid_amount_off_source.program_product, quantity=1
+    )
+    UserDiscount.objects.create(
+        user=paid_amount_off_source.user, discount=paid_amount_off_source.discount
+    )
+
+    apply_user_discounts(request)
+
+    assert basket.discounts.get().redeemed_discount == paid_amount_off_source.discount
+    assert check_basket_discounts_for_validity(request) is True

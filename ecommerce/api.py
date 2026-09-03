@@ -275,7 +275,7 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
     return payload
 
 
-def check_discount_for_products(discount, basket):
+def check_discount_for_products(discount, basket, products=None):
     """
     Checks the validity of the discount against what's in the basket.
 
@@ -286,13 +286,14 @@ def check_discount_for_products(discount, basket):
     Args:
         - basket (Basket): the current basket
         - discount (Discount|string: the discount to apply (if a string, loads the discount code specified)
+        - products (list or None): basket.get_products(), for a caller that already has it
     Returns:
         boolean
     """
     if not isinstance(discount, Discount):
         discount = Discount.objects.filter(discount_code=discount).first()
 
-    basket_products = basket.get_products()
+    basket_products = basket.get_products() if products is None else products
 
     return discount.check_validity_with_products(basket_products)
 
@@ -307,10 +308,14 @@ def check_basket_discounts_for_validity(request):
     """
     basket = establish_basket(request)
 
+    basket_products = basket.get_products()
+
     for basket_discount in basket.discounts.all():
         if not basket_discount.redeemed_discount.is_redeemable_by(
-            basket.user
-        ) or not check_discount_for_products(basket_discount.redeemed_discount, basket):
+            basket.user, basket_products
+        ) or not check_discount_for_products(
+            basket_discount.redeemed_discount, basket, basket_products
+        ):
             return False
 
     return True
@@ -358,10 +363,11 @@ def apply_user_discounts(request):
             discount = user_discount.discount
 
     if discount:
+        basket_products = basket.get_products()
         # check for product specificity in the discount
         if not check_discount_for_products(
-            discount, basket
-        ) or not discount.is_redeemable_by(user):
+            discount, basket, basket_products
+        ) or not discount.is_redeemable_by(user, basket_products):
             return
 
         bd = BasketDiscount(
