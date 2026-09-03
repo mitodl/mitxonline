@@ -2940,3 +2940,57 @@ def test_correct_courserun_languages(user_drf_client, primary):
     assert (
         regular_run.id if primary == "transreg" else translated_regular_run.id
     ) not in seen_run_ids
+
+
+@pytest.mark.django_db
+@pytest.mark.skip_nplusone_check
+def test_filter_returns_contracted_public_course(
+    mocker, contract_ready_course, mock_course_run_clone
+):
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    user.b2b_organizations.add(org)
+    user.b2b_contracts.add(contract)
+    user.refresh_from_db()
+
+    (course, _) = contract_ready_course
+    contract_runs = create_contract_run(contract, course)
+    (course_run, _) = contract_runs[0]
+
+    course_run.b2b_only = False
+    course_run.save()
+
+    contract_2 = ContractPageFactory(organization=org, active=True)
+    contract_runs = create_contract_run(contract_2, course)
+    (course_run_2, _) = contract_runs[0]
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    url = reverse("v2:courses_api-list")
+    response = client.get(url, {"org_id": org.id})
+
+    returned_course = [
+        result for result in response.data["results"] if result["id"] == course.id
+    ]
+    assert len(returned_course) == 1
+
+    returned_course = returned_course.pop()
+    run_ids = [returned_run["id"] for returned_run in returned_course["courseruns"]]
+    assert course_run.id in run_ids
+    assert course_run_2.id in run_ids
+
+    # run above again - we should still get the run even without the filtering
+    url = reverse("v2:courses_api-list")
+    response = client.get(url)
+
+    returned_course = [
+        result for result in response.data["results"] if result["id"] == course.id
+    ]
+    assert len(returned_course) == 1
+
+    returned_course = returned_course.pop()
+    run_ids = [returned_run["id"] for returned_run in returned_course["courseruns"]]
+    assert course_run.id in run_ids
+    assert course_run_2.id not in run_ids

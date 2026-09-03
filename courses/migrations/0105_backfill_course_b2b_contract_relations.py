@@ -17,6 +17,9 @@ def backfill_b2b_contract_associations(apps, schema_editor):
     for run in runs:
         run.b2b_contracts.add(run.b2b_contract)
 
+    # These should all be B2B-only migrating into this.
+    runs.update(b2b_only=True)
+
 
 def reverse_backfill(apps, schema_editor):
     """

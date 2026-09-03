@@ -867,7 +867,7 @@ def get_active_contracts_from_basket_items(basket: Basket):
         purchasable = item.product.purchasable_object
         if hasattr(purchasable, "b2b_contracts") and purchasable.b2b_contracts.exists():
             item_contract_ids = purchasable.b2b_contracts.values_list("id", flat=True)
-            contract_ids.extend(item_contract_ids.list())
+            contract_ids.extend([contract_id for contract_id in item_contract_ids])  # noqa: C416
 
     if contract_ids:
         return list(ContractPage.objects.filter(id__in=contract_ids, active=True))

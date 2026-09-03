@@ -428,7 +428,7 @@ class Command(BaseCommand):
                     # them correctly and create_contract_run can find them.
                     non_b2b = (
                         CourseRun.all_objects.filter(
-                            course=course, b2b_contract__isnull=True
+                            course=course, b2b_contracts__isnull=True
                         )
                         .exclude(Q(is_source_run=True) | Q(run_tag="SOURCE"))
                         .prefetch_related("enrollment_modes")

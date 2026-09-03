@@ -1831,7 +1831,7 @@ def test_create_contract_run_duplicate_language_source_raises(mocker, in_contrac
         first_run.save()
         first_run.b2b_contracts.add(contract)
 
-    second_run = CourseRunFactory.create(
+    second_run = CourseRunFactory.build(
         course=course,
         run_tag="1T2026",
         language="en",
