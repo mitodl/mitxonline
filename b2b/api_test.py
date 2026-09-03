@@ -372,6 +372,21 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
                 assert code.products.filter(product=product).exists()
 
 
+def test_contract_discounts_exclude_program_discounts():
+    """A program discount linked to a contract run is not one of the contract's codes."""
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_CODE, max_learners=1
+    )
+    run = CourseRunFactory.create(b2b_contract=contract)
+    product = ProductFactory.create(purchasable_object=run)
+    ensure_enrollment_codes_exist(contract)
+    program_discount = UnlimitedUseDiscountFactory.create(is_program_discount=True)
+    DiscountProduct.objects.create(discount=program_discount, product=product)
+
+    assert program_discount not in contract.get_discounts()
+    assert contract.get_discounts().count() == 1
+
+
 def test_ensure_enrollment_codes_clears_extras():
     """Test that ensure_enrollment_codes clears extra codes."""
 

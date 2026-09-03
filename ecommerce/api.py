@@ -1188,7 +1188,7 @@ def get_auto_apply_discounts_for_basket(basket_id: int) -> QuerySet[Discount]:
     )
 
 
-def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid=False):  # noqa: C901
+def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid=False):
     """
     Apply a discount to a basket.
 
@@ -1268,15 +1268,16 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
                     # skip this one.
                     return
 
-                found_better = False
-
-                for item in basket.basket_items.all():
-                    test_price = discount.discount_product(item.product, basket.user)
-                    if test_price is not None and item.discounted_price >= test_price:
-                        found_better = True
-                        break
-
-                if not found_better:
+                items = list(basket.basket_items.all())
+                target = discount.target_product([item.product for item in items])
+                if target is None:
+                    # The discount prices none of the items (a flexible-pricing
+                    # discount whose tiers name other courseware), so it cannot
+                    # beat what is already applied.
+                    return
+                item = next(item for item in items if item.product == target)
+                test_price = discount.discount_product(item.product, basket.user)
+                if test_price is None or item.discounted_price < test_price:
                     return
 
         BasketDiscount.objects.update_or_create(
@@ -1383,6 +1384,13 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
     product = Product.objects.filter(
         content_type=cr_ctype, object_id=courserun.id, is_active=True
     ).get()
+
+    # The program discount is linked to the program product, which is how
+    # create_verified_program_discount finds it again. A linked discount prices
+    # only a linked product (Discount.target_product), so the run has to be
+    # linked as well before the basket is priced. The link is permanent: the
+    # discount stays in scope for every run enrolled this way.
+    DiscountProduct.objects.get_or_create(discount=discount, product=product)
 
     basket = establish_basket(request)
 

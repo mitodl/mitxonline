@@ -20,6 +20,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
+    PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
     REDEMPTION_TYPE_UNLIMITED,
     REFUND_WINDOW_DAYS,
@@ -61,6 +62,7 @@ from ecommerce.models import (
     Transaction,
     UserDiscount,
 )
+from flexiblepricing.factories import FlexiblePriceTierFactory
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -871,6 +873,177 @@ def test_discount_with_unmatched_product_value_is_not_valid_for_basket():
         product=product,
     )
     assert not discount.is_valid_for_basket(basket_item.basket)
+
+
+def test_a_linked_discount_prices_only_its_linked_basket_item(basket):
+    """A discount linked to one of two basket items leaves the other at full price."""
+    other_product, linked_product = ProductFactory.create_batch(2)
+    other_item = BasketItemFactory.create(basket=basket, product=other_product)
+    linked_item = BasketItemFactory.create(basket=basket, product=linked_product)
+    discount = UnlimitedUseDiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_DOLLARS_OFF, amount=1
+    )
+    DiscountProduct.objects.create(discount=discount, product=linked_product)
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=basket.user,
+        redeemed_discount=discount,
+        redeemed_basket=basket,
+    )
+
+    assert linked_item.discounted_price == linked_product.price - 1
+    assert other_item.discounted_price == other_product.price
+
+
+def test_a_linked_discount_prices_only_its_linked_order_line(basket):
+    """The order built from a two-item basket takes a linked discount off the linked line only."""
+    with reversion.create_revision():
+        other_product, linked_product = ProductFactory.create_batch(2)
+    BasketItemFactory.create(basket=basket, product=other_product)
+    BasketItemFactory.create(basket=basket, product=linked_product)
+    discount = UnlimitedUseDiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_DOLLARS_OFF, amount=1
+    )
+    DiscountProduct.objects.create(discount=discount, product=linked_product)
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=basket.user,
+        redeemed_discount=discount,
+        redeemed_basket=basket,
+    )
+
+    order = PendingOrder.create_from_basket(basket)
+
+    assert {
+        line.product.id: line.get_discounted_unit_price() for line in order.lines.all()
+    } == {
+        linked_product.id: linked_product.price - 1,
+        other_product.id: other_product.price,
+    }
+    assert order.total_price_paid == linked_product.price + other_product.price - 1
+
+
+def test_an_unlinked_discount_prices_only_the_first_basket_item(basket):
+    """A discount with no product links comes off the first basket item, not every item."""
+    first_item = BasketItemFactory.create(basket=basket)
+    second_item = BasketItemFactory.create(basket=basket)
+    discount = UnlimitedUseDiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_DOLLARS_OFF, amount=1
+    )
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=basket.user,
+        redeemed_discount=discount,
+        redeemed_basket=basket,
+    )
+
+    assert first_item.discounted_price == first_item.product.price - 1
+    assert second_item.discounted_price == second_item.product.price
+
+
+def test_repricing_a_saved_line_derives_the_line_order_from_the_order(basket):
+    """
+    With no order_products passed, a saved line is priced against the order's
+    lines in creation order, so the second line stays at full price under an
+    unlinked discount just as it did when the order was created.
+    """
+    with reversion.create_revision():
+        first_product, second_product = ProductFactory.create_batch(2)
+    BasketItemFactory.create(basket=basket, product=first_product)
+    BasketItemFactory.create(basket=basket, product=second_product)
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=basket.user,
+        redeemed_discount=UnlimitedUseDiscountFactory.create(
+            discount_type=DISCOUNT_TYPE_DOLLARS_OFF, amount=1
+        ),
+        redeemed_basket=basket,
+    )
+    order = PendingOrder.create_from_basket(basket)
+
+    assert {
+        line.product.id: line.compute_discounted_unit_price()
+        for line in order.lines.all()
+    } == {
+        first_product.id: first_product.price - 1,
+        second_product.id: second_product.price,
+    }
+
+
+def test_a_finaid_discount_prices_the_item_it_was_approved_for(basket):
+    """Flexible pricing carries no product links; its tier's courseware picks the line, not basket order."""
+    other_item = BasketItemFactory.create(basket=basket)
+    approved_item = BasketItemFactory.create(basket=basket)
+    discount = UnlimitedUseDiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_DOLLARS_OFF,
+        amount=1,
+        payment_type=PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    )
+    FlexiblePriceTierFactory.create(
+        discount=discount,
+        courseware_object=approved_item.product.purchasable_object.course,
+    )
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=basket.user,
+        redeemed_discount=discount,
+        redeemed_basket=basket,
+    )
+
+    assert approved_item.discounted_price == approved_item.product.price - 1
+    assert other_item.discounted_price == other_item.product.price
+
+
+def test_a_reused_pending_order_prices_from_the_basket_not_its_stale_lines(basket):
+    """
+    A pending order is reused when it shares a product with the basket, and it
+    keeps the lines of the basket it was first built from. Pricing follows the
+    current basket, so a stale earlier line does not take the discount.
+    """
+    with reversion.create_revision():
+        stale_product, kept_product = ProductFactory.create_batch(2)
+    stale_item = BasketItemFactory.create(basket=basket, product=stale_product)
+    BasketItemFactory.create(basket=basket, product=kept_product)
+    first_order = PendingOrder.create_from_basket(basket)
+    stale_item.delete()
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=basket.user,
+        redeemed_discount=UnlimitedUseDiscountFactory.create(
+            discount_type=DISCOUNT_TYPE_DOLLARS_OFF, amount=1
+        ),
+        redeemed_basket=basket,
+    )
+
+    order = PendingOrder.create_from_basket(basket)
+
+    assert order == first_order
+    assert (
+        order.lines.get(
+            purchased_object_id=kept_product.object_id
+        ).get_discounted_unit_price()
+        == kept_product.price - 1
+    )
+    assert order.total_price_paid == kept_product.price - 1
+
+
+def test_a_finaid_discount_without_tiers_prices_the_first_item(basket):
+    """A financial-assistance discount that no tier names is unscoped, like any other unlinked discount."""
+    first_item = BasketItemFactory.create(basket=basket)
+    second_item = BasketItemFactory.create(basket=basket)
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=basket.user,
+        redeemed_discount=UnlimitedUseDiscountFactory.create(
+            discount_type=DISCOUNT_TYPE_DOLLARS_OFF,
+            amount=1,
+            payment_type=PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+        ),
+        redeemed_basket=basket,
+    )
+
+    assert first_item.discounted_price == first_item.product.price - 1
+    assert second_item.discounted_price == second_item.product.price
 
 
 def test_discount_with_unmatched_user_value_is_not_valid_for_basket():

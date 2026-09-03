@@ -117,6 +117,23 @@ class Product(TimestampedModel):
     def __str__(self):
         return f"#{self.id} {self.description} {self.price}"
 
+    @cached_property
+    def _flexible_pricing_courseware_keys(self):
+        """
+        (content type id, object id) of every courseware a flexible-pricing tier
+        could name for this product: the course and the programs it belongs to,
+        or the program itself. Cached because pricing asks once per discount.
+        """
+        # flexiblepricing.models imports Discount at module level.
+        from flexiblepricing.api import (  # noqa: PLC0415
+            get_ordered_eligible_coursewares,
+        )
+
+        return frozenset(
+            (ContentType.objects.get_for_model(courseware).id, courseware.id)
+            for courseware in get_ordered_eligible_coursewares(self.purchasable_object)
+        )
+
 
 class Basket(TimestampedModel):
     """Represents a User's basket."""
@@ -220,10 +237,28 @@ class Basket(TimestampedModel):
 
     def get_products(self):
         """
-        Returns the products that have been added to the basket so far.
+        Returns the products that have been added to the basket so far, in the
+        order they were added. Discount.target_product reads that order.
         """
 
-        return [item.product for item in self.basket_items.select_related("product")]
+        return [
+            item.product
+            for item in self.basket_items.select_related("product").order_by("id")
+        ]
+
+
+def redemptions_targeting(redemptions, product, products):
+    """
+    The redemptions whose discount prices ``product``, given ``products`` as the
+    basket's or order's products in basket order (Discount.target_product).
+    ``redemptions`` should select ``redeemed_discount`` and prefetch its
+    ``products`` so the check reads no further rows.
+    """
+    return [
+        redemption
+        for redemption in redemptions
+        if redemption.redeemed_discount.target_product(products) == product
+    ]
 
 
 class BasketItem(TimestampedModel):
@@ -242,12 +277,14 @@ class BasketItem(TimestampedModel):
         """Return the price of the product with discounts"""
         from ecommerce.discounts import DiscountType  # noqa: PLC0415
 
-        discounts = [
-            discount_redemption.redeemed_discount
-            for discount_redemption in self.basket.discounts.prefetch_related(
-                "redeemed_discount"
-            ).all()
-        ]
+        redemptions = redemptions_targeting(
+            self.basket.discounts.select_related("redeemed_discount").prefetch_related(
+                "redeemed_discount__products"
+            ),
+            self.product,
+            self.basket.get_products(),
+        )
+        discounts = [redemption.redeemed_discount for redemption in redemptions]
 
         return (
             DiscountType.get_discounted_price(
@@ -506,6 +543,59 @@ class Discount(TimestampedModel):
 
         return self.valid_now()
 
+    def applies_to_product(self, product) -> bool:
+        """
+        Whether ``product`` is in this discount's scope: the linked products when
+        there are links, else the courseware a flexible-pricing discount's tiers
+        name, else every product. Reads ``products`` from the prefetch cache
+        when the caller loaded one.
+        """
+        linked_product_ids = [link.product_id for link in self.products.all()]
+        if linked_product_ids:
+            return product.id in linked_product_ids
+        if self._flexible_pricing_tier_keys:
+            return self._flexible_pricing_covers(product)
+        return True
+
+    @cached_property
+    def _flexible_pricing_tier_keys(self):
+        """
+        (content type id, object id) of the courseware each of this discount's
+        flexible-pricing tiers names; empty for a discount with no tiers.
+        """
+        return frozenset(
+            tuple(tier)
+            for tier in self.flexible_price_tiers.values_list(
+                "courseware_content_type_id", "courseware_object_id"
+            )
+        )
+
+    def _flexible_pricing_covers(self, product) -> bool:
+        """
+        Whether one of this discount's flexible-pricing tiers is for ``product``'s
+        courseware or a program it belongs to. Flexible-pricing discounts carry
+        no product links, so without this an approval for one course would price
+        the first line in the basket instead of that course.
+        """
+        return not self._flexible_pricing_tier_keys.isdisjoint(
+            product._flexible_pricing_courseware_keys  # noqa: SLF001
+        )
+
+    def target_product(self, products):
+        """
+        The one product among ``products`` this discount prices, or None.
+
+        check_validity_with_products lets a discount onto a basket when any
+        product in it is in scope; the discount then comes off exactly one
+        line, the first in-scope product in basket order. A discount is one
+        amount for the order, whatever its type, so pricing every in-scope
+        line with it would hand it out once per line.
+        """
+        return next(
+            (product for product in products if self.applies_to_product(product)),
+            None,
+        )
+
     def valid_now(self):
         """Returns True if the discount is valid right now"""
         if self.activation_date is not None and self.activation_date > datetime.now(
@@ -630,6 +720,15 @@ class DiscountProduct(TimestampedModel):
         blank=True,
         null=True,
     )
+
+    class Meta:
+        constraints = [
+            # Lets get_or_create callers race safely: Django retries the get on
+            # the IntegrityError this raises.
+            models.UniqueConstraint(
+                fields=["discount", "product"], name="unique_discount_product"
+            )
+        ]
 
     def _check_program_child_purchase_validity(self):
         # A blank discount is the FK field's own validation error to report.
@@ -1158,7 +1257,7 @@ class PendingOrder(Order):
                     # doesn't pay for a value it would discard.
                     "discounted_unit_price": lambda i=i: (
                         Line.compute_discounted_unit_price_for(
-                            order, product_versions[i]
+                            order, product_versions[i], order_products=products
                         )
                     ),
                 },
@@ -1167,7 +1266,7 @@ class PendingOrder(Order):
                 # get_or_create skips `defaults` on an existing line, so a reused
                 # pending order carries the price from the last attempt until
                 # re-priced.
-                line.record_discounted_unit_price()
+                line.record_discounted_unit_price(order_products=products)
             total += line.discounted_price
 
         order.total_price_paid = total
@@ -1363,26 +1462,49 @@ class Line(TimestampedModel):
         return self.unit_price * self.quantity
 
     @staticmethod
-    def compute_discounted_unit_price_for(order, product_version):
-        """Price of one unit of product_version under the discounts currently on order."""
+    def compute_discounted_unit_price_for(
+        order, product_version, *, order_products=None
+    ):
+        """
+        Price of one unit of product_version under the discounts currently on
+        order.
+
+        ``order_products`` is the basket's products in basket order; it decides
+        which line each discount prices (Discount.target_product). PendingOrder
+        passes it because a reused pending order can still carry lines from an
+        earlier basket, and pricing from the basket keeps the charged price
+        equal to the displayed one. Without it the saved lines stand in, in
+        creation order, plus this product when its line is not saved yet.
+        """
         from ecommerce.discounts import (  # noqa: PLC0415
             DiscountType,
             product_from_version,
         )
 
-        discounts = [
-            discount_redemption.redeemed_discount
-            for discount_redemption in order.discounts.all()
-        ]
+        product = product_from_version(product_version)
+        if order_products is None:
+            order_products = [line.product for line in order.lines.order_by("id")]
+            if product not in order_products:
+                # A line priced in its own INSERT default is not saved yet.
+                order_products.append(product)
+        redemptions = redemptions_targeting(
+            order.discounts.select_related("redeemed_discount").prefetch_related(
+                "redeemed_discount__products"
+            ),
+            product,
+            order_products,
+        )
+        discounts = [redemption.redeemed_discount for redemption in redemptions]
 
-        return DiscountType.get_discounted_price(
-            discounts,
-            product_from_version(product_version),
-        ).quantize(Decimal("0.01"))
+        return DiscountType.get_discounted_price(discounts, product).quantize(
+            Decimal("0.01")
+        )
 
-    def compute_discounted_unit_price(self):
+    def compute_discounted_unit_price(self, *, order_products=None):
         """Price of one unit under the discounts currently on the order."""
-        return Line.compute_discounted_unit_price_for(self.order, self.product_version)
+        return Line.compute_discounted_unit_price_for(
+            self.order, self.product_version, order_products=order_products
+        )
 
     def get_discounted_unit_price(self):
         """
@@ -1399,7 +1521,7 @@ class Line(TimestampedModel):
         """
         return self.discounted_unit_price.quantize(Decimal("0.01"))
 
-    def record_discounted_unit_price(self):
+    def record_discounted_unit_price(self, *, order_products=None):
         """
         Record the post-discount unit price and save it.
 
@@ -1409,7 +1531,7 @@ class Line(TimestampedModel):
         price is unchanged, so re-pricing an untouched pending order does not
         churn updated_on.
         """
-        new_price = self.compute_discounted_unit_price()
+        new_price = self.compute_discounted_unit_price(order_products=order_products)
         if new_price != self.discounted_unit_price:
             self.discounted_unit_price = new_price
             self.save(update_fields=["discounted_unit_price", "updated_on"])

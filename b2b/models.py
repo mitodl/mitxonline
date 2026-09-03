@@ -635,7 +635,13 @@ class ContractPage(Page, ClusterableModel):
 
         from ecommerce.models import Discount  # noqa: PLC0415
 
-        return Discount.objects.filter(products__product__in=self.get_products())
+        # A verified-program discount is linked to each run product it is
+        # redeemed against (create_verified_program_course_run_enrollment), so
+        # through a contract run it would land in the contract's code sweeps,
+        # which rewrite and delete what they find here.
+        return Discount.objects.filter(
+            products__product__in=self.get_products()
+        ).exclude(is_program_discount=True)
 
     def get_discounts(self):
         """Get the discounts associated with the contract."""

@@ -1066,6 +1066,33 @@ def test_apply_discount_to_basket_prefers_a_full_credit_discount(user):
     assert basket.discounts.get().redeemed_discount == full_credit
 
 
+def test_apply_discount_to_basket_keeps_the_applied_discount_when_the_new_one_prices_nothing(
+    user,
+):
+    """A flexible-pricing discount whose tier names another course prices no item, so it cannot replace one that does."""
+    run = CourseRunFactory.create()
+    product = ProductFactory.create(purchasable_object=run)
+    basket, _ = Basket.objects.get_or_create(user=user)
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+    existing_discount = UnlimitedUseDiscountFactory.create(
+        amount=50, discount_type="percent-off"
+    )
+    BasketDiscount.objects.create(
+        redeemed_by=user,
+        redemption_date=now_in_utc(),
+        redeemed_discount=existing_discount,
+        redeemed_basket=basket,
+    )
+    other_course_tier = FlexiblePriceTierFactory.create()
+    other_course_tier.discount.amount = 100
+    other_course_tier.discount.discount_type = "percent-off"
+    other_course_tier.discount.save()
+
+    apply_discount_to_basket(basket, other_course_tier.discount, allow_finaid=True)
+
+    assert basket.discounts.get().redeemed_discount == existing_discount
+
+
 @pytest.mark.parametrize(
     "is_better",
     [
