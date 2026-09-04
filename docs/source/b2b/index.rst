@@ -28,3 +28,4 @@ These documents provide technical details about the B2B system.
    background
    orgs_contracts
    courseware
+   provisioning_api
