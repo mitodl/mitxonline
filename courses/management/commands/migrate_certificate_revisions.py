@@ -6,6 +6,12 @@ By default, only certificates that don't have a certificate_page_revision
 associated are updated. Pass --all to update every certificate for the
 course/run/program, even ones that already have a revision set.
 
+This is a targeted remediation/refresh tool for one course/run/program at a
+time (e.g. after publishing a new certificate page revision). Bulk backfill
+across every course and program happens automatically in the
+certificate_page_revision_not_nullable migration - see
+courses/migrations/0104_certificate_page_revision_not_nullable.py.
+
 Check the usages of this command below:
 
 1. Update certificates with no revision associated, for a course

@@ -37,6 +37,7 @@ from courses.factories import (
 from courses.models import (
     Course,
     CourseRun,
+    CourseRunCertificate,
     CourseRunEnrollment,
     PaidCourseRun,
     PartnerSchool,
@@ -538,22 +539,8 @@ def test_course_run_certificate_start_end_dates_and_page_revision(mocker):
     )
 
 
-def test_course_run_certificate_clean_allows_missing_page_revision(mocker):
-    """Revoking a certificate can clear certificate_page_revision before save."""
-    mocker.patch(
-        "hubspot_sync.api.upsert_custom_properties",
-    )
-    certificate = CourseRunCertificateFactory.create(
-        course_run__course__page__certificate_page__product_name="product_name"
-    )
-    certificate.certificate_page_revision = None
-
-    # Should not raise when revision is intentionally unset.
-    certificate.clean()
-
-
 def test_course_run_certificate_save_without_course_page(mocker):
-    """Saving should not fail if the course has no CMS page."""
+    """Saving should fail if the course has no CMS page to derive a revision from."""
     mocker.patch(
         "hubspot_sync.api.upsert_custom_properties",
     )
@@ -561,13 +548,16 @@ def test_course_run_certificate_save_without_course_page(mocker):
     course = CourseFactory.create(page=None)
     course_run = CourseRunFactory.create(course=course)
 
-    certificate = CourseRunCertificateFactory.create(user=user, course_run=course_run)
+    with pytest.raises(IntegrityError):
+        CourseRunCertificateFactory.create(user=user, course_run=course_run)
 
-    assert certificate.certificate_page_revision is None
 
-
-def test_course_run_certificate_save_without_certificate_child_page(mocker):
-    """Saving should not fail if the course page has no live certificate child page."""
+def test_course_run_certificate_deleted_when_certificate_page_is_deleted(mocker):
+    """
+    Deleting a certificate page cascades to delete certificates issued
+    against one of its revisions: Wagtail deletes a page's Revision rows
+    along with the page, and certificate_page_revision is on_delete=CASCADE.
+    """
     mocker.patch(
         "hubspot_sync.api.upsert_custom_properties",
     )
@@ -575,10 +565,7 @@ def test_course_run_certificate_save_without_certificate_child_page(mocker):
     course_page = certificate.course_run.course.page
     CertificatePage.objects.descendant_of(course_page).delete()
 
-    certificate.certificate_page_revision = None
-    certificate.save()
-
-    assert certificate.certificate_page_revision is None
+    assert not CourseRunCertificate.all_objects.filter(pk=certificate.pk).exists()
 
 
 def test_program_certificate_start_end_dates_and_page_revision(user, mocker):
