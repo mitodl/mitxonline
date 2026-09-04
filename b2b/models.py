@@ -35,6 +35,7 @@ from b2b.constants import (
 )
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import Program
+from main.models import ValidateOnSaveMixin
 from variants.models import SupportedVariant
 
 log = logging.getLogger(__name__)
@@ -864,7 +865,7 @@ class UserOrganization(models.Model):
         return f"UserOrganization: {self.user} in {self.organization}"
 
 
-class OrganizationOnboarding(TimestampedModel):
+class OrganizationOnboarding(TimestampedModel, ValidateOnSaveMixin):
     """
     Where an organization is in the B2B onboarding sequence.
 
@@ -912,7 +913,7 @@ class OrganizationOnboarding(TimestampedModel):
         return f"OrganizationOnboarding: {self.organization} is {self.state}"
 
 
-class OrganizationIdentityProvider(TimestampedModel):
+class OrganizationIdentityProvider(TimestampedModel, ValidateOnSaveMixin):
     """
     An identity provider we provisioned in Keycloak for an organization.
 
