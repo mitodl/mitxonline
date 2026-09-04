@@ -631,10 +631,7 @@ def update_edx_user_profile(user):
         return
 
     # Safety net, mirroring get_edx_api_client: make sure the user actually has an
-    # OpenEdxApiAuth record before we read it. get_valid_edx_api_auth() does a plain
-    # .get() and raises OpenEdxApiAuth.DoesNotExist otherwise, which is the common
-    # case for SCIM-provisioned users - SCIM never calls create_user, so it never
-    # runs create_edx_auth_token. create_edx_auth_token is itself idempotent.
+    # OpenEdxApiAuth record before we read it.
     if create_edx_auth_token(user) is None:
         log.info("Skipping user profile update for %s, could not create edX auth", user)
         return
