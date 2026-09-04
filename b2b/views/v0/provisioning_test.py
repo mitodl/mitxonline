@@ -7,6 +7,7 @@ from requests.exceptions import HTTPError
 from rest_framework import status
 
 from b2b.constants import (
+    IDP_PROTOCOL_OIDC,
     IDP_PROTOCOL_SAML,
     IDP_STATE_ACTIVE,
     IDP_STATE_DRAFT,
@@ -285,6 +286,62 @@ def test_create_identity_provider_requires_a_metadata_source(admin_drf_client):
     )
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_saml_identity_provider_requires_attribute_mappers(admin_drf_client):
+    """
+    Nothing maps a SAML assertion's attributes onto the user unless we say so.
+
+    A SAML IdP with no mappers brokers users with no email or name, which is a
+    support ticket rather than a working integration.
+    """
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+
+    response = admin_drf_client.post(
+        _identity_providers_url(organization.org_key),
+        {
+            "alias": "exampleu",
+            "protocol": IDP_PROTOCOL_SAML,
+            "metadata_url": "https://idp.example.edu/metadata.xml",
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_oidc_identity_provider_does_not_require_attribute_mappers(
+    admin_drf_client, mocker
+):
+    """
+    OIDC providers are valid with no mappers, and ours run that way.
+
+    ol-infrastructure's onboard_oidc_org creates no attribute-importer mappers
+    at all, so every OIDC IdP Pulumi manages in production today has none.
+    Rejecting that configuration would refuse what we already run.
+    """
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    mocked_create = mocker.patch(
+        "b2b.views.v0.provisioning.create_identity_provider",
+        return_value=_identity_provider(organization),
+    )
+
+    response = admin_drf_client.post(
+        _identity_providers_url(organization.org_key),
+        {
+            "alias": "exampleu",
+            "protocol": IDP_PROTOCOL_OIDC,
+            "discovery_url": "https://idp.example.edu/.well-known/openid-configuration",
+            "client_id": "mitxonline",
+            "client_secret": "shh",
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    mocked_create.assert_called_once()
 
 
 def test_create_identity_provider(admin_drf_client, mocker):
