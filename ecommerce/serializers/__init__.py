@@ -16,7 +16,6 @@ from ecommerce.constants import (
     BULK_GENERATION_REDEMPTION_TYPES,
     CYBERSOURCE_CARD_TYPES,
     DISCOUNT_TYPE_DOLLARS_OFF,
-    DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPES,
     TRANSACTION_TYPE_REFUND,
@@ -188,18 +187,17 @@ def discount_is_price_neutral(discount) -> bool:
     never move a price.
 
     A percent-off or dollars-off discount of 0 subtracts nothing. A
-    paid-amount-off discount stores 0 too, and its real per-user value is
-    resolved elsewhere (hq#11846), so nothing renderable exists for it yet;
-    the resolver revisits its visibility.
+    paid-amount-off discount stores 0 too but is not in this set: its value is
+    resolved per user, and it only attaches to a basket when a source resolves
+    (Discount.is_redeemable_by), so an attached one always moves the price.
 
     A fixed-price discount is not in this set even at 0 — it sets the price
     rather than reducing it, and a fixed price equal to the product price is a
     real B2B-contract shape the shopper needs to see confirmed.
     """
-    return discount.discount_type == DISCOUNT_TYPE_PAID_AMOUNT_OFF or (
-        discount.amount == 0
-        and discount.discount_type
-        in (DISCOUNT_TYPE_PERCENT_OFF, DISCOUNT_TYPE_DOLLARS_OFF)
+    return discount.amount == 0 and discount.discount_type in (
+        DISCOUNT_TYPE_PERCENT_OFF,
+        DISCOUNT_TYPE_DOLLARS_OFF,
     )
 
 

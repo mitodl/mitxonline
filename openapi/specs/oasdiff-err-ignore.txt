@@ -275,3 +275,12 @@ PUT /api/v0/discounts/{parent_lookup_discount}/products/{id}/ added the new `pai
 PUT /api/v0/discounts/{parent_lookup_discount}/products/{id}/ added the new `program-child-purchase` enum value to the `discount/redemption_type` response property for the response status `200`
 PUT /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ added the new `paid-amount-off` enum value to the `redeemed_discount/discount_type` response property for the response status `200`
 PUT /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ added the new `program-child-purchase` enum value to the `redeemed_discount/redemption_type` response property for the response status `200`
+# refund_status gained `review_required` (hq#11846): an order whose purchase
+# funded a paid-amount-off discount can still request a refund, but the request
+# is reviewed by a person. Learn's ReceiptRefundCard adds a case for it.
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ added the new `review_required` enum value to the `results/items/redeemed_order/refund_status/allOf[#/components/schemas/RefundStatusEnum]/` response property for the response status `200`
+POST /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ added the new `review_required` enum value to the `redeemed_order/refund_status/allOf[#/components/schemas/RefundStatusEnum]/` response property for the response status `201`
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ added the new `review_required` enum value to the `redeemed_order/refund_status/allOf[#/components/schemas/RefundStatusEnum]/` response property for the response status `200`
+PATCH /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ added the new `review_required` enum value to the `redeemed_order/refund_status/allOf[#/components/schemas/RefundStatusEnum]/` response property for the response status `200`
+PUT /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ added the new `review_required` enum value to the `redeemed_order/refund_status/allOf[#/components/schemas/RefundStatusEnum]/` response property for the response status `200`
+GET /api/v0/orders/receipt/{id}/ added the new `review_required` enum value to the `refund_status/allOf[#/components/schemas/RefundStatusEnum]/` response property for the response status `200`

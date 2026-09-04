@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable  # noqa: TC003
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import List  # noqa: UP035
@@ -240,8 +241,13 @@ class BasketItem(TimestampedModel):
     @cached_property
     def discounted_price(self):
         """Return the price of the product with discounts"""
+        from ecommerce.discount_sources import (  # noqa: PLC0415
+            has_paid_amount_off,
+            resolved_amounts_for_user,
+        )
         from ecommerce.discounts import DiscountType  # noqa: PLC0415
 
+        products = self.basket.get_products()
         discounts = [
             discount_redemption.redeemed_discount
             for discount_redemption in self.basket.discounts.prefetch_related(
@@ -253,6 +259,14 @@ class BasketItem(TimestampedModel):
             DiscountType.get_discounted_price(
                 discounts,
                 self.product,
+                # basket.user is a lazy FK: touch it only when a paid-amount-off
+                # discount is on the basket, so an ordinary cart pays no
+                # resolver cost at all.
+                resolved_amounts=(
+                    resolved_amounts_for_user(self.basket.user, discounts, products)
+                    if has_paid_amount_off(discounts)
+                    else {}
+                ),
             ).quantize(Decimal("0.01"))
             * self.quantity
         )
@@ -442,24 +456,40 @@ class Discount(TimestampedModel):
         """Returns True if the discount has been redeemed"""
         return DiscountRedemption.objects.filter(redeemed_discount=self).exists()
 
-    def is_redeemable_by(self, user: User):
+    def is_redeemable_by(self, user: User, products: Iterable[Product] | None = None):
         """
-        Enforces the redemption rules for a given discount.
+        Enforces the redemption rules for a given discount: how often it may be
+        redeemed, whether it is inside its date window, and — for a
+        program-child-purchase redemption — whether this user still holds an
+        unconsumed qualifying purchase for one of the products in hand.
+
+        Independent of check_validity_with_products (product scope and
+        liveness); is_valid_for_basket composes the two.
+
+        ``products`` is context for the program-child-purchase arm alone.
+        Omitting it means no product is in hand (a code redemption, the CMS
+        finaid quote), and a program-child-purchase discount is never
+        redeemable there.
 
         Args:
             - user (User): The user requesting the discount.
+            - products (Iterable[Product] or None): the products the discount is
+              being checked against — the basket's, or the one being priced.
         Returns:
             - boolean
         """
-        # A program-child-purchase discount is redeemable only by a learner
-        # holding the qualifying purchase; that eligibility is decided per source
-        # line — a question this method has no way to answer until the resolver
-        # lands (hq#11846). Refuse rather than fall through to the unlimited
-        # semantics at the bottom, which would let any code-redemption endpoint
-        # attach one.
         if self.redemption_type == REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE:
-            return False
+            from ecommerce.discount_sources import resolve_for_discount  # noqa: PLC0415
 
+            if products is None:
+                return False
+            if resolve_for_discount(self, user, products) is None:
+                return False
+
+        return self._within_redemption_limits(user)
+
+    def _within_redemption_limits(self, user: User) -> bool:
+        """The redemption-count and date-window rules, without the source check."""
         if (
             self.redemption_type == REDEMPTION_TYPE_ONE_TIME
             and DiscountRedemption.objects.filter(
@@ -525,8 +555,9 @@ class Discount(TimestampedModel):
         Check if the discount is valid for the basket.
 
         Performs the finaid gate and user-tied-discount checks, then delegates
-        product scope to check_validity_with_products and the redemption-limit
-        and date-window rules to is_redeemable_by.
+        product scope to check_validity_with_products and the redemption-limit,
+        date-window and program-child-purchase eligibility rules to
+        is_redeemable_by.
 
         Financial assistance discounts are excluded by default, because this
         check is used for discount codes that are submitted by the user, and
@@ -556,11 +587,13 @@ class Discount(TimestampedModel):
                 or self.user_discount_discount.filter(user=basket.user).count() > 0
             )
 
+        if not allow_finaid and self.payment_type == PAYMENT_TYPE_FINANCIAL_ASSISTANCE:
+            return False
+        products = basket.get_products()
         return (
-            (allow_finaid or self.payment_type != PAYMENT_TYPE_FINANCIAL_ASSISTANCE)
-            and self.check_validity_with_products(basket.get_products())
+            self.check_validity_with_products(products)
             and _discount_user_has_discount()
-            and self.is_redeemable_by(basket.user)
+            and self.is_redeemable_by(basket.user, products)
         )
 
     def friendly_format(self):
@@ -580,20 +613,42 @@ class Discount(TimestampedModel):
 
     def discount_product(self, product, user=None):
         """
-        Returns the calculated discount amount for a given product.
+        Returns the price of ``product`` after this discount.
 
         Args:
             product (Product): the product to discount
             user (User or None): the current user
         Returns:
-            Number; the calculated amount of the discounts
+            Decimal; the discounted price, or None when ``user`` may not redeem
+            this discount for ``product``
         """
+        from ecommerce.discount_sources import (  # noqa: PLC0415
+            resolve_for_discount,
+            spends_source,
+        )
         from ecommerce.discounts import DiscountType  # noqa: PLC0415
 
-        if (user is None and self.valid_now()) or self.is_redeemable_by(user):
-            return DiscountType.get_discounted_price([self], product).quantize(
-                Decimal("0.01")
-            )
+        resolved_amounts = {}
+        if user is None:
+            # No user bypasses the eligibility arm and resolves no amount, so a
+            # program-child-purchase discount quotes full price here; only
+            # callers that have already gated the discount on a real user may
+            # pass None.
+            if not self.valid_now():
+                return None
+        else:
+            if not self._within_redemption_limits(user):
+                return None
+            if self.redemption_type == REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE:
+                # One resolve serves both the eligibility check and the amount.
+                resolution = resolve_for_discount(self, user, [product])
+                if resolution is None:
+                    return None
+                if spends_source(self):
+                    resolved_amounts = {self.id: resolution.amount}
+        return DiscountType.get_discounted_price(
+            [self], product, resolved_amounts=resolved_amounts
+        ).quantize(Decimal("0.01"))
 
         return None
 
@@ -697,6 +752,7 @@ class OrderRefundStatus(TextChoices):
     REQUESTED = "requested"
     DENIED = "denied"
     ELIGIBLE = "eligible"
+    REVIEW_REQUIRED = "review_required"
     WINDOW_CLOSED = "window_closed"
     INELIGIBLE = "ineligible"
 
@@ -864,9 +920,17 @@ class OrderFlow:
         skip_fulfillment=False,  # noqa: FBT002
     ):
         """Fulfill the order - create a transaction, send email, trigger plugins."""
+        from ecommerce.discount_sources import log_source_anomalies  # noqa: PLC0415
 
         # record the transaction
         self.create_transaction(payment_data)
+
+        # Monitoring only: it logs and never raises, which is what keeps a
+        # charged order from being stranded (viewflow restores the initial
+        # state on any exception in a transition body, wherever it happens).
+        # Running after the transaction just keeps the Transaction row on a
+        # query failure.
+        log_source_anomalies(self.order)
 
         # record all the courseruns in the order (unless we're told not to)
         if not skip_fulfillment:
@@ -962,7 +1026,12 @@ class Order(TimestampedModel):
 
     @property
     def is_refund_eligible(self):
-        """Return True if the learner could request a refund for this order now."""
+        """
+        True when `refund_status` is `eligible`: the in-window self-service case.
+
+        A `review_required` or `window_closed` order is still submittable
+        through the free-text request path; see `refund_status`.
+        """
         return self.refund_status == OrderRefundStatus.ELIGIBLE
 
     @cached_property
@@ -977,6 +1046,18 @@ class Order(TimestampedModel):
         triple is the line's uniqueness constraint.
         """
         return any(run.b2b_contract_id for run in self.purchased_runs)
+
+    @property
+    def funds_fulfilled_redemption(self):
+        """
+        True when a line of this order funds a paid-amount-off redemption on a
+        fulfilled order (hq#11846).
+        """
+        from ecommerce.discount_sources import (  # noqa: PLC0415
+            fulfilled_redemptions_funded_by,
+        )
+
+        return fulfilled_redemptions_funded_by(self).exists()
 
     @cached_property
     def latest_refund_request(self):
@@ -1003,12 +1084,15 @@ class Order(TimestampedModel):
         Return where this order sits in the self-service refund flow.
 
         Precedence matters: a refund that already happened settles the question,
-        then any request the learner has made, and only then whether they could
-        make one right now.
+        then any request the learner has made, then whether the order is
+        refundable at all, then whether a person has to review it, and only then
+        the window.
 
-        The final branch deliberately mirrors what `RefundRequestSerializer`
-        accepts, so anything but `eligible` or `window_closed` means a request
-        would be rejected.
+        `eligible` means the in-window request form with preset reasons.
+        `review_required` and `window_closed` are both still submittable through
+        the free-text path — `RefundRequestSerializer` gates on ownership,
+        fulfilled state, B2B and an existing pending request, never on the
+        window — and land in the manual queue instead.
         """
         if self.state in (OrderStatus.REFUNDED, OrderStatus.PARTIALLY_REFUNDED):
             return OrderRefundStatus.COMPLETED
@@ -1025,6 +1109,12 @@ class Order(TimestampedModel):
 
         if self.state != OrderStatus.FULFILLED or self.is_b2b_order:
             return OrderRefundStatus.INELIGIBLE
+
+        # Refunding this order would leave the credit it funded in place —
+        # clawback is out of scope — so the request is accepted but reviewed
+        # by a person regardless of the window.
+        if self.funds_fulfilled_redemption:
+            return OrderRefundStatus.REVIEW_REQUIRED
 
         return (
             OrderRefundStatus.ELIGIBLE
@@ -1133,6 +1223,8 @@ class PendingOrder(Order):
 
         # Apply any discounts to the PendingOrder
         if discounts:
+            from ecommerce.discount_sources import source_line_for  # noqa: PLC0415
+
             now = now_in_utc()
             for discount in discounts:
                 if discount:
@@ -1140,6 +1232,7 @@ class PendingOrder(Order):
                         redemption_date=now,
                         redeemed_by=user,
                         redeemed_discount=discount,
+                        source_line=source_line_for(discount, user, products),
                     )
 
         # Create or get Line for each product.  Calculate the Order total based on Lines and discount.
@@ -1365,19 +1458,25 @@ class Line(TimestampedModel):
     @staticmethod
     def compute_discounted_unit_price_for(order, product_version):
         """Price of one unit of product_version under the discounts currently on order."""
+        from ecommerce.discount_sources import (  # noqa: PLC0415
+            resolved_amounts_from_redemptions,
+        )
         from ecommerce.discounts import (  # noqa: PLC0415
             DiscountType,
             product_from_version,
         )
 
-        discounts = [
-            discount_redemption.redeemed_discount
-            for discount_redemption in order.discounts.all()
-        ]
+        # source_line is joined for the paid-amount-off rows rather than
+        # fetched lazily per row.
+        redemptions = list(
+            order.discounts.select_related("redeemed_discount", "source_line")
+        )
+        discounts = [redemption.redeemed_discount for redemption in redemptions]
 
         return DiscountType.get_discounted_price(
             discounts,
             product_from_version(product_version),
+            resolved_amounts=resolved_amounts_from_redemptions(redemptions),
         ).quantize(Decimal("0.01"))
 
     def compute_discounted_unit_price(self):

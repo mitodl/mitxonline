@@ -43,6 +43,7 @@ from ecommerce.factories import (
     BasketFactory,
     BasketItemFactory,
     DiscountFactory,
+    DiscountRedemptionFactory,
     LineFactory,
     OrderFactory,
     PaidAmountOffDiscountFactory,
@@ -58,6 +59,7 @@ from ecommerce.models import (
     DiscountProduct,
     DiscountRedemption,
     Order,
+    OrderRefundStatus,
     OrderStatus,
     RefundRequest,
     RefundRequestStatus,
@@ -597,6 +599,25 @@ def test_create_basket_with_product(  # noqa: PLR0913
 # whole test in its own outer transaction, so this is the only way to
 # actually exercise (and catch regressions in) that requirement.
 @pytest.mark.django_db(transaction=True)
+def test_create_basket_from_product_lists_the_paid_amount_off_credit(
+    mocker, user_drf_client, paid_amount_off_source
+):
+    """The cart shows the automatic credit as a discount line, not just a lower total."""
+    mocker.patch("ecommerce.views.v0.sync_hubspot_cart_add")
+    url = reverse(
+        "v0:baskets_api-create_from_product",
+        kwargs={"product_id": paid_amount_off_source.program_product.id},
+    )
+
+    response = user_drf_client.post(url)
+
+    assert response.status_code == 201
+    assert Decimal(response.data["discounted_price"]) == Decimal("899.00")
+    assert [d["redeemed_discount"]["id"] for d in response.data["discounts"]] == [
+        paid_amount_off_source.discount.id
+    ]
+
+
 def test_create_basket_from_product_anonymous(mocker):
     """
     Test that an anonymous caller can create a basket via create_from_product,
@@ -1938,6 +1959,31 @@ def test_refund_request_duplicate_rejected(user, user_drf_client):
     assert resp.status_code == 400
     assert "order" in resp.json()["errors"]
     assert RefundRequest.objects.filter(order=order).count() == 1
+
+
+def test_refund_request_accepted_when_review_is_required(
+    paid_amount_off_source, user_drf_client
+):
+    """A used-source order can still request a refund — it just gets a human."""
+    order = paid_amount_off_source.source_line.order
+    DiscountRedemptionFactory.create(
+        redeemed_discount=paid_amount_off_source.discount,
+        source_line=paid_amount_off_source.source_line,
+        redeemed_order=OrderFactory.create(state=OrderStatus.FULFILLED),
+    )
+    assert order.refund_status == OrderRefundStatus.REVIEW_REQUIRED
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": "other",
+            "refund_reason_text": "I upgraded to the full program.",
+            "consent_given": True,
+        },
+    )
+
+    assert resp.status_code == 201
 
 
 def test_refund_request_allowed_after_denial(user, user_drf_client):

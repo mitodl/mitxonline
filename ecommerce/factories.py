@@ -1,6 +1,8 @@
 import faker
+import reversion
 from factory import LazyAttribute, SubFactory, fuzzy
 from factory.django import DjangoModelFactory
+from reversion.models import Version
 
 from courses.factories import CourseRunFactory, ProgramFactory
 from ecommerce import models
@@ -140,3 +142,32 @@ class DiscountRedemptionFactory(DjangoModelFactory):
 
     class Meta:
         model = models.DiscountRedemption
+
+
+def make_purchase(
+    user,
+    purchasable,
+    price,
+    *,
+    paid=None,
+    state=models.OrderStatus.FULFILLED,
+):
+    """
+    An order for ``purchasable`` with one line listed at ``price`` and charged
+    ``paid`` (defaults to ``price``). Returns the Line.
+
+    The Product is created inside a revision because Line.product_version is
+    non-null and reversion only records a Version for objects saved under one.
+    """
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=purchasable, price=price)
+    charged = price if paid is None else paid
+    order = OrderFactory.create(purchaser=user, state=state, total_price_paid=charged)
+    return models.Line.objects.create(
+        order=order,
+        purchased_object_id=product.object_id,
+        purchased_content_type_id=product.content_type_id,
+        product_version=Version.objects.get_for_object(product).first(),
+        quantity=1,
+        discounted_unit_price=charged,
+    )
