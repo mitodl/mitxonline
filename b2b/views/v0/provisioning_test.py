@@ -256,6 +256,19 @@ def test_identity_providers_are_scoped_to_their_organization(admin_drf_client):
     assert [idp["alias"] for idp in response.json()] == ["exampleu"]
 
 
+def test_listing_providers_for_an_unknown_organization_is_a_404(admin_drf_client):
+    """
+    An unknown org_key is a 404, not an empty list.
+
+    A mistyped key otherwise reads as "this organization has no identity
+    providers", which is a much worse thing for an operator to act on.
+    """
+
+    response = admin_drf_client.get(_identity_providers_url("NOSUCHORG"))
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
 def test_create_identity_provider_requires_a_metadata_source(admin_drf_client):
     """A SAML IdP takes exactly one of metadata_url or metadata_xml."""
 

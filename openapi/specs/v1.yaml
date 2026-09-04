@@ -1000,7 +1000,12 @@ paths:
   /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/identity-providers/:
     get:
       operationId: b2b_provisioning_organizations_identity_providers_list
-      description: List the organization's identity providers.
+      description: |-
+        List the organization's identity providers.
+
+        Resolve the parent first so an unknown org_key is a 404 rather than an
+        empty list. A mistyped key otherwise reads as "this organization has no
+        identity providers", which is the wrong answer to act on.
       parameters:
       - in: path
         name: parent_lookup_organization__org_key
