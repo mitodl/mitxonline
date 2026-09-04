@@ -26,6 +26,7 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 from b2b.exceptions import (
     AliasCollisionError,
     InvalidLifecycleTransitionError,
+    OrganizationNotProvisionedError,
     OrphanedKeycloakOrganizationError,
 )
 from b2b.models import (
@@ -76,7 +77,7 @@ class ProvisioningExceptionMixin:
     def handle_exception(self, exc):
         """Map provisioning exceptions onto HTTP responses."""
 
-        if isinstance(exc, AliasCollisionError):
+        if isinstance(exc, AliasCollisionError | OrganizationNotProvisionedError):
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         if isinstance(exc, InvalidLifecycleTransitionError):
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
