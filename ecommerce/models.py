@@ -720,7 +720,11 @@ class OrderFlow:
     def _on_transition_success(self, descriptor, source, target, **kwargs):  # noqa: ARG002
         self.order.save()
 
-    @state.transition(source=State.ANY, target=OrderStatus.CANCELED)
+    @state.transition(
+        source=State.ANY,
+        target=OrderStatus.CANCELED,
+        permission=this.is_approver,
+    )
     def cancel(self, *, api_response_data: dict | None = None):
         """Cancel this order. Create a transaction if we have data for that."""
 
@@ -730,10 +734,11 @@ class OrderFlow:
     def is_approver(self, user):
         return user.is_staff
 
+    # No permission: decline is a payment-processor decision, so it shouldn't
+    # be manually triggerable from the admin without a recorded transaction.
     @state.transition(
         source=OrderStatus.PENDING,
         target=OrderStatus.DECLINED,
-        permission=this.is_approver,
     )
     def decline(self):
         """
