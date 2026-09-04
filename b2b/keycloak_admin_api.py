@@ -14,6 +14,7 @@ from django.conf import settings
 
 from b2b.exceptions import KeycloakAdminImproperlyConfiguredError
 from b2b.keycloak_admin_dataclasses import (
+    IdentityProviderRepresentation,
     OrganizationRepresentation,
     RealmRepresentation,
     UserRepresentation,
@@ -21,6 +22,16 @@ from b2b.keycloak_admin_dataclasses import (
 
 KCAM_ORGANIZATIONS = (OrganizationRepresentation, "organizations")
 KCAM_USERS = (UserRepresentation, "users")
+KCAM_IDENTITY_PROVIDERS = (
+    IdentityProviderRepresentation,
+    "identity-provider/instances",
+)
+
+IDENTITY_PROVIDER_IMPORT_CONFIG_ENDPOINT = "identity-provider/import-config"
+
+# Keycloak's collection endpoints default to returning 10 items when `max` is
+# not supplied, so anything that needs the whole collection has to page.
+KEYCLOAK_LIST_PAGE_SIZE = 100
 
 
 class KeycloakAdminClient:
@@ -298,10 +309,92 @@ class KeycloakAdminClient:
         - requests.HTTPError if the request fails.
         """
 
+        return self.delete(endpoint)
+
+    def delete(self, endpoint):
+        """
+        Delete the object at the endpoint in the realm.
+
+        Args:
+        - endpoint: The endpoint to use (e.g., "identity-provider/instances/{alias}").
+        Returns:
+        - True if successful.
+        Raises:
+        - requests.HTTPError if the request fails.
+        """
+
         response = self.realm_request("DELETE", endpoint)
         response.raise_for_status()
 
         return True
+
+    def create_returning_id(self, endpoint, data):
+        """
+        Create an object at the endpoint in the realm and return its ID.
+
+        Several Keycloak creation endpoints - organizations and identity
+        provider instances among them - answer 201 with an empty body and the
+        new resource's location in the `Location` header, so `create` cannot be
+        used for them: it has no JSON to parse into a representation.
+
+        Args:
+        - endpoint: The endpoint to use (e.g., "organizations").
+        - data: The data to send.
+
+        Returns:
+        - The last path segment of the Location header, or None if Keycloak did
+          not send one.
+        """
+
+        response = self.realm_request("POST", endpoint, json=data)
+        response.raise_for_status()
+
+        location = response.headers.get("Location")
+
+        return location.rstrip("/").rsplit("/", 1)[-1] if location else None
+
+    def post_raw(self, endpoint, data):
+        """
+        POST to the endpoint in the realm and return the decoded JSON body.
+
+        For endpoints whose response is not one of the generated representation
+        classes - `identity-provider/import-config` answers with a flat config
+        map - so `create` cannot coerce it.
+
+        Args:
+        - endpoint: The endpoint to use.
+        - data: The data to send.
+
+        Returns:
+        - The decoded response body.
+        """
+
+        response = self.realm_request("POST", endpoint, json=data)
+        response.raise_for_status()
+
+        return response.json()
+
+    def post_file(self, endpoint, data, files):
+        """
+        POST a multipart form to the endpoint in the realm.
+
+        `identity-provider/import-config` takes either a JSON body naming a URL
+        for Keycloak to fetch, or a multipart upload of the metadata document
+        itself. This is the second form.
+
+        Args:
+        - endpoint: The endpoint to use.
+        - data: The form fields to send alongside the file.
+        - files: The requests-style files mapping.
+
+        Returns:
+        - The decoded response body.
+        """
+
+        response = self.realm_request("POST", endpoint, data=data, files=files)
+        response.raise_for_status()
+
+        return response.json()
 
 
 class KeycloakAdminModel:
@@ -344,6 +437,31 @@ class KeycloakAdminModel:
             self.endpoint, self.representation_class, **kwargs
         )
 
+    def list_all(self, page_size=KEYCLOAK_LIST_PAGE_SIZE, **kwargs):
+        """
+        List every object in the realm, paging until the results run out.
+
+        `list` passes no `max`, and Keycloak's collection endpoints default to
+        10 results, so it silently truncates any collection larger than that.
+        Use this wherever the whole collection is the point - a realm-wide
+        alias check, a reconciliation pass.
+
+        Args:
+        - page_size: How many results to ask for per request.
+        Returns:
+        - A list of representation instances.
+        """
+
+        items = []
+        first = 0
+
+        while True:
+            page = self.list(first=first, max=page_size, **kwargs)
+            items.extend(page)
+            if len(page) < page_size:
+                return items
+            first += page_size
+
     def get(self, item_id):
         """
         Get a single object by its ID.
@@ -359,6 +477,54 @@ class KeycloakAdminModel:
             f"{self.endpoint}/{item_id}",
             self.representation_class,
         )
+
+    def create(self, data):
+        """
+        Create an object at the endpoint in the realm.
+
+        Args:
+        - data: The data to send.
+
+        Returns:
+        - The new object's ID (its alias, for endpoints keyed by one), or None
+          if Keycloak did not report a location.
+        Raises:
+        - requests.HTTPError if the request fails.
+        """
+
+        return self.admin_client.create_returning_id(self.endpoint, data)
+
+    def update(self, item_id, data):
+        """
+        Update the object with the given ID.
+
+        Args:
+        - item_id: The ID of the object to update.
+        - data: The full representation to write. Keycloak's PUT endpoints
+          replace rather than merge, so send everything.
+
+        Returns:
+        - True if successful.
+        Raises:
+        - requests.HTTPError if the request fails.
+        """
+
+        return self.admin_client.save(f"{self.endpoint}/{item_id}", data)
+
+    def delete(self, item_id):
+        """
+        Delete the object with the given ID.
+
+        Args:
+        - item_id: The ID of the object to delete.
+
+        Returns:
+        - True if successful.
+        Raises:
+        - requests.HTTPError if the request fails.
+        """
+
+        return self.admin_client.delete(f"{self.endpoint}/{item_id}")
 
     def associate(self, association_type, parent_id, child_id):
         """
@@ -412,6 +578,55 @@ def bootstrap_client(*, verify_realm=False):
     client.set_realm(target_realm)
 
     return client
+
+
+def import_identity_provider_config(
+    provider_id, *, from_url=None, metadata=None, client=None
+):
+    """
+    Ask Keycloak to parse identity provider metadata into an IdP config map.
+
+    Keycloak fetches and parses the metadata itself, which is why we do not
+    port ol-infrastructure's saml_helpers into this codebase. Note that the URL
+    form makes Keycloak fetch a caller-supplied address, so the endpoints that
+    reach this stay staff-only.
+
+    This is not a KeycloakAdminModel method because import-config is a sibling
+    of identity-provider/instances rather than an operation on one.
+
+    Args:
+    - provider_id: The Keycloak provider ID ("saml" or "oidc").
+    - from_url: A metadata or discovery URL for Keycloak to fetch.
+    - metadata: The metadata document itself, uploaded instead of fetched.
+    - client: An optional KeycloakAdminClient instance.
+    Returns:
+    - The flat config dict Keycloak parsed out of the metadata.
+    Raises:
+    - ValueError if neither from_url nor metadata was given.
+    - requests.HTTPError if the request fails.
+    """
+
+    if not from_url and not metadata:
+        # Both are keyword arguments defaulting to None, and callers can reach
+        # this from a shell as well as through the serializers. Say which
+        # argument is missing rather than letting requests raise a TypeError on
+        # a None file body several frames down.
+        msg = "Supply either from_url or metadata to parse."
+        raise ValueError(msg)
+
+    client = client or bootstrap_client()
+
+    if from_url:
+        return client.post_raw(
+            IDENTITY_PROVIDER_IMPORT_CONFIG_ENDPOINT,
+            {"providerId": provider_id, "fromUrl": from_url},
+        )
+
+    return client.post_file(
+        IDENTITY_PROVIDER_IMPORT_CONFIG_ENDPOINT,
+        {"providerId": provider_id},
+        {"file": ("metadata.xml", metadata, "application/xml")},
+    )
 
 
 def get_keycloak_model(representation, endpoint, *, client=None):
