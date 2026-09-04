@@ -207,13 +207,15 @@ def get_or_create_retirement_contract() -> ContractPage:
 
 def check_retirement_contract_collision(run: CourseRun, contract: ContractPage) -> None:
     """
-    Check that moving the run into the holding contract won't break a constraint.
+    Check that moving the run into the holding contract won't break a rule.
 
-    ``CourseRun`` has two unique constraints that include ``b2b_contract`` with
-    ``nulls_distinct=False`` - ``unique_primary_language_per_group`` and
-    ``unique_language_per_group``. Collisions are unlikely in practice because
-    the B2B run tag embeds the source contract ID and year, but an
-    ``IntegrityError`` mid-command is a much worse outcome than a clear refusal.
+    ``CourseRun`` enforces two uniqueness rules per contract group -
+    ``unique_primary_language_per_group`` and ``unique_language_per_group``
+    (formerly database constraints, now validated in
+    ``CourseRun.validate_b2b_contract_group_uniqueness``). Collisions are
+    unlikely in practice because the B2B run tag embeds the source contract ID
+    and year, but a ``ValidationError`` mid-command is a much worse outcome
+    than a clear refusal.
 
     Args:
         run (CourseRun): the run being moved.
@@ -226,7 +228,7 @@ def check_retirement_contract_collision(run: CourseRun, contract: ContractPage) 
         course=run.course,
         run_tag=run.run_tag,
         is_source_run=run.is_source_run,
-        b2b_contract=contract,
+        b2b_contracts=contract,
     ).exclude(pk=run.pk)
 
     if (
@@ -268,13 +270,14 @@ def move_run_to_retirement_contract(run: CourseRun) -> ContractPage:
 
     contract = get_or_create_retirement_contract()
 
-    if run.b2b_contract_id == contract.id:
+    if run.b2b_contracts.filter(pk=contract.pk).exists():
         return contract
 
     check_retirement_contract_collision(run, contract)
 
     run.b2b_contract = contract
     run.save()
+    run.b2b_contracts.add(contract)
 
     log.info("Moved course run %s to %s", run.courseware_id, contract)
 
@@ -679,11 +682,14 @@ def create_contract_run(  # noqa: PLR0913
         if (
             CourseRun.objects.filter(
                 course=course,
-                b2b_contract=contract,
                 language=clone_course_run.language,
                 variant_industry=clone_course_run.variant_industry,
                 variant_length=clone_course_run.variant_length,
-            ).exists()
+            )
+            .filter(
+                Q(b2b_contract=contract) | Q(b2b_contracts__in=[contract]),
+            )
+            .exists()
             and no_reruns
         ):
             msg = (
@@ -706,12 +712,15 @@ def create_contract_run(  # noqa: PLR0913
             is_self_paced=True,
             live=True,
             b2b_contract=contract,
+            b2b_only=True,
             language=clone_course_run.language,
             is_primary_language=clone_course_run.is_primary_language,
             variant_length=clone_course_run.variant_length,
             variant_industry=clone_course_run.variant_industry,
         )
         course_run.save()
+
+        course_run.b2b_contracts.add(contract)
 
         required_modes = EnrollmentMode.objects.filter(
             mode_slug__in=[EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE]
@@ -856,8 +865,9 @@ def get_active_contracts_from_basket_items(basket: Basket):
     contract_ids = []
     for item in items:
         purchasable = item.product.purchasable_object
-        if hasattr(purchasable, "b2b_contract") and purchasable.b2b_contract:
-            contract_ids.append(purchasable.b2b_contract.id)
+        if hasattr(purchasable, "b2b_contracts") and purchasable.b2b_contracts.exists():
+            item_contract_ids = purchasable.b2b_contracts.values_list("id", flat=True)
+            contract_ids.extend([contract_id for contract_id in item_contract_ids])  # noqa: C416
 
     if contract_ids:
         return list(ContractPage.objects.filter(id__in=contract_ids, active=True))
@@ -1337,17 +1347,33 @@ def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict
         return {"result": main_constants.USER_MSG_TYPE_B2B_DISALLOWED}
 
     purchasable_object = product.purchasable_object
-    if not purchasable_object or not purchasable_object.b2b_contract:
+    if not purchasable_object:
         log.error(
             "B2B enroll: attempted to use %s but product has no purchasable object",
             product,
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT}
 
-    if (
-        isinstance(purchasable_object, CourseRun)
-        and not purchasable_object.is_enrollable_for_b2b
-    ):
+    contract = None
+    if isinstance(purchasable_object, CourseRun):
+        if purchasable_object.b2b_contracts.count() > 1:
+            # More than one contract attached to this run, so this is ambiguous.
+            # This should be updated to accept a particular contract but for now it
+            # will just bail out if there's more than one to consider.
+            log.error(
+                "B2B enroll: run %s has more than one contract", purchasable_object
+            )
+            return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
+        contract = purchasable_object.b2b_contracts.first()
+
+    if not contract:
+        log.error("B2B enroll: run %s has no contract", purchasable_object)
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
+    if isinstance(
+        purchasable_object, CourseRun
+    ) and not purchasable_object.enrollable_for_contract(contract):
         log.error(
             "B2B enroll: attempted to use %s but %s is not enrollable for B2B",
             product,
@@ -1355,23 +1381,21 @@ def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
 
-    if not ContractPage.active_objects.filter(
-        id=purchasable_object.b2b_contract.id
-    ).exists():
+    if not ContractPage.active_objects.filter(id=contract.id).exists():
         log.error(
             "B2B enroll: %s attempted to use %s but contract %s either doesn't exist or is invalid",
             user,
             product,
-            purchasable_object.b2b_contract,
+            contract,
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
 
-    if not user.b2b_contracts.filter(id=purchasable_object.b2b_contract.id).exists():
+    if not user.b2b_contracts.filter(id=contract.id).exists():
         log.error(
             "B2B enroll: attempted to use %s but %s is not in the contract %s",
             product,
             user,
-            purchasable_object.b2b_contract,
+            contract,
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
 
@@ -1455,16 +1479,16 @@ def _apply_available_discount(request, product: Product, basket: Basket) -> None
 
         if (
             not product.purchasable_object
-            or not product.purchasable_object.b2b_contract
+            or product.purchasable_object.b2b_contracts.count() != 1
         ):
-            msg = f"Product {product} has no purchasable object or the purchasable object has no B2B contract"
+            msg = f"Product {product} has no purchasable object or the purchasable object has <> 1 B2B contract"
             raise ValueError(msg)
 
-        discount_amount = product.purchasable_object.b2b_contract.enrollment_fixed_price
+        contract = product.purchasable_object.b2b_contracts.first()
+        discount_amount = contract.enrollment_fixed_price
         redemption_type = (
             REDEMPTION_TYPE_ONE_TIME
-            if product.purchasable_object.b2b_contract.max_learners
-            and product.purchasable_object.b2b_contract.max_learners > 0
+            if contract.max_learners and contract.max_learners > 0
             else REDEMPTION_TYPE_UNLIMITED
         )
 
@@ -1581,8 +1605,9 @@ def _enroll_in_program_for_b2b(user, product: Product, program_id: str):
     """
     Enroll the user in the specified program as part of a B2B course enrollment.
 
-    Validates that the program belongs to the same contract as the course run
-    being enrolled in, then creates a ProgramEnrollment if one doesn't exist.
+    Validates that the program belongs to a contract that the specified course
+    also belongs to, and creates a verified ProgramEnrollment if one doesn't
+    exist.
 
     Args:
     - user: The user to enroll.
@@ -1593,7 +1618,10 @@ def _enroll_in_program_for_b2b(user, product: Product, program_id: str):
     from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE  # noqa: PLC0415
 
     purchasable_object = product.purchasable_object
-    contract = purchasable_object.b2b_contract
+
+    if not isinstance(purchasable_object, CourseRun):
+        msg = f"Product {purchasable_object} is not for a course run."
+        raise TypeError(msg)
 
     try:
         program = Program.objects.get(readable_id=program_id)
@@ -1606,12 +1634,12 @@ def _enroll_in_program_for_b2b(user, product: Product, program_id: str):
 
     # Validate the program belongs to the same contract as the course run
     if not ContractProgramItem.objects.filter(
-        contract=contract, program=program
+        contract__in=purchasable_object.b2b_contracts.all(), program=program
     ).exists():
         log.warning(
-            "B2B enroll: program %s is not in contract %s, skipping program enrollment",
+            "B2B enroll: program %s and course %s do not share a contract, skipping program enrollment",
             program_id,
-            contract,
+            purchasable_object.courseware_id,
         )
         return
 

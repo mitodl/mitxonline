@@ -98,7 +98,8 @@ def test_b2b_contract_attachment(mocker, max_learners, code_used, contract_activ
         max_learners=max_learners,
     )
 
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     ensure_enrollment_codes_exist(contract)
@@ -169,7 +170,8 @@ def test_b2b_contract_attachment_response_excludes_unrelated_contracts(mocker):
     contract = ContractPageFactory.create(
         membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     ensure_enrollment_codes_exist(contract)
@@ -203,7 +205,8 @@ def test_b2b_contract_attachment_returns_matching_contract_when_already_attached
     contract = ContractPageFactory.create(
         membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     ensure_enrollment_codes_exist(contract)
@@ -239,7 +242,8 @@ def test_b2b_contract_attachment_invalid_code_dates(user, bad_start_or_end):
         max_learners=1,
     )
 
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     ensure_enrollment_codes_exist(contract)
@@ -294,7 +298,8 @@ def test_b2b_contract_attachment_invalid_contract_dates(user, bad_start_or_end):
         max_learners=1,
     )
 
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     ensure_enrollment_codes_exist(contract)
@@ -346,7 +351,8 @@ def test_b2b_contract_attachment_full_contract(mocker):
         max_learners=1,
     )
 
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     ensure_enrollment_codes_exist(contract)
@@ -394,7 +400,8 @@ def test_b2b_contract_attachment_full_contract_with_used_code(mocker):
         max_learners=1,
     )
 
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     ensure_enrollment_codes_exist(contract)
@@ -446,7 +453,7 @@ def test_b2b_contract_attachment_full_contract_with_used_code(mocker):
         "flag",
     ],
 )
-def test_b2b_enroll(  # noqa: PLR0915, PLR0913
+def test_b2b_enroll(  # noqa: PLR0915, PLR0913, C901
     mocker, settings, user_has_edx_user, has_price, run_is_enrollable, contract_active
 ):
     """Make sure that hitting the enroll endpoint actually results in enrollments"""
@@ -503,6 +510,11 @@ def test_b2b_enroll(  # noqa: PLR0915, PLR0913
     url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
     resp = client.post(url)
 
+    if contract_active in ["date", "flag"]:
+        assert resp.status_code == 400
+        assert resp.json()["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT
+        return
+
     if not run_is_enrollable:
         assert resp.status_code == 400
         assert resp.json()["result"] == USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE
@@ -546,7 +558,8 @@ def test_b2b_contract_attachment_sets_redeemed_on(mocker):
 
     user = UserFactory.create()
     contract = ContractPageFactory.create(membership_type=CONTRACT_MEMBERSHIP_CODE)
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
     ensure_enrollment_codes_exist(contract)
     contract_code = contract.get_discounts().first()
@@ -571,7 +584,8 @@ def test_b2b_contract_attachment_creates_org_membership_with_keep_until_seen(moc
 
     user = UserFactory.create()
     contract = ContractPageFactory.create(membership_type=CONTRACT_MEMBERSHIP_CODE)
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
     ensure_enrollment_codes_exist(contract)
     contract_code = contract.get_discounts().first()
@@ -611,7 +625,8 @@ def test_preassigned_code_can_be_redeemed(mocker):
         is_manager=True,
     )
 
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     with reversion.create_revision():
         ProductFactory.create(purchasable_object=courserun)
 
@@ -696,7 +711,8 @@ def test_enroll_product_not_found(mocker):
         membership_type=CONTRACT_MEMBERSHIP_MANAGED,
         enrollment_fixed_price=0,
     )
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     # Intentionally do not create a Product for courserun
 
     user = UserFactory.create()
@@ -715,7 +731,8 @@ def test_enroll_success(mocker):
         membership_type=CONTRACT_MEMBERSHIP_MANAGED,
         enrollment_fixed_price=0,
     )
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     mocker.patch(
@@ -750,7 +767,8 @@ def test_enroll_failure_returns_400(mocker, error_result):
         membership_type=CONTRACT_MEMBERSHIP_MANAGED,
         enrollment_fixed_price=0,
     )
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     mocker.patch(
@@ -776,7 +794,8 @@ def test_enroll_passes_program_id_to_api(mocker):
         membership_type=CONTRACT_MEMBERSHIP_MANAGED,
         enrollment_fixed_price=0,
     )
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     mocked_enroll = mocker.patch(
@@ -805,7 +824,8 @@ def test_enroll_omits_program_id_when_not_provided(mocker):
         membership_type=CONTRACT_MEMBERSHIP_MANAGED,
         enrollment_fixed_price=0,
     )
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     mocked_enroll = mocker.patch(

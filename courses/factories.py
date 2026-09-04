@@ -128,7 +128,9 @@ class CourseFactory(DjangoModelFactory):
     """Factory for Courses"""
 
     title = fuzzy.FuzzyText(prefix="Course ")
-    readable_id = factory.Sequence("course-v1:PyT+Course{0}".format)
+    readable_id = factory.LazyFunction(
+        lambda: f"course-v1:PyT+{''.join(FAKE.words(nb=3, unique=True))}"
+    )
     live = True
     departments = factory.SubFactory(DepartmentFactory)
 
@@ -196,6 +198,7 @@ class CourseRunFactory(DjangoModelFactory):
 
     live = True
     b2b_contract = None
+    b2b_only = False
     is_source_run = False
     language = ""
     is_primary_language = False
@@ -222,6 +225,26 @@ class CourseRunFactory(DjangoModelFactory):
             self.enrollment_modes.add(
                 EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
             )
+
+    @factory.post_generation
+    def b2b_contracts(self, create, extracted, **kwargs):  # noqa: ARG002
+        """
+        Handle assignment of B2B contracts.
+
+        If the test is setting b2b_contract, then copy that into the
+        b2b_contracts many-to-many. Having this here is a deliberate
+        choice - in non-test code, it should be fixed to use the right
+        field.
+        """
+
+        if not create:
+            return
+
+        if extracted is not None:
+            self.b2b_contracts.set(extracted)
+
+        if self.b2b_contract is not None:
+            self.b2b_contracts.add(self.b2b_contract)
 
     class Meta:
         model = CourseRun
