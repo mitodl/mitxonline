@@ -10,8 +10,10 @@ from zoneinfo import ZoneInfo
 import freezegun
 import pytest
 import reversion
+from django.db import connection
 from django.forms.models import model_to_dict
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.dateparse import parse_datetime
 from mitol.common.utils.datetime import now_in_utc
@@ -47,6 +49,7 @@ from ecommerce.factories import (
     OrderFactory,
     PaidAmountOffDiscountFactory,
     ProductFactory,
+    ProgramProductFactory,
     TransactionFactory,
     UnlimitedUseDiscountFactory,
 )
@@ -1538,7 +1541,6 @@ def test_start_checkout_with_bad_discount(user, user_drf_client):
     assert resp.status_code == 400
 
 
-@pytest.mark.skip_nplusone_check
 def test_order_history_list(user, user_drf_client):
     """Test that we can get a user's order history."""
     with reversion.create_revision():
@@ -1578,7 +1580,6 @@ def test_order_history_list(user, user_drf_client):
             ]
 
 
-@pytest.mark.skip_nplusone_check
 def test_order_history_retrieve(user, user_drf_client):
     """Test that we can get a user's order history."""
     with reversion.create_revision():
@@ -1598,6 +1599,89 @@ def test_order_history_retrieve(user, user_drf_client):
     returned_order = returned_orders[0]
     assert returned_order["id"] == order_1.id
     assert returned_order["lines"][0]["id"] == order_1_line.id
+
+
+# Each extra order on the page costs this many queries, all of them rooted in
+# `LineSerializer.product`: `Line.product` rebuilds an unsaved Product from a
+# reversion Version, so its generic `purchasable_object` — and the course, course
+# page, feature image, instructors, flexible-pricing form and current price under
+# it — resolve per line. A prefetch on the view's Order queryset cannot reach
+# them; serializing `line.purchased_object`, which is already prefetched, instead
+# of `product.purchasable_object` could.
+QUERIES_PER_ADDITIONAL_ORDER = 10
+
+# What one request costs before any order is serialized.
+FIXED_QUERIES_PER_PAGE = 6
+
+
+def _create_order_with_line(user):
+    """Create one fulfilled order carrying a single course-run line."""
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    LineFactory.create(
+        order=order,
+        product_version=Version.objects.get_for_object(product).last(),
+    )
+
+
+def _order_history_query_count(user_drf_client):
+    """Query count for one page of order history."""
+    with CaptureQueriesContext(connection) as queries:
+        resp = user_drf_client.get(reverse("v0:orderhistory_api-list"))
+    assert resp.status_code == 200
+    return len(queries.captured_queries)
+
+
+def test_order_history_query_count_grows_only_by_the_known_page_walk(
+    user, user_drf_client
+):
+    """
+    Pin what a page of order history costs in queries, and what a row adds.
+
+    Two row counts rather than one: the difference isolates a per-row
+    regression, which an absolute count alone cannot distinguish from a rise in
+    fixed cost, and the totals catch a regression that runs once per request,
+    which the difference alone cancels out. Any drop here is welcome and means
+    lowering a constant.
+    """
+    for _ in range(2):
+        _create_order_with_line(user)
+    # The ContentType and Site caches are process-wide, so the first request in
+    # a process pays their misses. Warm them ahead of both measurements.
+    _order_history_query_count(user_drf_client)
+    two_orders = _order_history_query_count(user_drf_client)
+
+    for _ in range(4):
+        _create_order_with_line(user)
+    six_orders = _order_history_query_count(user_drf_client)
+
+    assert six_orders - two_orders == 4 * QUERIES_PER_ADDITIONAL_ORDER
+    assert two_orders == FIXED_QUERIES_PER_PAGE + 2 * QUERIES_PER_ADDITIONAL_ORDER
+    assert six_orders == FIXED_QUERIES_PER_PAGE + 6 * QUERIES_PER_ADDITIONAL_ORDER
+
+
+def test_order_history_titles_follow_the_snapshotted_product(user, user_drf_client):
+    """
+    A title is decided by the product the line snapshots, not by the line's own
+    denormalized `purchased_content_type`.
+
+    The two agree wherever the app creates Lines, so a disagreement is the
+    symptom of reading the column instead: a program product would take the
+    course-run branch and dereference `.course` on a `Program`.
+    """
+    with reversion.create_revision():
+        product = ProgramProductFactory.create()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    LineFactory.create(
+        order=order,
+        product_version=Version.objects.get_for_object(product).last(),
+    )
+
+    resp = user_drf_client.get(reverse("v0:orderhistory_api-list"))
+
+    assert resp.status_code == 200
+    assert resp.json()["results"][0]["titles"] == [f"No Title - {product.id}"]
 
 
 @pytest.mark.skip_nplusone_check
@@ -1883,7 +1967,6 @@ def test_refund_request_b2b_order(user, user_drf_client):
     assert "order" in resp.json()["errors"]
 
 
-@pytest.mark.skip_nplusone_check
 def test_order_history_includes_refund_eligible(user, user_drf_client):
     """Order history responses include the refund_eligible field."""
     with reversion.create_revision():

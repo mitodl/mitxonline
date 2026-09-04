@@ -9,7 +9,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import Http404
 from django.shortcuts import redirect
 from django.views import View
@@ -59,6 +59,7 @@ from ecommerce.models import (
     Discount,
     DiscountProduct,
     DiscountRedemption,
+    Line,
     Order,
     OrderStatus,
     Product,
@@ -959,8 +960,30 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
         return (
             Order.objects.filter(purchaser=self.request.user)
             .filter(state__in=[OrderStatus.FULFILLED, OrderStatus.REFUNDED])
-            # Every serialized order reads both, once per row.
-            .prefetch_related("refund_requests", "lines__purchased_object")
+            .select_related("purchaser")
+            .prefetch_related(
+                # select_related builds a separate purchaser instance per row,
+                # so User.openedx_user (behind the serializer's `username`)
+                # needs its own prefetch to stay off the per-row path.
+                "purchaser__openedx_users",
+                # `refund_requests` feeds Order.latest_refund_request.
+                "refund_requests",
+                # `product_version` is read by Line.product and
+                # Line.item_description; `purchased_object` feeds
+                # Order.purchased_runs, behind both is_b2b_order and
+                # refund_deadline. `purchased_object` is nested rather than a
+                # sibling "lines__purchased_object" lookup, which is
+                # order-dependent: declared ahead of this Prefetch it raises
+                # "'lines' lookup was already seen with a different queryset".
+                # Line declares no Meta.ordering, so order_by pins the order of
+                # the serialized `lines` and `titles` against the query plan.
+                Prefetch(
+                    "lines",
+                    queryset=Line.objects.select_related("product_version")
+                    .prefetch_related("purchased_object")
+                    .order_by("id"),
+                ),
+            )
             .order_by("-created_on")
             .all()
         )

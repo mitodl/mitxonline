@@ -981,7 +981,18 @@ class Order(TimestampedModel):
     @cached_property
     def latest_refund_request(self):
         """Return the learner's most recent refund request for this order, if any."""
-        return self.refund_requests.order_by("-created_on").first()
+        # Sorted in Python off `.all()` so that a caller's
+        # `prefetch_related("refund_requests")` serves this: `order_by()` on a
+        # related manager clones the queryset, which bypasses the prefetch cache
+        # and costs one query per order on the history endpoint. RefundRequest
+        # declares no Meta.ordering, so the ordering cannot be left to the
+        # database either; pk breaks ties so the answer does not depend on the
+        # order rows come back in.
+        requests = sorted(
+            self.refund_requests.all(),
+            key=lambda request: (request.created_on, request.pk),
+        )
+        return requests[-1] if requests else None
 
     @property
     def refund_reviewed_on(self):
@@ -1425,6 +1436,15 @@ class Line(TimestampedModel):
         from ecommerce.discounts import product_from_version  # noqa: PLC0415
 
         return product_from_version(self.product_version)
+
+    @cached_property
+    def product_content_type(self):
+        """Return the content type of the product this line snapshots."""
+        # `product` is rebuilt in Python from a reversion Version, so traversing
+        # its `content_type` FK would cost a query per line and no prefetch can
+        # reach it. The id is in the Version's field_dict, and `get_for_id` is
+        # process-cached, so resolving it from the id is free.
+        return ContentType.objects.get_for_id(self.product.content_type_id)
 
     @cached_property
     def courseware(self):
