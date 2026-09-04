@@ -14,8 +14,12 @@ from b2b.keycloak_admin_api import (
     KeycloakAdminClient,
     KeycloakAdminModel,
     bootstrap_client,
+    import_identity_provider_config,
 )
-from b2b.keycloak_admin_dataclasses import RealmRepresentation
+from b2b.keycloak_admin_dataclasses import (
+    IdentityProviderRepresentation,
+    RealmRepresentation,
+)
 
 pytestmark = [pytest.mark.django_db]
 FAKE = faker.Faker()
@@ -657,3 +661,135 @@ def test_realm_representation_ignores_extra_fields():
 
     assert realm.id == fake_realm.id
     assert realm.realm == fake_realm.realm
+
+
+def test_create_returning_id_reads_the_location_header(settings, mocker):
+    """Keycloak answers a create with 201 and an empty body plus a Location."""
+
+    client, _, _, _ = _mocked_admin_client(settings, mocker)
+
+    new_id = FAKE.uuid4()
+    response = requests.Response()
+    response.status_code = 201
+    response.headers["Location"] = (
+        f"https://keycloak.example.com/admin/realms/olapps/organizations/{new_id}"
+    )
+    mocker.patch.object(client, "realm_request", return_value=response)
+
+    assert client.create_returning_id("organizations", {"alias": "acme"}) == new_id
+
+
+def test_create_returning_id_without_a_location(settings, mocker):
+    """A create with no Location header returns None rather than guessing."""
+
+    client, _, _, _ = _mocked_admin_client(settings, mocker)
+
+    response = requests.Response()
+    response.status_code = 201
+    mocker.patch.object(client, "realm_request", return_value=response)
+
+    assert client.create_returning_id("organizations", {"alias": "acme"}) is None
+
+
+def test_post_raw_returns_the_body_uncoerced(settings, mocker):
+    """import-config answers with a flat config map, not a representation."""
+
+    client, _, _, _ = _mocked_admin_client(settings, mocker)
+
+    config = {"singleSignOnServiceUrl": FAKE.url(), "idpEntityId": FAKE.url()}
+    mocker.patch.object(client, "realm_request", return_value=_faked_response(config))
+
+    assert client.post_raw("identity-provider/import-config", {}) == config
+
+
+def test_model_list_all_pages_until_exhausted(settings, mocker):
+    """
+    list_all keeps asking until a short page comes back.
+
+    Keycloak's collection endpoints default to 10 results when `max` is absent,
+    so anything that needs the whole collection has to page for it.
+    """
+
+    client, _, _, _ = _mocked_admin_client(settings, mocker)
+
+    first_page = RealmRepresentationFactory.create_batch(2)
+    second_page = RealmRepresentationFactory.create_batch(1)
+    mocked_list = mocker.patch.object(
+        client, "list", side_effect=[first_page, second_page]
+    )
+
+    realm_model = KeycloakAdminModel(client, RealmRepresentation, "realms")
+
+    assert realm_model.list_all(page_size=2) == [*first_page, *second_page]
+    assert mocked_list.call_args_list == [
+        mocker.call("realms", RealmRepresentation, first=0, max=2),
+        mocker.call("realms", RealmRepresentation, first=2, max=2),
+    ]
+
+
+def test_model_create_update_delete(settings, mocker):
+    """The three model-level methods the provisioning API needs."""
+
+    client, _, _, _ = _mocked_admin_client(settings, mocker)
+
+    fake_alias = FAKE.word()
+    mocked_create = mocker.patch.object(
+        client, "create_returning_id", return_value=fake_alias
+    )
+    mocked_save = mocker.patch.object(client, "save", return_value=True)
+    mocked_delete = mocker.patch.object(client, "delete", return_value=True)
+
+    idp_model = KeycloakAdminModel(
+        client, IdentityProviderRepresentation, "identity-provider/instances"
+    )
+
+    assert idp_model.create({"alias": fake_alias}) == fake_alias
+    assert idp_model.update(fake_alias, {"enabled": True}) is True
+    assert idp_model.delete(fake_alias) is True
+
+    mocked_create.assert_called_once_with(
+        "identity-provider/instances", {"alias": fake_alias}
+    )
+    mocked_save.assert_called_once_with(
+        f"identity-provider/instances/{fake_alias}", {"enabled": True}
+    )
+    mocked_delete.assert_called_once_with(f"identity-provider/instances/{fake_alias}")
+
+
+def test_import_identity_provider_config_from_url(settings, mocker):
+    """The URL form asks Keycloak to fetch and parse the metadata itself."""
+
+    client, _, _, _ = _mocked_admin_client(settings, mocker)
+
+    config = {"idpEntityId": FAKE.url()}
+    mocked_post = mocker.patch.object(client, "post_raw", return_value=config)
+    metadata_url = FAKE.url()
+
+    result = import_identity_provider_config(
+        "saml", from_url=metadata_url, client=client
+    )
+
+    assert result == config
+    mocked_post.assert_called_once_with(
+        "identity-provider/import-config",
+        {"providerId": "saml", "fromUrl": metadata_url},
+    )
+
+
+def test_import_identity_provider_config_from_document(settings, mocker):
+    """Metadata supplied inline is uploaded rather than fetched."""
+
+    client, _, _, _ = _mocked_admin_client(settings, mocker)
+
+    config = {"idpEntityId": FAKE.url()}
+    mocked_post = mocker.patch.object(client, "post_file", return_value=config)
+    metadata = "<EntityDescriptor />"
+
+    result = import_identity_provider_config("saml", metadata=metadata, client=client)
+
+    assert result == config
+    mocked_post.assert_called_once_with(
+        "identity-provider/import-config",
+        {"providerId": "saml"},
+        {"file": ("metadata.xml", metadata, "application/xml")},
+    )
