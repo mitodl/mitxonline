@@ -11,35 +11,24 @@ from users.models import LegalAddress, UserProfile
 if TYPE_CHECKING:
     from users.models import User
 
-#: to_dict() keys that map to Open edX profile data. A change to any of these
-#: queues update_edx_user_profile, which PATCHes the full edX field set (name,
-#: country, state, gender, year_of_birth, level_of_education).
+#: Attributes whose change queues update_edx_user_profile.
 EDX_PROFILE_SYNC_ATTRS = frozenset({"fullName", "name", "displayName"})
 
-#: to_dict() keys that map to the user's edX email. Kept separate from the
-#: profile attributes because update_edx_user_email re-runs the Open edX OAuth
-#: handshake rather than PATCHing - edX treats "email" as read-only on the
-#: accounts endpoint and routes it through its own confirmation flow.
+#: Separate from the profile attrs because update_edx_user_email re-runs the
+#: Open edX OAuth handshake rather than PATCHing - edX treats email as read-only.
 EDX_EMAIL_SYNC_ATTRS = frozenset({"emails"})
 
-#: The complete set of attributes diffed across a save. This is an allow-list on
-#: purpose: a SCIM client is free to send attributes we do not model, and nothing
-#: outside this set is ever allowed to queue Open edX work.
+#: Allow-list on purpose: a SCIM client may send attributes we do not model, and
+#: nothing outside this set may queue Open edX work.
 EDX_SYNC_ATTRS = EDX_PROFILE_SYNC_ATTRS | EDX_EMAIL_SYNC_ATTRS
 
-#: to_dict() keys deliberately NOT synced to Open edX:
-#: - id/schemas/groups/externalId are protocol scaffolding, not user data.
-#: - meta embeds lastModified, which changes on literally every save, and its
-#:   location needs a request; the diff runs over _scim_attrs(), which omits it.
-#: - userName and active are real user data, but Open edX will not accept either
-#:   on PATCH /api/user/v1/accounts/{username}: both are listed in
-#:   AccountUserSerializer.read_only_fields, and edX's _validate_read_only_fields
-#:   turns a read-only key in the payload into a 400 for the WHOLE request, which
-#:   would take the name/country/gender sync down with it. edX also exposes no
-#:   reactivate endpoint, so an "active" sync could only ever be one-way.
-#: This set exists so test_edx_sync_attrs_cover_to_dict can assert every
-#: to_dict() key is classified - a newly mapped attribute fails the suite until
-#: someone decides which side it belongs on, rather than being silently dropped.
+#: Deliberately not synced. id/schemas/groups/externalId are protocol
+#: scaffolding; meta changes on every save. userName and active are real data,
+#: but edX lists both in AccountUserSerializer.read_only_fields and 400s the
+#: whole PATCH on a read-only key, which would take the name sync with it - and
+#: it exposes no reactivate endpoint, so active could only ever sync one-way.
+#: test_edx_sync_attrs_cover_to_dict asserts this plus EDX_SYNC_ATTRS covers
+#: to_dict(), so a new attribute fails the suite instead of being dropped.
 EDX_UNSYNCED_ATTRS = frozenset(
     {"id", "schemas", "groups", "externalId", "meta", "userName", "active"}
 )
@@ -91,11 +80,9 @@ class LearnUserAdapter(UserAdapter):
             del self.obj.openedx_user
             self.openedx_user = self.obj.openedx_user = OpenEdxUser()
 
-        # __init__ runs before from_dict()/handle_replace() mutate the object, and
-        # the view calls save() on this same adapter instance, so this is a valid
-        # pre-change baseline. Skipped for a create: there is nothing to diff
-        # against, and a brand new SCIM user has no Open edX account to update
-        # (edX account creation is a separate concern - see create_user_from_id).
+        # __init__ runs before from_dict()/handle_replace() mutate the object and
+        # the view calls save() on this same instance, so this is a valid
+        # pre-change baseline. Creates have nothing to diff and no edX account yet.
         self._edx_sync_is_new = self.is_new_user
         self._edx_sync_snapshot_before = (
             None if self.is_new_user else self._edx_sync_snapshot()
@@ -106,10 +93,8 @@ class LearnUserAdapter(UserAdapter):
         """
         Snapshot the Open edX-relevant SCIM attributes, for diffing across a save.
 
-        Read through _scim_attrs() so the diff follows the adapter's own schema -
-        name.givenName lives on LegalAddress rather than User, and is covered
-        here by the same code path as fullName - while the EDX_SYNC_ATTRS filter
-        keeps any attribute we do not model out of the comparison entirely.
+        Reading through _scim_attrs() means the diff follows the adapter's schema,
+        so LegalAddress-backed name.givenName is covered like any other attribute.
         """
         snapshot = self._scim_attrs()
         return {key: snapshot.get(key) for key in EDX_SYNC_ATTRS}
@@ -144,11 +129,9 @@ class LearnUserAdapter(UserAdapter):
         """
         Return the user-data portion of the SCIM representation.
 
-        Split out of to_dict() so the Open edX change detection can diff the
-        real attributes without touching ``meta``, which is unusable for that:
-        its lastModified changes on every single save, and its location needs a
-        request that the management commands constructing this adapter do not
-        have.
+        Split out of to_dict() so change detection can diff it without touching
+        ``meta``, whose lastModified changes on every save and whose location
+        needs a request the management commands building this adapter lack.
         """
         given_name, family_name = self._resolve_name()
         return {
@@ -225,12 +208,10 @@ class LearnUserAdapter(UserAdapter):
         """
         Persist the user, then mirror any changed fields into Open edX.
 
-        This is the single choke point for every inbound SCIM write: PUT and POST
-        reach it via from_dict(), PATCH via handle_replace(), and /Bulk by
-        re-dispatching through those same views.
-
-        The Open edX work is handed to celery on commit and never raises - a SCIM
-        client must not see a 500 because the broker or edX is unavailable.
+        The single choke point for every inbound SCIM write: PUT/POST reach it via
+        from_dict(), PATCH via handle_replace(), and /Bulk by re-dispatching
+        through those views. Queueing never raises - a SCIM client must not see a
+        500 because the broker or edX is down.
         """
         from openedx.task_helpers import (  # noqa: PLC0415
             queue_edx_user_email_change,
@@ -244,18 +225,16 @@ class LearnUserAdapter(UserAdapter):
             return
 
         after = self._edx_sync_snapshot()
-        # Re-baseline: django_scim's handle_operations() calls save() once per
-        # PATCH operation, so without this each later save would re-diff against
-        # the values the request started with.
+        # handle_operations() calls save() once per PATCH operation, so re-baseline
+        # or every later save re-diffs against the values the request started with.
         self._edx_sync_snapshot_before = after
 
         changed = {key for key in EDX_SYNC_ATTRS if before.get(key) != after.get(key)}
         if not changed:
             return
 
-        # on_commit matters: PatchView.patch wraps the operation in an atomic block
-        # and UserAdapter.save() opens a nested one, so queueing inline would let a
-        # worker read the row before it is committed.
+        # on_commit, not inline: PatchView.patch and super().save() both open atomic
+        # blocks, so a worker could otherwise read the row before it is committed.
         if changed & EDX_PROFILE_SYNC_ATTRS and not self._edx_profile_sync_queued:
             self._edx_profile_sync_queued = True
             transaction.on_commit(partial(queue_edx_user_profile_update, self.obj))
