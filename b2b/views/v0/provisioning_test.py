@@ -212,6 +212,29 @@ def test_patch_updates_the_mutable_fields(admin_drf_client, mocker):
     assert mocked_update.call_args.kwargs["domains"] == ["renamed.edu"]
 
 
+def test_patching_an_unprovisioned_organization_is_a_conflict(admin_drf_client):
+    """
+    An org with no Keycloak record is 409, not 502.
+
+    502 would say the Keycloak API failed. It did not - our record is the
+    incomplete one, and retrying will never fix it. Roughly 24 production
+    organizations are in this state (hq#10552).
+    """
+
+    organization = OrganizationPageFactory.create(
+        org_key="LEGACYU", sso_organization_id=None
+    )
+
+    response = admin_drf_client.patch(
+        _organization_url(organization.org_key),
+        {"name": "Renamed"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert "LEGACYU" in response.json()["detail"]
+
+
 def test_set_onboarding_state(admin_drf_client):
     """The onboarding record is how an operator says where a customer is."""
 
