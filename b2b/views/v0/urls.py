@@ -13,6 +13,11 @@ from b2b.views.v0.manager import (
     ManagerOrganizationViewSet,
     ProcessMailgunWebhook,
 )
+from b2b.views.v0.provisioning import (
+    IdentityProviderProvisioningViewSet,
+    OrganizationProvisioningViewSet,
+    ParseMetadataView,
+)
 from b2b.views.v0.service import OrganizationManagerCheckView
 from main.routers import SimpleRouterWithNesting
 
@@ -43,6 +48,28 @@ manager_org.register(
     parents_query_lookups=[
         "organization",
     ],
+)
+
+# Staff-only provisioning routes (capability C1). These take ownership of
+# per-customer Keycloak resources from Pulumi; see
+# docs/source/b2b/provisioning_api.md.
+provisioning_org = v0_router.register(
+    r"provisioning/organizations",
+    OrganizationProvisioningViewSet,
+    basename="b2b-provisioning-organization",
+)
+provisioning_org.register(
+    r"identity-providers",
+    IdentityProviderProvisioningViewSet,
+    basename="b2b-provisioning-organization-idp",
+    parents_query_lookups=[
+        "organization__org_key",
+    ],
+)
+v0_router.register(
+    r"provisioning/parse-metadata",
+    ParseMetadataView,
+    basename="b2b-provisioning-parse-metadata",
 )
 
 urlpatterns = [

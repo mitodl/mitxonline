@@ -850,6 +850,397 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrganizationPage'
           description: ''
+  /api/v0/b2b/provisioning/organizations/:
+    post:
+      operationId: b2b_provisioning_organizations_create
+      description: |-
+        Provision a new organization.
+
+        Writes the Keycloak organization first, then the OrganizationPage and
+        its onboarding record in one transaction, compensating by deleting the
+        Keycloak organization if that transaction fails.
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisionedOrganization'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{org_key}/:
+    get:
+      operationId: b2b_provisioning_organizations_retrieve
+      description: Return an organization, including what Keycloak currently holds.
+      parameters:
+      - in: path
+        name: org_key
+        schema:
+          type: string
+          description: The short key used for the organization (for edX).
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisionedOrganization'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+    patch:
+      operationId: b2b_provisioning_organizations_partial_update
+      description: Update an organization in both systems. org_key cannot change.
+      parameters:
+      - in: path
+        name: org_key
+        schema:
+          type: string
+          description: The short key used for the organization (for edX).
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateOrganizationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateOrganizationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateOrganizationRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisionedOrganization'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{org_key}/onboarding/:
+    post:
+      operationId: b2b_provisioning_organizations_onboarding_create
+      description: |-
+        Record where this organization is in the onboarding sequence.
+
+        Descriptive only. Nothing in this API gates on the state; it exists so
+        a human can answer "what is left for this customer" without reading
+        four systems.
+      parameters:
+      - in: path
+        name: org_key
+        schema:
+          type: string
+          description: The short key used for the organization (for edX).
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetOnboardingStateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SetOnboardingStateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SetOnboardingStateRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationOnboarding'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/identity-providers/:
+    get:
+      operationId: b2b_provisioning_organizations_identity_providers_list
+      description: List the organization's identity providers.
+      parameters:
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrganizationIdentityProvider'
+          description: ''
+    post:
+      operationId: b2b_provisioning_organizations_identity_providers_create
+      description: |-
+        Provision an identity provider and link it to the organization.
+
+        The IdP lands in `draft`, which is disabled in Keycloak. Nobody can
+        reach it until it is transitioned to `testing`.
+      parameters:
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateIdentityProviderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateIdentityProviderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateIdentityProviderRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationIdentityProvider'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/identity-providers/{alias}/:
+    get:
+      operationId: b2b_provisioning_organizations_identity_providers_retrieve
+      description: Return a single identity provider.
+      parameters:
+      - in: path
+        name: alias
+        schema:
+          type: string
+          description: The Keycloak IdP alias. Realm-wide, not per-organization.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationIdentityProvider'
+          description: ''
+    delete:
+      operationId: b2b_provisioning_organizations_identity_providers_destroy
+      description: Unlink and delete an identity provider.
+      parameters:
+      - in: path
+        name: alias
+        schema:
+          type: string
+          description: The Keycloak IdP alias. Realm-wide, not per-organization.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      responses:
+        '204':
+          description: No response body
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/identity-providers/{alias}/refresh-metadata/:
+    post:
+      operationId: b2b_provisioning_organizations_identity_providers_refresh_metadata_create
+      description: |-
+        Re-fetch the partner's metadata and store what came back.
+
+        On failure the stored artifact is left untouched, which is the whole
+        reason it is stored.
+      parameters:
+      - in: path
+        name: alias
+        schema:
+          type: string
+          description: The Keycloak IdP alias. Realm-wide, not per-organization.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationIdentityProvider'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/identity-providers/{alias}/transition/:
+    post:
+      operationId: b2b_provisioning_organizations_identity_providers_transition_create
+      description: |-
+        Move the identity provider's lifecycle state.
+
+        The only mover, and it writes Keycloak's enabled flag in the same
+        operation so the two cannot drift. draft -> active is rejected: an IdP
+        goes live only after somebody has logged in through it.
+      parameters:
+      - in: path
+        name: alias
+        schema:
+          type: string
+          description: The Keycloak IdP alias. Realm-wide, not per-organization.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IdentityProviderTransitionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/IdentityProviderTransitionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/IdentityProviderTransitionRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationIdentityProvider'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/parse-metadata/:
+    post:
+      operationId: b2b_provisioning_parse_metadata_create
+      description: Return the config map Keycloak parses out of the given metadata.
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParseMetadataRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ParseMetadataRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ParseMetadataRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParsedIdentityProviderConfig'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
   /api/v0/b2b/service/organization-manager-check/:
     get:
       operationId: b2b_service_organization_manager_check
@@ -6445,6 +6836,74 @@ components:
           nullable: true
       required:
       - product_ids
+    CreateIdentityProviderRequest:
+      type: object
+      description: Request body for provisioning an identity provider.
+      properties:
+        alias:
+          type: string
+          minLength: 1
+          maxLength: 255
+        protocol:
+          $ref: '#/components/schemas/IdentityProviderProtocolEnum'
+        display_name:
+          type: string
+          default: ''
+          maxLength: 255
+        metadata_url:
+          type: string
+          format: uri
+        metadata_xml:
+          type: string
+        discovery_url:
+          type: string
+          format: uri
+        client_id:
+          type: string
+        client_secret:
+          type: string
+        attribute_map:
+          type: object
+          additionalProperties:
+            type: string
+            minLength: 1
+        attribute_name_map:
+          type: object
+          additionalProperties:
+            type: string
+            minLength: 1
+      required:
+      - alias
+      - protocol
+    CreateOrganizationRequest:
+      type: object
+      description: Request body for provisioning a new organization.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        org_key:
+          type: string
+          minLength: 1
+          maxLength: 30
+        org_key_prefix:
+          type: string
+          maxLength: 30
+        domains:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        description:
+          type: string
+          default: ''
+        redirect_url:
+          type: string
+          default: ''
+      required:
+      - name
+      - org_key
     Department:
       type: object
       description: Department model serializer
@@ -6943,6 +7402,42 @@ components:
       - key
       - text
       - title
+    IdentityProviderLifecycleStateEnum:
+      enum:
+      - draft
+      - testing
+      - active
+      - disabled
+      type: string
+      description: |-
+        * `draft` - Draft
+        * `testing` - Testing
+        * `active` - Active
+        * `disabled` - Disabled
+      x-enum-descriptions:
+      - Draft
+      - Testing
+      - Active
+      - Disabled
+    IdentityProviderProtocolEnum:
+      enum:
+      - saml
+      - oidc
+      type: string
+      description: |-
+        * `saml` - SAML
+        * `oidc` - OIDC
+      x-enum-descriptions:
+      - SAML
+      - OIDC
+    IdentityProviderTransitionRequest:
+      type: object
+      description: Request body for moving an identity provider's lifecycle state.
+      properties:
+        state:
+          $ref: '#/components/schemas/IdentityProviderLifecycleStateEnum'
+      required:
+      - state
     LanguageEnum:
       enum:
       - af_ZA
@@ -7557,6 +8052,32 @@ components:
     NullEnum:
       enum:
       - null
+    OnboardingStateEnum:
+      enum:
+      - requested
+      - org_created
+      - idp_configured
+      - idp_validated
+      - contract_ready
+      - live
+      - blocked
+      type: string
+      description: |-
+        * `requested` - Requested
+        * `org_created` - Organization created
+        * `idp_configured` - Identity provider configured
+        * `idp_validated` - Identity provider validated
+        * `contract_ready` - Contract ready
+        * `live` - Live
+        * `blocked` - Blocked
+      x-enum-descriptions:
+      - Requested
+      - Organization created
+      - Identity provider configured
+      - Identity provider validated
+      - Contract ready
+      - Live
+      - Blocked
     Order:
       type: object
       properties:
@@ -7757,6 +8278,72 @@ components:
       - reference_number
       - state
       - total_price_paid
+    OrganizationIdentityProvider:
+      type: object
+      description: |-
+        An identity provider we provisioned for an organization.
+
+        metadata_artifact is what Keycloak parsed out of the partner's metadata.
+        Credentials are never written to it, so this is safe to serve.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        alias:
+          type: string
+          readOnly: true
+          description: The Keycloak IdP alias. Realm-wide, not per-organization.
+        protocol:
+          allOf:
+          - $ref: '#/components/schemas/IdentityProviderProtocolEnum'
+          readOnly: true
+        display_name:
+          type: string
+          readOnly: true
+        lifecycle_state:
+          allOf:
+          - $ref: '#/components/schemas/IdentityProviderLifecycleStateEnum'
+          readOnly: true
+        internal_id:
+          type: string
+          readOnly: true
+          description: Keycloak's internalId for the IdP instance.
+        metadata_source:
+          type: string
+          readOnly: true
+          description: The metadata URL, or the inline XML, the config was parsed
+            from.
+        metadata_artifact:
+          readOnly: true
+          nullable: true
+          description: The config map Keycloak parsed out of the metadata. Persisted
+            so a partner's metadata endpoint going away can neither destroy config
+            nor block a deploy.
+        metadata_fetched_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_on:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_on:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - alias
+      - created_on
+      - display_name
+      - id
+      - internal_id
+      - lifecycle_state
+      - metadata_artifact
+      - metadata_fetched_at
+      - metadata_source
+      - protocol
+      - updated_on
     OrganizationManagerCheck:
       type: object
       description: Response shape for the org-manager check.
@@ -7766,6 +8353,21 @@ components:
           description: True if the user manages the organization.
       required:
       - is_manager
+    OrganizationOnboarding:
+      type: object
+      description: Where an organization is in the onboarding sequence.
+      properties:
+        state:
+          $ref: '#/components/schemas/OnboardingStateEnum'
+        state_changed_at:
+          type: string
+          format: date-time
+          readOnly: true
+        notes:
+          type: string
+          description: Free-form operator notes; holds the reason when state is blocked.
+      required:
+      - state_changed_at
     OrganizationPage:
       type: object
       description: Serializer for the OrganizationPage model.
@@ -8400,6 +9002,31 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/V2ProgramDetail'
+    ParseMetadataRequest:
+      type: object
+      description: |-
+        Request body for parsing IdP metadata without creating anything.
+
+        Exactly one of metadata_url or metadata_xml.
+      properties:
+        protocol:
+          $ref: '#/components/schemas/IdentityProviderProtocolEnum'
+        metadata_url:
+          type: string
+          format: uri
+        metadata_xml:
+          type: string
+      required:
+      - protocol
+    ParsedIdentityProviderConfig:
+      type: object
+      properties:
+        config:
+          type: object
+          additionalProperties:
+            type: string
+      required:
+      - config
     PartnerSchool:
       type: object
       properties:
@@ -8474,6 +9101,28 @@ components:
         receive_emails:
           type: boolean
           description: Whether to receive course emails
+    PatchedUpdateOrganizationRequest:
+      type: object
+      description: |-
+        Request body for updating an organization.
+
+        org_key is rejected rather than silently ignored. It is in every B2B
+        courseware ID via create_contract_run_key, so a caller who thinks they
+        changed it and did not is worse off than one who got an error.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+        redirect_url:
+          type: string
+        domains:
+          type: array
+          items:
+            type: string
+            minLength: 1
     PatchedUserDiscountMetaRequest:
       type: object
       description: Serializes UserDiscount but only allows depth = 1
@@ -9000,6 +9649,86 @@ components:
       required:
       - items
       - meta
+    ProvisionedOrganization:
+      type: object
+      description: |-
+        An organization as the provisioning API sees it.
+
+        `domains` and `redirect_url` live only in Keycloak, so they are populated
+        from the representation the view fetched rather than from our database.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+          description: The name of the organization
+        org_key:
+          type: string
+          readOnly: true
+          description: The short key used for the organization (for edX).
+        org_key_prefix:
+          type: string
+          readOnly: true
+          description: The prefix to append to the org key (defaults to UAI_).
+        description:
+          type: string
+          readOnly: true
+          description: Any useful extra information about the organization
+        slug:
+          type: string
+          readOnly: true
+          description: The name of the page as it will appear in URLs e.g http://domain.com/blog/[my-slug]/
+          pattern: ^[-\w]+$
+        sso_organization_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+          title: Organization SSO ID
+          description: The UUID for the organization in the SSO provider.
+        domains:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Return the organization's Keycloak domains, if they were fetched.
+          readOnly: true
+        redirect_url:
+          type: string
+          nullable: true
+          description: Return the organization's Keycloak redirect URL, if it was
+            fetched.
+          readOnly: true
+        onboarding:
+          allOf:
+          - $ref: '#/components/schemas/OrganizationOnboarding'
+          readOnly: true
+        identity_providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrganizationIdentityProvider'
+          readOnly: true
+      required:
+      - description
+      - domains
+      - id
+      - identity_providers
+      - name
+      - onboarding
+      - org_key
+      - org_key_prefix
+      - redirect_url
+      - slug
+      - sso_organization_id
+    ProvisioningDetail:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
     PublicUser:
       type: object
       description: Serializer for public user data
@@ -9216,6 +9945,16 @@ components:
           type: string
       required:
       - detail
+    SetOnboardingStateRequest:
+      type: object
+      description: Request body for recording an organization's onboarding state.
+      properties:
+        state:
+          $ref: '#/components/schemas/OnboardingStateEnum'
+        notes:
+          type: string
+      required:
+      - state
     SignatoryItem:
       type: object
       description: Serializer for signatory items used in certificate pages.
