@@ -16,7 +16,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Manager, Prefetch, Q
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
@@ -1823,9 +1823,14 @@ def reconcile_keycloak_orgs():
                     "state_changed_at": now_in_utc(),
                 },
             )
-        except ValidationError:  # noqa: PERF203
+        except (ValidationError, IntegrityError):  # noqa: PERF203
+            # IntegrityError because OrganizationOnboarding.organization is a
+            # OneToOneField: a concurrent provisioning saga or a second
+            # reconcile run can insert the row between this one's check and its
+            # insert. The per-org catch is the point - one org losing that race
+            # must not abandon the rest of the pass.
             log.exception(
-                "Validation error: could not create or update organization for Keycloak org %s",
+                "Could not create or update organization for Keycloak org %s",
                 org.id,
             )
 
