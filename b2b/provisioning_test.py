@@ -207,6 +207,25 @@ def test_create_organization_never_leaves_a_null_sso_organization_id(connection)
     ).exists()
 
 
+def test_create_organization_refuses_to_write_a_row_without_an_id(connection):
+    """
+    An unresolvable ID stops the saga rather than writing a null.
+
+    Keycloak sent no Location and the alias lookup found nothing, so there is
+    no ID to store and nothing to compensate with either - the delete needs the
+    ID we do not have. Writing the row anyway would mint exactly the
+    hq#10552 orphan this saga exists to prevent.
+    """
+
+    connection.organizations.create.return_value = None
+    connection.organizations.list_all.return_value = []
+
+    with pytest.raises(OrphanedKeycloakOrganizationError):
+        create_organization(connection=connection, **_organization_kwargs())
+
+    assert not OrganizationPage.objects.filter(org_key="EXAMPLEU").exists()
+
+
 def test_create_organization_looks_up_the_id_when_keycloak_sends_no_location(
     connection,
 ):

@@ -218,6 +218,24 @@ def create_organization(  # noqa: PLR0913
         created = _find_organization_by_alias(connection, org_key)
         sso_organization_id = created.id if created else None
 
+    if not sso_organization_id:
+        # Keycloak accepted the create but we cannot find what it made. Writing
+        # our row anyway would produce an OrganizationPage with a null
+        # sso_organization_id, which is the silently-broken shape this saga
+        # exists to prevent - attach_user() would no-op for every member. We
+        # cannot compensate either, because the delete needs the ID we do not
+        # have. Leave it for reconcile_keycloak_orgs to adopt by alias.
+        log.error(
+            "Created a Keycloak organization with alias %s but could not "
+            "resolve its ID, from the Location header or by lookup",
+            org_key,
+        )
+        msg = (
+            f"Keycloak accepted the organization '{org_key}' but did not "
+            "report its ID, so no MITx Online record could be written."
+        )
+        raise OrphanedKeycloakOrganizationError(msg)
+
     try:
         with transaction.atomic():
             organization = OrganizationPage(
