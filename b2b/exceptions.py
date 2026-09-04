@@ -42,3 +42,15 @@ class OrphanedKeycloakOrganizationError(Exception):
     delete also fails, the organization is orphaned and this is raised with its
     ID so the caller can surface it.
     """
+
+
+class OrganizationNotProvisionedError(Exception):
+    """
+    Raised when an organization has no Keycloak counterpart to act on.
+
+    An OrganizationPage with a null sso_organization_id cannot be updated in
+    Keycloak, because there is nothing there to update. Roughly 24 production
+    organizations are in this state, inherited from mitodl/hq#10552 and from
+    the b2b_contract create --create path that made them; they need backfilling
+    through this API rather than patching.
+    """
