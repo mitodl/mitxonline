@@ -257,7 +257,15 @@ class IdentityProviderProvisioningViewSet(
 
     @extend_schema(responses={200: OrganizationIdentityProviderSerializer(many=True)})
     def list(self, request, **kwargs):  # noqa: ARG002
-        """List the organization's identity providers."""
+        """
+        List the organization's identity providers.
+
+        Resolve the parent first so an unknown org_key is a 404 rather than an
+        empty list. A mistyped key otherwise reads as "this organization has no
+        identity providers", which is the wrong answer to act on.
+        """
+
+        self._organization()
 
         return Response(self.get_serializer(self.get_queryset(), many=True).data)
 
