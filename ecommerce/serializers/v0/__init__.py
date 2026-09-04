@@ -15,7 +15,6 @@ from ecommerce.constants import (
     CYBERSOURCE_CARD_TYPES,
     TRANSACTION_TYPE_REFUND,
 )
-from ecommerce.discounts import product_from_version
 from ecommerce.models import (
     Basket,
     BasketItem,
@@ -459,18 +458,12 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
 class LineSerializer(serializers.ModelSerializer):
     """Serializes order lines."""
 
-    product = serializers.SerializerMethodField()
+    product = ProductSerializer(read_only=True)
     quantity = serializers.IntegerField()
     item_description = serializers.CharField()
     unit_price = serializers.DecimalField(max_digits=9, decimal_places=2)
     total_price = serializers.DecimalField(max_digits=9, decimal_places=2)
     id = serializers.IntegerField()
-
-    @extend_schema_field(ProductSerializer)
-    def get_product(self, instance):
-        return ProductSerializer(
-            instance=product_from_version(instance.product_version)
-        ).data
 
     class Meta:
         fields = [
@@ -692,10 +685,11 @@ class OrderHistorySerializer(serializers.ModelSerializer):
         titles = []
 
         for line in instance.lines.all():
-            product = product_from_version(line.product_version)
-            if product.content_type.model == "courserun" and product.purchasable_object:
+            product = line.product
+            content_type = line.product_content_type
+            if content_type.model == "courserun" and product.purchasable_object:
                 titles.append(product.purchasable_object.course.title)
-            elif product.content_type.model == "programrun":
+            elif content_type.model == "programrun":
                 titles.append(product.description)
             else:
                 titles.append(f"No Title - {product.id}")
