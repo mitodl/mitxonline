@@ -1,12 +1,19 @@
 # B2B Provisioning API (C1) — implementation spec
 
-Status: spec, not yet implemented.
-Design RFC: <https://github.com/mitodl/hq/discussions/12784>
+Status: implemented, in review. Design RFC:
+<https://github.com/mitodl/hq/discussions/12784>
 
 This is the phase-1 implementation spec for the runtime provisioning API that
 takes ownership of per-customer Keycloak resources from Pulumi. It is a
 staff-only API surface; the partner-facing self-service wizard (C2) is a later
 UI built on top of it and is out of scope here.
+
+Built as a five-PR stack (mitodl/mitxonline stack #3933), bottom to top:
+mitodl/mitxonline#3928 (Keycloak client), #3929 (data model), #3930 (the
+provisioning module), #3931 (the HTTP surface), #3932 (retiring the manual
+paths). This document has been revised against what was actually built; where
+implementation found the original spec wrong, it says so rather than quietly
+reading as though it had been right all along.
 
 ## Why this exists
 
@@ -126,9 +133,10 @@ foundation for the phase-2 contract saga. Phase 1 does not change it.
 
 ## Client gaps to close
 
-`KeycloakAdminModel` needs three additions before the IdP endpoints can be
-written. All three belong in `b2b/keycloak_admin_api.py` alongside the existing
-methods.
+This spec originally named three additions to `KeycloakAdminModel`. Building it
+found six, and the three extra ones are not conveniences — without them the
+saga below cannot be written at all. All belong in `b2b/keycloak_admin_api.py`
+alongside the existing methods.
 
 1. **`update(item_id, data)`** — PUT to `{endpoint}/{item_id}`. `save` on the
    client takes a full URL path, so the model-level convenience is missing.
@@ -136,18 +144,83 @@ methods.
 2. **`delete(item_id)`** — DELETE to `{endpoint}/{item_id}`. The client's
    `disassociate` (`:284`) already issues a bare DELETE against a path, but the
    model-level `disassociate` (`:381`) only builds nested association paths.
-   Deleting an IdP outright needs the flat form.
+   Deleting an IdP outright needs the flat form. Implemented as a client-level
+   `delete(endpoint)` that `disassociate` now delegates to, so there is one
+   bare-DELETE implementation rather than two.
 3. **`import_config(payload)`** — POST to
    `identity-provider/import-config`, returning the raw `dict` Keycloak
    responds with. `create` (`:222`) cannot serve this: it coerces the response
    into a representation class, and `import-config` returns a flat config map,
    not an `IdentityProviderRepresentation`.
 
+   Shipped as a **module-level `import_identity_provider_config()`**, not a
+   `KeycloakAdminModel` method. `import-config` is a *sibling* of
+   `identity-provider/instances`, not an operation on one, so hanging it off a
+   model would mean a model whose `endpoint` attribute is a lie. It takes
+   `from_url` or `metadata`, and covers both transports (see 5).
+
+4. **`create(data)` on the model, backed by a client-level
+   `create_returning_id(endpoint, data)`.** The spec's saga said to create the
+   Keycloak organization "via `KeycloakAdminModel.create`". There was no such
+   method — and more importantly, the client's `create` could not have backed
+   one. Both creates this API makes answer **201 with an empty body**:
+
+   | Call | Response |
+   | --- | --- |
+   | `POST organizations` | 201, no body, `Location` header |
+   | `POST identity-provider/instances` | 201, no body, `Location` header; 409 on alias conflict |
+
+   `create` does `representation(**response.json())`, so there is nothing to
+   parse. The new id is recoverable only from the `Location` header, which is
+   what `create_returning_id` reads. The saga additionally falls back to a
+   lookup by alias when Keycloak sends no `Location`, because it cannot proceed
+   without the organization UUID for `sso_organization_id`.
+
+5. **`post_raw(endpoint, data)` and `post_file(endpoint, data, files)`** on the
+   client. The first returns the decoded body uncoerced, for `import-config`'s
+   flat config map. The second covers `import-config`'s multipart form: it
+   accepts *either* a JSON body naming a URL for Keycloak to fetch **or** an
+   uploaded metadata document, and the spec's `metadata_xml` input needs the
+   second.
+
+6. **`list_all(page_size=100)`** — pages on `first`/`max` until a short page
+   comes back. This one is a bug fix, not an addition; see
+   [Paging is not optional](#paging-is-not-optional) below.
+
 Prefer Keycloak's own `identity-provider/import-config` over porting
 `ol-infrastructure`'s `saml_helpers` into mitxonline. It accepts either
 `fromUrl` or an uploaded file, parses SAML metadata server-side, and hands back
 the config dict ready to attach to an IdP. It is gated on
 `manage-identity-providers`, not `view-identity-providers`.
+
+Two more response shapes worth knowing before adding Keycloak calls, both
+confirmed against the published OpenAPI spec that generated
+`keycloak_admin_dataclasses.py`:
+
+- **`PUT organizations/{id}` replaces rather than merges.** Updating one field
+  means reading the current representation, applying the change, and writing
+  the whole thing back. `update_organization` does exactly that.
+- **`POST organizations/{org-id}/identity-providers` takes a plain string body**
+  (the alias) and answers 204 — which is precisely the existing `associate()`
+  shape, as this spec predicted. `DELETE .../{alias}` answers 204 and matches
+  `disassociate()`.
+
+### Paging is not optional
+
+Keycloak's collection endpoints declare `max` with `@DefaultValue("10")`. A GET
+that omits it returns **at most 10 items**, with no error and no indication
+that anything was cut off.
+
+`KeycloakAdminModel.list()` passes no `max`. `reconcile_keycloak_orgs()`
+(`b2b/api.py`) called `org_model.list()` with no arguments at all, and the
+Production realm holds 24 organizations — so the reconciler has been
+reconciling a first page rather than the realm. That is a pre-existing bug this
+work surfaced, not one it introduced, and mitodl/mitxonline#3932 fixes it.
+
+The rule this leaves behind: **any Keycloak call whose correctness depends on
+seeing the whole collection must page.** That covers the realm-wide alias
+checks below as much as it covers the reconciler — an alias guard that reads 10
+of 24 organizations is worse than no guard, because it reads as one.
 
 ## Data model
 
@@ -159,14 +232,21 @@ The missing system of record: where a given customer is in the onboarding
 sequence. One row per organization.
 
 ```python
-class OrganizationOnboarding(models.Model):
+class OrganizationOnboarding(TimestampedModel):
     organization = models.OneToOneField(
         OrganizationPage, on_delete=models.CASCADE, related_name="onboarding"
     )
     state = models.CharField(max_length=32, choices=ONBOARDING_STATE_CHOICES)
-    state_changed_at = models.DateTimeField(auto_now=True)
-    notes = models.TextField(blank=True)
+    state_changed_at = models.DateTimeField(default=now_in_utc)
+    notes = models.TextField(blank=True, default="")
 ```
+
+`state_changed_at` is stamped explicitly by `set_state()` rather than being
+`auto_now`, which this spec originally called for. `auto_now` moves the field
+whenever *anything* on the row is saved, so editing `notes` would look like a
+state change — and the field is named for what it is supposed to record.
+`TimestampedModel` supplies `created_on`/`updated_on` for the "when did this row
+last change at all" question, which is the one `auto_now` actually answers.
 
 States, in order: `requested` → `org_created` → `idp_configured` →
 `idp_validated` → `contract_ready` → `live`. Plus `blocked`, reachable from
@@ -184,17 +264,23 @@ MITx Online's record of an IdP it provisioned, and the lifecycle state Keycloak
 has no field for.
 
 ```python
-class OrganizationIdentityProvider(models.Model):
+class OrganizationIdentityProvider(TimestampedModel):
     organization = models.ForeignKey(
         OrganizationPage, on_delete=models.CASCADE, related_name="identity_providers"
     )
     alias = models.CharField(max_length=255, unique=True)
-    protocol = models.CharField(max_length=8, choices=[("saml", "SAML"), ("oidc", "OIDC")])
+    protocol = models.CharField(max_length=8, choices=IDP_PROTOCOL_CHOICES)
     lifecycle_state = models.CharField(max_length=16, choices=IDP_LIFECYCLE_CHOICES)
-    metadata_source = models.TextField(blank=True)
+    display_name = models.CharField(max_length=255, blank=True, default="")
+    internal_id = models.CharField(max_length=255, blank=True, default="")
+    metadata_source = models.TextField(blank=True, default="")
     metadata_artifact = models.JSONField(null=True, blank=True)
     metadata_fetched_at = models.DateTimeField(null=True, blank=True)
 ```
+
+`internal_id` holds Keycloak's `internalId`, which responses return alongside
+our own fields. `display_name` is stored so a list response does not need a
+Keycloak round trip per row.
 
 Lifecycle: `draft` → `testing` → `active` → `disabled`. The state maps onto
 Keycloak's own `enabled` and `hideOnLogin` fields rather than living only in
@@ -211,6 +297,26 @@ our database:
 today: partner IdPs are reached by organization/domain routing or an explicit
 hint, never by a button on the shared login page.
 
+Note what that table does *not* say: `testing` and `active` carry **identical**
+Keycloak flags. The difference between them is whether the organization has an
+email-domain redirect pointing at the IdP, which is org-level config rather
+than anything on the IdP. `transition/` moves our row and the two Keycloak
+flags; it does not add or remove the domain redirect.
+
+The allowed moves, in full:
+
+| From | To |
+| --- | --- |
+| `draft` | `testing` |
+| `testing` | `draft`, `active`, `disabled` |
+| `active` | `testing`, `disabled` |
+| `disabled` | `testing`, `active` |
+
+There is no `draft` → `active` edge: an IdP goes live only after somebody has
+actually logged in through it. `disabled` → `active` *is* allowed, because an
+IdP in that state has already been through `testing` — the rule is "no
+untested IdP goes live", not "everything re-enters through testing".
+
 ### Metadata artifact
 
 `metadata_artifact` stores the parsed config dict `import-config` returned, and
@@ -221,6 +327,12 @@ converts from silent to loud: with the fetched result persisted, a partner's
 metadata endpoint being unreachable can neither destroy config nor block a
 deploy. Refresh is an explicit operation, never a side effect of an unrelated
 change.
+
+**The artifact holds parsed metadata and nothing else.** For OIDC, `clientId`
+and `clientSecret` are merged into the config sent to Keycloak but are
+deliberately *not* written to `metadata_artifact`, because this field is served
+back over the API. Keeping the credential out of the stored artifact is what
+lets the field be returned at all.
 
 ## API surface
 
@@ -244,7 +356,14 @@ is.
 POST   /api/v0/b2b/provisioning/organizations/
 GET    /api/v0/b2b/provisioning/organizations/{org_key}/
 PATCH  /api/v0/b2b/provisioning/organizations/{org_key}/
+POST   /api/v0/b2b/provisioning/organizations/{org_key}/onboarding/
 ```
+
+`onboarding/` takes `{"state": ..., "notes": ...}` and is not in the original
+spec. It has to exist: the onboarding row is only ever written once, at
+`org_created`, so without a mover the "system of record" is a field that never
+changes and cannot answer the question it was added for. It remains
+descriptive — nothing in this API gates on the state it records.
 
 `POST` body:
 
@@ -268,6 +387,12 @@ which is why `reconcile_single_keycloak_org` deliberately refuses to update
 function bakes the contract's database primary key into the run tag
 (`B2B_RUN_TAG_FORMAT`, `b2b/api.py:336`), so contracts cannot be pre-created
 out of band either — relevant to the phase-2 contract saga, not to phase 1.
+
+`GET` returns our record plus `domains` and `redirect_url` read back from
+Keycloak, because those two live *only* there. Reporting what we asked for
+rather than what is present would defeat the point of a provisioning API. The
+cost is one admin API call per detail read, and a Keycloak failure surfaces as
+502 rather than a stale-looking 200.
 
 `PATCH` accepts `name`, `description`, `redirect_url` and `domains`. Domain
 changes are the interesting case: today every domain Pulumi declares is written
@@ -373,10 +498,14 @@ safe:
    `b2b/models.py:108`) and a duplicate Keycloak alias before writing anything.
    The alias check must query the **realm**, not just `OrganizationPage`:
    aliases are realm-wide and shared with the organizations Pulumi still
-   declares, so a name that is free in our database can still collide.
+   declares, so a name that is free in our database can still collide. It must
+   also *page* the realm — see [Paging is not optional](#paging-is-not-optional).
 2. Create the Keycloak organization with its domains, via
    `KeycloakAdminModel.create` on the `organizations` endpoint. This is the
    step that can fail for reasons outside our control, so it goes first.
+   Keycloak answers 201 with an empty body, so the new UUID comes from the
+   `Location` header, with a lookup by alias as the fallback — the saga cannot
+   continue without it.
 3. In a single `transaction.atomic()` block, create the `OrganizationPage`
    under `OrganizationIndexPage` with `sso_organization_id` set to the UUID
    Keycloak just returned, and the `OrganizationOnboarding` row in state
@@ -392,6 +521,17 @@ ID at `error` and leave the Keycloak org in place — `reconcile_keycloak_orgs()
 will adopt it on its next run, which is the correct outcome and better than a
 retry loop against a system that just failed.
 
+That fallback is only real because `reconcile_keycloak_orgs()` now pages. While
+it was reading a first page of 10, an orphan sitting past the boundary would
+never have been adopted and this paragraph would have been describing a
+recovery that could not happen.
+
+Step 3 adds the page under `OrganizationIndexPage.objects.first()`, matching
+what the reconciler does, rather than calling `ensure_b2b_organization_index()`.
+The latter *moves every existing organization page* when its child count and
+`OrganizationPage.objects.count()` disagree (`b2b/api.py:127`), which is not an
+acceptable side effect of creating one organization.
+
 An `OrganizationPage` must never be created without `sso_organization_id`. The
 existing `b2b_contract create --create` path does exactly that
 (`b2b/management/commands/b2b_contract.py:296`), and orgs in that state are
@@ -399,6 +539,13 @@ silently broken: `attach_user()` returns `False` without doing anything
 (`b2b/models.py:176`), so every membership write is a no-op. Once this API
 exists, `--create` should be removed rather than fixed — there is no reason to
 keep a second, worse org-creation path.
+
+Removed in mitodl/mitxonline#3932, along with the `--org-key` argument that only
+existed to feed it; the command's error now points at
+`POST /api/v0/b2b/provisioning/organizations/`. `b2b_contract import`'s
+`_import_organization` is deliberately untouched: it is a separate declarative
+path that carries `sso_organization_id` through from the export, so it does not
+mint the broken shape.
 
 ## Demoting `sync_keycloak_orgs` to self-heal
 
@@ -414,10 +561,22 @@ reconciler for drift, not the primary path:
 - Add: when it adopts an organization that has no `OrganizationOnboarding` row,
   create one in state `org_created` so adopted orgs are visible in the same
   place as provisioned ones.
+- **Fix: switch it from `list()` to `list_all()`.** This was not in the original
+  spec because the bug had not been found yet. `list()` sends no `max`, so
+  Keycloak caps the response at 10; Production has 24 organizations. The
+  reconciler has therefore been reconciling a fraction of the realm for as long
+  as it has existed, which is also why the "adopted on the next run" fallback
+  for a failed compensation could not be relied on. Fixed in
+  mitodl/mitxonline#3932.
 - Consider dropping `KEYCLOAK_ORG_SYNC_FREQUENCY` well below 86400 once it is
   no longer the primary create path. A self-heal loop that runs daily is a
   self-heal loop that hides a problem for a day. This is a config change, not
-  code, and can wait for evidence of actual drift.
+  code, and can wait for evidence of actual drift. Not done in phase 1.
+
+The truncation is worth generalising rather than treating as one bad call: it
+is silent, it grows with the customer base, and every one of this API's
+realm-wide guards has the same exposure. It is recorded outside this document
+so other Keycloak consumers (`ol-keycloak`, `ol-infrastructure`) inherit it.
 
 ## Migration and data debt
 
@@ -472,6 +631,21 @@ instinct on a 500 is to run it again.
   with its previous lifecycle state and returns 502. Our row lagging Keycloak
   is recoverable; a deleted partner integration is not.
 
+As built, that comes out as:
+
+| Condition | Status |
+| --- | --- |
+| Alias taken here or in the realm | 409 |
+| `org_key` change attempted on `PATCH` | 400 |
+| Lifecycle transition that skips `testing` | 400 |
+| Compensating delete also failed (orphan) | 500, with the orphan ID in the detail |
+| Any Keycloak admin call failed | 502 |
+
+502 rather than 500 for Keycloak failures is the load-bearing one: our records
+are intact and the operator's next move is to retry, not to open a ticket
+against MITx Online. It is implemented as a `handle_exception` override on a
+mixin shared by all three viewsets, so no endpoint can forget it.
+
 ## Testing
 
 - Unit tests against a mocked `KeycloakAdminClient` for the saga's happy path,
@@ -486,21 +660,55 @@ instinct on a 500 is to run it again.
   Re-run it against **production** credentials before the handover, since only
   QA has been exercised.
 
-## Open decisions
+All of the above is written, in `b2b/provisioning_test.py` (20 tests) and
+`b2b/views/v0/provisioning_test.py` (15). Three cases were added that this list
+did not anticipate, each guarding a decision made during implementation:
 
-1. **Alias naming.** Keycloak organization and IdP aliases are realm-wide.
-   Derive from `org_key` (collision-free by construction, since `org_key` is
-   unique) or let the operator choose and reject collisions? Deriving is safer;
-   a partner with two IdPs needs a suffix scheme either way.
+- the OIDC client secret reaches Keycloak but does not appear in the stored
+  `metadata_artifact`;
+- `list_all` issues the exact `first`/`max` sequence, since the truncation it
+  exists to prevent is silent and a wrong page size would be too;
+- a plain authenticated user gets 403 on both `POST /organizations/` and
+  `parse-metadata/`, which is the boundary between this API and C2.
 
-   Whichever is chosen, the **collision guard is not optional**. Aliases are
-   shared with the resources Pulumi still declares, so an alias this API creates
-   will break a later `pulumi up` that declares the same name. Check the realm,
-   not just our own tables, before creating.
+## OpenAPI
 
-2. **Where the invite token for C2 lives.** Phase 1 does not need it, but the
-   `OrganizationOnboarding` row is the obvious home, and deciding now avoids a
-   second migration.
+`manage.py generate_openapi_spec` regenerates `openapi/specs/v{0,1,2}.yaml`
+purely additively — no component is renamed or removed — and warning-free.
+
+Getting there needed three `ENUM_NAME_OVERRIDES` entries in
+`openapi/settings_spectacular.py`, one of which is not about this API at all:
+**`StateEnum` is pinned to `ecommerce.models.OrderStatus`**. Adding `state`
+fields here collides with ecommerce's existing one, and drf-spectacular resolves
+a collision by renaming the *published* component to a hashed name
+(`State402Enum`) — unstable across regenerations and a breaking rename for
+anything generated from the spec. Any future work that adds another `state`
+field should expect to pin it the same way.
+
+## Decisions
+
+1. **Alias naming — settled.** The Keycloak **organization** alias is `org_key`
+   verbatim. The **IdP** alias stays operator-chosen with realm collision
+   rejection.
+
+   The organization half turned out not to be a judgement call.
+   `reconcile_single_keycloak_org` sets `org_key = keycloak_org.alias[:30]` when
+   it adopts an organization (`b2b/api.py`), so any alias that is not the
+   `org_key` gives an adopted organization a *different* `org_key` from the one
+   it was created with — and `org_key` is in every B2B courseware ID. Since the
+   compensation-failure path deliberately routes orgs through that adoption, the
+   round trip has to be lossless. A partner with two IdPs still needs a suffix
+   scheme, which is why the IdP half stays operator-chosen.
+
+   The **collision guard is not optional** either way. Aliases are shared with
+   the resources Pulumi still declares, so an alias this API creates will break
+   a later `pulumi up` that declares the same name. Check the realm, not just
+   our own tables, before creating — and page it.
+
+2. **Where the invite token for C2 lives — still open.** Phase 1 does not need
+   it, but the `OrganizationOnboarding` row is the obvious home, and deciding
+   now avoids a second migration. Not decided by this work; migration 0028 does
+   not carry a token field.
 
 3. **Whether `parse-metadata` should be reachable by an org manager.** It
    creates nothing and leaks nothing about other customers, so it is the one
@@ -511,3 +719,6 @@ instinct on a 500 is to run it again.
    host through `import-config` on 2026-09-03. Keep it staff-only in phase 1.
    Exposing it to partners needs an allowlist or deny-private-ranges policy and
    a rate limit, which belongs to C2's threat model.
+
+   Shipped staff-only, with a test asserting a non-staff authenticated user gets
+   403. The question itself is still C2's to answer.
