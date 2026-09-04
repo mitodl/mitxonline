@@ -45,6 +45,7 @@ from b2b.constants import (
     B2B_RUN_TAG_FORMAT,
     CONTRACT_MEMBERSHIP_CODE,
     CONTRACT_MEMBERSHIP_MANAGED,
+    ONBOARDING_STATE_ORG_CREATED,
 )
 from b2b.exceptions import SourceCourseIncompleteError
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
@@ -927,6 +928,18 @@ def test_b2b_reconcile_keycloak_orgs(mocker, update_an_org):
 
             return self.orgs
 
+        def list_all(self, page_size=None, **kwargs):  # noqa: ARG002
+            """
+            Return every fake org.
+
+            reconcile_keycloak_orgs pages rather than calling list, because
+            Keycloak's collection endpoints answer with 10 results when no max
+            is given and a drift reconciler that sees a first page is not a
+            reconciler.
+            """
+
+            return self.orgs
+
     org_model = MockedOrgModel()
     org_model.orgs = factories.OrganizationRepresentationFactory.create_batch(3)
 
@@ -979,6 +992,13 @@ def test_b2b_reconcile_keycloak_orgs(mocker, update_an_org):
                 assert org_page.org_key != "changedKey"
 
     assert found_count == (3 if not update_an_org else 4)
+
+    # An adopted org needs an onboarding record too, so orgs that arrived this
+    # way show up in the same place as the ones the provisioning API made.
+    assert all(
+        org_page.onboarding.state == ONBOARDING_STATE_ORG_CREATED
+        for org_page in org_pages
+    )
 
 
 def test_reconcile_bad_keycloak_org(mocker):

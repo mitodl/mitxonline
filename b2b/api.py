@@ -32,6 +32,7 @@ from b2b.constants import (
     MAILGUN_LOGS_DESC,
     MAILGUN_LOGS_PAGE_LIMIT,
     MAILGUN_LOGS_RETENTION_DAYS,
+    ONBOARDING_STATE_ORG_CREATED,
     ORG_KEY_MAX_LENGTH,
     RETIREMENT_CONTRACT_NAME,
     RETIREMENT_ORG_KEY,
@@ -49,6 +50,7 @@ from b2b.models import (
     ContractProgramItem,
     DiscountContractAttachmentRedemption,
     OrganizationIndexPage,
+    OrganizationOnboarding,
     OrganizationPage,
     UserOrganization,
 )
@@ -1782,12 +1784,18 @@ def reconcile_keycloak_orgs():
     create or update corresponding records in MITx Online. This does not manage
     memberships, just base org info.
 
+    Since the provisioning API (capability C1) writes both systems together,
+    this is a drift reconciler rather than the primary create path: it adopts
+    the organizations Pulumi still owns, ones made in the console, and ones left
+    behind by a provisioning saga whose compensating delete also failed. That
+    last case is why it has to see the whole realm, not a first page of it.
+
     Returns
     - tuple (created, updated): number of orgs created and updated
     """
 
     org_model = get_keycloak_model(*KCAM_ORGANIZATIONS)
-    orgs = org_model.list()
+    orgs = org_model.list_all()
     parent_org_page = OrganizationIndexPage.objects.first()
     created_count = 0
     updated_count = 0
@@ -1804,6 +1812,17 @@ def reconcile_keycloak_orgs():
             else:
                 updated_count += 1
                 page.save()
+
+            # An adopted organization needs an onboarding record too, so that
+            # orgs that arrived this way show up in the same place as the ones
+            # the provisioning API made.
+            OrganizationOnboarding.objects.get_or_create(
+                organization=page,
+                defaults={
+                    "state": ONBOARDING_STATE_ORG_CREATED,
+                    "state_changed_at": now_in_utc(),
+                },
+            )
         except ValidationError:  # noqa: PERF203
             log.exception(
                 "Validation error: could not create or update organization for Keycloak org %s",
