@@ -793,3 +793,22 @@ def test_import_identity_provider_config_from_document(settings, mocker):
         {"providerId": "saml"},
         {"file": ("metadata.xml", metadata, "application/xml")},
     )
+
+
+def test_import_identity_provider_config_needs_a_source(settings, mocker):
+    """
+    With neither source, say so rather than posting a None file body.
+
+    Both sources are keyword arguments defaulting to None, so this is reachable
+    from a shell even though the serializers require one of them.
+    """
+
+    client, _, _, _ = _mocked_admin_client(settings, mocker)
+    mocked_post_raw = mocker.patch.object(client, "post_raw")
+    mocked_post_file = mocker.patch.object(client, "post_file")
+
+    with pytest.raises(ValueError, match="Supply either from_url or metadata"):
+        import_identity_provider_config("saml", client=client)
+
+    mocked_post_raw.assert_not_called()
+    mocked_post_file.assert_not_called()

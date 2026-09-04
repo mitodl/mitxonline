@@ -602,8 +602,17 @@ def import_identity_provider_config(
     Returns:
     - The flat config dict Keycloak parsed out of the metadata.
     Raises:
+    - ValueError if neither from_url nor metadata was given.
     - requests.HTTPError if the request fails.
     """
+
+    if not from_url and not metadata:
+        # Both are keyword arguments defaulting to None, and callers can reach
+        # this from a shell as well as through the serializers. Say which
+        # argument is missing rather than letting requests raise a TypeError on
+        # a None file body several frames down.
+        msg = "Supply either from_url or metadata to parse."
+        raise ValueError(msg)
 
     client = client or bootstrap_client()
 
