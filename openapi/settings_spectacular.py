@@ -9,6 +9,18 @@ open_spectacular_settings = {
     "SERVE_INCLUDE_SCHEMA": False,
     "SERVE_URLCONF": "main.urls",
     "ENUM_GENERATE_CHOICE_DESCRIPTION": True,
+    # Without these, spectacular resolves the collision between the several
+    # `state` fields by appending a hash to the component name (State402Enum),
+    # which is neither stable across regenerations nor meaningful to a client.
+    "ENUM_NAME_OVERRIDES": {
+        # Pinned so it keeps the name it had before the b2b provisioning
+        # `state` fields arrived and pushed it into a hashed one; renaming a
+        # published component breaks generated clients.
+        "StateEnum": "ecommerce.models.OrderStatus",
+        "OnboardingStateEnum": "b2b.constants.ONBOARDING_STATE_CHOICES",
+        "IdentityProviderLifecycleStateEnum": "b2b.constants.IDP_LIFECYCLE_CHOICES",
+        "IdentityProviderProtocolEnum": "b2b.constants.IDP_PROTOCOL_CHOICES",
+    },
     "COMPONENT_SPLIT_REQUEST": True,
     "AUTHENTICATION_WHITELIST": [],
     "SCHEMA_PATH_PREFIX": "/api/v[0-9]",
