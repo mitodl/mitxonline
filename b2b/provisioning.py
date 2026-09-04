@@ -116,6 +116,29 @@ def realm_identity_provider_aliases(connection):
     }
 
 
+def _require_provisioned(organization):
+    """
+    Refuse to act on an organization that has no Keycloak counterpart.
+
+    Without this the admin call goes to organizations/None, Keycloak answers
+    404, and the operator is told the Keycloak API failed - a 502 they would
+    retry forever. Keycloak is fine; our record is the incomplete one.
+
+    Args:
+    - organization (OrganizationPage): the organization to check.
+    Raises:
+    - OrganizationNotProvisionedError: it has no sso_organization_id.
+    """
+
+    if not organization.sso_organization_id:
+        msg = (
+            f"Organization '{organization.org_key}' has no Keycloak "
+            "organization. It predates this API and needs backfilling before "
+            "it can be managed here."
+        )
+        raise OrganizationNotProvisionedError(msg)
+
+
 def _find_organization_by_alias(connection, alias):
     """Return the realm's organization with this alias, or None."""
 
@@ -312,16 +335,7 @@ def update_organization(  # noqa: PLR0913
     - OrganizationNotProvisionedError: the organization has no Keycloak record
     """
 
-    if not organization.sso_organization_id:
-        # Without this the GET goes to organizations/None, Keycloak answers
-        # 404, and the operator is told the admin API failed - a 502 they would
-        # retry forever. Keycloak is fine; our record is the incomplete one.
-        msg = (
-            f"Organization '{organization.org_key}' has no Keycloak "
-            "organization to update. It predates this API and needs "
-            "backfilling rather than patching."
-        )
-        raise OrganizationNotProvisionedError(msg)
+    _require_provisioned(organization)
 
     connection = connection or KeycloakConnection()
 
@@ -465,7 +479,13 @@ def create_identity_provider(  # noqa: PLR0913
     - OrganizationIdentityProvider: the new record
     Raises:
     - AliasCollisionError: the alias is taken here or in the realm
+    - OrganizationNotProvisionedError: the organization has no Keycloak record
     """
+
+    # Before anything is written. Without it the IdP is created in Keycloak and
+    # only the org<->IdP link fails, so the compensation deletes an IdP we
+    # should never have made - a wasted round trip reported as 502.
+    _require_provisioned(organization)
 
     connection = connection or KeycloakConnection()
 

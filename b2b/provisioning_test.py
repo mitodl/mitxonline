@@ -294,6 +294,33 @@ def test_update_organization_refuses_an_unprovisioned_organization(connection):
     connection.organizations.update.assert_not_called()
 
 
+def test_create_identity_provider_refuses_an_unprovisioned_organization(
+    connection, mocked_import_config
+):
+    """
+    Same guard as update_organization, checked before anything is written.
+
+    Without it the IdP is created in Keycloak and only the org link fails, so
+    the compensation deletes an IdP that should never have been made.
+    """
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+
+    with pytest.raises(OrganizationNotProvisionedError):
+        create_identity_provider(
+            organization,
+            connection=connection,
+            alias="exampleu",
+            protocol=IDP_PROTOCOL_SAML,
+            metadata_url="https://idp.example.edu/metadata.xml",
+            attribute_map={"email": "E-Mail Address"},
+        )
+
+    mocked_import_config.assert_not_called()
+    connection.identity_providers.create.assert_not_called()
+    connection.identity_providers.delete.assert_not_called()
+
+
 def test_create_identity_provider_starts_in_draft(connection, mocked_import_config):
     """A new IdP is disabled in Keycloak until somebody moves it to testing."""
 
