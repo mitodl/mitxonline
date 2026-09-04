@@ -26,6 +26,11 @@ from b2b.constants import (
     CONTRACT_MEMBERSHIP_AUTOS,
     CONTRACT_MEMBERSHIP_MANAGED,
     CONTRACT_MEMBERSHIP_TYPE_CHOICES,
+    IDP_LIFECYCLE_CHOICES,
+    IDP_PROTOCOL_CHOICES,
+    IDP_STATE_DRAFT,
+    ONBOARDING_STATE_CHOICES,
+    ONBOARDING_STATE_REQUESTED,
     ORG_INDEX_SLUG,
 )
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
@@ -855,6 +860,109 @@ class UserOrganization(models.Model):
         """Return a reasonable representation of the object as a string."""
 
         return f"UserOrganization: {self.user} in {self.organization}"
+
+
+class OrganizationOnboarding(TimestampedModel):
+    """
+    Where an organization is in the B2B onboarding sequence.
+
+    The system of record that did not exist before: onboarding state lived in
+    people's heads and in four separate systems. The state is descriptive, not
+    enforcing - nothing gates on it. A state machine that blocks operators
+    before the operators trust it is a state machine they work around.
+    """
+
+    organization = models.OneToOneField(
+        "b2b.OrganizationPage",
+        on_delete=models.CASCADE,
+        related_name="onboarding",
+    )
+    state = models.CharField(
+        max_length=32,
+        choices=ONBOARDING_STATE_CHOICES,
+        default=ONBOARDING_STATE_REQUESTED,
+    )
+    state_changed_at = models.DateTimeField(default=now_in_utc)
+    notes = models.TextField(
+        blank=True,
+        default="",
+        help_text="Free-form operator notes; holds the reason when state is blocked.",
+    )
+
+    def set_state(self, state, notes=None):
+        """
+        Move to the given onboarding state and stamp when it happened.
+
+        Args:
+        - state (str): the state to move to
+        - notes (str): replacement notes, if any
+        """
+
+        self.state = state
+        self.state_changed_at = now_in_utc()
+        if notes is not None:
+            self.notes = notes
+        self.save()
+
+    def __str__(self):
+        """Return a reasonable representation of the object as a string."""
+
+        return f"OrganizationOnboarding: {self.organization} is {self.state}"
+
+
+class OrganizationIdentityProvider(TimestampedModel):
+    """
+    An identity provider we provisioned in Keycloak for an organization.
+
+    Keycloak has no field for where an IdP is in its rollout, so the lifecycle
+    state lives here - but it is written through to Keycloak's `enabled` and
+    `hideOnLogin` on every transition (see IDP_STATE_KEYCLOAK_FLAGS) so the two
+    representations cannot drift apart silently.
+    """
+
+    organization = models.ForeignKey(
+        "b2b.OrganizationPage",
+        on_delete=models.CASCADE,
+        related_name="identity_providers",
+    )
+    alias = models.CharField(
+        max_length=255,
+        unique=True,
+        help_text="The Keycloak IdP alias. Realm-wide, not per-organization.",
+    )
+    protocol = models.CharField(max_length=8, choices=IDP_PROTOCOL_CHOICES)
+    lifecycle_state = models.CharField(
+        max_length=16,
+        choices=IDP_LIFECYCLE_CHOICES,
+        default=IDP_STATE_DRAFT,
+    )
+    display_name = models.CharField(max_length=255, blank=True, default="")
+    internal_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Keycloak's internalId for the IdP instance.",
+    )
+    metadata_source = models.TextField(
+        blank=True,
+        default="",
+        help_text="The metadata URL, or the inline XML, the config was parsed from.",
+    )
+    metadata_artifact = models.JSONField(
+        null=True,
+        blank=True,
+        help_text=(
+            "The config map Keycloak parsed out of the metadata. Persisted so a "
+            "partner's metadata endpoint going away can neither destroy config "
+            "nor block a deploy."
+        ),
+    )
+    metadata_fetched_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        """Return a reasonable representation of the object as a string."""
+
+        return f"OrganizationIdentityProvider: {self.alias} ({self.lifecycle_state})"
 
 
 def is_organization_manager(user, org_id):
