@@ -20,7 +20,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       nano \
       ngrep \
       procps \
-      screen \
       wget
 
 FROM base AS deps
