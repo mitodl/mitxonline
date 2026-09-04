@@ -209,9 +209,19 @@ class CreateIdentityProviderSerializer(serializers.Serializer):
                 )
                 raise serializers.ValidationError(msg)
 
-        if not attrs.get("attribute_map") and not attrs.get("attribute_name_map"):
-            msg = "Supply attribute_map or attribute_name_map."
-            raise serializers.ValidationError(msg)
+            # SAML only. Nothing maps a SAML assertion's attributes onto the
+            # user unless we say so, so a SAML IdP with no mappers brokers
+            # users with no email or name. ol-infrastructure treats them as
+            # required too: onboard_saml_org falls back to scanning the
+            # metadata for common friendly names when none are given, while
+            # onboard_oidc_org creates no mappers at all - the OIDC IdPs
+            # Pulumi runs in production today have none.
+            if not attrs.get("attribute_map") and not attrs.get("attribute_name_map"):
+                msg = (
+                    "Supply attribute_map or attribute_name_map for a SAML "
+                    "identity provider."
+                )
+                raise serializers.ValidationError(msg)
 
         return attrs
 
