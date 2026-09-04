@@ -11,7 +11,7 @@ import freezegun
 import pytest
 import reversion
 from django.forms.models import model_to_dict
-from django.test import Client
+from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils.dateparse import parse_datetime
 from mitol.common.utils.datetime import now_in_utc
@@ -342,6 +342,7 @@ def test_add_basket_item(user_drf_client, user):
 @pytest.mark.parametrize("existing_basket", [True, False])
 @pytest.mark.parametrize("add_discount", [True, False])
 @pytest.mark.parametrize("bad_product", [True, False])
+@override_settings(ENABLE_MULTIPLE_CART_ITEMS=True)
 def test_create_basket_with_products(
     user, user_client, existing_basket, add_discount, bad_product
 ):
