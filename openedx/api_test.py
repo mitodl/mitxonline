@@ -2056,3 +2056,63 @@ def test_process_course_run_clone(mocker):
     mocked_clone_course.assert_called_with(
         cloneable_key, course_run.courseware_id, client=ANY
     )
+
+
+def test_update_edx_user_profile_no_edx_auth(mocker, user, caplog):
+    """
+    update_edx_user_profile bails out when no Open edX auth can be created, rather
+    than falling through to get_valid_edx_api_auth and raising DoesNotExist
+    """
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=None)
+    mock_get_auth = mocker.patch("openedx.api.get_valid_edx_api_auth")
+    mock_session = mocker.patch("openedx.api.requests.Session")
+
+    with caplog.at_level(logging.INFO):
+        update_edx_user_profile(user)
+
+    assert "could not create edX auth" in caplog.text
+    mock_get_auth.assert_not_called()
+    mock_session.return_value.patch.assert_not_called()
+
+
+def test_update_edx_user_profile_creates_missing_auth(mocker, user):
+    """
+    Regression test: a synced user with no OpenEdxApiAuth record must not blow up
+    with OpenEdxApiAuth.DoesNotExist. get_valid_edx_api_auth does a plain .get(),
+    so update_edx_user_profile calls create_edx_auth_token as a safety net first -
+    the common shape for SCIM-provisioned users, who never go through create_user
+    and so never had an auth token created for them.
+    """
+    OpenEdxApiAuth.objects.filter(user=user).delete()
+
+    mock_create_auth = mocker.patch(
+        "openedx.api.create_edx_auth_token",
+        side_effect=lambda auth_user: OpenEdxApiAuthFactory.create(user=auth_user),
+    )
+    mock_session = mocker.patch("openedx.api.requests.Session")
+    mock_session.return_value.patch.return_value = mocker.Mock(
+        status_code=status.HTTP_200_OK
+    )
+
+    update_edx_user_profile(user)
+
+    mock_create_auth.assert_called_once_with(user)
+    mock_session.return_value.patch.assert_called_once()
+
+
+def test_update_edx_user_email_no_openedx_user(mocker, user, caplog):
+    """
+    update_edx_user_email skips the Open edX OAuth handshake entirely when the user
+    has no edX account - otherwise it would run the whole flow against nothing
+    """
+    user.openedx_users.all().delete()
+
+    mock_create_session = mocker.patch("openedx.api.auth_api.create_user_session")
+    mock_session = mocker.patch("openedx.api.requests.Session")
+
+    with caplog.at_level(logging.INFO):
+        update_edx_user_email(user)
+
+    assert "Skipping user email update" in caplog.text
+    mock_create_session.assert_not_called()
+    mock_session.return_value.get.assert_not_called()
