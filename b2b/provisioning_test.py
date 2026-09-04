@@ -18,6 +18,7 @@ from b2b.constants import (
 from b2b.exceptions import (
     AliasCollisionError,
     InvalidLifecycleTransitionError,
+    OrganizationNotProvisionedError,
     OrphanedKeycloakOrganizationError,
 )
 from b2b.factories import OrganizationIndexPageFactory, OrganizationPageFactory
@@ -273,6 +274,24 @@ def test_update_organization_replaces_the_keycloak_representation(connection):
 
     organization.refresh_from_db()
     assert organization.name == "Renamed"
+
+
+def test_update_organization_refuses_an_unprovisioned_organization(connection):
+    """
+    An org with no Keycloak record cannot be updated in Keycloak.
+
+    Roughly 24 production organizations are in this state (hq#10552). Without
+    the check the GET goes to organizations/None and the operator is told the
+    Keycloak API failed, which is a 502 they would retry forever.
+    """
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+
+    with pytest.raises(OrganizationNotProvisionedError):
+        update_organization(organization, connection=connection, name="Renamed")
+
+    connection.organizations.get.assert_not_called()
+    connection.organizations.update.assert_not_called()
 
 
 def test_create_identity_provider_starts_in_draft(connection, mocked_import_config):
