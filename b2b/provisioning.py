@@ -18,6 +18,7 @@ See docs/source/b2b/provisioning_api.md.
 
 import logging
 
+from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from mitol.common.utils import now_in_utc
 
@@ -183,6 +184,18 @@ def create_organization(  # noqa: PLR0913
         )
         raise AliasCollisionError(msg)
 
+    # Resolve the parent page here rather than inside the transaction below. It
+    # is a precondition we can check before touching Keycloak, and a
+    # precondition checked after the irreversible external write is one the
+    # compensation has to clean up for no reason.
+    organization_index = OrganizationIndexPage.objects.first()
+    if organization_index is None:
+        msg = (
+            "No OrganizationIndexPage exists; the CMS is not set up to hold "
+            "organizations."
+        )
+        raise ImproperlyConfigured(msg)
+
     # Domains are written verified, with no verification having occurred: staff
     # are asserting them. That is defensible only while the asserting party is
     # MIT staff, and stops being so the moment the partner-facing wizard (C2)
@@ -216,7 +229,7 @@ def create_organization(  # noqa: PLR0913
             if org_key_prefix:
                 organization.org_key_prefix = org_key_prefix
 
-            OrganizationIndexPage.objects.first().add_child(instance=organization)
+            organization_index.add_child(instance=organization)
             organization.save()
 
             OrganizationOnboarding.objects.create(

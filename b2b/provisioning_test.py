@@ -2,8 +2,11 @@
 
 import faker
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 
 from b2b.constants import (
+    IDP_ALLOWED_TRANSITIONS,
+    IDP_LIFECYCLE_CHOICES,
     IDP_PROTOCOL_OIDC,
     IDP_PROTOCOL_SAML,
     IDP_STATE_ACTIVE,
@@ -521,3 +524,42 @@ def test_onboarding_set_state_stamps_the_change():
     assert onboarding.state == ONBOARDING_STATE_ORG_CREATED
     assert onboarding.notes == "created by hand"
     assert onboarding.state_changed_at > original
+
+
+def test_every_lifecycle_state_has_transitions():
+    """
+    IDP_ALLOWED_TRANSITIONS covers exactly the lifecycle choices.
+
+    transition_identity_provider indexes the dict by the IdP's current state.
+    That is a KeyError waiting to happen only if the two constants drift apart,
+    so guard the drift rather than the lookup: a runtime .get() would turn
+    "somebody added a fifth state and forgot the transitions" into a silently
+    untransitionable IdP, where this fails the build.
+    """
+
+    assert set(IDP_ALLOWED_TRANSITIONS) == {state for state, _ in IDP_LIFECYCLE_CHOICES}
+
+    valid_states = set(IDP_ALLOWED_TRANSITIONS)
+    for state, destinations in IDP_ALLOWED_TRANSITIONS.items():
+        assert set(destinations) <= valid_states, state
+        assert state not in destinations, state
+
+
+def test_create_organization_checks_the_index_page_before_touching_keycloak(
+    connection, organization_index
+):
+    """
+    A missing index page fails before the Keycloak write, not after.
+
+    It is a precondition we can check for nothing; checking it after the
+    irreversible external write would mean compensating for a failure we could
+    have seen coming.
+    """
+
+    organization_index.delete()
+
+    with pytest.raises(ImproperlyConfigured):
+        create_organization(connection=connection, **_organization_kwargs())
+
+    connection.organizations.create.assert_not_called()
+    connection.organizations.delete.assert_not_called()
