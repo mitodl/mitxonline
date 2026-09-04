@@ -1330,6 +1330,34 @@ def test_is_refund_eligible_false_once_a_request_exists(user):
     assert not order.is_refund_eligible
 
 
+def test_latest_refund_request_is_the_newest_not_the_last_inserted(
+    user, django_assert_num_queries
+):
+    """
+    The newest request wins even when it was not the last row written, and a
+    prefetched order answers without a query.
+
+    A learner can accumulate requests once one has been denied, and the
+    property is read once per row by the order-history endpoint.
+    """
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    start = now_in_utc()
+    with freeze_time(start):
+        RefundRequest.objects.create(order=order, user=user, consent_given=True)
+    with freeze_time(start + timedelta(days=2)):
+        newest = RefundRequest.objects.create(
+            order=order, user=user, consent_given=True
+        )
+    with freeze_time(start + timedelta(days=1)):
+        RefundRequest.objects.create(order=order, user=user, consent_given=True)
+
+    assert Order.objects.get(pk=order.pk).latest_refund_request == newest
+
+    prefetched = Order.objects.prefetch_related("refund_requests").get(pk=order.pk)
+    with django_assert_num_queries(0):
+        assert prefetched.latest_refund_request == newest
+
+
 def test_refund_status_eligible():
     """A fulfilled order inside the window can be refunded on request."""
     order = OrderFactory.create(state=OrderStatus.FULFILLED)

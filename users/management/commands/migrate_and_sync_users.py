@@ -241,14 +241,10 @@ class Command(BaseCommand):
         needs pre-loaded, then apply --limit.
 
         LearnUserAdapter.__init__ touches user_profile and the openedx_user
-        cached_property on every instantiation (see _classify below) -
-        user_profile is a real OneToOneField, so select_related covers it,
-        but openedx_user is backed by self.openedx_users.first(), which
-        select_related can't target (openedx_users is the real FK) and
-        prefetch_related alone doesn't help either, since .first() re-queries
-        instead of using the prefetch cache. So prime the cached_property's
-        cache manually from the bulk prefetch below, rather than paying one
-        extra query per candidate.
+        cached_property on every instantiation (see _classify below), so both
+        need covering here or classification costs 2 extra queries per
+        candidate. user_profile is a real OneToOneField; openedx_user reads
+        the `openedx_users` relation, which select_related cannot target.
         """
         queryset = (
             User.objects.filter(is_active=True)
@@ -264,11 +260,7 @@ class Command(BaseCommand):
             # and prefetching every unsynced user in the table just to
             # discard all but the first `limit` in Python afterward.
             queryset = queryset[:limit]
-        candidates = list(queryset)
-        for user in candidates:
-            prefetched = list(user.openedx_users.all())
-            user.__dict__["openedx_user"] = prefetched[0] if prefetched else None
-        return candidates
+        return list(queryset)
 
     def _classify(self, candidates, *, force):
         """Split candidates into (to_sync, blocked) using LearnUserAdapter's
