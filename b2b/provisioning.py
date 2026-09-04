@@ -33,6 +33,7 @@ from b2b.constants import (
 from b2b.exceptions import (
     AliasCollisionError,
     InvalidLifecycleTransitionError,
+    OrganizationNotProvisionedError,
     OrphanedKeycloakOrganizationError,
 )
 from b2b.keycloak_admin_api import (
@@ -307,7 +308,20 @@ def update_organization(  # noqa: PLR0913
     - connection (KeycloakConnection): an existing connection, if any
     Returns:
     - OrganizationPage: the updated organization
+    Raises:
+    - OrganizationNotProvisionedError: the organization has no Keycloak record
     """
+
+    if not organization.sso_organization_id:
+        # Without this the GET goes to organizations/None, Keycloak answers
+        # 404, and the operator is told the admin API failed - a 502 they would
+        # retry forever. Keycloak is fine; our record is the incomplete one.
+        msg = (
+            f"Organization '{organization.org_key}' has no Keycloak "
+            "organization to update. It predates this API and needs "
+            "backfilling rather than patching."
+        )
+        raise OrganizationNotProvisionedError(msg)
 
     connection = connection or KeycloakConnection()
 
