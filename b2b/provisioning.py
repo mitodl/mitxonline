@@ -646,7 +646,16 @@ def delete_identity_provider(identity_provider, *, connection=None):
     Args:
     - identity_provider (OrganizationIdentityProvider): the IdP to delete
     - connection (KeycloakConnection): an existing connection, if any
+    Raises:
+    - OrganizationNotProvisionedError: the organization has no Keycloak record
     """
+
+    # Creation requires a provisioned organization, so this looks unreachable -
+    # but sso_organization_id is an editable panel on OrganizationPage
+    # (content_panels) and is nullable, so staff can blank it in the Wagtail
+    # admin after the IdP exists. Without the guard the unlink 502s and the IdP
+    # can never be deleted, with a message blaming Keycloak.
+    _require_provisioned(identity_provider.organization)
 
     connection = connection or KeycloakConnection()
 

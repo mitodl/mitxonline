@@ -576,6 +576,29 @@ def test_delete_identity_provider_unlinks_before_deleting(connection):
     assert not OrganizationIdentityProvider.objects.filter(alias="exampleu").exists()
 
 
+def test_delete_identity_provider_refuses_an_unprovisioned_organization(connection):
+    """
+    Reachable because sso_organization_id is editable in the Wagtail admin.
+
+    Creation requires a provisioned organization, but staff can blank the field
+    afterwards. Without the guard the unlink 502s and the IdP can never be
+    deleted.
+    """
+
+    organization = OrganizationPageFactory.create()
+    identity_provider = _identity_provider(organization)
+    organization.sso_organization_id = None
+    organization.save()
+    identity_provider.refresh_from_db()
+
+    with pytest.raises(OrganizationNotProvisionedError):
+        delete_identity_provider(identity_provider, connection=connection)
+
+    connection.organizations.disassociate.assert_not_called()
+    connection.identity_providers.delete.assert_not_called()
+    assert OrganizationIdentityProvider.objects.filter(alias="exampleu").exists()
+
+
 def test_onboarding_set_state_stamps_the_change():
     """state_changed_at tracks state changes, not every save."""
 
