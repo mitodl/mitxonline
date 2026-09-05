@@ -1830,27 +1830,39 @@ def reconcile_keycloak_orgs():
 
     for org in orgs:
         try:
-            page, created = reconcile_single_keycloak_org(org)
+            # Each org gets its own savepoint. Postgres aborts the whole
+            # transaction on any failed statement, so catching a database error
+            # and carrying on with the loop only works if that error was
+            # contained - otherwise every later query raises
+            # TransactionManagementError and skipping one org still loses the
+            # rest of the pass, just less legibly.
+            with transaction.atomic():
+                page, created = reconcile_single_keycloak_org(org)
 
+                if created:
+                    parent_org_page.add_child(instance=page)
+                    page.save()
+                    parent_org_page.save()
+                else:
+                    page.save()
+
+                # An adopted organization needs an onboarding record too, so
+                # that orgs that arrived this way show up in the same place as
+                # the ones the provisioning API made.
+                OrganizationOnboarding.objects.get_or_create(
+                    organization=page,
+                    defaults={
+                        "state": ONBOARDING_STATE_ORG_CREATED,
+                        "state_changed_at": now_in_utc(),
+                    },
+                )
+
+            # Counted after the savepoint commits, so a rolled-back org is not
+            # reported as reconciled.
             if created:
                 created_count += 1
-                parent_org_page.add_child(instance=page)
-                page.save()
-                parent_org_page.save()
             else:
                 updated_count += 1
-                page.save()
-
-            # An adopted organization needs an onboarding record too, so that
-            # orgs that arrived this way show up in the same place as the ones
-            # the provisioning API made.
-            OrganizationOnboarding.objects.get_or_create(
-                organization=page,
-                defaults={
-                    "state": ONBOARDING_STATE_ORG_CREATED,
-                    "state_changed_at": now_in_utc(),
-                },
-            )
         except (ValidationError, IntegrityError):  # noqa: PERF203
             # IntegrityError because OrganizationOnboarding.organization is a
             # OneToOneField: a concurrent provisioning saga or a second
