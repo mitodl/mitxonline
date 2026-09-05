@@ -8316,8 +8316,9 @@ components:
         metadata_source:
           type: string
           readOnly: true
-          description: The metadata URL, or the inline XML, the config was parsed
-            from.
+          description: 'The metadata URL, or the inline XML, the config was parsed
+            from. Not blankable: refreshing an IdP re-reads this, so a row without
+            one cannot be refreshed.'
         metadata_artifact:
           readOnly: true
           nullable: true
