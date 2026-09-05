@@ -78,9 +78,7 @@ class Migration(migrations.Migration):
                 (
                     "metadata_source",
                     models.TextField(
-                        blank=True,
-                        default="",
-                        help_text="The metadata URL, or the inline XML, the config was parsed from.",
+                        help_text="The metadata URL, or the inline XML, the config was parsed from. Not blankable: refreshing an IdP re-reads this, so a row without one cannot be refreshed."
                     ),
                 ),
                 (
