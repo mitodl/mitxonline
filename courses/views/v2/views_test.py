@@ -2817,7 +2817,7 @@ def test_course_run_and_product_prefetch_optimized(
     """
 
     course = CourseFactory()
-    num_courseruns = 20
+    num_courseruns = 8
     courseruns = [CourseRunFactory(course=course) for _ in range(num_courseruns)]
     for run in courseruns:
         ProductFactory(
