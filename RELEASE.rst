@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 1.165.2
+---------------
+
+- fix: Handle payment gateway refund errors in admin (#3803)
+- Remove 'screen' from Dockerfile dependencies (#3927)
+- fix: remap issued-certificate signatory references (#3921)
+- feat (hq11846): Complete your Purchase, Discount Creation (#3916)
+- Fix Content-Type on Keycloak organization member association requests (#3923)
+
 Version 1.165.1 (Released September 02, 2026)
 ---------------
 
