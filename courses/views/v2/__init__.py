@@ -372,12 +372,12 @@ class CourseFilterSet(django_filters.FilterSet):
         ):
             return queryset.filter(
                 Q(
-                    courseruns__b2b_contract__organization_id=value,
+                    courseruns__b2b_contract__id=value,
                     courseruns__b2b_contract__active=True,
                 )
                 | Q(
                     courseruns__b2b_contracts__active=True,
-                    courseruns__b2b_contracts__organization_id=value,
+                    courseruns__b2b_contracts__id=value,
                 )
             )
         return Course.objects.none()
@@ -471,7 +471,7 @@ class CourseViewSet(
             "courseruns",
             queryset=CourseRun.objects.order_by("id")
             .select_related("b2b_contract")
-            .prefetch_related(modes_prefetch, products_prefetch),
+            .prefetch_related("b2b_contracts", modes_prefetch, products_prefetch),
         )
         queryset = queryset.prefetch_related(
             "departments", "in_programs", course_runs_prefetch

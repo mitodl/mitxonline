@@ -1118,11 +1118,6 @@ def test_next_run_id_with_org_filter(  # noqa: PLR0915
 
     # same test as above, but filter on contract ID
 
-    url = reverse(
-        "v2:courses_api-detail",
-        kwargs={"pk": b2b_course.id},
-    )
-
     resp = auth_api_client.get(f"{url}?contract_id={contract.id}")
 
     assert resp.status_code < 300
@@ -2822,13 +2817,14 @@ def test_course_run_and_product_prefetch_optimized(
     """
 
     course = CourseFactory()
-    num_courseruns = 8
+    num_courseruns = 20
     courseruns = [CourseRunFactory(course=course) for _ in range(num_courseruns)]
     for run in courseruns:
         ProductFactory(
             purchasable_object=run,
         )
-    max_expected_queries = 21
+    # increased below from 21 to 27 - the M2M for b2b_contracts adds some queries
+    max_expected_queries = 27
     num_queries_before = len(connection.queries)
     with django_assert_max_num_queries(max_expected_queries):
         resp = user_drf_client.get(reverse("v2:courses_api-list"))
@@ -2843,8 +2839,9 @@ def test_course_run_and_product_prefetch_optimized(
     product_queries = [
         q for q in queries_after if 'FROM "ecommerce_product"' in q.get("sql", "")
     ]
-    assert len(product_queries) == 2, (
-        f"Expected 1 product query, got {len(product_queries)}: {[q['sql'] for q in product_queries]}"
+    # increased below from 2 to 3 - the M2M for b2b_contracts adds some queries
+    assert len(product_queries) == 3, (
+        f"Expected 3 product query, got {len(product_queries)}: {[q['sql'] for q in product_queries]}"
     )
 
 

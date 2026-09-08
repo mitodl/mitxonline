@@ -282,6 +282,7 @@ class TestUserEnrollmentFiltering:
         contract = ContractPageFactory.create(organization=org)
         b2b_enrollment = CourseRunEnrollmentFactory.create()
         b2b_enrollment.run.b2b_contract = contract
+        b2b_enrollment.run.b2b_only = True
         b2b_enrollment.run.save()
 
         queryset = CourseRunEnrollment.objects.filter(
