@@ -29,10 +29,12 @@ from courses.models import PaidCourseRun, PaidProgram, ProgramEnrollment
 from ecommerce.api import fulfill_completed_order
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_CUSTOMER_SUPPORT,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     REDEMPTION_TYPE_ONE_TIME,
+    REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
     REDEMPTION_TYPE_UNLIMITED,
     ZERO_PAYMENT_DATA,
 )
@@ -43,6 +45,7 @@ from ecommerce.factories import (
     DiscountFactory,
     LineFactory,
     OrderFactory,
+    PaidAmountOffDiscountFactory,
     ProductFactory,
     TransactionFactory,
     UnlimitedUseDiscountFactory,
@@ -806,6 +809,69 @@ def test_discount_rest_api(admin_drf_client, user_drf_client):
     assert Discount.objects.filter(pk=discount_payload["id"]).count() == 0
 
 
+def test_attaching_a_non_program_product_to_a_program_child_purchase_discount_is_a_400(
+    admin_drf_client,
+):
+    """Program-child-purchase discounts only ever link to program products."""
+    discount = PaidAmountOffDiscountFactory.create()
+    product = ProductFactory.create()  # course-run product
+
+    resp = admin_drf_client.patch(
+        reverse("v0:discounts_api-products-detail", args=[discount.id, product.id]),
+        {"product_id": product.id},
+    )
+
+    assert resp.status_code == 400
+    assert not DiscountProduct.objects.filter(
+        discount=discount, product=product
+    ).exists()
+
+
+def test_attaching_a_deactivated_product_is_a_404(admin_drf_client):
+    """Product.delete() only clears is_active; a deactivated product can't be sold,
+    so it can't be linked either — same as the dashboard's product picker.
+    """
+    discount = DiscountFactory.create()
+    product = ProductFactory.create()
+    product.delete()
+
+    resp = admin_drf_client.patch(
+        reverse("v0:discounts_api-products-detail", args=[discount.id, product.id]),
+        {"product_id": product.id},
+    )
+
+    assert resp.status_code == 404
+    assert not DiscountProduct.objects.filter(
+        discount=discount, product=product
+    ).exists()
+
+
+def test_attaching_to_an_unknown_discount_is_a_404(admin_drf_client):
+    """A discount id that matches nothing is a client error, not a server one."""
+    missing_id = DiscountFactory.create().id + 1
+    product = ProductFactory.create()
+
+    resp = admin_drf_client.patch(
+        reverse("v0:discounts_api-products-detail", args=[missing_id, product.id]),
+        {"product_id": product.id},
+    )
+
+    assert resp.status_code == 404
+
+
+def test_attaching_an_unknown_product_is_a_404(admin_drf_client):
+    """A product_id that matches nothing is a client error, not a server one."""
+    discount = DiscountFactory.create()
+    missing_id = ProductFactory.create().id + 1
+
+    resp = admin_drf_client.patch(
+        reverse("v0:discounts_api-products-detail", args=[discount.id, missing_id]),
+        {"product_id": missing_id},
+    )
+
+    assert resp.status_code == 404
+
+
 @pytest.mark.parametrize(
     "zerovalue",
     [
@@ -1059,6 +1125,43 @@ def test_bulk_discount_create_rejects_ambiguous_code_sources(admin_drf_client, e
 
     assert resp.status_code == 400
     assert not Discount.objects.exists()
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        pytest.param(
+            {"discount_type": DISCOUNT_TYPE_PAID_AMOUNT_OFF}, id="calculation"
+        ),
+        pytest.param(
+            {"redemption_type": REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE}, id="redemption"
+        ),
+    ],
+)
+def test_bulk_discount_create_rejects_the_new_discount_and_redemption_types(
+    admin_drf_client, override
+):
+    """
+    A paid-amount-off discount needs the matching redemption type, and a
+    program-child-purchase discount needs automatic plus the program product
+    links, so bulk generation refuses both rather than raising its way to a 500.
+    """
+    resp = admin_drf_client.post(
+        reverse("v0:discounts_api-create_batch"),
+        {
+            "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+            "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
+            "count": 5,
+            "amount": 50,
+            "prefix": "Generated-Code-",
+            **override,
+        },
+    )
+
+    assert resp.status_code == 400
+    assert not Discount.objects.filter(
+        discount_code__startswith="Generated-Code-"
+    ).exists()
 
 
 # Checkout tests

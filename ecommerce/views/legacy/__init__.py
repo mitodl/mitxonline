@@ -70,6 +70,7 @@ from ecommerce.serializers import (
     UserDiscountMetaSerializer,
     UserDiscountSerializer,
 )
+from ecommerce.views.utils import AttachDiscountProductMixin
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.models import FlexiblePriceTier
 from flexiblepricing.serializers import FlexiblePriceTierSerializer
@@ -429,7 +430,9 @@ class DiscountViewSet(ModelViewSet):
         ),
     ]
 )
-class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
+class NestedDiscountProductViewSet(
+    AttachDiscountProductMixin, NestedViewSetMixin, ModelViewSet
+):
     """API view set for Discounts"""
 
     serializer_class = DiscountProductSerializer
@@ -437,20 +440,6 @@ class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated, IsAdminUser)
     pagination_class = RefinePagination
-
-    def partial_update(self, request, **kwargs):
-        discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
-
-        (_, created) = DiscountProduct.objects.get_or_create(
-            discount=discount, product_id=request.data["product_id"]
-        )
-
-        return Response(
-            DiscountProductSerializer(
-                DiscountProduct.objects.filter(discount=discount).all(), many=True
-            ).data,
-            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
-        )
 
     def destroy(self, request, **kwargs):  # noqa: ARG002
         discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])

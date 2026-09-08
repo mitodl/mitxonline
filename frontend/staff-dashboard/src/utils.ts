@@ -13,6 +13,9 @@ export const formatDiscount = (discount: IDiscount) => {
         case "fixed-price":
             formattedDiscount = formatIncome(discount.amount, "USD") + " fixed-price"
             break
+        case "paid-amount-off":
+            formattedDiscount = "amount paid for a prior purchase"
+            break
     }
     return formattedDiscount;
 }

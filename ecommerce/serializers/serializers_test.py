@@ -14,7 +14,9 @@ from ecommerce.constants import (
     CYBERSOURCE_CARD_TYPES,
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
+    REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
 )
 from ecommerce.discounts import DiscountType
 from ecommerce.factories import (
@@ -31,6 +33,7 @@ from ecommerce.serializers import (
     BasketSerializer,
     BasketWithProductSerializer,
     CourseRunProductPurchasableObjectSerializer,
+    DiscountSerializer,
     ProductFlexibilePriceSerializer,
     ProductSerializer,
     ProgramProductPurchasableObjectSerializer,
@@ -576,3 +579,22 @@ def test_legacy_receipt_line_reports_the_recorded_price():
     assert data["price"] == "300.00"
     assert data["discount"] == "100.00"
     assert data["total_paid"] == "200.00"
+
+
+def test_discount_serializer_runs_the_program_child_purchase_shape_rules():
+    """
+    The rules themselves are covered against V0DiscountSerializer; this pins
+    that ProgramChildPurchaseShapeMixin is wired into this surface too.
+    """
+    serializer = DiscountSerializer(
+        data={
+            "amount": "10",
+            "automatic": True,
+            "discount_type": DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+            "redemption_type": REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+            "discount_code": "linked-serializer-test",
+        }
+    )
+
+    assert not serializer.is_valid()
+    assert "store 0" in str(serializer.errors)

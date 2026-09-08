@@ -36,11 +36,13 @@ from ecommerce.factories import (
     BasketItemFactory,
     DiscountFactory,
     LineFactory,
+    PaidAmountOffDiscountFactory,
     ProductFactory,
     UnlimitedUseDiscountFactory,
 )
 from ecommerce.models import (
     Basket,
+    BasketDiscount,
     BasketItem,
     Discount,
     DiscountProduct,
@@ -310,6 +312,32 @@ def test_redeem_discount(  # noqa: PLR0913
     else:
         assert "message" in resp_json
         assert resp_json["message"] == "Discount applied"
+
+
+def test_redeem_discount_refuses_a_program_child_purchase_code(
+    user, user_drf_client, products, discounts
+):
+    """
+    The endpoint clears the basket's existing discount only once validation has
+    passed, so a refused code has to leave the standing discount in place.
+    """
+    basket = create_basket(user, products)
+    standing_discount = discounts[0]
+    BasketDiscount.objects.create(
+        redeemed_basket=basket,
+        redeemed_by=user,
+        redeemed_discount=standing_discount,
+        redemption_date=now_in_utc(),
+    )
+    program_child_purchase_discount = PaidAmountOffDiscountFactory.create()
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"),
+        {"discount": program_child_purchase_discount.discount_code},
+    )
+
+    assert resp.status_code == 404
+    assert basket.discounts.get().redeemed_discount == standing_discount
 
 
 @pytest.mark.parametrize("try_product_discount", [True, False])
@@ -1295,6 +1323,69 @@ def test_discount_rest_api(admin_drf_client, user_drf_client):
 
     assert resp.status_code == 204
     assert Discount.objects.filter(pk=discount_payload["id"]).count() == 0
+
+
+def test_attaching_a_non_program_product_to_a_program_child_purchase_discount_is_a_400(
+    admin_drf_client,
+):
+    """Program-child-purchase discounts only ever link to program products."""
+    discount = PaidAmountOffDiscountFactory.create()
+    product = ProductFactory.create()  # course-run product
+
+    resp = admin_drf_client.patch(
+        reverse("discounts_api-products-detail", args=[discount.id, product.id]),
+        {"product_id": product.id},
+    )
+
+    assert resp.status_code == 400
+    assert not DiscountProduct.objects.filter(
+        discount=discount, product=product
+    ).exists()
+
+
+def test_attaching_a_deactivated_product_is_a_404(admin_drf_client):
+    """Product.delete() only clears is_active; a deactivated product can't be sold,
+    so it can't be linked either — same as the dashboard's product picker.
+    """
+    discount = DiscountFactory.create()
+    product = ProductFactory.create()
+    product.delete()
+
+    resp = admin_drf_client.patch(
+        reverse("discounts_api-products-detail", args=[discount.id, product.id]),
+        {"product_id": product.id},
+    )
+
+    assert resp.status_code == 404
+    assert not DiscountProduct.objects.filter(
+        discount=discount, product=product
+    ).exists()
+
+
+def test_attaching_to_an_unknown_discount_is_a_404(admin_drf_client):
+    """A discount id that matches nothing is a client error, not a server one."""
+    missing_id = DiscountFactory.create().id + 1
+    product = ProductFactory.create()
+
+    resp = admin_drf_client.patch(
+        reverse("discounts_api-products-detail", args=[missing_id, product.id]),
+        {"product_id": product.id},
+    )
+
+    assert resp.status_code == 404
+
+
+def test_attaching_an_unknown_product_is_a_404(admin_drf_client):
+    """A product_id that matches nothing is a client error, not a server one."""
+    discount = DiscountFactory.create()
+    missing_id = ProductFactory.create().id + 1
+
+    resp = admin_drf_client.patch(
+        reverse("discounts_api-products-detail", args=[discount.id, missing_id]),
+        {"product_id": missing_id},
+    )
+
+    assert resp.status_code == 404
 
 
 @pytest.mark.parametrize(

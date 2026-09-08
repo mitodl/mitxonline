@@ -12,12 +12,13 @@ from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses.models import Course, CourseRun, Program, ProgramRun
 from ecommerce import models
 from ecommerce.constants import (
+    BULK_GENERATION_DISCOUNT_TYPES,
+    BULK_GENERATION_REDEMPTION_TYPES,
     CYBERSOURCE_CARD_TYPES,
     DISCOUNT_TYPE_DOLLARS_OFF,
+    DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
-    DISCOUNT_TYPES,
     PAYMENT_TYPES,
-    REDEMPTION_TYPES,
     TRANSACTION_TYPE_REFUND,
 )
 from ecommerce.discounts import product_from_version
@@ -26,6 +27,7 @@ from ecommerce.models import (
     BasketItem,
     Order,
     Product,
+    validate_program_child_purchase_shape,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from main.settings import TIME_ZONE
@@ -180,7 +182,56 @@ class ProductSerializer(BaseProductSerializer):
         model = models.Product
 
 
-class DiscountSerializer(serializers.ModelSerializer):
+def discount_is_price_neutral(discount) -> bool:
+    """
+    Whether a discount is display noise in a cart: one of the shapes that can
+    never move a price.
+
+    A percent-off or dollars-off discount of 0 subtracts nothing. A
+    paid-amount-off discount stores 0 too, and its real per-user value is
+    resolved elsewhere (hq#11846), so nothing renderable exists for it yet;
+    the resolver revisits its visibility.
+
+    A fixed-price discount is not in this set even at 0 — it sets the price
+    rather than reducing it, and a fixed price equal to the product price is a
+    real B2B-contract shape the shopper needs to see confirmed.
+    """
+    return discount.discount_type == DISCOUNT_TYPE_PAID_AMOUNT_OFF or (
+        discount.amount == 0
+        and discount.discount_type
+        in (DISCOUNT_TYPE_PERCENT_OFF, DISCOUNT_TYPE_DOLLARS_OFF)
+    )
+
+
+class ProgramChildPurchaseShapeMixin:
+    """
+    Runs the paid-amount-off / program-child-purchase shape rules over the
+    merged field values, so a PATCH that would make the stored row invalid is
+    a 400 rather than an unconverted ValidationError out of Model.save().
+
+    Mix into any serializer that writes a Discount.
+    """
+
+    def validate(self, attrs):
+        def _value(name, default=None):
+            if name in attrs:
+                return attrs[name]
+            return getattr(self.instance, name, default)
+
+        validate_program_child_purchase_shape(
+            discount_type=_value("discount_type"),
+            redemption_type=_value("redemption_type"),
+            amount=_value("amount"),
+            automatic=_value("automatic", default=False),
+            discount=self.instance,
+        )
+
+        return super().validate(attrs)
+
+
+class DiscountSerializer(ProgramChildPurchaseShapeMixin, serializers.ModelSerializer):
+    """Serializes a discount."""
+
     class Meta:
         model = models.Discount
         fields = [
@@ -341,7 +392,7 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
     @extend_schema_field(BasketDiscountSerializer(many=True))
     def get_discounts(self, instance) -> list[dict[str, any]]:
         """
-        Exclude zero value discounts and return applicable discounts on the basket.
+        Serialize the basket's discounts, skipping the price-neutral ones.
 
         Args:
             instance: Basket instance
@@ -349,20 +400,11 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
         Returns:
             List of serialized basket discount records
         """
-        discounts = []
-        for discount_record in instance.discounts.all():
-            discount = discount_record.redeemed_discount
-            if discount.amount == 0 and discount.discount_type in [
-                DISCOUNT_TYPE_PERCENT_OFF,
-                DISCOUNT_TYPE_DOLLARS_OFF,
-            ]:
-                continue
-
-            discounts.append(
-                BasketDiscountSerializer(discount_record, context=self.context).data
-            )
-
-        return discounts
+        return [
+            BasketDiscountSerializer(discount_record, context=self.context).data
+            for discount_record in instance.discounts.all()
+            if not discount_is_price_neutral(discount_record.redeemed_discount)
+        ]
 
     class Meta:
         model = models.Basket
@@ -678,8 +720,10 @@ class BulkDiscountSerializer(serializers.Serializer):
     # views pass validated_data, so an undeclared key is dropped rather than
     # reaching the function. redemption_type in particular is load-bearing —
     # the staff dashboard's bulk form sends it.
-    discount_type = serializers.ChoiceField(choices=DISCOUNT_TYPES)
-    redemption_type = serializers.ChoiceField(choices=REDEMPTION_TYPES, required=False)
+    discount_type = serializers.ChoiceField(choices=BULK_GENERATION_DISCOUNT_TYPES)
+    redemption_type = serializers.ChoiceField(
+        choices=BULK_GENERATION_REDEMPTION_TYPES, required=False
+    )
     payment_type = serializers.ChoiceField(choices=PAYMENT_TYPES)
     amount = serializers.DecimalField(max_digits=9, decimal_places=2)
     one_time = serializers.BooleanField(default=False)

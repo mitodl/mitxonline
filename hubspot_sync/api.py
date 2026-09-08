@@ -45,6 +45,7 @@ from ecommerce import models
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
 )
 from ecommerce.discounts import product_from_version
@@ -278,7 +279,7 @@ CUSTOM_ECOMMERCE_PROPERTIES = {
             {
                 "name": "discount_type",
                 "label": "Discount Type",
-                "description": "Type of discount (percent-off or dollars-off or fixed-price)",
+                "description": "Type of discount (percent-off, dollars-off, fixed-price, or paid-amount-off)",
                 "groupName": "coupon",
                 "type": "enumeration",
                 "fieldType": "select",
@@ -299,6 +300,12 @@ CUSTOM_ECOMMERCE_PROPERTIES = {
                         "value": DISCOUNT_TYPE_FIXED_PRICE,
                         "label": DISCOUNT_TYPE_FIXED_PRICE,
                         "displayOrder": 2,
+                        "hidden": False,
+                    },
+                    {
+                        "value": DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+                        "label": DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+                        "displayOrder": 3,
                         "hidden": False,
                     },
                 ],

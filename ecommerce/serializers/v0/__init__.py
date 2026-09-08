@@ -13,8 +13,6 @@ from courses.models import Course, CourseRun, Program, ProgramRun
 from ecommerce import models
 from ecommerce.constants import (
     CYBERSOURCE_CARD_TYPES,
-    DISCOUNT_TYPE_DOLLARS_OFF,
-    DISCOUNT_TYPE_PERCENT_OFF,
     TRANSACTION_TYPE_REFUND,
 )
 from ecommerce.discounts import product_from_version
@@ -28,6 +26,10 @@ from ecommerce.models import (
     RefundReasonChoices,
     RefundRequest,
     RefundRequestStatus,
+)
+from ecommerce.serializers import (
+    ProgramChildPurchaseShapeMixin,
+    discount_is_price_neutral,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from main.constants import (
@@ -48,7 +50,7 @@ from users.serializers import (
 User = get_user_model()
 
 
-class V0DiscountSerializer(serializers.ModelSerializer):
+class V0DiscountSerializer(ProgramChildPurchaseShapeMixin, serializers.ModelSerializer):
     """Serializes a discount."""
 
     class Meta:
@@ -427,7 +429,7 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
     @extend_schema_field(BasketDiscountSerializer(many=True))
     def get_discounts(self, instance) -> list[BasketDiscountSerializer]:
         """
-        Exclude zero value discounts and return applicable discounts on the basket.
+        Serialize the basket's discounts, skipping the price-neutral ones.
 
         Args:
             instance: Basket instance
@@ -435,20 +437,11 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
         Returns:
             List of serialized basket discount records
         """
-        discounts = []
-        for discount_record in instance.discounts.all():
-            discount = discount_record.redeemed_discount
-            if discount.amount == 0 and discount.discount_type in [
-                DISCOUNT_TYPE_PERCENT_OFF,
-                DISCOUNT_TYPE_DOLLARS_OFF,
-            ]:
-                continue
-
-            discounts.append(
-                BasketDiscountSerializer(discount_record, context=self.context).data
-            )
-
-        return discounts
+        return [
+            BasketDiscountSerializer(discount_record, context=self.context).data
+            for discount_record in instance.discounts.all()
+            if not discount_is_price_neutral(discount_record.redeemed_discount)
+        ]
 
     class Meta:
         model = models.Basket

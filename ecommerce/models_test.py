@@ -7,6 +7,7 @@ import pytest
 import reversion
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import ProtectedError
 from django.urls import reverse
 from freezegun import freeze_time
 from mitol.common.utils import now_in_utc
@@ -17,7 +18,10 @@ from courses.factories import CourseRunFactory
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
+    REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+    REDEMPTION_TYPE_UNLIMITED,
     REFUND_WINDOW_DAYS,
     ZERO_PAYMENT_DATA,
 )
@@ -25,11 +29,14 @@ from ecommerce.factories import (
     BasketFactory,
     BasketItemFactory,
     DiscountFactory,
+    DiscountRedemptionFactory,
     LineFactory,
     OneTimeDiscountFactory,
     OneTimePerUserDiscountFactory,
     OrderFactory,
+    PaidAmountOffDiscountFactory,
     ProductFactory,
+    ProgramProductFactory,
     SetLimitDiscountFactory,
     UnlimitedUseDiscountFactory,
 )
@@ -38,6 +45,7 @@ from ecommerce.models import (
     Basket,
     BasketDiscount,
     BasketItem,
+    Discount,
     DiscountProduct,
     DiscountRedemption,
     FulfilledOrder,
@@ -1436,3 +1444,155 @@ def test_refund_reviewed_on_is_none_without_a_request():
     order = OrderFactory.create(state=OrderStatus.FULFILLED)
 
     assert order.refund_reviewed_on is None
+
+
+def test_a_source_line_is_protected_once_it_funds_a_redemption():
+    """PROTECT: deleting purchase history out from under a redemption is an error."""
+    line = _line_for(Decimal("100.00"))
+    DiscountRedemptionFactory.create(source_line=line)
+
+    with pytest.raises(ProtectedError):
+        line.delete()
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        pytest.param(
+            {
+                "amount": 0,
+                "discount_type": DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+                "redemption_type": REDEMPTION_TYPE_UNLIMITED,
+                "automatic": True,
+            },
+            id="paid-amount-off-without-program-child-purchase",
+        ),
+        pytest.param(
+            {
+                "amount": 10,
+                "discount_type": DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+                "redemption_type": REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+                "automatic": True,
+            },
+            id="nonzero-amount",
+        ),
+        pytest.param(
+            {
+                "amount": 0,
+                "discount_type": DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+                "redemption_type": REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+                "automatic": False,
+            },
+            id="not-automatic",
+        ),
+    ],
+)
+def test_db_constraint_rejects_a_malformed_discount_shape(row):
+    """The DB backstop holds even for writes that skip model validation."""
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Discount.objects.bulk_create(
+            [Discount(discount_code="constraint-bypass", **row)]
+        )
+
+
+def test_db_constraint_allows_program_child_purchase_redemption_with_standard_type():
+    """The type constraint is one-way on purpose: a standard calculation may
+    pair with the program-child-purchase redemption rules (future fractional offers).
+    """
+    Discount.objects.bulk_create(
+        [
+            Discount(
+                amount=10,
+                discount_code="reverse-pairing",
+                discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+                redemption_type=REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+                automatic=True,
+            )
+        ]
+    )
+
+    assert Discount.objects.filter(discount_code="reverse-pairing").exists()
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        pytest.param(
+            {"redemption_type": REDEMPTION_TYPE_UNLIMITED}, id="wrong-redemption-type"
+        ),
+        pytest.param({"amount": 10}, id="nonzero-amount"),
+        pytest.param({"automatic": False}, id="not-automatic"),
+    ],
+)
+def test_paid_amount_off_discount_shape_is_enforced_on_save(override):
+    """Saving a malformed paid-amount-off discount raises instead of hitting the DB constraint."""
+    with pytest.raises(ValidationError):
+        PaidAmountOffDiscountFactory.create(**override)
+
+
+def test_program_child_purchase_discount_only_links_program_products():
+    """
+    Enforced on the link row rather than only on Discount.save(), so every write
+    path is covered — Django admin's DiscountProduct form included.
+    """
+    discount = PaidAmountOffDiscountFactory.create()
+
+    with pytest.raises(ValidationError):
+        DiscountProduct.objects.create(
+            discount=discount, product=ProductFactory.create()
+        )
+
+
+def test_program_child_purchase_discount_links_a_program_product():
+    """The intended attach path stays open."""
+    discount = PaidAmountOffDiscountFactory.create()
+
+    DiscountProduct.objects.create(
+        discount=discount, product=ProgramProductFactory.create()
+    )
+
+    discount.clean()
+
+
+def test_converting_a_discount_with_a_courserun_product_is_rejected():
+    """
+    An existing discount cannot become program-child-purchase while a course-run
+    product is still attached. The cross-table clause lives in clean() (and the
+    serializers), not save(), so save() stays row-local.
+    """
+    discount = DiscountFactory.create()
+    DiscountProduct.objects.create(discount=discount, product=ProductFactory.create())
+
+    discount.discount_type = DISCOUNT_TYPE_PAID_AMOUNT_OFF
+    discount.redemption_type = REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE
+    discount.amount = 0
+    discount.automatic = True
+
+    with pytest.raises(ValidationError):
+        discount.clean()
+
+
+def test_program_child_purchase_discount_tolerates_a_product_less_link_row():
+    """DiscountProduct.product is nullable, and a null row is not a non-program product."""
+    discount = PaidAmountOffDiscountFactory.create()
+    DiscountProduct.objects.create(discount=discount, product=None)
+
+    discount.clean()
+
+
+def test_program_child_purchase_discount_is_not_redeemable_by_anyone(user):
+    """
+    Eligibility is per qualifying purchase and has no resolver yet, so the
+    generic redemption check has to refuse rather than treat the discount as
+    unlimited-use.
+    """
+    discount = PaidAmountOffDiscountFactory.create()
+
+    assert discount.is_redeemable_by(user) is False
+
+
+def test_friendly_format_for_paid_amount_off():
+    """The label carries no amount — the true value is per-user."""
+    discount = PaidAmountOffDiscountFactory.create()
+
+    assert discount.friendly_format() == "the amount paid for a prior purchase"

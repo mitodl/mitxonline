@@ -83,6 +83,7 @@ from ecommerce.serializers.v0 import (
     requests,
 )
 from ecommerce.tasks import send_refund_request_notification_email
+from ecommerce.views.utils import AttachDiscountProductMixin
 from flexiblepricing.models import FlexiblePriceTier
 from flexiblepricing.serializers import FlexiblePriceTierSerializer
 from hubspot_sync.task_helpers import sync_hubspot_cart_add
@@ -736,7 +737,9 @@ class DiscountViewSet(ModelViewSet):
         ),
     ]
 )
-class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
+class NestedDiscountProductViewSet(
+    AttachDiscountProductMixin, NestedViewSetMixin, ModelViewSet
+):
     """API view set for Discounts"""
 
     serializer_class = DiscountProductSerializer
@@ -744,22 +747,6 @@ class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
     authentication_classes = (SessionAuthentication,)
     permission_classes = (IsAdminUser,)
     pagination_class = LimitOffsetPagination
-
-    def partial_update(self, request, **kwargs):
-        """Partial update for a discount product."""
-
-        discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
-
-        (_, created) = DiscountProduct.objects.get_or_create(
-            discount=discount, product_id=request.data["product_id"]
-        )
-
-        return Response(
-            DiscountProductSerializer(
-                DiscountProduct.objects.filter(discount=discount).all(), many=True
-            ).data,
-            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
-        )
 
     def destroy(self, request, **kwargs):  # noqa: ARG002
         """Delete a linked product from a discount."""

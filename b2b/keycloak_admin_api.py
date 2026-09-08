@@ -263,9 +263,9 @@ class KeycloakAdminClient:
         Associate an object at the endpoint in the realm with the target ID.
 
         For things like adding members to an organization, we don't send the
-        entire user object. We just send the user ID to associate. save will
-        try to JSONify the data we're sending, which is not necessarily useful
-        in this case, so this op is separate.
+        entire user object, just the user ID as a bare JSON string (Keycloak's
+        contract for these association endpoints), so this op is separate from
+        save/create which send a JSON representation of the full object.
 
         Args:
         - endpoint: The endpoint to use (e.g., "organizations/{org_id}/members", etc).
@@ -276,7 +276,7 @@ class KeycloakAdminClient:
         - requests.HTTPError if the request fails.
         """
 
-        response = self.realm_request("POST", endpoint, data=target_id)
+        response = self.realm_request("POST", endpoint, json=target_id)
         response.raise_for_status()
 
         return True
