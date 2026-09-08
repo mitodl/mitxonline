@@ -132,3 +132,11 @@ class OpenEdxUserMissingError(Exception):
 
 class EdxApiCourseOutlineError(Exception):
     """Base exception for Open edX course outline fetch errors."""
+
+
+class EdxApiNotificationPreferencesError(Exception):
+    """The Open edX notification preferences API rejected a request"""
+
+    def __init__(self, msg, status_code=None):
+        self.status_code = status_code
+        super().__init__(msg)

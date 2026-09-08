@@ -21,6 +21,10 @@ from courses.models import (
     CourseRunEnrollment,
 )
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.exceptions import (
+    EdxApiNotificationPreferencesError,
+    NoEdxApiAuthError,
+)
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -506,3 +510,207 @@ class TestEdxCertificateWebhook:
             ).count()
             == 1
         )
+
+
+NOTIFICATION_PREFERENCES_URL = "notification-preferences"
+
+PREFERENCES_PAYLOAD = {
+    "status": "success",
+    "show_preferences": True,
+    "show_email_preferences": True,
+    "data": {
+        "discussion": {
+            "enabled": True,
+            "non_editable": [],
+            "notification_types": {
+                "new_discussion_post": {
+                    "web": False,
+                    "push": False,
+                    "email": False,
+                    "email_cadence": "Daily",
+                    "info": "",
+                }
+            },
+        }
+    },
+}
+
+
+def test_notification_preferences_requires_auth(client):
+    """Anonymous users cannot read notification preferences"""
+    response = client.get(reverse(NOTIFICATION_PREFERENCES_URL))
+    assert response.status_code in (
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_403_FORBIDDEN,
+    )
+
+
+def test_notification_preferences_get(mocker, user_client, user):
+    """GET proxies the learner's preferences straight through"""
+    api_mock = mocker.patch(
+        "openedx.views.get_notification_preferences",
+        return_value=PREFERENCES_PAYLOAD,
+    )
+
+    response = user_client.get(reverse(NOTIFICATION_PREFERENCES_URL))
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == PREFERENCES_PAYLOAD
+    api_mock.assert_called_once_with(user)
+
+
+def test_notification_preferences_get_not_synced(mocker, user_client):
+    """A learner without Open edX auth gets a 409, not a 500"""
+    mocker.patch(
+        "openedx.views.get_notification_preferences",
+        side_effect=NoEdxApiAuthError("not synced"),
+    )
+
+    response = user_client.get(reverse(NOTIFICATION_PREFERENCES_URL))
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert "detail" in response.json()
+
+
+def test_notification_preferences_get_upstream_error(mocker, user_client):
+    """An upstream failure surfaces as a 502"""
+    mocker.patch(
+        "openedx.views.get_notification_preferences",
+        side_effect=EdxApiNotificationPreferencesError("boom"),
+    )
+
+    response = user_client.get(reverse(NOTIFICATION_PREFERENCES_URL))
+
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {
+            "notification_app": "discussion",
+            "notification_type": "new_discussion_post",
+            "notification_channel": "web",
+            "value": True,
+        },
+        {
+            "notification_app": "discussion",
+            "notification_type": "grouped_notification",
+            "notification_channel": "email_cadence",
+            "email_cadence": "Weekly",
+        },
+    ],
+)
+def test_notification_preferences_put(mocker, user_client, user, body):
+    """PUT forwards a validated single-field change"""
+    api_mock = mocker.patch(
+        "openedx.views.update_notification_preference",
+        return_value={"status": "success"},
+    )
+
+    response = user_client.put(
+        reverse(NOTIFICATION_PREFERENCES_URL), body, content_type="application/json"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    api_mock.assert_called_once_with(user, body)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        # boolean channel with no value
+        {
+            "notification_app": "discussion",
+            "notification_type": "new_discussion_post",
+            "notification_channel": "email",
+        },
+        # cadence channel with no cadence
+        {
+            "notification_app": "discussion",
+            "notification_type": "new_discussion_post",
+            "notification_channel": "email_cadence",
+        },
+        # unknown channel
+        {
+            "notification_app": "discussion",
+            "notification_type": "new_discussion_post",
+            "notification_channel": "carrier_pigeon",
+            "value": True,
+        },
+        # bad cadence
+        {
+            "notification_app": "discussion",
+            "notification_type": "new_discussion_post",
+            "notification_channel": "email_cadence",
+            "email_cadence": "Hourly",
+        },
+        # missing required identifiers
+        {"notification_channel": "web", "value": True},
+    ],
+)
+def test_notification_preferences_put_validation(mocker, user_client, body):
+    """Malformed changes are rejected locally, never forwarded to the LMS"""
+    api_mock = mocker.patch("openedx.views.update_notification_preference")
+
+    response = user_client.put(
+        reverse(NOTIFICATION_PREFERENCES_URL), body, content_type="application/json"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    api_mock.assert_not_called()
+
+
+def test_notification_preferences_put_not_synced(mocker, user_client):
+    """A learner without Open edX auth gets a 409 on write too"""
+    mocker.patch(
+        "openedx.views.update_notification_preference",
+        side_effect=NoEdxApiAuthError("not synced"),
+    )
+
+    response = user_client.put(
+        reverse(NOTIFICATION_PREFERENCES_URL),
+        {
+            "notification_app": "discussion",
+            "notification_type": "new_discussion_post",
+            "notification_channel": "web",
+            "value": True,
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+
+
+def test_notification_preferences_put_throttled_upstream(mocker, user_client):
+    """An LMS throttle is passed through as a 429, not flattened to a 502"""
+    mocker.patch(
+        "openedx.views.update_notification_preference",
+        side_effect=EdxApiNotificationPreferencesError("slow down", status_code=429),
+    )
+
+    response = user_client.put(
+        reverse(NOTIFICATION_PREFERENCES_URL),
+        {
+            "notification_app": "discussion",
+            "notification_type": "new_discussion_post",
+            "notification_channel": "web",
+            "value": True,
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+    assert "wait a moment" in response.json()["detail"]
+
+
+def test_notification_preferences_get_throttled_upstream(mocker, user_client):
+    """A throttled read is also passed through as a 429"""
+    mocker.patch(
+        "openedx.views.get_notification_preferences",
+        side_effect=EdxApiNotificationPreferencesError("slow down", status_code=429),
+    )
+
+    response = user_client.get(reverse(NOTIFICATION_PREFERENCES_URL))
+
+    assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS

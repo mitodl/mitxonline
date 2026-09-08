@@ -2,6 +2,7 @@
 
 # pylint: disable=redefined-outer-name
 import itertools
+import json
 import logging
 from datetime import timedelta
 from unittest.mock import ANY, call, patch
@@ -30,6 +31,7 @@ from main.test_utils import MockHttpError, MockResponse
 from openedx.api import (
     ACCESS_TOKEN_HEADER_NAME,
     OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS,
+    OPENEDX_NOTIFICATION_PREFERENCES_PATH,
     OPENEDX_REGISTRATION_VALIDATION_PATH,
     bulk_retire_edx_users,
     create_edx_auth_token,
@@ -41,6 +43,7 @@ from openedx.api import (
     get_edx_api_client,
     get_edx_course_outline,
     get_edx_retirement_service_client,
+    get_notification_preferences,
     get_valid_edx_api_auth,
     process_course_run_clone,
     push_edx_modes_from_run,
@@ -56,6 +59,7 @@ from openedx.api import (
     update_edx_user_email,
     update_edx_user_name,
     update_edx_user_profile,
+    update_notification_preference,
     validate_username_email_with_edx,
 )
 from openedx.constants import (
@@ -71,9 +75,11 @@ from openedx.exceptions import (
     EdxApiCourseOutlineError,
     EdxApiEmailSettingsErrorException,
     EdxApiEnrollErrorException,
+    EdxApiNotificationPreferencesError,
     EdxApiRegistrationValidationException,
     EdxApiUserUpdateError,
     NoEdxApiAuthError,
+    OpenEdXOAuth2Error,
     OpenEdxUserMissingError,
     UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
@@ -2056,3 +2062,244 @@ def test_process_course_run_clone(mocker):
     mocked_clone_course.assert_called_with(
         cloneable_key, course_run.courseware_id, client=ANY
     )
+
+
+NOTIFICATION_PREFERENCES_RESPONSE = {
+    "status": "success",
+    "message": "Notification preferences retrieved successfully.",
+    "show_preferences": True,
+    "show_email_preferences": True,
+    "data": {
+        "discussion": {
+            "enabled": True,
+            "non_editable": [],
+            "notification_types": {
+                "new_discussion_post": {
+                    "web": False,
+                    "push": False,
+                    "email": False,
+                    "email_cadence": "Daily",
+                    "info": "",
+                }
+            },
+        }
+    },
+}
+
+
+@pytest.fixture
+def synced_user(user):
+    """
+    A user with a known, unexpired Open edX bearer token.
+
+    UserFactory already attaches an OpenEdxApiAuth via RelatedFactory, so this
+    pins its token to a predictable value rather than creating a second row
+    (OpenEdxApiAuth.user is unique).
+    """
+    OpenEdxApiAuth.objects.filter(user=user).update(
+        access_token="edx-access-token",  # noqa: S106
+        access_token_expires_on=now_in_utc() + timedelta(hours=1),
+    )
+    return user
+
+
+@responses.activate
+def test_get_notification_preferences(settings, mocker, synced_user):
+    """get_notification_preferences returns the LMS payload for the learner"""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    resp = responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}{OPENEDX_NOTIFICATION_PREFERENCES_PATH}",
+        json=NOTIFICATION_PREFERENCES_RESPONSE,
+        status=status.HTTP_200_OK,
+    )
+
+    assert get_notification_preferences(synced_user) == (
+        NOTIFICATION_PREFERENCES_RESPONSE
+    )
+    assert resp.call_count == 1
+    assert (
+        responses.calls[0].request.headers["Authorization"] == "Bearer edx-access-token"
+    )
+
+
+@responses.activate
+def test_get_notification_preferences_upstream_error(settings, mocker, synced_user):
+    """get_notification_preferences raises when the LMS does not return a 200"""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}{OPENEDX_NOTIFICATION_PREFERENCES_PATH}",
+        json={"detail": "nope"},
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+    with pytest.raises(EdxApiNotificationPreferencesError):
+        get_notification_preferences(synced_user)
+
+
+@responses.activate
+def test_update_notification_preference(settings, mocker, synced_user):
+    """update_notification_preference forwards the validated body verbatim"""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    responses.add(
+        responses.PUT,
+        f"{settings.OPENEDX_API_BASE_URL}{OPENEDX_NOTIFICATION_PREFERENCES_PATH}",
+        json={"status": "success"},
+        status=status.HTTP_200_OK,
+    )
+    preference = {
+        "notification_app": "discussion",
+        "notification_type": "new_discussion_post",
+        "notification_channel": "email",
+        "value": True,
+    }
+
+    assert update_notification_preference(synced_user, preference) == {
+        "status": "success"
+    }
+    assert json.loads(responses.calls[0].request.body) == preference
+    assert (
+        responses.calls[0].request.headers["Authorization"] == "Bearer edx-access-token"
+    )
+
+
+@responses.activate
+def test_update_notification_preference_upstream_error(settings, mocker, synced_user):
+    """update_notification_preference raises when the LMS rejects the write"""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    responses.add(
+        responses.PUT,
+        f"{settings.OPENEDX_API_BASE_URL}{OPENEDX_NOTIFICATION_PREFERENCES_PATH}",
+        json={"status": "error"},
+        status=status.HTTP_400_BAD_REQUEST,
+    )
+
+    with pytest.raises(EdxApiNotificationPreferencesError):
+        update_notification_preference(
+            synced_user,
+            {
+                "notification_app": "discussion",
+                "notification_type": "new_discussion_post",
+                "notification_channel": "web",
+                "value": False,
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    "api_func",
+    [
+        get_notification_preferences,
+        lambda user: update_notification_preference(user, {}),
+    ],
+)
+def test_notification_preferences_not_synced(mocker, user, api_func):
+    """Both helpers raise NoEdxApiAuthError when the user is not synced with edX"""
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=None)
+
+    with pytest.raises(NoEdxApiAuthError):
+        api_func(user)
+
+
+def test_notification_preferences_missing_auth_record(mocker, user):
+    """A user with no OpenEdxApiAuth row raises NoEdxApiAuthError, not DoesNotExist"""
+    OpenEdxApiAuth.objects.filter(user=user).delete()
+    # create_edx_auth_token returning truthy without leaving a row is the
+    # pathological case: the lookup must surface as NoEdxApiAuthError.
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+
+    with pytest.raises(NoEdxApiAuthError):
+        get_notification_preferences(user)
+
+
+def _http_error(status_code):
+    """An HTTPError carrying a response, the way raise_for_status raises it"""
+    response = MockResponse({}, status_code=status_code)
+    return HTTPError(f"{status_code} from the token endpoint", response=response)
+
+
+def test_notification_preferences_rejected_grant_is_a_409(mocker, user):
+    """
+    A 400 from the token endpoint means the grant itself was rejected (revoked
+    or invalid refresh token), so this learner genuinely has no usable auth.
+    """
+    mocker.patch("openedx.api.create_edx_auth_token", side_effect=_http_error(400))
+
+    with pytest.raises(NoEdxApiAuthError):
+        get_notification_preferences(user)
+
+
+@pytest.mark.parametrize("upstream_status", [401, 403, 500, 502, 503])
+def test_notification_preferences_token_service_failure_is_not_a_409(
+    mocker, user, upstream_status
+):
+    """
+    A token-service or credentials failure is not this learner's account being
+    unprovisioned -- it must not masquerade as the 409 "still being set up"
+    state, or a synced learner gets a permanent, non-retryable message.
+    """
+    mocker.patch(
+        "openedx.api.create_edx_auth_token",
+        side_effect=_http_error(upstream_status),
+    )
+
+    with pytest.raises(EdxApiNotificationPreferencesError) as exc_info:
+        get_notification_preferences(user)
+
+    assert exc_info.value.status_code == upstream_status
+
+
+def test_notification_preferences_oauth_handshake_failure_is_not_a_409(mocker, user):
+    """An incomplete OAuth handshake is a configuration/flow fault, not a 409"""
+    mocker.patch(
+        "openedx.api.create_edx_auth_token",
+        side_effect=OpenEdXOAuth2Error("redirected somewhere unexpected"),
+    )
+
+    with pytest.raises(EdxApiNotificationPreferencesError):
+        get_notification_preferences(user)
+
+
+def test_notification_preferences_refresh_rejected_is_a_409(mocker, user):
+    """A refresh the LMS rejects with a 400 leaves no usable auth"""
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    mocker.patch("openedx.api.get_valid_edx_api_auth", side_effect=_http_error(400))
+
+    with pytest.raises(NoEdxApiAuthError):
+        get_notification_preferences(user)
+
+
+def test_notification_preferences_refresh_outage_is_not_a_409(mocker, user):
+    """A 503 while refreshing is transient, so it must not read as a 409"""
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    mocker.patch("openedx.api.get_valid_edx_api_auth", side_effect=_http_error(503))
+
+    with pytest.raises(EdxApiNotificationPreferencesError) as exc_info:
+        get_notification_preferences(user)
+
+    assert exc_info.value.status_code == 503
+
+
+@responses.activate
+def test_notification_preferences_error_carries_upstream_status(
+    settings, mocker, synced_user
+):
+    """The upstream status is preserved so the view can honour a throttle"""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}{OPENEDX_NOTIFICATION_PREFERENCES_PATH}",
+        json={"detail": "slow down"},
+        status=status.HTTP_429_TOO_MANY_REQUESTS,
+    )
+
+    with pytest.raises(EdxApiNotificationPreferencesError) as exc_info:
+        get_notification_preferences(synced_user)
+
+    assert exc_info.value.status_code == status.HTTP_429_TOO_MANY_REQUESTS
