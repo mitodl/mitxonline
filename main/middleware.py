@@ -7,11 +7,17 @@ from urllib.parse import urlparse
 from django.conf import settings
 from django.http import HttpResponseRedirect
 from django.middleware.csrf import CsrfViewMiddleware
+from django.urls import reverse
 from django.utils.deprecation import MiddlewareMixin
 
 log = logging.getLogger(__name__)
 
 ANONYMOUS_BASKET_HANDOFF_PARAM = "anonymous_basket_id"
+
+# The id of the basket MIT Learn filled just before handing the browser over,
+# and the marker showing this hand-off has already had one session reset.
+EXPECTED_BASKET_PARAM = "basket_id"
+SESSION_RESET_PARAM = "session_reset"
 
 
 class CachelessAPIMiddleware(MiddlewareMixin):
@@ -92,3 +98,84 @@ class HostBasedCSRFMiddleware(CsrfViewMiddleware):
                     0
                 ]
         return response
+
+
+class BasketOwnerHandoffMiddleware(MiddlewareMixin):
+    """
+    Refuse to serve a cart that belongs to someone other than the caller.
+
+    Defence in depth for hq#12763.  Learn fills the basket over MITx Online's
+    API on Learn's own domain -- where the gateway session is Learn's, and
+    correct -- then sends the browser here, where the gateway session is a
+    separate cookie on a separate parent domain and may still name whoever used
+    this browser previously.  Learn therefore passes the id of the basket it just
+    filled, and this compares it against the basket the session it arrived with
+    actually owns.
+
+    On a mismatch the browser is bounced through ``switch-session``, which
+    discards the stale gateway session so the retry authenticates as the current
+    user.  That bounce happens at most once per hand-off: if the retry still
+    mismatches something other than a stale session is wrong, and looping would
+    be worse than proceeding.  Proceeding is safe -- the caller sees their own
+    session's cart, which is the wrong cart for whoever clicked but never a
+    different person's data.
+
+    Ordered after ``ApisixUserMiddleware`` so ``request.user`` reflects the
+    gateway header rather than a possibly stale Django session.
+    """
+
+    def process_request(self, request):
+        """Bounce a hand-off whose basket the caller's session does not own."""
+        if not self._is_stale_handoff(request):
+            return None
+
+        query_params = request.GET.copy()
+        query_params[SESSION_RESET_PARAM] = "1"
+        # switch-session forwards every parameter other than `next` onto the
+        # destination, so the retry arrives back here carrying the marker above.
+        query_params["next"] = request.path
+        return HttpResponseRedirect(
+            f"{reverse('switch-session')}?{query_params.urlencode()}"
+        )
+
+    @staticmethod
+    def _is_stale_handoff(request):
+        """Whether this request names a basket its session does not own."""
+        expected_basket_id = request.GET.get(EXPECTED_BASKET_PARAM)
+        # The reset endpoint is where the fix happens; checking there would just
+        # add a hop, and its session is mid-teardown anyway.
+        if not expected_basket_id or request.path.rstrip("/").endswith(
+            "/switch-session"
+        ):
+            return False
+
+        if not expected_basket_id.isdigit():
+            log.warning(
+                "Ignoring malformed %s query param: %s",
+                EXPECTED_BASKET_PARAM,
+                expected_basket_id,
+            )
+            return False
+
+        if not request.user.is_authenticated:
+            # Nothing to compare against.  The route's own auth gate decides
+            # whether an anonymous caller may be here at all.
+            return False
+
+        from ecommerce.models import Basket  # noqa: PLC0415
+
+        if Basket.objects.filter(
+            user=request.user, id=int(expected_basket_id)
+        ).exists():
+            return False
+
+        if request.GET.get(SESSION_RESET_PARAM):
+            log.warning(
+                "Basket %s still not owned by %s after a session reset; "
+                "serving this session's own cart instead of bouncing again.",
+                expected_basket_id,
+                request.user.global_id,
+            )
+            return False
+
+        return True

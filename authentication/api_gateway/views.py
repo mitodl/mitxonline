@@ -1,10 +1,10 @@
 """Authentication views"""
 
 import logging
-from urllib.parse import urlencode, urljoin
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, logout
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -91,12 +91,13 @@ class RegisterExtraDetailsView(ProfileDetailsAPIView):
     serializer_class = RegisterExtraDetailsSerializer
 
 
-def get_redirect_url(request):
+def get_redirect_url(request, default="/dashboard"):
     """
     Get the redirect URL from the request.
 
     Args:
         request: Django request object
+        default: Where to send the user when no usable `next` was supplied
 
     Returns:
         str: Redirect URL
@@ -108,7 +109,7 @@ def get_redirect_url(request):
         and url_has_allowed_host_and_scheme(
             next_url, allowed_hosts=settings.ALLOWED_REDIRECT_HOSTS
         )
-        else "/dashboard"
+        else default
     )
 
 
@@ -140,6 +141,60 @@ class GatewayLoginView(View):
             profile.completed_onboarding = True
             profile.save()
         return redirect(redirect_url)
+
+
+class SwitchSessionView(RedirectView):
+    """
+    Discard whatever session this browser arrived with, then continue to `next`.
+
+    Entry point for hand-offs from MIT Learn (hq#12763).  Learn and MITx Online
+    sit behind separate APISIX gateway sessions on separate parent domains, so a
+    browser that switched users on Learn can still be carrying the *previous*
+    user's MITx Online session -- and the gateway will happily assert that
+    identity to us for as long as its cached access token has left to run.
+
+    The APISIX route for this path carries no ``openid-connect`` plugin and
+    instead expires the gateway session cookie on the way out, so the redirect
+    below lands on a route that has to authenticate from scratch and comes back
+    as whoever currently holds the Keycloak SSO session.  Django's own session
+    is dropped here for the same reason: on its own it would keep naming the
+    previous user.
+
+    Deliberately not a logout: Keycloak is never contacted, because ending the
+    SSO session would log the user out of Learn as well -- the opposite of what
+    a hand-off from Learn wants.
+    """
+
+    permanent = False
+
+    def get(self, request, *args, **kwargs):
+        """Drop Django's session, then redirect.
+
+        The session is dropped here rather than in ``get_redirect_url`` so that
+        a HEAD request, which also resolves the redirect target, does not carry
+        the side effect.
+        """
+        if request.user.is_authenticated:
+            logout(request)
+        return super().get(request, *args, **kwargs)
+
+    def get_redirect_url(self, *args, **kwargs):  # noqa: ARG002
+        """Return the URL to continue to once the session has been dropped."""
+        target = get_redirect_url(self.request, default="/cart/")
+
+        # Carry any other query parameters through to the destination -- notably
+        # `ecom-service`, which Learn sets to suppress MITx Online's own chrome.
+        passthrough = {
+            key: value for key, value in self.request.GET.items() if key != "next"
+        }
+        if not passthrough:
+            return target
+
+        scheme, netloc, path, query, fragment = urlsplit(target)
+        merged = urlencode(
+            {**dict(parse_qsl(query)), **passthrough},
+        )
+        return urlunsplit((scheme, netloc, path, merged, fragment))
 
 
 class OpenedxAndApiGatewayLogoutView(RedirectView):
