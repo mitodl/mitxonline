@@ -74,6 +74,12 @@ class DiscountType(abc.ABC):
         return price
 
     def get_product_price(self, product: Product):
+        # If the discount is restricted to specific products, skip it for non-matching ones
+        if (
+            self.discount.products.exists()
+            and not self.discount.products.filter(product_id=product.id).exists()
+        ):
+            return product.price
         return self.get_product_version_price(product)
 
     @abc.abstractmethod
