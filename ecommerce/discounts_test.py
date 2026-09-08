@@ -146,7 +146,8 @@ def test_product_specific_discount_does_not_apply_to_other_products():
 
 def test_program_discount_applies_regardless_of_product_restriction():
     """Program discounts link to the program product for identification only; they must
-    still apply to course-run products placed in the basket."""
+    still apply to course-run products placed in the basket.
+    """
     program_product = ProductFactory.create(price=Decimal("500.00"))
     course_run_product = ProductFactory.create(price=Decimal("100.00"))
 
