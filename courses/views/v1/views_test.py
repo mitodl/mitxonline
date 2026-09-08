@@ -558,6 +558,26 @@ def test_user_enrollments_create_export_compliance_blocked(
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
+        "detail": "Unable to complete enrollment. Please contact support. Error code: CS_700"
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+def test_user_enrollments_create_export_compliance_missing_data(
+    mocker, user_drf_client, user
+):
+    """Missing profile data is not a CyberSource rejection, so it carries no error code."""
+    run = CourseRunFactory.create()
+    exc = ExportComplianceDataError(user, ["bill_to_country"])
+    mocker.patch(
+        "courses.serializers.v1.courses.create_run_enrollments",
+        side_effect=exc,
+    )
+    resp = user_drf_client.post(
+        reverse("v1:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
         "detail": "Unable to complete enrollment. Please contact support."
     }
     assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
