@@ -139,12 +139,12 @@ def get_or_create_retirement_contract() -> ContractPage:
     """
     Get (or create) the holding contract that retired course runs live in.
 
-    Moving a retired run here rather than nulling its ``b2b_contract`` matters:
-    ``CourseRunQuerySet.exclude_b2b()`` is ``b2b_contract__isnull=True``, so a
-    run with no contract becomes a candidate for the *public* catalog. Parking
-    it against an inactive contract keeps it out of the public catalog and out
-    of every org/contract catalog query, which filter on
-    ``b2b_contract__active=True``.
+    Retired course runs can be moved to a retirement contract - previously, this
+    was because the only way to determine if a course run was for B2B was whether
+    it had a linked contract (so just removing the contract FK would make the run
+    potentially appear in the public catalog). We have a specific flag to
+    signify a B2B run now, but we may still want to move the run out of the
+    contract.
 
     Both pages are created unpublished so they are never served, and the
     contract is inactive with a zero learner cap. The org has no

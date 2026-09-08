@@ -1476,6 +1476,29 @@ def test_course_next_run_multiple_languages(primary, include_translations, b2b):
         assert first_unexpired_run != nc_run
 
 
+@pytest.mark.parametrize("filter_name", ["org_id", "contract_id"])
+def test_get_filtered_runs_includes_runs_from_b2b_contracts(filter_name):
+    """Runs linked through the B2B contracts relation are returned when filtered."""
+    course = CourseFactory.create()
+    contract = ContractPageFactory.create()
+    other_contract = ContractPageFactory.create()
+    course_run = CourseRunFactory.create(course=course, b2b_only=True)
+    course_run.b2b_contracts.add(contract)
+    course_run.b2b_contracts.add(other_contract)
+
+    filter_value = contract.organization_id if filter_name == "org_id" else contract.id
+
+    assert course_run in course.get_filtered_runs(
+        courserun_is_enrollable=None, **{filter_name: filter_value}
+    )
+
+    if filter_name == "contract_id":
+        assert course_run in course.get_filtered_runs(
+            courserun_is_enrollable=None,
+            contract_id=other_contract.id,
+        )
+
+
 # Test for course run constraints
 # As a default we expect uniqueness on course, courseware_id, and run_tag
 # We also shouldn't allow:

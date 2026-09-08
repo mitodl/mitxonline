@@ -1199,7 +1199,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         courseruns = (
             self.prefetched_courseruns
             if hasattr(self, "prefetched_courseruns")
-            else list(self.courseruns.all())
+            else list(self.courseruns.prefetch_related("b2b_contracts").all())
         )
         courseruns = sorted(courseruns, key=lambda r: r.id)
 
@@ -1215,13 +1215,17 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             courseruns = filter(
                 lambda run: (
                     getattr(run.b2b_contract, "organization_id", None) == org_id
+                    or run.b2b_contracts.filter(organization_id=org_id).exists()
                 ),
                 courseruns,
             )
 
         if contract_id is not None:
             courseruns = filter(
-                lambda run: getattr(run.b2b_contract, "id", None) == contract_id,
+                lambda run: (
+                    getattr(run.b2b_contract, "id", None) == contract_id
+                    or run.b2b_contracts.filter(pk=contract_id).exists()
+                ),
                 courseruns,
             )
 

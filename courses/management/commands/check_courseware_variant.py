@@ -7,6 +7,7 @@ from argparse import RawTextHelpFormatter
 
 from django.core.management import BaseCommand
 from django.core.management.base import CommandParser
+from django.db.models import Count, Q
 
 from b2b.models import ContractPage
 from courses.api import resolve_courseware_object_from_id
@@ -141,9 +142,16 @@ by the course, which may include variant options that the contract does not incl
             f"{len(other_options)} supported variants + default for course {course_obj.readable_id}"
         )
 
-        runs_qs = course_obj.courseruns.filter(
-            b2b_contract=(contract_obj if contract_obj else None)
-        )
+        runs_qs = course_obj.courseruns
+
+        if contract_obj:
+            runs_qs = runs_qs.filter(
+                Q(b2b_contract=contract_obj) | Q(b2b_contracts=contract_obj)
+            )
+        else:
+            runs_qs = runs_qs.annotate(
+                b2b_contracts_count=Count("b2b_contracts")
+            ).filter(Q(b2b_contract=None) | Q(b2b_contracts_count=0))
 
         if b2b_flag:
             runs_qs = runs_qs.filter(is_source_run=True)

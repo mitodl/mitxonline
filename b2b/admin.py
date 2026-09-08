@@ -103,8 +103,7 @@ class ContractPageProgramInline(DisplayOnlyAdminMixin, admin.TabularInline):
 class ContractPageCourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
     """Inline to display course runs for contract pages."""
 
-    model = CourseRun
-    fk_name = "b2b_contract"
+    model = CourseRun.b2b_contracts.through
     extra = 0
     fields = [
         "title_linked",
