@@ -2606,7 +2606,7 @@ def test_get_courses_b2b_runs(with_b2b, single, user_drf_client):
 
     contract = ContractPageFactory.create() if with_b2b else None
 
-    test_course_run = CourseRunFactory.create(b2b_contract=contract)
+    test_course_run = CourseRunFactory.create(b2b_only=with_b2b, b2b_contract=contract)
 
     url = reverse("v2:courses_api-list")
     response_raw = user_drf_client.get(

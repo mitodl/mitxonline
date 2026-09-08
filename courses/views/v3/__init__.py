@@ -112,9 +112,10 @@ class UserEnrollmentsApiViewSet(
         CourseRunEnrollment.objects.select_related(
             # these possibly get joined anyway via filer, so select over prefetch
             "run",
-            "run__b2b_contracts",
+            "run__b2b_contract",
         )
         .prefetch_related(
+            "run__b2b_contracts",
             "run__course",
             "run__course__page",
             Prefetch(

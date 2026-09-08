@@ -336,18 +336,17 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 # - If it's in a contract already and we *are* forcing it, set it to be in this contract.
                 # - If it's not in a contract, add it to this contract.
 
-                if (
-                    not force_associate
-                    and courseware.b2b_contracts.filter(id=contract.id).exists()
-                ):
+                other_contracts = courseware.b2b_contracts.exclude(id=contract.id)
+
+                if not force_associate and other_contracts.exists():
                     # Already owned by another contract, so skip
                     self.stdout.write(
                         self.style.WARNING(
-                            f"Run '{courseware.courseware_id}' is already owned by {courseware.b2b_contract}."
+                            f"Run '{courseware.courseware_id}' is already owned by {other_contracts.first()}."
                         )
                     )
                     continue
-                elif courseware.b2b_contracts.filter(id=contract.id):
+                elif courseware.b2b_contracts.filter(id=contract.id).exists():
                     # Already owned by this contract, so skip
                     self.stdout.write(
                         self.style.WARNING(
