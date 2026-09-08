@@ -12,7 +12,7 @@ from mitol.common.utils import now_in_utc
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from compliance.exceptions import ExportComplianceError
+from compliance.exceptions import ExportComplianceDataError, ExportComplianceError
 from courses.conftest import B2BCourses, UserWithEnrollmentsAndCerts
 from courses.constants import (
     ENROLL_CHANGE_STATUS_UNENROLLED,
@@ -651,6 +651,27 @@ def test_create_program_enrollment_export_compliance_blocked(
     """POST should fail closed when the export compliance check rejects the user."""
     program = ProgramFactory.create(live=True)
     exc = ExportComplianceError(user, "REJECT", "102")
+    mocker.patch("courses.views.v3.create_program_enrollments", side_effect=exc)
+
+    resp = user_drf_client.post(
+        reverse("v3:user_program_enrollments_api-list"),
+        data={"program_id": program.id},
+        format="json",
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Please contact support. Error code: CS_700"
+    }
+    assert not ProgramEnrollment.objects.filter(user=user, program=program).exists()
+
+
+def test_create_program_enrollment_export_compliance_missing_data(
+    mocker, user_drf_client, user
+):
+    """Missing profile data is not a CyberSource rejection, so it carries no error code."""
+    program = ProgramFactory.create(live=True)
+    exc = ExportComplianceDataError(user, ["bill_to_country"])
     mocker.patch("courses.views.v3.create_program_enrollments", side_effect=exc)
 
     resp = user_drf_client.post(

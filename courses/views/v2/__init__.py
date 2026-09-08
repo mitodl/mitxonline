@@ -820,8 +820,9 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
             )
         except ExportComplianceCheckError as exc:
             # Don't propagate the specifics of the compliance decision to the
-            # client - the underlying cause is logged where it's raised.
-            raise EnrollmentError from exc
+            # client - only an opaque support code, if the cause declares one.
+            # The underlying cause is logged where it's raised.
+            raise EnrollmentError.from_cause(exc) from exc
         if len(enrollments) == 0:
             raise EnrollmentCreationFailedError
         return Response(

@@ -402,8 +402,9 @@ def reconcile_verified_program_enrollments(
             raise EnrollmentError
     except ExportComplianceCheckError as exc:
         # Don't propagate the specifics of the compliance decision to the
-        # client - the underlying cause is logged where it's raised.
-        raise EnrollmentError from exc
+        # client - only an opaque support code, if the cause declares one.
+        # The underlying cause is logged where it's raised.
+        raise EnrollmentError.from_cause(exc) from exc
 
 
 def upgrade_audit_run_enrollments_for_program_purchase(user, program):

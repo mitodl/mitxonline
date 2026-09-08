@@ -30,7 +30,7 @@ from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.models import ContractProgramItem
 from cms.factories import CoursePageFactory, ProgramPageFactory
 from cms.serializers import ProgramPageSerializer
-from compliance.exceptions import ExportComplianceError
+from compliance.exceptions import ExportComplianceDataError, ExportComplianceError
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
     CourseFactory,
@@ -1250,6 +1250,26 @@ def test_user_enrollments_create_export_compliance_blocked_v2(
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
+        "detail": "Unable to complete enrollment. Please contact support. Error code: CS_700"
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+def test_user_enrollments_create_export_compliance_missing_data_v2(
+    mocker, user_drf_client, user
+):
+    """Missing profile data is not a CyberSource rejection, so it carries no error code."""
+    run = CourseRunFactory.create()
+    exc = ExportComplianceDataError(user, ["bill_to_country"])
+    mocker.patch(
+        "courses.serializers.v2.courses.create_run_enrollments",
+        side_effect=exc,
+    )
+    resp = user_drf_client.post(
+        reverse("v2:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
         "detail": "Unable to complete enrollment. Please contact support."
     }
     assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
@@ -2283,7 +2303,7 @@ def test_add_verified_program_course_enrollment_export_compliance_blocked(
 
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
-        "detail": "Unable to complete enrollment. Please contact support."
+        "detail": "Unable to complete enrollment. Please contact support. Error code: CS_700"
     }
     assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
 
@@ -2508,7 +2528,7 @@ def test_add_nested_verified_program_course_enrollment_export_compliance_blocked
 
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
-        "detail": "Unable to complete enrollment. Please contact support."
+        "detail": "Unable to complete enrollment. Please contact support. Error code: CS_700"
     }
     assert not ProgramEnrollment.objects.filter(user=user, program=crogram).exists()
 
