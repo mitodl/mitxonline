@@ -75,7 +75,7 @@ class IngestibleCourseViewSet(viewsets.ReadOnlyModelViewSet):
             dated_runs_prefetch,
         )
         queryset = queryset.annotate(
-            verified_courserun_count=verified_courserun_exists(),
+            has_verified_courserun=verified_courserun_exists(),
             has_live_certificate_page=live_certificate_page_exists(),
         )
         queryset = queryset.prefetch(

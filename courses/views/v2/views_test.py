@@ -263,7 +263,7 @@ def test_course_queryset_avoids_courserun_aggregate_annotations():
     """Course pagination should not aggregate over every related course run."""
     annotations = CourseViewSet().get_queryset().query.annotations
 
-    assert isinstance(annotations["verified_courserun_count"], Exists)
+    assert isinstance(annotations["has_verified_courserun"], Exists)
     assert {"count_b2b_courseruns", "count_courseruns"}.isdisjoint(annotations)
 
 
