@@ -27,6 +27,28 @@ describe("OrderSummaryCard", () => {
     sandbox.restore()
   })
 
+  it("shows a paid-amount-off coupon as the gap between the basket prices", () => {
+    const wrapper = shallow(
+      <OrderSummaryCard
+        {...baseProps}
+        totalPrice={899}
+        discountedPrice={799}
+        discounts={[
+          {
+            id:            1,
+            amount:        0,
+            discount_code: "bought-child",
+            discount_type: "paid-amount-off",
+            payment_type:  "sales"
+          }
+        ]}
+        isAuthenticated={true}
+      />
+    )
+
+    assert.include(wrapper.text(), "-$100.00")
+  })
+
   it("does not render the coupon form when logged out", () => {
     const wrapper = shallow(
       <OrderSummaryCard {...baseProps} isAuthenticated={false} />
