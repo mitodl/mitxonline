@@ -15,6 +15,7 @@ from wagtail_factories import PageFactory
 from cms import utils as cms_utils
 from cms.api import (
     RESOURCE_PAGE_TITLES,
+    _FinancialAssistanceForms,
     create_default_courseware_page,
     create_featured_items,
     ensure_home_page_and_site,
@@ -697,6 +698,48 @@ def test_financial_assistance_url_absent_when_no_form():
     page.product.program = None
 
     assert _url_for(page.product) == ""
+
+
+@pytest.mark.django_db
+def test_financial_assistance_forms_load_is_scoped_to_the_request():
+    """
+    The forms query must not grow with the number of live forms on the site.
+
+    The query count tests below cannot catch this: fetching the whole form table
+    is still exactly one query, so a regression back to that would leave every
+    other test in this file passing. What matters here is how many rows come
+    back, which is why this asserts on the loaded buckets rather than on timing
+    or query count.
+
+    A form is reachable from a course only via one of the three lookups
+    ``url_for`` performs - tied to the course, tied to one of its programs, or a
+    child of one of the pages in play. Forms hung off unrelated course pages
+    satisfy none of them.
+    """
+    page = CoursePageFactory()
+    FlexiblePricingFormFactory(parent=page)
+    course_ids = [page.product.id]
+
+    def loaded_form_pks():
+        forms = _FinancialAssistanceForms(course_ids)
+        return {
+            form.pk
+            for bucket in (
+                forms.forms_by_parent_path,
+                forms.forms_by_course_id,
+                forms.forms_by_program_id,
+            )
+            for rows in bucket.values()
+            for form in rows
+        }
+
+    before = loaded_form_pks()
+    assert before, "the course's own form should load"
+
+    for _ in range(5):
+        FlexiblePricingFormFactory(parent=CoursePageFactory())
+
+    assert loaded_form_pks() == before
 
 
 @pytest.mark.django_db
