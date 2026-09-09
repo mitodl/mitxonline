@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.165.3
+---------------
+
+- Optimize course API pagination query (#3939)
+- ENABLE_MULTIPLE_CART_ITEMS=False should disable multi-product baskets even through APIs   (#3909)
+
 Version 1.165.2
 ---------------
 
