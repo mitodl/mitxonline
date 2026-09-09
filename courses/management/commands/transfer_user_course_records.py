@@ -85,9 +85,7 @@ class Command(BaseCommand):
         )
         orders_to_transfer = self._verified_orders(source_user, to_transfer)
         paid_course_runs_to_transfer = list(
-            PaidCourseRun.objects.filter(
-                user=source_user, order__in=orders_to_transfer
-            )
+            PaidCourseRun.objects.filter(user=source_user, order__in=orders_to_transfer)
         )
 
         with transaction.atomic():
