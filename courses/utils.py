@@ -24,6 +24,18 @@ from courses.models import (
 log = logging.getLogger(__name__)
 
 
+def verified_courserun_exists():
+    """Build an Exists() annotation for whether a course has a verified run."""
+    from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE  # noqa: PLC0415
+
+    return Exists(
+        CourseRun.objects.filter(
+            course_id=OuterRef("pk"),
+            enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+    )
+
+
 def live_certificate_page_exists():
     """
     Build an Exists() subquery annotation for whether a live CertificatePage

@@ -15,7 +15,7 @@ from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 from django.db import connection
-from django.db.models import Q
+from django.db.models import Exists, Q
 from django.test import RequestFactory
 from django.urls import reverse
 from faker import Faker
@@ -77,7 +77,7 @@ from courses.views.test_utils import (
     num_queries_from_department,
     num_queries_from_programs,
 )
-from courses.views.v2 import Pagination, ProgramFilterSet
+from courses.views.v2 import CourseViewSet, Pagination, ProgramFilterSet
 from ecommerce.factories import OrderFactory, ProductFactory
 from ecommerce.models import OrderStatus, Product
 from main import features
@@ -257,6 +257,14 @@ def test_delete_program(
         )
     duplicate_queries_check(context)
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+
+
+def test_course_queryset_avoids_courserun_aggregate_annotations():
+    """Course pagination should not aggregate over every related course run."""
+    annotations = CourseViewSet().get_queryset().query.annotations
+
+    assert isinstance(annotations["verified_courserun_count"], Exists)
+    assert {"count_b2b_courseruns", "count_courseruns"}.isdisjoint(annotations)
 
 
 @pytest.mark.skip_nplusone_check

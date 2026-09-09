@@ -8,7 +8,7 @@ from functools import cached_property
 import django_filters
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -77,6 +77,7 @@ from courses.utils import (
     get_program_certificate_by_enrollment,
     get_unenrollable_courses,
     live_certificate_page_exists,
+    verified_courserun_exists,
 )
 from ecommerce.api import create_verified_program_course_run_enrollment
 from ecommerce.models import Product
@@ -464,19 +465,8 @@ class CourseViewSet(
             "departments", "in_programs", course_runs_prefetch
         )
         queryset = queryset.annotate(
-            count_b2b_courseruns=Count("courseruns__b2b_contract__id")
-        )
-        queryset = queryset.annotate(count_courseruns=Count("courseruns"))
-        queryset = queryset.annotate(
-            verified_courserun_count=Count(
-                "courseruns__enrollment_modes",
-                filter=Q(
-                    courseruns__enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
-                ),
-            )
-        )
-        queryset = queryset.annotate(
-            has_live_certificate_page=live_certificate_page_exists()
+            verified_courserun_count=verified_courserun_exists(),
+            has_live_certificate_page=live_certificate_page_exists(),
         )
         queryset = queryset.prefetch_related(
             Prefetch(
