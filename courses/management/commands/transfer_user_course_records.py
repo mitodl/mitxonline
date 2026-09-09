@@ -39,6 +39,11 @@ class Command(BaseCommand):
     matching enrollment/grade/certificate; transferred and skipped counts are
     reported at the end.
 
+    Pass --verified-only to move only verified (paid) enrollments, leaving
+    audit enrollments with the source user. Grades and certificates are
+    unaffected by this flag - they still transfer independently of the
+    enrollment's mode.
+
     Example: transfer_user_course_records --from_email=old@example.com --to_email=new@example.com
     """
 
@@ -63,6 +68,18 @@ class Command(BaseCommand):
             required=True,
             help="Email address for the user records should be moved to",
         )
+        parser.add_argument(
+            "--verified-only",
+            "--verified_only",
+            dest="verified_only",
+            action="store_true",
+            required=False,
+            help=(
+                "Only move verified (paid) enrollments; audit enrollments are "
+                "left with the source user. Grades and certificates still "
+                "transfer regardless of this flag."
+            ),
+        )
         super().add_arguments(parser)
 
     def handle(self, *args, **options):  # noqa: ARG002
@@ -73,7 +90,9 @@ class Command(BaseCommand):
         if source_user.pk == destination_user.pk:
             raise CommandError("Source and destination users must be different.")  # noqa: EM101
 
-        source_records = self._load_source_records(source_user)
+        source_records = self._load_source_records(
+            source_user, verified_only=options.get("verified_only", False)
+        )
         to_transfer, skipped_counts = self._partition_conflicts(
             source_records, destination_user
         )
@@ -96,7 +115,7 @@ class Command(BaseCommand):
             msg = f"Could not find user for --{option_name}={email}."
             raise CommandError(msg) from exc
 
-    def _load_source_records(self, source_user):
+    def _load_source_records(self, source_user, verified_only=False):  # noqa: FBT002
         """
         Load all transfer candidates for the source user.
 
@@ -105,6 +124,10 @@ class Command(BaseCommand):
         end_date is treated as not yet ended, matching CourseRun.is_past, and
         is excluded. Program enrollments/certificates aren't tied to a single
         course run, so they aren't filtered by end date.
+
+        When verified_only is True, both enrollment queries are further
+        restricted to verified (paid) enrollments - grades and certificates
+        are unaffected, since they aren't tied to an enrollment mode.
         """
         now = now_in_utc()
         ended_run = {"run__end_date__isnull": False, "run__end_date__lt": now}
@@ -112,17 +135,22 @@ class Command(BaseCommand):
             "course_run__end_date__isnull": False,
             "course_run__end_date__lt": now,
         }
+        mode_filter = (
+            {"enrollment_mode__in": EDX_ENROLLMENTS_PAID_MODES}
+            if verified_only
+            else {}
+        )
 
         return {
             "course_run_enrollments": list(
                 CourseRunEnrollment.all_objects.filter(
-                    user=source_user, **ended_run
+                    user=source_user, **ended_run, **mode_filter
                 ).select_related("run")
             ),
             "program_enrollments": list(
-                ProgramEnrollment.all_objects.filter(user=source_user).select_related(
-                    "program"
-                )
+                ProgramEnrollment.all_objects.filter(
+                    user=source_user, **mode_filter
+                ).select_related("program")
             ),
             "course_run_grades": list(
                 CourseRunGrade.objects.filter(
