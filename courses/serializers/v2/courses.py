@@ -167,8 +167,8 @@ class CourseSerializer(BaseCourseSerializer):
 
         return (
             instance.first_unexpired_run is not None
-            and hasattr(instance, "verified_courserun_count")
-            and instance.verified_courserun_count > 0
+            and hasattr(instance, "has_verified_courserun")
+            and instance.has_verified_courserun
             and not instance.certificates_disabled
             and has_live_certificate_page(instance)
         )

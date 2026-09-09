@@ -84,12 +84,12 @@ def test_serialize_course(
         run=courseRun1, **({} if is_anonymous else {"user": user})
     )
 
-    # Fake out a "verified_courserun_count" attribute - this is an annotation that the
+    # Fake out a "has_verified_courserun" attribute - this is an annotation that the
     # viewset adds, but won't be here because we're just passing it in a straight
     # Course object.
-    course.verified_courserun_count = course.courseruns.filter(
+    course.has_verified_courserun = course.courseruns.filter(
         enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
-    ).count()
+    ).exists()
 
     data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
 
@@ -138,9 +138,9 @@ def _course_eligible_for_certificate():
         EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
     )
     course = course_run.course
-    course.verified_courserun_count = course.courseruns.filter(
+    course.has_verified_courserun = course.courseruns.filter(
         enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
-    ).count()
+    ).exists()
     return course
 
 
