@@ -3,8 +3,10 @@
 from argparse import RawTextHelpFormatter
 
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import Q
 from mitol.common.utils.datetime import now_in_utc
 
 from courses.models import (
@@ -14,6 +16,8 @@ from courses.models import (
     ProgramCertificate,
     ProgramEnrollment,
 )
+from ecommerce.models import Order, OrderStatus
+from openedx.constants import EDX_ENROLLMENTS_PAID_MODES
 from users.api import fetch_user
 
 User = get_user_model()
@@ -27,7 +31,9 @@ class Command(BaseCommand):
     that have already ended - plus program enrollments and certificates, from
     one user to another, matching users by email address. A course run with
     no end_date is treated as not yet ended and its records are left with the
-    source user.
+    source user. Any verified enrollment that transfers also moves its
+    associated ecommerce Order(s), so the payment record follows the
+    enrollment.
 
     A record is skipped, not aborted, if the destination user already has a
     matching enrollment/grade/certificate; transferred and skipped counts are
@@ -71,9 +77,12 @@ class Command(BaseCommand):
         to_transfer, skipped_counts = self._partition_conflicts(
             source_records, destination_user
         )
+        orders_to_transfer = self._verified_orders(source_user, to_transfer)
 
         with transaction.atomic():
-            transfer_counts = self._transfer_records(to_transfer, destination_user)
+            transfer_counts = self._transfer_records(
+                to_transfer, orders_to_transfer, destination_user
+            )
 
         self._print_result(
             source_user, destination_user, transfer_counts, skipped_counts
@@ -200,7 +209,60 @@ class Command(BaseCommand):
         }
         return to_transfer, skipped_counts
 
-    def _transfer_records(self, to_transfer, destination_user):
+    def _verified_orders(self, source_user, to_transfer):
+        """
+        Find the ecommerce Order(s) backing the verified enrollments that are
+        actually transferring (audit enrollments have no purchase, so
+        nothing to find for those).
+
+        Only FULFILLED orders are considered - a pending/canceled/declined/
+        errored/refunded order for the same course run/program is left with
+        the source user.
+
+        Note: if an order bundles a Line for something NOT being transferred
+        alongside a Line for something that is, the whole order still moves
+        with the enrollment - Orders aren't split by line.
+        """
+        verified_run_ids = [
+            enrollment.run_id
+            for enrollment in to_transfer["course_run_enrollments"]
+            if enrollment.enrollment_mode in EDX_ENROLLMENTS_PAID_MODES
+        ]
+        verified_program_ids = [
+            enrollment.program_id
+            for enrollment in to_transfer["program_enrollments"]
+            if enrollment.enrollment_mode in EDX_ENROLLMENTS_PAID_MODES
+        ]
+
+        if not verified_run_ids and not verified_program_ids:
+            return []
+
+        course_run_content_type = ContentType.objects.get(
+            app_label="courses", model="courserun"
+        )
+        program_content_type = ContentType.objects.get(
+            app_label="courses", model="program"
+        )
+
+        return list(
+            Order.objects.filter(
+                purchaser=source_user,
+                state=OrderStatus.FULFILLED,
+            )
+            .filter(
+                Q(
+                    lines__purchased_content_type=course_run_content_type,
+                    lines__purchased_object_id__in=verified_run_ids,
+                )
+                | Q(
+                    lines__purchased_content_type=program_content_type,
+                    lines__purchased_object_id__in=verified_program_ids,
+                )
+            )
+            .distinct()
+        )
+
+    def _transfer_records(self, to_transfer, orders_to_transfer, destination_user):
         """Transfer each record set and return counts by label."""
         for enrollment in to_transfer["course_run_enrollments"]:
             enrollment.user = destination_user
@@ -222,7 +284,13 @@ class Command(BaseCommand):
             certificate.user = destination_user
             certificate.save(update_fields=["user"])
 
-        return {label: len(records) for label, records in to_transfer.items()}
+        for order in orders_to_transfer:
+            order.purchaser = destination_user
+            order.save(update_fields=["purchaser"])
+
+        counts = {label: len(records) for label, records in to_transfer.items()}
+        counts["orders"] = len(orders_to_transfer)
+        return counts
 
     def _print_result(
         self, source_user, destination_user, transfer_counts, skipped_counts
