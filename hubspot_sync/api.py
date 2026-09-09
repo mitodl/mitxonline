@@ -48,7 +48,6 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
 )
-from ecommerce.discounts import product_from_version
 from ecommerce.models import Line, Order, Product
 from hubspot_sync.rate_limiter import wait_for_hubspot_rate_limit
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
@@ -2337,11 +2336,6 @@ def _build_target_line_item_message(
     return line_item_input
 
 
-def _get_product_from_line(line: Line) -> Product | None:
-    """Resolve the line's product similarly to serializer logic used for HubSpot payloads."""
-    return product_from_version(line.product_version)
-
-
 def _find_target_product_id_by_unique_app_id(
     hubspot_client: HubspotApi, unique_app_id: str
 ) -> str | None:
@@ -2535,7 +2529,7 @@ def _ensure_target_hubspot_product_for_line(
     line: Line, hubspot_client: HubspotApi
 ) -> str | None:
     """Return a target-account product id for a line item's hs_product_id."""
-    product = _get_product_from_line(line)
+    product = line.product
     if not product:
         return None
 

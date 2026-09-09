@@ -986,7 +986,18 @@ class Order(TimestampedModel):
     @cached_property
     def latest_refund_request(self):
         """Return the learner's most recent refund request for this order, if any."""
-        return self.refund_requests.order_by("-created_on").first()
+        # Sorted in Python off `.all()` so that a caller's
+        # `prefetch_related("refund_requests")` serves this: `order_by()` on a
+        # related manager clones the queryset, which bypasses the prefetch cache
+        # and costs one query per order on the history endpoint. RefundRequest
+        # declares no Meta.ordering, so the ordering cannot be left to the
+        # database either; pk breaks ties so the answer does not depend on the
+        # order rows come back in.
+        requests = sorted(
+            self.refund_requests.all(),
+            key=lambda request: (request.created_on, request.pk),
+        )
+        return requests[-1] if requests else None
 
     @property
     def refund_reviewed_on(self):
@@ -1303,6 +1314,29 @@ class PartiallyRefundedOrder(Order):
         proxy = True
 
 
+def _product_from_version(version):
+    """Reconstruct the Product a reversion Version snapshots.
+
+    The Product is unsaved and its row may be gone: an order line has to render
+    what was bought even after the product is deleted, so the fields come from
+    the Version's `field_dict` rather than from a lookup. Callers holding a
+    `Line` want `Line.product`, which caches this -- the returned instance
+    resolves its generic `purchasable_object`, and the CMS pages under it, once
+    per instance, so rebuilding per reader multiplies that walk.
+    """
+    if version is None:
+        return None
+    field_dict = version.field_dict
+    return Product(
+        id=field_dict["id"],
+        content_type_id=field_dict["content_type_id"],
+        object_id=field_dict["object_id"],
+        price=field_dict["price"],
+        description=field_dict["description"],
+        is_active=field_dict["is_active"],
+    )
+
+
 class Line(TimestampedModel):
     """A line in an Order."""
 
@@ -1370,10 +1404,7 @@ class Line(TimestampedModel):
     @staticmethod
     def compute_discounted_unit_price_for(order, product_version):
         """Price of one unit of product_version under the discounts currently on order."""
-        from ecommerce.discounts import (  # noqa: PLC0415
-            DiscountType,
-            product_from_version,
-        )
+        from ecommerce.discounts import DiscountType  # noqa: PLC0415
 
         discounts = [
             discount_redemption.redeemed_discount
@@ -1382,7 +1413,7 @@ class Line(TimestampedModel):
 
         return DiscountType.get_discounted_price(
             discounts,
-            product_from_version(product_version),
+            _product_from_version(product_version),
         ).quantize(Decimal("0.01"))
 
     def compute_discounted_unit_price(self):
@@ -1427,9 +1458,16 @@ class Line(TimestampedModel):
 
     @cached_property
     def product(self):
-        from ecommerce.discounts import product_from_version  # noqa: PLC0415
+        return _product_from_version(self.product_version)
 
-        return product_from_version(self.product_version)
+    @cached_property
+    def product_content_type(self):
+        """Return the content type of the product this line snapshots."""
+        # `product` is rebuilt in Python from a reversion Version, so traversing
+        # its `content_type` FK would cost a query per line and no prefetch can
+        # reach it. The id is in the Version's field_dict, and `get_for_id` is
+        # process-cached, so resolving it from the id is free.
+        return ContentType.objects.get_for_id(self.product.content_type_id)
 
     @cached_property
     def courseware(self):

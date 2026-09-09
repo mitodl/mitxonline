@@ -11,21 +11,6 @@ from ecommerce.constants import (
 from ecommerce.models import Discount, Product
 
 
-def product_from_version(version):
-    """Reconstruct a Product from its reversion Version's serialized data."""
-    if version is None:
-        return None
-    field_dict = version.field_dict
-    return Product(
-        id=field_dict["id"],
-        content_type_id=field_dict["content_type_id"],
-        object_id=field_dict["object_id"],
-        price=field_dict["price"],
-        description=field_dict["description"],
-        is_active=field_dict["is_active"],
-    )
-
-
 @dataclass
 class DiscountType(abc.ABC):
     _CLASSES = {}

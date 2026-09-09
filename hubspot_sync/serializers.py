@@ -13,7 +13,6 @@ from courses.models import (
     ProgramEnrollment,
 )
 from ecommerce import models
-from ecommerce.discounts import product_from_version
 from hubspot_sync.api import format_product_name, get_hubspot_id_for_object
 from main.utils import format_decimal
 from users.serializers import UserSerializer
@@ -90,16 +89,6 @@ class LineSerializer(serializers.ModelSerializer):
     enrollment_mode = serializers.SerializerMethodField()
     change_status = serializers.SerializerMethodField()
 
-    def _get_product(self, instance):
-        """Retrieve the line product and cache it on the model instance."""
-        cache_attr = "_hubspot_line_product"
-        if hasattr(instance, cache_attr):
-            return getattr(instance, cache_attr)
-
-        product = product_from_version(instance.product_version)
-        setattr(instance, cache_attr, product)
-        return product
-
     def _get_enrollment(self, instance):
         """Returns the enrollment associated with the Order, if one exists, else None"""
         cache_attr = "_hubspot_line_enrollment"
@@ -127,14 +116,14 @@ class LineSerializer(serializers.ModelSerializer):
     def get_name(self, instance):
         """Get the product version name"""
         if instance.product_version:
-            return format_product_name(self._get_product(instance))
+            return format_product_name(instance.product)
         return ""
 
     def get_hs_product_id(self, instance):
         """Return the hubspot id for the product"""
         if not instance.product_version:
             return None
-        return get_hubspot_id_for_object(self._get_product(instance))
+        return get_hubspot_id_for_object(instance.product)
 
     def get_status(self, instance):
         """Get status of the associated Order"""
@@ -142,7 +131,7 @@ class LineSerializer(serializers.ModelSerializer):
 
     def get_product_id(self, instance):
         """Return the product version text_id"""
-        product = self._get_product(instance)
+        product = instance.product
         if product:
             return product.purchasable_object.readable_id
 
@@ -150,7 +139,7 @@ class LineSerializer(serializers.ModelSerializer):
 
     def get_price(self, instance):
         """Get the product version price"""
-        product = self._get_product(instance)
+        product = instance.product
         if product:
             return format_decimal(product.price)
 
