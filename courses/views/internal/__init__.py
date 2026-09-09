@@ -9,6 +9,7 @@ from rest_framework_api_key.permissions import HasAPIKey
 from courses.models import (
     Course,
     CourseRun,
+    CoursesTopic,
     Program,
 )
 from courses.permissions import IsEtlUser
@@ -37,7 +38,9 @@ class IngestibleCourseViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         """Get the queryset, with a bunch of prefetching for related data."""
 
-        queryset = Course.objects.select_related("page")
+        # page__feature_image matches the v2 CourseViewSet: CoursePageSerializer
+        # .get_feature_image_src dereferences it for every serialized course.
+        queryset = Course.objects.select_related("page", "page__feature_image")
         # Use Prefetch for reverse GenericRelation (products on CourseRun)
         # 1. Get the ContentType object for the CourseRun model
         courserun_content_type = ContentType.objects.get_for_model(CourseRun)
@@ -56,23 +59,41 @@ class IngestibleCourseViewSet(viewsets.ReadOnlyModelViewSet):
             "enrollment_modes",
             to_attr="prefetched_enrollment_modes",
         )
+        # No to_attr: this has to land in the plain "courseruns" prefetch cache,
+        # because Course.first_unexpired_run reads self.courseruns.all(). Under a
+        # to_attr-only prefetch that cache stays empty and every serialized
+        # course issues its own query. IngestibleCourseWithCourseRunsSerializer
+        # already falls back to instance.courseruns, so nothing else changes.
         course_runs_prefetch = Prefetch(
             "courseruns",
             queryset=CourseRun.all_objects.order_by("id").prefetch_related(
                 modes_prefetch, products_prefetch
             ),
-            to_attr="prefetched_courseruns",
         )
         dated_runs_prefetch = Prefetch(
             "courseruns",
             queryset=CourseRun.all_objects.enrollable().filter(is_self_paced=False),
             to_attr="prefetched_dated_courseruns",
         )
+        # Topics are serialized per course along with their parent topics, whose
+        # sort key is CoursesTopic.Meta.ordering == ["parent__name", "name"] -
+        # hence select_related down to the grandparent.
+        topics_prefetch = Prefetch(
+            "page__topics",
+            queryset=CoursesTopic.objects.select_related("parent", "parent__parent"),
+        )
         queryset = queryset.prefetch_related(
             "departments",
             "in_programs",
             course_runs_prefetch,
             dated_runs_prefetch,
+            topics_prefetch,
+            # CoursePageSerializer.get_instructors walks this for every course.
+            "page__linked_instructors__linked_instructor_page",
+            # Serialized by CourseSerializer.possible_variant_sets. Unfiltered,
+            # unlike the v2 CourseViewSet's: this view has no org/contract
+            # params to narrow it by, and ETL consumers expect every variant.
+            "possible_variant_sets",
         )
         # Only a boolean is ever read from this (CourseSerializer.
         # get_certificate_available), so Exists() beats an aggregate - no
