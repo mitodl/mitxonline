@@ -1568,16 +1568,6 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
             and self.start_date is not None
         )
 
-    @cached_property
-    def is_enrollable_for_b2b(self):
-        """Determine if the run is enrollable for B2B purchases."""
-
-        # A run can be in more than one contract, so we really need more context
-        # to determine if this is an enrollable run. But we can at least see
-        # if there's contracts associated with the run.
-
-        return self.b2b_contracts.exists() and self.is_enrollable
-
     @property
     def is_fake_course_run(self):
         """
