@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+import operator
 import random
 from collections import defaultdict
 from datetime import timedelta
+from functools import reduce
 from typing import Tuple, Union  # noqa: UP035
 from urllib.parse import urlencode, urljoin
 
@@ -17,6 +19,7 @@ from django.core.cache import caches
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.files.base import ContentFile
 from django.db.models import Case, IntegerField, Q, When
+from django.db.models.functions import Length, Substr
 from django.utils.text import slugify
 from mitol.common.utils import now_in_utc
 from wagtail.blocks import StreamValue
@@ -589,10 +592,12 @@ class _FinancialAssistanceForms:
     """
     Everything the financial assistance cascade needs, fetched once.
 
-    Five queries regardless of how many courses are asked for. Resolving a
-    single course is just this with a one-element list, so there is exactly one
-    implementation of the cascade rather than a batched one and a per-page one
-    that have to be kept in agreement.
+    Five queries regardless of how many courses are asked for, and each one is
+    scoped to the request: the forms query loads only the rows this batch could
+    consult, so the work does not grow with the number of live forms on the
+    site. Resolving a single course is just this with a one-element list, so
+    there is exactly one implementation of the cascade rather than a batched one
+    and a per-page one that have to be kept in agreement.
     """
 
     def __init__(self, course_ids):
@@ -616,11 +621,21 @@ class _FinancialAssistanceForms:
             every_program_id.update(related_ids)
         self.program_pages_by_program_id = self._load_program_pages(every_program_id)
 
+        # The only pages whose children the cascade ever asks for: course pages
+        # via _fallback_url, program pages via url_for. Program pages here
+        # include related programs' - a superset of what child_form is called
+        # with, deliberately, so the two do not have to stay in step.
+        parent_paths = {page.path for page in self.pages_by_course_id.values()}
+        parent_paths.update(
+            program_page.path
+            for program_page in self.program_pages_by_program_id.values()
+        )
+
         (
             self.forms_by_parent_path,
             self.forms_by_course_id,
             self.forms_by_program_id,
-        ) = self._load_forms()
+        ) = self._load_forms(course_ids, every_program_id, parent_paths)
 
     @staticmethod
     def _load_programs(course_ids):
@@ -692,21 +707,60 @@ class _FinancialAssistanceForms:
         return program_pages_by_program_id
 
     @staticmethod
-    def _load_forms():
+    def _load_forms(course_ids, program_ids, parent_paths):
         """
-        Every live form, bucketed the three ways the cascade asks for them.
+        The live forms this batch could consult, bucketed the three ways the
+        cascade asks for them.
 
-        The live-form table is small (tens of rows), so fetching it whole beats
-        one query per course.
+        One query, scoped to the request rather than the whole site. A form is
+        reachable only if it is tied to one of these courses, tied to one of
+        these programs, or is a direct child of one of these pages - the three
+        buckets below are exactly the three lookups ``url_for`` performs, so
+        anything outside them can never be returned.
+
+        Only the five fields the cascade reads are selected. They come back as
+        namedtuples rather than model instances on purpose: a deferred field on
+        a real instance reloads itself with a silent query on first access,
+        which is the failure mode this whole resolver exists to prevent.
         """
         by_parent_path = defaultdict(list)
         by_course_id = defaultdict(list)
         by_program_id = defaultdict(list)
-        for form in cms_models.FlexiblePricingRequestForm.objects.live():
+
+        # Collected and reduced rather than seeded with Q() and OR-ed onto:
+        # an all-empty disjunction collapses back to Q(), which matches every
+        # row and would silently restore the old fetch-the-whole-table read.
+        reachable = [
+            condition
+            for condition, values in (
+                (Q(selected_course_id__in=course_ids), course_ids),
+                (Q(selected_program_id__in=program_ids), program_ids),
+                (Q(parent_path__in=parent_paths), parent_paths),
+            )
+            if values
+        ]
+        if not reachable:
+            return by_parent_path, by_course_id, by_program_id
+
+        forms = (
+            cms_models.FlexiblePricingRequestForm.objects.live()
             # Treebeard gives children a fixed-width path suffix, so a page's
-            # parent path is its own path minus one step. This is the batched
-            # equivalent of get_children(), which filters
-            # path__startswith=parent.path AND depth=parent.depth + 1.
+            # parent path is its own path minus one step. The SQL mirror of
+            # form.path[: -Page.steplen] below, and the batched equivalent of
+            # get_children(), which filters path__startswith=parent.path AND
+            # depth=parent.depth + 1.
+            .annotate(parent_path=Substr("path", 1, Length("path") - Page.steplen))
+            .filter(reduce(operator.or_, reachable))
+            .values_list(
+                "pk",
+                "path",
+                "slug",
+                "selected_course_id",
+                "selected_program_id",
+                named=True,
+            )
+        )
+        for form in forms:
             by_parent_path[form.path[: -Page.steplen]].append(form)
             if form.selected_course_id:
                 by_course_id[form.selected_course_id].append(form)
