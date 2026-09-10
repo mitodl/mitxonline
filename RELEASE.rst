@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.165.4
+---------------
+
+- Skip duplicate learner records when transfering (#3942)
+- Update B2B provisioning; allow public course attachment (#3903)
+- Respect product-scoped discounts in pricing (#3937)
+- Cut per-order queries on GET /api/v0/orders/history/ from 17 to 10 (#3934)
+
 Version 1.165.3
 ---------------
 
