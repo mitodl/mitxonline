@@ -5,7 +5,7 @@ import logging
 from django.conf import settings
 
 from courses.models import CourseRun, ProgramEnrollment
-from courses.utils import is_uai_order
+from courses.utils import is_uai_order, is_xpro_order
 from ecommerce.models import Order, Product
 from hubspot_sync import tasks
 from hubspot_sync.api import _resolve_hubspot_token
@@ -61,7 +61,7 @@ def sync_hubspot_deal(order: Order):
     """
     Trigger celery task to sync an order to Hubspot if it has lines.
     Use a delay of 10 seconds to make sure state is updated first.
-    For UAI courses, uses the UAI HubSpot account token.
+    For UAI/XPro courses, uses the respective HubSpot account token.
 
     Args:
         order (Order): The order to sync
@@ -87,11 +87,14 @@ def sync_hubspot_deal(order: Order):
 
     if order.lines.first() is not None:
         is_uai = is_uai_order(order)
+        is_xpro = is_xpro_order(order)
 
-        if _resolve_hubspot_token(is_uai=is_uai):
+        if _resolve_hubspot_token(is_uai=is_uai, is_xpro=is_xpro):
             try:
                 tasks.sync_deal_with_hubspot_targeted.apply_async(
-                    args=(order.id,), kwargs={"is_uai": is_uai}, countdown=10
+                    args=(order.id,),
+                    kwargs={"is_uai": is_uai, "is_xpro": is_xpro},
+                    countdown=10,
                 )
             except:  # noqa: E722
                 log.exception(
@@ -133,7 +136,9 @@ def sync_hubspot_product(product: Product):
             )
 
 
-def sync_hubspot_cart_add(user: User, product: Product, *, is_uai: bool):
+def sync_hubspot_cart_add(
+    user: User, product: Product, *, is_uai: bool, is_xpro: bool = False
+):
     """
     Trigger celery task to track a cart add event in HubSpot.
 
@@ -141,14 +146,17 @@ def sync_hubspot_cart_add(user: User, product: Product, *, is_uai: bool):
         user (User): The user adding the product to cart
         product (Product): The product being added
         is_uai (bool): Whether the added course is a UAI course
+        is_xpro (bool): Whether the added course is an XPro course
     """
-    if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN or getattr(
-        settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None
+    if (
+        settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN
+        or getattr(settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
+        or getattr(settings, "XPRO_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
     ):
         try:
             tasks.sync_cart_add_event_with_hubspot.apply_async(
                 args=(user.id, product.id),
-                kwargs={"is_uai_course": is_uai},
+                kwargs={"is_uai_course": is_uai, "is_xpro_course": is_xpro},
                 countdown=5,
             )
         except:  # noqa: E722

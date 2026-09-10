@@ -13,6 +13,7 @@ from requests.exceptions import HTTPError
 from courses.constants import (
     COURSEWARE_URL_PATTERN_TEMPLATE,
     UAI_COURSEWARE_ID_PREFIX,
+    XPRO_COURSEWARE_ID_PREFIX,
 )
 from courses.models import (
     CourseRun,
@@ -188,6 +189,48 @@ def get_dated_courseruns(queryset):
     return queryset.filter(
         CourseRunQuerySet.get_enrollable_filter() & Q(is_self_paced=False)
     )
+
+def is_xpro_course_run(course_run):
+    """
+    Check if a course run is an XPro course run.
+
+    Args:
+        course_run: CourseRun instance
+
+    Returns:
+        bool: True if the course run is XPro, False otherwise
+    """
+    if not course_run or not course_run.courseware_id:
+        return False
+
+    courseware_id = course_run.courseware_id
+    return courseware_id.startswith(
+        (XPRO_COURSEWARE_ID_PREFIX, f"course-v1:{XPRO_COURSEWARE_ID_PREFIX}")
+    )
+
+def is_xpro_order(order):
+    """
+    Check if an order contains any XPro course runs.
+
+    Args:
+        order: Order instance
+
+    Returns:
+        bool: True if the order contains XPro course runs, False otherwise
+    """
+    for line in order.lines.all():
+        purchasable_object = getattr(line, "purchased_object", None)
+        if not purchasable_object and hasattr(line.product, "purchasable_object"):
+            purchasable_object = line.product.purchasable_object
+
+        if not purchasable_object:
+            continue
+
+        if isinstance(purchasable_object, CourseRun) and is_xpro_course_run(
+            purchasable_object
+        ):
+            return True
+    return False
 
 
 def is_uai_course_run(course_run):

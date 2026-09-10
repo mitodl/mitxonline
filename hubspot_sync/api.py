@@ -2033,9 +2033,11 @@ def sync_contact_with_hubspot(user: User):
     return result
 
 
-def _resolve_hubspot_token(*, is_uai: bool) -> str | None:
-    """Resolve HubSpot API token, routing UAI orders to the UAI account when configured."""
-    if is_uai:
+def _resolve_hubspot_token(
+    *, is_uai: bool, is_xpro: bool = False
+) -> str | None:
+    """Resolve HubSpot API token, routing UAI/XPro orders to the UAI/xPro account."""
+    if is_uai or is_xpro:
         return getattr(
             settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None
         ) or getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
@@ -2043,7 +2045,7 @@ def _resolve_hubspot_token(*, is_uai: bool) -> str | None:
 
 
 def _is_uai_token(token: str) -> bool:
-    """Return True if the token belongs to the UAI HubSpot account."""
+    """Return True if the token belongs to the UAI/XPro HubSpot account."""
     uai_token = getattr(settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
     return bool(uai_token) and token == uai_token
 
@@ -2714,7 +2716,7 @@ def _sync_cart_add_deal_with_hubspot(
 
 
 def track_cart_add_with_hubspot(
-    user: User, product: Product, *, is_uai_course: bool
+    user: User, product: Product, *, is_uai_course: bool, is_xpro_course: bool = False
 ) -> bool:
     """
     Create and sync a dedicated deal that represents a cart-add occurrence.
@@ -2726,11 +2728,12 @@ def track_cart_add_with_hubspot(
         user (User): The user adding to cart
         product (Product): Product being added
         is_uai_course (bool): Whether this is a UAI/Learn course add
+        is_xpro_course (bool): Whether this is an XPro course add
 
     Returns:
         bool: True if synced successfully, False otherwise.
     """
-    token = _resolve_hubspot_token(is_uai=is_uai_course)
+    token = _resolve_hubspot_token(is_uai=is_uai_course, is_xpro=is_xpro_course)
     if not token:
         return False
 
@@ -2779,18 +2782,20 @@ def track_cart_add_with_hubspot(
 
         deal = _sync_cart_add_deal_with_hubspot(order, contact_id, hubspot_client)
         log.info(
-            "Synced cart-add deal with HubSpot for user_id=%s product_id=%s deal_id=%s is_uai=%s",
+            "Synced cart-add deal with HubSpot for user_id=%s product_id=%s deal_id=%s is_uai=%s is_xpro=%s",
             user.id,
             product.id,
             deal.id,
             is_uai_course,
+            is_xpro_course,
         )
     except Exception:  # pylint: disable=broad-except
         log.exception(
-            "Failed to sync HubSpot cart-add deal for user %s product %s (is_uai=%s)",
+            "Failed to sync HubSpot cart-add deal for user %s product %s (is_uai=%s is_xpro=%s)",
             user.id,
             product.id,
             is_uai_course,
+            is_xpro_course,
         )
         return False
 

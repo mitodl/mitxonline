@@ -43,7 +43,7 @@ from courses.models import (
     Program,
     ProgramRun,
 )
-from courses.utils import is_uai_course_run, is_uai_program
+from courses.utils import is_uai_course_run, is_uai_program, is_xpro_course_run
 from ecommerce.api import (
     apply_discount_to_basket,
     establish_basket,
@@ -268,6 +268,10 @@ def _create_basket_from_product(
                     is_product_program(product)
                     and is_uai_program(product.purchasable_object)
                 ),
+                is_xpro=(
+                    is_product_courserun(product)
+                    and is_xpro_course_run(product.purchasable_object)
+                ),
             )
 
             # Discounts (including auto-applied financial assistance) are only
@@ -451,6 +455,10 @@ def create_basket_with_products(request):
                 or (
                     is_product_program(product)
                     and is_uai_program(product.purchasable_object)
+                ),
+                is_xpro=(
+                    is_product_courserun(product)
+                    and is_xpro_course_run(product.purchasable_object)
                 ),
             )
     except ProductBlockedError:
