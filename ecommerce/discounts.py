@@ -76,9 +76,8 @@ class DiscountType(abc.ABC):
     def get_product_price(self, product: Product):
         # Program discounts are linked to a program product for identification only;
         # they must still apply to the course-run products placed in the basket.
-        if not self.discount.is_program_discount and (
-            self.discount.products.exists()
-            and not self.discount.products.filter(product_id=product.id).exists()
+        if not self.discount.is_program_discount and not self.discount.applies_to_products(
+            [product]
         ):
             return product.price
         return self.get_product_version_price(product)
