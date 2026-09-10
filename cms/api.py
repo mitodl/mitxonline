@@ -8,7 +8,7 @@ import random
 from collections import defaultdict
 from datetime import timedelta
 from functools import reduce
-from typing import Tuple, Union  # noqa: UP035
+from typing import TYPE_CHECKING, Tuple, Union  # noqa: UP035
 from urllib.parse import urlencode, urljoin
 
 import requests
@@ -44,6 +44,9 @@ from courses.models import (
 from courses.utils import (
     get_enrollable_courseruns_qs,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 log = logging.getLogger(__name__)
 DEFAULT_HOMEPAGE_PROPS = dict(  # noqa: C408
@@ -571,32 +574,53 @@ def create_featured_items():
     )
 
 
-def _form_url(page, slug) -> str:
-    """Build the financial assistance form URL hung off ``page``."""
+def _form_url(page: Page | None, slug: str | None) -> str:
+    """
+    Build the financial assistance form URL hung off ``page``.
+
+    Args:
+        page (Page or None): the page the form URL hangs off
+        slug (str or None): the form page's slug
+
+    Returns:
+        str: the form URL, or "" if either argument is missing
+    """
     return f"{page.get_url()}{slug}/" if page and slug else ""
 
 
-def _min_pk(rows):
+def _min_pk(
+    rows: Iterable[cms_models.FlexiblePricingRequestForm],
+) -> cms_models.FlexiblePricingRequestForm | None:
     """
     Lowest-pk element, or None.
 
     ``QuerySet.first()`` orders by pk when the queryset is unordered, so every
     ``.first()`` this replaces means "min pk".
+
+    Args:
+        rows (iterable of FlexiblePricingRequestForm): rows carrying a ``pk``
+
+    Returns:
+        FlexiblePricingRequestForm or None: the lowest-pk row, or None if there are none
     """
     return min(rows, key=lambda row: row.pk, default=None)
 
 
 class _FinancialAssistanceForms:
     """
-    Everything the financial assistance cascade needs, fetched once.
+    Everything the financial assistance form lookup needs, fetched once.
 
     A fixed number of queries however many courses are asked for, each scoped
     to the batch rather than to the whole site. Resolving a single course is
-    this with a one-element list, so the cascade has one implementation instead
-    of a batched and a per-page one to keep in agreement.
+    this with a one-element list, so the order of precedence has one
+    implementation instead of a batched and a per-page one to keep in
+    agreement.
+
+    Args:
+        course_ids (list of int): the Course ids this instance can resolve
     """
 
-    def __init__(self, course_ids):
+    def __init__(self, course_ids: list[int]) -> None:
         self.pages_by_course_id = {
             page.course_id: page
             for page in cms_models.CoursePage.objects.filter(
@@ -617,10 +641,10 @@ class _FinancialAssistanceForms:
             every_program_id.update(related_ids)
         self.program_pages_by_program_id = self._load_program_pages(every_program_id)
 
-        # The only pages whose children the cascade ever asks for: course pages
-        # via _fallback_url, program pages via url_for. Program pages here
-        # include related programs' - a superset of what child_form is called
-        # with, deliberately, so the two do not have to stay in step.
+        # The only pages whose children are ever asked for: course pages via
+        # _fallback_url, program pages via url_for. Program pages here include
+        # related programs' - a superset of what child_form is called with,
+        # deliberately, so the two do not have to stay in step.
         parent_paths = {page.path for page in self.pages_by_course_id.values()}
         parent_paths.update(
             program_page.path
@@ -634,11 +658,17 @@ class _FinancialAssistanceForms:
         ) = self._load_forms(course_ids, every_program_id, parent_paths)
 
     @staticmethod
-    def _load_programs(course_ids):
+    def _load_programs(course_ids: list[int]) -> dict[int, list[Program]]:
         """
         Programs per course, matching ``Course.programs``.
 
         Every program linked through a COURSE requirement node, unfiltered.
+
+        Args:
+            course_ids (list of int): the Course ids to look up
+
+        Returns:
+            defaultdict: {course_id: [Program]}
         """
         programs_by_course_id = defaultdict(list)
         wanted = set(course_ids)
@@ -657,8 +687,17 @@ class _FinancialAssistanceForms:
         return programs_by_course_id
 
     @staticmethod
-    def _load_related_programs(program_ids):
-        """Related programs for every program in play, matching ``Program.related_programs``."""
+    def _load_related_programs(program_ids: set[int]) -> dict[int, list[int]]:
+        """
+        Related programs for every program in play, matching
+        ``Program.related_programs``.
+
+        Args:
+            program_ids (set of int): the Program ids to look up
+
+        Returns:
+            defaultdict: {program_id: [related program_id]}
+        """
         related_by_program_id = defaultdict(list)
         if not program_ids:
             return related_by_program_id
@@ -674,12 +713,20 @@ class _FinancialAssistanceForms:
         return related_by_program_id
 
     @staticmethod
-    def _load_program_pages(program_ids):
+    def _load_program_pages(
+        program_ids: set[int],
+    ) -> dict[int, cms_models.ProgramPage]:
         """
         Every ProgramPage a URL might hang off, keyed by program.
 
         ``select_related("program")`` because ``ProductPage.get_url_parts``
         reads ``product.readable_id``.
+
+        Args:
+            program_ids (set of int): the Program ids to look up
+
+        Returns:
+            dict: {program_id: ProgramPage}, lowest pk wins per program
         """
         program_pages_by_program_id = {}
         if not program_ids:
@@ -695,25 +742,28 @@ class _FinancialAssistanceForms:
             )
         return program_pages_by_program_id
 
-    @staticmethod
-    def _load_forms(course_ids, program_ids, parent_paths):
+    def _load_forms(
+        self, course_ids: list[int], program_ids: set[int], parent_paths: set[str]
+    ):
         """
-        The live forms this batch could consult, bucketed the three ways the
-        cascade asks for them.
+        The live forms this batch could consult, bucketed the three ways they
+        are asked for.
 
         The three buckets are exactly the three lookups ``url_for`` performs,
-        so a form outside them can never be returned. Rows come back as
-        namedtuples rather than model instances because a deferred field on an
-        instance reloads itself with a silent query on first access - the
-        failure mode this resolver exists to prevent.
+        so a form outside them can never be returned.
+
+        Args:
+            course_ids (list of int): Course ids a form may be tied to
+            program_ids (set of int): Program ids a form may be tied to
+            parent_paths (set of str): page paths a form may be a child of
         """
-        by_parent_path = defaultdict(list)
-        by_course_id = defaultdict(list)
-        by_program_id = defaultdict(list)
+        self.forms_by_parent_path = defaultdict(list)
+        self.forms_by_course_id = defaultdict(list)
+        self.forms_by_program_id = defaultdict(list)
 
         # Collected and reduced rather than OR-ed onto a seed Q(): an all-empty
         # disjunction collapses back to Q(), matching every row.
-        reachable = [
+        filters = [
             condition
             for condition, values in (
                 (Q(selected_course_id__in=course_ids), course_ids),
@@ -722,8 +772,9 @@ class _FinancialAssistanceForms:
             )
             if values
         ]
-        if not reachable:
-            return by_parent_path, by_course_id, by_program_id
+
+        if not filters:
+            return
 
         forms = (
             cms_models.FlexiblePricingRequestForm.objects.live()
@@ -731,42 +782,78 @@ class _FinancialAssistanceForms:
             # parent path is its own path minus one step - the SQL mirror of
             # form.path[: -Page.steplen] below, and the batched get_children().
             .annotate(parent_path=Substr("path", 1, Length("path") - Page.steplen))
-            .filter(reduce(operator.or_, reachable))
-            .values_list(
+            .filter(reduce(operator.or_, filters))
+            .only(
                 "pk",
                 "path",
                 "slug",
                 "selected_course_id",
                 "selected_program_id",
-                named=True,
             )
         )
         for form in forms:
-            by_parent_path[form.path[: -Page.steplen]].append(form)
+            self.forms_by_parent_path[form.path[: -Page.steplen]].append(form)
             if form.selected_course_id:
-                by_course_id[form.selected_course_id].append(form)
+                self.forms_by_course_id[form.selected_course_id].append(form)
             if form.selected_program_id:
-                by_program_id[form.selected_program_id].append(form)
-        return by_parent_path, by_course_id, by_program_id
+                self.forms_by_program_id[form.selected_program_id].append(form)
 
-    def child_form(self, page):
-        """The lowest-pk live form that is a direct child of ``page``."""
+    def child_form(self, page: Page) -> cms_models.FlexiblePricingRequestForm | None:
+        """
+        The lowest-pk live form that is a direct child of ``page``.
+
+        Args:
+            page (Page): the parent page
+
+        Returns:
+            FlexiblePricingRequestForm or None: the form row, or None if the page has no child
+                form
+        """
         return _min_pk(self.forms_by_parent_path.get(page.path, []))
 
-    def _fallback_url(self, page, course_id) -> str:
-        """Course-specific form, else a child form, else nothing."""
+    def _fallback_url(self, page: cms_models.CoursePage, course_id: int) -> str:
+        """
+        The URL used when no program-linked form applies.
+
+        In order of precedence:
+          - the form tied to this course
+          - a form that is a child of the course page
+
+        Args:
+            page (CoursePage): the course's page
+            course_id (int): the Course id
+
+        Returns:
+            str: the form URL, or "" if neither exists
+        """
         form = _min_pk(self.forms_by_course_id.get(course_id, [])) or self.child_form(
             page
         )
         return _form_url(page, form.slug) if form else ""
 
-    def _program_url(self, page, program_page, form, program_ids) -> str:
+    def _program_url(
+        self,
+        page: cms_models.CoursePage,
+        program_page: cms_models.ProgramPage | None,
+        form: cms_models.FlexiblePricingRequestForm,
+        program_ids: list[int],
+    ) -> str:
         """
         Turn a program-linked form into a URL.
 
-        The page it hangs off is, in order: the program page the form is a
-        child of, the page of the other program the form belongs to, or this
-        course's own page.
+        In order of precedence:
+          - the program page the form is a child of
+          - the page of the other program the form belongs to
+          - the course page
+
+        Args:
+            page (CoursePage): the course's page
+            program_page (ProgramPage or None): the page the form is a child of
+            form (FlexiblePricingRequestForm): the form row to build a URL for
+            program_ids (list of int): the course's own Program ids
+
+        Returns:
+            str: the form URL, or "" if none of the above apply
         """
         if program_page:
             return _form_url(program_page, form.slug)
@@ -781,8 +868,21 @@ class _FinancialAssistanceForms:
 
         return ""
 
-    def url_for(self, course_id) -> str:
-        """The financial assistance form URL for one course."""
+    def url_for(self, course_id: int) -> str:
+        """
+        The financial assistance form URL for one course.
+
+        In order of precedence:
+          - a form belonging to one of the course's programs, or to a program
+            related to one of them
+          - a form tied to the course, or a child of the course page
+
+        Args:
+            course_id (int): the Course id
+
+        Returns:
+            str: the form URL, or "" if the course has no form
+        """
         page = self.pages_by_course_id.get(course_id)
         if page is None:
             return ""
@@ -824,7 +924,9 @@ class _FinancialAssistanceForms:
         return self._fallback_url(page, course_id)
 
 
-def resolve_financial_assistance_form_urls(course_ids) -> dict[int, str]:
+def resolve_financial_assistance_form_urls(
+    course_ids: Iterable[int],
+) -> dict[int, str]:
     """
     Financial assistance form URL per course id, in a fixed number of queries.
 
