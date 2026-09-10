@@ -7,6 +7,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
+    REDEMPTION_TYPE_INTERNAL,
 )
 from ecommerce.models import Discount, Product
 
@@ -59,10 +60,11 @@ class DiscountType(abc.ABC):
         return price
 
     def get_product_price(self, product: Product):
-        # Program discounts are linked to a program product for identification only;
-        # they must still apply to the course-run products placed in the basket.
+        # An internal discount's product links say what it is for, not what it
+        # prices; the code that attached it decided eligibility (see
+        # REDEMPTION_TYPE_INTERNAL).
         if (
-            not self.discount.is_program_discount
+            self.discount.redemption_type != REDEMPTION_TYPE_INTERNAL
             and not self.discount.applies_to_products([product])
         ):
             return product.price
