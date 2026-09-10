@@ -580,10 +580,8 @@ def _min_pk(rows):
     """
     Lowest-pk element, or None.
 
-    ``QuerySet.first()`` applies ``order_by("pk")`` when the queryset is
-    unordered, so every ``.first()`` this replaces means "min pk". For a Wagtail
-    page under multi-table inheritance ``pk == page_ptr_id == Page.pk``, so this
-    matches whether the row came from the concrete model or from ``Page``.
+    ``QuerySet.first()`` orders by pk when the queryset is unordered, so every
+    ``.first()`` this replaces means "min pk".
     """
     return min(rows, key=lambda row: row.pk, default=None)
 
@@ -592,12 +590,10 @@ class _FinancialAssistanceForms:
     """
     Everything the financial assistance cascade needs, fetched once.
 
-    Five queries regardless of how many courses are asked for, and each one is
-    scoped to the request: the forms query loads only the rows this batch could
-    consult, so the work does not grow with the number of live forms on the
-    site. Resolving a single course is just this with a one-element list, so
-    there is exactly one implementation of the cascade rather than a batched one
-    and a per-page one that have to be kept in agreement.
+    A fixed number of queries however many courses are asked for, each scoped
+    to the batch rather than to the whole site. Resolving a single course is
+    this with a one-element list, so the cascade has one implementation instead
+    of a batched and a per-page one to keep in agreement.
     """
 
     def __init__(self, course_ids):
@@ -643,7 +639,6 @@ class _FinancialAssistanceForms:
         Programs per course, matching ``Course.programs``.
 
         Every program linked through a COURSE requirement node, unfiltered.
-        ArrayAgg lets one program row carry all the course ids it belongs to.
         """
         programs_by_course_id = defaultdict(list)
         wanted = set(course_ids)
@@ -663,11 +658,7 @@ class _FinancialAssistanceForms:
 
     @staticmethod
     def _load_related_programs(program_ids):
-        """
-        Related programs for every program in play, in one query.
-
-        ``Program.related_programs`` runs an OR across two FKs per program.
-        """
+        """Related programs for every program in play, matching ``Program.related_programs``."""
         related_by_program_id = defaultdict(list)
         if not program_ids:
             return related_by_program_id
@@ -688,9 +679,7 @@ class _FinancialAssistanceForms:
         Every ProgramPage a URL might hang off, keyed by program.
 
         ``select_related("program")`` because ``ProductPage.get_url_parts``
-        reads ``product.readable_id`` when building the URL. ``order_by("pk")``
-        plus ``setdefault`` reproduces ``.first()``'s min-pk pick when several
-        pages point at one program.
+        reads ``product.readable_id``.
         """
         program_pages_by_program_id = {}
         if not program_ids:
@@ -712,24 +701,18 @@ class _FinancialAssistanceForms:
         The live forms this batch could consult, bucketed the three ways the
         cascade asks for them.
 
-        One query, scoped to the request rather than the whole site. A form is
-        reachable only if it is tied to one of these courses, tied to one of
-        these programs, or is a direct child of one of these pages - the three
-        buckets below are exactly the three lookups ``url_for`` performs, so
-        anything outside them can never be returned.
-
-        Only the five fields the cascade reads are selected. They come back as
-        namedtuples rather than model instances on purpose: a deferred field on
-        a real instance reloads itself with a silent query on first access,
-        which is the failure mode this whole resolver exists to prevent.
+        The three buckets are exactly the three lookups ``url_for`` performs,
+        so a form outside them can never be returned. Rows come back as
+        namedtuples rather than model instances because a deferred field on an
+        instance reloads itself with a silent query on first access - the
+        failure mode this resolver exists to prevent.
         """
         by_parent_path = defaultdict(list)
         by_course_id = defaultdict(list)
         by_program_id = defaultdict(list)
 
-        # Collected and reduced rather than seeded with Q() and OR-ed onto:
-        # an all-empty disjunction collapses back to Q(), which matches every
-        # row and would silently restore the old fetch-the-whole-table read.
+        # Collected and reduced rather than OR-ed onto a seed Q(): an all-empty
+        # disjunction collapses back to Q(), matching every row.
         reachable = [
             condition
             for condition, values in (
@@ -745,10 +728,8 @@ class _FinancialAssistanceForms:
         forms = (
             cms_models.FlexiblePricingRequestForm.objects.live()
             # Treebeard gives children a fixed-width path suffix, so a page's
-            # parent path is its own path minus one step. The SQL mirror of
-            # form.path[: -Page.steplen] below, and the batched equivalent of
-            # get_children(), which matches children by parent path prefix at
-            # one level deeper than the parent.
+            # parent path is its own path minus one step - the SQL mirror of
+            # form.path[: -Page.steplen] below, and the batched get_children().
             .annotate(parent_path=Substr("path", 1, Length("path") - Page.steplen))
             .filter(reduce(operator.or_, reachable))
             .values_list(
@@ -783,10 +764,9 @@ class _FinancialAssistanceForms:
         """
         Turn a program-linked form into a URL.
 
-        Priority:
-        1. the form is a child of a program page - use that page
-        2. the form belongs to some *other* program - use that program's page
-        3. the form belongs to one of this course's programs - use this page
+        The page it hangs off is, in order: the program page the form is a
+        child of, the page of the other program the form belongs to, or this
+        course's own page.
         """
         if program_page:
             return _form_url(program_page, form.slug)
@@ -848,10 +828,10 @@ def resolve_financial_assistance_form_urls(course_ids) -> dict[int, str]:
     """
     Financial assistance form URL per course id, in a fixed number of queries.
 
-    Callers on an API path should not call this directly - the view's queryset
-    assembles the value via ``Course.objects.prefetch(...)`` so that nothing
-    queries during serialization. This is the single implementation behind both
-    that prefetcher and ``CoursePage.financial_assistance_form_url``.
+    API callers should not call this directly - the view's queryset resolves it
+    via ``Course.objects.prefetch(...)`` so nothing queries during
+    serialization. Backs both that prefetcher and
+    ``CoursePage.financial_assistance_form_url``.
 
     Args:
         course_ids: iterable of Course ids
