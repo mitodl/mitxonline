@@ -2033,9 +2033,7 @@ def sync_contact_with_hubspot(user: User):
     return result
 
 
-def _resolve_hubspot_token(
-    *, is_uai: bool, is_xpro: bool = False
-) -> str | None:
+def _resolve_hubspot_token(*, is_uai: bool, is_xpro: bool = False) -> str | None:
     """Resolve HubSpot API token, routing UAI/XPro orders to the UAI/xPro account."""
     if is_uai or is_xpro:
         return getattr(

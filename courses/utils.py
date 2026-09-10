@@ -190,6 +190,7 @@ def get_dated_courseruns(queryset):
         CourseRunQuerySet.get_enrollable_filter() & Q(is_self_paced=False)
     )
 
+
 def is_xpro_course_run(course_run):
     """
     Check if a course run is an XPro course run.
@@ -207,6 +208,7 @@ def is_xpro_course_run(course_run):
     return courseware_id.startswith(
         (XPRO_COURSEWARE_ID_PREFIX, f"course-v1:{XPRO_COURSEWARE_ID_PREFIX}")
     )
+
 
 def is_xpro_order(order):
     """
