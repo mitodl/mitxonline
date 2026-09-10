@@ -747,8 +747,8 @@ class _FinancialAssistanceForms:
             # Treebeard gives children a fixed-width path suffix, so a page's
             # parent path is its own path minus one step. The SQL mirror of
             # form.path[: -Page.steplen] below, and the batched equivalent of
-            # get_children(), which filters path__startswith=parent.path AND
-            # depth=parent.depth + 1.
+            # get_children(), which matches children by parent path prefix at
+            # one level deeper than the parent.
             .annotate(parent_path=Substr("path", 1, Length("path") - Page.steplen))
             .filter(reduce(operator.or_, reachable))
             .values_list(
