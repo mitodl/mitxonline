@@ -13,7 +13,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import TextChoices
+from django.db.models import Q, Count, TextChoices
 from django.utils.functional import cached_property
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
@@ -489,6 +489,14 @@ class Discount(TimestampedModel):
 
         return self.valid_now()
 
+    def applies_to_products(self, products) -> bool:
+        """True when the discount has no product links, or one of ``products`` is linked."""
+        scope = self.products.aggregate(
+            linked=Count("id"),
+            matching=Count("id", filter=Q(product_id__in=[p.id for p in products])),
+        )
+        return not scope["linked"] or bool(scope["matching"])
+
     def check_validity_with_products(self, products: list):
         """
         Checks if the discount is valid for product
@@ -499,12 +507,7 @@ class Discount(TimestampedModel):
         Returns:
             Boolean
         """
-        if self.products.exists() and not (
-            self.products.filter(product__in=products).exists()
-        ):
-            return False
-
-        return self.valid_now()
+        return self.applies_to_products(products) and self.valid_now()
 
     def valid_now(self):
         """Returns True if the discount is valid right now"""
