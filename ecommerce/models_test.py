@@ -1597,6 +1597,25 @@ def test_db_constraint_allows_program_child_purchase_redemption_with_standard_ty
     assert Discount.objects.filter(discount_code="reverse-pairing").exists()
 
 
+def test_internal_discount_cannot_be_automatic():
+    """
+    Auto-apply selects discounts by flag rather than by a caller's decision, so
+    the DB backstop holds even for writes that skip model validation.
+    """
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Discount.objects.bulk_create(
+            [
+                Discount(
+                    amount=100,
+                    discount_code="internal-automatic",
+                    discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+                    redemption_type=REDEMPTION_TYPE_INTERNAL,
+                    automatic=True,
+                )
+            ]
+        )
+
+
 @pytest.mark.parametrize(
     "override",
     [
