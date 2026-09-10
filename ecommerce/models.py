@@ -36,6 +36,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPES,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     PAYMENT_TYPES,
+    REDEMPTION_TYPE_INTERNAL,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
@@ -458,10 +459,11 @@ class Discount(TimestampedModel):
 
     def is_redeemable_by(self, user: User, products: Iterable[Product] | None = None):
         """
-        Enforces the redemption rules for a given discount: how often it may be
-        redeemed, whether it is inside its date window, and — for a
-        program-child-purchase redemption — whether this user still holds an
-        unconsumed qualifying purchase for one of the products in hand.
+        Enforces the redemption rules for a given discount: whether its type is
+        learner-redeemable at all, how often it may be redeemed, whether it is
+        inside its date window, and — for a program-child-purchase redemption —
+        whether this user still holds an unconsumed qualifying purchase for one
+        of the products in hand.
 
         Independent of check_validity_with_products (product scope and
         liveness); is_valid_for_basket composes the two.
@@ -489,7 +491,18 @@ class Discount(TimestampedModel):
         return self._within_redemption_limits(user)
 
     def _within_redemption_limits(self, user: User) -> bool:
-        """The redemption-count and date-window rules, without the source check."""
+        """
+        The redemption-type, redemption-count and date-window rules, without the
+        source check.
+        """
+        # An internal discount is attached only by application code that has
+        # already decided eligibility (see REDEMPTION_TYPE_INTERNAL). The rule
+        # belongs at this depth rather than in is_redeemable_by because
+        # discount_product, and so quote_user_price, reaches the redemption
+        # rules through here.
+        if self.redemption_type == REDEMPTION_TYPE_INTERNAL:
+            return False
+
         if (
             self.redemption_type == REDEMPTION_TYPE_ONE_TIME
             and DiscountRedemption.objects.filter(

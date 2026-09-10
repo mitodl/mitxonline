@@ -91,6 +91,7 @@ from ecommerce.exceptions import (
 )
 from ecommerce.factories import (
     DiscountRedemptionFactory,
+    InternalDiscountFactory,
     LineFactory,
     OneTimeDiscountFactory,
     OneTimePerUserDiscountFactory,
@@ -1575,6 +1576,22 @@ def test_quote_user_price_skips_an_automatic_tied_to_another_learner(user):
         automatic=True, amount=50, discount_type=DISCOUNT_TYPE_PERCENT_OFF
     )
     UserDiscount.objects.create(discount=automatic, user=UserFactory.create())
+
+    quote = quote_user_price(product, user)
+
+    assert quote.discount is None
+    assert quote.price == product.price
+
+
+def test_quote_user_price_skips_an_internal_discount(user):
+    """
+    Checkout refuses an internal discount, so a UserDiscount row tying one to
+    this learner must not quote a price the cart will not honor.
+    """
+    product = ProductFactory.create()
+    internal = InternalDiscountFactory.create()
+    DiscountProduct.objects.create(discount=internal, product=product)
+    UserDiscount.objects.create(discount=internal, user=user)
 
     quote = quote_user_price(product, user)
 
