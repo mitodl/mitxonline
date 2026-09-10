@@ -2164,6 +2164,13 @@ class CourseRunEnrollment(EnrollmentModel):
             "longer retried automatically."
         ),
     )
+    b2b_contract = models.ForeignKey(
+        "b2b.ContractPage",
+        on_delete=models.DO_NOTHING,
+        related_name="course_run_enrollments",
+        null=True,
+        blank=True,
+    )
 
     objects = ActiveCourseRunEnrollmentManager()
     all_objects = CourseRunEnrollmentManager()
@@ -2301,6 +2308,13 @@ class ProgramEnrollment(EnrollmentModel):
 
     program = models.ForeignKey(
         "courses.Program", on_delete=models.CASCADE, related_name="enrollments"
+    )
+    b2b_contract = models.ForeignKey(
+        "b2b.ContractPage",
+        on_delete=models.DO_NOTHING,
+        related_name="program_enrollments",
+        null=True,
+        blank=True,
     )
 
     objects = ActiveProgramEnrollmentManager()
