@@ -28,6 +28,7 @@ from django_countries.fields import CountryField
 from lru_method_cache import lru_method_cache
 from mitol.common.models import TimestampedModel, TimestampedModelQuerySet
 from mitol.common.utils.datetime import now_in_utc
+from mitol.common.utils.queryset import is_prefetched
 from mitol.openedx.utils import get_course_number
 from modelcluster.fields import ParentalKey
 from prefetch import Prefetcher, PrefetchManagerMixin, PrefetchQuerySet
@@ -1230,9 +1231,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         return self._select_first_unexpired_run(
             run
             for run in self.courseruns.all()
-            if any(
-                contract.id in contract_ids for contract in run.b2b_contracts.all()
-            )
+            if any(contract.id in contract_ids for contract in run.b2b_contracts.all())
         )
 
     @cached_property
@@ -1290,6 +1289,21 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         """Flag to indicate if this is a run"""
         return False
 
+    def _courseruns_with_contracts(self):
+        """
+        Return this course's runs with ``b2b_contracts`` available.
+
+        Calling ``prefetch_related`` on the related manager unconditionally
+        would clone the prefetched queryset, and a clone starts with an empty
+        result cache - so a caller that already prefetched ``courseruns``
+        (``CourseViewSet`` does, with ``b2b_contracts`` inside it) would still
+        pay one query per course. Read the cache when it is populated and only
+        build a new queryset when it is not.
+        """
+        if is_prefetched(self, "courseruns"):
+            return self.courseruns.all()
+        return self.courseruns.prefetch_related("b2b_contracts").all()
+
     @lru_method_cache(max_size=12, typed=True)
     def get_filtered_runs(
         self,
@@ -1302,7 +1316,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         courseruns = (
             self.prefetched_courseruns
             if hasattr(self, "prefetched_courseruns")
-            else list(self.courseruns.prefetch_related("b2b_contracts").all())
+            else list(self._courseruns_with_contracts())
         )
         courseruns = sorted(courseruns, key=lambda r: r.id)
 
