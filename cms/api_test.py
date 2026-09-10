@@ -43,6 +43,7 @@ from cms.models import (
     ResourcePage,
 )
 from courses.factories import CourseFactory, CourseRunFactory, ProgramFactory
+from courses.models import Program, default_program_queryset
 from main.utils import get_learn_product_url
 
 # resolve_financial_assistance_form_urls does a fixed number of queries:
@@ -632,9 +633,11 @@ def test_create_featured_items_cache_no_expiry():
     )
 
 
-def _url_for(course):
+def _url_for(course, program_queryset=None):
     """The resolved financial assistance form URL for one course."""
-    return resolve_financial_assistance_form_urls([course.id])[course.id]
+    return resolve_financial_assistance_form_urls(
+        [course.id], program_queryset=program_queryset
+    )[course.id]
 
 
 @pytest.mark.django_db
@@ -701,6 +704,69 @@ def test_financial_assistance_url_absent_when_no_form():
 
 
 @pytest.mark.django_db
+def test_financial_assistance_url_skips_programs_outside_the_scope():
+    """
+    A program the caller filtered out cannot supply the URL.
+
+    The regression this guards: the v2 course list scopes its ``programs``
+    prefetch to live, non-b2b programs, and the URL is chosen by walking a
+    course's programs - so the two have to be asked the same question. Before
+    this was threaded through, a course in a ``live=False`` program served that
+    program's form.
+    """
+    program = ProgramFactory(live=False)
+    page = CoursePageFactory()
+    program.add_requirement(page.product)
+    FlexiblePricingFormFactory(parent=CoursePageFactory(), selected_program=program)
+
+    live_only = Program.objects.filter(live=True)
+
+    assert _url_for(page.product, program_queryset=live_only) == ""
+    # Same data, no scope: the form is reachable, so the assertion above is
+    # about the scope rather than about the form being missing.
+    assert _url_for(page.product, program_queryset=Program.objects.all()) != ""
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_default_scope_excludes_b2b_programs():
+    """
+    With no scope named, b2b-only programs are out.
+
+    ``default_program_queryset()`` is what both this resolver and the
+    ``programs`` prefetch fall back to, so a b2b-only program must not supply a
+    URL to a caller that never asked about b2b.
+    """
+    program = ProgramFactory(b2b_only=True)
+    page = CoursePageFactory()
+    program.add_requirement(page.product)
+    FlexiblePricingFormFactory(parent=CoursePageFactory(), selected_program=program)
+
+    assert _url_for(page.product) == ""
+    assert _url_for(page.product, program_queryset=Program.objects.all()) != ""
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_scope_is_not_reentered_by_related_programs():
+    """
+    A scoped-out program does not sneak back in as somebody's related program.
+
+    Related programs are deliberately unscoped - they are reached *through* a
+    course's own programs, which are scoped - so this pins down that the
+    scoping happens at the only place it can: the course's own programs.
+    """
+    scoped_out = ProgramFactory(live=False)
+    related = ProgramFactory()
+    scoped_out.add_related_program(related)
+    page = CoursePageFactory()
+    scoped_out.add_requirement(page.product)
+    FlexiblePricingFormFactory(parent=CoursePageFactory(), selected_program=related)
+
+    assert (
+        _url_for(page.product, program_queryset=Program.objects.filter(live=True)) == ""
+    )
+
+
+@pytest.mark.django_db
 def test_financial_assistance_forms_load_is_scoped_to_the_request():
     """
     The forms query must not grow with the number of live forms on the site.
@@ -721,7 +787,7 @@ def test_financial_assistance_forms_load_is_scoped_to_the_request():
     course_ids = [page.product.id]
 
     def loaded_form_pks():
-        forms = _FinancialAssistanceForms(course_ids)
+        forms = _FinancialAssistanceForms(course_ids, default_program_queryset())
         return {
             form.pk
             for bucket in (

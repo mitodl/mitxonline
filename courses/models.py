@@ -907,15 +907,27 @@ class CourseQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):  # pylint: dis
         return self.filter(in_programs__program=program)
 
 
+def default_program_queryset() -> ProgramQuerySet:
+    """
+    The program scope used when a caller does not name one.
+
+    Non-b2b is the safest default: a b2b-only program is not part of the public
+    catalog, so it must not supply a course's programs list nor - which is the
+    same question asked twice - its financial assistance form URL.
+
+    Returns:
+        ProgramQuerySet: every program outside the b2b-only catalog
+    """
+    return Program.objects.filter(b2b_only=False)
+
+
 class CourseProgramPrefetcher(Prefetcher):
     """Prefetcher for Course programs."""
 
-    queryset: CourseQuerySet
+    queryset: ProgramQuerySet
 
     def __init__(self, *args, **kwargs):
-        self.queryset = kwargs.pop(  # safest default is non-b2b
-            "queryset", Program.objects.filter(b2b_only=False)
-        )
+        self.queryset = kwargs.pop("queryset", default_program_queryset())
         super().__init__(*args, **kwargs)
 
     @staticmethod
@@ -980,25 +992,41 @@ class CourseFinancialAssistanceFormUrlPrefetcher(Prefetcher):
     during serialization. Resolving it here means the serializer only ever reads
     an attribute.
 
-    Deliberately holds no state on ``self``: ``PrefetchQuerySet._clone()`` shares
-    the ``_prefetch`` dict by reference, so a class-level ``queryset =
+    Scoped to ``program_queryset``, which must be the same programs the caller
+    hands the ``programs`` prefetch: the URL is chosen by walking a course's
+    programs, so a program the caller filtered out must not be able to supply it
+    either.
+
+    Holds no *result* state on ``self``. ``PrefetchQuerySet._clone()`` shares the
+    ``_prefetch`` dict by reference, so a class-level ``queryset =
     ...prefetch(...)`` reuses one Prefetcher instance across every request in the
-    process. Results are carried in ``filter()``'s return value instead.
+    process; results are carried in ``filter()``'s return value instead.
+    Configuration set once in ``__init__`` and only ever read is safe under that
+    same sharing - ``CourseProgramPrefetcher`` has always worked this way.
     """
+
+    program_queryset: ProgramQuerySet
+
+    def __init__(self, *args, **kwargs):
+        self.program_queryset = kwargs.pop(
+            "program_queryset", default_program_queryset()
+        )
+        super().__init__(*args, **kwargs)
 
     @staticmethod
     def mapper(course):
         """Map each course to Course.id"""
         return course.id
 
-    @staticmethod
-    def filter(course_ids):
+    def filter(self, course_ids):
         """Resolve every id at once, one row per id."""
         # Local import: cms.api imports courses.models at module scope.
         from cms.api import resolve_financial_assistance_form_urls  # noqa: PLC0415
 
         course_ids = list(course_ids)
-        urls = resolve_financial_assistance_form_urls(course_ids)
+        urls = resolve_financial_assistance_form_urls(
+            course_ids, program_queryset=self.program_queryset
+        )
         # A row for every id, including courses with no form, so each one
         # reaches the two-arg decorator() call - the one-arg pass runs before
         # filter() and so cannot see these results.

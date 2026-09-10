@@ -29,7 +29,11 @@ from rest_framework.test import APIClient
 from b2b.api import create_contract_run
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.models import ContractProgramItem
-from cms.factories import CoursePageFactory, ProgramPageFactory
+from cms.factories import (
+    CoursePageFactory,
+    FlexiblePricingFormFactory,
+    ProgramPageFactory,
+)
 from cms.models import CoursePage
 from cms.serializers import ProgramPageSerializer
 from compliance.exceptions import ExportComplianceError
@@ -3064,11 +3068,39 @@ def test_get_courses_ordering_is_unchanged_by_prefetching(user_drf_client, param
         assert course_data["next_run_id"] == (expected_run.id if expected_run else None)
         if course_data["page"] is not None:
             # The batched finaid cascade must agree with the per-page
-            # cached_property it replaced, branch for branch.
+            # cached_property it replaced, branch for branch. The two agree
+            # here because every program course_catalog_data builds is live and
+            # non-b2b; they are scoped differently in general - see
+            # test_courses_list_omits_finaid_form_of_a_non_live_program.
             expected_url = CoursePage.objects.get(
                 pk=bare.course_page.pk
             ).financial_assistance_form_url
             assert course_data["page"]["financial_assistance_form_url"] == expected_url
+
+
+@pytest.mark.django_db
+def test_courses_list_omits_finaid_form_of_a_non_live_program():
+    """
+    A non-live program's financial assistance form must not reach the catalog.
+
+    The list scopes its ``programs`` prefetch to live, non-b2b programs, and the
+    financial assistance URL is chosen by walking a course's programs - so both
+    have to be asked the same question. When they drifted apart, a course whose
+    only program was an unpublished draft served that draft's form.
+    """
+    program = ProgramFactory.create(live=False)
+    course_page = CoursePageFactory.create()
+    program.add_requirement(course_page.product)
+    FlexiblePricingFormFactory.create(parent=program.page)
+
+    client = APIClient()
+    response = client.get(reverse("v2:courses_api-list"))
+
+    result = next(
+        row for row in response.json()["results"] if row["id"] == course_page.course_id
+    )
+    assert result["programs"] == []
+    assert result["page"]["financial_assistance_form_url"] == ""
 
 
 @pytest.mark.usefixtures("course_catalog_data")
