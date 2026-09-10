@@ -7,6 +7,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from decimal import ROUND_HALF_EVEN, Decimal
+from typing import TYPE_CHECKING
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
@@ -54,6 +55,13 @@ from openedx.constants import (
     EDX_ENROLLMENTS_PAID_MODES,
 )
 from variants.models import SupportedVariant, VariantOptionsModel
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    # Import-time only: b2b.models imports Program from this module at module
+    # scope, so a runtime import here would be circular.
+    from b2b.models import Contract
 
 User = get_user_model()
 
@@ -1243,7 +1251,9 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             default_variant=True,
         ).first()
 
-    def get_first_unexpired_b2b_run(self, user_contracts):
+    def get_first_unexpired_b2b_run(
+        self, user_contracts: "Iterable[int | Contract] | None"
+    ) -> "CourseRun | None":
         """
         Gets the first unexpired/enrollable CourseRun associated with both this
         Course and the user's specified contracts.
@@ -1251,11 +1261,15 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         First means in start date order ascending.
 
         Args:
-        - user_contracts (list of int): the current user's contracts
+        - user_contracts (iterable of int or Contract): the current user's
+          contracts, as ids or as model instances
 
         Returns:
             CourseRun or None: An unexpired/enrollable course run
         """
+        # Ids or instances, matching what the ``b2b_contracts__in`` filter this
+        # replaces would have accepted. Callers pass ids today
+        # (CourseViewSet.get_serializer_context builds them with values_list).
         contract_ids = {
             getattr(contract, "id", contract) for contract in (user_contracts or [])
         }
@@ -1347,12 +1361,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         contract_id: int | None = None,
     ) -> list["CourseRun"]:
         """Return sorted course runs respecting org/contract/enrollability context."""
-        courseruns = (
-            self.prefetched_courseruns
-            if hasattr(self, "prefetched_courseruns")
-            else list(self._courseruns_with_contracts())
-        )
-        courseruns = sorted(courseruns, key=lambda r: r.id)
+        courseruns = sorted(self._courseruns_with_contracts(), key=lambda r: r.id)
 
         if courserun_is_enrollable is not None:
             courseruns = filter(
