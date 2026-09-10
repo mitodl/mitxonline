@@ -63,6 +63,10 @@ from ecommerce.constants import (
     STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
     ZERO_PAYMENT_DATA,
 )
+from ecommerce.discount_sources import (
+    double_spent_source_line_ids,
+    fulfilled_paid_amount_off_redemptions,
+)
 from ecommerce.exceptions import (
     VerifiedProgramInvalidBasketError,
     VerifiedProgramInvalidOrderError,
@@ -275,7 +279,7 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
     return payload
 
 
-def check_discount_for_products(discount, basket):
+def check_discount_for_products(discount, basket, products=None):
     """
     Checks the validity of the discount against what's in the basket.
 
@@ -286,13 +290,14 @@ def check_discount_for_products(discount, basket):
     Args:
         - basket (Basket): the current basket
         - discount (Discount|string: the discount to apply (if a string, loads the discount code specified)
+        - products (list or None): basket.get_products(), for a caller that already has it
     Returns:
         boolean
     """
     if not isinstance(discount, Discount):
         discount = Discount.objects.filter(discount_code=discount).first()
 
-    basket_products = basket.get_products()
+    basket_products = basket.get_products() if products is None else products
 
     return discount.check_validity_with_products(basket_products)
 
@@ -307,10 +312,14 @@ def check_basket_discounts_for_validity(request):
     """
     basket = establish_basket(request)
 
+    basket_products = basket.get_products()
+
     for basket_discount in basket.discounts.all():
         if not basket_discount.redeemed_discount.is_redeemable_by(
-            basket.user
-        ) or not check_discount_for_products(basket_discount.redeemed_discount, basket):
+            basket.user, basket_products
+        ) or not check_discount_for_products(
+            basket_discount.redeemed_discount, basket, basket_products
+        ):
             return False
 
     return True
@@ -358,10 +367,11 @@ def apply_user_discounts(request):
             discount = user_discount.discount
 
     if discount:
+        basket_products = basket.get_products()
         # check for product specificity in the discount
         if not check_discount_for_products(
-            discount, basket
-        ) or not discount.is_redeemable_by(user):
+            discount, basket, basket_products
+        ) or not discount.is_redeemable_by(user, basket_products):
             return
 
         bd = BasketDiscount(
@@ -955,8 +965,8 @@ def check_and_process_pending_orders_for_resolution(
 
 def check_for_duplicate_discount_redemptions():
     """
-    Checks for multiple redemptions for discount codes, and makes noise if there
-    are any.
+    Checks for multiple redemptions for discount codes, and makes noise if
+    there are any.
 
     For discounts that are one-time or one-time-per-user redemptions, there's a
     possibility that the code can be redeemed more than once. This will check
@@ -1025,6 +1035,34 @@ def check_for_duplicate_discount_redemptions():
             seen.append(redemption.redeemed_discount.id)
 
     return seen
+
+
+def check_for_double_spent_sources():
+    """
+    The safety net behind OrderFlow.fulfill's source check: log every source
+    line funding a fulfilled paid-amount-off redemption on more than one order,
+    naming the orders to review.
+
+    Returns:
+    - List of the double-spent source line IDs
+    """
+    double_spent = double_spent_source_line_ids()
+    for source_line_id in double_spent:
+        reference_numbers = (
+            fulfilled_paid_amount_off_redemptions()
+            .filter(source_line_id=source_line_id)
+            .order_by("redeemed_order__reference_number")
+            .values_list("redeemed_order__reference_number", flat=True)
+            .distinct()
+        )
+        log.error(
+            "Line %s funds fulfilled paid-amount-off redemptions on more than one "
+            "order (%s); review manually.",
+            source_line_id,
+            ", ".join(reference_numbers),
+        )
+
+    return double_spent
 
 
 def _coerce_supplied_date(value):
