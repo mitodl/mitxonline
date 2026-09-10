@@ -1,5 +1,6 @@
 """Tests for Ecommerce api"""
 
+import itertools
 import logging
 import random
 import uuid
@@ -58,6 +59,8 @@ from ecommerce.api import (
 )
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PERCENT_OFF,
+    PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
     STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED,
     STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
@@ -1174,22 +1177,25 @@ def test_apply_discount_to_basket_prefers_a_full_credit_discount(user):
 
 
 @pytest.mark.parametrize(
-    "is_better",
+    ("candidate_amount", "candidate_wins"),
     [
-        True,
-        False,
+        (50, True),
+        (300, False),
+        (200, True),
     ],
 )
-def test_apply_discount_to_basket_with_user_discount(user, is_better):
-    """
-    Test that apply_discount_to_basket function works properly with a user discount applied.
-
-    User discounts should take precedence over anything that the learner is
-    applying, whether or not it's a better discount.
+def test_apply_discount_to_basket_replaces_a_user_discount_only_when_cheaper(
+    user, candidate_amount, candidate_wins
+):
+    """A user-tied discount competes on price like any other: the cheaper of the
+    applied user-tied discount and the candidate ends up applied, and a candidate
+    pricing the item at exactly the applied price replaces it.
     """
 
     run = CourseRunFactory.create()
-    product = ProductFactory.create(purchasable_object=run)
+    # A fixed-price discount never raises the price, so the product has to cost
+    # more than either amount for the two to price the item differently.
+    product = ProductFactory.create(purchasable_object=run, price=500)
     basket, _ = Basket.objects.get_or_create(user=user)
 
     BasketItem.objects.create(basket=basket, product=product, quantity=1)
@@ -1198,7 +1204,7 @@ def test_apply_discount_to_basket_with_user_discount(user, is_better):
         amount=200, discount_type=DISCOUNT_TYPE_FIXED_PRICE
     )
     apply_discount = UnlimitedUseDiscountFactory.create(
-        amount=(50 if is_better else 300), discount_type=DISCOUNT_TYPE_FIXED_PRICE
+        amount=candidate_amount, discount_type=DISCOUNT_TYPE_FIXED_PRICE
     )
 
     UserDiscount.objects.create(user=user, discount=user_discount)
@@ -1215,24 +1221,18 @@ def test_apply_discount_to_basket_with_user_discount(user, is_better):
     apply_discount_to_basket(basket, apply_discount)
 
     assert basket.discounts.count() == 1
-    assert basket.discounts.filter(redeemed_discount=user_discount).exists()
+    assert basket.discounts.get().redeemed_discount == (
+        apply_discount if candidate_wins else user_discount
+    )
 
 
-@pytest.mark.parametrize("apply_finaid_first", [True, False])
-def test_apply_discount_to_basket_with_user_discount_and_finaid(
-    user, apply_finaid_first
-):
-    """
-    Test that apply_discount_to_basket function works properly with a finaid discount
-    and user discount applied.
-
-    User discounts should take precedence over anything that the learner is
-    applying, whether or not it's a better discount, unless there's a financial
-    assistance discount applied.
+def test_apply_discount_to_basket_is_order_independent(user):
+    """The basket lands on the cheapest of a financial assistance, a user-tied
+    and an automatic discount whatever order they are applied in.
     """
 
     run = CourseRunFactory.create()
-    product = ProductFactory.create(purchasable_object=run)
+    product = ProductFactory.create(purchasable_object=run, price=100)
     basket, _ = Basket.objects.get_or_create(user=user)
     finaid_tier = FlexiblePriceTierFactory(courseware_object=run.course)
     FlexiblePriceFactory(
@@ -1242,41 +1242,52 @@ def test_apply_discount_to_basket_with_user_discount_and_finaid(
         status=FlexiblePriceStatus.APPROVED,
     )
     finaid_tier.discount.discount_type = DISCOUNT_TYPE_FIXED_PRICE
-    finaid_tier.discount.amount = 100
+    finaid_tier.discount.amount = 80
+    finaid_tier.discount.payment_type = PAYMENT_TYPE_FINANCIAL_ASSISTANCE
     finaid_tier.discount.save()
 
     BasketItem.objects.create(basket=basket, product=product, quantity=1)
 
     user_discount = UnlimitedUseDiscountFactory.create(
-        amount=200, discount_type=DISCOUNT_TYPE_FIXED_PRICE
+        amount=90, discount_type=DISCOUNT_TYPE_FIXED_PRICE
     )
     UserDiscount.objects.create(user=user, discount=user_discount)
 
-    BasketDiscount.objects.create(
-        redeemed_by=user,
-        redemption_date=now_in_utc(),
-        redeemed_discount=finaid_tier.discount if apply_finaid_first else user_discount,
-        redeemed_basket=basket,
+    automatic_discount = UnlimitedUseDiscountFactory.create(
+        amount=40, discount_type=DISCOUNT_TYPE_FIXED_PRICE, automatic=True
     )
 
-    apply_discount_to_basket(
-        basket,
-        user_discount if apply_finaid_first else finaid_tier.discount,
-        allow_finaid=True,
+    for order in itertools.permutations(
+        [finaid_tier.discount, user_discount, automatic_discount]
+    ):
+        BasketDiscount.objects.filter(redeemed_basket=basket).delete()
+
+        for discount in order:
+            apply_discount_to_basket(basket, discount, allow_finaid=True)
+
+        assert basket.discounts.get().redeemed_discount == automatic_discount
+        # discounted_price is a cached_property reading the basket's discounts,
+        # so it has to be read off an item fetched after this permutation ran.
+        assert BasketItem.objects.get(basket=basket).discounted_price == Decimal(
+            "40.00"
+        )
+
+
+def test_apply_discount_to_basket_refuses_finaid_without_the_flag(user):
+    """A financial assistance discount stays unapplied unless allow_finaid is set."""
+
+    run = CourseRunFactory.create()
+    product = ProductFactory.create(purchasable_object=run)
+    basket, _ = Basket.objects.get_or_create(user=user)
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+
+    finaid_discount = UnlimitedUseDiscountFactory.create(
+        payment_type=PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     )
 
-    assert basket.discounts.count() == 1
-    assert basket.discounts.filter(redeemed_discount=finaid_tier.discount).exists()
+    apply_discount_to_basket(basket, finaid_discount)
 
-    regular_discount = UnlimitedUseDiscountFactory.create(
-        amount=50, discount_type=DISCOUNT_TYPE_FIXED_PRICE
-    )
-    apply_discount_to_basket(basket, regular_discount)
-
-    assert basket.discounts.count() == 1
-    # The finaid discount should override the user discount, so we should now
-    # have the regular discount, because it's better.
-    assert basket.discounts.filter(redeemed_discount=regular_discount).exists()
+    assert basket.discounts.count() == 0
 
 
 def test_get_auto_apply_discounts(user):  # noqa: PLR0915

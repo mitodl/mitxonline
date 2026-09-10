@@ -1226,20 +1226,33 @@ def get_auto_apply_discounts_for_basket(basket_id: int) -> QuerySet[Discount]:
     )
 
 
-def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid=False):  # noqa: C901
+def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid=False):
     """
     Apply a discount to a basket.
 
     Discount application is subject to rules:
-    - The discount itself must be valid on its face (not inactive, applies to products, etc.)
-    - The discount is not a financial assistance tier discount, unless allow_finaid is set
-    - The discount provides a better price to the learner than any other applied discount
-    - The discount is not overriding a user discount
+    - The discount itself must be valid on its face (inside its
+      activation/expiration window, applies to products, tied to no user or to
+      this one, within its redemption limits, and -- for a
+      program-child-purchase discount -- the learner still holds an unconsumed
+      qualifying prior purchase among the basket's products)
+    - The discount is not a discount marked as financial assistance
+      (``payment_type``), unless allow_finaid is set
+    - The discount prices some basket item at or below that item's current
+      discounted price
 
-    If a user discount is supplied to this function, then that discount will be
-    applied _unless_ a financial assistance discount is also applied. User
-    discounts take precedence over any other discount, other than financial
-    assistance discounts.
+    For the single-item baskets checkout builds -- ``_create_basket_from_product``
+    and ``create_basket_with_products`` in ecommerce/views/v0 empty the basket
+    before adding, unless ENABLE_MULTIPLE_CART_ITEMS is on, which it is not by
+    default -- the cheapest applicable discount wins whatever order the
+    candidates arrive in: no class of discount outranks another, so a user-tied
+    discount, a financial assistance tier discount, an automatic discount and a
+    typed-in code all compete on price alone, and a candidate that ties the
+    applied price replaces it, which is why the basket view applies the code the
+    learner typed in last. With several items the rule is bullet 3 exactly: a
+    candidate is kept when it prices *some* item at or below the applied price,
+    so which candidates survive, and the basket total, depend on the order they
+    arrive in.
 
     This function is not for use with B2B or verified program enrollment code
     redemption. Those use cases have their own redemption code paths because
@@ -1257,65 +1270,16 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
         }
 
         if basket.discounts.count() > 0 and basket.basket_items.count() > 0:
-            # Check to make sure the supplied discount can be applied. This means
-            # that it should not override any user discounts that are applied,
-            # and it should be better than the other discounts in the basket.
+            found_better = False
 
-            if discount.user_discount_discount.filter(user=basket.user).exists():
-                # This is a user discount.
-                # Check for an existing tier discount - user discount shouldn't override that
-                finaid_discounts = [
-                    basket_discount
-                    for basket_discount in basket.discounts.all()
-                    if basket_discount.redeemed_discount.flexible_price_tiers.count()
-                    > 0
-                ]
+            for item in basket.basket_items.all():
+                test_price = discount.discount_product(item.product, basket.user)
+                if test_price is not None and item.discounted_price >= test_price:
+                    found_better = True
+                    break
 
-                if len(finaid_discounts) > 0:
-                    # There is a finaid discount, so don't apply this user one.
-                    return
-            else:
-                is_finaid_discount = discount.flexible_price_tiers.exists()
-                has_user_discount = (
-                    basket.discounts.filter(
-                        redeemed_discount__user_discount_discount__user=basket.user
-                    ).count()
-                    > 0
-                )
-
-                if is_finaid_discount and not allow_finaid:
-                    # Financial assistance discount; bail unless the flag is set
-                    return
-
-                if has_user_discount and is_finaid_discount and allow_finaid:
-                    # Basket has a user discount applied; this is a finaid
-                    # discount (and we're allowed to apply it); apply the
-                    # discount without further evaluation.
-
-                    BasketDiscount.objects.update_or_create(
-                        redeemed_by=basket.user,
-                        redeemed_basket=basket,
-                        defaults=defaults,
-                        create_defaults=defaults,
-                    )
-                    return
-
-                if has_user_discount:
-                    # This basket has a user discount applied; this isn't a
-                    # finaid discount that we're permitting to be applied; so
-                    # skip this one.
-                    return
-
-                found_better = False
-
-                for item in basket.basket_items.all():
-                    test_price = discount.discount_product(item.product, basket.user)
-                    if test_price is not None and item.discounted_price >= test_price:
-                        found_better = True
-                        break
-
-                if not found_better:
-                    return
+            if not found_better:
+                return
 
         BasketDiscount.objects.update_or_create(
             redeemed_by=basket.user,
