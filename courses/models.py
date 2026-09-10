@@ -934,6 +934,9 @@ class CourseProgramPrefetcher(Prefetcher):
                 "all_requirements__course_id",
                 distinct=True,
                 filter=Q(all_requirements__node_type=ProgramRequirementNodeType.COURSE),
+                # A program can join on a course_id whose node_type is not
+                # COURSE, which aggregates to NULL rather than an empty array.
+                default=[],
             )
         )
 

@@ -651,11 +651,7 @@ class _FinancialAssistanceForms:
             for program_page in self.program_pages_by_program_id.values()
         )
 
-        (
-            self.forms_by_parent_path,
-            self.forms_by_course_id,
-            self.forms_by_program_id,
-        ) = self._load_forms(course_ids, every_program_id, parent_paths)
+        self._load_forms(course_ids, every_program_id, parent_paths)
 
     @staticmethod
     def _load_programs(course_ids: list[int]) -> dict[int, list[Program]]:
@@ -679,9 +675,12 @@ class _FinancialAssistanceForms:
                 "all_requirements__course_id",
                 distinct=True,
                 filter=Q(all_requirements__node_type=ProgramRequirementNodeType.COURSE),
+                # A program can join on a course_id whose node_type is not
+                # COURSE, which aggregates to NULL rather than an empty array.
+                default=[],
             )
         ):
-            for course_id in program.course_ids or []:
+            for course_id in program.course_ids:
                 if course_id in wanted:
                     programs_by_course_id[course_id].append(program)
         return programs_by_course_id
@@ -744,13 +743,15 @@ class _FinancialAssistanceForms:
 
     def _load_forms(
         self, course_ids: list[int], program_ids: set[int], parent_paths: set[str]
-    ):
+    ) -> None:
         """
         The live forms this batch could consult, bucketed the three ways they
         are asked for.
 
         The three buckets are exactly the three lookups ``url_for`` performs,
-        so a form outside them can never be returned.
+        so a form outside them can never be returned. Sets
+        ``forms_by_parent_path``, ``forms_by_course_id`` and
+        ``forms_by_program_id``.
 
         Args:
             course_ids (list of int): Course ids a form may be tied to
