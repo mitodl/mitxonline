@@ -42,7 +42,9 @@ def test_sync_hubspot_deal_uai_order_with_uai_token(
 
     sync_hubspot_deal(hubspot_order)
     mock_sync.assert_called_once_with(
-        args=(hubspot_order.id,), kwargs={"is_uai": True, "is_xpro": False}, countdown=10
+        args=(hubspot_order.id,),
+        kwargs={"is_uai": True, "is_xpro": False},
+        countdown=10,
     )
 
     if raise_exc:
@@ -70,7 +72,9 @@ def test_sync_hubspot_deal_non_uai_order(
 
     sync_hubspot_deal(hubspot_order)
     mock_sync.assert_called_once_with(
-        args=(hubspot_order.id,), kwargs={"is_uai": False, "is_xpro": False}, countdown=10
+        args=(hubspot_order.id,),
+        kwargs={"is_uai": False, "is_xpro": False},
+        countdown=10,
     )
 
     if raise_exc:
