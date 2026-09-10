@@ -18,6 +18,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPES,
+    REDEMPTION_TYPE_INTERNAL,
     TRANSACTION_TYPE_REFUND,
 )
 from ecommerce.models import (
@@ -200,33 +201,47 @@ def discount_is_price_neutral(discount) -> bool:
     )
 
 
-class ProgramChildPurchaseShapeMixin:
+class DiscountShapeMixin:
     """
-    Runs the paid-amount-off / program-child-purchase shape rules over the
-    merged field values, so a PATCH that would make the stored row invalid is
-    a 400 rather than an unconverted ValidationError out of Model.save().
+    Runs the Discount shape rules over the merged field values, so a PATCH that
+    would make the stored row invalid is a 400 rather than an unconverted
+    ValidationError out of Model.save(). Also enforces the one rule those
+    row-local checks cannot see: an internal discount may not be re-typed.
 
     Mix into any serializer that writes a Discount.
     """
 
     def validate(self, attrs):
-        def _value(name, default=None):
+        def _merged(name, default=None):
             if name in attrs:
                 return attrs[name]
             return getattr(self.instance, name, default)
 
+        # An internal discount's code is visible on receipts, so any other
+        # redemption type would make that code live. The model cannot carry
+        # this rule: by the time save() runs, the instance holds the new value
+        # and the stored one is gone.
+        if (
+            self.instance is not None
+            and self.instance.redemption_type == REDEMPTION_TYPE_INTERNAL
+            and _merged("redemption_type") != REDEMPTION_TYPE_INTERNAL
+        ):
+            raise serializers.ValidationError(
+                {"redemption_type": "An internal discount cannot change type."}
+            )
+
         validate_program_child_purchase_shape(
-            discount_type=_value("discount_type"),
-            redemption_type=_value("redemption_type"),
-            amount=_value("amount"),
-            automatic=_value("automatic", default=False),
+            discount_type=_merged("discount_type"),
+            redemption_type=_merged("redemption_type"),
+            amount=_merged("amount"),
+            automatic=_merged("automatic", default=False),
             discount=self.instance,
         )
 
         return super().validate(attrs)
 
 
-class DiscountSerializer(ProgramChildPurchaseShapeMixin, serializers.ModelSerializer):
+class DiscountSerializer(DiscountShapeMixin, serializers.ModelSerializer):
     """Serializes a discount."""
 
     class Meta:

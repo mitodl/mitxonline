@@ -943,6 +943,20 @@ def test_discount_rest_api(admin_drf_client, user_drf_client):
     assert Discount.objects.filter(pk=discount_payload["id"]).count() == 0
 
 
+def test_discount_rest_api_refuses_to_retype_an_internal_discount(admin_drf_client):
+    """Staff can edit discounts over the API, but re-typing an internal one would make its code live."""
+    discount = InternalDiscountFactory.create()
+
+    resp = admin_drf_client.patch(
+        reverse("v0:discounts_api-detail", kwargs={"pk": discount.id}),
+        {"redemption_type": REDEMPTION_TYPE_UNLIMITED},
+    )
+
+    assert resp.status_code == 400
+    discount.refresh_from_db()
+    assert discount.redemption_type == REDEMPTION_TYPE_INTERNAL
+
+
 def test_attaching_a_non_program_product_to_a_program_child_purchase_discount_is_a_400(
     admin_drf_client,
 ):
