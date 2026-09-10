@@ -21,7 +21,6 @@ from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import permission_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import GenericAPIView
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -77,6 +76,7 @@ from main.constants import (
     USER_MSG_TYPE_ENROLL_FAILED,
     USER_MSG_TYPE_ENROLLED,
 )
+from main.pagination import Pagination
 from main.utils import encode_json_cookie_value, redirect_with_user_message
 from openapi.utils import extend_schema_get_queryset
 from openedx.api import (
@@ -99,15 +99,6 @@ class UpdateCourseRunEnrollmentSerializer(serializers.Serializer):
     receive_emails = serializers.BooleanField(
         required=False, help_text="Whether to receive course emails"
     )
-
-
-class Pagination(PageNumberPagination):
-    """Paginator class for infinite loading"""
-
-    page_size = 12
-    page_size_query_param = "page_size"
-    max_page_size = 100
-    ordering = "-created_on"
 
 
 class ProgramViewSet(viewsets.ReadOnlyModelViewSet):

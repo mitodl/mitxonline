@@ -6,16 +6,10 @@ to import elsewhere.
 """
 
 from django.shortcuts import get_object_or_404
-from rest_framework.pagination import PageNumberPagination
 
+from main.pagination import Pagination
 
-class Pagination(PageNumberPagination):
-    """Paginator class for infinite loading"""
-
-    page_size = 12
-    page_size_query_param = "page_size"
-    max_page_size = 100
-    ordering = "-created_on"
+__all__ = ["Pagination", "ReadableIdLookupMixin"]
 
 
 class ReadableIdLookupMixin:

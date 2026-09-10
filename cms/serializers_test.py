@@ -8,12 +8,13 @@ import bleach
 import pytest
 from django.test import RequestFactory
 
+from cms.api import resolve_financial_assistance_form_urls
 from cms.factories import (
     CoursePageFactory,
     FlexiblePricingFormFactory,
     ProgramPageFactory,
 )
-from cms.models import FlexiblePricingRequestForm
+from cms.models import CoursePage, FlexiblePricingRequestForm
 from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses.factories import (
     CourseFactory,
@@ -291,16 +292,22 @@ def test_serialized_course_finaid_form_url(
     if related_program:
         program1.add_related_program(program2)
 
+    # financial_assistance_form_url is a cached_property on CoursePage, so each
+    # assertion below needs a freshly loaded page - re-serializing the same
+    # in-memory instance would return the answer cached before the form existed.
+    def serialize_fresh():
+        return CoursePageSerializer(CoursePage.objects.get(pk=course1.page.pk)).data
+
     if own_program_has_form:
         own_fa_page = FlexiblePricingFormFactory.create(
             parent=program1.page, selected_program=program1
         )
 
-        serialized_output = CoursePageSerializer(course1.page).data
+        serialized_output = serialize_fresh()
 
         assert own_fa_page.slug in serialized_output["financial_assistance_form_url"]
     else:
-        serialized_output = CoursePageSerializer(course1.page).data
+        serialized_output = serialize_fresh()
 
         assert serialized_output["financial_assistance_form_url"] == ""
 
@@ -309,7 +316,7 @@ def test_serialized_course_finaid_form_url(
             parent=program2.page, selected_program=program2
         )
 
-        serialized_output = CoursePageSerializer(course1.page).data
+        serialized_output = serialize_fresh()
 
         if own_program_has_form:
             assert (
@@ -366,29 +373,27 @@ def test_serialized_course_finaid_form_url_publishing_states(
         assert serialized_output["financial_assistance_form_url"] == ""
 
 
-def test_get_course_specific_form_returns_only_live_forms(fully_configured_wagtail):
-    """_get_course_specific_form should ignore non-live forms and return the live one."""
+def test_financial_assistance_url_ignores_non_live_forms(fully_configured_wagtail):
+    """A draft form must never win over the published one."""
 
     course_page = CoursePageFactory()
 
-    # Non-live form for this course
+    # Non-live form for this course, created first so it has the lower pk and
+    # would win on min-pk if liveness were not filtered.
     FlexiblePricingFormFactory(
         parent=course_page,
         selected_course=course_page.product,
         live=False,
     )
-
-    # Live form for this course
     live_form = FlexiblePricingFormFactory(
         parent=course_page,
         selected_course=course_page.product,
         live=True,
     )
 
-    serializer = CoursePageSerializer()
-    result = serializer._get_course_specific_form(course_page)  # noqa: SLF001
+    urls = resolve_financial_assistance_form_urls([course_page.course_id])
 
-    assert result == live_form
+    assert urls[course_page.course_id].endswith(f"{live_form.slug}/")
 
 
 def test_serialize_program_page(

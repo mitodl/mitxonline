@@ -6,7 +6,7 @@ from http import HTTPStatus
 from urllib.parse import urljoin
 
 from django.conf import settings
-from django.db.models import Exists, OuterRef, Prefetch, Q
+from django.db.models import Exists, OuterRef, Q
 from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError
 
@@ -24,12 +24,19 @@ from courses.models import (
 log = logging.getLogger(__name__)
 
 
-def verified_courserun_exists():
-    """Build an Exists() annotation for whether a course has a verified run."""
+def verified_courserun_exists(manager=None):
+    """
+    Build an Exists() annotation for whether a course has a verified run.
+
+    Args:
+        manager: CourseRun manager to search. Defaults to ``CourseRun.objects``,
+            which excludes source runs. The ETL views pass ``all_objects``
+            because they report on source runs too.
+    """
     from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE  # noqa: PLC0415
 
     return Exists(
-        CourseRun.objects.filter(
+        (manager or CourseRun.objects).filter(
             course_id=OuterRef("pk"),
             enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
         )
@@ -165,12 +172,15 @@ def get_unenrollable_courses(queryset):
         queryset: Queryset of Course objects
     """
     courseruns_qs = CourseRun.objects.unenrollable()
-    return (
-        queryset.prefetch_related(Prefetch("courseruns", queryset=courseruns_qs))
-        .prefetch_related("courseruns__course")
-        .filter(courseruns__id__in=courseruns_qs.values_list("id", flat=True))
-        .distinct()
-    )
+    # Deliberately does not prefetch "courseruns" here. Callers (notably
+    # CourseViewSet) build a richer Prefetch for that relation, and re-declaring
+    # it would silently replace theirs, dropping select_related("b2b_contract")
+    # and the prefetched_enrollment_modes / prefetched_products caches.
+    # Course.get_filtered_runs applies the is_enrollable predicate in Python, so
+    # narrowing the prefetch was redundant anyway.
+    return queryset.filter(
+        courseruns__id__in=courseruns_qs.values_list("id", flat=True)
+    ).distinct()
 
 
 def get_archived_courseruns(queryset):

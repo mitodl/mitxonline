@@ -23,7 +23,6 @@ from rest_framework.decorators import (
     api_view,
     permission_classes,
 )
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import (
     AllowAny,
     IsAuthenticated,
@@ -82,6 +81,7 @@ from courses.utils import (
 from ecommerce.api import create_verified_program_course_run_enrollment
 from ecommerce.models import Product
 from main import features
+from main.pagination import Pagination
 from openapi.utils import extend_schema_get_queryset
 from openedx.api import sync_enrollments_with_edx
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
@@ -89,15 +89,6 @@ from variants.models import SupportedVariant
 
 log = logging.getLogger(__name__)
 VPE_MAX_PROGRAMS = 2
-
-
-class Pagination(PageNumberPagination):
-    """Paginator class for infinite loading"""
-
-    page_size = 12
-    page_size_query_param = "page_size"
-    max_page_size = 100
-    ordering = "-created_on"
 
 
 def user_has_org_access(user, org_id):
@@ -448,7 +439,7 @@ class CourseViewSet(
 
     def get_queryset(self):
         """Get the queryset for the viewset."""
-        queryset = Course.objects.select_related("page")
+        queryset = Course.objects.select_related("page", "page__feature_image")
         # Use Prefetch for reverse GenericRelation (products on CourseRun)
         # 1. Get the ContentType object for the CourseRun model
         courserun_content_type = ContentType.objects.get_for_model(CourseRun)
@@ -473,9 +464,22 @@ class CourseViewSet(
             .select_related("b2b_contract")
             .prefetch_related("b2b_contracts", modes_prefetch, products_prefetch),
         )
-        queryset = queryset.prefetch_related(
-            "departments", "in_programs", course_runs_prefetch
+        # Topics are serialized per course along with their parent topics, whose
+        # sort key is CoursesTopic.Meta.ordering == ["parent__name", "name"] -
+        # hence select_related down to the grandparent.
+        topics_prefetch = Prefetch(
+            "page__topics",
+            queryset=CoursesTopic.objects.select_related("parent", "parent__parent"),
         )
+        queryset = queryset.prefetch_related(
+            "departments",
+            "in_programs",
+            course_runs_prefetch,
+            topics_prefetch,
+            "page__linked_instructors__linked_instructor_page",
+        )
+        # Only booleans are ever read from these, so Exists() beats an aggregate:
+        # it needs no GROUP BY, which also keeps the paginator's COUNT cheap.
         queryset = queryset.annotate(
             has_verified_courserun=verified_courserun_exists(),
             has_live_certificate_page=live_certificate_page_exists(),
@@ -489,16 +493,25 @@ class CourseViewSet(
                 ),
             )
         )
-        queryset = queryset.prefetch(
-            PrefetchOption(
-                "programs",
-                queryset=Program.objects.filter(self.get_program_filters())
-                .filter(
-                    live=True,
-                    page__live=True,
-                )
-                .only("id", "readable_id", "title", "display_mode"),
+        # One queryset for both prefetches: the financial assistance URL is
+        # picked by walking a course's programs, so a program this view filters
+        # out of "programs" must not be able to supply the URL either.
+        program_queryset = (
+            Program.objects.filter(self.get_program_filters())
+            .filter(
+                live=True,
+                page__live=True,
             )
+            .only("id", "readable_id", "title", "display_mode", "program_type")
+        )
+        queryset = queryset.prefetch(
+            # Resolved in the queryset so nothing queries during serialization.
+            # Applies to the detail route too, since ReadableIdLookupMixin.
+            # get_object filters this same queryset.
+            PrefetchOption(
+                "financial_assistance_form_url", program_queryset=program_queryset
+            ),
+            PrefetchOption("programs", queryset=program_queryset),
         )
 
         return queryset.order_by("title").distinct()
@@ -695,6 +708,7 @@ class UserEnrollmentsApiViewSet(
         .prefetch(
             "certificate",
             "grades",
+            "run__course__financial_assistance_form_url",
             PrefetchOption(
                 "run__course__programs", queryset=Program.objects.filter(b2b_only=False)
             ),
@@ -740,9 +754,22 @@ class UserEnrollmentsApiViewSet(
         operation_id="user_enrollments_create_v2",
         description="Create a new user enrollment - API v2",
     )
-    def create(self, request, *args, **kwargs):
+    def create(self, request, *args, **kwargs):  # noqa: ARG002
         """Create a new enrollment."""
-        return super().create(request, *args, **kwargs)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        enrollment = serializer.save()
+        if enrollment is not None:
+            # serializer.save() hands back a plain instance, so the nested
+            # CourseSerializer would have to resolve its prefetched fields one
+            # query at a time. Read it back through this viewset's queryset
+            # instead: one query, and the response matches the list route.
+            serializer = self.get_serializer(self.queryset.get(pk=enrollment.pk))
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED,
+            headers=self.get_success_headers(serializer.data),
+        )
 
     @extend_schema(
         operation_id="user_enrollments_destroy_v2",
@@ -834,10 +861,7 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
             raise EnrollmentError from exc
         if len(enrollments) == 0:
             raise EnrollmentCreationFailedError
-        return Response(
-            CourseRunEnrollmentSerializer(enrollments[0]).data,
-            status=status.HTTP_201_CREATED,
-        )
+        return _created_enrollment_response(enrollments[0])
 
     # Everything checks out for a verified enrollment, so generate one.
     # This requires generating an order.
@@ -846,8 +870,23 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
         request, run, program_enrollment.program
     )
 
+    return _created_enrollment_response(enrollment)
+
+
+def _created_enrollment_response(enrollment):
+    """
+    Serialize a just-created enrollment the way a GET would.
+
+    create_run_enrollments and create_verified_program_course_run_enrollment
+    return plain instances, so the nested CourseSerializer would resolve its
+    prefetched fields lazily, one query at a time. Reading the row back through
+    UserEnrollmentsApiViewSet.queryset costs one query on a POST and keeps the
+    response identical in shape to the list and detail routes.
+    """
     return Response(
-        CourseRunEnrollmentSerializer(enrollment).data,
+        CourseRunEnrollmentSerializer(
+            UserEnrollmentsApiViewSet.queryset.get(pk=enrollment.pk)
+        ).data,
         status=status.HTTP_201_CREATED,
     )
 
@@ -999,10 +1038,11 @@ class CourseCertificateRetrieveViewSet(_BaseCertificateRetrieveViewSet):
 
     serializer_class = CourseRunCertificateSerializer
     queryset = CourseRunCertificate.objects.prefetch(
+        "course_run__course__financial_assistance_form_url",
         PrefetchOption(
             "course_run__course__programs",
             queryset=Program.objects.filter(b2b_only=False),
-        )
+        ),
     ).prefetch_related("user")
 
 
@@ -1059,7 +1099,10 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                     )
                     .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
                     .select_related("run__course__page", "run__b2b_contract")
-                    .prefetch("run__course__programs")
+                    .prefetch(
+                        "run__course__programs",
+                        "run__course__financial_assistance_form_url",
+                    )
                     .order_by("-id"),
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),
