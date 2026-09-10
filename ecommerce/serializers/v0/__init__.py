@@ -32,7 +32,7 @@ from ecommerce.models import (
     RefundRequestStatus,
 )
 from ecommerce.serializers import (
-    ProgramChildPurchaseShapeMixin,
+    DiscountShapeMixin,
     discount_is_price_neutral,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
@@ -54,7 +54,7 @@ from users.serializers import (
 User = get_user_model()
 
 
-class V0DiscountSerializer(ProgramChildPurchaseShapeMixin, serializers.ModelSerializer):
+class V0DiscountSerializer(DiscountShapeMixin, serializers.ModelSerializer):
     """Serializes a discount."""
 
     class Meta:
