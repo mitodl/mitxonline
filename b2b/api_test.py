@@ -11,7 +11,6 @@ import pytest
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
 from django.test import RequestFactory
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
@@ -86,7 +85,6 @@ from main.constants import (
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
     USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED,
     USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT,
-    USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT,
     USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE,
     USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
 )
@@ -207,7 +205,8 @@ def test_b2b_basket_validation(user, run_contract, apply_code):
     if run_contract:
         contract = factories.ContractPageFactory.create()
 
-        product.purchasable_object.b2b_contract = contract
+        product.purchasable_object.b2b_contracts.add(contract)
+        product.purchasable_object.b2b_only = True
         product.purchasable_object.save()
         product.refresh_from_db()
 
@@ -379,7 +378,8 @@ def test_ensure_enrollment_codes_clears_extras():
         max_learners=10,
         membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
     product = ProductFactory.create(purchasable_object=run)
 
     created, updated, errors = ensure_enrollment_codes_exist(contract)
@@ -498,7 +498,7 @@ def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
             assert Basket.objects.filter(user=user).count() == assert_test
 
         if not product_in_contract:
-            assert result["result"] == USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT
+            assert result["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT
             return
 
         if not user_in_contract:
@@ -562,7 +562,8 @@ def test_enroll_in_program_for_b2b(program_in_contract, program_exists):
 
     user = UserFactory.create()
     course = CourseFactory.create()
-    run = CourseRunFactory.create(course=course, b2b_contract=contract)
+    run = CourseRunFactory.create(course=course, b2b_only=True)
+    run.b2b_contracts.add(contract)
 
     product = ProductFactory.create(purchasable_object=run)
 
@@ -622,10 +623,11 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
             course=course,
             courseware_id=target_course_id,
             run_tag=CourseKey.from_string(target_course_id).run,
-            b2b_contract=contract,
+            b2b_only=True,
             language="en",
             is_primary_language=True,
         )
+        collision_run.b2b_contracts.add(contract)
 
         [(new_run, _)] = create_contract_run(contract, course)
 
@@ -1149,7 +1151,8 @@ def test_b2b_contract_removal_keeps_enrollments(mocked_b2b_org_attach):
         name="Contract Auto",
     )
 
-    courserun = CourseRunFactory.create(b2b_contract=contract_auto)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract_auto)
 
     process_add_org_membership(user, org)
 
@@ -1399,7 +1402,8 @@ def test_get_runs_without_products():
 
     contract = ContractPageFactory.create()
 
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
 
     assert run in get_contract_runs_without_products(contract)
 
@@ -1409,7 +1413,9 @@ def test_get_contract_products_with_bad_pricing():
 
     contract = ContractPageFactory.create(enrollment_fixed_price=19)
 
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
+
     product = ProductFactory.create(price=76, purchasable_object=run)
 
     assert product in get_contract_products_with_bad_pricing(contract)
@@ -1420,7 +1426,8 @@ def test_ensure_contract_run_products():
 
     contract = ContractPageFactory.create()
 
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
 
     created_products = ensure_contract_run_products(contract)
 
@@ -1433,7 +1440,9 @@ def test_ensure_contract_run_pricing():
 
     contract = ContractPageFactory.create(enrollment_fixed_price=19)
 
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
+
     product = ProductFactory.create(price=76, purchasable_object=run)
 
     ensure_contract_run_pricing(contract)
@@ -1455,7 +1464,9 @@ def test_remove_extra_codes():
         membership_type=CONTRACT_MEMBERSHIP_CODE,
         max_learners=5,
     )
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
+
     product = ProductFactory.create(price=76, purchasable_object=run)
 
     ensure_enrollment_codes_exist(contract)
@@ -1592,7 +1603,9 @@ def test_apply_available_discount_seat_limit():
         max_learners=2,
         membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
-    CourseRunFactory.create_batch(2, b2b_contract=contract)
+    contract_runs = CourseRunFactory.create_batch(2, b2b_only=True)
+    for contract_run in contract_runs:
+        contract_run.b2b_contracts.add(contract)
     user_orgs = factories.UserOrganizationFactory.create_batch(
         3, organization=contract.organization
     )
@@ -1671,12 +1684,16 @@ def test_apply_available_discount_unlimited_seats(existing_discounts):
         max_learners=0,
         membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
-    CourseRunFactory.create_batch(2, b2b_contract=contract)
+    contract_runs = CourseRunFactory.create_batch(2, b2b_only=True)
+    for run in contract_runs:
+        run.b2b_contracts.add(contract)
     user_orgs = factories.UserOrganizationFactory.create_batch(
         3, organization=contract.organization
     )
 
     products = ensure_contract_run_products(contract)
+    assert products
+
     if existing_discounts:
         # Testing for existing discounts means we should create some orders where
         # the discount is used, to make sure we don't end up with extras.
@@ -1794,41 +1811,51 @@ def test_create_contract_run_duplicate_language_source_raises(mocker, in_contrac
     """
     Test that you can't create two source runs with the same run tag and language.
 
-    This is enforced as a unique constraint so trying to do this should fail,
-    unless the runs are in different contracts (or one is in a contract and the
-    other isn't).
+    This is enforced in application code (see
+    ``CourseRun.validate_b2b_contract_group_uniqueness``) so trying to do this
+    should fail, unless the runs are in different contracts (or one is in a
+    contract and the other isn't).
     """
     contract = None if in_contract == "no" else ContractPageFactory.create()
     course = CourseFactory.create()
-    CourseRunFactory.create(
+    first_run = CourseRunFactory.create(
         course=course,
         run_tag="1T2026",
         language="en",
         is_source_run=True,
         is_primary_language=True,
         courseware_id=f"{course.readable_id}+1T2026-en",
-        b2b_contract=contract if in_contract in ["first", "both"] else None,
+    )
+    if in_contract in ["first", "both"]:
+        first_run.b2b_only = True
+        first_run.save()
+        first_run.b2b_contracts.add(contract)
+
+    second_run = CourseRunFactory.build(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en-copy",
     )
 
-    if in_contract in ["no", "both"]:
-        with pytest.raises(IntegrityError, match="unique_language_per_group"):
-            CourseRunFactory.create(
-                course=course,
-                run_tag="1T2026",
-                language="en",
-                is_source_run=True,
-                courseware_id=f"{course.readable_id}+1T2026-en-copy",
-                b2b_contract=contract,
-            )
+    if in_contract == "both":
+        second_run.b2b_only = True
+        second_run.save()
+
+        with pytest.raises(ValidationError):
+            second_run.b2b_contracts.add(contract)
+    elif in_contract == "no":
+        # Both runs are public, so re-validating the existing row surfaces the
+        # collision.
+        with pytest.raises(ValidationError):
+            second_run.save()
     else:
-        CourseRunFactory.create(
-            course=course,
-            run_tag="1T2026",
-            language="en",
-            is_source_run=True,
-            courseware_id=f"{course.readable_id}+1T2026-en-copy",
-            b2b_contract=contract if in_contract == "second" else None,
-        )
+        if in_contract == "second":
+            second_run.b2b_only = True
+            second_run.save()
+            second_run.b2b_contracts.add(contract)
+        second_run.save()
 
 
 def test_create_contract_run_single_language_legacy(mocker):
@@ -2220,7 +2247,8 @@ def test_enroll_prereqs_existing_enrollment(mocker, change_status):
     """
 
     contract = ContractPageFactory.create()
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
     product = ProductFactory.create(purchasable_object=run)
 
     user = UserFactory.create()

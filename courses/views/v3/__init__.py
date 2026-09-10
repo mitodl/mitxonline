@@ -72,13 +72,13 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
     def filter_exclude_b2b(self, queryset, name, value):  # noqa: ARG002
         """Filter out B2B enrollments if exclude_b2b is True."""
         if value:
-            return queryset.filter(run__b2b_contract__isnull=True)
+            return queryset.filter(run__b2b_contracts__isnull=True)
         return queryset
 
     def filter_org_id(self, queryset, name, value):  # noqa: ARG002
         """Filter enrollments by B2B organization ID."""
         if value:
-            return queryset.filter(run__b2b_contract__organization_id=value)
+            return queryset.filter(run__b2b_contracts__organization_id=value)
         return queryset
 
 
@@ -115,6 +115,7 @@ class UserEnrollmentsApiViewSet(
             "run__b2b_contract",
         )
         .prefetch_related(
+            "run__b2b_contracts",
             "run__course",
             "run__course__page",
             Prefetch(
@@ -484,7 +485,7 @@ def get_course_variant_runs(request):
         Prefetch(
             "courseruns",
             queryset=get_enrollable_courseruns_qs()
-            .filter(b2b_contract_id=contract)
+            .filter(b2b_contracts=contract)
             .filter(variant_filter),
         )
     )

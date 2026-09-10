@@ -1091,10 +1091,12 @@ def test_next_run_id_with_org_filter(  # noqa: PLR0915
     # create a run for the other org, same course, and starting before b2b_run
     second_eligible_b2b_run = CourseRunFactory.create(
         b2b_contract=third_contract_first_org,
+        b2b_only=True,
         start_date=one_month_prior - timedelta(days=5),
         enrollment_start=one_month_prior - timedelta(days=5),
         course=b2b_run.course,
     )
+    second_eligible_b2b_run.b2b_contracts.add(third_contract_first_org)
 
     # we're not in this contract so we should get the b2b_run id next
     resp = auth_api_client.get(f"{url}?org_id={contract.organization.id}")
@@ -1115,11 +1117,6 @@ def test_next_run_id_with_org_filter(  # noqa: PLR0915
     assert resp_course["next_run_id"] == second_eligible_b2b_run.id
 
     # same test as above, but filter on contract ID
-
-    url = reverse(
-        "v2:courses_api-detail",
-        kwargs={"pk": b2b_course.id},
-    )
 
     resp = auth_api_client.get(f"{url}?contract_id={contract.id}")
 
@@ -2604,7 +2601,7 @@ def test_get_courses_b2b_runs(with_b2b, single, user_drf_client):
 
     contract = ContractPageFactory.create() if with_b2b else None
 
-    test_course_run = CourseRunFactory.create(b2b_contract=contract)
+    test_course_run = CourseRunFactory.create(b2b_only=with_b2b, b2b_contract=contract)
 
     url = reverse("v2:courses_api-list")
     response_raw = user_drf_client.get(
@@ -2826,7 +2823,8 @@ def test_course_run_and_product_prefetch_optimized(
         ProductFactory(
             purchasable_object=run,
         )
-    max_expected_queries = 21
+    # increased below from 21 to 27 - the M2M for b2b_contracts adds some queries
+    max_expected_queries = 27
     num_queries_before = len(connection.queries)
     with django_assert_max_num_queries(max_expected_queries):
         resp = user_drf_client.get(reverse("v2:courses_api-list"))
@@ -2841,8 +2839,9 @@ def test_course_run_and_product_prefetch_optimized(
     product_queries = [
         q for q in queries_after if 'FROM "ecommerce_product"' in q.get("sql", "")
     ]
-    assert len(product_queries) == 2, (
-        f"Expected 1 product query, got {len(product_queries)}: {[q['sql'] for q in product_queries]}"
+    # increased below from 2 to 3 - the M2M for b2b_contracts adds some queries
+    assert len(product_queries) == 3, (
+        f"Expected 3 product query, got {len(product_queries)}: {[q['sql'] for q in product_queries]}"
     )
 
 
@@ -2946,3 +2945,57 @@ def test_correct_courserun_languages(user_drf_client, primary):
     assert (
         regular_run.id if primary == "transreg" else translated_regular_run.id
     ) not in seen_run_ids
+
+
+@pytest.mark.django_db
+@pytest.mark.skip_nplusone_check
+def test_filter_returns_contracted_public_course(
+    mocker, contract_ready_course, mock_course_run_clone
+):
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    user.b2b_organizations.add(org)
+    user.b2b_contracts.add(contract)
+    user.refresh_from_db()
+
+    (course, _) = contract_ready_course
+    contract_runs = create_contract_run(contract, course)
+    (course_run, _) = contract_runs[0]
+
+    course_run.b2b_only = False
+    course_run.save()
+
+    contract_2 = ContractPageFactory(organization=org, active=True)
+    contract_runs = create_contract_run(contract_2, course)
+    (course_run_2, _) = contract_runs[0]
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    url = reverse("v2:courses_api-list")
+    response = client.get(url, {"org_id": org.id})
+
+    returned_course = [
+        result for result in response.data["results"] if result["id"] == course.id
+    ]
+    assert len(returned_course) == 1
+
+    returned_course = returned_course.pop()
+    run_ids = [returned_run["id"] for returned_run in returned_course["courseruns"]]
+    assert course_run.id in run_ids
+    assert course_run_2.id in run_ids
+
+    # run above again - we should still get the run even without the filtering
+    url = reverse("v2:courses_api-list")
+    response = client.get(url)
+
+    returned_course = [
+        result for result in response.data["results"] if result["id"] == course.id
+    ]
+    assert len(returned_course) == 1
+
+    returned_course = returned_course.pop()
+    run_ids = [returned_run["id"] for returned_run in returned_course["courseruns"]]
+    assert course_run.id in run_ids
+    assert course_run_2.id not in run_ids

@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from django.contrib import admin
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.db.models import Count
+from django.urls import reverse
 from django.utils.html import format_html
 
 from b2b.api import get_events_for_message_ids, should_persist_event
@@ -103,11 +104,10 @@ class ContractPageProgramInline(DisplayOnlyAdminMixin, admin.TabularInline):
 class ContractPageCourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
     """Inline to display course runs for contract pages."""
 
-    model = CourseRun
-    fk_name = "b2b_contract"
+    model = CourseRun.b2b_contracts.through
     extra = 0
     fields = [
-        "title_linked",
+        "courseware_id",
         "title",
         "run_tag",
         "language",
@@ -115,7 +115,7 @@ class ContractPageCourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
         "variant_industry",
     ]
     readonly_fields = [
-        "title_linked",
+        "courseware_id",
         "title",
         "run_tag",
         "language",
@@ -125,6 +125,36 @@ class ContractPageCourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
 
     verbose_name = "Contract Course Run"
     verbose_name_plural = "Contract Course Runs"
+
+    @admin.display(description="Courseware ID")
+    def courseware_id(self, obj):
+        admin_link = reverse("admin:courses_courserun_change", args=(obj.courserun.id,))
+        course_admin_link = reverse(
+            "admin:courses_course_change", args=(obj.courserun.course.id,)
+        )
+        return format_html(
+            f'{obj.courserun.courseware_id} &bull; Admins: <a href="{admin_link}">Run</a> -  <a href="{course_admin_link}">Course</a>'
+        )
+
+    @admin.display(description="Course Title")
+    def title(self, obj):
+        return obj.courserun.title
+
+    @admin.display(description="Run Tag")
+    def run_tag(self, obj):
+        return obj.courserun.run_tag
+
+    @admin.display(description="Language")
+    def language(self, obj):
+        return obj.courserun.language
+
+    @admin.display(description="Variant Length")
+    def variant_length(self, obj):
+        return obj.courserun.variant_length
+
+    @admin.display(description="Variant Industry")
+    def variant_industry(self, obj):
+        return obj.courserun.variant_industry
 
 
 @admin.register(DiscountContractAttachmentRedemption)

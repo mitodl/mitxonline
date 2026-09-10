@@ -336,19 +336,17 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 # - If it's in a contract already and we *are* forcing it, set it to be in this contract.
                 # - If it's not in a contract, add it to this contract.
 
-                if (
-                    not force_associate
-                    and courseware.b2b_contract
-                    and courseware.b2b_contract != contract
-                ):
+                other_contracts = courseware.b2b_contracts.exclude(id=contract.id)
+
+                if not force_associate and other_contracts.exists():
                     # Already owned by another contract, so skip
                     self.stdout.write(
                         self.style.WARNING(
-                            f"Run '{courseware.courseware_id}' is already owned by {courseware.b2b_contract}."
+                            f"Run '{courseware.courseware_id}' is already owned by {other_contracts.first()}."
                         )
                     )
                     continue
-                elif courseware.b2b_contract == contract:
+                elif courseware.b2b_contracts.filter(id=contract.id).exists():
                     # Already owned by this contract, so skip
                     self.stdout.write(
                         self.style.WARNING(
@@ -360,6 +358,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 # Add the run to the contract
                 courseware.b2b_contract = contract
                 courseware.save()
+                courseware.b2b_contracts.add(contract)
                 managed += 1
             elif self.create_run(
                 contract,
@@ -401,7 +400,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 if remove_runs:
                     program_courses = courseware.courses
                     program_runs = CourseRun.objects.filter(
-                        b2b_contract=contract,
+                        b2b_contracts=contract,
                         course__in=[course for (course, _) in program_courses],
                     ).all()
 
@@ -427,7 +426,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 # there's nothing else to do here.
 
                 course_contract_runs = courseware.courseruns.filter(
-                    b2b_contract=contract
+                    b2b_contracts=contract
                 ).all()
 
                 coursewares.extend(course_contract_runs)
@@ -455,8 +454,13 @@ Specifying a program will only unlink the program from the contract, unless "--r
                     courseware.enrollment_end = now
 
                 # If there are no enrollments, detach the run from the contract
-                if not has_enrollments and courseware.b2b_contract == contract:
-                    courseware.b2b_contract = None
+                if (
+                    not has_enrollments
+                    and courseware.b2b_contracts.filter(id=contract.id).exists()
+                ):
+                    if courseware.b2b_contract == contract:
+                        courseware.b2b_contract = None
+                    courseware.b2b_contracts.remove(contract)
 
                 courseware.save()
 

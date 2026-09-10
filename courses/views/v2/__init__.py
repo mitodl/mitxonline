@@ -346,8 +346,14 @@ class CourseFilterSet(django_filters.FilterSet):
 
         if user_has_org_access(user, value):
             return queryset.filter(
-                courseruns__b2b_contract__organization_id=value,
-                courseruns__b2b_contract__active=True,
+                Q(
+                    courseruns__b2b_contract__organization_id=value,
+                    courseruns__b2b_contract__active=True,
+                )
+                | Q(
+                    courseruns__b2b_contracts__active=True,
+                    courseruns__b2b_contracts__organization_id=value,
+                )
             )
         return Course.objects.none()
 
@@ -365,8 +371,14 @@ class CourseFilterSet(django_filters.FilterSet):
             and user.b2b_contracts.filter(id=value).exists()
         ):
             return queryset.filter(
-                courseruns__b2b_contract__id=value,
-                courseruns__b2b_contract__active=True,
+                Q(
+                    courseruns__b2b_contract__id=value,
+                    courseruns__b2b_contract__active=True,
+                )
+                | Q(
+                    courseruns__b2b_contracts__active=True,
+                    courseruns__b2b_contracts__id=value,
+                )
             )
         return Course.objects.none()
 
@@ -459,7 +471,7 @@ class CourseViewSet(
             "courseruns",
             queryset=CourseRun.objects.order_by("id")
             .select_related("b2b_contract")
-            .prefetch_related(modes_prefetch, products_prefetch),
+            .prefetch_related("b2b_contracts", modes_prefetch, products_prefetch),
         )
         queryset = queryset.prefetch_related(
             "departments", "in_programs", course_runs_prefetch
@@ -637,14 +649,22 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
 
     def filter_exclude_b2b(self, queryset, name, value):  # noqa: ARG002
         """Filter out B2B enrollments if exclude_b2b is True."""
+
+        # At this point, the only sure way to determine if an enrollment is a
+        # B2B one is if the run is marked as b2b_only. The enrollment APIs will
+        # need to be updated so we can track enrollments in public courses that
+        # are also B2B, which hasn't happened yet.
         if value:
-            return queryset.filter(run__b2b_contract__isnull=True)
+            return queryset.filter(run__b2b_only=False)
         return queryset
 
     def filter_org_id(self, queryset, name, value):  # noqa: ARG002
         """Filter enrollments by B2B organization ID."""
         if value:
-            return queryset.filter(run__b2b_contract__organization_id=value)
+            return queryset.filter(
+                Q(run__b2b_contract__organization_id=value)
+                | Q(run__b2b_contracts__organization_id=value)
+            )
         return queryset
 
 
