@@ -126,7 +126,9 @@ class BasketItemViewSet(ModelViewSet):
         if getattr(self, "swagger_fake_view", False):
             return BasketItem.objects.none()
 
-        return BasketItem.objects.filter(basket__user=self.request.user)
+        # BasketItem has no Meta.ordering, so without this the row order is
+        # whatever Postgres hands back - it varies between requests.
+        return BasketItem.objects.filter(basket__user=self.request.user).order_by("id")
 
 
 @extend_schema_view(
