@@ -493,20 +493,25 @@ class CourseViewSet(
                 ),
             )
         )
+        # One queryset for both prefetches: the financial assistance URL is
+        # picked by walking a course's programs, so a program this view filters
+        # out of "programs" must not be able to supply the URL either.
+        program_queryset = (
+            Program.objects.filter(self.get_program_filters())
+            .filter(
+                live=True,
+                page__live=True,
+            )
+            .only("id", "readable_id", "title", "display_mode", "program_type")
+        )
         queryset = queryset.prefetch(
             # Resolved in the queryset so nothing queries during serialization.
             # Applies to the detail route too, since ReadableIdLookupMixin.
             # get_object filters this same queryset.
-            "financial_assistance_form_url",
             PrefetchOption(
-                "programs",
-                queryset=Program.objects.filter(self.get_program_filters())
-                .filter(
-                    live=True,
-                    page__live=True,
-                )
-                .only("id", "readable_id", "title", "display_mode", "program_type"),
+                "financial_assistance_form_url", program_queryset=program_queryset
             ),
+            PrefetchOption("programs", queryset=program_queryset),
         )
 
         return queryset.order_by("title").distinct()

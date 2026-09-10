@@ -40,6 +40,7 @@ from courses.models import (
     Program,
     ProgramRequirementNodeType,
     RelatedProgram,
+    default_program_queryset,
 )
 from courses.utils import (
     get_enrollable_courseruns_qs,
@@ -47,6 +48,8 @@ from courses.utils import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
+    from courses.models import ProgramQuerySet
 
 log = logging.getLogger(__name__)
 DEFAULT_HOMEPAGE_PROPS = dict(  # noqa: C408
@@ -618,16 +621,20 @@ class _FinancialAssistanceForms:
 
     Args:
         course_ids (list of int): the Course ids this instance can resolve
+        program_queryset (ProgramQuerySet): the programs a URL may be drawn
+            from - see ``_load_programs``
     """
 
-    def __init__(self, course_ids: list[int]) -> None:
+    def __init__(
+        self, course_ids: list[int], program_queryset: ProgramQuerySet
+    ) -> None:
         self.pages_by_course_id = {
             page.course_id: page
             for page in cms_models.CoursePage.objects.filter(
                 course_id__in=course_ids
             ).select_related("course")
         }
-        self.programs_by_course_id = self._load_programs(course_ids)
+        self.programs_by_course_id = self._load_programs(program_queryset, course_ids)
 
         own_program_ids = {
             program.id
@@ -654,13 +661,23 @@ class _FinancialAssistanceForms:
         self._load_forms(course_ids, every_program_id, parent_paths)
 
     @staticmethod
-    def _load_programs(course_ids: list[int]) -> dict[int, list[Program]]:
+    def _load_programs(
+        program_queryset: ProgramQuerySet, course_ids: list[int]
+    ) -> dict[int, list[Program]]:
         """
-        Programs per course, matching ``Course.programs``.
+        Programs per course, drawn from the caller's own program scope.
 
-        Every program linked through a COURSE requirement node, unfiltered.
+        Deliberately the same shape as ``CourseProgramPrefetcher.filter``: the
+        two answer the same question, and a program the caller filtered out of
+        a course's ``programs`` must not be able to supply that course's
+        financial assistance URL either.
+
+        Only ``program.id`` and the ``course_ids`` annotation are read, so a
+        caller narrowing the queryset with ``.only(...)`` cannot trip a
+        deferred-field reload here.
 
         Args:
+            program_queryset (ProgramQuerySet): the programs to draw from
             course_ids (list of int): the Course ids to look up
 
         Returns:
@@ -668,7 +685,7 @@ class _FinancialAssistanceForms:
         """
         programs_by_course_id = defaultdict(list)
         wanted = set(course_ids)
-        for program in Program.objects.filter(
+        for program in program_queryset.filter(
             all_requirements__course_id__in=course_ids
         ).annotate(
             course_ids=ArrayAgg(
@@ -927,6 +944,7 @@ class _FinancialAssistanceForms:
 
 def resolve_financial_assistance_form_urls(
     course_ids: Iterable[int],
+    program_queryset: ProgramQuerySet | None = None,
 ) -> dict[int, str]:
     """
     Financial assistance form URL per course id, in a fixed number of queries.
@@ -938,6 +956,10 @@ def resolve_financial_assistance_form_urls(
 
     Args:
         course_ids: iterable of Course ids
+        program_queryset: the programs a URL may be drawn from. Pass the same
+            queryset the caller hands the ``programs`` prefetch; ``None`` falls
+            back to ``default_program_queryset()``, which is that prefetch's own
+            default.
 
     Returns:
         dict: {course_id: url}, with "" for courses that have no form
@@ -946,5 +968,8 @@ def resolve_financial_assistance_form_urls(
     if not course_ids:
         return {}
 
-    forms = _FinancialAssistanceForms(course_ids)
+    if program_queryset is None:
+        program_queryset = default_program_queryset()
+
+    forms = _FinancialAssistanceForms(course_ids, program_queryset)
     return {course_id: forms.url_for(course_id) for course_id in course_ids}

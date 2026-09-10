@@ -103,15 +103,18 @@ class IngestibleCourseViewSet(viewsets.ReadOnlyModelViewSet):
             has_verified_courserun=verified_courserun_exists(CourseRun.all_objects),
             has_live_certificate_page=live_certificate_page_exists(),
         )
+        # One queryset for both prefetches: the financial assistance URL is
+        # picked by walking a course's programs, so a program this view filters
+        # out of "programs" must not be able to supply the URL either.
+        program_queryset = Program.objects.filter(
+            live=True,
+            page__live=True,
+        ).only("id", "readable_id", "title", "display_mode", "program_type")
         queryset = queryset.prefetch(
-            "financial_assistance_form_url",
             PrefetchOption(
-                "programs",
-                queryset=Program.objects.filter(
-                    live=True,
-                    page__live=True,
-                ).only("id", "readable_id", "title", "display_mode", "program_type"),
+                "financial_assistance_form_url", program_queryset=program_queryset
             ),
+            PrefetchOption("programs", queryset=program_queryset),
         )
 
         return queryset.order_by("title").distinct()
