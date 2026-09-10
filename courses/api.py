@@ -1034,13 +1034,20 @@ def is_program_text_id(item_text_id):
     return item_text_id.startswith(PROGRAM_TEXT_ID_PREFIX)
 
 
-def process_course_run_grade_certificate(course_run_grade, should_force_create=False):  # noqa: FBT002
+def process_course_run_grade_certificate(
+    course_run_grade,
+    should_force_create=False,  # noqa: FBT002
+    *,
+    defer_hubspot_sync=False,
+):
     """
     Ensure that the course run certificate is in line with the values in the course run grade
 
     Args:
         course_run_grade (courses.models.CourseRunGrade): The course run grade for which to generate/delete the certificate
         should_force_create (bool): If True, it will force the certificate creation without matching criteria
+        defer_hubspot_sync (bool): If True, skip the per-user HubSpot sync; the
+            caller is responsible for batch-syncing users whose certificates changed
     Returns:
         Tuple[ CourseRunCertificate, bool, bool ]: A Tuple containing None or CourseRunCertificate object,
             A bool representing if the certificate is created, A bool representing if a certificate is deleted
@@ -1058,7 +1065,8 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
         delete_count, _ = CourseRunCertificate.objects.filter(
             user=user, course_run=course_run
         ).delete()
-        sync_hubspot_user(user)
+        if delete_count > 0 and not defer_hubspot_sync:
+            sync_hubspot_user(user)
         return None, False, (delete_count > 0)
 
     elif should_create:
@@ -1089,7 +1097,8 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
             certificate, created = CourseRunCertificate.objects.get_or_create(
                 user=user, course_run=course_run
             )
-            sync_hubspot_user(user)
+            if created and not defer_hubspot_sync:
+                sync_hubspot_user(user)
             if not certificate.verifiable_credential_id:
                 create_verifiable_credential(certificate)
             return certificate, created, False  # noqa: TRY300
@@ -1148,6 +1157,8 @@ def generate_course_run_certificates(  # noqa: C901
     Returns:
         None
     """
+    from hubspot_sync.task_helpers import sync_hubspot_users_batch  # noqa: PLC0415
+
     now = now_in_utc()
 
     if course_run:
@@ -1164,6 +1175,7 @@ def generate_course_run_certificates(  # noqa: C901
             get_edx_grades_with_users(run, user=user)
         )
         stats = Counter()
+        changed_cert_user_ids = set()
         for edx_grade, run_user in edx_grade_user_iter:
             try:
                 course_run_grade, created, updated = ensure_course_run_grade(
@@ -1200,7 +1212,8 @@ def generate_course_run_certificates(  # noqa: C901
             ):
                 try:
                     _, created, deleted = process_course_run_grade_certificate(
-                        course_run_grade=course_run_grade
+                        course_run_grade=course_run_grade,
+                        defer_hubspot_sync=True,
                     )
                 except Exception:
                     stats["failed_certificates"] += 1
@@ -1212,12 +1225,14 @@ def generate_course_run_certificates(  # noqa: C901
                     continue
 
                 if deleted:
+                    changed_cert_user_ids.add(run_user.id)
                     log.warning(
                         "Certificate deleted for user %s and course_run %s",
                         run_user,
                         run,
                     )
                 elif created:
+                    changed_cert_user_ids.add(run_user.id)
                     log.warning(
                         "Certificate created for user %s and course_run %s",
                         run_user,
@@ -1225,6 +1240,7 @@ def generate_course_run_certificates(  # noqa: C901
                     )
                     stats["generated_certificates"] += 1
 
+        sync_hubspot_users_batch(changed_cert_user_ids)
         log.info(
             f"Finished processing course run {run}: created grades for {stats['created_grades']} users, updated grades for {stats['updated_grades']} users, generated certificates for {stats['generated_certificates']} users, failed certificates for {stats['failed_certificates']} users"  # noqa: G004
         )

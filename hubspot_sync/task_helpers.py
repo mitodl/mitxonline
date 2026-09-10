@@ -3,6 +3,9 @@
 import logging
 
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
+from mitol.hubspot_api.api import HubspotObjectType
+from mitol.hubspot_api.models import HubspotObject
 
 from courses.models import CourseRun, ProgramEnrollment
 from courses.utils import is_uai_order
@@ -39,6 +42,59 @@ def sync_hubspot_user(user: User):
             log.exception(
                 "Exception calling sync_contact_with_hubspot for user %s",
                 user.edx_username,
+            )
+
+
+def sync_hubspot_users_batch(user_ids):
+    """
+    Trigger celery tasks to sync many Users to Hubspot via the batch endpoints.
+
+    Unlike sync_hubspot_user, which enqueues one task (and one HubSpot API call)
+    per user, this splits the users into those that already have a HubSpot
+    contact (batch update) and those that don't (batch create) and dispatches
+    each group through batch_upsert_hubspot_objects (100 contacts per request).
+
+    Args:
+        user_ids (Iterable[int]): ids of the users to sync
+    """
+    if not settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN or not user_ids:
+        return
+
+    # Skip sync for B2B users to avoid errors
+    eligible_ids = list(
+        User.objects.filter(id__in=user_ids)
+        .exclude(b2b_contracts__isnull=False)
+        .order_by("id")
+        .values_list("id", flat=True)
+    )
+    skipped_count = len(set(user_ids)) - len(eligible_ids)
+    if skipped_count:
+        log.info("Skipping HubSpot sync for %d B2B user(s)", skipped_count)
+    if not eligible_ids:
+        return
+
+    content_type = ContentType.objects.get_for_model(User)
+    synced_ids = set(
+        HubspotObject.objects.filter(
+            content_type=content_type, object_id__in=eligible_ids
+        ).values_list("object_id", flat=True)
+    )
+    for create in (True, False):
+        ids = [uid for uid in eligible_ids if (uid not in synced_ids) is create]
+        if not ids:
+            continue
+        try:
+            tasks.batch_upsert_hubspot_objects.delay(
+                HubspotObjectType.CONTACTS.value,
+                content_type.model,
+                User._meta.app_label,  # noqa: SLF001
+                create=create,
+                object_ids=ids,
+            )
+        except:  # noqa: E722
+            log.exception(
+                "Exception calling batch_upsert_hubspot_objects for %d user(s)",
+                len(ids),
             )
 
 

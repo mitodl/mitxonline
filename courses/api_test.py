@@ -1574,6 +1574,8 @@ def test_course_run_certificate(  # noqa: PLR0913
     )
     if created:
         patched_sync_hubspot_user.assert_called_once_with(user)
+    else:
+        patched_sync_hubspot_user.assert_not_called()
     assert bool(certificate) is exp_certificate
     assert created is exp_created
     assert deleted is exp_deleted
@@ -1610,6 +1612,9 @@ def test_course_run_certificate_idempotent(
     assert not created
     assert not deleted
 
+    # No additional HubSpot sync for the no-op second call
+    patched_sync_hubspot_user.assert_called_once_with(user)
+
 
 @patch("courses.signals.upsert_custom_properties")
 def test_course_run_certificate_not_passing(
@@ -1618,6 +1623,9 @@ def test_course_run_certificate_not_passing(
     """
     Test that the certificate is not generated if the grade is set to not passed
     """
+    patched_sync_hubspot_user = mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
     mocker.patch(
         "hubspot_sync.api.upsert_custom_properties",
     )
@@ -1628,6 +1636,7 @@ def test_course_run_certificate_not_passing(
     assert certificate
     assert created
     assert not deleted
+    assert patched_sync_hubspot_user.call_count == 1
 
     # Now that the grade indicates score 0.0, certificate should be deleted
     passed_grade_with_enrollment.grade = 0.0
@@ -1637,6 +1646,51 @@ def test_course_run_certificate_not_passing(
     assert not certificate
     assert not created
     assert deleted
+    assert patched_sync_hubspot_user.call_count == 2
+
+
+def test_course_run_certificate_no_sync_when_nothing_deleted(
+    passed_grade_with_enrollment, mocker
+):
+    """No HubSpot sync should happen when the delete branch deletes nothing"""
+    patched_sync_hubspot_user = mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+    passed_grade_with_enrollment.grade = 0.0
+
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment
+    )
+    assert certificate is None
+    assert not created
+    assert not deleted
+    patched_sync_hubspot_user.assert_not_called()
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_course_run_certificate_defer_hubspot_sync(
+    mock_upsert_custom_properties, passed_grade_with_enrollment, mocker
+):
+    """defer_hubspot_sync=True should skip the per-user HubSpot sync entirely"""
+    patched_sync_hubspot_user = mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment, defer_hubspot_sync=True
+    )
+    assert certificate
+    assert created
+    assert not deleted
+
+    passed_grade_with_enrollment.grade = 0.0
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment, defer_hubspot_sync=True
+    )
+    assert deleted
+    patched_sync_hubspot_user.assert_not_called()
 
 
 @pytest.mark.parametrize("should_force_create", [True, False])
@@ -1940,6 +1994,54 @@ def test_generate_course_certificates_failure_isolation(
 
     assert mock_process.call_count == 2
     assert "failed certificates for 1 users" in courses_api_logs.info.call_args[0][0]
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_course_certificates_batches_hubspot_sync(
+    mock_upsert_custom_properties,
+    mocker,
+):
+    """The bulk path should batch-sync only the users whose certificates changed"""
+    mocker.patch("hubspot_sync.api.upsert_custom_properties")
+    patched_batch_sync = mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_users_batch"
+    )
+    course_run = CourseRunFactory.create(certificate_available_date=now_in_utc())
+
+    created_user = UserFactory.create()
+    deleted_user = UserFactory.create()
+    unchanged_user = UserFactory.create()
+    grades = {
+        run_user: CourseRunGradeFactory.create(
+            course_run=course_run, user=run_user, grade=0.5, passed=True
+        )
+        for run_user in (created_user, deleted_user, unchanged_user)
+    }
+
+    mocker.patch(
+        "courses.api.exception_logging_generator",
+        return_value=[(grade, run_user) for run_user, grade in grades.items()],
+    )
+    mocker.patch(
+        "courses.api.ensure_course_run_grade",
+        side_effect=[(grade, False, True) for grade in grades.values()],
+    )
+    mock_process = mocker.patch(
+        "courses.api.process_course_run_grade_certificate",
+        side_effect=[
+            (mocker.Mock(), True, False),  # created
+            (None, False, True),  # deleted
+            (None, False, False),  # unchanged
+        ],
+    )
+
+    generate_course_run_certificates(course_run=course_run, force=True)
+
+    assert all(
+        call.kwargs["defer_hubspot_sync"] is True
+        for call in mock_process.call_args_list
+    )
+    patched_batch_sync.assert_called_once_with({created_user.id, deleted_user.id})
 
 
 @pytest.mark.parametrize(
