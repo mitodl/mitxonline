@@ -471,7 +471,7 @@ class CourseViewSet(
             "courseruns",
             queryset=CourseRun.objects.order_by("id")
             .select_related("b2b_contract")
-            .prefetch_related("b2b_contracts", modes_prefetch, products_prefetch),
+            .prefetch_related(modes_prefetch, products_prefetch),
         )
         queryset = queryset.prefetch_related(
             "departments", "in_programs", course_runs_prefetch

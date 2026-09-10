@@ -1199,7 +1199,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         courseruns = (
             self.prefetched_courseruns
             if hasattr(self, "prefetched_courseruns")
-            else list(self.courseruns.prefetch_related("b2b_contracts").all())
+            else list(self.courseruns.all())
         )
         courseruns = sorted(courseruns, key=lambda r: r.id)
 
