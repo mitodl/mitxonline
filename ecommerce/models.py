@@ -36,6 +36,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPES,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     PAYMENT_TYPES,
+    REDEMPTION_TYPE_INTERNAL,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
@@ -478,6 +479,12 @@ class Discount(TimestampedModel):
         Returns:
             - boolean
         """
+        # An internal discount is attached only by application code that has
+        # already decided eligibility (see REDEMPTION_TYPE_INTERNAL). The code
+        # itself is visible on receipts, so refusing here is what keeps it inert.
+        if self.redemption_type == REDEMPTION_TYPE_INTERNAL:
+            return False
+
         if self.redemption_type == REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE:
             from ecommerce.discount_sources import resolve_for_discount  # noqa: PLC0415
 
