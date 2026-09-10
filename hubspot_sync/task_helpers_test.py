@@ -219,6 +219,50 @@ def test_sync_hubspot_users_batch_skips_b2b_users(mocker, settings):
     )
 
 
+def test_sync_hubspot_users_batch_excludes_ineligible_from_create(mocker, settings):
+    """Unsynced users failing the create eligibility bar should not be batch-created"""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "faketoken"  # noqa: S105
+    mock_batch = mocker.patch(
+        "hubspot_sync.task_helpers.tasks.batch_upsert_hubspot_objects.delay"
+    )
+    eligible_user = UserFactory.create()
+    inactive_user = UserFactory.create(is_active=False)
+    never_logged_in_user = UserFactory.create(last_login=None)
+    # An already-synced inactive user still goes through the update path,
+    # which tolerates inactive users
+    synced_inactive_user = UserFactory.create(is_active=False)
+    HubspotObjectFactory.create(
+        content_type=ContentType.objects.get_for_model(User),
+        object_id=synced_inactive_user.id,
+        content_object=synced_inactive_user,
+    )
+
+    sync_hubspot_users_batch(
+        [
+            eligible_user.id,
+            inactive_user.id,
+            never_logged_in_user.id,
+            synced_inactive_user.id,
+        ]
+    )
+
+    assert mock_batch.call_count == 2
+    mock_batch.assert_any_call(
+        HubspotObjectType.CONTACTS.value,
+        "user",
+        "users",
+        create=True,
+        object_ids=[eligible_user.id],
+    )
+    mock_batch.assert_any_call(
+        HubspotObjectType.CONTACTS.value,
+        "user",
+        "users",
+        create=False,
+        object_ids=[synced_inactive_user.id],
+    )
+
+
 def test_sync_hubspot_users_batch_all_b2b(mocker, settings):
     """sync_hubspot_users_batch should dispatch nothing when all users are B2B"""
     settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "faketoken"  # noqa: S105

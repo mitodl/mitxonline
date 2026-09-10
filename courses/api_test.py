@@ -2044,6 +2044,41 @@ def test_generate_course_certificates_batches_hubspot_sync(
     patched_batch_sync.assert_called_once_with({created_user.id, deleted_user.id})
 
 
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_course_certificates_single_user_syncs_immediately(
+    mock_upsert_custom_properties,
+    mocker,
+    user,
+):
+    """The single-user path (e.g. webhook) should keep the real-time per-user sync"""
+    mocker.patch("hubspot_sync.api.upsert_custom_properties")
+    patched_batch_sync = mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_users_batch"
+    )
+    course_run = CourseRunFactory.create(certificate_available_date=now_in_utc())
+    grade = CourseRunGradeFactory.create(
+        course_run=course_run, user=user, grade=0.5, passed=True
+    )
+
+    mocker.patch(
+        "courses.api.exception_logging_generator",
+        return_value=[(grade, user)],
+    )
+    mocker.patch(
+        "courses.api.ensure_course_run_grade",
+        return_value=(grade, True, False),
+    )
+    mock_process = mocker.patch(
+        "courses.api.process_course_run_grade_certificate",
+        return_value=(mocker.Mock(), True, False),
+    )
+
+    generate_course_run_certificates(user=user, course_run=course_run, force=True)
+
+    assert mock_process.call_args.kwargs["defer_hubspot_sync"] is False
+    patched_batch_sync.assert_not_called()
+
+
 @pytest.mark.parametrize(
     ("enrollment_mode", "grade", "passed", "should_create_cert"),
     [

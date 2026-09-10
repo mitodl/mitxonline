@@ -52,7 +52,8 @@ def sync_hubspot_users_batch(user_ids):
     Unlike sync_hubspot_user, which enqueues one task (and one HubSpot API call)
     per user, this splits the users into those that already have a HubSpot
     contact (batch update) and those that don't (batch create) and dispatches
-    each group through batch_upsert_hubspot_objects (100 contacts per request).
+    each group through batch_upsert_hubspot_objects, which chunks the requests
+    against HubSpot's batch endpoints.
 
     Args:
         user_ids (Iterable[int]): ids of the users to sync
@@ -61,12 +62,8 @@ def sync_hubspot_users_batch(user_ids):
         return
 
     # Skip sync for B2B users to avoid errors
-    eligible_ids = list(
-        User.objects.filter(id__in=user_ids)
-        .exclude(b2b_contracts__isnull=False)
-        .order_by("id")
-        .values_list("id", flat=True)
-    )
+    users = User.objects.filter(id__in=user_ids).exclude(b2b_contracts__isnull=False)
+    eligible_ids = list(users.order_by("id").values_list("id", flat=True))
     skipped_count = len(set(user_ids)) - len(eligible_ids)
     if skipped_count:
         log.info("Skipping HubSpot sync for %d B2B user(s)", skipped_count)
@@ -79,8 +76,31 @@ def sync_hubspot_users_batch(user_ids):
             content_type=content_type, object_id__in=eligible_ids
         ).values_list("object_id", flat=True)
     )
-    for create in (True, False):
-        ids = [uid for uid in eligible_ids if (uid not in synced_ids) is create]
+    # The batch create path requires the same eligibility bar as the periodic
+    # full sync (batch_upsert_hubspot_objects with no object_ids); ineligible
+    # users would otherwise crash the create result handling in
+    # batch_create_hubspot_objects_chunked, which looks contacts up by email
+    # with is_active=True.
+    create_eligible_ids = set(
+        users.filter(
+            is_active=True,
+            email__contains="@",
+            global_id__isnull=False,
+            last_login__isnull=False,
+        ).values_list("id", flat=True)
+    )
+    to_create = [
+        uid
+        for uid in eligible_ids
+        if uid not in synced_ids and uid in create_eligible_ids
+    ]
+    to_update = [uid for uid in eligible_ids if uid in synced_ids]
+    dropped_count = len(eligible_ids) - len(to_create) - len(to_update)
+    if dropped_count:
+        log.info(
+            "Skipping HubSpot batch create for %d ineligible user(s)", dropped_count
+        )
+    for create, ids in ((True, to_create), (False, to_update)):
         if not ids:
             continue
         try:

@@ -1160,6 +1160,10 @@ def generate_course_run_certificates(  # noqa: C901
     from hubspot_sync.task_helpers import sync_hubspot_users_batch  # noqa: PLC0415
 
     now = now_in_utc()
+    # Batch HubSpot syncs only on bulk invocations (periodic task / whole-run
+    # processing); single-user calls (e.g. the edX webhook) keep the
+    # real-time per-user sync.
+    defer_hubspot_sync = user is None
 
     if course_run:
         course_runs = [course_run]
@@ -1213,7 +1217,7 @@ def generate_course_run_certificates(  # noqa: C901
                 try:
                     _, created, deleted = process_course_run_grade_certificate(
                         course_run_grade=course_run_grade,
-                        defer_hubspot_sync=True,
+                        defer_hubspot_sync=defer_hubspot_sync,
                     )
                 except Exception:
                     stats["failed_certificates"] += 1
@@ -1240,7 +1244,8 @@ def generate_course_run_certificates(  # noqa: C901
                     )
                     stats["generated_certificates"] += 1
 
-        sync_hubspot_users_batch(changed_cert_user_ids)
+        if defer_hubspot_sync:
+            sync_hubspot_users_batch(changed_cert_user_ids)
         log.info(
             f"Finished processing course run {run}: created grades for {stats['created_grades']} users, updated grades for {stats['updated_grades']} users, generated certificates for {stats['generated_certificates']} users, failed certificates for {stats['failed_certificates']} users"  # noqa: G004
         )
