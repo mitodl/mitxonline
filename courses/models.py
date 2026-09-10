@@ -5,7 +5,7 @@ Course models
 
 import logging
 import uuid
-from collections import namedtuple
+from dataclasses import dataclass
 from decimal import ROUND_HALF_EVEN, Decimal
 
 from django.contrib import admin
@@ -946,9 +946,12 @@ class CourseProgramPrefetcher(Prefetcher):
         course.programs = programs or []
 
 
-FinancialAssistanceFormUrl = namedtuple(  # noqa: PYI024
-    "FinancialAssistanceFormUrl", ["course_id", "url"]
-)
+@dataclass(frozen=True)
+class FinancialAssistanceFormUrl:
+    """One course's resolved financial assistance form URL."""
+
+    course_id: int
+    url: str
 
 
 class _PrefetchRows(list):
