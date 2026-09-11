@@ -132,3 +132,5 @@ docker-compose.*.yml
 certs/*
 
 .claude/
+
+.drf_lint_cache.json
