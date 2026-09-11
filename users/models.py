@@ -310,6 +310,7 @@ class User(
         blank=True,
         related_name="users",
         help_text="The contracts the user is associated with.",
+        through="b2b.UserB2BContract",
     )
     b2b_organizations = models.ManyToManyField(
         "b2b.OrganizationPage",
