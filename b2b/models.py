@@ -221,7 +221,7 @@ class OrganizationPage(Page):
 
         return user.b2b_contracts.through.objects.filter(
             user_id=user.id,
-            contractpage_id__in=self.contracts.filter(
+            contract_page_id__in=self.contracts.filter(
                 membership_type__in=CONTRACT_MEMBERSHIP_AUTOS
             ).values_list("id", flat=True),
         ).delete()
@@ -987,3 +987,24 @@ def is_organization_manager(user, org_id):
     return UserOrganization.objects.filter(
         user=user, organization_id=org_id, is_manager=True
     ).exists()
+
+
+class UserB2BContract(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="user_b2b_contracts",
+        db_column="user_id",
+    )
+    contract_page = models.ForeignKey(
+        "b2b.ContractPage",
+        on_delete=models.CASCADE,
+        related_name="b2b_contract_users",
+        db_column="contractpage_id",
+    )
+
+    class Meta:
+        unique_together = ("user", "contract_page")
+
+    def __str__(self):
+        return f"UserOrganization: {self.user} in {self.contract_page}"

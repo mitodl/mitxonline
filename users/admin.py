@@ -109,7 +109,7 @@ class UserContractPageInline(admin.TabularInline):
 
     model = User.b2b_contracts.through
     extra = 0
-    autocomplete_fields = ("contractpage",)
+    autocomplete_fields = ("contract_page",)
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """
@@ -121,7 +121,7 @@ class UserContractPageInline(admin.TabularInline):
         render with an empty selection here.
         """
 
-        if db_field.name == "contractpage":
+        if db_field.name == "contract_page":
             from b2b.models import ContractPage  # noqa: PLC0415
 
             kwargs["queryset"] = ContractPage.objects.order_by(
