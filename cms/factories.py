@@ -156,6 +156,17 @@ class CertificatePageFactory(wagtail_factories.PageFactory):
     class Meta:
         model = CertificatePage
 
+    @factory.post_generation
+    def revision(self, create, extracted, **kwargs):  # noqa: ARG002
+        """
+        Save a revision by default. wagtail_factories saves the page directly
+        (live=True) without going through Wagtail's publish flow, unlike a
+        real editor publishing a page, which always creates one - certificates
+        rely on certificate_page.get_latest_revision() returning something.
+        """
+        if create:
+            self.save_revision()
+
 
 class InstructorIndexPageFactory(wagtail_factories.PageFactory):
     title = "Instructors"
