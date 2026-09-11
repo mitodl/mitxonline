@@ -16,3 +16,41 @@ class TargetCourseRunExistsError(Exception):
 
 class KeycloakAdminImproperlyConfiguredError(Exception):
     """Raised if Keycloak admin client is improperly configured."""
+
+
+class AliasCollisionError(Exception):
+    """
+    Raised when a Keycloak alias is already taken.
+
+    Organization and identity provider aliases are realm-wide, and the realm is
+    shared with the resources Pulumi still declares, so an alias that is free in
+    our own tables can still collide. Creating one anyway would break the next
+    pulumi up that declares the same name.
+    """
+
+
+class InvalidLifecycleTransitionError(Exception):
+    """Raised when an identity provider is asked to skip a lifecycle state."""
+
+
+class OrphanedKeycloakOrganizationError(Exception):
+    """
+    Raised when a Keycloak organization is left behind by a failed create.
+
+    The organization creation saga compensates for a failed MITx Online write by
+    deleting the Keycloak organization it just made. When that compensating
+    delete also fails, the organization is orphaned and this is raised with its
+    ID so the caller can surface it.
+    """
+
+
+class OrganizationNotProvisionedError(Exception):
+    """
+    Raised when an organization has no Keycloak counterpart to act on.
+
+    An OrganizationPage with a null sso_organization_id cannot be updated in
+    Keycloak, because there is nothing there to update. Roughly 24 production
+    organizations are in this state, inherited from mitodl/hq#10552 and from
+    the b2b_contract create --create path that made them; they need backfilling
+    through this API rather than patching.
+    """
