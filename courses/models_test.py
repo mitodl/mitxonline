@@ -1499,6 +1499,18 @@ def test_get_filtered_runs_includes_runs_from_b2b_contracts(filter_name):
         )
 
 
+def test_get_filtered_runs_reuses_prefetched_courseruns(django_assert_num_queries):
+    """A courseruns prefetch is reused rather than re-queried."""
+    course = CourseFactory.create()
+    course_run = CourseRunFactory.create(course=course)
+    course = Course.objects.prefetch_related("courseruns").get(pk=course.pk)
+
+    with django_assert_num_queries(0):
+        runs = course.get_filtered_runs(courserun_is_enrollable=None)
+
+    assert runs == [course_run]
+
+
 # Test for course run constraints
 # As a default we expect uniqueness on course, courseware_id, and run_tag
 # We also shouldn't allow:

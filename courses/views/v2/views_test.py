@@ -2823,8 +2823,7 @@ def test_course_run_and_product_prefetch_optimized(
         ProductFactory(
             purchasable_object=run,
         )
-    # increased below from 21 to 27 - the M2M for b2b_contracts adds some queries
-    max_expected_queries = 27
+    max_expected_queries = 21
     num_queries_before = len(connection.queries)
     with django_assert_max_num_queries(max_expected_queries):
         resp = user_drf_client.get(reverse("v2:courses_api-list"))
@@ -2839,9 +2838,8 @@ def test_course_run_and_product_prefetch_optimized(
     product_queries = [
         q for q in queries_after if 'FROM "ecommerce_product"' in q.get("sql", "")
     ]
-    # increased below from 2 to 3 - the M2M for b2b_contracts adds some queries
-    assert len(product_queries) == 3, (
-        f"Expected 3 product query, got {len(product_queries)}: {[q['sql'] for q in product_queries]}"
+    assert len(product_queries) == 2, (
+        f"Expected 2 product queries, got {len(product_queries)}: {[q['sql'] for q in product_queries]}"
     )
 
 
