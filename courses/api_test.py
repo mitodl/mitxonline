@@ -18,7 +18,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import connection
 from django.db.models import Prefetch
-from django.test import RequestFactory
+from django.test import RequestFactory, override_settings
 from django.test.utils import CaptureQueriesContext
 from edx_api.course_detail import CourseDetail, CourseMode, CourseModes
 from mitol.common.utils.datetime import now_in_utc
@@ -3863,6 +3863,7 @@ def test_course_run_certificate_verifiable_credentials_feature_flag_disabled(
     assert certificate.verifiable_credential is None
 
 
+@override_settings(MIT_LEARN_BASE_URL="https://learn.mit.edu")
 @patch("courses.api.CourseRunEnrollment.all_objects.get")
 @patch("courses.api.get_thumbnail_url")
 @patch("courses.signals.upsert_custom_properties")
@@ -3974,6 +3975,7 @@ def test_course_run_certificate_verifiable_credentials_signing_payload(
     assert payload == expected_payload
 
 
+@override_settings(MIT_LEARN_BASE_URL="https://learn.mit.edu")
 @patch("courses.api.ProgramEnrollment.all_objects.get")
 @patch("courses.api.get_thumbnail_url")
 def test_program_certificate_verifiable_credentials_signing_payload(
