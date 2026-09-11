@@ -26,7 +26,7 @@ from viewflow import this
 from viewflow.fsm import State
 
 from courses.models import CourseRun, PaidCourseRun, Program
-from courses.utils import is_contract_order, is_uai_order
+from courses.utils import is_contract_order, is_uai_order, is_xpro_order
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
@@ -885,6 +885,7 @@ class OrderFlow:
             and not skip_receipt
             and not skip_fulfillment
             and not is_uai_order(self.order)
+            and not is_xpro_order(self.order)
             and not is_contract_order(self.order)
         ):
             transaction.on_commit(self.order.send_ecommerce_order_receipt)

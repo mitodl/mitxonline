@@ -1,6 +1,7 @@
 """Constants for the courses app"""
 
 UAI_COURSEWARE_ID_PREFIX = "UAI_"
+XPRO_COURSEWARE_ID_PREFIX = "PRO+"
 
 CONTENT_TYPE_MODEL_PROGRAM = "program"
 CONTENT_TYPE_MODEL_COURSE = "course"
