@@ -12,6 +12,12 @@ class ExportComplianceCheckError(Exception):
 class ExportComplianceError(ExportComplianceCheckError):
     """A user failed a CyberSource export compliance check"""
 
+    #: Opaque support-facing code appended to the learner-visible enrollment
+    #: error (see ``courses.exceptions.EnrollmentError.from_cause``). Lets a
+    #: learner quote something actionable without us disclosing the CyberSource
+    #: decision or reason code - those stay in the logs.
+    error_code = "CS_700"
+
     def __init__(self, user, decision, reason_code, msg=None):
         """
         Sets exception properties and adds a default message
