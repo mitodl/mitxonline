@@ -109,7 +109,7 @@ class UserContractPageInline(admin.TabularInline):
 
     model = User.b2b_contracts.through
     extra = 0
-    autocomplete_fields = ("contractpage",)
+    autocomplete_fields = ("contract_page",)
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """
