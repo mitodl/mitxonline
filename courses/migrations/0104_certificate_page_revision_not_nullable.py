@@ -49,52 +49,50 @@ def _live_certificate_page_revision_id(page_model, fk_field, obj_id):
 
 def delete_certificates_without_certificate_page(apps, schema_editor):
     """
-    Delete any CourseRunCertificate/ProgramCertificate that has no
-    certificate_page_revision and whose course/program has no live
-    certificate page at all - there's nothing to backfill from, and no
-    CertificatePage is ever auto-created, so these can never be resolved.
+    Delete a CourseRunCertificate/ProgramCertificate if it has no
+    certificate_page_revision AND its course/program has no live
+    certificate page - a page may exist but only in draft, or not exist at
+    all; either way counts as "no live page" here.
 
-    A course/program whose certificate page exists but has never had a
-    revision saved is a different, rarer case (an operator can fix it by
-    opening the page in Wagtail and publishing) and is deliberately NOT
-    covered here - those are left for backfill_certificate_page_revision to
-    leave null, so the AlterField below fails loudly instead of silently
-    deleting a certificate that content only needs one Wagtail click to fix.
+    A certificate that already has a certificate_page_revision is never
+    deleted here, even if its page is no longer live (e.g. unpublished
+    after the certificate was issued) - only a null-revision certificate is
+    considered, and only one with no live page to backfill from is deleted;
+    a null-revision certificate whose course/program currently HAS a live
+    page is left for backfill_certificate_page_revision below to fix
+    instead. No CertificatePage is ever auto-created, so a null-revision
+    certificate with no live page can never resolve on its own.
     """
     from cms.models import CoursePage, ProgramPage  # noqa: PLC0415
 
     CourseRunCertificate = apps.get_model("courses", "CourseRunCertificate")
     ProgramCertificate = apps.get_model("courses", "ProgramCertificate")
 
-    course_ids_without_page = set()
+    has_live_page_by_course_id = {}
     course_run_cert_ids_to_delete = []
     for cert in CourseRunCertificate.objects.filter(
         certificate_page_revision__isnull=True
     ).only("id", "course_run__course_id"):
         course_id = cert.course_run.course_id
-        if course_id not in course_ids_without_page:
-            has_page = (
+        if course_id not in has_live_page_by_course_id:
+            has_live_page_by_course_id[course_id] = (
                 _live_certificate_page(CoursePage, "course_id", course_id) is not None
             )
-            if not has_page:
-                course_ids_without_page.add(course_id)
-        if course_id in course_ids_without_page:
+        if not has_live_page_by_course_id[course_id]:
             course_run_cert_ids_to_delete.append(cert.id)
 
-    program_ids_without_page = set()
+    has_live_page_by_program_id = {}
     program_cert_ids_to_delete = []
     for cert in ProgramCertificate.objects.filter(
         certificate_page_revision__isnull=True
     ).only("id", "program_id"):
         program_id = cert.program_id
-        if program_id not in program_ids_without_page:
-            has_page = (
+        if program_id not in has_live_page_by_program_id:
+            has_live_page_by_program_id[program_id] = (
                 _live_certificate_page(ProgramPage, "program_id", program_id)
                 is not None
             )
-            if not has_page:
-                program_ids_without_page.add(program_id)
-        if program_id in program_ids_without_page:
+        if not has_live_page_by_program_id[program_id]:
             program_cert_ids_to_delete.append(cert.id)
 
     CourseRunCertificate.objects.filter(id__in=course_run_cert_ids_to_delete).delete()
