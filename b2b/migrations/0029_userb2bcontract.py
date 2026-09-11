@@ -7,7 +7,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("b2b", "0027_discountcontractattachmentredemption_email_message_id_and_more"),
+        ("b2b", "0028_organizationidentityprovider_organizationonboarding"),
         # TODO: Need to see if this sort of dependency is allowed. Most of the time we rely on # noqa: FIX002, TD003, TD002
         # migrations.swappable_dependency(settings.AUTH_USER_MODEL) but I think that's just model existence
         ("users", "0029_add_b2b_contract_fk"),
