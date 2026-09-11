@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("b2b", "0028_userb2bcontract"),
+        ("b2b", "0029_userb2bcontract"),
         ("users", "0043_legaladdress_first_name_last_name"),
     ]
 
