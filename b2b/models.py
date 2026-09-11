@@ -987,3 +987,16 @@ def is_organization_manager(user, org_id):
     return UserOrganization.objects.filter(
         user=user, organization_id=org_id, is_manager=True
     ).exists()
+
+
+class UserB2BContract(TimestampedModel):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="user_b2b_contracts",
+    )
+    contract = models.ForeignKey(
+        "b2b.ContractPage",
+        on_delete=models.CASCADE,
+        related_name="b2b_contract_users",
+    )
