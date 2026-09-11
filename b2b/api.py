@@ -16,7 +16,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Manager, Prefetch, Q
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
@@ -32,6 +32,7 @@ from b2b.constants import (
     MAILGUN_LOGS_DESC,
     MAILGUN_LOGS_PAGE_LIMIT,
     MAILGUN_LOGS_RETENTION_DAYS,
+    ONBOARDING_STATE_ORG_CREATED,
     ORG_KEY_MAX_LENGTH,
     RETIREMENT_CONTRACT_NAME,
     RETIREMENT_ORG_KEY,
@@ -49,6 +50,7 @@ from b2b.models import (
     ContractProgramItem,
     DiscountContractAttachmentRedemption,
     OrganizationIndexPage,
+    OrganizationOnboarding,
     OrganizationPage,
     UserOrganization,
 )
@@ -1810,31 +1812,65 @@ def reconcile_keycloak_orgs():
     create or update corresponding records in MITx Online. This does not manage
     memberships, just base org info.
 
+    Since the provisioning API (capability C1) writes both systems together,
+    this is a drift reconciler rather than the primary create path: it adopts
+    the organizations Pulumi still owns, ones made in the console, and ones left
+    behind by a provisioning saga whose compensating delete also failed. That
+    last case is why it has to see the whole realm, not a first page of it.
+
     Returns
     - tuple (created, updated): number of orgs created and updated
     """
 
     org_model = get_keycloak_model(*KCAM_ORGANIZATIONS)
-    orgs = org_model.list()
+    orgs = org_model.list_all()
     parent_org_page = OrganizationIndexPage.objects.first()
     created_count = 0
     updated_count = 0
 
     for org in orgs:
         try:
-            page, created = reconcile_single_keycloak_org(org)
+            # Each org gets its own savepoint. Postgres aborts the whole
+            # transaction on any failed statement, so catching a database error
+            # and carrying on with the loop only works if that error was
+            # contained - otherwise every later query raises
+            # TransactionManagementError and skipping one org still loses the
+            # rest of the pass, just less legibly.
+            with transaction.atomic():
+                page, created = reconcile_single_keycloak_org(org)
 
+                if created:
+                    parent_org_page.add_child(instance=page)
+                    page.save()
+                    parent_org_page.save()
+                else:
+                    page.save()
+
+                # An adopted organization needs an onboarding record too, so
+                # that orgs that arrived this way show up in the same place as
+                # the ones the provisioning API made.
+                OrganizationOnboarding.objects.get_or_create(
+                    organization=page,
+                    defaults={
+                        "state": ONBOARDING_STATE_ORG_CREATED,
+                        "state_changed_at": now_in_utc(),
+                    },
+                )
+
+            # Counted after the savepoint commits, so a rolled-back org is not
+            # reported as reconciled.
             if created:
                 created_count += 1
-                parent_org_page.add_child(instance=page)
-                page.save()
-                parent_org_page.save()
             else:
                 updated_count += 1
-                page.save()
-        except ValidationError:  # noqa: PERF203
+        except (ValidationError, IntegrityError):  # noqa: PERF203
+            # IntegrityError because OrganizationOnboarding.organization is a
+            # OneToOneField: a concurrent provisioning saga or a second
+            # reconcile run can insert the row between this one's check and its
+            # insert. The per-org catch is the point - one org losing that race
+            # must not abandon the rest of the pass.
             log.exception(
-                "Validation error: could not create or update organization for Keycloak org %s",
+                "Could not create or update organization for Keycloak org %s",
                 org.id,
             )
 
