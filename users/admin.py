@@ -121,7 +121,7 @@ class UserContractPageInline(admin.TabularInline):
         render with an empty selection here.
         """
 
-        if db_field.name == "contractpage":
+        if db_field.name == "contract_page":
             from b2b.models import ContractPage  # noqa: PLC0415
 
             kwargs["queryset"] = ContractPage.objects.order_by(
