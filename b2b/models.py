@@ -995,8 +995,14 @@ class UserB2BContract(TimestampedModel):
         on_delete=models.CASCADE,
         related_name="user_b2b_contracts",
     )
-    contract = models.ForeignKey(
+    contract_page = models.ForeignKey(
         "b2b.ContractPage",
         on_delete=models.CASCADE,
         related_name="b2b_contract_users",
     )
+    data_consent = models.BooleanField(
+        default=False,
+        null=True,
+        blank=True,
+    )
+    data_consent_timestamp = models.DateTimeField()
