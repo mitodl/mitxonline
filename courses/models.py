@@ -1796,13 +1796,6 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
         if not self.b2b_contracts.filter(pk=contract.id).exists():
             return False
 
-        if (
-            contract.max_learners
-            and contract.max_learners > 0
-            and contract.get_enrollments().count() >= contract.max_learners
-        ):
-            return False
-
         return self.is_enrollable
 
 
