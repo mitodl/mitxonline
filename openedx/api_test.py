@@ -80,7 +80,7 @@ from openedx.exceptions import (
     UserNameUpdateFailedException,
 )
 from openedx.factories import OpenEdxApiAuthFactory
-from openedx.models import OpenEdxApiAuth, OpenEdxUser
+from openedx.models import CourseRunClone, OpenEdxApiAuth, OpenEdxUser
 from openedx.utils import SyncResult
 from users.factories import UserFactory
 
@@ -2056,3 +2056,68 @@ def test_process_course_run_clone(mocker):
     mocked_clone_course.assert_called_with(
         cloneable_key, course_run.courseware_id, client=ANY
     )
+
+
+@pytest.fixture
+def mocked_clone_edx(mocker):
+    """Patch the edX calls process_course_run_clone makes."""
+
+    mocker.patch("openedx.api.get_edx_api_jwt_client")
+    mocker.patch("openedx.api.fix_cloned_run_data")
+    mocker.patch("openedx.api.push_edx_modes_from_run")
+    return mocker.patch(
+        "openedx.api.clone_edx_course", return_value={"result": "success"}
+    )
+
+
+@pytest.mark.parametrize("previously_requested", [True, False])
+def test_process_course_run_clone_target_exists(
+    mocker, mocked_clone_edx, previously_requested
+):
+    """
+    A target already in edX is accepted only when an earlier attempt for this
+    run asked edX to create it. Otherwise it belongs to something else.
+    """
+
+    mocker.patch("openedx.api.get_edx_course", return_value=True)
+    course_run = CourseRunFactory.create()
+    clone = CourseRunClone.objects.create(
+        course_run=course_run,
+        source_courseware_id="course-v1:PyT+TestCourse+9T3036",
+        clone_requested_at=now_in_utc() if previously_requested else None,
+    )
+
+    if previously_requested:
+        process_course_run_clone(course_run, clone.source_courseware_id, clone=clone)
+    else:
+        with pytest.raises(ValueError, match="was found in edX"):
+            process_course_run_clone(
+                course_run, clone.source_courseware_id, clone=clone
+            )
+
+    mocked_clone_edx.assert_not_called()
+
+
+def test_process_course_run_clone_stamps_request(mocker, mocked_clone_edx):
+    """The clone record is stamped before edX is asked to clone."""
+
+    mocker.patch(
+        "openedx.api.get_edx_course",
+        side_effect=[True, CourseRunAPIError("not found")],
+    )
+    course_run = CourseRunFactory.create()
+    clone = CourseRunClone.objects.create(
+        course_run=course_run,
+        source_courseware_id="course-v1:PyT+TestCourse+9T3036",
+    )
+
+    def assert_stamped(*args, **kwargs):
+        clone.refresh_from_db()
+        assert clone.clone_requested_at is not None
+        return {"result": "success"}
+
+    mocked_clone_edx.side_effect = assert_stamped
+
+    process_course_run_clone(course_run, clone.source_courseware_id, clone=clone)
+
+    mocked_clone_edx.assert_called_once()

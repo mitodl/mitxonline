@@ -78,6 +78,7 @@ from hubspot_sync.task_helpers import sync_hubspot_cart_add
 from main import constants as main_constants
 from main.utils import date_to_datetime
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.models import CourseRunClone
 from openedx.tasks import clone_courserun
 from users.models import User
 
@@ -731,6 +732,10 @@ def create_contract_run(  # noqa: PLR0913
         course_run.enrollment_modes.add(*required_modes)
 
         if not skip_edx:
+            CourseRunClone.objects.create(
+                course_run=course_run,
+                source_courseware_id=clone_course_run.courseware_id,
+            )
             clone_courserun.delay(course_run.id, clone_course_run.courseware_id)
 
         log.info(

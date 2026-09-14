@@ -99,7 +99,11 @@ from main.constants import (
     USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
 )
 from main.utils import date_to_datetime
-from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.constants import (
+    COURSE_RUN_CLONE_STATUS_PENDING,
+    EDX_ENROLLMENT_VERIFIED_MODE,
+)
+from openedx.models import CourseRunClone
 from users.factories import UserFactory
 from variants.models import SupportedVariant
 
@@ -660,7 +664,10 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
     assert created_product.object_id == created_run.id
     assert settings.OPENEDX_COURSE_BASE_URL in created_run.courseware_url
 
-    mocked_clone_run.assert_called()
+    mocked_clone_run.assert_called_once_with(created_run.id, source_run.courseware_id)
+    clone = CourseRunClone.objects.get(course_run=created_run)
+    assert clone.status == COURSE_RUN_CLONE_STATUS_PENDING
+    assert clone.source_courseware_id == source_run.courseware_id
 
 
 def test_create_contract_run_variants(mocker):
