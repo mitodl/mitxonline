@@ -4,6 +4,7 @@ import pytest
 from django.contrib.messages import get_messages
 from django.core.exceptions import ValidationError
 from django.urls import reverse
+from mitol.common.utils.datetime import now_in_utc
 
 from compliance.factories import ExportComplianceLogFactory
 from compliance.models import ExportComplianceDecision
@@ -72,3 +73,71 @@ def test_mark_manually_approved_action_not_on_changelist(client, admin_user):
     # mark_manually_approved isn't reachable from this page.
     assert response.context["action_form"] is None
     assert b"mark_manually_approved" not in response.content
+
+
+def test_decision_filter(client, admin_user):
+    """The decision filter should only return logs with the selected decision"""
+    client.force_login(admin_user)
+    completed = ExportComplianceLogFactory.create(
+        decision=ExportComplianceDecision.COMPLETED
+    )
+    ExportComplianceLogFactory.create(decision=ExportComplianceDecision.DECLINED)
+
+    response = client.get(
+        reverse("admin:compliance_exportcompliancelog_changelist"),
+        {"decision": ExportComplianceDecision.COMPLETED},
+    )
+
+    assert response.status_code == 200
+    results = list(response.context["cl"].queryset)
+    assert results == [completed]
+
+
+def test_accepted_filter(client, admin_user):
+    """The accepted filter should split logs by whether their decision is accepted"""
+    client.force_login(admin_user)
+    accepted = ExportComplianceLogFactory.create(
+        decision=ExportComplianceDecision.MANUALLY_APPROVED,
+        approved_by=admin_user,
+        approved_on=now_in_utc(),
+    )
+    not_accepted = ExportComplianceLogFactory.create(
+        decision=ExportComplianceDecision.DECLINED
+    )
+
+    yes_response = client.get(
+        reverse("admin:compliance_exportcompliancelog_changelist"),
+        {"accepted": "yes"},
+    )
+    no_response = client.get(
+        reverse("admin:compliance_exportcompliancelog_changelist"),
+        {"accepted": "no"},
+    )
+
+    assert list(yes_response.context["cl"].queryset) == [accepted]
+    assert list(no_response.context["cl"].queryset) == [not_accepted]
+
+
+def test_manually_approved_filter(client, admin_user):
+    """The manually approved filter should split logs by whether approved_by is set"""
+    client.force_login(admin_user)
+    approved = ExportComplianceLogFactory.create(
+        decision=ExportComplianceDecision.MANUALLY_APPROVED,
+        approved_by=admin_user,
+        approved_on=now_in_utc(),
+    )
+    not_approved = ExportComplianceLogFactory.create(
+        decision=ExportComplianceDecision.DECLINED
+    )
+
+    yes_response = client.get(
+        reverse("admin:compliance_exportcompliancelog_changelist"),
+        {"manually_approved": "yes"},
+    )
+    no_response = client.get(
+        reverse("admin:compliance_exportcompliancelog_changelist"),
+        {"manually_approved": "no"},
+    )
+
+    assert list(yes_response.context["cl"].queryset) == [approved]
+    assert list(no_response.context["cl"].queryset) == [not_approved]

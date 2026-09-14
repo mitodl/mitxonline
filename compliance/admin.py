@@ -10,6 +10,64 @@ from compliance.models import ExportComplianceDecision, ExportComplianceLog
 from main.utils import get_field_names
 
 
+class ExportComplianceDecisionFilter(admin.SimpleListFilter):
+    """Filter ExportComplianceLog by decision, with human-readable labels"""
+
+    title = "decision"
+    parameter_name = "decision"
+
+    def lookups(self, request, model_admin):  # noqa: ARG002
+        return ExportComplianceDecision.choices
+
+    def queryset(self, request, queryset):  # noqa: ARG002
+        value = self.value()
+        if value:
+            return queryset.filter(decision=value)
+        return queryset
+
+
+class ExportComplianceAcceptedFilter(admin.SimpleListFilter):
+    """Filter ExportComplianceLog by whether the decision is an accepted one"""
+
+    title = "accepted"
+    parameter_name = "accepted"
+
+    def lookups(self, request, model_admin):  # noqa: ARG002
+        return (
+            ("yes", "Yes"),
+            ("no", "No"),
+        )
+
+    def queryset(self, request, queryset):  # noqa: ARG002
+        value = self.value()
+        if value == "yes":
+            return queryset.filter(decision__in=ExportComplianceLog.ACCEPTED_DECISIONS)
+        if value == "no":
+            return queryset.exclude(decision__in=ExportComplianceLog.ACCEPTED_DECISIONS)
+        return queryset
+
+
+class ExportComplianceManuallyApprovedFilter(admin.SimpleListFilter):
+    """Filter ExportComplianceLog by whether it has a manual approver set"""
+
+    title = "manually approved"
+    parameter_name = "manually_approved"
+
+    def lookups(self, request, model_admin):  # noqa: ARG002
+        return (
+            ("yes", "Yes"),
+            ("no", "No"),
+        )
+
+    def queryset(self, request, queryset):  # noqa: ARG002
+        value = self.value()
+        if value == "yes":
+            return queryset.filter(approved_by__isnull=False)
+        if value == "no":
+            return queryset.filter(approved_by__isnull=True)
+        return queryset
+
+
 @admin.register(ExportComplianceLog)
 class ExportComplianceLogAdmin(DjangoObjectActions, TimestampedModelAdmin):
     """Read-only admin for ExportComplianceLog"""
@@ -22,6 +80,12 @@ class ExportComplianceLogAdmin(DjangoObjectActions, TimestampedModelAdmin):
         "courseware_content_type",
         "courseware_object_id",
         "decision",
+    )
+    list_filter = (
+        ExportComplianceDecisionFilter,
+        "courseware_content_type",
+        ExportComplianceAcceptedFilter,
+        ExportComplianceManuallyApprovedFilter,
     )
     readonly_fields = get_field_names(ExportComplianceLog)
     change_actions = ["mark_manually_approved"]
