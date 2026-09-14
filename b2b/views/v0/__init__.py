@@ -38,7 +38,7 @@ from ecommerce.constants import REDEMPTION_TYPE_UNLIMITED
 from ecommerce.models import Discount, Product
 from main.authentication import CsrfExemptSessionAuthentication
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
-from main.permissions import IsAdminOrReadOnly
+from rest_framework.permissions import IsAdminUser
 
 log = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ class OrganizationPageViewSet(viewsets.ReadOnlyModelViewSet):
         )
     )
     serializer_class = OrganizationPageSerializer
-    permission_classes = [IsAdminOrReadOnly | HasAPIKey]
+    permission_classes = [IsAdminUser | HasAPIKey]
     lookup_field = "slug"
     lookup_url_kwarg = "organization_slug"
 
@@ -73,7 +73,7 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
     """
 
     serializer_class = ContractPageSerializer
-    permission_classes = [IsAdminOrReadOnly | HasAPIKey]
+    permission_classes = [IsAdminUser | HasAPIKey]
     lookup_field = "slug"
     lookup_url_kwarg = "contract_slug"
 
