@@ -1678,7 +1678,7 @@ def test_apply_available_discount_seat_limit():
 
     # We've added the user to the contract - the seat limit is exceeded but because
     # we manually did it above this should return successfully.
-    assert result == None
+    assert result is None
 
     # Calling this directly should result in a new discount being created.
 
