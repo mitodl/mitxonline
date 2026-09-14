@@ -18,6 +18,7 @@ from b2b.constants import (
 from b2b.exceptions import (
     AliasCollisionError,
     InvalidLifecycleTransitionError,
+    OrganizationNameCollisionError,
     OrganizationNotProvisionedError,
     OrphanedKeycloakOrganizationError,
 )
@@ -146,6 +147,30 @@ def test_create_organization_rejects_an_alias_taken_in_the_realm(connection):
         create_organization(connection=connection, **_organization_kwargs())
 
     connection.organizations.create.assert_not_called()
+
+
+@pytest.mark.parametrize("name", ["Example University", "example university!"])
+def test_create_organization_rejects_a_name_that_reuses_a_page_slug(connection, name):
+    """
+    A name whose slug is taken under the index fails before Keycloak is touched.
+
+    Wagtail's own sibling-slug check in add_child() raises a plain
+    ValidationError, which the API turned into a 500 (MITXONLINE-73J), and only
+    after a Keycloak organization had been created and had to be deleted again.
+    """
+
+    create_organization(connection=connection, **_organization_kwargs())
+    connection.organizations.create.reset_mock()
+
+    with pytest.raises(OrganizationNameCollisionError):
+        create_organization(
+            connection=connection,
+            **_organization_kwargs(name=name, org_key="EXAMPLEU2"),
+        )
+
+    connection.organizations.create.assert_not_called()
+    connection.organizations.delete.assert_not_called()
+    assert not OrganizationPage.objects.filter(org_key="EXAMPLEU2").exists()
 
 
 def test_create_organization_compensates_a_failed_local_write(connection, mocker):

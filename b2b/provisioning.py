@@ -33,6 +33,7 @@ from b2b.constants import (
 from b2b.exceptions import (
     AliasCollisionError,
     InvalidLifecycleTransitionError,
+    OrganizationNameCollisionError,
     OrganizationNotProvisionedError,
     OrphanedKeycloakOrganizationError,
 )
@@ -190,6 +191,7 @@ def create_organization(  # noqa: PLR0913
     - OrganizationPage: the new organization
     Raises:
     - AliasCollisionError: org_key is taken here or in the realm
+    - OrganizationNameCollisionError: the name's page slug is already taken
     - OrphanedKeycloakOrganizationError: the MITx Online write and its
       compensating delete both failed
     - requests.HTTPError: Keycloak rejected the create
@@ -219,6 +221,20 @@ def create_organization(  # noqa: PLR0913
             "organizations."
         )
         raise ImproperlyConfigured(msg)
+
+    # add_child() enforces sibling slug uniqueness with a ValidationError, after
+    # the Keycloak write. Checking here keeps a duplicate name from creating and
+    # then compensating a Keycloak organization, and gives the caller a 409.
+    if (
+        organization_index.get_children()
+        .filter(slug=OrganizationPage.slug_for_name(name))
+        .exists()
+    ):
+        msg = (
+            f"An organization named '{name}', or one whose name produces the same "
+            "page slug, already exists."
+        )
+        raise OrganizationNameCollisionError(msg)
 
     # Domains are written verified, with no verification having occurred: staff
     # are asserting them. That is defensible only while the asserting party is

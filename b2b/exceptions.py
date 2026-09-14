@@ -29,6 +29,16 @@ class AliasCollisionError(Exception):
     """
 
 
+class OrganizationNameCollisionError(Exception):
+    """
+    Raised when a new organization's name would reuse an existing page slug.
+
+    The name becomes the OrganizationPage slug, which Wagtail requires to be
+    unique under the organization index. Names that differ only in case or
+    punctuation slugify to the same thing, so they collide too.
+    """
+
+
 class InvalidLifecycleTransitionError(Exception):
     """Raised when an identity provider is asked to skip a lifecycle state."""
 
