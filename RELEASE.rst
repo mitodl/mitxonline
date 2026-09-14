@@ -1,6 +1,19 @@
 Release Notes
 =============
 
+Version 1.166.0
+---------------
+
+- feat (hq11846): Complete your Purchase, paid-amount-off discount behavior (#3926)
+- Retire b2b_contract create --create, demote the org sync to a reconciler (C1 5/5) (#3932)
+- Expose the provisioning API under /api/v0/b2b/provisioning/ (C1 4/5) (#3931)
+- Provision Keycloak organizations and IdPs at runtime (C1 3/5) (#3930)
+- Add the B2B onboarding and identity provider records (C1 2/5) (#3929)
+- Give the Keycloak admin client the calls provisioning needs (C1 1/5) (#3928)
+- Harden test for locals (#3950)
+- chore: pin mitol-drf-lint in the drf-serializer-orm-check hook (#3943)
+- Reuse prefetched course runs in the v2 course API again (#3948)
+
 Version 1.165.4
 ---------------
 
