@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 1.166.1
+---------------
+
+- Fix enrollable_for_contract so it just checks that the run is in the contract (#3954)
+- Only sync changed users to HubSpot during cert generation, and in batches (#3946)
+- Add admin filters for compliance logs (#3952)
+
 Version 1.166.0
 ---------------
 
