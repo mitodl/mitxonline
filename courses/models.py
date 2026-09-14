@@ -1796,9 +1796,6 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
         if not self.b2b_contracts.filter(pk=contract.id).exists():
             return False
 
-        if contract.is_full():
-            return False
-
         return self.is_enrollable
 
 
