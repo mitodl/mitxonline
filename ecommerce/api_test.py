@@ -1,5 +1,6 @@
 """Tests for Ecommerce api"""
 
+import logging
 import random
 import uuid
 from datetime import datetime, timedelta
@@ -32,7 +33,10 @@ from ecommerce.api import (
     ANONYMOUS_BASKET_SESSION_KEY,
     _retrieve_pending_cybersource_orders,
     apply_discount_to_basket,
+    apply_user_discounts,
     check_and_process_pending_orders_for_resolution,
+    check_basket_discounts_for_validity,
+    check_for_double_spent_sources,
     check_for_duplicate_discount_redemptions,
     claim_anonymous_basket,
     create_verified_program_course_run_enrollment,
@@ -41,6 +45,7 @@ from ecommerce.api import (
     downgrade_learner_from_order,
     establish_basket,
     establish_basket_for_request,
+    fulfill_completed_order,
     generate_checkout_payload,
     get_anonymous_basket_id,
     get_auto_apply_discounts_for_basket,
@@ -72,6 +77,7 @@ from ecommerce.constants import (
     STRIPE_PAYMENT_STATUS_UNPAID,
     TRANSACTION_TYPE_PAYMENT,
     TRANSACTION_TYPE_REFUND,
+    ZERO_PAYMENT_DATA,
 )
 from ecommerce.exceptions import (
     VerifiedProgramNoEnrollmentError,
@@ -82,9 +88,11 @@ from ecommerce.factories import (
     OneTimeDiscountFactory,
     OneTimePerUserDiscountFactory,
     OrderFactory,
+    PaidAmountOffDiscountFactory,
     ProductFactory,
     TransactionFactory,
     UnlimitedUseDiscountFactory,
+    make_purchase,
 )
 from ecommerce.fixtures import (
     stripe_checkout_session,
@@ -810,6 +818,79 @@ def test_check_and_process_pending_orders_options(mocker):
     mocked_create_enrollments.assert_not_called()
 
 
+def _pending_credit_order(user, source_line):
+    """
+    A pending program order carrying a paid-amount-off redemption funded by
+    source_line: the shape checkout leaves behind before payment. The line's
+    price is irrelevant to these tests; only the redemption's FK matters.
+    """
+    line = make_purchase(
+        user, ProgramFactory.create(), Decimal("500.00"), state=OrderStatus.PENDING
+    )
+    DiscountRedemption.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=PaidAmountOffDiscountFactory.create(),
+        redeemed_order=line.order,
+        source_line=source_line,
+    )
+    return line.order
+
+
+def test_fulfillment_logs_a_double_spent_source_and_proceeds(
+    paid_amount_off_source, mocker, caplog
+):
+    """Two pending orders share one source; the second still fulfills, loudly."""
+    mocker.patch("ecommerce.api.sync_hubspot_deal")
+    # Enrollment side effects are another test's concern.
+    mocker.patch("ecommerce.models.OrderFlow.create_enrollments")
+    source_line = paid_amount_off_source.source_line
+    first = _pending_credit_order(paid_amount_off_source.user, source_line)
+    second = _pending_credit_order(paid_amount_off_source.user, source_line)
+
+    with caplog.at_level(logging.ERROR, logger="ecommerce.discount_sources"):
+        # Factory setup logs at INFO before at_level narrows the capture
+        # handler, so the records already collected are not fulfillment's.
+        caplog.clear()
+        fulfill_completed_order(first, ZERO_PAYMENT_DATA)
+        assert [
+            r for r in caplog.records if r.name == "ecommerce.discount_sources"
+        ] == []
+
+        fulfill_completed_order(second, ZERO_PAYMENT_DATA)
+
+    first.refresh_from_db()
+    second.refresh_from_db()
+    assert first.state == OrderStatus.FULFILLED
+    assert second.state == OrderStatus.FULFILLED
+    assert first.reference_number in caplog.text
+    assert second.reference_number in caplog.text
+    assert str(source_line.id) in caplog.text
+
+
+def test_fulfillment_logs_a_source_refunded_after_pricing(
+    paid_amount_off_source, mocker, caplog
+):
+    """The credit is already baked into the price, so log the released source
+    and let the payment settle.
+    """
+    mocker.patch("ecommerce.api.sync_hubspot_deal")
+    mocker.patch("ecommerce.models.OrderFlow.create_enrollments")
+    source_line = paid_amount_off_source.source_line
+    order = _pending_credit_order(paid_amount_off_source.user, source_line)
+    Order.objects.filter(pk=source_line.order_id).update(state=OrderStatus.REFUNDED)
+
+    with caplog.at_level(logging.ERROR, logger="ecommerce.discount_sources"):
+        caplog.clear()
+        fulfill_completed_order(order, ZERO_PAYMENT_DATA)
+
+    order.refresh_from_db()
+    assert order.state == OrderStatus.FULFILLED
+    assert order.reference_number in caplog.text
+    assert source_line.order.reference_number in caplog.text
+    assert str(source_line.id) in caplog.text
+
+
 @pytest.mark.parametrize("peruser", [True, False])
 def test_duplicate_redemption_check(peruser):
     """
@@ -843,6 +924,32 @@ def test_duplicate_redemption_check(peruser):
     seen_ids = check_for_duplicate_discount_redemptions()
 
     assert discount.id in seen_ids
+
+
+def test_duplicate_redemption_monitor_flags_shared_source_lines(
+    paid_amount_off_source, caplog
+):
+    """The safety net reports a source funding two fulfilled redemptions and
+    names the orders to review.
+    """
+    source_line = paid_amount_off_source.source_line
+    orders = OrderFactory.create_batch(2, state=OrderStatus.FULFILLED)
+    for order in orders:
+        DiscountRedemptionFactory.create(
+            redeemed_by=paid_amount_off_source.user,
+            redeemed_discount=PaidAmountOffDiscountFactory.create(),
+            redeemed_order=order,
+            source_line=source_line,
+        )
+
+    with caplog.at_level(logging.ERROR, logger="ecommerce.api"):
+        caplog.clear()
+        double_spent_ids = check_for_double_spent_sources()
+
+    assert double_spent_ids == [source_line.id]
+    assert str(source_line.id) in caplog.text
+    for order in orders:
+        assert order.reference_number in caplog.text
 
 
 def test_create_verified_program_discount():
@@ -1888,3 +1995,50 @@ def test_retrieve_pending_cs_orders(mocker, test_type):
         mocked_cs_gateway.assert_called()
         assert len(completed.keys()) == (0 if test_type == "cancelled" else 1)
         assert len(cancelled.keys()) == (0 if test_type == "completed" else 1)
+
+
+def test_apply_user_discounts_validates_against_the_whole_basket(
+    paid_amount_off_source,
+):
+    """A user discount linked to the second basket item is applied, not refused against the first."""
+    request = RequestFactory().get("/")
+    request.user = paid_amount_off_source.user
+    basket = Basket.objects.create(user=paid_amount_off_source.user)
+    BasketItem.objects.create(
+        basket=basket, product=ProductFactory.create(), quantity=1
+    )
+    BasketItem.objects.create(
+        basket=basket, product=paid_amount_off_source.program_product, quantity=1
+    )
+    UserDiscount.objects.create(
+        user=paid_amount_off_source.user, discount=paid_amount_off_source.discount
+    )
+
+    apply_user_discounts(request)
+
+    assert basket.discounts.get().redeemed_discount == paid_amount_off_source.discount
+
+
+def test_revalidation_passes_a_resolvable_program_child_purchase_discount(
+    paid_amount_off_source,
+):
+    """
+    Both revalidation call sites hand the basket's products to is_redeemable_by.
+    Without them a program-child-purchase discount fails closed, and a False from
+    check_basket_discounts_for_validity wipes every basket discount and blocks
+    checkout.
+    """
+    request = RequestFactory().get("/")
+    request.user = paid_amount_off_source.user
+    basket = Basket.objects.create(user=paid_amount_off_source.user)
+    BasketItem.objects.create(
+        basket=basket, product=paid_amount_off_source.program_product, quantity=1
+    )
+    UserDiscount.objects.create(
+        user=paid_amount_off_source.user, discount=paid_amount_off_source.discount
+    )
+
+    apply_user_discounts(request)
+
+    assert basket.discounts.get().redeemed_discount == paid_amount_off_source.discount
+    assert check_basket_discounts_for_validity(request) is True

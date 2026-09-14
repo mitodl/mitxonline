@@ -314,24 +314,24 @@ def test_v0_discount_serializer_rejects_converting_a_discount_with_a_courserun_p
     assert "program products" in str(serializer.errors)
 
 
-def test_basket_serializer_hides_a_paid_amount_off_discount(user):
+def test_basket_serializer_lists_a_paid_amount_off_discount(user):
     """
-    A paid-amount-off discount's stored amount is always 0 and its real
-    per-user value is resolved elsewhere (hq#11846), so there is nothing to
-    render for it yet.
+    A paid-amount-off discount stores 0 but is not price-neutral: it attaches
+    only when a source resolves, so the shopper must see it explain the price.
     """
     basket = BasketFactory.create(user=user)
     BasketItemFactory.create(basket=basket)
+    discount = PaidAmountOffDiscountFactory.create()
     BasketDiscount.objects.create(
         redemption_date=now_in_utc(),
         redeemed_by=user,
-        redeemed_discount=PaidAmountOffDiscountFactory.create(),
+        redeemed_discount=discount,
         redeemed_basket=basket,
     )
 
     data = BasketWithProductSerializer(instance=basket).data
 
-    assert data["discounts"] == []
+    assert [d["redeemed_discount"]["id"] for d in data["discounts"]] == [discount.id]
 
 
 def test_basket_serializer_shows_a_fixed_price_discount_equal_to_the_product_price(
