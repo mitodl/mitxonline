@@ -1676,7 +1676,9 @@ def test_apply_available_discount_seat_limit():
 
     result = _validate_b2b_enrollment_prerequisites(user_orgs[2].user, products[0])
 
-    assert result == {"result": USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
+    # We've added the user to the contract - the seat limit is exceeded but because
+    # we manually did it above this should return successfully.
+    assert result == None
 
     # Calling this directly should result in a new discount being created.
 
