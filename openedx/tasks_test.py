@@ -5,7 +5,14 @@ from requests.exceptions import HTTPError
 
 from courses.factories import CourseRunFactory
 from openedx import tasks
+from openedx.constants import (
+    COURSE_RUN_CLONE_STATUS_CLONED,
+    COURSE_RUN_CLONE_STATUS_CLONING,
+    COURSE_RUN_CLONE_STATUS_FAILED,
+    COURSE_RUN_CLONE_STATUS_PENDING,
+)
 from openedx.exceptions import OpenEdXOAuth2Error
+from openedx.models import CourseRunClone
 from users.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
@@ -82,6 +89,11 @@ def test_clone_courserun_retries_transient_errors(mocker, settings, exc):
 
     mock_retry.assert_called_once_with(exc=exc, countdown=311)
 
+    clone = CourseRunClone.objects.get(course_run=run)
+    assert clone.status == COURSE_RUN_CLONE_STATUS_CLONING
+    assert clone.attempts == 1
+    assert type(exc).__name__ in clone.error
+
 
 def test_clone_courserun_does_not_retry_non_transient_errors(mocker):
     """Permanent clone failures should bubble up without retrying."""
@@ -94,6 +106,10 @@ def test_clone_courserun_does_not_retry_non_transient_errors(mocker):
         tasks.clone_courserun.run(run.id, "course-v1:MITx+BASE+1T2099")
 
     mock_retry.assert_not_called()
+
+    clone = CourseRunClone.objects.get(course_run=run)
+    assert clone.status == COURSE_RUN_CLONE_STATUS_FAILED
+    assert clone.error == "ValueError: Course already exists in edX"
 
 
 def test_clone_courserun_logs_exception_after_retry_exhaustion(mocker, settings):
@@ -113,3 +129,33 @@ def test_clone_courserun_logs_exception_after_retry_exhaustion(mocker, settings)
 
     mock_retry.assert_not_called()
     mock_log_exception.assert_called_once()
+    assert (
+        CourseRunClone.objects.get(course_run=run).status
+        == COURSE_RUN_CLONE_STATUS_FAILED
+    )
+
+
+@pytest.mark.parametrize("record_exists", [True, False])
+def test_clone_courserun_records_success(mocker, record_exists):
+    """
+    A clone that completes is marked cloned, whether or not the caller created
+    the progress record before queueing the task.
+    """
+    run = CourseRunFactory.create()
+    base_key = "course-v1:MITx+BASE+1T2099"
+    if record_exists:
+        CourseRunClone.objects.create(
+            course_run=run,
+            source_courseware_id=base_key,
+            status=COURSE_RUN_CLONE_STATUS_PENDING,
+        )
+    mock_clone = mocker.patch("openedx.tasks.api.process_course_run_clone")
+
+    tasks.clone_courserun.run(run.id, base_key)
+
+    clone = CourseRunClone.objects.get(course_run=run)
+    mock_clone.assert_called_once_with(run, base_key, clone=clone)
+    assert clone.status == COURSE_RUN_CLONE_STATUS_CLONED
+    assert clone.source_courseware_id == base_key
+    assert clone.attempts == 1
+    assert clone.error == ""
