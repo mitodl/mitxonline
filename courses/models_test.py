@@ -430,6 +430,19 @@ def test_readable_id_invalid(readable_id_value):
         course.save()
 
 
+def test_course_readable_id_rejects_courserun_courseware_id():
+    """
+    A Course's readable_id should never be set to a full CourseRun
+    courseware_id (e.g. the course key with a run tag appended). Saving one
+    should raise a ValidationError instead of silently persisting a
+    course-run-shaped readable_id that would 404 once linked at /courses/.
+    """
+    existing_run = CourseRunFactory.create()
+    course = CourseFactory.build(readable_id=existing_run.courseware_id)
+    with pytest.raises(ValidationError):
+        course.save()
+
+
 def test_get_program_run_enrollments(user):
     """
     Test that the get_program_run_enrollments helper method for CourseRunEnrollment returns
