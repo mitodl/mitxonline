@@ -5694,7 +5694,9 @@ components:
           type: string
           format: uri
           nullable: true
-          description: URL a relevant FAQ page or entry for the course/program.
+          description: External link to a separate FAQ page (opens in a new tab on
+            the legacy site). For on-page FAQs shown on MIT Learn, use the FAQs section
+            below instead.
           maxLength: 200
         hubspot_form_id:
           type: string
@@ -5729,6 +5731,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Faculty'
+        faqs:
+          type: array
+          items:
+            $ref: '#/components/schemas/FAQItem'
         certificate_page:
           allOf:
           - $ref: '#/components/schemas/CertificatePage'
@@ -5761,6 +5767,7 @@ components:
       - faculty
       - faculty_section_title
       - faq_url
+      - faqs
       - feature_image
       - how_youll_learn
       - hubspot_form_id
@@ -7230,6 +7237,20 @@ components:
       required:
       - country
       - email
+    FAQItem:
+      type: object
+      description: Serializer for FAQ items shown on course/program pages.
+      properties:
+        id:
+          type: integer
+        question:
+          type: string
+        answer:
+          type: string
+      required:
+      - answer
+      - id
+      - question
     Faculty:
       type: object
       description: Serializer for faculty details used in course pages.
@@ -9572,7 +9593,9 @@ components:
           type: string
           format: uri
           nullable: true
-          description: URL a relevant FAQ page or entry for the course/program.
+          description: External link to a separate FAQ page (opens in a new tab on
+            the legacy site). For on-page FAQs shown on MIT Learn, use the FAQs section
+            below instead.
           maxLength: 200
         hubspot_form_id:
           type: string
@@ -9607,6 +9630,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Faculty'
+        faqs:
+          type: array
+          items:
+            $ref: '#/components/schemas/FAQItem'
         certificate_page:
           $ref: '#/components/schemas/CertificatePage'
         program_details:
@@ -9623,6 +9650,7 @@ components:
       - faculty
       - faculty_section_title
       - faq_url
+      - faqs
       - feature_image
       - how_youll_learn
       - hubspot_form_id

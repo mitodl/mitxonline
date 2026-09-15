@@ -44,7 +44,7 @@ from wagtail.embeds.embeds import get_embed
 from wagtail.embeds.exceptions import EmbedException
 from wagtail.fields import RichTextField, StreamField
 from wagtail.images.models import Image
-from wagtail.models import Page
+from wagtail.models import Orderable, Page
 from wagtail.search import index
 from wagtail.snippets.models import register_snippet
 from wagtailmetadata.models import MetadataPageMixin
@@ -725,6 +725,24 @@ class InstructorPageLink(models.Model):  # noqa: DJ008
     ]
 
 
+class ProductPageFAQ(Orderable):
+    """A single frequently asked question shown on a course/program product page."""
+
+    page = ParentalKey(Page, on_delete=models.CASCADE, related_name="faqs_list")
+    question = models.TextField(help_text="The frequently asked question.")
+    answer = RichTextField(
+        help_text="The answer. Supports links and basic formatting.",
+    )
+
+    panels = [
+        FieldPanel("question"),
+        FieldPanel("answer"),
+    ]
+
+    def __str__(self):
+        return self.question
+
+
 class HomePage(VideoPlayerConfigMixin):
     """
     Site home page
@@ -1160,7 +1178,11 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
     faq_url = models.URLField(  # noqa: DJ001
         null=True,
         blank=True,
-        help_text="URL a relevant FAQ page or entry for the course/program.",
+        help_text=(
+            "External link to a separate FAQ page (opens in a new tab on the "
+            "legacy site). For on-page FAQs shown on MIT Learn, use the FAQs "
+            "section below instead."
+        ),
     )
 
     video_url = models.URLField(  # noqa: DJ001
@@ -1299,6 +1321,7 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
             "linked_instructors",
             label="Faculty Members",
         ),
+        InlinePanel("faqs_list", label="FAQs"),
     ]
     api_fields = [
         APIField("description", serializer=RichTextSerializer()),
@@ -1320,6 +1343,7 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         APIField("video_url"),
         APIField("faculty_section_title"),
         APIField("faculty"),
+        APIField("faqs"),
         APIField("certificate_page", serializer=ProductChildPageSerializer()),
         APIField("how_youll_learn"),
     ]
@@ -1380,6 +1404,16 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
             member.linked_instructor_page for member in self.linked_instructors.all()
         ]
         return InstructorPageSerializer(instructor_pages, many=True).data
+
+    @property
+    def faqs(self):
+        """
+        Returns the FAQs for this product page, ordered, for the wagtail API.
+        """
+        from cms.serializers import ProductPageFAQSerializer  # noqa: PLC0415
+
+        # Orderable's default ordering already sorts by sort_order.
+        return ProductPageFAQSerializer(self.faqs_list.all(), many=True).data
 
     @property
     def product(self):
