@@ -16,6 +16,7 @@ from ecommerce.constants import (
     CYBERSOURCE_CARD_TYPES,
     DISCOUNT_SOURCE_TYPES,
     DISCOUNT_TYPES,
+    PAYMENT_TYPES,
     TRANSACTION_TYPE_REFUND,
 )
 from ecommerce.discount_sources import credited_courseware
@@ -755,6 +756,18 @@ class UserPricingDiscountSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     discount_code = serializers.CharField()
     discount_type = serializers.ChoiceField(choices=DISCOUNT_TYPES)
+    # required=False matches V0Discount's derivation from the nullable model
+    # column; openapi-generator types a required nullable enum as non-null.
+    payment_type = serializers.ChoiceField(
+        choices=PAYMENT_TYPES,
+        allow_null=True,
+        required=False,
+        help_text=(
+            "What kind of discount won: `financial-assistance` is the learner's "
+            "approved aid tier; the other values say how a discount was funded. "
+            "Null on discounts created without one."
+        ),
+    )
     amount_off = serializers.DecimalField(
         max_digits=7,
         decimal_places=2,
@@ -785,6 +798,7 @@ class UserPricingDiscountSerializer(serializers.Serializer):
             "id": quote.discount.id,
             "discount_code": quote.discount.discount_code,
             "discount_type": quote.discount.discount_type,
+            "payment_type": quote.discount.payment_type,
             "amount_off": instance.price - quote.price,
             "source": self._source(quote.source_line),
         }
@@ -820,7 +834,6 @@ class _QuotedPriceField(serializers.DecimalField):
 # reads from user_flexible_price is inherited here, so moving off it
 # (https://github.com/mitodl/hq/issues/12799) cannot lose one. The docstring is
 # the public schema description, so the rationale lives here instead.
-@extend_schema_serializer(deprecate_fields=["product_flexible_price"])
 class UserPricingProductSerializer(ProductFlexiblePriceSerializer):
     """A product priced for one user."""
 
@@ -831,10 +844,10 @@ class UserPricingProductSerializer(ProductFlexiblePriceSerializer):
         V0DiscountSerializer(
             allow_null=True,
             help_text=(
-                "Deprecated. The learner's approved financial-assistance "
-                "discount exactly as `user_flexible_price` returns it, kept so "
-                "callers of that endpoint can move over unchanged; `user_price` "
-                "and `discount` say what checkout charges."
+                "The learner's approved financial-assistance tier discount, or "
+                "null: whether they are approved and at which tier, even when "
+                "that tier is 0% or another discount wins. Read `user_price` "
+                "for the price, not this field's `amount`."
             ),
         )
     )

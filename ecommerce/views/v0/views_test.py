@@ -336,6 +336,7 @@ def test_user_pricing_returns_the_single_product_flexible_price_data(user_client
     assert single["product_flexible_price"]["id"] == finaid.id
     assert {key: quoted[key] for key in single} == single
     assert quoted["discount"]["id"] == finaid.id
+    assert quoted["discount"]["payment_type"] == PAYMENT_TYPE_FINANCIAL_ASSISTANCE
     assert quoted["discount"]["source"] is None
 
 

@@ -2875,9 +2875,8 @@ paths:
         computes it (financial assistance, user-tied and automatic discounts, including
         paid-amount-off credit for a qualifying prior purchase). The response also
         carries product_flexible_price exactly as the deprecated user_flexible_price
-        endpoint returns it (deprecated here too), so a caller moves over field for
-        field. Anonymous requests are a 403; an unknown or no-longer-purchasable product
-        is a 404.
+        endpoint returns it, so a caller moves over field for field. Anonymous requests
+        are a 403; an unknown or no-longer-purchasable product is a 404.
       parameters:
       - in: path
         name: id
@@ -10386,6 +10385,20 @@ components:
           type: string
         discount_type:
           $ref: '#/components/schemas/DiscountTypeEnum'
+        payment_type:
+          nullable: true
+          description: |-
+            What kind of discount won: `financial-assistance` is the learner's approved aid tier; the other values say how a discount was funded. Null on discounts created without one.
+
+            * `marketing` - marketing
+            * `sales` - sales
+            * `financial-assistance` - financial-assistance
+            * `customer-support` - customer-support
+            * `staff` - staff
+            * `legacy` - legacy
+          oneOf:
+          - $ref: '#/components/schemas/PaymentTypeEnum'
+          - $ref: '#/components/schemas/NullEnum'
         amount_off:
           type: string
           format: decimal
@@ -10425,12 +10438,11 @@ components:
           allOf:
           - $ref: '#/components/schemas/V0Discount'
           nullable: true
-          description: Deprecated. The learner's approved financial-assistance discount
-            exactly as `user_flexible_price` returns it, kept so callers of that endpoint
-            can move over unchanged; `user_price` and `discount` say what checkout
-            charges.
+          description: 'The learner''s approved financial-assistance tier discount,
+            or null: whether they are approved and at which tier, even when that tier
+            is 0% or another discount wins. Read `user_price` for the price, not this
+            field''s `amount`.'
           readOnly: true
-          deprecated: true
         user_price:
           type: string
           format: decimal

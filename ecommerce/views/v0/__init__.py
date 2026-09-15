@@ -684,9 +684,8 @@ class ProductViewSet(ReadOnlyModelViewSet):
             "automatic discounts, including paid-amount-off credit for a "
             "qualifying prior purchase). The response also carries "
             "product_flexible_price exactly as the deprecated "
-            "user_flexible_price endpoint returns it (deprecated here too), so "
-            "a caller moves over field for field. Anonymous requests are a 403; "
-            "an unknown or "
+            "user_flexible_price endpoint returns it, so a caller moves over "
+            "field for field. Anonymous requests are a 403; an unknown or "
             "no-longer-purchasable product is a 404."
         ),
         responses={
