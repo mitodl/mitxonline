@@ -170,7 +170,7 @@ def add_courseware_to_contract(  # noqa: PLR0913
     return CoursewareAddition(runs_added=len(created))
 
 
-def remove_run_from_contract(contract: ContractPage, run: CourseRun) -> bool:
+def _remove_run_from_contract(contract: ContractPage, run: CourseRun) -> bool:
     """
     Close a contract run to new enrollments and take it out of the contract.
 
@@ -244,7 +244,7 @@ def remove_courseware_from_contract(
     removing it removes its contract runs. Only runs in this contract are
     touched.
 
-    Returns (run, unlinked) for each run removed; see remove_run_from_contract.
+    Returns (run, unlinked) for each run removed; see _remove_run_from_contract.
     """
 
     contract_runs = CourseRun.objects.filter(b2b_contracts=contract)
@@ -267,7 +267,7 @@ def remove_courseware_from_contract(
     else:
         runs = list(contract_runs.filter(course=courseware))
 
-    return [(run, remove_run_from_contract(contract, run)) for run in runs]
+    return [(run, _remove_run_from_contract(contract, run)) for run in runs]
 
 
 def expected_enrollment_code_count(contract: ContractPage) -> int:

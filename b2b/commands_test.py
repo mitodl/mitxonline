@@ -1,5 +1,7 @@
 """Tests for B2B management commands."""
 
+from io import StringIO
+
 import pytest
 from django.core.management import call_command
 
@@ -28,6 +30,20 @@ def _create_run_with_product_and_discount(contract, *, with_enrollment=False):
         CourseRunEnrollmentFactory.create(run=run)
 
     return run, product, discount
+
+
+def test_b2b_courseware_remove_course_with_no_contract_runs_says_so():
+    """Removing a course with no runs in the contract reports that nothing was removed."""
+
+    contract = ContractPageFactory.create()
+    course = CourseRunFactory.create().course
+    out = StringIO()
+
+    call_command(
+        "b2b_courseware", "remove", str(contract.id), course.readable_id, stdout=out
+    )
+
+    assert f"{course.readable_id} has no runs in {contract}" in out.getvalue()
 
 
 def test_b2b_courseware_remove_run_without_enrollments_unlinks_and_deactivates(mocker):
