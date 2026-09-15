@@ -995,7 +995,7 @@ def is_organization_manager(user, org_id):
     ).exists()
 
 
-class UserB2BContract(models.Model):
+class UserB2BContract(TimestampedModel):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -1006,6 +1006,8 @@ class UserB2BContract(models.Model):
         on_delete=models.CASCADE,
         related_name="b2b_contract_users",
     )
+    consented_to_data_sharing = models.BooleanField(null=True)
+    consent_modified_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         unique_together = ("user", "contract_page")
