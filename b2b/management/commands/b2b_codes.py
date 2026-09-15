@@ -23,6 +23,7 @@ from b2b.api import (
     get_contract_runs_without_products,
 )
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
+from b2b.contracts import expected_enrollment_code_count
 from b2b.models import ContractPage, DiscountContractAttachmentRedemption
 from courses.models import CourseRun
 from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME, REDEMPTION_TYPE_UNLIMITED
@@ -504,14 +505,12 @@ class Command(BaseCommand):
                     else contract.enrollment_fixed_price
                 )
 
-                if contract.max_learners:
-                    expected_codes_count = (
-                        contract.max_learners * contract.get_course_runs().count()
-                    )
-                    code_redemption_type = REDEMPTION_TYPE_ONE_TIME
-                else:
-                    expected_codes_count = contract.get_course_runs().count()
-                    code_redemption_type = REDEMPTION_TYPE_UNLIMITED
+                expected_codes_count = expected_enrollment_code_count(contract)
+                code_redemption_type = (
+                    REDEMPTION_TYPE_ONE_TIME
+                    if contract.max_learners
+                    else REDEMPTION_TYPE_UNLIMITED
+                )
 
                 total_code_count = contract.get_discounts().count()
 
