@@ -326,6 +326,12 @@ Specifying a program will only unlink the program from the contract, unless "--r
                         f"Removed program {courseware.readable_id} from contract {contract}, with {len(removed)} of its runs."
                     )
                 )
+            elif not removed:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"{courseware.readable_id} has no runs in {contract}; nothing removed."
+                    )
+                )
 
             for run, unlinked in removed:
                 if unlinked:
