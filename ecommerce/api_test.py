@@ -1666,7 +1666,7 @@ def test_quote_user_price_query_count_does_not_grow_with_unrelated_discounts(
     One quote costs what the learner's own applicable discounts cost and
     nothing more. Product scope is a filter on the candidate query rather than
     a check per candidate, so five automatic discounts on sale elsewhere leave
-    the count untouched -- without that, each one costs a query whether or not
+    the count untouched -- without that, each one costs queries whether or not
     it can price this product.
     """
     user = paid_amount_off_source.user

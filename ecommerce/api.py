@@ -1252,8 +1252,8 @@ def quote_user_price(product, user) -> UserPriceQuote:
     discount outranks another.
 
     The price therefore agrees with what the basket charges for the
-    single-item baskets checkout builds, and can differ from the basket's in
-    two ways. On an exact tie the basket keeps whichever discount it applied
+    single-item baskets checkout builds; only the discount named can differ,
+    in two ways. On an exact tie the basket keeps whichever discount it applied
     last while this names the lowest id. And a discount that beats no other
     candidate but still quotes the list price is recorded on the basket, while
     this reports no discount, because the basket's price is the discount's
@@ -1266,8 +1266,9 @@ def quote_user_price(product, user) -> UserPriceQuote:
     qualifying prior purchase. The first three are the candidate query;
     discount_product enforces the rest.
 
-    The work is bounded by the discounts that actually cover this product,
-    which is the bound checkout itself pays for one product.
+    The work is bounded by the discounts that can price this product, not by
+    anything about the request. Checkout's own bound is looser: it checks every
+    discount on offer to the learner, in scope for the basket or not.
 
     Args:
         product (Product): the product to price
@@ -1290,7 +1291,7 @@ def quote_user_price(product, user) -> UserPriceQuote:
             # A discount carrying DiscountProduct rows applies only to the
             # products named by them; one carrying none applies to everything.
             # Scoping in SQL rather than per candidate is what keeps the cost
-            # independent of how many discounts the site has live.
+            # independent of how many discounts are live for other products.
             Q(products__isnull=True) | Q(products__product=product)
         )
         .filter(
