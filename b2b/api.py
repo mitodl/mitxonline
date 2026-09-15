@@ -778,8 +778,8 @@ def create_contract_run(  # noqa: PLR0913
     if queue_codes:
         queue_enrollment_code_check.delay(contract.id)
 
-    # Saving the contract here triggers any shoring up of related data,
-    # like generating enrollment codes.
+    # Saving the contract does not generate enrollment codes; ContractPage.save
+    # only sets the title. Pass queue_codes, or queue the check separately.
     contract.save()
 
     return results
