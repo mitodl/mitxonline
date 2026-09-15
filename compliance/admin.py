@@ -87,6 +87,7 @@ class ExportComplianceLogAdmin(DjangoObjectActions, TimestampedModelAdmin):
         ExportComplianceAcceptedFilter,
         ExportComplianceManuallyApprovedFilter,
     )
+    search_fields = ("user__email", "user__username")
     readonly_fields = get_field_names(ExportComplianceLog)
     change_actions = ["mark_manually_approved"]
 
