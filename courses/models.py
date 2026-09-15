@@ -1258,9 +1258,23 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         the course-level ID (e.g. "course-v1:MITxT+JPAL101SPAx"). Links built
         from a readable_id in that shape 404 once redirected to the Learn
         front end, since a run ID isn't a valid course readable_id there.
+
+        Only checked when readable_id is being newly set or changed, so
+        existing rows that already have a colliding value (from before this
+        validation existed) aren't blocked from being saved for unrelated
+        reasons.
         """
+        if not self.readable_id:
+            return
+
+        is_new_or_changed = (
+            self.pk is None
+            or not Course.objects.filter(
+                pk=self.pk, readable_id=self.readable_id
+            ).exists()
+        )
         if (
-            self.readable_id
+            is_new_or_changed
             and CourseRun.objects.filter(courseware_id=self.readable_id).exists()
         ):
             raise ValidationError(
