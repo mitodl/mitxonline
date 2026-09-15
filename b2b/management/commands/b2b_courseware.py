@@ -8,21 +8,14 @@ import logging
 from argparse import RawTextHelpFormatter
 
 from django.core.management import BaseCommand, CommandError
-from mitol.common.utils.datetime import now_in_utc
 from opaque_keys import InvalidKeyError
 
-from b2b.api import create_contract_run, import_and_create_contract_run
-from b2b.models import ContractPage, ContractProgramItem
+from b2b.api import import_and_create_contract_run
+from b2b.contracts import add_courseware_to_contract, remove_courseware_from_contract
+from b2b.models import ContractPage
 from b2b.tasks import queue_enrollment_code_check
 from courses.api import resolve_courseware_object_from_id
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
-from courses.models import CourseRun, CourseRunEnrollment
-from courses.retirement import (
-    deactivate_run_products,
-    get_run_products,
-    push_run_dates_to_edx,
-)
-from ecommerce.models import Discount, DiscountProduct
 
 log = logging.getLogger(__name__)
 
@@ -71,55 +64,6 @@ Specifying a course will unlink any of the course's runs that are attached to th
 
 Specifying a program will only unlink the program from the contract, unless "--remove-program-runs" is set. If it is, then all the runs that belong to both the contract and the program's courses will be removed from the contract. Note that doing this and then re-adding the program will *not* re-attach the existing runs to the contract - you will need to do that manually.
     """
-
-    def create_run(  # noqa: PLR0913
-        self,
-        contract,
-        courseware,
-        *,
-        skip_edx=False,
-        org_prefix=None,
-        no_reruns=False,
-        ignore_langs=False,
-        only_lang=None,
-        filter_variants=None,
-    ):
-        """Create a run for the specified contract."""
-        try:
-            run_tuples = create_contract_run(
-                contract=contract,
-                course=courseware,
-                skip_edx=skip_edx,
-                org_prefix=org_prefix,
-                no_reruns=no_reruns,
-                ignore_langs=ignore_langs,
-                only_lang=only_lang,
-                filter_variants=filter_variants,
-            )
-        except InvalidKeyError:
-            self.stderr.write(
-                self.style.ERROR(
-                    f"Invalid key error for course {courseware}. Is the course's readable ID configured correctly?"
-                )
-            )
-            return False
-
-        if not run_tuples:
-            self.stdout.write(
-                self.style.ERROR(
-                    f"Failed to create run for course {courseware} for contract {contract}."
-                )
-            )
-            return False
-
-        for run, product in run_tuples:
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"Created run {run} and product {product} for course {courseware} for contract {contract}."
-                )
-            )
-
-        return True
 
     def add_arguments(self, parser):
         """Add command line arguments."""
@@ -302,77 +246,57 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 continue
 
             if courseware.is_program:
-                # If you're specifying a program, we will always make new runs
-                # since we won't be able to tell which existing ones to use.
-
                 self.stdout.write(
                     self.style.WARNING(
                         f"'{courseware.readable_id}' is a program, so creating runs for all of its courses."
                     )
                 )
 
-                prog_add, prog_no_source = contract.add_program_courses(
+            try:
+                added = add_courseware_to_contract(
+                    contract,
                     courseware,
                     skip_edx=skip_edx,
                     no_reruns=no_reruns,
+                    force=force_associate,
+                    org_prefix=org_prefix,
                     ignore_langs=ignore_langs,
                     only_lang=only_lang,
                     filter_variants=filter_variants,
                 )
-                if prog_no_source > 0:
-                    self.stdout.write(
-                        self.style.WARNING(
-                            f"Program '{courseware.readable_id}' has {prog_no_source} courses with no source runs; cannot create contract runs for these courses."
-                        )
+            except InvalidKeyError:
+                self.stderr.write(
+                    self.style.ERROR(
+                        f"Invalid key error for course {courseware}. Is the course's readable ID configured correctly?"
                     )
-                contract.save()
-                managed += prog_add
-                self.stdout.write(
-                    self.style.SUCCESS(f"Added {courseware.readable_id} to {contract}.")
                 )
-            elif courseware.is_run:
-                # This run already exists, so:
-                # - If it's in a contract already and we're not forcing it, skip it.
-                # - If it's in a contract already and we *are* forcing it, set it to be in this contract.
-                # - If it's not in a contract, add it to this contract.
+                continue
 
-                other_contracts = courseware.b2b_contracts.exclude(id=contract.id)
+            if added.skipped_reason:
+                self.stdout.write(self.style.WARNING(added.skipped_reason))
+                continue
 
-                if not force_associate and other_contracts.exists():
-                    # Already owned by another contract, so skip
-                    self.stdout.write(
-                        self.style.WARNING(
-                            f"Run '{courseware.courseware_id}' is already owned by {other_contracts.first()}."
-                        )
+            if added.courses_without_source_run:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Program '{courseware.readable_id}' has {added.courses_without_source_run} courses with no source runs; cannot create contract runs for these courses."
                     )
-                    continue
-                elif courseware.b2b_contracts.filter(id=contract.id).exists():
-                    # Already owned by this contract, so skip
-                    self.stdout.write(
-                        self.style.WARNING(
-                            f"Run '{courseware.courseware_id}' is already owned by this contract."
-                        )
+                )
+
+            if not added.runs_added and not courseware.is_program:
+                self.stdout.write(
+                    self.style.ERROR(
+                        f"Failed to create run for course {courseware} for contract {contract}."
                     )
-                    continue
+                )
+                continue
 
-                # Add the run to the contract
-                courseware.b2b_contract = contract
-                courseware.save()
-                courseware.b2b_contracts.add(contract)
-                managed += 1
-            elif self.create_run(
-                contract,
-                courseware,
-                skip_edx=skip_edx,
-                org_prefix=org_prefix,
-                no_reruns=no_reruns,
-                ignore_langs=ignore_langs,
-                only_lang=only_lang,
-                filter_variants=filter_variants,
-            ):
-                # This is a course, so create a run (unless we've been told not to).
-
-                managed += 1
+            managed += added.runs_added
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Added {courseware.readable_id} to {contract} ({added.runs_added} runs)."
+                )
+            )
 
         if make_codes:
             self.stdout.write(f"Queueing enrollment code check for {contract}")
@@ -386,141 +310,34 @@ Specifying a program will only unlink the program from the contract, unless "--r
 
         return True
 
-    def handle_remove(self, contract, coursewares, **kwargs):  # noqa: C901
+    def handle_remove(self, contract, coursewares, **kwargs):
         """Handle removing courseware from a contract."""
 
         remove_runs = kwargs.pop("remove_program_runs")
 
         for courseware in coursewares:
+            removed = remove_courseware_from_contract(
+                contract, courseware, remove_program_runs=remove_runs
+            )
+
             if courseware.is_program:
-                # If we have a program, unlink the program from the contract.
-                # Then, if we're told to, unlink any contract runs that are
-                # part of the program too.
-
-                if remove_runs:
-                    program_courses = courseware.courses
-                    program_runs = CourseRun.objects.filter(
-                        b2b_contracts=contract,
-                        course__in=[course for (course, _) in program_courses],
-                    ).all()
-
-                    coursewares.extend(program_runs)
-
-                    self.stdout.write(
-                        self.style.NOTICE(
-                            f"{courseware.readable_id} is a program and --remove-program-runs set, so adding {len(program_runs)} course runs"
-                        )
-                    )
-
-                ContractProgramItem.objects.filter(
-                    contract=contract, program=courseware
-                ).delete()
                 self.stdout.write(
                     self.style.SUCCESS(
-                        f"Removed program {courseware.readable_id} from contract {contract}."
+                        f"Removed program {courseware.readable_id} from contract {contract}, with {len(removed)} of its runs."
                     )
                 )
-            elif not courseware.is_run:
-                # If we have a course, find and add the contract runs for the
-                # course to the list. We don't link courses to contracts, so
-                # there's nothing else to do here.
 
-                course_contract_runs = courseware.courseruns.filter(
-                    b2b_contracts=contract
-                ).all()
-
-                coursewares.extend(course_contract_runs)
-
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"Added {len(course_contract_runs)} course runs from course {courseware.readable_id} to remove from contract {contract}."
-                    )
-                )
-            else:
-                # We're actually at a course run now.
-
-                has_enrollments = CourseRunEnrollment.objects.filter(
-                    run=courseware
-                ).exists()
-
-                # Deactivate the run for future enrollments
-                now = now_in_utc()
-                if (
-                    courseware.live
-                    or courseware.enrollment_end is None
-                    or courseware.enrollment_end > now
-                ):
-                    courseware.live = False
-                    courseware.enrollment_end = now
-
-                # If there are no enrollments, detach the run from the contract
-                if (
-                    not has_enrollments
-                    and courseware.b2b_contracts.filter(id=contract.id).exists()
-                ):
-                    if courseware.b2b_contract == contract:
-                        courseware.b2b_contract = None
-                    courseware.b2b_contracts.remove(contract)
-
-                courseware.save()
-
-                # Deactivate products for this run. get_run_products uses
-                # all_objects so it finds products regardless of their current
-                # is_active state, and returns a list so the deactivation below
-                # doesn't mutate the collection we reuse when removing discount
-                # associations. Shared with the retire_courserun command.
-                run_products = get_run_products(courseware)
-                deactivate_run_products(courseware)
-
-                # Invalidate/delete any enrollment codes (Discounts) associated with this run's products
-                discounts = Discount.objects.filter(
-                    products__product__in=run_products
-                ).distinct()
-
-                for discount in discounts:
-                    # Remove only associations for these products
-                    DiscountProduct.objects.filter(
-                        discount=discount,
-                        product__in=run_products,
-                    ).delete()
-                    discount.refresh_from_db()
-
-                    # If the discount no longer applies to any products, remove it
-                    if discount.products.count() == 0 and not (
-                        discount.order_redemptions.exists()
-                        or discount.contract_redemptions.exists()
-                    ):
-                        discount.delete()
-
-                # Attempt to push the new enrollment_end to edX so it isn't
-                # overwritten by the next sync from edX.
-                #
-                # NOTE: edX will not accept an enrollment window for a run that
-                # has no start and end date, so for a run with a null end_date
-                # the new enrollment_end never reaches edX and the next sync
-                # reverts it. push_run_dates_to_edx returns False and logs a
-                # warning in that case. Fixing it properly means also moving
-                # end_date into the past, which is what the retire_courserun
-                # command does; this command's contract is narrower, so the
-                # behaviour is left as-is here.
-                try:
-                    push_run_dates_to_edx(courseware)
-                except Exception:
-                    log.exception(
-                        "Failed to update enrollment end date on edX for %s",
-                        courseware.courseware_id,
-                    )
-
-                if not has_enrollments:
+            for run, unlinked in removed:
+                if unlinked:
                     self.stdout.write(
                         self.style.SUCCESS(
-                            f"Deactivated and unlinked {courseware.courseware_id} from {contract} (no enrollments)."
+                            f"Deactivated and unlinked {run.courseware_id} from {contract} (no enrollments)."
                         )
                     )
                 else:
                     self.stdout.write(
                         self.style.SUCCESS(
-                            f"Deactivated {courseware.courseware_id} but kept it linked to {contract} (has enrollments)."
+                            f"Deactivated {run.courseware_id} but kept it linked to {contract} (has enrollments)."
                         )
                     )
 
