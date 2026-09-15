@@ -1,6 +1,7 @@
 """Courseware tasks"""
 
 import pytest
+from django.core.cache import cache
 from requests.exceptions import HTTPError
 
 from courses.factories import CourseRunFactory
@@ -159,3 +160,27 @@ def test_clone_courserun_records_success(mocker, record_exists):
     assert clone.source_courseware_id == base_key
     assert clone.attempts == 1
     assert clone.error == ""
+    assert cache.get(f"clone_courserun_lock:{run.id}") is None
+
+
+def test_clone_courserun_skips_a_duplicate_delivery(mocker):
+    """
+    A delivery that finds another attempt holding the run's lock leaves the
+    record and edX alone.
+    """
+    run = CourseRunFactory.create()
+    clone = CourseRunClone.objects.create(
+        course_run=run,
+        source_courseware_id="course-v1:MITx+BASE+1T2099",
+        status=COURSE_RUN_CLONE_STATUS_CLONING,
+        attempts=1,
+    )
+    cache.add(f"clone_courserun_lock:{run.id}", "another-task")
+    mock_clone = mocker.patch("openedx.tasks.api.process_course_run_clone")
+
+    tasks.clone_courserun.run(run.id, clone.source_courseware_id)
+
+    mock_clone.assert_not_called()
+    clone.refresh_from_db()
+    assert clone.attempts == 1
+    assert cache.get(f"clone_courserun_lock:{run.id}") == "another-task"

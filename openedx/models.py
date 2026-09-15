@@ -92,11 +92,14 @@ class CourseRunClone(TimestampedModel):
     error = models.TextField(blank=True, default="")
 
     def start_attempt(self):
-        """Record that a clone attempt is starting."""
+        """Record that a clone attempt is starting, counting it atomically."""
 
-        self.status = COURSE_RUN_CLONE_STATUS_CLONING
-        self.attempts += 1
-        self.save(update_fields=["status", "attempts", "updated_on"])
+        CourseRunClone.objects.filter(pk=self.pk).update(
+            status=COURSE_RUN_CLONE_STATUS_CLONING,
+            attempts=models.F("attempts") + 1,
+            updated_on=now_in_utc(),
+        )
+        self.refresh_from_db()
 
     def mark_requested(self):
         """Record that edX is about to be asked to clone."""
