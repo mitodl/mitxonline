@@ -785,6 +785,28 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             ).distinct()
         )
 
+    @cached_property
+    def is_enrollable(self):
+        """
+        Determines if the program is enrollable
+        """
+        now = now_in_utc()
+        return (
+            (self.enrollment_end is None or self.enrollment_end > now)
+            and self.enrollment_start is not None
+            and self.enrollment_start <= now
+            and self.live is True
+            and self.start_date is not None
+        )
+
+    def enrollable_for_contract(self, contract) -> bool:
+        """Determine if the run is enrollable for the specified contract."""
+
+        if not self.b2b_contracts.filter(pk=contract.id).exists():
+            return False
+
+        return self.is_enrollable
+
 
 class RelatedProgram(TimestampedModel, ValidateOnSaveMixin):
     """
