@@ -14,7 +14,7 @@ from b2b.constants import (
     IDP_STATE_TESTING,
     ONBOARDING_STATE_LIVE,
 )
-from b2b.exceptions import AliasCollisionError
+from b2b.exceptions import AliasCollisionError, OrganizationNameCollisionError
 from b2b.factories import OrganizationIndexPageFactory, OrganizationPageFactory
 from b2b.keycloak_admin_dataclasses import (
     OrganizationDomainRepresentation,
@@ -134,6 +134,20 @@ def test_create_organization_alias_collision_is_a_conflict(admin_drf_client, moc
 
     assert response.status_code == status.HTTP_409_CONFLICT
     assert response.json()["detail"] == "taken"
+
+
+def test_create_organization_name_collision_is_a_conflict(admin_drf_client, mocker):
+    """A name whose page slug is taken is 409, not the 500 in MITXONLINE-73J."""
+
+    mocker.patch(
+        "b2b.views.v0.provisioning.create_organization",
+        side_effect=OrganizationNameCollisionError("name taken"),
+    )
+
+    response = admin_drf_client.post(_organizations_url(), CREATE_BODY, format="json")
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert response.json()["detail"] == "name taken"
 
 
 def test_keycloak_failure_is_a_bad_gateway(admin_drf_client, mocker):

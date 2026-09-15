@@ -147,13 +147,19 @@ class OrganizationPage(Page):
 
     # Use default promote_panels from Page to allow manual slug editing
 
+    @staticmethod
+    def slug_for_name(name):
+        """Return the slug a new organization with this name is saved under."""
+
+        return slugify(f"org-{name}")
+
     def save(self, clean=True, user=None, log_action=False, **kwargs):  # noqa: FBT002
         """Save the page, and update the slug and title appropriately."""
 
         self.title = str(self.name)
 
         if not self.slug:
-            self.slug = slugify(f"org-{self.name}")
+            self.slug = self.slug_for_name(self.name)
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
 
     def get_learners(self):
