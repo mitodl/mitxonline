@@ -116,6 +116,20 @@ def test_create_contract(admin_drf_client, mocked_tasks):
     mocked_tasks.code_check.assert_not_called()
 
 
+def test_create_contract_requires_membership_type(admin_drf_client):
+    """membership_type has a model default, but creating a contract requires it."""
+
+    organization = OrganizationPageFactory.create()
+
+    response = admin_drf_client.post(
+        _contracts_url(organization.org_key), {"name": "Spring cohort"}, format="json"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "membership_type" in response.json()["errors"]
+    assert not organization.contracts.exists()
+
+
 def test_create_contract_for_unknown_organization_is_a_404(admin_drf_client):
     """A mistyped org_key does not create an orphaned contract."""
 
