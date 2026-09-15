@@ -235,6 +235,19 @@ def source_line_for(discount, user, products) -> Line | None:
     return resolution.source_line if resolution else None
 
 
+def credited_courseware(source_line):
+    """
+    The course or program ``source_line`` credits a paid-amount-off discount
+    with. A run purchase credits its course: that is the title the learner
+    recognizes and the id Learn links by.
+
+    resolve_program_child_purchase only ever matches a run or a program, so
+    those are the only two shapes a source line arrives in.
+    """
+    purchased = source_line.purchased_object
+    return purchased.course if isinstance(purchased, CourseRun) else purchased
+
+
 def has_paid_amount_off(discounts) -> bool:
     """Whether any of ``discounts`` spends a source, i.e. needs resolving."""
     return any(spends_source(discount) for discount in discounts)

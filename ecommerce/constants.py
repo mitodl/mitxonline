@@ -6,6 +6,8 @@ from mitol.payment_gateway.constants import (
     MITOL_PAYMENT_GATEWAY_STRIPE,
 )
 
+from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
+
 REFERENCE_NUMBER_PREFIX = "mitxonline-"
 
 # Standard self-service refund window, per the terms of service: learners may
@@ -37,6 +39,16 @@ STANDARD_DISCOUNT_TYPES = [
 BULK_GENERATION_DISCOUNT_TYPES = list(
     zip(STANDARD_DISCOUNT_TYPES, STANDARD_DISCOUNT_TYPES)
 )
+
+# The courseware a paid-amount-off discount credits a prior purchase of. A run
+# purchase is credited to its course, so a run never appears here. These are
+# the same two tokens the course and program serializers publish as `type`,
+# which is what lets a client key both off one vocabulary.
+ALL_DISCOUNT_SOURCE_TYPES = [
+    CONTENT_TYPE_MODEL_COURSE,
+    CONTENT_TYPE_MODEL_PROGRAM,
+]
+DISCOUNT_SOURCE_TYPES = list(zip(ALL_DISCOUNT_SOURCE_TYPES, ALL_DISCOUNT_SOURCE_TYPES))
 
 REDEMPTION_TYPE_ONE_TIME = "one-time"
 REDEMPTION_TYPE_ONE_TIME_PER_USER = "one-time-per-user"

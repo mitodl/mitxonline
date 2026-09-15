@@ -6,7 +6,11 @@ from factory.django import DjangoModelFactory
 from mitol.common.utils import now_in_utc
 
 from courses.factories import CourseFactory
-from ecommerce.factories import DiscountFactory
+from ecommerce.constants import (
+    DISCOUNT_TYPE_PERCENT_OFF,
+    PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+)
+from ecommerce.factories import DiscountFactory, UnlimitedUseDiscountFactory
 from flexiblepricing import models
 from flexiblepricing.constants import FlexiblePriceStatus
 from users.factories import UserFactory
@@ -57,3 +61,26 @@ class FlexiblePriceFactory(DjangoModelFactory):
 
     class Meta:
         model = models.FlexiblePrice
+
+
+def approve_flexible_price(user, courseware, amount):
+    """
+    An approved percent-off financial-assistance tier on ``courseware`` for
+    ``user``, marked financial-assistance the way configure_tiers marks it.
+    Returns the tier's discount, which is what pricing applies.
+    """
+    tier = FlexiblePriceTierFactory.create(
+        courseware_object=courseware,
+        discount=UnlimitedUseDiscountFactory.create(
+            amount=amount,
+            discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+            payment_type=PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+        ),
+    )
+    FlexiblePriceFactory.create(
+        user=user,
+        courseware_object=courseware,
+        tier=tier,
+        status=FlexiblePriceStatus.APPROVED,
+    )
+    return tier.discount

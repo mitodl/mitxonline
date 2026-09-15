@@ -1,3 +1,6 @@
+from decimal import Decimal
+from types import SimpleNamespace
+
 import faker
 import reversion
 from factory import LazyAttribute, SubFactory, fuzzy
@@ -5,6 +8,7 @@ from factory.django import DjangoModelFactory
 from reversion.models import Version
 
 from courses.factories import CourseRunFactory, ProgramFactory
+from courses.models import CourseRun
 from ecommerce import models
 from ecommerce.constants import (
     DISCOUNT_TYPE_PAID_AMOUNT_OFF,
@@ -170,4 +174,32 @@ def make_purchase(
         product_version=Version.objects.get_for_object(product).first(),
         quantity=1,
         discounted_unit_price=charged,
+    )
+
+
+def make_paid_amount_off_offer(user, purchased):
+    """
+    One learner holding exactly one qualifying source for a paid-amount-off
+    discount: a $999 program product whose requirement tree contains
+    ``purchased`` -- a course run or a sub-program -- and a $100 fulfilled
+    purchase of it. Resolving the discount returns a 100.00 credit, so the
+    program prices at 899.00.
+    """
+    program = ProgramFactory.create()
+    program.add_requirement(
+        purchased.course if isinstance(purchased, CourseRun) else purchased
+    )
+    source_line = make_purchase(user, purchased, Decimal("100.00"))
+    with reversion.create_revision():
+        program_product = ProgramProductFactory.create(
+            purchasable_object=program, price=Decimal("999.00")
+        )
+    discount = PaidAmountOffDiscountFactory.create()
+    models.DiscountProduct.objects.create(discount=discount, product=program_product)
+    return SimpleNamespace(
+        user=user,
+        program_product=program_product,
+        program_product_version=Version.objects.get_for_object(program_product).first(),
+        source_line=source_line,
+        discount=discount,
     )
