@@ -533,14 +533,43 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
             request_serializer.validated_data["courseware_id"]
         )
 
+        courseware_id = request_serializer.validated_data["courseware_id"]
+
+        # The 400 bodies are built from the requested ID, never the exception
+        # text, which is logged instead.
         try:
             added = add_courseware_to_contract(
                 contract,
                 courseware,
                 force=request_serializer.validated_data["force"],
             )
-        except (InvalidKeyError, SourceCourseIncompleteError) as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except SourceCourseIncompleteError:
+            log.warning(
+                "No source run to add %s to contract %s",
+                courseware_id,
+                contract.id,
+                exc_info=True,
+            )
+            return Response(
+                {"detail": f"No source run found for {courseware_id}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except InvalidKeyError:
+            log.warning(
+                "Invalid course key adding %s to contract %s",
+                courseware_id,
+                contract.id,
+                exc_info=True,
+            )
+            return Response(
+                {
+                    "detail": (
+                        f"Could not build a contract run key for {courseware_id}. "
+                        "Check the course's readable ID."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if added.runs_added:
             queue_enrollment_code_check_if_required(contract)
