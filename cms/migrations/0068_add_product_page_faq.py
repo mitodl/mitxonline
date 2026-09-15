@@ -7,7 +7,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("cms", "0067_remove_coursepage_show_stay_updated_and_more"),
         ("wagtailcore", "0097_baselogentry_uuid_action_timestamp_indexes"),
