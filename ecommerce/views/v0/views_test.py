@@ -21,6 +21,7 @@ from reversion.models import Version
 
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE, CONTRACT_MEMBERSHIP_MANAGED
 from b2b.factories import ContractPageFactory
+from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
 from courses.factories import (
     BlockedCountryFactory,
     CourseRunEnrollmentFactory,
@@ -53,6 +54,7 @@ from ecommerce.factories import (
     ProgramProductFactory,
     TransactionFactory,
     UnlimitedUseDiscountFactory,
+    make_paid_amount_off_offer,
     make_purchase,
 )
 from ecommerce.models import (
@@ -76,7 +78,11 @@ from ecommerce.serializers import (
     ProductSerializer,
 )
 from flexiblepricing.constants import FlexiblePriceStatus
-from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
+from flexiblepricing.factories import (
+    FlexiblePriceFactory,
+    FlexiblePriceTierFactory,
+    approve_flexible_price,
+)
 from main.constants import (
     USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
     USER_MSG_TYPE_BASKET_EMPTY,
@@ -262,6 +268,89 @@ def test_product_user_flexible_price_unauthenticated(client, products):
 
     # Verify flexible price discount has no amount when user has no approved flexible price
     assert resp_data["product_flexible_price"] is None
+
+
+@pytest.mark.parametrize("purchased_a_program", [False, True])
+def test_user_pricing_quotes_the_paid_amount_off_credit(
+    user_client, user, purchased_a_program
+):
+    """
+    An eligible learner sees the program at price minus their child purchase,
+    and the credit names the courseware they bought: a run purchase names its
+    course, a sub-program purchase names the program.
+    """
+    purchased = (
+        ProgramFactory.create() if purchased_a_program else CourseRunFactory.create()
+    )
+    offer = make_paid_amount_off_offer(user, purchased)
+    credited = purchased if purchased_a_program else purchased.course
+
+    resp = user_client.get(
+        reverse(
+            "v0:products_api-user-pricing",
+            kwargs={"pk": offer.program_product.id},
+        )
+    )
+
+    assert resp.status_code == 200
+    quoted = resp.json()
+    assert quoted["user_price"] == "899.00"
+    assert quoted["discount"]["discount_type"] == DISCOUNT_TYPE_PAID_AMOUNT_OFF
+    assert quoted["discount"]["amount_off"] == "100.00"
+    assert quoted["discount"]["source"] == {
+        "type": CONTENT_TYPE_MODEL_PROGRAM
+        if purchased_a_program
+        else CONTENT_TYPE_MODEL_COURSE,
+        "readable_id": credited.readable_id,
+        "title": credited.title,
+    }
+
+
+def test_user_pricing_requires_a_signed_in_user(client):
+    """
+    An anonymous request is a 403, not a list-price quote: the answer is
+    per-user, and a silent anonymous fallback would hide a caller whose
+    session did not reach this host.
+    """
+    product = ProductFactory.create()
+
+    resp = client.get(
+        reverse("v0:products_api-user-pricing", kwargs={"pk": product.id})
+    )
+
+    assert resp.status_code == 403
+
+
+def test_user_pricing_returns_the_single_product_flexible_price_data(user_client, user):
+    """hq#12799: the response carries exactly what user_flexible_price returns."""
+    product = ProductFactory.create()
+    finaid = approve_flexible_price(user, product.purchasable_object.course, 50)
+
+    single = user_client.get(
+        reverse("v0:products_api-user-flexible-price", kwargs={"pk": product.id})
+    ).json()
+    quoted = user_client.get(
+        reverse("v0:products_api-user-pricing", kwargs={"pk": product.id})
+    ).json()
+
+    assert single["product_flexible_price"]["id"] == finaid.id
+    assert {key: quoted[key] for key in single} == single
+    assert quoted["discount"]["id"] == finaid.id
+    assert quoted["discount"]["source"] is None
+
+
+def test_user_pricing_404s_for_a_product_the_queryset_excludes(user_client):
+    """A product whose run closed enrollment is a 404, like an unknown id."""
+    closed_run = CourseRunFactory.create(
+        enrollment_end=now_in_utc() - timedelta(days=1)
+    )
+    closed = ProductFactory.create(purchasable_object=closed_run)
+
+    resp = user_client.get(
+        reverse("v0:products_api-user-pricing", kwargs={"pk": closed.id})
+    )
+
+    assert resp.status_code == 404
 
 
 def test_get_basket(user_drf_client, user):

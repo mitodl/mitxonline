@@ -9,12 +9,16 @@ from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
 from cms.serializers import CoursePageSerializer, ProgramPageSerializer
+from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
 from courses.models import Course, CourseRun, Program, ProgramRun
 from ecommerce import models
 from ecommerce.constants import (
     CYBERSOURCE_CARD_TYPES,
+    DISCOUNT_SOURCE_TYPES,
+    DISCOUNT_TYPES,
     TRANSACTION_TYPE_REFUND,
 )
+from ecommerce.discount_sources import credited_courseware
 from ecommerce.models import (
     Basket,
     BasketItem,
@@ -733,6 +737,131 @@ class ProductFlexiblePriceSerializer(BaseProductSerializer):
     class Meta:
         fields = BaseProductSerializer.Meta.fields + [  # noqa: RUF005
             "product_flexible_price",
+        ]
+        model = models.Product
+
+
+class DiscountSourceSerializer(serializers.Serializer):
+    """The prior purchase a discount credits."""
+
+    type = serializers.ChoiceField(choices=DISCOUNT_SOURCE_TYPES)
+    readable_id = serializers.CharField()
+    title = serializers.CharField()
+
+
+class UserPricingDiscountSerializer(serializers.Serializer):
+    """The discount checkout would apply to a product for this user."""
+
+    id = serializers.IntegerField()
+    discount_code = serializers.CharField()
+    discount_type = serializers.ChoiceField(choices=DISCOUNT_TYPES)
+    amount_off = serializers.DecimalField(
+        max_digits=7,
+        decimal_places=2,
+        help_text=(
+            "Dollars taken off `price` for this user. For paid-amount-off "
+            "discounts this is the prior purchase's paid price, capped at "
+            "`price`, never the stored amount."
+        ),
+    )
+    source = DiscountSourceSerializer(
+        allow_null=True,
+        help_text=(
+            "Set only for paid-amount-off discounts (`discount_type` is the "
+            "discriminator): the prior purchase being credited."
+        ),
+    )
+
+    def get_attribute(self, instance):
+        """
+        Shape the winning discount out of the request's quote. The quote is the
+        only place the resolved amount and the credited purchase exist; neither
+        is stored on the Discount row.
+        """
+        quote = self.context["quote"]
+        if quote.discount is None:
+            return None
+        return {
+            "id": quote.discount.id,
+            "discount_code": quote.discount.discount_code,
+            "discount_type": quote.discount.discount_type,
+            "amount_off": instance.price - quote.price,
+            "source": self._source(quote.source_line),
+        }
+
+    @staticmethod
+    def _source(source_line):
+        if source_line is None:
+            return None
+        courseware = credited_courseware(source_line)
+        return {
+            "type": CONTENT_TYPE_MODEL_PROGRAM
+            if isinstance(courseware, Program)
+            else CONTENT_TYPE_MODEL_COURSE,
+            "readable_id": courseware.readable_id,
+            "title": courseware.title,
+        }
+
+
+class _QuotedPriceField(serializers.DecimalField):
+    """
+    The quoted price, which belongs to the request rather than to the product,
+    so it is read from serializer context. Declaring it as a real DecimalField
+    rather than a method field is what keeps it a decimal string on the wire,
+    like every other price the API publishes.
+    """
+
+    def get_attribute(self, instance):  # noqa: ARG002
+        return self.context["quote"].price
+
+
+# Subclassing the deprecated endpoint's serializer is what makes this payload a
+# strict superset of that one rather than a copy of it: every field a caller
+# reads from user_flexible_price is inherited here, so moving off it
+# (https://github.com/mitodl/hq/issues/12799) cannot lose one. The docstring is
+# the public schema description, so the rationale lives here instead.
+@extend_schema_serializer(deprecate_fields=["product_flexible_price"])
+class UserPricingProductSerializer(ProductFlexiblePriceSerializer):
+    """A product priced for one user."""
+
+    # The quote already determined the learner's aid while gathering its
+    # candidates, so this reads it from context instead of repeating the
+    # lookup the inherited method makes.
+    @extend_schema_field(
+        V0DiscountSerializer(
+            allow_null=True,
+            help_text=(
+                "Deprecated. The learner's approved financial-assistance "
+                "discount exactly as `user_flexible_price` returns it, kept so "
+                "callers of that endpoint can move over unchanged; `user_price` "
+                "and `discount` say what checkout charges."
+            ),
+        )
+    )
+    def get_product_flexible_price(self, instance):  # noqa: ARG002
+        finaid = self.context["quote"].flexible_price_discount
+        if finaid is None:
+            return None
+        return V0DiscountSerializer(finaid, context=self.context).data
+
+    user_price = _QuotedPriceField(
+        max_digits=7,
+        decimal_places=2,
+        help_text="What this user pays at checkout today.",
+    )
+    discount = UserPricingDiscountSerializer(
+        allow_null=True,
+        help_text=(
+            "The discount checkout applies to this product for this user, or "
+            "null at list price."
+        ),
+    )
+
+    class Meta:
+        fields = [
+            *ProductFlexiblePriceSerializer.Meta.fields,
+            "user_price",
+            "discount",
         ]
         model = models.Product
 

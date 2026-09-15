@@ -40,6 +40,7 @@ open_spectacular_settings = {
         "OnboardingStateEnum": "b2b.constants.ONBOARDING_STATE_CHOICES",
         "IdentityProviderLifecycleStateEnum": "b2b.constants.IDP_LIFECYCLE_CHOICES",
         "IdentityProviderProtocolEnum": "b2b.constants.IDP_PROTOCOL_CHOICES",
+        "DiscountSourceTypeEnum": "ecommerce.constants.DISCOUNT_SOURCE_TYPES",
     },
     "POSTPROCESSING_HOOKS": [
         "drf_spectacular.hooks.postprocess_schema_enums",

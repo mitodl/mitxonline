@@ -2849,7 +2849,34 @@ paths:
   /api/v0/products/{id}/user_flexible_price/:
     get:
       operationId: products_user_flexible_price_retrieve
-      description: Retrieve a product with user-specific flexible price information
+      description: Retrieve a product with user-specific flexible price information.
+        Use `user_pricing` instead.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this product.
+        required: true
+      tags:
+      - products
+      deprecated: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductFlexiblePrice'
+          description: ''
+  /api/v0/products/{id}/user_pricing/:
+    get:
+      operationId: products_user_pricing_retrieve
+      description: The price this user pays for this product, computed the way checkout
+        computes it (financial assistance, user-tied and automatic discounts, including
+        paid-amount-off credit for a qualifying prior purchase). The response also
+        carries product_flexible_price exactly as the deprecated user_flexible_price
+        endpoint returns it, so a caller moves over field for field. Anonymous requests
+        are a 403; an unknown or no-longer-purchasable product is a 404.
       parameters:
       - in: path
         name: id
@@ -2864,7 +2891,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProductFlexiblePrice'
+                $ref: '#/components/schemas/UserPricingProduct'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
           description: ''
   /api/v0/products/all/:
     get:
@@ -7097,6 +7136,31 @@ components:
       - redeemed_by
       - redeemed_discount
       - redeemed_order
+    DiscountSource:
+      type: object
+      description: The prior purchase a discount credits.
+      properties:
+        type:
+          $ref: '#/components/schemas/DiscountSourceTypeEnum'
+        readable_id:
+          type: string
+        title:
+          type: string
+      required:
+      - readable_id
+      - title
+      - type
+    DiscountSourceTypeEnum:
+      enum:
+      - course
+      - program
+      type: string
+      description: |-
+        * `course` - course
+        * `program` - program
+      x-enum-descriptions:
+      - course
+      - program
     DiscountTypeEnum:
       enum:
       - percent-off
@@ -10311,6 +10375,79 @@ components:
       required:
       - discount
       - user
+    UserPricingDiscount:
+      type: object
+      description: The discount checkout would apply to a product for this user.
+      properties:
+        id:
+          type: integer
+        discount_code:
+          type: string
+        discount_type:
+          $ref: '#/components/schemas/DiscountTypeEnum'
+        amount_off:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+          description: Dollars taken off `price` for this user. For paid-amount-off
+            discounts this is the prior purchase's paid price, capped at `price`,
+            never the stored amount.
+        source:
+          allOf:
+          - $ref: '#/components/schemas/DiscountSource'
+          nullable: true
+          description: 'Set only for paid-amount-off discounts (`discount_type` is
+            the discriminator): the prior purchase being credited.'
+      required:
+      - amount_off
+      - discount_code
+      - discount_type
+      - id
+      - source
+    UserPricingProduct:
+      type: object
+      description: A product priced for one user.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
+        product_flexible_price:
+          allOf:
+          - $ref: '#/components/schemas/V0Discount'
+          nullable: true
+          description: Deprecated. The learner's approved financial-assistance discount
+            exactly as `user_flexible_price` returns it, kept so callers of that endpoint
+            can move over unchanged; `user_price` and `discount` say what checkout
+            charges.
+          readOnly: true
+          deprecated: true
+        user_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+          description: What this user pays at checkout today.
+        discount:
+          allOf:
+          - $ref: '#/components/schemas/UserPricingDiscount'
+          nullable: true
+          description: The discount checkout applies to this product for this user,
+            or null at list price.
+      required:
+      - description
+      - discount
+      - id
+      - price
+      - product_flexible_price
+      - user_price
     UserProfile:
       type: object
       description: Serializer for profile

@@ -35,6 +35,7 @@ from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.api import is_product_courserun, is_product_program
+from b2b.serializers.v0.manager import DetailErrorSerializer
 from courses.models import (
     Course,
     CourseRun,
@@ -51,6 +52,7 @@ from ecommerce.api import (
     generate_checkout_payload,
     generate_discount_code,
     get_auto_apply_discounts_for_basket,
+    quote_user_price,
 )
 from ecommerce.discount_sources import funds_fulfilled_redemption_exists
 from ecommerce.exceptions import ProductBlockedError
@@ -82,6 +84,7 @@ from ecommerce.serializers.v0 import (
     RefundRequestSerializer,
     UserDiscountMetaSerializer,
     UserDiscountSerializer,
+    UserPricingProductSerializer,
     V0DiscountSerializer,
     requests,
 )
@@ -650,7 +653,11 @@ class ProductViewSet(ReadOnlyModelViewSet):
 
     @extend_schema(
         operation_id="products_user_flexible_price_retrieve",
-        description="Retrieve a product with user-specific flexible price information",
+        description=(
+            "Retrieve a product with user-specific flexible price information. "
+            "Use `user_pricing` instead."
+        ),
+        deprecated=True,
         responses={
             200: ProductFlexiblePriceSerializer,
         },
@@ -666,6 +673,42 @@ class ProductViewSet(ReadOnlyModelViewSet):
         product = self.get_object()
         serializer = ProductFlexiblePriceSerializer(
             product, context={"request": request}
+        )
+        return Response(serializer.data)
+
+    @extend_schema(
+        operation_id="products_user_pricing_retrieve",
+        description=(
+            "The price this user pays for this product, computed the way "
+            "checkout computes it (financial assistance, user-tied and "
+            "automatic discounts, including paid-amount-off credit for a "
+            "qualifying prior purchase). The response also carries "
+            "product_flexible_price exactly as the deprecated "
+            "user_flexible_price endpoint returns it, so a caller moves over "
+            "field for field. Anonymous requests are a 403; an unknown or "
+            "no-longer-purchasable product is a 404."
+        ),
+        responses={
+            200: UserPricingProductSerializer,
+            403: DetailErrorSerializer,
+            404: DetailErrorSerializer,
+        },
+    )
+    @action(
+        detail=True,
+        methods=["get"],
+        permission_classes=[IsAuthenticated],
+        url_path="user_pricing",
+    )
+    def user_pricing(self, request, **kwargs):  # noqa: ARG002
+        """Quote the per-user price of a product."""
+        product = self.get_object()
+        serializer = UserPricingProductSerializer(
+            product,
+            context={
+                "request": request,
+                "quote": quote_user_price(product, request.user),
+            },
         )
         return Response(serializer.data)
 
