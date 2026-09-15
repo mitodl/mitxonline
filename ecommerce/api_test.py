@@ -15,7 +15,9 @@ from CyberSource.rest import ApiException
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
+from django.db import connection
 from django.test import RequestFactory
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from factory import Faker, fuzzy
 from mitol.common.utils.datetime import now_in_utc
@@ -23,6 +25,7 @@ from mitol.payment_gateway.api import CartItem, PaymentGateway, ProcessorRespons
 from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_STRIPE
 from reversion.models import Version
 from stripe import convert_to_stripe_object
+from zeal import zeal_context
 
 from courses.factories import (
     CourseRunEnrollmentFactory,
@@ -54,6 +57,7 @@ from ecommerce.api import (
     process_cybersource_payment_response,
     process_stripe_checkout_completed,
     process_stripe_checkout_expired,
+    quote_user_price,
     refund_order,
     unenroll_learner_from_order,
 )
@@ -111,13 +115,18 @@ from ecommerce.models import (
     FulfilledOrder,
     Order,
     OrderStatus,
+    PendingOrder,
     Product,
     StripeEventLog,
     Transaction,
     UserDiscount,
 )
 from flexiblepricing.constants import FlexiblePriceStatus
-from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
+from flexiblepricing.factories import (
+    FlexiblePriceFactory,
+    FlexiblePriceTierFactory,
+    approve_flexible_price,
+)
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.factories import OpenEdxUserFactory
 from users.factories import UserFactory
@@ -1451,6 +1460,251 @@ def test_get_auto_apply_discounts_respects_dates(user):
 
     discounts = get_auto_apply_discounts_for_basket(basket.id)
     assert discounts.count() == 0
+
+
+def test_quote_user_price_picks_the_cheapest_across_discount_classes(user):
+    """
+    Financial assistance, a user-tied discount and an automatic one compete on
+    price alone, so the cheapest of the three wins whatever class it belongs
+    to -- and checkout charges the quoted price.
+    """
+    product = ProductFactory.create(price=Decimal("100.00"))
+    automatic = UnlimitedUseDiscountFactory.create(
+        automatic=True, amount=90, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    user_tied = UnlimitedUseDiscountFactory.create(
+        amount=10, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    UserDiscount.objects.create(discount=user_tied, user=user)
+    finaid = approve_flexible_price(user, product.purchasable_object.course, 20)
+
+    quote = quote_user_price(product, user)
+
+    assert quote.discount == automatic
+    assert quote.price == Decimal("10.00")
+
+    basket = Basket.objects.create(user=user)
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+    for discount in (finaid, user_tied, automatic):
+        apply_discount_to_basket(basket, discount, allow_finaid=True)
+
+    assert basket.basket_items.first().discounted_price == quote.price
+
+
+def test_quote_user_price_reports_no_discount_for_a_full_price_finaid_tier(user):
+    """
+    A candidate that quotes the list price is not worth reporting, so the
+    0%-off top tier leaves the learner at list price with no discount -- and
+    is still reported as the aid they hold.
+    """
+    product = ProductFactory.create(price=Decimal("100.00"))
+    finaid = approve_flexible_price(user, product.purchasable_object.course, 0)
+
+    quote = quote_user_price(product, user)
+
+    assert quote.discount is None
+    assert quote.price == product.price
+    assert quote.flexible_price_discount == finaid
+
+
+def test_quote_user_price_quotes_list_price_without_a_user(django_assert_num_queries):
+    """An anonymous or absent user is quoted list price, sale or no sale,
+    without reading the database at all.
+    """
+    product = ProductFactory.create()
+    UnlimitedUseDiscountFactory.create(
+        automatic=True, amount=50, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+
+    for caller in (AnonymousUser(), None):
+        with django_assert_num_queries(0):
+            quote = quote_user_price(product, caller)
+        assert quote.discount is None
+        assert quote.price == product.price
+        assert quote.flexible_price_discount is None
+        assert quote.source_line is None
+
+
+def test_quote_user_price_breaks_a_price_tie_on_the_lowest_discount_id(user):
+    """
+    Two automatic discounts quoting the same price are separated by id, so the
+    quote names one discount rather than depending on iteration order.
+    """
+    product = ProductFactory.create(price=Decimal("100.00"))
+    first = UnlimitedUseDiscountFactory.create(
+        automatic=True, amount=30, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    UnlimitedUseDiscountFactory.create(
+        automatic=True, amount=30, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+
+    quote = quote_user_price(product, user)
+
+    assert quote.discount == first
+    assert quote.price == Decimal("70.00")
+
+
+def test_quote_user_price_considers_every_user_tied_discount(user):
+    """
+    Checkout's auto-apply queryset offers every user-tied discount the learner
+    holds, so a second, cheaper UserDiscount row beats the first.
+    """
+    product = ProductFactory.create(price=Decimal("100.00"))
+    dearer = UnlimitedUseDiscountFactory.create(
+        amount=10, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    cheaper = UnlimitedUseDiscountFactory.create(
+        amount=40, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    UserDiscount.objects.create(discount=dearer, user=user)
+    UserDiscount.objects.create(discount=cheaper, user=user)
+
+    quote = quote_user_price(product, user)
+
+    assert quote.discount == cheaper
+    assert quote.price == Decimal("60.00")
+
+
+def test_quote_user_price_skips_an_automatic_tied_to_another_learner(user):
+    """
+    An automatic discount carrying a UserDiscount for someone else is refused
+    at checkout, so it is not quoted to this learner either.
+    """
+    product = ProductFactory.create()
+    automatic = UnlimitedUseDiscountFactory.create(
+        automatic=True, amount=50, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    UserDiscount.objects.create(discount=automatic, user=UserFactory.create())
+
+    quote = quote_user_price(product, user)
+
+    assert quote.discount is None
+    assert quote.price == product.price
+
+
+def test_quote_user_price_skips_a_discount_linked_to_another_product(user):
+    """
+    A discount carrying DiscountProduct links is in scope only for the products
+    those links name, so it does not price a product it is not linked to.
+    """
+    product = ProductFactory.create()
+    linked = UnlimitedUseDiscountFactory.create(
+        automatic=True, amount=50, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    DiscountProduct.objects.create(discount=linked, product=ProductFactory.create())
+
+    quote = quote_user_price(product, user)
+
+    assert quote.discount is None
+    assert quote.price == product.price
+
+
+def test_quote_user_price_matches_checkout_for_linked_purchase(paid_amount_off_source):
+    """
+    The quoted price is the price PendingOrder charges for that discount, and
+    the quote names the prior purchase the credit is spent from.
+    """
+    program_product = paid_amount_off_source.program_product
+    user = paid_amount_off_source.user
+
+    quote = quote_user_price(program_product, user)
+    order = PendingOrder.create_from_product(program_product, user, quote.discount)
+
+    assert quote.discount == paid_amount_off_source.discount
+    assert quote.price == Decimal("899.00")
+    assert quote.source_line == paid_amount_off_source.source_line
+    assert order.total_price_paid == quote.price
+
+
+def test_quote_user_price_confines_financial_assistance_to_its_courseware(user):
+    """
+    A tier discount carries no product links, so nothing but the aid lookup
+    confines it: a product the learner was not approved for is quoted list
+    price and reports no aid.
+    """
+    other = ProductFactory.create()
+    approve_flexible_price(user, CourseRunFactory.create().course, 25)
+
+    quote = quote_user_price(other, user)
+
+    assert quote.discount is None
+    assert quote.price == other.price
+    assert quote.flexible_price_discount is None
+
+
+def test_quote_user_price_keeps_an_automatic_that_is_also_a_tier_discount(user):
+    """
+    A discount that qualifies on its own -- here an automatic sale a tier also
+    points at -- prices a product the learner holds no aid for, so being
+    someone's tier discount does not narrow it to that courseware.
+    """
+    plain = ProductFactory.create(price=Decimal("100.00"))
+    shared = UnlimitedUseDiscountFactory.create(
+        automatic=True, amount=25, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    aided_course = CourseRunFactory.create().course
+    tier = FlexiblePriceTierFactory.create(
+        courseware_object=aided_course, discount=shared
+    )
+    FlexiblePriceFactory.create(
+        user=user,
+        courseware_object=aided_course,
+        tier=tier,
+        status=FlexiblePriceStatus.APPROVED,
+    )
+
+    quote = quote_user_price(plain, user)
+
+    assert quote.discount == shared
+    assert quote.price == Decimal("75.00")
+
+
+def test_quote_user_price_query_count_does_not_grow_with_unrelated_discounts(
+    paid_amount_off_source,
+):
+    """
+    One quote costs what the learner's own applicable discounts cost and
+    nothing more. Product scope is a filter on the candidate query rather than
+    a check per candidate, so five automatic discounts on sale elsewhere leave
+    the count untouched -- without that, each one costs a query whether or not
+    it can price this product.
+    """
+    user = paid_amount_off_source.user
+    program_product = paid_amount_off_source.program_product
+    approve_flexible_price(user, CourseRunFactory.create().course, 25)
+    UserDiscount.objects.create(
+        discount=UnlimitedUseDiscountFactory.create(
+            amount=10, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+        ),
+        user=user,
+    )
+
+    def reload_product():
+        return Product.objects.get(id=program_product.id)
+
+    # ContentType.objects.get_for_model caches per process, so the first quote
+    # pays for the lookups behind the source resolve and the second does not.
+    quote_user_price(reload_product(), user)
+
+    alone = reload_product()
+    with zeal_context(), CaptureQueriesContext(connection) as before:
+        quote_user_price(alone, user)
+
+    for _ in range(5):
+        elsewhere = OneTimePerUserDiscountFactory.create(
+            automatic=True, amount=5, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+        )
+        DiscountProduct.objects.create(
+            discount=elsewhere, product=ProductFactory.create()
+        )
+
+    crowded = reload_product()
+    with zeal_context(), CaptureQueriesContext(connection) as after:
+        quote = quote_user_price(crowded, user)
+
+    assert quote.discount == paid_amount_off_source.discount
+    assert quote.price == Decimal("899.00")
+    assert len(after) == len(before)
 
 
 @pytest.mark.parametrize(
