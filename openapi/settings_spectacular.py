@@ -41,6 +41,13 @@ open_spectacular_settings = {
         "IdentityProviderLifecycleStateEnum": "b2b.constants.IDP_LIFECYCLE_CHOICES",
         "IdentityProviderProtocolEnum": "b2b.constants.IDP_PROTOCOL_CHOICES",
         "DiscountSourceTypeEnum": "ecommerce.constants.DISCOUNT_SOURCE_TYPES",
+        # `status` and `clone_status` on the staff contract API's setup status.
+        # Unpinned they publish as StatusEnum and CloneStatusEnum, and the next
+        # `status` choice set would hash-suffix StatusEnum.
+        "ContractSetupStatusEnum": "b2b.constants.CONTRACT_SETUP_STATUS_CHOICES",
+        "CourseRunCloneStatusEnum": (
+            "openedx.constants.COURSE_RUN_CLONE_STATUS_CHOICES"
+        ),
     },
     "POSTPROCESSING_HOOKS": [
         "drf_spectacular.hooks.postprocess_schema_enums",

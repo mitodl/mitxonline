@@ -15,6 +15,7 @@ from b2b.views.v0.manager import (
     ProcessMailgunWebhook,
 )
 from b2b.views.v0.provisioning import (
+    ContractProvisioningViewSet,
     IdentityProviderProvisioningViewSet,
     OrganizationProvisioningViewSet,
     ParseMetadataView,
@@ -63,6 +64,15 @@ provisioning_org.register(
     r"identity-providers",
     IdentityProviderProvisioningViewSet,
     basename="b2b-provisioning-organization-idp",
+    parents_query_lookups=[
+        "organization__org_key",
+    ],
+)
+# Staff-only contract setup (capability C3).
+provisioning_org.register(
+    r"contracts",
+    ContractProvisioningViewSet,
+    basename="b2b-provisioning-organization-contract",
     parents_query_lookups=[
         "organization__org_key",
     ],
