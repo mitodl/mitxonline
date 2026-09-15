@@ -13,7 +13,13 @@ from django.db import transaction
 from mitol.common.utils import now_in_utc
 
 from b2b.api import create_contract_run
+from b2b.constants import (
+    CONTRACT_SETUP_STATUS_COMPLETE,
+    CONTRACT_SETUP_STATUS_FAILED,
+    CONTRACT_SETUP_STATUS_IN_PROGRESS,
+)
 from b2b.models import ContractPage, ContractProgramItem, OrganizationPage
+from b2b.tasks import queue_enrollment_code_check
 from courses.models import CourseRun, CourseRunEnrollment
 from courses.retirement import (
     deactivate_run_products,
@@ -21,6 +27,13 @@ from courses.retirement import (
     push_run_dates_to_edx,
 )
 from ecommerce.models import Discount, DiscountProduct
+from openedx.constants import (
+    COURSE_RUN_CLONE_STATUS_CLONING,
+    COURSE_RUN_CLONE_STATUS_FAILED,
+    COURSE_RUN_CLONE_STATUS_PENDING,
+)
+from openedx.models import CourseRunClone
+from openedx.tasks import clone_courserun
 from variants.models import SupportedVariant
 
 log = logging.getLogger(__name__)
@@ -288,3 +301,124 @@ def expected_enrollment_code_count(contract: ContractPage) -> int:
     product_count = contract.get_products().count()
 
     return product_count * (contract.max_learners or 1)
+
+
+def queue_enrollment_code_check_if_required(contract: ContractPage):
+    """
+    Queue the enrollment code check for a contract that uses codes.
+
+    Contracts that don't are skipped: for them the check strips codes, and
+    that should stay a deliberate b2b_codes validate rather than a side effect
+    of editing the contract.
+    """
+
+    if contract.requires_enrollment_codes:
+        queue_enrollment_code_check.delay(contract.id)
+
+
+def get_contract_setup_status(contract: ContractPage) -> dict:
+    """
+    Report how far a contract's setup has got.
+
+    A contract run created without an edX clone (skip_edx, or before clones
+    were tracked) has no clone status and does not hold the contract in
+    progress.
+
+    Returns a dict with `status` (a CONTRACT_SETUP_STATUS_* value), `runs` (the
+    clone status, attempts and last error of each contract run) and
+    `enrollment_codes` (how many the contract needs and how many it has).
+    """
+
+    runs = list(contract.get_course_runs().order_by("courseware_id"))
+    clones = {
+        clone.course_run_id: clone
+        for clone in CourseRunClone.objects.filter(course_run__in=runs)
+    }
+    expected_codes = expected_enrollment_code_count(contract)
+    existing_codes = contract.get_discounts().distinct().count()
+
+    clone_statuses = {clone.status for clone in clones.values()}
+    if COURSE_RUN_CLONE_STATUS_FAILED in clone_statuses:
+        status = CONTRACT_SETUP_STATUS_FAILED
+    elif (
+        clone_statuses
+        & {COURSE_RUN_CLONE_STATUS_PENDING, COURSE_RUN_CLONE_STATUS_CLONING}
+        or existing_codes < expected_codes
+    ):
+        status = CONTRACT_SETUP_STATUS_IN_PROGRESS
+    else:
+        status = CONTRACT_SETUP_STATUS_COMPLETE
+
+    run_statuses = []
+    for run in runs:
+        clone = clones.get(run.id)
+        run_statuses.append(
+            {
+                "courseware_id": run.courseware_id,
+                "clone_status": clone.status if clone else None,
+                "clone_attempts": clone.attempts if clone else 0,
+                "clone_error": clone.error if clone else "",
+            }
+        )
+
+    return {
+        "status": status,
+        "runs": run_statuses,
+        "enrollment_codes": {"expected": expected_codes, "existing": existing_codes},
+    }
+
+
+def retry_contract_setup(contract: ContractPage) -> list[CourseRunClone]:
+    """
+    Queue again the parts of a contract's setup that failed.
+
+    Failed edX clones are re-queued. Clones still pending or running are left
+    alone. The enrollment code check is queued for a contract that uses codes,
+    since it converges.
+
+    Returns the clones that were re-queued.
+    """
+
+    failed = list(
+        CourseRunClone.objects.filter(
+            course_run__b2b_contracts=contract,
+            status=COURSE_RUN_CLONE_STATUS_FAILED,
+        ).distinct()
+    )
+    for clone in failed:
+        clone.status = COURSE_RUN_CLONE_STATUS_PENDING
+        clone.save(update_fields=["status", "updated_on"])
+        clone_courserun.delay(clone.course_run_id, clone.source_courseware_id)
+
+    queue_enrollment_code_check_if_required(contract)
+
+    return failed
+
+
+def expire_unused_enrollment_codes(
+    contract: ContractPage, *, dry_run: bool = False
+) -> list[tuple[str, bool]]:
+    """
+    Take the contract's unused enrollment codes out of the contract.
+
+    Each code is detached from the contract's products, and deleted if it
+    applies to nothing else. Codes redeemed to enroll or to join the contract
+    are left alone.
+
+    Returns (code, deleted) for each code; with dry_run, what would happen.
+    """
+
+    contract_products = list(contract.get_products())
+    expired = []
+
+    for discount in list(contract.get_unused_discounts()):
+        deleted = not discount.products.exclude(product__in=contract_products).exists()
+
+        if not dry_run:
+            discount.products.filter(product__in=contract_products).delete()
+            if deleted:
+                discount.delete()
+
+        expired.append((discount.discount_code, deleted))
+
+    return expired
