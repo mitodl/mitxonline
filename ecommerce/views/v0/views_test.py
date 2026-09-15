@@ -36,6 +36,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_CUSTOMER_SUPPORT,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    REDEMPTION_TYPE_INTERNAL,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
     REDEMPTION_TYPE_UNLIMITED,
@@ -47,6 +48,7 @@ from ecommerce.factories import (
     BasketItemFactory,
     DiscountFactory,
     DiscountRedemptionFactory,
+    InternalDiscountFactory,
     LineFactory,
     OrderFactory,
     PaidAmountOffDiscountFactory,
@@ -845,6 +847,22 @@ def test_redeem_discount(  # noqa: PLR0913
         assert resp_json["message"] == "Discount applied"
 
 
+def test_redeem_internal_discount_is_not_found(user, user_drf_client, products):
+    """An internal discount's code is inert at the cart, even when it links to the product in the basket."""
+    basket = create_basket(user, products)
+    discount = InternalDiscountFactory.create()
+    DiscountProduct.objects.create(
+        discount=discount, product=basket.basket_items.first().product
+    )
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
+    )
+
+    assert resp.status_code == 404
+    assert basket.discounts.count() == 0
+
+
 # Discount tests
 
 
@@ -923,6 +941,20 @@ def test_discount_rest_api(admin_drf_client, user_drf_client):
 
     assert resp.status_code == 204
     assert Discount.objects.filter(pk=discount_payload["id"]).count() == 0
+
+
+def test_discount_rest_api_refuses_to_retype_an_internal_discount(admin_drf_client):
+    """Staff can edit discounts over the API, but re-typing an internal one would make its code live."""
+    discount = InternalDiscountFactory.create()
+
+    resp = admin_drf_client.patch(
+        reverse("v0:discounts_api-detail", kwargs={"pk": discount.id}),
+        {"redemption_type": REDEMPTION_TYPE_UNLIMITED},
+    )
+
+    assert resp.status_code == 400
+    discount.refresh_from_db()
+    assert discount.redemption_type == REDEMPTION_TYPE_INTERNAL
 
 
 def test_attaching_a_non_program_product_to_a_program_child_purchase_discount_is_a_400(
@@ -1252,15 +1284,17 @@ def test_bulk_discount_create_rejects_ambiguous_code_sources(admin_drf_client, e
         pytest.param(
             {"redemption_type": REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE}, id="redemption"
         ),
+        pytest.param({"redemption_type": REDEMPTION_TYPE_INTERNAL}, id="internal"),
     ],
 )
 def test_bulk_discount_create_rejects_the_new_discount_and_redemption_types(
     admin_drf_client, override
 ):
     """
-    A paid-amount-off discount needs the matching redemption type, and a
+    A paid-amount-off discount needs the matching redemption type, a
     program-child-purchase discount needs automatic plus the program product
-    links, so bulk generation refuses both rather than raising its way to a 500.
+    links, and an internal discount is never learner-redeemable, so bulk
+    generation refuses all three rather than raising its way to a 500.
     """
     resp = admin_drf_client.post(
         reverse("v0:discounts_api-create_batch"),

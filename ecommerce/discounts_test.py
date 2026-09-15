@@ -11,6 +11,7 @@ from ecommerce.discounts import (
 )
 from ecommerce.factories import (
     DiscountFactory,
+    InternalDiscountFactory,
     PaidAmountOffDiscountFactory,
     ProductFactory,
     UnlimitedUseDiscountFactory,
@@ -144,23 +145,19 @@ def test_product_specific_discount_does_not_apply_to_other_products():
     assert discount_cls.get_product_price(other_product) == other_product.price
 
 
-def test_program_discount_applies_regardless_of_product_restriction():
-    """Program discounts link to the program product for identification only; they must
-    still apply to course-run products placed in the basket.
+def test_internal_discount_prices_products_outside_its_links():
     """
-    program_product = ProductFactory.create(price=Decimal("500.00"))
-    course_run_product = ProductFactory.create(price=Decimal("100.00"))
+    An internal discount's link names the program it belongs to; the code that
+    attached it decided eligibility, so the link does not scope pricing.
+    """
+    program_product = ProductFactory.create()
+    course_run_product = ProductFactory.create()
 
-    discount = UnlimitedUseDiscountFactory.create(
-        discount_type="percent-off",
-        amount=100,
-        is_program_discount=True,
-    )
+    discount = InternalDiscountFactory.create()
     DiscountProduct.objects.create(discount=discount, product=program_product)
 
     discount_cls = DiscountType.for_discount(discount)
 
-    # Must apply to a course-run product even though it's not in DiscountProduct
     assert discount_cls.get_product_price(course_run_product) == Decimal("0.00")
 
 

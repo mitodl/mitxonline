@@ -65,6 +65,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    REDEMPTION_TYPE_INTERNAL,
     STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
     STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED,
     STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
@@ -87,6 +88,7 @@ from ecommerce.constants import (
     ZERO_PAYMENT_DATA,
 )
 from ecommerce.exceptions import (
+    VerifiedProgramCourseNotInProgramError,
     VerifiedProgramNoEnrollmentError,
 )
 from ecommerce.factories import (
@@ -978,10 +980,11 @@ def test_create_verified_program_discount():
     discount = create_verified_program_discount(program)
 
     assert discount
-    assert discount.is_program_discount
+    assert discount.redemption_type == REDEMPTION_TYPE_INTERNAL
     assert discount.products.filter(
         product__content_type=content_type, product__object_id=program.id
     ).exists()
+    assert create_verified_program_discount(program) == discount
 
 
 def test_create_verified_program_course_run_enrollment(
@@ -1045,6 +1048,27 @@ def test_create_vpcre_no_program(bootstrapped_verified_program, user):
         create_verified_program_course_run_enrollment(request, courserun, program)
 
     assert "No verified enrollment" in str(exc.value)
+
+
+def test_create_vpcre_run_not_in_program(bootstrapped_verified_program, user):
+    """
+    The program's discount prices anything it is attached to, so a run whose
+    course is outside the program's requirements is refused before a basket
+    exists.
+    """
+    (program, _, _, _, _) = bootstrapped_verified_program
+    ProgramEnrollmentFactory.create(
+        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    other_run = CourseRunFactory.create()
+
+    request = RequestFactory().get("/")
+    request.user = user
+
+    with pytest.raises(VerifiedProgramCourseNotInProgramError):
+        create_verified_program_course_run_enrollment(request, other_run, program)
+
+    assert not BasketDiscount.objects.filter(redeemed_by=user).exists()
 
 
 def test_create_vpcre_bad_basket(

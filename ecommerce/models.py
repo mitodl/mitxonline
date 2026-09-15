@@ -36,6 +36,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPES,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     PAYMENT_TYPES,
+    REDEMPTION_TYPE_INTERNAL,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
@@ -342,7 +343,16 @@ class Discount(TimestampedModel):
     )
     automatic = models.BooleanField(default=False)
     discount_type = models.CharField(choices=DISCOUNT_TYPES, max_length=30)
-    redemption_type = models.CharField(choices=REDEMPTION_TYPES, max_length=30)
+    redemption_type = models.CharField(
+        choices=REDEMPTION_TYPES,
+        max_length=30,
+        help_text=(
+            "'internal' discounts are attached by application code that has "
+            "verified the learner's eligibility (e.g. verified program "
+            "enrollment). Learners cannot redeem them and pricing does not "
+            "re-check the product."
+        ),
+    )
     payment_type = models.CharField(null=True, choices=PAYMENT_TYPES, max_length=30)  # noqa: DJ001
     max_redemptions = models.PositiveIntegerField(null=True, default=0)
     discount_code = models.CharField(max_length=100)
@@ -361,7 +371,7 @@ class Discount(TimestampedModel):
         null=True,
         blank=True,
         default=False,
-        help_text="Discount is only for creating verified course run enrollments for a program.",
+        help_text="Deprecated and unused; superseded by redemption_type 'internal'.",
     )
     # Only for B2B enrollment codes where the contract has a Google Sheet configured.
     # This is just to save time/energy when we want to update the sheet later.
@@ -399,6 +409,11 @@ class Discount(TimestampedModel):
                 )
                 | models.Q(automatic=True),
                 name="program_child_purchase_requires_automatic",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(redemption_type=REDEMPTION_TYPE_INTERNAL)
+                | models.Q(automatic=False),
+                name="internal_discount_never_automatic",
             ),
         ]
 
@@ -478,6 +493,12 @@ class Discount(TimestampedModel):
         Returns:
             - boolean
         """
+        # An internal discount is attached only by application code that has
+        # already decided eligibility (see REDEMPTION_TYPE_INTERNAL). The code
+        # itself is visible on receipts, so refusing here is what keeps it inert.
+        if self.redemption_type == REDEMPTION_TYPE_INTERNAL:
+            return False
+
         if self.redemption_type == REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE:
             from ecommerce.discount_sources import resolve_for_discount  # noqa: PLC0415
 

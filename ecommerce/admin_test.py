@@ -1,17 +1,22 @@
 """Tests for ecommerce admin views"""
 
 import pytest
+from django.contrib import admin
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages import get_messages
+from django.test import RequestFactory
 from django.urls import NoReverseMatch, reverse
 from reversion.models import Version
 
 from courses.factories import CourseRunFactory
+from ecommerce.admin import DiscountAdmin
 from ecommerce.factories import (
     DiscountRedemptionFactory,
+    InternalDiscountFactory,
     OrderFactory,
+    UnlimitedUseDiscountFactory,
 )
-from ecommerce.models import OrderStatus, Product
+from ecommerce.models import Discount, OrderStatus, Product
 
 pytestmark = [pytest.mark.django_db]
 
@@ -336,3 +341,22 @@ def test_admin_refund_view_keeps_the_credit_warning_on_a_rejected_form(
     assert response.context["form_valid"] is False
     assert list(response.context["used_source_redemptions"]) == [redemption]
     assert redemption.redeemed_order.reference_number in response.content.decode()
+
+
+@pytest.mark.parametrize(
+    ("factory", "locked"),
+    [(InternalDiscountFactory, True), (UnlimitedUseDiscountFactory, False)],
+)
+def test_discount_admin_locks_redemption_type_for_internal_discounts(
+    admin_user, factory, locked
+):
+    """Re-typing an internal discount would turn it into a live 100%-off code."""
+    discount = factory.create()
+    request = RequestFactory().get("/")
+    request.user = admin_user
+
+    readonly = DiscountAdmin(Discount, admin.site).get_readonly_fields(
+        request, discount
+    )
+
+    assert ("redemption_type" in readonly) is locked
