@@ -133,7 +133,7 @@ class ContractPageCourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
             "admin:courses_course_change", args=(obj.courserun.course.id,)
         )
         return format_html(
-            f'{obj.courserun.courseware_id} &bull; Admins: <a href="{admin_link}">Run</a> -  <a href="{course_admin_link}">Course</a>'
+            f'{obj.courserun.courseware_id}<br />Admins: <a href="{admin_link}">Run</a> -  <a href="{course_admin_link}">Course</a>'
         )
 
     @admin.display(description="Course Title")
