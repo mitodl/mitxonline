@@ -66,6 +66,21 @@ ONBOARDING_STATE_CHOICES = [
     (ONBOARDING_STATE_BLOCKED, "Blocked"),
 ]
 
+# How far a contract's setup has got, as the staff contract API reports it.
+# in_progress while an edX clone for a contract run is pending or running, or
+# the contract has fewer enrollment codes than it needs; failed when any clone
+# has failed. MITx Online's own rows are written before a write request
+# returns, so they never hold a contract in progress.
+CONTRACT_SETUP_STATUS_IN_PROGRESS = "in_progress"
+CONTRACT_SETUP_STATUS_COMPLETE = "complete"
+CONTRACT_SETUP_STATUS_FAILED = "failed"
+
+CONTRACT_SETUP_STATUS_CHOICES = [
+    (CONTRACT_SETUP_STATUS_IN_PROGRESS, "In progress"),
+    (CONTRACT_SETUP_STATUS_COMPLETE, "Complete"),
+    (CONTRACT_SETUP_STATUS_FAILED, "Failed"),
+]
+
 IDP_PROTOCOL_SAML = "saml"
 IDP_PROTOCOL_OIDC = "oidc"
 IDP_PROTOCOL_CHOICES = [
