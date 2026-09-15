@@ -295,11 +295,18 @@ CONTRACT_WRITABLE_FIELDS = [
 
 
 class CreateContractSerializer(serializers.ModelSerializer):
-    """Request body for creating a contract."""
+    """
+    Request body for creating a contract.
+
+    membership_type is required even though the model has a default, as it is
+    for b2b_contract create: how learners join a contract is chosen, not
+    defaulted.
+    """
 
     class Meta:
         model = ContractPage
         fields = CONTRACT_WRITABLE_FIELDS
+        extra_kwargs = {"membership_type": {"required": True}}
 
 
 class UpdateContractSerializer(serializers.ModelSerializer):
