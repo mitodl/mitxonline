@@ -5,6 +5,7 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 
 from cms.factories import CoursePageFactory, ProgramPageFactory
+from cms.models import ProductPageFAQ
 
 pytestmark = [
     pytest.mark.django_db,
@@ -261,3 +262,60 @@ def test_program_page_detail_exposes_hubspot_form_id(user_drf_client):
     body = resp.json()
     assert body["hubspot_form_id"] == "program-form-456"
     assert "show_stay_updated" not in body
+
+
+# --- faqs field tests ---
+
+
+def test_course_page_detail_exposes_faqs_in_order(user_drf_client):
+    """CoursePage detail returns authored FAQs (question + answer) in sort order."""
+    page = CoursePageFactory.create()
+    ProductPageFAQ.objects.create(
+        page=page,
+        question="Second question?",
+        answer="<p>Second answer.</p>",
+        sort_order=1,
+    )
+    ProductPageFAQ.objects.create(
+        page=page,
+        question="First question?",
+        answer='<p>First answer with a <a href="https://example.com">link</a>.</p>',
+        sort_order=0,
+    )
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    faqs = resp.json()["faqs"]
+    assert [faq["question"] for faq in faqs] == [
+        "First question?",
+        "Second question?",
+    ]
+    assert "https://example.com" in faqs[0]["answer"]
+
+
+def test_program_page_detail_exposes_faqs(user_drf_client):
+    """ProgramPage detail returns authored FAQs (question + answer)."""
+    page = ProgramPageFactory.create()
+    ProductPageFAQ.objects.create(
+        page=page,
+        question="What is this program?",
+        answer="<p>Program details.</p>",
+    )
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    faqs = resp.json()["faqs"]
+    assert len(faqs) == 1
+    assert faqs[0]["question"] == "What is this program?"
+
+
+def test_course_page_detail_faqs_empty_when_none_authored(user_drf_client):
+    """CoursePage detail returns an empty faqs list when no FAQs are authored."""
+    page = CoursePageFactory.create()
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    assert resp.json()["faqs"] == []

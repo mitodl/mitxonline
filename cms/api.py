@@ -396,6 +396,30 @@ def get_optional_placeholder_values_for_courseware_type(
     return values
 
 
+PLACEHOLDER_FAQS = [
+    (
+        "What will I learn in this program?",
+        "<p>PLACEHOLDER - A short overview of the skills and knowledge you'll gain.</p>",
+    ),
+    (
+        "What are the prerequisites for enrolling?",
+        "<p>PLACEHOLDER - Any background or preparation recommended before you start.</p>",
+    ),
+    (
+        "How much time should I expect to spend on the program each week?",
+        "<p>PLACEHOLDER - A typical weekly time commitment.</p>",
+    ),
+    (
+        "Are there any financial aid or payment options available?",
+        "<p>PLACEHOLDER - Details about financial aid and payment plans.</p>",
+    ),
+    (
+        "Are assignments, projects, or exams part of the program?",
+        "<p>PLACEHOLDER - How your learning is assessed.</p>",
+    ),
+]
+
+
 def create_default_courseware_page(
     courseware: Union[Course, Program],
     *,
@@ -468,6 +492,14 @@ def create_default_courseware_page(
 
     page.save()
     page.refresh_from_db()
+
+    for sort_order, (question, answer) in enumerate(PLACEHOLDER_FAQS):
+        cms_models.ProductPageFAQ.objects.create(
+            page=page,
+            question=question,
+            answer=answer,
+            sort_order=sort_order,
+        )
 
     if isinstance(courseware, Course):
         homepage = cms_models.HomePage.objects.first()
