@@ -14,7 +14,7 @@ from drf_spectacular.utils import (
 from mitol.common.utils.datetime import now_in_utc
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_api_key.permissions import HasAPIKey
@@ -38,7 +38,6 @@ from ecommerce.constants import REDEMPTION_TYPE_UNLIMITED
 from ecommerce.models import Discount, Product
 from main.authentication import CsrfExemptSessionAuthentication
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
-from main.permissions import IsAdminOrReadOnly
 
 log = logging.getLogger(__name__)
 
@@ -62,7 +61,7 @@ class OrganizationPageViewSet(viewsets.ReadOnlyModelViewSet):
         )
     )
     serializer_class = OrganizationPageSerializer
-    permission_classes = [IsAdminOrReadOnly | HasAPIKey]
+    permission_classes = [IsAdminUser | HasAPIKey]
     lookup_field = "slug"
     lookup_url_kwarg = "organization_slug"
 
@@ -73,7 +72,7 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
     """
 
     serializer_class = ContractPageSerializer
-    permission_classes = [IsAdminOrReadOnly | HasAPIKey]
+    permission_classes = [IsAdminUser | HasAPIKey]
     lookup_field = "slug"
     lookup_url_kwarg = "contract_slug"
 
