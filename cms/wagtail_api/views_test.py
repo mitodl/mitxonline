@@ -292,6 +292,8 @@ def test_course_page_detail_exposes_faqs_in_order(user_drf_client):
         "Second question?",
     ]
     assert "https://example.com" in faqs[0]["answer"]
+    # id is exposed so the frontend can use it as a stable accordion key.
+    assert all(isinstance(faq["id"], int) for faq in faqs)
 
 
 def test_program_page_detail_exposes_faqs(user_drf_client):

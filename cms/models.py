@@ -1412,9 +1412,8 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         """
         from cms.serializers import ProductPageFAQSerializer  # noqa: PLC0415
 
-        return ProductPageFAQSerializer(
-            self.faqs_list.all().order_by("sort_order"), many=True
-        ).data
+        # Orderable's default ordering already sorts by sort_order.
+        return ProductPageFAQSerializer(self.faqs_list.all(), many=True).data
 
     @property
     def product(self):
