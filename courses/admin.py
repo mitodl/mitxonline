@@ -163,7 +163,7 @@ class EnrollableCourseRunInline(CourseRunInline):
 class CourseRunContractPageInline(DisplayOnlyAdminMixin, admin.TabularInline):
     """
     Displays the contracts that the run belongs to.
-    
+
     This is the opposite of b2b.admin.ContractPageCourseRunInline
     """
 
@@ -183,15 +183,19 @@ class CourseRunContractPageInline(DisplayOnlyAdminMixin, admin.TabularInline):
 
     @admin.display(description="Contract Name")
     def name(self, obj):
-        admin_link = reverse("admin:b2b_contractpage_change", args=(obj.contractpage.id,))
+        admin_link = reverse(
+            "admin:b2b_contractpage_change", args=(obj.contractpage.id,)
+        )
         return format_html(
             f'<a href="{admin_link}">{obj.contractpage.id} - {obj.contractpage.name}</a>'
         )
 
-
     @admin.display(description="Organization")
     def organization(self, obj):
-        admin_link = reverse("admin:b2b_organizationpage_change", args=(obj.contractpage.organization.id,))
+        admin_link = reverse(
+            "admin:b2b_organizationpage_change",
+            args=(obj.contractpage.organization.id,),
+        )
         return format_html(
             f'<a href="{admin_link}">{obj.contractpage.organization.id} - {obj.contractpage.organization.name}</a>'
         )
