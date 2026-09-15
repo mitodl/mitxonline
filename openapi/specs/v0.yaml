@@ -7478,7 +7478,12 @@ components:
       - product_ids
     CreateContractRequest:
       type: object
-      description: Request body for creating a contract.
+      description: |-
+        Request body for creating a contract.
+
+        membership_type is required even though the model has a default, as it is
+        for b2b_contract create: how learners join a contract is chosen, not
+        defaulted.
       properties:
         name:
           type: string
@@ -7526,6 +7531,7 @@ components:
           description: The fixed price for enrollment under this contract. (Set to
             zero or leave blank for free.)
       required:
+      - membership_type
       - name
     CreateIdentityProviderRequest:
       type: object
