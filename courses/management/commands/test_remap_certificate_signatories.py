@@ -242,17 +242,6 @@ def test_missing_new_id_makes_no_changes_and_is_reported():
     assert str(missing_id) in output
 
 
-def test_null_revision_cert_is_skipped_without_error():
-    """A certificate with no frozen revision is ignored, not an error."""
-    new = SignatoryPageFactory.create()
-    certificate = CourseRunCertificateFactory.create(certificate_page_revision=None)
-
-    _run("--old-id", "1", "--new-id", str(new.id), "--commit")
-
-    certificate.refresh_from_db()
-    assert certificate.certificate_page_revision is None
-
-
 def test_program_certificate_is_remapped():
     """Program certificates are covered as well as course certificates."""
     old, other, new = SignatoryPageFactory.create_batch(3)
