@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.166.2
+---------------
+
+- Add XPro HubSpot routing for ecommerce events (#3947)
+- Search compliance logs in the admin (#3962)
+
 Version 1.166.1
 ---------------
 
