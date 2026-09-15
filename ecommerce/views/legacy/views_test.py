@@ -1047,6 +1047,7 @@ def test_add_to_cart_triggers_hubspot_cart_add_for_uai_course(
         user,
         product,
         is_uai=True,
+        is_xpro=False,
     )
 
 
