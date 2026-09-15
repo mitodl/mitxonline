@@ -1251,6 +1251,37 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         title = f"{self.readable_id} | {self.title}"
         return title if len(title) <= 100 else title[:97] + "..."  # noqa: PLR2004
 
+    def clean(self):
+        """
+        Guard against a Course's readable_id being set to a CourseRun's full
+        courseware_id (e.g. "course-v1:MITxT+JPAL101SPAx+1T2023") instead of
+        the course-level ID (e.g. "course-v1:MITxT+JPAL101SPAx"). Links built
+        from a readable_id in that shape 404 once redirected to the Learn
+        front end, since a run ID isn't a valid course readable_id there.
+
+        Only checked when readable_id is being newly set or changed, so
+        existing rows that already have a colliding value (from before this
+        validation existed) aren't blocked from being saved for unrelated
+        reasons.
+        """
+        if not self.readable_id:
+            return
+
+        is_new_or_changed = (
+            self.pk is None
+            or not Course.objects.filter(
+                pk=self.pk, readable_id=self.readable_id
+            ).exists()
+        )
+        if (
+            is_new_or_changed
+            and CourseRun.objects.filter(courseware_id=self.readable_id).exists()
+        ):
+            raise ValidationError(
+                "readable_id matches an existing CourseRun's courseware_id. "  # noqa: EM101
+                "It should be the course-level ID without a run tag."
+            )
+
 
 class CourseRunQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):  # pylint: disable=missing-docstring
     def exclude_b2b(self):
