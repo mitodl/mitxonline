@@ -1858,8 +1858,17 @@ def process_course_run_clone(
 
     try:
         get_edx_course(target_course.readable_id, client=edx_client)
-    except CourseRunAPIError:
-        # An HTTP error is good in this case. We don't want the target course to exist.
+    except CourseRunAPIError as exc:
+        # Only a 404 says the target is absent. Anything else (auth, a 5xx) says
+        # nothing about it, and treating it as absent would stamp the request
+        # and clone over whatever is there. Re-raise so the task retries.
+        cause = exc.__cause__
+        if not (
+            isinstance(cause, HTTPError)
+            and cause.response is not None
+            and cause.response.status_code == status.HTTP_404_NOT_FOUND
+        ):
+            raise
         target_exists = False
     else:
         target_exists = True
