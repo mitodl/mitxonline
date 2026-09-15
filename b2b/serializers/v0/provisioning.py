@@ -3,6 +3,7 @@
 from rest_framework import serializers
 
 from b2b.constants import (
+    CONTRACT_SETUP_STATUS_CHOICES,
     IDP_LIFECYCLE_CHOICES,
     IDP_PROTOCOL_CHOICES,
     IDP_PROTOCOL_OIDC,
@@ -10,10 +11,13 @@ from b2b.constants import (
     ONBOARDING_STATE_CHOICES,
 )
 from b2b.models import (
+    ContractPage,
+    ContractProgramItem,
     OrganizationIdentityProvider,
     OrganizationOnboarding,
     OrganizationPage,
 )
+from openedx.constants import COURSE_RUN_CLONE_STATUS_CHOICES
 
 
 class OrganizationOnboardingSerializer(serializers.ModelSerializer):
@@ -237,3 +241,151 @@ class SetOnboardingStateSerializer(serializers.Serializer):
 
     state = serializers.ChoiceField(choices=ONBOARDING_STATE_CHOICES)
     notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class ContractProgramSerializer(serializers.ModelSerializer):
+    """A program in a contract, in the contract's order."""
+
+    readable_id = serializers.CharField(source="program.readable_id")
+    title = serializers.CharField(source="program.title")
+
+    class Meta:
+        model = ContractProgramItem
+        fields = ["readable_id", "title", "sort_order"]
+        read_only_fields = fields
+
+
+class ProvisionedContractSerializer(serializers.ModelSerializer):
+    """A contract as the staff contract API sees it."""
+
+    programs = ContractProgramSerializer(
+        source="contract_programs", many=True, read_only=True
+    )
+
+    class Meta:
+        model = ContractPage
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "organization",
+            "membership_type",
+            "description",
+            "welcome_message",
+            "contract_start",
+            "contract_end",
+            "active",
+            "max_learners",
+            "enrollment_fixed_price",
+            "programs",
+        ]
+        read_only_fields = fields
+
+
+CONTRACT_WRITABLE_FIELDS = [
+    "name",
+    "membership_type",
+    "description",
+    "welcome_message",
+    "contract_start",
+    "contract_end",
+    "max_learners",
+    "enrollment_fixed_price",
+]
+
+
+class CreateContractSerializer(serializers.ModelSerializer):
+    """Request body for creating a contract."""
+
+    class Meta:
+        model = ContractPage
+        fields = CONTRACT_WRITABLE_FIELDS
+
+
+class UpdateContractSerializer(serializers.ModelSerializer):
+    """
+    Request body for updating a contract.
+
+    Enrollment codes are not changed here. The view queues the code check
+    afterwards for a contract that uses codes.
+    """
+
+    class Meta:
+        model = ContractPage
+        fields = [*CONTRACT_WRITABLE_FIELDS, "active"]
+
+
+class ContractCoursewareSerializer(serializers.Serializer):
+    """Request body for adding courseware to a contract."""
+
+    courseware_id = serializers.CharField(
+        help_text="Readable ID of a program, course or course run."
+    )
+    force = serializers.BooleanField(
+        default=False,
+        help_text="Move a course run that is already in another contract.",
+    )
+
+
+class RemoveContractCoursewareSerializer(serializers.Serializer):
+    """Request body for removing courseware from a contract."""
+
+    courseware_id = serializers.CharField(
+        help_text="Readable ID of a program, course or course run."
+    )
+    remove_program_runs = serializers.BooleanField(
+        default=False,
+        help_text="For a program, also remove its courses' runs from the contract.",
+    )
+
+
+class CoursewareAdditionSerializer(serializers.Serializer):
+    """What adding courseware to a contract did."""
+
+    runs_added = serializers.IntegerField()
+    courses_without_source_run = serializers.IntegerField()
+    skipped_reason = serializers.CharField(allow_blank=True)
+
+
+class RemovedContractRunSerializer(serializers.Serializer):
+    """A contract run that was removed from a contract."""
+
+    courseware_id = serializers.CharField()
+    unlinked = serializers.BooleanField(
+        help_text="False when the run stays linked because learners are enrolled."
+    )
+
+
+class ContractRunSetupSerializer(serializers.Serializer):
+    """The edX clone status of one contract run."""
+
+    courseware_id = serializers.CharField()
+    clone_status = serializers.ChoiceField(
+        choices=COURSE_RUN_CLONE_STATUS_CHOICES, allow_null=True
+    )
+    clone_attempts = serializers.IntegerField()
+    clone_error = serializers.CharField(allow_blank=True)
+
+
+class ContractEnrollmentCodeSetupSerializer(serializers.Serializer):
+    """How many enrollment codes a contract needs and has."""
+
+    expected = serializers.IntegerField()
+    existing = serializers.IntegerField()
+
+
+class ContractSetupStatusSerializer(serializers.Serializer):
+    """How far a contract's setup has got."""
+
+    status = serializers.ChoiceField(choices=CONTRACT_SETUP_STATUS_CHOICES)
+    runs = ContractRunSetupSerializer(many=True)
+    enrollment_codes = ContractEnrollmentCodeSetupSerializer()
+
+
+class ExpiredEnrollmentCodeSerializer(serializers.Serializer):
+    """An unused enrollment code taken out of a contract."""
+
+    code = serializers.CharField()
+    deleted = serializers.BooleanField(
+        help_text="False when the code still applies to products outside the contract."
+    )
