@@ -2017,13 +2017,49 @@ def test_push_edx_modes_from_run(mocker):
     mocked_create_edx_mode.assert_has_calls(calls, any_order=True)
 
 
+def _course_run_api_error(status_code):
+    """Build the CourseRunAPIError edx_api raises, with its HTTPError cause."""
+
+    response = MockResponse(content="", status_code=status_code)
+    exc = CourseRunAPIError(f"Failed to get course run: {status_code}")
+    exc.__cause__ = HTTPError(response=response)
+    return exc
+
+
+def test_process_course_run_clone_lookup_error_is_not_absence(mocker, mocked_clone_edx):
+    """
+    A target lookup that fails with anything but a 404 is re-raised for the task
+    to retry, without stamping the record or asking edX to clone.
+    """
+
+    mocker.patch(
+        "openedx.api.get_edx_course",
+        side_effect=[
+            True,
+            _course_run_api_error(status.HTTP_500_INTERNAL_SERVER_ERROR),
+        ],
+    )
+    course_run = CourseRunFactory.create()
+    clone = CourseRunClone.objects.create(
+        course_run=course_run,
+        source_courseware_id="course-v1:PyT+TestCourse+9T3036",
+    )
+
+    with pytest.raises(CourseRunAPIError):
+        process_course_run_clone(course_run, clone.source_courseware_id, clone=clone)
+
+    clone.refresh_from_db()
+    assert clone.clone_requested_at is None
+    mocked_clone_edx.assert_not_called()
+
+
 def test_process_course_run_clone(mocker):
     """Test that the course run clone calls the edX APIs properly."""
 
     mocker.patch("openedx.api.get_edx_api_jwt_client")
     mocker.patch(
         "openedx.api.get_edx_course",
-        side_effect=[True, CourseRunAPIError("fake value error")],
+        side_effect=[True, _course_run_api_error(status.HTTP_404_NOT_FOUND)],
     )
     mocker.patch("openedx.api.get_edx_course_modes", return_value=[])
     mocker.patch("openedx.api.fix_cloned_run_data")
@@ -2103,7 +2139,7 @@ def test_process_course_run_clone_stamps_request(mocker, mocked_clone_edx):
 
     mocker.patch(
         "openedx.api.get_edx_course",
-        side_effect=[True, CourseRunAPIError("not found")],
+        side_effect=[True, _course_run_api_error(status.HTTP_404_NOT_FOUND)],
     )
     course_run = CourseRunFactory.create()
     clone = CourseRunClone.objects.create(
