@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.166.3
+---------------
+
+- feat: GET /api/v0/products/{id}/user_pricing/ per-user price quote (#3959)
+- Return 409 when a new organization's name reuses a page slug (#3955)
+- Restrict B2B page access to admins (#3957)
+- fix(sentry): cap request bodies at 1KB and scrub Postgres DETAIL rows (#3936)
+
 Version 1.166.2
 ---------------
 
