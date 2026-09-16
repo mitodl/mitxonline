@@ -57,6 +57,16 @@ class FacultySerializer(serializers.Serializer):
     feature_image_src = serializers.CharField(allow_null=True)
 
 
+class FAQItemSerializer(serializers.Serializer):
+    """
+    Serializer for FAQ items shown on course/program pages.
+    """
+
+    id = serializers.IntegerField()
+    question = serializers.CharField()
+    answer = serializers.CharField()
+
+
 class PriceItemSerializer(serializers.Serializer):
     """
     Serializer for price items used in course pages.
@@ -194,6 +204,7 @@ class CoursePageItemSerializer(serializers.ModelSerializer):
             "video_url",
             "faculty_section_title",
             "faculty",
+            "faqs",
             "certificate_page",
             "course_details",
             "topic_list",
@@ -210,6 +221,7 @@ class CoursePageItemSerializer(serializers.ModelSerializer):
     meta = PageMetaSerializer()
     feature_image = FeatureImageSerializer()
     faculty = FacultySerializer(many=True)
+    faqs = FAQItemSerializer(many=True)
     certificate_page = CertificatePageSerializer(allow_null=True)
     course_details = CourseSerializer()
     topic_list = TopicSerializer(many=True)
@@ -257,6 +269,7 @@ class ProgramPageItemSerializer(serializers.ModelSerializer):
             "video_url",
             "faculty_section_title",
             "faculty",
+            "faqs",
             "certificate_page",
             "program_details",
             "how_youll_learn",
@@ -277,6 +290,7 @@ class ProgramPageItemSerializer(serializers.ModelSerializer):
     price = PriceItemSerializer(many=True)
     feature_image = FeatureImageSerializer()
     faculty = FacultySerializer(many=True)
+    faqs = FAQItemSerializer(many=True)
     certificate_page = CertificatePageSerializer()
     program_details = ProgramSerializer()
     how_youll_learn = HowYoullLearnSerializer(many=True)

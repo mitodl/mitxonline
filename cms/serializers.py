@@ -9,6 +9,7 @@ from rest_framework import serializers
 from cms import models
 from cms.api import get_wagtail_img_src
 from cms.models import FlexiblePricingRequestForm, ProgramPage
+from main.serializers import RichTextSerializer
 from main.utils import get_learn_product_url
 
 
@@ -393,6 +394,14 @@ class ProgramPageSerializer(serializers.ModelSerializer):
             "price",
             "list_price",
         ]
+
+
+class ProductPageFAQSerializer(serializers.Serializer):
+    """Serializes a single product page FAQ (question + rich-text answer)."""
+
+    id = serializers.IntegerField(read_only=True)
+    question = serializers.CharField(read_only=True)
+    answer = RichTextSerializer(read_only=True)
 
 
 class InstructorPageSerializer(serializers.ModelSerializer):
