@@ -298,8 +298,23 @@ INSTALLED_APPS = (
 # if ENVIRONMENT not in ("production", "prod"):
 #     INSTALLED_APPS += ("localdev.seed",)  # noqa: ERA001
 
+SLOW_REQUEST_WATCHDOG_ENABLED = get_bool(
+    name="SLOW_REQUEST_WATCHDOG_ENABLED",
+    default=False,
+    description=(
+        "Dump every thread's stack (via faulthandler) when a request runs "
+        "past SLOW_REQUEST_WATCHDOG_THRESHOLD_SECONDS"
+    ),
+)
+SLOW_REQUEST_WATCHDOG_THRESHOLD_SECONDS = get_int(
+    name="SLOW_REQUEST_WATCHDOG_THRESHOLD_SECONDS",
+    default=3,
+    description="Seconds a request may run before the watchdog dumps thread stacks",
+)
+
 MIDDLEWARE = (
     "django.middleware.security.SecurityMiddleware",
+    "main.middleware.SlowRequestWatchdogMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",

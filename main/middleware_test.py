@@ -4,7 +4,11 @@ import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.http import HttpResponse
 
-from main.middleware import AnonymousBasketHandoffMiddleware, HostBasedCSRFMiddleware
+from main.middleware import (
+    AnonymousBasketHandoffMiddleware,
+    HostBasedCSRFMiddleware,
+    SlowRequestWatchdogMiddleware,
+)
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -156,3 +160,67 @@ def test_host_based_csrf_middleware_no_referer(mocker, rf, settings):
 
     # Domain should not be modified (should remain empty)
     assert processed_response.cookies[settings.CSRF_COOKIE_NAME]["domain"] == ""
+
+
+def test_slow_request_watchdog_disabled_by_default_is_a_noop(mocker, rf, settings):
+    """When disabled, the middleware starts no timer and just delegates."""
+    settings.SLOW_REQUEST_WATCHDOG_ENABLED = False
+    mock_timer_cls = mocker.patch("main.middleware.threading.Timer")
+
+    request = rf.get("/some/path")
+    expected_response = HttpResponse()
+    get_response = mocker.MagicMock(return_value=expected_response)
+    middleware = SlowRequestWatchdogMiddleware(get_response)
+
+    response = middleware(request)
+
+    assert response is expected_response
+    get_response.assert_called_once_with(request)
+    mock_timer_cls.assert_not_called()
+
+
+def test_slow_request_watchdog_starts_and_cancels_timer_on_success(
+    mocker, rf, settings
+):
+    """When enabled, a per-request timer is started and cancelled once the
+    view returns normally.
+    """
+    settings.SLOW_REQUEST_WATCHDOG_ENABLED = True
+    settings.SLOW_REQUEST_WATCHDOG_THRESHOLD_SECONDS = 7
+    mock_timer = mocker.MagicMock()
+    mock_timer_cls = mocker.patch(
+        "main.middleware.threading.Timer", return_value=mock_timer
+    )
+    mock_dump_traceback = mocker.patch("main.middleware.faulthandler.dump_traceback")
+
+    request = rf.get("/some/path")
+    expected_response = HttpResponse()
+    get_response = mocker.MagicMock(return_value=expected_response)
+    middleware = SlowRequestWatchdogMiddleware(get_response)
+
+    response = middleware(request)
+
+    assert response is expected_response
+    mock_timer_cls.assert_called_once_with(
+        7, mock_dump_traceback, kwargs={"file": mocker.ANY, "all_threads": True}
+    )
+    assert mock_timer.daemon is True
+    mock_timer.start.assert_called_once()
+    mock_timer.cancel.assert_called_once()
+
+
+def test_slow_request_watchdog_cancels_timer_even_if_view_raises(mocker, rf, settings):
+    """The timer must still be cancelled if the wrapped view raises."""
+    settings.SLOW_REQUEST_WATCHDOG_ENABLED = True
+    mock_timer = mocker.MagicMock()
+    mocker.patch("main.middleware.threading.Timer", return_value=mock_timer)
+    mocker.patch("main.middleware.faulthandler.dump_traceback")
+
+    request = rf.get("/some/path")
+    get_response = mocker.MagicMock(side_effect=ValueError("boom"))
+    middleware = SlowRequestWatchdogMiddleware(get_response)
+
+    with pytest.raises(ValueError, match="boom"):
+        middleware(request)
+
+    mock_timer.cancel.assert_called_once()

@@ -1,6 +1,9 @@
 """Common mitx_online middleware"""
 
+import faulthandler
 import logging
+import sys
+import threading
 import uuid
 from urllib.parse import urlparse
 
@@ -12,6 +15,45 @@ from django.utils.deprecation import MiddlewareMixin
 log = logging.getLogger(__name__)
 
 ANONYMOUS_BASKET_HANDOFF_PARAM = "anonymous_basket_id"
+
+
+class SlowRequestWatchdogMiddleware:
+    """
+    Dump every thread's stack if a request runs past a threshold.
+
+    Written as a plain callable rather than a MiddlewareMixin subclass so the
+    watchdog timer is cancelled in a `finally` block -- guaranteed to run
+    whether the view returns normally or raises, unlike relying on
+    process_response being reached.
+
+    Uses a per-request threading.Timer rather than
+    faulthandler.dump_traceback_later: that call is a single process-global
+    timer, so a second concurrent request (Granian runs multiple
+    blocking_threads per worker) would silently cancel the first request's
+    scheduled dump instead of adding its own. A dedicated Timer per request
+    has its own independent cancel(), and the dump it triggers
+    (faulthandler.dump_traceback) is a plain one-shot call that's safe to
+    fire from multiple threads at once.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if not settings.SLOW_REQUEST_WATCHDOG_ENABLED:
+            return self.get_response(request)
+
+        timer = threading.Timer(
+            settings.SLOW_REQUEST_WATCHDOG_THRESHOLD_SECONDS,
+            faulthandler.dump_traceback,
+            kwargs={"file": sys.stderr, "all_threads": True},
+        )
+        timer.daemon = True
+        timer.start()
+        try:
+            return self.get_response(request)
+        finally:
+            timer.cancel()
 
 
 class CachelessAPIMiddleware(MiddlewareMixin):
