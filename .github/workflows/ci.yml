@@ -38,6 +38,11 @@ jobs:
         run: uv python install 3.11
 
       - name: Install dependencies
+        # cybersource-rest-client-python pulls in urllib3-future, whose wheel
+        # deletes the real urllib3 at interpreter start (see pyproject.toml's
+        # no-binary-package entry) -- this forces the source build that skips it.
+        env:
+          URLLIB3_NO_OVERRIDE: "1"
         run: uv sync --locked
 
       - name: Create test local state
@@ -137,6 +142,11 @@ jobs:
         run: uv python install 3.11
 
       - name: Install dependencies
+        # cybersource-rest-client-python pulls in urllib3-future, whose wheel
+        # deletes the real urllib3 at interpreter start (see pyproject.toml's
+        # no-binary-package entry) -- this forces the source build that skips it.
+        env:
+          URLLIB3_NO_OVERRIDE: "1"
         run: uv sync --locked
 
       - name: Create test local state
