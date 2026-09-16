@@ -6994,6 +6994,15 @@ components:
       required:
       - name
       - org_key
+    DataConsentFieldErrors:
+      type: object
+      properties:
+        consented:
+          type: array
+          items:
+            type: string
+          description: Errors for the 'consented' field, e.g. if missing or not a
+            boolean.
     DataConsentRequest:
       type: object
       description: Records whether a user has consented to data sharing for a contract
@@ -7006,12 +7015,10 @@ components:
       type: object
       description: Default DRF is_valid(raise_exception=True) error shape for DataConsentSerializer.
       properties:
-        consented:
-          type: array
-          items:
-            type: string
-          description: Errors for the 'consented' field, e.g. if missing or not a
-            boolean.
+        errors:
+          $ref: '#/components/schemas/DataConsentFieldErrors'
+      required:
+      - errors
     Department:
       type: object
       description: Department model serializer
