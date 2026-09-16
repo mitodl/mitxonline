@@ -121,6 +121,17 @@ package = false
 default-groups = "all"
 exclude-newer = "7d"
 required-version = ">=0.9.17"
+# cybersource-rest-client-python depends on urllib3-future, whose prebuilt wheel
+# installs a .pth file that deletes the real urllib3 from site-packages on every
+# interpreter start and replaces it with itself (see its own hatch_build.py:
+# SHOULD_PREVENT_FORK_OVERRIDE). That silently switches every `requests` call in
+# the app from HTTP/1.1 to HTTP/2 -- including calls to openedx -- which is the
+# root cause behind MITXONLINE-6ZV/6PQ's "ConnectionError: None" failures on
+# HTTP/2 stream resets. Forcing a source build here skips the .pth entirely, as
+# long as URLLIB3_NO_OVERRIDE is also set wherever this lockfile is installed
+# (Dockerfile, CI) -- the env var only takes effect inside urllib3-future's own
+# build hook, not at import time.
+no-binary-package = ["urllib3-future"]
 
 [tool.uv.exclude-newer-package]
 ol-concourse = "0d"

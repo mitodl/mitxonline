@@ -35,6 +35,11 @@ COPY --chown=mitodl:mitodl mitol_*.gz /src/
 
 USER mitodl
 WORKDIR /src
+# Forces urllib3-future (pulled in by cybersource-rest-client-python) to build
+# from source instead of PyPI's prebuilt wheel, which ships a .pth file that
+# deletes the real urllib3 at every interpreter start -- see the no-binary-package
+# entry in pyproject.toml's [tool.uv] for the full explanation.
+ENV URLLIB3_NO_OVERRIDE=1
 # BuildKit cache mount keeps the uv download cache across builds.
 RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
     uv sync --frozen --no-install-project --no-dev
