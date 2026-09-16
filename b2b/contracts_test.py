@@ -104,20 +104,19 @@ def test_add_program():
     assert list(contract.programs) == [program]
 
 
-@pytest.mark.parametrize("force", [True, False])
-def test_add_run_in_another_contract(force):
-    """A run in another contract moves only when forced."""
+def test_add_run_in_another_contract_is_skipped():
+    """A run already in another contract stays there and is reported."""
 
     run = CourseRunFactory.create()
     other_contract = ContractPageFactory.create()
     run.b2b_contracts.add(other_contract)
     contract = ContractPageFactory.create()
 
-    added = add_courseware_to_contract(contract, run, force=force)
+    added = add_courseware_to_contract(contract, run)
 
-    assert added.runs_added == (1 if force else 0)
-    assert bool(added.skipped_reason) is not force
-    assert run.b2b_contracts.filter(id=contract.id).exists() is force
+    assert added.runs_added == 0
+    assert str(other_contract) in added.skipped_reason
+    assert not run.b2b_contracts.filter(id=contract.id).exists()
 
 
 @pytest.mark.parametrize("has_enrollments", [True, False])
