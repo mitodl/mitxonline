@@ -209,6 +209,41 @@ paths:
               schema:
                 $ref: '#/components/schemas/ContractPageVariantRunBadRequest'
           description: ''
+  /api/v0/b2b/data_consent/{contract_id}/:
+    post:
+      operationId: b2b_data_consent_create
+      description: View for recording data consent for a user on a contract.
+      parameters:
+      - in: path
+        name: contract_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataConsentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DataConsentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DataConsentRequest'
+        required: true
+      responses:
+        '204':
+          description: No response body
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataConsentValidationError'
+          description: ''
+        '403':
+          description: No response body
   /api/v0/b2b/enroll/{readable_id}/:
     post:
       operationId: b2b_enroll_create
@@ -6959,6 +6994,24 @@ components:
       required:
       - name
       - org_key
+    DataConsentRequest:
+      type: object
+      description: Records whether a user has consented to data sharing for a contract
+      properties:
+        consented:
+          type: boolean
+      required:
+      - consented
+    DataConsentValidationError:
+      type: object
+      description: Default DRF is_valid(raise_exception=True) error shape for DataConsentSerializer.
+      properties:
+        consented:
+          type: array
+          items:
+            type: string
+          description: Errors for the 'consented' field, e.g. if missing or not a
+            boolean.
     Department:
       type: object
       description: Department model serializer
