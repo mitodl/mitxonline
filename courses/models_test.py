@@ -430,6 +430,53 @@ def test_readable_id_invalid(readable_id_value):
         course.save()
 
 
+def test_course_readable_id_rejects_courserun_courseware_id():
+    """
+    A Course's readable_id should never be set to a full CourseRun
+    courseware_id (e.g. the course key with a run tag appended). Saving one
+    should raise a ValidationError instead of silently persisting a
+    course-run-shaped readable_id that would 404 once linked at /courses/.
+    """
+    existing_run = CourseRunFactory.create()
+    course = CourseFactory.build(readable_id=existing_run.courseware_id)
+    with pytest.raises(ValidationError):
+        course.save()
+
+
+def test_course_readable_id_allows_resaving_unchanged_legacy_collision():
+    """
+    A pre-existing Course row that already collides with a CourseRun's
+    courseware_id (grandfathered in from before this validation existed)
+    should still be saveable for unrelated field changes, as long as its
+    readable_id itself isn't part of the change.
+    """
+    existing_run = CourseRunFactory.create()
+    course = CourseFactory.create()
+    # Simulate a pre-existing bad readable_id without going through clean().
+    Course.objects.filter(pk=course.pk).update(readable_id=existing_run.courseware_id)
+    course.refresh_from_db()
+
+    course.title = "Updated Title"
+    course.save()
+
+    course.refresh_from_db()
+    assert course.title == "Updated Title"
+
+
+def test_course_readable_id_rejects_changing_to_existing_courserun_courseware_id():
+    """
+    Changing an existing Course's readable_id to match a CourseRun's
+    courseware_id should still be rejected, even for a Course row that
+    already existed prior to the change.
+    """
+    existing_run = CourseRunFactory.create()
+    course = CourseFactory.create()
+
+    course.readable_id = existing_run.courseware_id
+    with pytest.raises(ValidationError):
+        course.save()
+
+
 def test_get_program_run_enrollments(user):
     """
     Test that the get_program_run_enrollments helper method for CourseRunEnrollment returns
