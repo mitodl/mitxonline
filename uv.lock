@@ -53,9 +53,6 @@ ol-openedx-course-export = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 mitol-django-openedx = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 mitol-django-scim = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 
-[manifest]
-overrides = [{ name = "urllib3-future", marker = "sys_platform == 'never'" }]
-
 [[package]]
 name = "amqp"
 version = "5.3.1"
@@ -624,7 +621,7 @@ dependencies = [
     { name = "pyjwt" },
     { name = "setuptools" },
     { name = "six" },
-    { name = "urllib3-future", marker = "sys_platform == 'never'" },
+    { name = "urllib3-future" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/90/e3/b7f9b6384ee9621a0c690dd3693e0c003b77350e613c7aada2de1ea970f3/cybersource_rest_client_python-0.0.74.tar.gz", hash = "sha256:9c64247e8eedd8151f40f60a018a9d0ca1c53498b892b94e9cbb6b6175a99107", size = 1503549, upload-time = "2026-02-11T08:37:58.447Z" }
 
@@ -1708,15 +1705,6 @@ wheels = [
 ]
 
 [[package]]
-name = "jh2"
-version = "5.0.10"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/1b/ed/466eb2a162d9cfaa8452e9a05d24b4fc11d4cf84cf27f5a71457dc590323/jh2-5.0.10.tar.gz", hash = "sha256:2c737a47bee50dc727f7a766185e110befdceba5efb1c4fa240b1e4399291487", size = 7301475, upload-time = "2025-10-05T06:18:59.414Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/93/57/d0fcb025736e24cb68c4e250cc4cf63a87b7e0bd7285e188c543018d05c1/jh2-5.0.10-py3-none-any.whl", hash = "sha256:1808c0e5d355c60485bb282b34c6aa3f15069b2634eb44779fb9f3bda0256ac0", size = 98099, upload-time = "2025-10-05T06:18:58.203Z" },
-]
-
-[[package]]
 name = "jinja2"
 version = "3.1.6"
 source = { registry = "https://pypi.org/simple" }
@@ -2270,6 +2258,7 @@ dependencies = [
     { name = "trino" },
     { name = "ulid-py" },
     { name = "urllib3" },
+    { name = "urllib3-future" },
     { name = "user-util" },
     { name = "wagtail" },
     { name = "wagtail-metadata" },
@@ -2382,6 +2371,7 @@ requires-dist = [
     { name = "trino", specifier = ">=0.336.0,<0.337" },
     { name = "ulid-py", specifier = ">=1.1.0,<2" },
     { name = "urllib3", specifier = ">=2.0.0,<3" },
+    { name = "urllib3-future", directory = "shims/urllib3-future" },
     { name = "user-util", specifier = ">=0.1.5,<0.2" },
     { name = "wagtail", specifier = "==7.3.3" },
     { name = "wagtail-metadata", specifier = ">=5.0.0,<6" },
@@ -3986,16 +3976,8 @@ wheels = [
 
 [[package]]
 name = "urllib3-future"
-version = "2.16.900"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "h11" },
-    { name = "jh2" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e0/51/ad9202a73ed27e6d9643fab84856cef507c993941ea6ab9a00c0a6a1ee25/urllib3_future-2.16.900.tar.gz", hash = "sha256:aea8895b54c79fc67181efe0b473b4857927235bee6e54416688b2eb4a707abe", size = 1124153, upload-time = "2026-02-22T08:06:47.767Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/45/f8/d200701b30e0f3a5feb86668b5fe0c5f440ac896195f731c0a5e3ceacb4a/urllib3_future-2.16.900-py3-none-any.whl", hash = "sha256:d8b5fee7bd53f5ac5541ee02ff60331c8d410166cfa7d71412f256393d08da5a", size = 691731, upload-time = "2026-02-22T08:06:46.406Z" },
-]
+version = "0.0.0"
+source = { directory = "shims/urllib3-future" }
 
 [[package]]
 name = "user-agents"
