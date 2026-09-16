@@ -323,14 +323,15 @@ class UpdateContractSerializer(serializers.ModelSerializer):
 
 
 class ContractCoursewareSerializer(serializers.Serializer):
-    """Request body for adding courseware to a contract."""
+    """
+    Request body for adding courseware to a contract.
+
+    A course run already in another contract is left there and reported as
+    skipped; there is no option to move it.
+    """
 
     courseware_id = serializers.CharField(
         help_text="Readable ID of a program, course or course run."
-    )
-    force = serializers.BooleanField(
-        default=False,
-        help_text="Move a course run that is already in another contract.",
     )
 
 

@@ -509,6 +509,13 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
         request_serializer.is_valid(raise_exception=True)
         contract = request_serializer.save()
 
+        # The queryset prefetches contract_programs, and that cache is stale
+        # once the instance has been saved, so the response would serialize
+        # the programs as they were. DRF's UpdateModelMixin clears it for the
+        # same reason.
+        if getattr(contract, "_prefetched_objects_cache", None):
+            contract._prefetched_objects_cache = {}  # noqa: SLF001
+
         queue_enrollment_code_check_if_required(contract)
 
         return Response(self.get_serializer(contract).data)
@@ -535,20 +542,13 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
 
         request_serializer = ContractCoursewareSerializer(data=request.data)
         request_serializer.is_valid(raise_exception=True)
-        courseware = self._courseware(
-            request_serializer.validated_data["courseware_id"]
-        )
-
         courseware_id = request_serializer.validated_data["courseware_id"]
+        courseware = self._courseware(courseware_id)
 
         # The 400 bodies are built from the requested ID, never the exception
         # text, which is logged instead.
         try:
-            added = add_courseware_to_contract(
-                contract,
-                courseware,
-                force=request_serializer.validated_data["force"],
-            )
+            added = add_courseware_to_contract(contract, courseware)
         except SourceCourseIncompleteError:
             log.warning(
                 "No source run to add %s to contract %s",

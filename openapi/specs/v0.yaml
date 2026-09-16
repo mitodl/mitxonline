@@ -5855,16 +5855,16 @@ components:
       - Other (N/A or Don't know)
     ContractCoursewareRequest:
       type: object
-      description: Request body for adding courseware to a contract.
+      description: |-
+        Request body for adding courseware to a contract.
+
+        A course run already in another contract is left there and reported as
+        skipped; there is no option to move it.
       properties:
         courseware_id:
           type: string
           minLength: 1
           description: Readable ID of a program, course or course run.
-        force:
-          type: boolean
-          default: false
-          description: Move a course run that is already in another contract.
       required:
       - courseware_id
     ContractEnrollmentCodeSetup:
