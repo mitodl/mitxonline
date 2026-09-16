@@ -17,7 +17,11 @@ from b2b.constants import (
     CONTRACT_MEMBERSHIP_MANAGED,
 )
 from b2b.factories import ContractPageFactory
-from b2b.models import DiscountContractAttachmentRedemption, UserOrganization
+from b2b.models import (
+    DiscountContractAttachmentRedemption,
+    UserB2BContract,
+    UserOrganization,
+)
 from courses.factories import CourseRunFactory
 from courses.models import CourseRunEnrollment
 from ecommerce.factories import ProductFactory, UnlimitedUseDiscountFactory
@@ -859,3 +863,62 @@ def test_enroll_courserun_without_b2b_contract_not_found(mocker):
     url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
     with pytest.raises(Exception):  # noqa: B017, PT011
         client.post(url)
+
+
+def test_data_consent_forbidden_when_not_a_contract_member(user):
+    """A user who isn't attached to the contract should get a 403."""
+    contract = ContractPageFactory.create()
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:data-consent", kwargs={"contract_id": contract.id})
+    resp = client.post(url, data={"consented": True}, format="json")
+
+    assert resp.status_code == 403
+    assert not UserB2BContract.objects.filter(
+        user=user, contract_page=contract
+    ).exists()
+
+
+def test_data_consent_invalid_body(user):
+    """A request missing the required 'consented' field should return 400."""
+    contract = ContractPageFactory.create()
+    user.b2b_contracts.add(contract)
+
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:data-consent", kwargs={"contract_id": contract.id})
+    resp = client.post(url, data={}, format="json")
+
+    assert resp.status_code == 400
+    assert "consented" in resp.json()["errors"]
+
+    membership = UserB2BContract.objects.get(user=user, contract_page=contract)
+    assert membership.consented_to_data_sharing is None
+    assert membership.consent_modified_at is None
+
+
+def test_data_consent_success(user):
+    """A contract member can set consent, and later change their mind."""
+    contract = ContractPageFactory.create()
+    user.b2b_contracts.add(contract)
+
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:data-consent", kwargs={"contract_id": contract.id})
+
+    resp = client.post(url, data={"consented": True}, format="json")
+    assert resp.status_code == 204
+    membership = UserB2BContract.objects.get(user=user, contract_page=contract)
+    assert membership.consented_to_data_sharing is True
+    first_modified_at = membership.consent_modified_at
+    assert first_modified_at is not None
+
+    resp = client.post(url, data={"consented": False}, format="json")
+    assert resp.status_code == 204
+    membership.refresh_from_db()
+    assert membership.consented_to_data_sharing is False
+    assert membership.consent_modified_at is not None
+    assert membership.consent_modified_at >= first_modified_at

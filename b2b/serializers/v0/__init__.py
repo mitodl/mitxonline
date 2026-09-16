@@ -1,6 +1,6 @@
 """Serializers for the B2B API (v0)."""
 
-from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.utils import extend_schema_field, inline_serializer
 from rest_framework import serializers
 
 from b2b.models import ContractPage, OrganizationPage
@@ -183,8 +183,13 @@ class DataConsentSerializer(serializers.Serializer):
 class DataConsentValidationErrorSerializer(serializers.Serializer):
     """Default DRF is_valid(raise_exception=True) error shape for DataConsentSerializer."""
 
-    consented = serializers.ListField(
-        child=serializers.CharField(),
-        required=False,
-        help_text="Errors for the 'consented' field, e.g. if missing or not a boolean.",
+    errors = inline_serializer(
+        name="DataConsentFieldErrors",
+        fields={
+            "consented": serializers.ListField(
+                child=serializers.CharField(),
+                required=False,
+                help_text="Errors for the 'consented' field, e.g. if missing or not a boolean.",
+            )
+        },
     )
