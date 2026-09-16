@@ -30,7 +30,7 @@ Courseware objects can be course runs, courses, or programs. specified by their 
 Specifying courseware: You must specify one courseware item (of any type). You can specify more than one by adding "--also <courseware id>" to the end of the command. You can repeat this as many times as necessary.
 
 To add courseware:
-   b2b_courseware add [--import <departments>] [--no-create-runs] [--force] [--prefix <prefix>] [--make-codes] <contract> <courseware> [--also <courseware>] [--also <courseware>...]
+   b2b_courseware add [--import <departments>] [--no-create-runs] [--prefix <prefix>] [--make-codes] <contract> <courseware> [--also <courseware>] [--also <courseware>...]
 
 Example: b2b_courseware add contract-100-101 program-v1:UAI+Fundamentals --also course-v1:UAI_C100+14.314x+2025_C101
 
@@ -38,7 +38,7 @@ Specifying "--import" will attempt to import the course run from edX if it can't
 
 If "--import" is specified, it expects a list of departments for the new courses to be added to. This should be a list of names, separated by commas. You must specify at least one department as courses must belong to at least one department. The departments must exist; it won't create them for you.
 
-Specifying a course run will attach it to the contract unless the contract is already attached to a contract. Specify "--force" to override any existing contract attachment.
+Specifying a course run will attach it to the contract unless the run is already in another contract, in which case it is left alone and reported as skipped.
 
 Specifying a course will attempt to create a course run for the contract for the specified course. It will try to create a course run in edX as well unless "--no-create-runs" is specified. This flag is ignored if "--import" is specified.
 
@@ -109,12 +109,6 @@ Specifying a program will only unlink the program from the contract, unless "--r
             action="store_true",
         )
         add_subparser.add_argument(
-            "--force",
-            help="Force adding any specified runs to the contract (overwrite existing contract associations).",
-            dest="force",
-            action="store_true",
-        )
-        add_subparser.add_argument(
             "--import",
             help="Attempt to import course runs specified into the department(s), if they don't exist in MITx Online.",
             dest="can_import",
@@ -165,7 +159,6 @@ Specifying a program will only unlink the program from the contract, unless "--r
         """Handle the add subcommand."""
 
         skip_edx = kwargs.pop("no_create_runs", False)
-        force_associate = kwargs.pop("force")
         can_import = kwargs.pop("can_import")
         org_prefix = kwargs.pop("prefix")
         make_codes = kwargs.pop("make_codes", False)
@@ -258,7 +251,6 @@ Specifying a program will only unlink the program from the contract, unless "--r
                     courseware,
                     skip_edx=skip_edx,
                     no_reruns=no_reruns,
-                    force=force_associate,
                     org_prefix=org_prefix,
                     ignore_langs=ignore_langs,
                     only_lang=only_lang,

@@ -98,7 +98,6 @@ def add_courseware_to_contract(  # noqa: PLR0913
     *,
     skip_edx: bool = False,
     no_reruns: bool = True,
-    force: bool = False,
     org_prefix: str | None = None,
     ignore_langs: bool = False,
     only_lang: str | None = None,
@@ -111,7 +110,9 @@ def add_courseware_to_contract(  # noqa: PLR0913
       run, and is linked to the contract.
     - A course gets contract runs from its source runs.
     - An existing run is attached as it is. A run already in another contract
-      is left there unless force is set.
+      is left there and reported as skipped: a run can legitimately belong to
+      more than one contract, and moving it out of one silently takes its
+      learners' courseware with it.
 
     Runs are created for the variant sets in filter_variants, which defaults to
     every variant set on the contract. no_reruns defaults to True, unlike
@@ -145,7 +146,7 @@ def add_courseware_to_contract(  # noqa: PLR0913
             )
 
         other_contract = courseware.b2b_contracts.exclude(id=contract.id).first()
-        if other_contract and not force:
+        if other_contract:
             return CoursewareAddition(
                 skipped_reason=(
                     f"Run '{courseware.courseware_id}' is already in {other_contract}."
