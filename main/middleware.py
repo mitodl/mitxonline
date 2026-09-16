@@ -99,17 +99,19 @@ class HostBasedCSRFMiddleware(CsrfViewMiddleware):
         ):
             get_token(request)
         response = super().process_response(request, response)
-        # Origin is the page's origin and browsers send it on every cross-origin
-        # fetch/XHR regardless of the page's referrer policy. Referer is subject
-        # to that policy and may be absent, in which case the cookie keeps
-        # CSRF_COOKIE_DOMAIN and a response from any other host cannot set it.
-        # Referer is only a fallback for clients that send no Origin.
-        source = request.headers.get("origin") or request.headers.get("referer")
-        if settings.CSRF_COOKIE_NAME in response.cookies and source:
-            host = urlparse(source).netloc
+        # Browsers send Origin on every cross-origin request regardless of the
+        # page's referrer policy, so it is present exactly when the cookie has
+        # to be scoped to a host other than this one. A request without it is
+        # same-origin or not from a browser, and the cookie keeps
+        # CSRF_COOKIE_DOMAIN. Referer is deliberately not consulted: it is
+        # subject to the referrer policy and can be absent on the very requests
+        # that need the rewrite.
+        origin = request.headers.get("origin")
+        if settings.CSRF_COOKIE_NAME in response.cookies and origin:
+            host = urlparse(origin).netloc
             csrf_trusted_hosts = []
-            for origin in getattr(settings, "CSRF_TRUSTED_ORIGINS", []):
-                parsed_origin = urlparse(origin)
+            for trusted_origin in getattr(settings, "CSRF_TRUSTED_ORIGINS", []):
+                parsed_origin = urlparse(trusted_origin)
                 if parsed_origin.netloc:
                     csrf_trusted_hosts.append(parsed_origin.netloc)
             if host in csrf_trusted_hosts:
