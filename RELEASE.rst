@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.166.4
+---------------
+
+- Disallow the urllib3-future package (#3975)
+
 Version 1.166.3
 ---------------
 
