@@ -1267,16 +1267,12 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         if not self.readable_id:
             return
 
-        is_new_or_changed = (
-            self.pk is None
-            or not Course.objects.filter(
-                pk=self.pk, readable_id=self.readable_id
-            ).exists()
-        )
-        if (
-            is_new_or_changed
-            and CourseRun.objects.filter(courseware_id=self.readable_id).exists()
-        ):
+    unchanged = self.pk and Course.objects.filter(
+        pk=self.pk, readable_id=self.readable_id
+    ).exists()
+    if not unchanged and CourseRun.objects.filter(
+        courseware_id=self.readable_id
+    ).exists():
             raise ValidationError(
                 "readable_id matches an existing CourseRun's courseware_id. "  # noqa: EM101
                 "It should be the course-level ID without a run tag."
