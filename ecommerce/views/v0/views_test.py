@@ -957,6 +957,23 @@ def test_discount_rest_api_refuses_to_retype_an_internal_discount(admin_drf_clie
     assert discount.redemption_type == REDEMPTION_TYPE_INTERNAL
 
 
+def test_discount_rest_api_refuses_an_automatic_internal_discount(admin_drf_client):
+    """The API mirror of the internal shape rule returns a 400, not a 500."""
+    resp = admin_drf_client.post(
+        reverse("v0:discounts_api-list"),
+        {
+            "amount": 100,
+            "automatic": True,
+            "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+            "redemption_type": REDEMPTION_TYPE_INTERNAL,
+            "discount_code": "automatic-internal",
+        },
+    )
+
+    assert resp.status_code == 400
+    assert not Discount.objects.filter(discount_code="automatic-internal").exists()
+
+
 def test_attaching_a_non_program_product_to_a_program_child_purchase_discount_is_a_400(
     admin_drf_client,
 ):

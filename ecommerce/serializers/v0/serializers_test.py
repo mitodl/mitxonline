@@ -244,7 +244,7 @@ def test_order_line_reports_no_free_audit_track(settings, mocker, user):
 
 def test_v0_discount_serializer_rejects_a_malformed_paid_amount_off_discount():
     """
-    The API mirror of Discount.check_program_child_purchase_validity returns a 400,
+    The API mirror of Discount.check_shape_validity returns a 400,
     not a 500. The individual shape clauses are pinned in models_test.
     """
     data = {

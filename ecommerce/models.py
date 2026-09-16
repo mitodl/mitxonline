@@ -283,11 +283,11 @@ PROGRAM_PRODUCTS_ONLY_ERROR = (
 )
 
 
-def validate_program_child_purchase_shape(
+def validate_discount_shape(
     *, discount_type, redemption_type, amount, automatic, discount=None
 ):
     """
-    Enforce the paid-amount-off / program-child-purchase shape on unsaved values.
+    Enforce the row-local shape rules for a Discount on unsaved values.
 
     Raises django.core.exceptions.ValidationError. DRF's Serializer.run_validation
     turns that into a 400 when it comes from validate(), so serializers call this
@@ -322,6 +322,11 @@ def validate_program_child_purchase_shape(
             .exists()
         ):
             raise ValidationError(PROGRAM_PRODUCTS_ONLY_ERROR)
+
+    if redemption_type == REDEMPTION_TYPE_INTERNAL and automatic:
+        raise ValidationError(
+            "An internal discount cannot be automatic; only application code that has checked eligibility may attach one."  # noqa: EM101
+        )
 
 
 def validate_program_child_purchase_product(*, redemption_type, product):
@@ -385,9 +390,9 @@ class Discount(TimestampedModel):
 
     class Meta:
         # A storage-layer backstop for the row-local clauses of
-        # validate_program_child_purchase_shape, because bulk_create and queryset
-        # update() skip save(). The cross-table program-products clause can't
-        # be expressed here.
+        # validate_discount_shape, because bulk_create and queryset update()
+        # skip save(). The cross-table program-products clause can't be
+        # expressed here.
         #
         # The type constraint is one-way on purpose: a program-child-purchase
         # redemption may pair with a standard calculation (e.g. a
@@ -439,8 +444,8 @@ class Discount(TimestampedModel):
 
         return True
 
-    def check_program_child_purchase_validity(self, *, include_product_links=False):
-        validate_program_child_purchase_shape(
+    def check_shape_validity(self, *, include_product_links=False):
+        validate_discount_shape(
             discount_type=self.discount_type,
             redemption_type=self.redemption_type,
             amount=self.amount,
@@ -458,12 +463,12 @@ class Discount(TimestampedModel):
         # row fail with an error about products. clean() and the serializers
         # enforce that clause where the edit is actually being made, and
         # DiscountProduct.save() guards the attach direction.
-        self.check_program_child_purchase_validity()
+        self.check_shape_validity()
         super().save(*args, **kwargs)
 
     def clean(self, *args, **kwargs):
         self.check_date_validity()
-        self.check_program_child_purchase_validity(include_product_links=True)
+        self.check_shape_validity(include_product_links=True)
         super().clean(*args, **kwargs)
 
     @cached_property

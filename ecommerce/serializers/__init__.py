@@ -26,7 +26,7 @@ from ecommerce.models import (
     BasketItem,
     Order,
     Product,
-    validate_program_child_purchase_shape,
+    validate_discount_shape,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from main.settings import TIME_ZONE
@@ -230,7 +230,7 @@ class DiscountShapeMixin:
                 {"redemption_type": "An internal discount cannot change type."}
             )
 
-        validate_program_child_purchase_shape(
+        validate_discount_shape(
             discount_type=_merged("discount_type"),
             redemption_type=_merged("redemption_type"),
             amount=_merged("amount"),

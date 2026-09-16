@@ -1632,6 +1632,15 @@ def test_paid_amount_off_discount_shape_is_enforced_on_save(override):
         PaidAmountOffDiscountFactory.create(**override)
 
 
+def test_internal_discount_shape_is_enforced_on_save():
+    """
+    Saving an automatic internal discount raises instead of hitting the DB
+    constraint, which is what lets the admin and the staff API report it.
+    """
+    with pytest.raises(ValidationError):
+        InternalDiscountFactory.create(automatic=True)
+
+
 def test_program_child_purchase_discount_only_links_program_products():
     """
     Enforced on the link row rather than only on Discount.save(), so every write
