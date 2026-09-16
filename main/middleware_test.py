@@ -206,3 +206,31 @@ def test_host_based_csrf_middleware_origin(
         processed_response.cookies[settings.CSRF_COOKIE_NAME]["domain"]
         == expected_domain
     )
+
+
+@pytest.mark.parametrize(
+    ("authenticated", "has_cookie", "expect_set_cookie"),
+    [
+        (True, False, True),
+        (True, True, False),
+        (False, False, False),
+    ],
+)
+def test_host_based_csrf_middleware_reissues_missing_cookie(
+    rf, settings, authenticated, has_cookie, expect_set_cookie
+):
+    """A logged-in request without the CSRF cookie gets it re-issued, scoped by Origin."""
+    settings.CSRF_COOKIE_NAME = "csrf_mitxonline"
+    settings.CSRF_TRUSTED_ORIGINS = ["https://learn.mit.edu"]
+    request = rf.get("/api/v0/users/me", HTTP_ORIGIN="https://learn.mit.edu")
+    request.user = UserFactory.create() if authenticated else AnonymousUser()
+    if has_cookie:
+        request.COOKIES[settings.CSRF_COOKIE_NAME] = "existing"
+    middleware = HostBasedCSRFMiddleware(lambda _request: None)
+    processed_response = middleware.process_response(request, HttpResponse())
+    cookie = processed_response.cookies.get(settings.CSRF_COOKIE_NAME)
+    if expect_set_cookie:
+        assert cookie is not None
+        assert cookie["domain"] == "learn.mit.edu"
+    else:
+        assert cookie is None

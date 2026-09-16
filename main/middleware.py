@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 
 from django.conf import settings
 from django.http import HttpResponseRedirect
-from django.middleware.csrf import CsrfViewMiddleware
+from django.middleware.csrf import CsrfViewMiddleware, get_token
 from django.utils.deprecation import MiddlewareMixin
 
 log = logging.getLogger(__name__)
@@ -82,6 +82,18 @@ class HostBasedCSRFMiddleware(CsrfViewMiddleware):
     """
 
     def process_response(self, request, response):
+        # Django issues the CSRF cookie only when a request flags it, and on
+        # API paths only auth.login() does, once per session. A logged-in
+        # browser that never stored that cookie (its Domain was not settable
+        # from this host) would otherwise stay without one for the whole
+        # session. Flag it again so this response re-issues it.
+        user = getattr(request, "user", None)
+        if (
+            user is not None
+            and user.is_authenticated
+            and settings.CSRF_COOKIE_NAME not in request.COOKIES
+        ):
+            get_token(request)
         response = super().process_response(request, response)
         # Origin is the page's origin and browsers send it on every cross-origin
         # fetch/XHR regardless of the page's referrer policy. Referer is subject
