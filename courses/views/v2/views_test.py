@@ -1255,7 +1255,7 @@ def test_user_enrollments_create_export_compliance_blocked_v2(
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
-        "detail": "Unable to complete enrollment. Please contact support. Error code: CS_700"
+        "detail": "Unable to complete enrollment. Error code: CS_700"
     }
     assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
 
@@ -1274,9 +1274,7 @@ def test_user_enrollments_create_export_compliance_missing_data_v2(
         reverse("v2:user-enrollments-api-list"), data={"run_id": run.id}
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
-    assert resp.json() == {
-        "detail": "Unable to complete enrollment. Please contact support."
-    }
+    assert resp.json() == {"detail": "Unable to complete enrollment."}
     assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
 
 
@@ -2308,7 +2306,7 @@ def test_add_verified_program_course_enrollment_export_compliance_blocked(
 
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
-        "detail": "Unable to complete enrollment. Please contact support. Error code: CS_700"
+        "detail": "Unable to complete enrollment. Error code: CS_700"
     }
     assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
 
@@ -2533,7 +2531,7 @@ def test_add_nested_verified_program_course_enrollment_export_compliance_blocked
 
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
-        "detail": "Unable to complete enrollment. Please contact support. Error code: CS_700"
+        "detail": "Unable to complete enrollment. Error code: CS_700"
     }
     assert not ProgramEnrollment.objects.filter(user=user, program=crogram).exists()
 

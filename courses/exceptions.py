@@ -9,15 +9,17 @@ class EnrollmentError(APIException):
     Raised when an enrollment request cannot be completed.
 
     Deliberately excludes any specifics about *why* the enrollment failed (e.g.
-    which export compliance decision came back) - historically we've just told
-    learners to contact support in these cases rather than surfacing that detail
-    to the client. The one thing that varies is an opaque support code appended
-    by ``from_cause`` for causes that declare one. The underlying cause is
-    logged server-side by the code that raises it (e.g. ``courses.api``).
+    which export compliance decision came back) rather than surfacing that
+    detail to the client. The one thing that varies is an opaque support code
+    appended by ``from_cause`` for causes that declare one. The underlying cause
+    is logged server-side by the code that raises it (e.g. ``courses.api``).
+
+    Says nothing about contacting support either - clients already pair an
+    enrollment failure with their own support copy, so a CTA here doubles up.
     """
 
     status_code = status.HTTP_400_BAD_REQUEST
-    default_detail = "Unable to complete enrollment. Please contact support."
+    default_detail = "Unable to complete enrollment."
     default_code = "unable_to_complete_enrollment"
 
     @classmethod
