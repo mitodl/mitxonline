@@ -86,11 +86,15 @@ class HostBasedCSRFMiddleware(CsrfViewMiddleware):
         # API paths only auth.login() does, once per session. A logged-in
         # browser that never stored that cookie (its Domain was not settable
         # from this host) would otherwise stay without one for the whole
-        # session. Flag it again so this response re-issues it.
+        # session. Flag it again so this response re-issues it. Only a
+        # session-cookie login can be in that state; token clients (OAuth2
+        # bearer) never hold a CSRF cookie and would be re-issued one on every
+        # response.
         user = getattr(request, "user", None)
         if (
             user is not None
             and user.is_authenticated
+            and settings.SESSION_COOKIE_NAME in request.COOKIES
             and settings.CSRF_COOKIE_NAME not in request.COOKIES
         ):
             get_token(request)

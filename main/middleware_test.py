@@ -209,22 +209,31 @@ def test_host_based_csrf_middleware_origin(
 
 
 @pytest.mark.parametrize(
-    ("authenticated", "has_cookie", "expect_set_cookie"),
+    ("authenticated", "has_session_cookie", "has_csrf_cookie", "expect_set_cookie"),
     [
-        (True, False, True),
-        (True, True, False),
-        (False, False, False),
+        (True, True, False, True),
+        (True, True, True, False),
+        # Authenticated by bearer token, not a session: nothing to heal
+        (True, False, False, False),
+        (False, True, False, False),
     ],
 )
-def test_host_based_csrf_middleware_reissues_missing_cookie(
-    rf, settings, authenticated, has_cookie, expect_set_cookie
+def test_host_based_csrf_middleware_reissues_missing_cookie(  # noqa: PLR0913
+    rf,
+    settings,
+    authenticated,
+    has_session_cookie,
+    has_csrf_cookie,
+    expect_set_cookie,
 ):
-    """A logged-in request without the CSRF cookie gets it re-issued, scoped by Origin."""
+    """A session-logged-in request without the CSRF cookie gets it re-issued, scoped by Origin."""
     settings.CSRF_COOKIE_NAME = "csrf_mitxonline"
     settings.CSRF_TRUSTED_ORIGINS = ["https://learn.mit.edu"]
     request = rf.get("/api/v0/users/me", HTTP_ORIGIN="https://learn.mit.edu")
     request.user = UserFactory.create() if authenticated else AnonymousUser()
-    if has_cookie:
+    if has_session_cookie:
+        request.COOKIES[settings.SESSION_COOKIE_NAME] = "session"
+    if has_csrf_cookie:
         request.COOKIES[settings.CSRF_COOKIE_NAME] = "existing"
     middleware = HostBasedCSRFMiddleware(lambda _request: None)
     processed_response = middleware.process_response(request, HttpResponse())
