@@ -156,3 +156,53 @@ def test_host_based_csrf_middleware_no_referer(mocker, rf, settings):
 
     # Domain should not be modified (should remain empty)
     assert processed_response.cookies[settings.CSRF_COOKIE_NAME]["domain"] == ""
+
+
+@pytest.mark.parametrize(
+    ("headers", "expected_domain"),
+    [
+        # Origin alone is enough: the frontend's referrer policy may strip Referer
+        ({"HTTP_ORIGIN": "https://learn.mit.edu"}, "learn.mit.edu"),
+        # Origin is the page's origin; Referer is a stand-in and loses when both are sent
+        (
+            {
+                "HTTP_ORIGIN": "https://learn.mit.edu",
+                "HTTP_REFERER": "https://mitxonline.mit.edu/",
+            },
+            "learn.mit.edu",
+        ),
+        # An untrusted Origin is not rewritten, and Referer is not consulted
+        (
+            {
+                "HTTP_ORIGIN": "https://evil.example",
+                "HTTP_REFERER": "https://learn.mit.edu/",
+            },
+            "",
+        ),
+        # Opaque origin (sandboxed iframe, some redirects) has no host to trust
+        ({"HTTP_ORIGIN": "null"}, ""),
+    ],
+)
+def test_host_based_csrf_middleware_origin(
+    mocker, rf, settings, headers, expected_domain
+):
+    """The Origin header decides the cookie domain; Referer is only a fallback."""
+    settings.CSRF_COOKIE_NAME = "csrf_mitxonline"
+    settings.CSRF_TRUSTED_ORIGINS = [
+        "https://mitxonline.mit.edu",
+        "https://learn.mit.edu",
+    ]
+
+    request = rf.get("/some/path", **headers)
+
+    middleware = HostBasedCSRFMiddleware(mocker.MagicMock())
+
+    response = HttpResponse()
+    response.set_cookie(settings.CSRF_COOKIE_NAME, "dummy_value")
+
+    processed_response = middleware.process_response(request, response)
+
+    assert (
+        processed_response.cookies[settings.CSRF_COOKIE_NAME]["domain"]
+        == expected_domain
+    )

@@ -72,16 +72,25 @@ class AnonymousBasketHandoffMiddleware(MiddlewareMixin):
 
 class HostBasedCSRFMiddleware(CsrfViewMiddleware):
     """
-    CSRF middleware that changes the response cookie's domain property
-    to match the request's host if it exists in settings.CSRF_TRUSTED_ORIGINS
+    CSRF middleware that scopes the response cookie's domain to the origin of
+    the page that made the request, when that origin is one of
+    settings.CSRF_TRUSTED_ORIGINS.
+
+    A frontend on another host (learn.mit.edu calling api.learn.mit.edu) can
+    only read the cookie from document.cookie if its Domain covers the
+    frontend, and the request's Host header names the API, not the frontend.
     """
 
     def process_response(self, request, response):
         response = super().process_response(request, response)
-        referrer = request.headers.get("referer", None)
-        if settings.CSRF_COOKIE_NAME in response.cookies and referrer:
-            parsed_referrer = urlparse(referrer)
-            host = parsed_referrer.netloc
+        # Origin is the page's origin and browsers send it on every cross-origin
+        # fetch/XHR regardless of the page's referrer policy. Referer is subject
+        # to that policy and may be absent, in which case the cookie keeps
+        # CSRF_COOKIE_DOMAIN and a response from any other host cannot set it.
+        # Referer is only a fallback for clients that send no Origin.
+        source = request.headers.get("origin") or request.headers.get("referer")
+        if settings.CSRF_COOKIE_NAME in response.cookies and source:
+            host = urlparse(source).netloc
             csrf_trusted_hosts = []
             for origin in getattr(settings, "CSRF_TRUSTED_ORIGINS", []):
                 parsed_origin = urlparse(origin)
