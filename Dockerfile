@@ -32,6 +32,8 @@ RUN update-ca-certificates
 # mitol_*.gz are local wheels that uv resolves from the lock file.
 COPY --chown=mitodl:mitodl pyproject.toml uv.lock /src/
 COPY --chown=mitodl:mitodl mitol_*.gz /src/
+# Local path dependency resolved by the lock file (metadata-only urllib3-future stub).
+COPY --chown=mitodl:mitodl shims/ /src/shims/
 
 USER mitodl
 WORKDIR /src
