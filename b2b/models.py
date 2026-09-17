@@ -695,7 +695,7 @@ class ContractPage(Page, ClusterableModel):
           organization's own prefix
 
         Returns:
-        - tuple: Tuple with three integers:
+        - tuple: Tuple with two integers:
             - number of course runs created
             - number of courses with no source run
         """
