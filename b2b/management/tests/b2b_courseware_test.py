@@ -581,3 +581,25 @@ def test_add_course_variants(mock_clone_courserun, add_filtering):
     assert contract_runs.filter(language__in=language_check).count() == len(
         language_check
     )
+
+
+def test_remove_course_prints_summary(capsys):
+    """Removing a course should print a removal summary, like removing a program does."""
+
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(b2b_contract=contract)
+    command = b2b_courseware.Command()
+
+    command.handle(
+        subcommand="remove",
+        contract=str(contract.id),
+        courseware=str(run.course.readable_id),
+        additional_courseware=None,
+        remove_program_runs=False,
+    )
+
+    output = capsys.readouterr().out
+    assert (
+        f"Removed {run.course.readable_id} from contract {contract}, with 1 of its runs."
+        in output
+    )
