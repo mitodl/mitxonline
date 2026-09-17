@@ -34,7 +34,11 @@ class Migration(migrations.Migration):
             reverse_sql=migrations.RunSQL.noop,
         ),
         migrations.RunSQL(
-            sql="DROP TABLE users_user_b2b_contracts",
+            sql="""
+                ALTER TABLE users_user_b2b_contracts
+                    DROP CONSTRAINT IF EXISTS users_user_b2b_contracts_user_id_651de07d_fk_users_user_id,
+                    DROP CONSTRAINT IF EXISTS users_user_b2b_contr_contractpage_id_deb41495_fk_b2b_contr
+            """,
             reverse_sql=migrations.RunSQL.noop,
         ),
     ]
