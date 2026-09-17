@@ -1000,13 +1000,11 @@ class UserB2BContract(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="user_b2b_contracts",
-        db_column="user_id",
     )
     contract_page = models.ForeignKey(
         "b2b.ContractPage",
         on_delete=models.CASCADE,
         related_name="b2b_contract_users",
-        db_column="contractpage_id",
     )
 
     class Meta:
