@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.166.7
+---------------
+
+- Scope the CSRF cookie domain by Origin and re-issue it when missing (#3978)
+- Make verified-program discounts an "internal" redemption type (#3972)
+
 Version 1.166.5
 ---------------
 
