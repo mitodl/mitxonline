@@ -160,6 +160,51 @@ class EnrollableCourseRunInline(CourseRunInline):
         return self.model.all_objects.filter(is_source_run=False)
 
 
+class CourseRunContractPageInline(DisplayOnlyAdminMixin, admin.TabularInline):
+    """
+    Displays the contracts that the run belongs to.
+
+    This is the opposite of b2b.admin.ContractPageCourseRunInline
+    """
+
+    model = CourseRun.b2b_contracts.through
+    extra = 0
+    verbose_name = "B2B Contract"
+    fields = [
+        "name",
+        "organization",
+        "membership_type",
+    ]
+    readonly_fields = [
+        "name",
+        "organization",
+        "membership_type",
+    ]
+
+    @admin.display(description="Contract Name")
+    def name(self, obj):
+        admin_link = reverse(
+            "admin:b2b_contractpage_change", args=(obj.contractpage.id,)
+        )
+        return format_html(
+            f'<a href="{admin_link}">{obj.contractpage.id} - {obj.contractpage.name}</a>'
+        )
+
+    @admin.display(description="Organization")
+    def organization(self, obj):
+        admin_link = reverse(
+            "admin:b2b_organizationpage_change",
+            args=(obj.contractpage.organization.id,),
+        )
+        return format_html(
+            f'<a href="{admin_link}">{obj.contractpage.organization.id} - {obj.contractpage.organization.name}</a>'
+        )
+
+    @admin.display(description="Membership Type")
+    def membership_type(self, obj):
+        return obj.contractpage.membership_type
+
+
 @admin.register(Program)
 class ProgramAdmin(VerifiableCredentialBackfillAdminMixin, admin.ModelAdmin):
     """Admin for Program"""
@@ -432,14 +477,6 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
             },
         ),
         (
-            "B2B",
-            {
-                "fields": [
-                    "b2b_contract",
-                ],
-            },
-        ),
-        (
             "Customization Variant",
             {
                 "fields": [
@@ -447,6 +484,15 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
                     "is_primary_language",
                     "variant_industry",
                     "variant_length",
+                ],
+            },
+        ),
+        (
+            "B2B",
+            {
+                "fields": [
+                    "b2b_only",
+                    "b2b_contract",
                 ],
             },
         ),
@@ -458,6 +504,10 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
     }
 
     actions = ["populate_verifiable_credentials_for_courserun"]
+
+    inlines = [
+        CourseRunContractPageInline,
+    ]
 
     @admin.action(
         description="Backfill verifiable credentials for course run certificates"
