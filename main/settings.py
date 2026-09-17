@@ -306,6 +306,9 @@ MIDDLEWARE = (
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "mitol.apigateway.middleware.ApisixUserMiddleware",
     "main.middleware.AnonymousBasketHandoffMiddleware",
+    # After ApisixUserMiddleware, so request.user is the gateway's view of who
+    # is calling rather than a stale Django session (hq#12763).
+    "main.middleware.BasketOwnerHandoffMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "main.middleware.HostBasedCSRFMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",

@@ -1,10 +1,16 @@
 import uuid
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.http import HttpResponse
 
-from main.middleware import AnonymousBasketHandoffMiddleware, HostBasedCSRFMiddleware
+from ecommerce.factories import BasketFactory
+from main.middleware import (
+    AnonymousBasketHandoffMiddleware,
+    BasketOwnerHandoffMiddleware,
+    HostBasedCSRFMiddleware,
+)
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -156,3 +162,98 @@ def test_host_based_csrf_middleware_no_referer(mocker, rf, settings):
 
     # Domain should not be modified (should remain empty)
     assert processed_response.cookies[settings.CSRF_COOKIE_NAME]["domain"] == ""
+
+
+@pytest.fixture
+def basket_owner_middleware(mocker):
+    """BasketOwnerHandoffMiddleware with a stubbed downstream."""
+    return BasketOwnerHandoffMiddleware(mocker.MagicMock())
+
+
+def test_basket_owner_handoff_passes_when_session_owns_the_basket(
+    rf, basket_owner_middleware
+):
+    """The common case: Learn's hand-off matches, so nothing happens."""
+    basket = BasketFactory.create()
+
+    request = rf.get("/cart/", {"basket_id": basket.id})
+    request.user = basket.user
+
+    assert basket_owner_middleware.process_request(request) is None
+
+
+def test_basket_owner_handoff_bounces_when_session_is_a_different_user(
+    rf, basket_owner_middleware
+):
+    """The hq#12763 case: the browser arrived as someone else.
+
+    Learn filled User B's basket over its own domain, then handed the browser
+    here where the gateway session still names User A.  The request must be sent
+    through switch-session rather than rendering A's cart.
+    """
+    basket = BasketFactory.create()
+    other_user = UserFactory.create()
+
+    request = rf.get("/cart/", {"basket_id": basket.id, "ecom-service": "true"})
+    request.user = other_user
+
+    response = basket_owner_middleware.process_request(request)
+
+    assert response is not None
+    assert response.url.startswith("/switch-session")
+    query = parse_qs(urlparse(response.url).query)
+    assert query["next"] == ["/cart/"]
+    assert query["session_reset"] == ["1"]
+    # Unrelated parameters survive the bounce.
+    assert query["ecom-service"] == ["true"]
+    assert query["basket_id"] == [str(basket.id)]
+
+
+def test_basket_owner_handoff_does_not_loop(rf, basket_owner_middleware):
+    """A second mismatch proceeds rather than bouncing forever.
+
+    The caller then sees their own session's cart -- the wrong cart for whoever
+    clicked, but never a different person's data.
+    """
+    basket = BasketFactory.create()
+    other_user = UserFactory.create()
+
+    request = rf.get(
+        "/cart/",
+        {"basket_id": basket.id, "session_reset": "1"},
+    )
+    request.user = other_user
+
+    assert basket_owner_middleware.process_request(request) is None
+
+
+def test_basket_owner_handoff_skips_the_reset_endpoint(rf, basket_owner_middleware):
+    """switch-session is where the fix happens; checking there adds a hop."""
+    basket = BasketFactory.create()
+    other_user = UserFactory.create()
+
+    request = rf.get("/switch-session/", {"basket_id": basket.id})
+    request.user = other_user
+
+    assert basket_owner_middleware.process_request(request) is None
+
+
+@pytest.mark.parametrize("basket_id", ["", "abc", "1; DROP TABLE", "-1"])
+def test_basket_owner_handoff_ignores_unusable_basket_ids(
+    rf, basket_owner_middleware, basket_id
+):
+    """A malformed id is ignored rather than treated as a mismatch."""
+    request = rf.get("/cart/", {"basket_id": basket_id})
+    request.user = UserFactory.create()
+
+    assert basket_owner_middleware.process_request(request) is None
+
+
+def test_basket_owner_handoff_ignores_anonymous_callers(rf, basket_owner_middleware):
+    """With no user there is nothing to compare; the route's gate decides."""
+    basket = BasketFactory.create()
+
+    request = rf.get("/cart/", {"basket_id": basket.id})
+    request.user = AnonymousUser()
+
+    assert basket_owner_middleware.process_request(request) is None
