@@ -33,4 +33,8 @@ class Migration(migrations.Migration):
             """,
             reverse_sql=migrations.RunSQL.noop,
         ),
+        migrations.RunSQL(
+            sql="DROP TABLE users_user_b2b_contracts",
+            reverse_sql=migrations.RunSQL.noop,
+        ),
     ]
