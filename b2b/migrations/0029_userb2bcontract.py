@@ -45,11 +45,4 @@ class Migration(migrations.Migration):
                 "unique_together": {("user", "contract_page")},
             },
         ),
-        migrations.RunSQL(
-            sql="""
-                INSERT INTO b2b_userb2bcontract (user_id, contract_page_id)
-                SELECT user_id, contractpage_id FROM users_user_b2b_contracts
-            """,
-            reverse_sql=migrations.RunSQL.noop,
-        ),
     ]
