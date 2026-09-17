@@ -1278,7 +1278,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         # - same shape as the ``b2b_contracts__in`` filter it replaces.
         return self._select_first_unexpired_run(
             run
-            for run in self.courseruns.all()
+            for run in self._courseruns_with_contracts()
             if any(contract.id in contract_ids for contract in run.b2b_contracts.all())
         )
 

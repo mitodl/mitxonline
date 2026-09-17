@@ -458,11 +458,15 @@ class CourseViewSet(
             "enrollment_modes",
             to_attr="prefetched_enrollment_modes",
         )
+        # b2b_contracts is prefetched because get_first_unexpired_b2b_run and
+        # get_filtered_runs now match contracts in Python over the loaded runs
+        # rather than with a b2b_contracts__in filter - without it each run
+        # costs a query.
         course_runs_prefetch = Prefetch(
             "courseruns",
             queryset=CourseRun.objects.order_by("id")
             .select_related("b2b_contract")
-            .prefetch_related(modes_prefetch, products_prefetch),
+            .prefetch_related("b2b_contracts", modes_prefetch, products_prefetch),
         )
         # Topics are serialized per course along with their parent topics, whose
         # sort key is CoursesTopic.Meta.ordering == ["parent__name", "name"] -
