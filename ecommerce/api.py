@@ -43,6 +43,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     PAYMENT_TYPE_SALES,
+    REDEMPTION_TYPE_INTERNAL,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
@@ -70,6 +71,7 @@ from ecommerce.discount_sources import (
     source_line_for,
 )
 from ecommerce.exceptions import (
+    VerifiedProgramCourseNotInProgramError,
     VerifiedProgramInvalidBasketError,
     VerifiedProgramInvalidOrderError,
     VerifiedProgramNoEnrollmentError,
@@ -1425,8 +1427,10 @@ def create_verified_program_discount(program):
     codes - this creates one for the program that is set up to make the order
     zero-value, so the learner doesn't have to pay for upgraded enrollments.
 
-    This will create a single discount, with the "verified program" flag set,
-    with unlimited redemptions, set to 100% off.
+    This creates a single 100%-off discount with the "internal" redemption type
+    and no redemption cap: learners cannot redeem it, and it prices whatever the
+    verified-enrollment flow attaches it to. Callers are responsible for
+    checking the run belongs to the program before attaching it.
 
     If a discount already exists for this purpose, this will return it.
 
@@ -1445,7 +1449,9 @@ def create_verified_program_discount(program):
         Q(activation_date__isnull=True) | Q(activation_date__lte=now_in_utc()),
         Q(expiration_date__isnull=True) | Q(expiration_date__gte=now_in_utc()),
         products__product=product,
-        is_program_discount=True,
+        redemption_type=REDEMPTION_TYPE_INTERNAL,
+        discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+        amount=100,
     )
 
     if existing_discount_qs.exists():
@@ -1455,11 +1461,10 @@ def create_verified_program_discount(program):
         amount=Decimal(100),
         automatic=False,
         discount_type=DISCOUNT_TYPE_PERCENT_OFF,
-        redemption_type=REDEMPTION_TYPE_UNLIMITED,
+        redemption_type=REDEMPTION_TYPE_INTERNAL,
         payment_type=PAYMENT_TYPE_SALES,
         discount_code=f"{program.readable_id}-{uuid.uuid4()}",
         is_bulk=True,
-        is_program_discount=True,
     )
 
     DiscountProduct.objects.create(discount=discount, product=product)
@@ -1496,6 +1501,8 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
     Raises:
     - VerifiedProgramNoEnrollmentError if the learner doesn't have a program
       enrollment
+    - VerifiedProgramCourseNotInProgramError if the run's course is not in the
+      program's requirements
     - VerifiedProgramInvalidBasketError if the basket isn't zero value
     - VerifiedProgramInvalidOrderError if the order doesn't get processed through
     """
@@ -1505,6 +1512,12 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
     ).exists():
         msg = f"No verified enrollment for {request.user} for program {program}"
         raise VerifiedProgramNoEnrollmentError(msg)
+
+    # The program's internal discount prices whatever it is attached to, so
+    # membership is decided here, against the current requirements tree.
+    if not program.courses_qset.filter(courseruns=courserun).exists():
+        msg = f"Course run {courserun} is not in program {program}"
+        raise VerifiedProgramCourseNotInProgramError(msg)
 
     discount = create_verified_program_discount(program)
 

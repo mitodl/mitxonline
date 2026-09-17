@@ -21,6 +21,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
+    REDEMPTION_TYPE_INTERNAL,
     REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
     REDEMPTION_TYPE_UNLIMITED,
     REFUND_WINDOW_DAYS,
@@ -32,6 +33,7 @@ from ecommerce.factories import (
     BasketItemFactory,
     DiscountFactory,
     DiscountRedemptionFactory,
+    InternalDiscountFactory,
     LineFactory,
     OneTimeDiscountFactory,
     OneTimePerUserDiscountFactory,
@@ -1595,6 +1597,25 @@ def test_db_constraint_allows_program_child_purchase_redemption_with_standard_ty
     assert Discount.objects.filter(discount_code="reverse-pairing").exists()
 
 
+def test_internal_discount_cannot_be_automatic():
+    """
+    Auto-apply selects discounts by flag rather than by a caller's decision, so
+    the DB backstop holds even for writes that skip model validation.
+    """
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Discount.objects.bulk_create(
+            [
+                Discount(
+                    amount=100,
+                    discount_code="internal-automatic",
+                    discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+                    redemption_type=REDEMPTION_TYPE_INTERNAL,
+                    automatic=True,
+                )
+            ]
+        )
+
+
 @pytest.mark.parametrize(
     "override",
     [
@@ -1609,6 +1630,15 @@ def test_paid_amount_off_discount_shape_is_enforced_on_save(override):
     """Saving a malformed paid-amount-off discount raises instead of hitting the DB constraint."""
     with pytest.raises(ValidationError):
         PaidAmountOffDiscountFactory.create(**override)
+
+
+def test_internal_discount_shape_is_enforced_on_save():
+    """
+    Saving an automatic internal discount raises instead of hitting the DB
+    constraint, which is what lets the admin and the staff API report it.
+    """
+    with pytest.raises(ValidationError):
+        InternalDiscountFactory.create(automatic=True)
 
 
 def test_program_child_purchase_discount_only_links_program_products():
@@ -1801,6 +1831,17 @@ def test_is_valid_for_basket_inherits_the_program_child_purchase_guard(
 
     assert paid_amount_off_source.discount.is_valid_for_basket(own_basket) is True
     assert paid_amount_off_source.discount.is_valid_for_basket(stranger_basket) is False
+
+
+def test_internal_discount_is_not_redeemable_by_anyone(user):
+    """
+    Only application code that has checked eligibility attaches one, so every
+    code-redemption route has to be refused even though the type has no
+    redemption limit of its own.
+    """
+    discount = InternalDiscountFactory.create()
+
+    assert discount.is_redeemable_by(user) is False
 
 
 def test_friendly_format_for_paid_amount_off():

@@ -12,6 +12,8 @@ from courses.models import CourseRun
 from ecommerce import models
 from ecommerce.constants import (
     DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+    DISCOUNT_TYPE_PERCENT_OFF,
+    REDEMPTION_TYPE_INTERNAL,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
@@ -82,6 +84,12 @@ class PaidAmountOffDiscountFactory(DiscountFactory):
     discount_type = DISCOUNT_TYPE_PAID_AMOUNT_OFF
     redemption_type = REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE
     automatic = True
+
+
+class InternalDiscountFactory(DiscountFactory):
+    amount = 100
+    discount_type = DISCOUNT_TYPE_PERCENT_OFF
+    redemption_type = REDEMPTION_TYPE_INTERNAL
 
 
 class BasketFactory(DjangoModelFactory):

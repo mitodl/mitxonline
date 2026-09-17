@@ -36,6 +36,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPES,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     PAYMENT_TYPES,
+    REDEMPTION_TYPE_INTERNAL,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
@@ -282,11 +283,11 @@ PROGRAM_PRODUCTS_ONLY_ERROR = (
 )
 
 
-def validate_program_child_purchase_shape(
+def validate_discount_shape(
     *, discount_type, redemption_type, amount, automatic, discount=None
 ):
     """
-    Enforce the paid-amount-off / program-child-purchase shape on unsaved values.
+    Enforce the row-local shape rules for a Discount on unsaved values.
 
     Raises django.core.exceptions.ValidationError. DRF's Serializer.run_validation
     turns that into a 400 when it comes from validate(), so serializers call this
@@ -322,6 +323,11 @@ def validate_program_child_purchase_shape(
         ):
             raise ValidationError(PROGRAM_PRODUCTS_ONLY_ERROR)
 
+    if redemption_type == REDEMPTION_TYPE_INTERNAL and automatic:
+        raise ValidationError(
+            "An internal discount cannot be automatic; only application code that has checked eligibility may attach one."  # noqa: EM101
+        )
+
 
 def validate_program_child_purchase_product(*, redemption_type, product):
     """Enforce the program-products clause for a single product link."""
@@ -342,7 +348,16 @@ class Discount(TimestampedModel):
     )
     automatic = models.BooleanField(default=False)
     discount_type = models.CharField(choices=DISCOUNT_TYPES, max_length=30)
-    redemption_type = models.CharField(choices=REDEMPTION_TYPES, max_length=30)
+    redemption_type = models.CharField(
+        choices=REDEMPTION_TYPES,
+        max_length=30,
+        help_text=(
+            "'internal' discounts are attached by application code that has "
+            "verified the learner's eligibility (e.g. verified program "
+            "enrollment). Learners cannot redeem them and pricing does not "
+            "re-check the product."
+        ),
+    )
     payment_type = models.CharField(null=True, choices=PAYMENT_TYPES, max_length=30)  # noqa: DJ001
     max_redemptions = models.PositiveIntegerField(null=True, default=0)
     discount_code = models.CharField(max_length=100)
@@ -361,7 +376,7 @@ class Discount(TimestampedModel):
         null=True,
         blank=True,
         default=False,
-        help_text="Discount is only for creating verified course run enrollments for a program.",
+        help_text="Deprecated and unused; superseded by redemption_type 'internal'.",
     )
     # Only for B2B enrollment codes where the contract has a Google Sheet configured.
     # This is just to save time/energy when we want to update the sheet later.
@@ -375,9 +390,9 @@ class Discount(TimestampedModel):
 
     class Meta:
         # A storage-layer backstop for the row-local clauses of
-        # validate_program_child_purchase_shape, because bulk_create and queryset
-        # update() skip save(). The cross-table program-products clause can't
-        # be expressed here.
+        # validate_discount_shape, because bulk_create and queryset update()
+        # skip save(). The cross-table program-products clause can't be
+        # expressed here.
         #
         # The type constraint is one-way on purpose: a program-child-purchase
         # redemption may pair with a standard calculation (e.g. a
@@ -399,6 +414,11 @@ class Discount(TimestampedModel):
                 )
                 | models.Q(automatic=True),
                 name="program_child_purchase_requires_automatic",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(redemption_type=REDEMPTION_TYPE_INTERNAL)
+                | models.Q(automatic=False),
+                name="internal_discount_never_automatic",
             ),
         ]
 
@@ -424,8 +444,8 @@ class Discount(TimestampedModel):
 
         return True
 
-    def check_program_child_purchase_validity(self, *, include_product_links=False):
-        validate_program_child_purchase_shape(
+    def check_shape_validity(self, *, include_product_links=False):
+        validate_discount_shape(
             discount_type=self.discount_type,
             redemption_type=self.redemption_type,
             amount=self.amount,
@@ -443,12 +463,12 @@ class Discount(TimestampedModel):
         # row fail with an error about products. clean() and the serializers
         # enforce that clause where the edit is actually being made, and
         # DiscountProduct.save() guards the attach direction.
-        self.check_program_child_purchase_validity()
+        self.check_shape_validity()
         super().save(*args, **kwargs)
 
     def clean(self, *args, **kwargs):
         self.check_date_validity()
-        self.check_program_child_purchase_validity(include_product_links=True)
+        self.check_shape_validity(include_product_links=True)
         super().clean(*args, **kwargs)
 
     @cached_property
@@ -458,10 +478,11 @@ class Discount(TimestampedModel):
 
     def is_redeemable_by(self, user: User, products: Iterable[Product] | None = None):
         """
-        Enforces the redemption rules for a given discount: how often it may be
-        redeemed, whether it is inside its date window, and — for a
-        program-child-purchase redemption — whether this user still holds an
-        unconsumed qualifying purchase for one of the products in hand.
+        Enforces the redemption rules for a given discount: whether its type is
+        learner-redeemable at all, how often it may be redeemed, whether it is
+        inside its date window, and — for a program-child-purchase redemption —
+        whether this user still holds an unconsumed qualifying purchase for one
+        of the products in hand.
 
         Independent of check_validity_with_products (product scope and
         liveness); is_valid_for_basket composes the two.
@@ -489,7 +510,18 @@ class Discount(TimestampedModel):
         return self._within_redemption_limits(user)
 
     def _within_redemption_limits(self, user: User) -> bool:
-        """The redemption-count and date-window rules, without the source check."""
+        """
+        The redemption-type, redemption-count and date-window rules, without the
+        source check.
+        """
+        # An internal discount is attached only by application code that has
+        # already decided eligibility (see REDEMPTION_TYPE_INTERNAL). The rule
+        # belongs at this depth rather than in is_redeemable_by because
+        # discount_product, and so quote_user_price, reaches the redemption
+        # rules through here.
+        if self.redemption_type == REDEMPTION_TYPE_INTERNAL:
+            return False
+
         if (
             self.redemption_type == REDEMPTION_TYPE_ONE_TIME
             and DiscountRedemption.objects.filter(

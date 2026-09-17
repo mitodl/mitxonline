@@ -1737,15 +1737,19 @@ paths:
         schema:
           type: string
           enum:
+          - internal
           - one-time
           - one-time-per-user
           - program-child-purchase
           - unlimited
         description: |-
+          'internal' discounts are attached by application code that has verified the learner's eligibility (e.g. verified program enrollment). Learners cannot redeem them and pricing does not re-check the product.
+
           * `one-time` - one-time
           * `one-time-per-user` - one-time-per-user
           * `unlimited` - unlimited
           * `program-child-purchase` - program-child-purchase
+          * `internal` - internal
       tags:
       - discounts
       responses:
@@ -7038,7 +7042,16 @@ components:
         discount_type:
           $ref: '#/components/schemas/DiscountTypeEnum'
         redemption_type:
-          $ref: '#/components/schemas/RedemptionTypeEnum'
+          allOf:
+          - $ref: '#/components/schemas/RedemptionTypeEnum'
+          description: |-
+            'internal' discounts are attached by application code that has verified the learner's eligibility (e.g. verified program enrollment). Learners cannot redeem them and pricing does not re-check the product.
+
+            * `one-time` - one-time
+            * `one-time-per-user` - one-time-per-user
+            * `unlimited` - unlimited
+            * `program-child-purchase` - program-child-purchase
+            * `internal` - internal
         max_redemptions:
           type: integer
           maximum: 2147483647
@@ -8058,7 +8071,16 @@ components:
         discount_type:
           $ref: '#/components/schemas/DiscountTypeEnum'
         redemption_type:
-          $ref: '#/components/schemas/RedemptionTypeEnum'
+          allOf:
+          - $ref: '#/components/schemas/RedemptionTypeEnum'
+          description: |-
+            'internal' discounts are attached by application code that has verified the learner's eligibility (e.g. verified program enrollment). Learners cannot redeem them and pricing does not re-check the product.
+
+            * `one-time` - one-time
+            * `one-time-per-user` - one-time-per-user
+            * `unlimited` - unlimited
+            * `program-child-purchase` - program-child-purchase
+            * `internal` - internal
         payment_type:
           nullable: true
           oneOf:
@@ -8089,8 +8111,7 @@ components:
         is_program_discount:
           type: boolean
           nullable: true
-          description: Discount is only for creating verified course run enrollments
-            for a program.
+          description: Deprecated and unused; superseded by redemption_type 'internal'.
         b2b_sheet_location:
           type: string
           nullable: true
@@ -9246,7 +9267,16 @@ components:
         discount_type:
           $ref: '#/components/schemas/DiscountTypeEnum'
         redemption_type:
-          $ref: '#/components/schemas/RedemptionTypeEnum'
+          allOf:
+          - $ref: '#/components/schemas/RedemptionTypeEnum'
+          description: |-
+            'internal' discounts are attached by application code that has verified the learner's eligibility (e.g. verified program enrollment). Learners cannot redeem them and pricing does not re-check the product.
+
+            * `one-time` - one-time
+            * `one-time-per-user` - one-time-per-user
+            * `unlimited` - unlimited
+            * `program-child-purchase` - program-child-purchase
+            * `internal` - internal
         max_redemptions:
           type: integer
           maximum: 2147483647
@@ -9855,17 +9885,20 @@ components:
       - one-time-per-user
       - unlimited
       - program-child-purchase
+      - internal
       type: string
       description: |-
         * `one-time` - one-time
         * `one-time-per-user` - one-time-per-user
         * `unlimited` - unlimited
         * `program-child-purchase` - program-child-purchase
+        * `internal` - internal
       x-enum-descriptions:
       - one-time
       - one-time-per-user
       - unlimited
       - program-child-purchase
+      - internal
     RefundReasonEnum:
       enum:
       - not_enough_time
@@ -10671,7 +10704,16 @@ components:
         discount_type:
           $ref: '#/components/schemas/DiscountTypeEnum'
         redemption_type:
-          $ref: '#/components/schemas/RedemptionTypeEnum'
+          allOf:
+          - $ref: '#/components/schemas/RedemptionTypeEnum'
+          description: |-
+            'internal' discounts are attached by application code that has verified the learner's eligibility (e.g. verified program enrollment). Learners cannot redeem them and pricing does not re-check the product.
+
+            * `one-time` - one-time
+            * `one-time-per-user` - one-time-per-user
+            * `unlimited` - unlimited
+            * `program-child-purchase` - program-child-purchase
+            * `internal` - internal
         max_redemptions:
           type: integer
           maximum: 2147483647
@@ -10721,7 +10763,16 @@ components:
         discount_type:
           $ref: '#/components/schemas/DiscountTypeEnum'
         redemption_type:
-          $ref: '#/components/schemas/RedemptionTypeEnum'
+          allOf:
+          - $ref: '#/components/schemas/RedemptionTypeEnum'
+          description: |-
+            'internal' discounts are attached by application code that has verified the learner's eligibility (e.g. verified program enrollment). Learners cannot redeem them and pricing does not re-check the product.
+
+            * `one-time` - one-time
+            * `one-time-per-user` - one-time-per-user
+            * `unlimited` - unlimited
+            * `program-child-purchase` - program-child-purchase
+            * `internal` - internal
         max_redemptions:
           type: integer
           maximum: 2147483647

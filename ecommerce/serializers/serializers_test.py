@@ -584,7 +584,7 @@ def test_legacy_receipt_line_reports_the_recorded_price():
 def test_discount_serializer_runs_the_program_child_purchase_shape_rules():
     """
     The rules themselves are covered against V0DiscountSerializer; this pins
-    that ProgramChildPurchaseShapeMixin is wired into this surface too.
+    that DiscountShapeMixin is wired into this surface too.
     """
     serializer = DiscountSerializer(
         data={
