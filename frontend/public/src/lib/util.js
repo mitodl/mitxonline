@@ -351,9 +351,24 @@ export const getStartDateText = (
     return ""
   }
 
-  const courseRun = courseware.courseruns ?
-    courseware.courseruns.sort(compareCourseRunStartDates)[0] :
-    courseware
+  // When a course with multiple runs is provided, compute the label
+  // from runs that are still open for enrollment
+  // (`is_enrollable` true). This keeps the catalog card from showing
+  // start dates for long‑past, closed runs when a newer enrollable run
+  // exists.
+  let courseRun
+  if (courseware.courseruns) {
+    const enrollableRuns = courseware.courseruns.filter(
+      run => run.is_enrollable
+    )
+
+    const runsToConsider =
+      enrollableRuns.length > 0 ? enrollableRuns : courseware.courseruns
+
+    courseRun = runsToConsider.sort(compareCourseRunStartDates)[0]
+  } else {
+    courseRun = courseware
+  }
 
   if (!courseRun.start_date) {
     return ""
