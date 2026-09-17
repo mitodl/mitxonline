@@ -1011,4 +1011,4 @@ class UserB2BContract(models.Model):
         unique_together = ("user", "contract_page")
 
     def __str__(self):
-        return f"UserOrganization: {self.user} in {self.contract_page}"
+        return f"UserB2BContract: {self.user} in {self.contract_page}"
