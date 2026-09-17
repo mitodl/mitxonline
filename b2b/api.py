@@ -1358,14 +1358,14 @@ def _determine_contract_for_user_product(
     item = product.purchasable_object
 
     if not item:
-        msg = f"Product {product} doesn't appear to have a purchasable object."
+        msg = f"_determine_contract_for_user_product: Product {product} doesn't appear to have a purchasable object."
         raise ValueError(msg)
 
     user_contract_ids = list(user.b2b_contracts.values_list("id", flat=True))
 
-    if program and not program.b2b_contracts.exists():
+    if program and not program.contract_memberships.exists():
         log.error(
-            "User %s tried to use product %s with program %s but program is not attached to any contracts",
+            "_determine_contract_for_user_product: User %s tried to use product %s with program %s but program is not attached to any contracts",
             user,
             product,
             program,
@@ -1380,6 +1380,11 @@ def _determine_contract_for_user_product(
         )
 
         if not item.b2b_contracts.filter(id__in=user_contract_ids).exists():
+            log.info(
+                "_determine_contract_for_user_product: no contract match between for %s purchasing %s",
+                user,
+                product,
+            )
             return {
                 "result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH,
                 "failed_match": "item",
@@ -1387,8 +1392,15 @@ def _determine_contract_for_user_product(
 
         if (
             program
-            and not program.b2b_contracts.filter(id__in=user_contract_ids).exists()
+            and not program.contract_memberships.filter(contract__id__in=user_contract_ids).exists()
         ):
+            log.info(
+                "_determine_contract_for_user_product: no contract match between %s purchasing %s for program %s",
+                user,
+                product,
+                program,
+            )
+            
             return {
                 "result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH,
                 "failed_match": "program",
@@ -1400,23 +1412,31 @@ def _determine_contract_for_user_product(
             )
         )
 
+        log.info(
+            "Item contracts: %s",
+            ",".join([ str(i) for i in overlap_item_contracts ])
+        )
+
         if program:
-            overlap_item_contracts = (
-                set(
-                    program.b2b_contracts.filter(id__in=user_contract_ids).values_list(
-                        "id", flat=True
-                    )
-                )
-                & overlap_item_contracts
+            program_overlaps = set(
+                                program.contract_memberships.filter(contract__id__in=user_contract_ids).values_list(
+                                    "contract__id", flat=True
+                                )
+                            )
+            log.info(
+                "Program contracts: %s",
+                ",".join([ str(i) for i in program_overlaps ])
             )
+            overlap_item_contracts = (program_overlaps & overlap_item_contracts)
 
         contract_matches = set(user_contract_ids) & overlap_item_contracts
 
         if len(contract_matches) != 1:
             log.error(
-                "User %s tried to use product %s but the contract to use is ambiguous",
+                "User %s tried to use product %s but the contract to use is ambiguous (%s)",
                 user,
                 product,
+                ",".join([ str(i) for i in contract_matches ])
             )
             return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_AMBIGUOUS_CONTRACT}
 
@@ -1425,7 +1445,7 @@ def _determine_contract_for_user_product(
     if (
         user.b2b_contracts.filter(id=contract_id).exists()
         and item.b2b_contracts.filter(id=contract_id).exists()
-        and (not program or program.b2b_contracts.filter(id=contract_id).exists())
+        and (not program or program.contract_memberships.filter(contract__id=contract_id).exists())
     ):
         return contract_id
 
@@ -1522,7 +1542,9 @@ def _validate_b2b_enrollment_prerequisites(
     return contract
 
 
-def _prepare_basket_for_b2b_enrollment(request, product: Product) -> Basket:
+def _prepare_basket_for_b2b_enrollment(
+    request, product: Product, contract: ContractPage
+) -> Basket:
     """
     Prepare basket for B2B enrollment by clearing it and adding the product.
 
@@ -1537,7 +1559,9 @@ def _prepare_basket_for_b2b_enrollment(request, product: Product) -> Basket:
     basket.basket_items.all().delete()
     basket.discounts.all().delete()
 
-    item = BasketItem.objects.create(product=product, basket=basket, quantity=1)
+    item = BasketItem.objects.create(
+        product=product, basket=basket, quantity=1, b2b_contract=contract
+    )
     item.save()
 
     # Sync with HubSpot for CourseRun
@@ -1656,7 +1680,7 @@ def create_b2b_enrollment(
     )
 
     if (
-        prereq_check
+        isinstance(prereq_check, dict)
         and prereq_check.get("result", None)
         == main_constants.USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED
     ):
@@ -1681,7 +1705,7 @@ def create_b2b_enrollment(
     contract = prereq_check
 
     # Prepare the basket for enrollment
-    basket = _prepare_basket_for_b2b_enrollment(request, product)
+    basket = _prepare_basket_for_b2b_enrollment(request, product, contract)
 
     # Apply any available discount to the basket
     _apply_available_discount(request, product, basket)

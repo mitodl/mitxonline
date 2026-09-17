@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Iterable  # noqa: TC003
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import List  # noqa: UP035
+from typing import TYPE_CHECKING, List, Tuple  # noqa: UP035
 from zoneinfo import ZoneInfo
 
 import reversion
@@ -49,6 +49,9 @@ from ecommerce.constants import (
 from ecommerce.tasks import send_ecommerce_order_receipt, send_order_refund_email
 from main.plugin_manager import get_plugin_manager
 from users.models import User
+
+if TYPE_CHECKING:
+    from b2b.models import ContractPage
 
 User = get_user_model()  # noqa: F811
 
@@ -224,7 +227,19 @@ class Basket(TimestampedModel):
         Returns the products that have been added to the basket so far.
         """
 
-        return [item.product for item in self.basket_items.select_related("product")]
+        return [
+            item.product for item in self.basket_items.select_related("product")
+        ]
+
+    def get_products_contracts(self):
+        """
+        get_products, but adds in the contracts too.
+        """
+
+        return [
+            (item.product, item.b2b_contract)
+            for item in self.basket_items.select_related("product")
+        ]
 
 
 class BasketItem(TimestampedModel):
@@ -237,6 +252,9 @@ class BasketItem(TimestampedModel):
         Basket, on_delete=models.CASCADE, related_name="basket_items"
     )
     quantity = models.PositiveIntegerField(default=1)
+    b2b_contract = models.ForeignKey(
+        "b2b.ContractPage", on_delete=models.DO_NOTHING, related_name="+", null=True
+    )
 
     @cached_property
     def discounted_price(self):
@@ -1173,7 +1191,7 @@ class PendingOrder(Order):
     @transaction.atomic
     def _get_or_create(
         self,
-        products: List[Product],  # noqa: UP006
+        products: List[Tuple[Product, ContractPage]],  # noqa: UP006
         user: User,
         discounts: List[Discount] | None = None,  # noqa: UP006
         gateway_type: str = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
@@ -1198,7 +1216,7 @@ class PendingOrder(Order):
         """
         # Get the details from each Product.
         product_versions, product_object_ids, product_content_types = [], [], []
-        for product in products:
+        for product, _ in products:
             # Per docs, this should sort most recent first.
             product_version = Version.objects.get_for_object(product).first()
 
@@ -1257,7 +1275,8 @@ class PendingOrder(Order):
 
         # Create or get Line for each product.  Calculate the Order total based on Lines and discount.
         total = 0
-        for i, product in enumerate(products):
+        for i, product_tuple in enumerate(products):
+            product, contract = product_tuple
             line, created = Line.objects.get_or_create(
                 order=order,
                 purchased_object_id=product.object_id,
@@ -1274,6 +1293,7 @@ class PendingOrder(Order):
                             order, product_versions[i]
                         )
                     ),
+                    "b2b_contract": contract,
                 },
             )
             if not created:
@@ -1305,7 +1325,7 @@ class PendingOrder(Order):
         Returns:
             PendingOrder: the created pending order
         """
-        products = basket.get_products()
+        products = basket.get_products_contracts()
         discounts = [
             basket_discount.redeemed_discount
             for basket_discount in basket.discounts.all()
@@ -1458,6 +1478,9 @@ class Line(TimestampedModel):
         decimal_places=5,
         max_digits=20,
         help_text="Post-discount price of one unit, recorded when the order was priced.",
+    )
+    b2b_contract = models.ForeignKey(
+        "b2b.ContractPage", on_delete=models.DO_NOTHING, related_name="+", null=True
     )
 
     # denormalized reference which otherwise requires the lookup: line.product_version.product.purchasable_object

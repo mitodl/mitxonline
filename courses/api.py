@@ -196,7 +196,7 @@ def create_run_enrollments(  # noqa: C901
 
     Args:
         user (User): The user to enroll
-        runs (iterable of CourseRun or tuple (CourseRun,Contract)): The course runs to enroll in
+        runs (iterable of CourseRun): The course runs to enroll in
         change_status (str): The status of the enrollment
         keep_failed_enrollments: (boolean): If True, keeps the local enrollment record
             in the database even if the enrollment fails in edX.
@@ -208,20 +208,7 @@ def create_run_enrollments(  # noqa: C901
             created in mitxonline, paired with a boolean indicating whether or not the edX enrollment API call was successful
             for all of the given course runs
     """
-
-    # If we've been given a tuple here, then this is a B2B enrollment, and
-    # as such we have a contract that we should link the enrollment to.
-    # This will get done again in the iterator because we do this processing
-    # below outside of it.
-    if isinstance(runs[0], tuple):
-        first_run, _ = runs[0]
-
-    # TODO: this is sorta messy because of the below only-care-about-the-first-element
-    # stuff.. should also be refactored a bit but ought to start here by extracting
-    # tuples out of runs so that the edX enrollments and export compliance can
-    # do their thing.
-
-    _verify_exports_compliance_for_enrollment(user, first_run)
+    _verify_exports_compliance_for_enrollment(user, runs[0])
 
     if keep_failed_enrollments is None:
         keep_failed_enrollments = settings.FEATURES.get(
@@ -234,7 +221,7 @@ def create_run_enrollments(  # noqa: C901
         subscribe_edx_course_emails.delay(enrollment.id)
 
     edx_request_success = True
-    if not first_run.is_fake_course_run:
+    if not runs[0].is_fake_course_run:
         # Make the API call to enroll the user in edX only if the run is not a fake course run
         try:
             enroll_in_edx_course_runs(
@@ -331,7 +318,7 @@ def create_program_enrollments(
 
     Args:
         user (User): The user to enroll
-        programs (iterable of Program or tuple of Program,Contract): The programs to enroll in
+        programs (iterable of Program): The course runs to enroll in
 
     Kwargs:
         enrollment_mode (str): The mode the enrollment should be in
@@ -340,21 +327,13 @@ def create_program_enrollments(
         list of ProgramEnrollment: A list of enrollment objects that were successfully created
     """
     successful_enrollments = []
-    for program_data in programs:
-        # If we've been given a tuple here, then this is a B2B enrollment, and
-        # as such we have a contract that we should link the enrollment to.
-        contract = None
-        program = program_data
-        if isinstance(program_data, tuple):
-            program, contract = program_data
-
+    for program in programs:
         _verify_exports_compliance_for_enrollment(user, program)
 
         try:
             enrollment, created = ProgramEnrollment.all_objects.get_or_create(
                 user=user,
                 program=program,
-                b2b_contract=contract,
                 defaults={
                     "enrollment_mode": enrollment_mode,
                 },

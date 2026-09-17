@@ -10,7 +10,9 @@ def populate_enrollment_contracts(apps, schema_editor):
     """
 
     CourseRunEnrollment = apps.get_model("courses", "CourseRunEnrollment")
-    contract_course_run_enrollments = CourseRunEnrollment.objects.filter(run__b2b_contract__isnull=False).all()
+    contract_course_run_enrollments = CourseRunEnrollment.objects.filter(
+        run__b2b_contract__isnull=False
+    ).all()
 
     for enrollment in contract_course_run_enrollments:
         # We haven't dropped the b2b_contract FK as of yet, so use that to determine
@@ -21,19 +23,25 @@ def populate_enrollment_contracts(apps, schema_editor):
     # Program backfill works differently. The program may be associated with one
     # or more contracts. So, each enrollment may be for a different contract, or
     # it may not be a B2B enrollment at all (if the program isn't flagged b2b_only).
-    # Loop through and see what 
+    # Loop through and see what
 
     ProgramEnrollment = apps.get_model("courses", "ProgramEnrollment")
 
     # Using objects here and not all_objects - want to avoid enrollments that might
     # be for no longer valid contracts; if the user re-enrolls in the program,
     # that will cause the enrollment to be linked up to the correct contract.
-    contract_program_enrollments = ProgramEnrollment.objects.filter(program__b2b_contracts__isnull=False).all()
+    contract_program_enrollments = ProgramEnrollment.objects.filter(
+        program__contract_memberships__isnull=False
+    ).all()
     updated_enrollments = []
 
     for enrollment in contract_program_enrollments:
         user = enrollment.user
-        first_user_contract = user.b2b_contracts.filter(id__in=list(enrollment.program.b2b_contracts.values_list("id", flat=True))).first()
+        first_user_contract = user.b2b_contracts.filter(
+            id__in=list(
+                enrollment.program.contract_memberships.values_list("id", flat=True)
+            )
+        ).first()
 
         if not first_user_contract and enrollment.program.b2b_only:
             msg = f"Enrollment for {user} in {enrollment.program} seems invalid - program is marked B2B-only but the user isn't in the contract."
