@@ -16,6 +16,7 @@ from reversion.admin import VersionAdmin
 from viewflow import fsm
 
 from ecommerce.api import refund_order
+from ecommerce.constants import REDEMPTION_TYPE_INTERNAL
 from ecommerce.discount_sources import fulfilled_redemptions_funded_by
 from ecommerce.forms import AdminRefundOrderForm
 from ecommerce.models import (
@@ -154,6 +155,7 @@ class BasketItemAdmin(VersionAdmin):
 @admin.register(Discount)
 class DiscountAdmin(admin.ModelAdmin):
     model = Discount
+    exclude = ["is_program_discount"]
     search_fields = ["discount_type", "redemption_type", "discount_code"]
     list_display = [
         "id",
@@ -164,6 +166,14 @@ class DiscountAdmin(admin.ModelAdmin):
         "payment_type",
     ]
     list_filter = ["discount_type", "redemption_type", "payment_type"]
+
+    def get_readonly_fields(self, request, obj=None):  # noqa: ARG002
+        # An internal discount's code is visible on receipts, so any other
+        # redemption type would make that code live. DiscountShapeMixin refuses
+        # the same change over the API.
+        if obj is not None and obj.redemption_type == REDEMPTION_TYPE_INTERNAL:
+            return ("redemption_type",)
+        return ()
 
 
 @admin.register(DiscountProduct)

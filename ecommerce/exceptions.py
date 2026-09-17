@@ -39,3 +39,11 @@ class VerifiedProgramInvalidOrderError(Exception):
     Raised if we've tried to process a verified enrollment for a program's course
     run, but the processed order either had an error or it required payment.
     """
+
+
+class VerifiedProgramCourseNotInProgramError(Exception):
+    """
+    Raised if a verified enrollment in a program's course run is requested for a
+    run whose course is not in that program's requirements. The program's
+    internal discount would otherwise price the run at zero.
+    """
