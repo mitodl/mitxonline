@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.166.6
+---------------
+
+- Make verified-program discounts an "internal" redemption type (#3972)
+
 Version 1.166.5
 ---------------
 
