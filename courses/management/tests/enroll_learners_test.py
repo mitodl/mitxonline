@@ -17,6 +17,7 @@ def mock_bulk_enroll(mocker):
     """Mock bulk_enroll_learners to avoid edX API calls"""
     return mocker.patch(
         "courses.management.commands.enroll_learners.bulk_enroll_learners",
+        autospec=True,
         return_value={
             "succeeded": 0,
             "failed": 0,
@@ -43,21 +44,25 @@ class TestBulkEnrollInlineUsers:
         }
 
         out = StringIO()
+        err = StringIO()
         call_command(
             "enroll_learners",
             users="a@b.com,c@d.com",
             run="run-1",
             commit=True,
             stdout=out,
+            stderr=err,
         )
 
         mock_bulk_enroll.assert_called_once_with(
             [("a@b.com", "run-1"), ("c@d.com", "run-1")],
             mode="audit",
             keep_failed_enrollments=False,
+            skip_compliance_check=False,
         )
         output = out.getvalue()
         assert "2 succeeded" in output
+        assert "SKIPPED" not in err.getvalue()
         assert "0 failed" in output
 
     def test_inline_users_missing_run(self):
@@ -80,6 +85,7 @@ class TestBulkEnrollInlineUsers:
             [("a@b.com", "run-1")],
             mode="audit",
             keep_failed_enrollments=True,
+            skip_compliance_check=False,
         )
 
     def test_inline_users_mixed_results(self, mock_bulk_enroll):
@@ -153,6 +159,7 @@ class TestBulkEnrollCSV:
             [("a@b.com", "run-1"), ("c@d.com", "run-1")],
             mode="audit",
             keep_failed_enrollments=False,
+            skip_compliance_check=False,
         )
         assert "2 succeeded" in out.getvalue()
 
@@ -172,6 +179,7 @@ class TestBulkEnrollCSV:
             [("a@b.com", "run-1")],
             mode="audit",
             keep_failed_enrollments=False,
+            skip_compliance_check=False,
         )
 
     def test_csv_own_courseware_id_column(self, mock_bulk_enroll):
@@ -190,6 +198,7 @@ class TestBulkEnrollCSV:
             [("a@b.com", "run-1"), ("c@d.com", "run-2")],
             mode="audit",
             keep_failed_enrollments=False,
+            skip_compliance_check=False,
         )
 
     def test_csv_missing_email_column(self):
@@ -233,6 +242,7 @@ class TestBulkEnrollCSV:
             [("a@b.com", "run-1")],
             mode="audit",
             keep_failed_enrollments=False,
+            skip_compliance_check=False,
         )
 
 
@@ -316,3 +326,33 @@ class TestBulkEnrollNoArgs:
             call_command(
                 "enroll_learners", "--users=a@b.com", "--run=run-1", "--mode=verified"
             )
+
+
+@pytest.mark.django_db()
+class TestSkipComplianceCheck:
+    """Tests for --skip-compliance-check flag"""
+
+    def test_flag_is_passed_through_and_warns(self, mock_bulk_enroll):
+        """The flag should reach bulk_enroll_learners and warn on stderr"""
+        out = StringIO()
+        err = StringIO()
+        call_command(
+            "enroll_learners",
+            "--users=a@b.com",
+            "--run=run-1",
+            "--commit",
+            "--skip-compliance-check",
+            stdout=out,
+            stderr=err,
+        )
+
+        mock_bulk_enroll.assert_called_once_with(
+            [("a@b.com", "run-1")],
+            mode="audit",
+            keep_failed_enrollments=False,
+            skip_compliance_check=True,
+        )
+        assert (
+            "Export compliance checks will be SKIPPED for these enrollments."
+            in err.getvalue()
+        )

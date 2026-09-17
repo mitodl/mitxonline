@@ -1,5 +1,6 @@
 """Courses API tests"""
 
+import logging
 from copy import deepcopy
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -969,6 +970,44 @@ def test_create_run_enrollments_skips_exports_check_when_feature_disabled(
     patched_verify.assert_not_called()
     patched_edx_enroll.assert_called_once()
     assert len(successful_enrollments) == 1
+
+
+# [True] pins the bypass; [False] pins that the warning still fires.
+@pytest.mark.parametrize("compliance_enabled", [True, False])
+def test_create_run_enrollments_skips_exports_check_when_requested(
+    settings, mocker, caplog, user, compliance_enabled
+):
+    """skip_compliance_check=True bypasses the check and logs the warning."""
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = compliance_enabled
+    run = CourseRunFactory.create()
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="REJECT",
+            reason_code=102,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    with caplog.at_level(logging.WARNING, logger="courses.api"):
+        successful_enrollments, _ = create_run_enrollments(
+            user, [run], mode=EDX_ENROLLMENT_AUDIT_MODE, skip_compliance_check=True
+        )
+
+    patched_verify.assert_not_called()
+    patched_edx_enroll.assert_called_once()
+    assert len(successful_enrollments) == 1
+    assert any(
+        record.name == "courses.api"
+        and record.levelno == logging.WARNING
+        and record.getMessage()
+        == f"Skipping export compliance check for user={user.id} run={run.courseware_id}"
+        for record in caplog.records
+    )
 
 
 def test_create_program_enrollments_verifies_exports_for_verified_mode(mocker, user):

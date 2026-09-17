@@ -176,13 +176,14 @@ def create_local_enrollment(user, run, *, mode=EDX_DEFAULT_ENROLLMENT_MODE):
     return enrollment, created
 
 
-def create_run_enrollments(  # noqa: C901
+def create_run_enrollments(  # noqa: C901, PLR0913
     user,
     runs,
     *,
     change_status=None,
     keep_failed_enrollments=None,
     mode=EDX_DEFAULT_ENROLLMENT_MODE,
+    skip_compliance_check=False,
 ):
     """
     Creates local records of a user's enrollment in course runs, and attempts to enroll them
@@ -202,13 +203,25 @@ def create_run_enrollments(  # noqa: C901
             in the database even if the enrollment fails in edX.
             If None, defaults to the value of the IGNORE_EDX_FAILURES feature flag.
         mode (str): The course mode
+        skip_compliance_check (bool): If True, bypass the export compliance
+            check. Operator-run management commands only.
 
     Returns:
         (list of CourseRunEnrollment, bool): A list of enrollment objects that were successfully
             created in mitxonline, paired with a boolean indicating whether or not the edX enrollment API call was successful
             for all of the given course runs
     """
-    _verify_exports_compliance_for_enrollment(user, runs[0])
+    # Pre-existing: only runs[0] is screened, so runs[1:] go unscreened for the
+    # two multi-run callers (upgrade_audit_run_enrollments_for_program_purchase,
+    # ecommerce.api.downgrade_learner_from_order).
+    if skip_compliance_check:
+        log.warning(
+            "Skipping export compliance check for user=%s run=%s",
+            user.id,
+            runs[0].courseware_id,
+        )
+    else:
+        _verify_exports_compliance_for_enrollment(user, runs[0])
 
     if keep_failed_enrollments is None:
         keep_failed_enrollments = settings.FEATURES.get(
