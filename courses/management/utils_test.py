@@ -6,6 +6,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from mitol.common.utils.datetime import now_in_utc
 
+from compliance.api import ExportComplianceResult
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
@@ -15,7 +16,10 @@ from courses.management.utils import (
     bulk_enroll_learners,
     enroll_learner_in_run,
 )
+from courses.models import CourseRunEnrollment
+from main import features
 from main.test_utils import MockHttpError
+from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE
 from openedx.exceptions import EdxApiEnrollErrorException, UnknownEdxApiEnrollException
 from users.factories import UserFactory
 
@@ -189,13 +193,18 @@ class TestEnrollLearnerInRun:
         enrollment = CourseRunEnrollmentFactory.build(user=user, run=run)
         mock_create_run_enrollments = mocker.patch(
             "courses.management.utils.create_run_enrollments",
+            autospec=True,
             return_value=([enrollment], True),
         )
 
         enroll_learner_in_run(user, run, mode="verified", keep_failed_enrollments=True)
 
         mock_create_run_enrollments.assert_called_once_with(
-            user, [run], keep_failed_enrollments=True, mode="verified"
+            user,
+            [run],
+            keep_failed_enrollments=True,
+            mode="verified",
+            skip_compliance_check=False,
         )
 
 
@@ -256,6 +265,7 @@ class TestBulkEnrollLearnersUtil:
         enrollment = CourseRunEnrollmentFactory.build(user=user, run=run)
         mock_enroll = mocker.patch(
             "courses.management.utils.enroll_learner_in_run",
+            autospec=True,
             return_value=(enrollment, "Enrolled"),
         )
 
@@ -266,7 +276,11 @@ class TestBulkEnrollLearnersUtil:
         )
 
         mock_enroll.assert_called_once_with(
-            user, run, mode="verified", keep_failed_enrollments=True
+            user,
+            run,
+            mode="verified",
+            keep_failed_enrollments=True,
+            skip_compliance_check=False,
         )
 
     def test_one_bad_row_does_not_abort_the_batch(self, mocker):
@@ -331,3 +345,88 @@ class TestBulkEnrollLearnersUtil:
         )
 
         mock_filter.assert_called_once_with(courseware_id=run.courseware_id)
+
+    def test_skip_compliance_check_passed(self, mocker):
+        """skip_compliance_check should reach create_run_enrollments for every entry"""
+        users = UserFactory.create_batch(2)
+        run = CourseRunFactory.create()
+        mock_create_run_enrollments = mocker.patch(
+            "courses.management.utils.create_run_enrollments",
+            autospec=True,
+            return_value=(
+                [CourseRunEnrollmentFactory.build(user=users[0], run=run)],
+                True,
+            ),
+        )
+
+        bulk_enroll_learners(
+            [(user.email, run.courseware_id) for user in users],
+            skip_compliance_check=True,
+        )
+
+        assert mock_create_run_enrollments.call_count == len(users)
+        mock_create_run_enrollments.assert_has_calls(
+            [
+                mocker.call(
+                    user,
+                    [run],
+                    keep_failed_enrollments=False,
+                    mode=EDX_DEFAULT_ENROLLMENT_MODE,
+                    skip_compliance_check=True,
+                )
+                for user in users
+            ]
+        )
+
+    def test_compliance_rejection_fails_closed(self, settings, mocker):
+        """A rejection should surface as a failed entry and enroll nobody"""
+        settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = True
+        user = UserFactory.create()
+        run = CourseRunFactory.create()
+        mocker.patch(
+            "courses.api.verify_user_with_exports",
+            return_value=ExportComplianceResult(
+                decision="REJECT",
+                reason_code=102,
+                request_id="req-123",
+                raw={},
+            ),
+        )
+        patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        summary = bulk_enroll_learners([(user.email, run.courseware_id)])
+
+        assert summary["failed"] == 1
+        assert summary["succeeded"] == 0
+        # enroll_learner_in_run collapses every exception into a failed row.
+        _, _, _, message = summary["details"][0]
+        assert "Export compliance check did not accept enrollment" in message
+        patched_edx_enroll.assert_not_called()
+        assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+    def test_skip_compliance_check_enrolls_rejected_user(self, settings, mocker):
+        """The same REJECT setup enrolls the user when the bypass is on"""
+        settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = True
+        user = UserFactory.create()
+        run = CourseRunFactory.create()
+        # REJECT so the outcome assertions fail on a regressed bypass too.
+        patched_verify = mocker.patch(
+            "courses.api.verify_user_with_exports",
+            return_value=ExportComplianceResult(
+                decision="REJECT",
+                reason_code=102,
+                request_id="req-123",
+                raw={},
+            ),
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+        mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+        summary = bulk_enroll_learners(
+            [(user.email, run.courseware_id)], skip_compliance_check=True
+        )
+
+        assert summary["succeeded"] == 1
+        patched_verify.assert_not_called()
+        assert CourseRunEnrollment.objects.filter(user=user, run=run).exists()

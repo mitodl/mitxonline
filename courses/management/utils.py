@@ -115,6 +115,7 @@ def enroll_learner_in_run(
     *,
     mode=EDX_DEFAULT_ENROLLMENT_MODE,
     keep_failed_enrollments=False,
+    skip_compliance_check=False,
 ):
     """
     Enroll a single learner in a course run in both edX and MITx Online.
@@ -128,6 +129,8 @@ def enroll_learner_in_run(
         mode (str): The enrollment mode (default: audit)
         keep_failed_enrollments (bool): If True, keeps the local enrollment record
             even if the edX enrollment fails.
+        skip_compliance_check (bool): If True, bypasses the export compliance
+            check. Operator-run commands only.
 
     Returns:
         tuple[CourseRunEnrollment | None, str]: (enrollment_result, message)
@@ -144,6 +147,7 @@ def enroll_learner_in_run(
             [course_run],
             keep_failed_enrollments=keep_failed_enrollments,
             mode=mode,
+            skip_compliance_check=skip_compliance_check,
         )
     except Exception as exc:  # pylint: disable=broad-except
         # create_user() re-raises edX failures (e.g. unreachable edX) unless
@@ -169,7 +173,11 @@ def enroll_learner_in_run(
 
 
 def bulk_enroll_learners(
-    entries, *, mode=EDX_DEFAULT_ENROLLMENT_MODE, keep_failed_enrollments=False
+    entries,
+    *,
+    mode=EDX_DEFAULT_ENROLLMENT_MODE,
+    keep_failed_enrollments=False,
+    skip_compliance_check=False,
 ):
     """
     Enroll multiple learners in course runs in both edX and MITx Online.
@@ -183,6 +191,8 @@ def bulk_enroll_learners(
         mode (str): The enrollment mode to use for all enrollments (default: audit).
         keep_failed_enrollments (bool): If True, keeps local enrollment records
             even if the edX enrollment fails.
+        skip_compliance_check (bool): If True, bypasses the export compliance
+            check. Operator-run commands only.
 
     Returns:
         dict: Summary with keys 'succeeded', 'failed', 'skipped' (int counts)
@@ -222,6 +232,7 @@ def bulk_enroll_learners(
             course_run,
             mode=mode,
             keep_failed_enrollments=keep_failed_enrollments,
+            skip_compliance_check=skip_compliance_check,
         )
         if result:
             log.info(message)
