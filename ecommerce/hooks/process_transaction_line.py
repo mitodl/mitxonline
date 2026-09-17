@@ -58,7 +58,9 @@ def _link_b2b_course_run_contracts(line) -> str | None:
         return
 
     enrollment_qs = CourseRunEnrollment.objects.filter(
-        run=purchased_run, user=line.order.purchaser, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        run=purchased_run,
+        user=line.order.purchaser,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
     )
 
     if enrollment_qs.count() != 1:

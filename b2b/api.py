@@ -1392,7 +1392,9 @@ def _determine_contract_for_user_product(
 
         if (
             program
-            and not program.contract_memberships.filter(contract__id__in=user_contract_ids).exists()
+            and not program.contract_memberships.filter(
+                contract__id__in=user_contract_ids
+            ).exists()
         ):
             log.info(
                 "_determine_contract_for_user_product: no contract match between %s purchasing %s for program %s",
@@ -1400,7 +1402,7 @@ def _determine_contract_for_user_product(
                 product,
                 program,
             )
-            
+
             return {
                 "result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH,
                 "failed_match": "program",
@@ -1413,21 +1415,19 @@ def _determine_contract_for_user_product(
         )
 
         log.info(
-            "Item contracts: %s",
-            ",".join([ str(i) for i in overlap_item_contracts ])
+            "Item contracts: %s", ",".join([str(i) for i in overlap_item_contracts])
         )
 
         if program:
             program_overlaps = set(
-                                program.contract_memberships.filter(contract__id__in=user_contract_ids).values_list(
-                                    "contract__id", flat=True
-                                )
-                            )
-            log.info(
-                "Program contracts: %s",
-                ",".join([ str(i) for i in program_overlaps ])
+                program.contract_memberships.filter(
+                    contract__id__in=user_contract_ids
+                ).values_list("contract__id", flat=True)
             )
-            overlap_item_contracts = (program_overlaps & overlap_item_contracts)
+            log.info(
+                "Program contracts: %s", ",".join([str(i) for i in program_overlaps])
+            )
+            overlap_item_contracts = program_overlaps & overlap_item_contracts
 
         contract_matches = set(user_contract_ids) & overlap_item_contracts
 
@@ -1436,7 +1436,7 @@ def _determine_contract_for_user_product(
                 "User %s tried to use product %s but the contract to use is ambiguous (%s)",
                 user,
                 product,
-                ",".join([ str(i) for i in contract_matches ])
+                ",".join([str(i) for i in contract_matches]),
             )
             return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_AMBIGUOUS_CONTRACT}
 
@@ -1445,7 +1445,10 @@ def _determine_contract_for_user_product(
     if (
         user.b2b_contracts.filter(id=contract_id).exists()
         and item.b2b_contracts.filter(id=contract_id).exists()
-        and (not program or program.contract_memberships.filter(contract__id=contract_id).exists())
+        and (
+            not program
+            or program.contract_memberships.filter(contract__id=contract_id).exists()
+        )
     ):
         return contract_id
 
