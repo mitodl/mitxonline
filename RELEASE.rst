@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 1.166.5
+---------------
+
+- feat: add --skip-compliance-check flag to enroll_learners (#3980)
+- Expose some new B2B fields in CourseRunAdmin (#3968)
+- fix: reject Course.readable_id values that collide with a CourseRun's courseware_id (#3960)
+
 Version 1.166.4
 ---------------
 
