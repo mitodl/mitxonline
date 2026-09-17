@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         ("b2b", "0027_discountcontractattachmentredemption_email_message_id_and_more"),
-        ("courses", "0103_gate_certificate_creation"),
+        ("courses", "0106_drop_courserun_b2b_contract_constraints"),
     ]
 
     operations = [
