@@ -1,14 +1,17 @@
 import React, { useState } from "react";
 
-import { CanAccess, useLogout, useTitle, useNavigation } from "@pankod/refine-core";
-import { AntdLayout, Menu, Grid, Icons, useMenu, Typography, Space, Divider } from "@pankod/refine-antd";
-import { antLayoutSider, antLayoutSiderMobile } from "./styles";
+import { CanAccess, useLogout, useTitle, useNavigation, useMenu } from "@refinedev/core";
 
-const { RightOutlined, LogoutOutlined } = Icons;
+import { RightOutlined, LogoutOutlined } from "@ant-design/icons";
+
+import { Layout as AntdLayout, Menu, Grid, Typography, Space, Divider } from "antd";
+import { antLayoutSider, antLayoutSiderMobile } from "./styles";
 
 export const Sider: React.FC = () => {
   const [collapsed, setCollapsed] = useState<boolean>(false);
-  const { mutate: logout } = useLogout();
+  const { mutate: logout } = useLogout({
+    v3LegacyAuthProviderCompatible: true
+  });
   const Title = useTitle();
   const { menuItems, selectedKey } = useMenu();
   const { push } = useNavigation();
