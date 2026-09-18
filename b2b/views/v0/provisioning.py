@@ -6,7 +6,9 @@ against ol-infrastructure's olapps.py, and for waiting up to
 KEYCLOAK_ORG_SYNC_FREQUENCY seconds for the organization to appear in MITx
 Online. See docs/source/b2b/provisioning_api.md.
 
-Everything here is staff-write via IsAdminOrReadOnly. b2b.permissions'
+Everything here is staff-only, reads included: an organization's identity
+providers, their metadata and the audit trail are partner configuration, not
+something any signed-in learner should be able to list. b2b.permissions'
 IsOrganizationManager is deliberately not used: an org manager is a
 customer-side role and must not be able to provision. The partner-facing
 wizard (C2) gets its own permission class scoped by invite token.
@@ -14,15 +16,19 @@ wizard (C2) gets its own permission class scoped by invite token.
 
 import logging
 
+import django_filters
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, inline_serializer
 from requests.exceptions import HTTPError
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
+from b2b.constants import ONBOARDING_STATE_CHOICES
 from b2b.exceptions import (
     AliasCollisionError,
     InvalidLifecycleTransitionError,
@@ -30,11 +36,7 @@ from b2b.exceptions import (
     OrganizationNotProvisionedError,
     OrphanedKeycloakOrganizationError,
 )
-from b2b.models import (
-    OrganizationIdentityProvider,
-    OrganizationOnboarding,
-    OrganizationPage,
-)
+from b2b.models import OrganizationIdentityProvider, OrganizationPage
 from b2b.provisioning import (
     KeycloakConnection,
     create_identity_provider,
@@ -42,6 +44,7 @@ from b2b.provisioning import (
     delete_identity_provider,
     parse_identity_provider_metadata,
     refresh_identity_provider_metadata,
+    set_onboarding_state,
     transition_identity_provider,
     update_organization,
 )
@@ -51,12 +54,13 @@ from b2b.serializers.v0.provisioning import (
     IdentityProviderTransitionSerializer,
     OrganizationIdentityProviderSerializer,
     OrganizationOnboardingSerializer,
+    OrganizationProvisioningAuditSerializer,
     ParseMetadataSerializer,
     ProvisionedOrganizationSerializer,
     SetOnboardingStateSerializer,
     UpdateOrganizationSerializer,
 )
-from main.permissions import IsAdminOrReadOnly
+from main.views import RefinePagination
 
 log = logging.getLogger(__name__)
 
@@ -102,19 +106,44 @@ class ProvisioningExceptionMixin:
         return super().handle_exception(exc)
 
 
+class ProvisionedOrganizationFilterSet(django_filters.FilterSet):
+    """Filters for the staff organization list."""
+
+    q = django_filters.CharFilter(
+        method="search", label="Search by name or org key, case-insensitively."
+    )
+    onboarding_state = django_filters.ChoiceFilter(
+        field_name="onboarding__state", choices=ONBOARDING_STATE_CHOICES
+    )
+
+    def search(self, queryset, name, value):  # noqa: ARG002
+        """Match the name or org key."""
+
+        return queryset.filter(Q(name__icontains=value) | Q(org_key__icontains=value))
+
+    class Meta:
+        model = OrganizationPage
+        fields = ["q", "onboarding_state"]
+
+
 class OrganizationProvisioningViewSet(
     ProvisioningExceptionMixin,
     viewsets.GenericViewSet,
 ):
     """Provision and inspect B2B organizations."""
 
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [IsAdminUser]
     serializer_class = ProvisionedOrganizationSerializer
     lookup_field = "org_key"
     lookup_url_kwarg = "org_key"
-    queryset = OrganizationPage.objects.select_related("onboarding").prefetch_related(
-        "identity_providers"
+    queryset = (
+        OrganizationPage.objects.select_related("onboarding")
+        .prefetch_related("identity_providers")
+        .order_by("name")
     )
+    pagination_class = RefinePagination
+    filter_backends = [django_filters.rest_framework.DjangoFilterBackend]
+    filterset_class = ProvisionedOrganizationFilterSet
 
     def _with_keycloak(self, organization, connection=None):
         """
@@ -132,6 +161,20 @@ class OrganizationProvisioningViewSet(
             )
 
         return organization
+
+    def list(self, request):  # noqa: ARG002
+        """
+        List organizations, without asking Keycloak about each one.
+
+        domains and redirect_url live only in Keycloak, so they are null here;
+        retrieve an organization to see them. One admin call per row would make
+        the list as slow as the realm is large.
+        """
+
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+
+        return self.get_paginated_response(self.get_serializer(page, many=True).data)
 
     @extend_schema(
         request=CreateOrganizationSerializer,
@@ -155,7 +198,9 @@ class OrganizationProvisioningViewSet(
 
         connection = KeycloakConnection()
         organization = create_organization(
-            connection=connection, **request_serializer.validated_data
+            connection=connection,
+            actor=request.user,
+            **request_serializer.validated_data,
         )
 
         return Response(
@@ -191,7 +236,10 @@ class OrganizationProvisioningViewSet(
 
         connection = KeycloakConnection()
         organization = update_organization(
-            organization, connection=connection, **request_serializer.validated_data
+            organization,
+            connection=connection,
+            actor=request.user,
+            **request_serializer.validated_data,
         )
 
         return Response(
@@ -217,15 +265,43 @@ class OrganizationProvisioningViewSet(
         request_serializer = SetOnboardingStateSerializer(data=request.data)
         request_serializer.is_valid(raise_exception=True)
 
-        onboarding, _ = OrganizationOnboarding.objects.get_or_create(
-            organization=organization
-        )
-        onboarding.set_state(
+        onboarding = set_onboarding_state(
+            organization,
             request_serializer.validated_data["state"],
             notes=request_serializer.validated_data.get("notes"),
+            actor=request.user,
         )
 
         return Response(OrganizationOnboardingSerializer(onboarding).data)
+
+    @extend_schema(
+        request=None,
+        responses={200: OrganizationProvisioningAuditSerializer(many=True)},
+    )
+    @action(
+        detail=True,
+        methods=["get"],
+        filter_backends=[],
+        pagination_class=RefinePagination,
+    )
+    def events(self, request, org_key=None):  # noqa: ARG002
+        """
+        Return the organization's provisioning changes, newest first.
+
+        The review trail for partner SSO config now that changes are API calls
+        rather than reviewed Pulumi PRs.
+        """
+
+        organization = self.get_object()
+        page = self.paginate_queryset(
+            organization.provisioning_audits.select_related("acting_user").order_by(
+                "-created_on", "-id"
+            )
+        )
+
+        return self.get_paginated_response(
+            OrganizationProvisioningAuditSerializer(page, many=True).data
+        )
 
 
 @extend_schema(
@@ -248,7 +324,7 @@ class IdentityProviderProvisioningViewSet(
 ):
     """Provision and manage an organization's identity providers."""
 
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [IsAdminUser]
     serializer_class = OrganizationIdentityProviderSerializer
     lookup_field = "alias"
     lookup_url_kwarg = "alias"
@@ -304,7 +380,9 @@ class IdentityProviderProvisioningViewSet(
         payload = dict(request_serializer.validated_data)
         payload.pop("discovery_url", None)
 
-        identity_provider = create_identity_provider(self._organization(), **payload)
+        identity_provider = create_identity_provider(
+            self._organization(), actor=request.user, **payload
+        )
 
         return Response(
             self.get_serializer(identity_provider).data,
@@ -315,7 +393,7 @@ class IdentityProviderProvisioningViewSet(
     def destroy(self, request, alias=None, **kwargs):  # noqa: ARG002
         """Unlink and delete an identity provider."""
 
-        delete_identity_provider(self.get_object())
+        delete_identity_provider(self.get_object(), actor=request.user)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -337,7 +415,9 @@ class IdentityProviderProvisioningViewSet(
 
         return Response(
             self.get_serializer(
-                refresh_identity_provider_metadata(self.get_object())
+                refresh_identity_provider_metadata(
+                    self.get_object(), actor=request.user
+                )
             ).data
         )
 
@@ -363,7 +443,9 @@ class IdentityProviderProvisioningViewSet(
         request_serializer.is_valid(raise_exception=True)
 
         identity_provider = transition_identity_provider(
-            self.get_object(), request_serializer.validated_data["state"]
+            self.get_object(),
+            request_serializer.validated_data["state"],
+            actor=request.user,
         )
 
         return Response(self.get_serializer(identity_provider).data)
@@ -380,7 +462,7 @@ class ParseMetadataView(ProvisioningExceptionMixin, viewsets.ViewSet):
     needs an allowlist and a rate limit before it goes anywhere near a partner.
     """
 
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [IsAdminUser]
 
     @extend_schema(
         request=ParseMetadataSerializer,

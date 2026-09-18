@@ -2,6 +2,7 @@
 
 import logging
 from decimal import Decimal
+from urllib.parse import urljoin
 
 from django.conf import settings
 from django.contrib import admin
@@ -28,6 +29,7 @@ from b2b.constants import (
     CONTRACT_MEMBERSHIP_TYPE_CHOICES,
     IDP_LIFECYCLE_CHOICES,
     IDP_PROTOCOL_CHOICES,
+    IDP_PROTOCOL_SAML,
     IDP_STATE_DRAFT,
     ONBOARDING_STATE_CHOICES,
     ONBOARDING_STATE_REQUESTED,
@@ -970,6 +972,35 @@ class OrganizationIdentityProvider(TimestampedModel, ValidateOnSaveMixin):
         ),
     )
     metadata_fetched_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def service_provider(self):
+        """
+        Return what the partner's IdP needs to know about our side.
+
+        These are Keycloak's broker URLs for this alias, which is what an
+        operator hands the partner's engineers. The SP entity ID is only
+        meaningful for SAML; Keycloak uses the realm URL unless the IdP config
+        sets entityId.
+
+        Returns:
+        - dict: entity_id (SAML only), redirect_uri (the SAML ACS URL or the
+          OIDC redirect URI) and metadata_url (the SAML SP descriptor)
+        """
+
+        realm_url = urljoin(
+            settings.KEYCLOAK_BASE_URL, f"/realms/{settings.KEYCLOAK_REALM_NAME}"
+        )
+        endpoint = f"{realm_url}/broker/{self.alias}/endpoint"
+
+        if self.protocol != IDP_PROTOCOL_SAML:
+            return {"entity_id": None, "redirect_uri": endpoint, "metadata_url": None}
+
+        return {
+            "entity_id": (self.metadata_artifact or {}).get("entityId") or realm_url,
+            "redirect_uri": endpoint,
+            "metadata_url": f"{endpoint}/descriptor",
+        }
 
     def __str__(self):
         """Return a reasonable representation of the object as a string."""
