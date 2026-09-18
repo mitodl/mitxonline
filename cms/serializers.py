@@ -404,6 +404,23 @@ class ProductPageFAQSerializer(serializers.Serializer):
     answer = RichTextSerializer(read_only=True)
 
 
+class ProductPageTestimonialSerializer(serializers.Serializer):
+    """Serializes a single product page testimonial."""
+
+    id = serializers.IntegerField(read_only=True)
+    quote = serializers.CharField(read_only=True)
+    name = serializers.CharField(read_only=True)
+    title = serializers.CharField(read_only=True)
+    image_src = serializers.SerializerMethodField()
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_image_src(self, instance):
+        """Serializes the source of the testimonial image, or None if not set."""
+        if instance.image:
+            return get_wagtail_img_src(instance.image) or None
+        return None
+
+
 class InstructorPageSerializer(serializers.ModelSerializer):
     """Instructor page model serializer"""
 

@@ -5778,6 +5778,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/FAQItem'
+        testimonials:
+          type: array
+          items:
+            $ref: '#/components/schemas/TestimonialItem'
         certificate_page:
           allOf:
           - $ref: '#/components/schemas/CertificatePage'
@@ -5827,6 +5831,7 @@ components:
       - min_weeks
       - prerequisites
       - price
+      - testimonials
       - title
       - topic_list
       - video_url
@@ -9728,6 +9733,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/FAQItem'
+        testimonials:
+          type: array
+          items:
+            $ref: '#/components/schemas/TestimonialItem'
         certificate_page:
           $ref: '#/components/schemas/CertificatePage'
         program_details:
@@ -9760,6 +9769,7 @@ components:
       - prerequisites
       - price
       - program_details
+      - testimonials
       - title
       - video_url
       - what_you_learn
@@ -10268,6 +10278,27 @@ components:
       - language
       - variant_industry
       - variant_length
+    TestimonialItem:
+      type: object
+      description: Serializer for testimonial items shown on course/program pages.
+      properties:
+        id:
+          type: integer
+        quote:
+          type: string
+        name:
+          type: string
+        title:
+          type: string
+        image_src:
+          type: string
+          nullable: true
+      required:
+      - id
+      - image_src
+      - name
+      - quote
+      - title
     Topic:
       type: object
       description: Serializer for topics used in course pages.
