@@ -1375,9 +1375,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             courseruns = filter(
                 lambda run: (
                     getattr(run.b2b_contract, "organization_id", None) == org_id
-                    or any(
-                        c.organization_id == org_id for c in run.b2b_contracts.all()
-                    )
+                    or any(c.organization_id == org_id for c in run.b2b_contracts.all())
                 ),
                 courseruns,
             )
