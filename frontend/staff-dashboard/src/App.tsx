@@ -1,58 +1,45 @@
-import { Refine, useGetIdentity } from "@refinedev/core";
-import { notificationProvider } from "@refinedev/antd";
-
+import { Authenticated, CanAccess, Refine } from "@refinedev/core";
+import { ErrorComponent, useNotificationProvider } from "@refinedev/antd";
+import routerProvider, { CatchAllNavigate } from "@refinedev/react-router-v6";
+import { App as AntdApp } from "antd";
 import { BarcodeOutlined, FormOutlined } from "@ant-design/icons";
+import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 
-import routerProvider from "@refinedev/react-router-v6/legacy";
 import "@refinedev/antd/dist/reset.css";
-import { useAuthProvider } from "hooks/useAuthProvider";
-import {
-  Title,
-  Header,
-  Sider,
-  Footer,
-  Layout,
-  OffLayoutArea,
-} from "components/layout";
+import { PROFILE_KEY, useAuthProvider } from "hooks/useAuthProvider";
+import { Layout } from "components/layout";
 import LoginPage from "pages/login";
 import { DashboardPage } from "pages/dashboard";
 import { DiscountList, DiscountEdit, DiscountShow, DiscountCreate, BulkDiscountCreate } from "pages/discounts";
 import { FlexiblePricingList } from "./pages/flexible_pricing";
-import axios from "axios";
 import useDrfDataProvider from "hooks/useDrfDataProvider";
-import { Routes, Route } from "react-router-dom";
 
 import "styles/antd.less";
 
-const axiosInterface = axios.create();
-
-axiosInterface.interceptors.request.use((config: any) => {
-  let token = sessionStorage.getItem(`oidc.user:${OIDC_CONFIG.authority}:${OIDC_CONFIG.client_id}`);
-
-  if (token !== null) {
-    token = JSON.parse(token).access_token;
-
-    if (config && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  }
-
-  return config;
-}, (error: any) => Promise.reject(error));
-
 const _ = require("lodash");
 
-const { RouterComponent : RefineRouterComponent } = routerProvider;
+const accessControlProvider = {
+  can: async ({ resource }: { resource?: string }) => {
+    let profile = localStorage.getItem(PROFILE_KEY);
+    if (profile) {
+      profile = JSON.parse(profile);
+    } else {
+      return { can: false, reason: "You don't have a valid session." };
+    }
 
-const customRoutes = [
-  {
-    element: <BulkDiscountCreate />,
-    path: "discounts/create_batch",
-    layout: true,
+    if (_.get(profile, 'is_superuser')) {
+      return { can: true };
+    }
+
+    if (_.get(profile, 'is_staff')) {
+      if (resource == 'flexible_pricing') {
+        return { can: true };
+      }
+    }
+
+    return { can: false, reason: 'Your account is not allowed to do that.' };
   }
-];
-
-const RouterComponent = () => (<RefineRouterComponent basename="/staff-dashboard" />);
+};
 
 export default function App() {
   const dataURI = DATASOURCES_CONFIG?.mitxOnline ?? "";
@@ -60,67 +47,62 @@ export default function App() {
   const xonlineProvider = useDrfDataProvider(dataURI);
 
   return (
-    <Refine
-      legacyRouterProvider={{
-        ...routerProvider,
-        RouterComponent,
-        routes: customRoutes
-      }}
-      notificationProvider={notificationProvider}
-      dataProvider={xonlineProvider}
-      legacyAuthProvider={authProvider}
-      accessControlProvider={{
-        can: async ({ action, params, resource }) => {
-          let profile = localStorage.getItem("mitx-online-staff-profile");
-          if (profile) {
-            profile = JSON.parse(profile);
-          } else {
-            return Promise.resolve({ can: false, reason: "You don't have a valid session." });
-          }
-
-          if (_.get(profile, 'is_superuser')) {
-            return Promise.resolve({ can: true });
-          }
-
-          if (_.get(profile, 'is_staff')) {
-            if (resource == 'dashboard' || resource == 'flexible_pricing') {
-              return Promise.resolve({ can: true });
+    <BrowserRouter basename="/staff-dashboard">
+      <AntdApp>
+        <Refine
+          routerProvider={routerProvider}
+          notificationProvider={useNotificationProvider}
+          dataProvider={xonlineProvider}
+          authProvider={authProvider}
+          accessControlProvider={accessControlProvider}
+          resources={[
+            {
+              name: "discounts",
+              list: "/discounts",
+              show: "/discounts/show/:id",
+              edit: "/discounts/edit/:id",
+              create: "/discounts/create",
+              meta: {
+                icon: <BarcodeOutlined/>,
+              },
+            },
+            {
+              name: 'flexible_pricing',
+              list: "/flexible_pricing",
+              meta: {
+                label: 'Flexible Pricing',
+                icon: <FormOutlined/>,
+              },
             }
-          }
-
-          return Promise.resolve({ can: false, reason: 'Your account is not allowed to do that.' });
-        }
-      }}
-      LoginPage={LoginPage}
-      DashboardPage={DashboardPage}
-      resources={[
-        // {
-        //   name: "learners",
-        //   icon: <UserOutlined/>
-        // },
-        {
-          name: "discounts",
-          icon: <BarcodeOutlined/>,
-          show: DiscountShow,
-          list: DiscountList,
-          edit: DiscountEdit,
-          create: DiscountCreate,
-        },
-        {
-          name: 'flexible_pricing',
-          icon: <FormOutlined/>,
-          meta: {
-            label: 'Flexible Pricing'
-          },
-          list: FlexiblePricingList,
-        }
-      ]}
-      Title={Title}
-      Header={Header}
-      Sider={Sider}
-      Footer={Footer}
-      Layout={Layout}
-      OffLayoutArea={OffLayoutArea}
-    />
+          ]}
+        >
+          <Routes>
+            <Route
+              element={
+                <Authenticated key="authenticated" fallback={<CatchAllNavigate to="/login" />}>
+                  <Layout>
+                    <Outlet />
+                  </Layout>
+                </Authenticated>
+              }
+            >
+              <Route index element={<DashboardPage />} />
+              <Route element={<CanAccess fallback={<ErrorComponent />}><Outlet /></CanAccess>}>
+                <Route path="/discounts">
+                  <Route index element={<DiscountList />} />
+                  <Route path="create" element={<DiscountCreate />} />
+                  <Route path="create_batch" element={<BulkDiscountCreate />} />
+                  <Route path="show/:id" element={<DiscountShow />} />
+                  <Route path="edit/:id" element={<DiscountEdit />} />
+                </Route>
+                <Route path="/flexible_pricing" element={<FlexiblePricingList />} />
+              </Route>
+              <Route path="*" element={<ErrorComponent />} />
+            </Route>
+            <Route path="/login" element={<LoginPage />} />
+          </Routes>
+        </Refine>
+      </AntdApp>
+    </BrowserRouter>
   );
 }
