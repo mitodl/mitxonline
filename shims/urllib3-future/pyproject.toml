@@ -14,6 +14,15 @@
 # imports. The CyberSource SDK only ever does `import urllib3`, which resolves to the
 # real urllib3 pinned in the root pyproject.toml.
 #
+# That is necessary but NOT sufficient. The SDK has no *import* dependency on
+# urllib3-future, but it does have an *API* one: CyberSource/rest.py calls
+# urllib3.PoolManager/ProxyManager with `keepalive_delay` and `keepalive_idle_window`,
+# kwargs only urllib3-future accepts. The real urllib3 swallows them into
+# connection_pool_kw and then raises on the first request, when it builds the pool key:
+#     TypeError: PoolKey.__new__() got an unexpected keyword argument 'key_keepalive_delay'
+# main/cybersource_compat.py filters those kwargs back out; keep it in place alongside
+# this stub.
+#
 # If a dependency ever requires a *version* of urllib3-future, resolution will fail
 # here rather than silently swapping urllib3 back out - revisit this shim at that point.
 
