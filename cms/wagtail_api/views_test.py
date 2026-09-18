@@ -1,10 +1,13 @@
 """Tests for Wagtail API views."""
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework.test import APIClient
 
 from cms.factories import CoursePageFactory, ProgramPageFactory
+from cms.models import ProductPageFAQ
 
 pytestmark = [
     pytest.mark.django_db,
@@ -261,3 +264,85 @@ def test_program_page_detail_exposes_hubspot_form_id(user_drf_client):
     body = resp.json()
     assert body["hubspot_form_id"] == "program-form-456"
     assert "show_stay_updated" not in body
+
+
+def test_course_page_detail_exposes_faqs_in_order(user_drf_client):
+    """CoursePage detail returns authored FAQs (question + answer) in sort order."""
+    page = CoursePageFactory.create()
+    first_answer = '<p>First answer with a <a href="https://example.com">link</a>.</p>'
+    ProductPageFAQ.objects.create(
+        page=page,
+        question="Second question?",
+        answer="<p>Second answer.</p>",
+        sort_order=1,
+    )
+    ProductPageFAQ.objects.create(
+        page=page,
+        question="First question?",
+        answer=first_answer,
+        sort_order=0,
+    )
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    faqs = resp.json()["faqs"]
+    assert [faq["question"] for faq in faqs] == [
+        "First question?",
+        "Second question?",
+    ]
+    assert faqs[0]["answer"] == first_answer
+    # id is exposed so the frontend can use it as a stable accordion key.
+    assert all(isinstance(faq["id"], int) for faq in faqs)
+
+
+def test_program_page_detail_exposes_faqs(user_drf_client):
+    """ProgramPage detail returns authored FAQs (question + answer)."""
+    page = ProgramPageFactory.create()
+    ProductPageFAQ.objects.create(
+        page=page,
+        question="What is this program?",
+        answer="<p>Program details.</p>",
+    )
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    faqs = resp.json()["faqs"]
+    assert len(faqs) == 1
+    assert faqs[0]["question"] == "What is this program?"
+
+
+def test_course_page_detail_faqs_empty_when_none_authored(user_drf_client):
+    """CoursePage detail returns an empty faqs list when no FAQs are authored."""
+    page = CoursePageFactory.create()
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    assert resp.json()["faqs"] == []
+
+
+@pytest.mark.skip_nplusone_check  # list endpoint has a pre-existing course N+1
+# "*" is the all-fields form the documented catalog routes use, so it must
+# prefetch faqs too, not just the explicit "faqs" token.
+@pytest.mark.parametrize("fields", ["faqs", "*"])
+def test_course_page_listing_faqs_prefetched(user_drf_client, fields):
+    """Listing course pages with faqs hits faqs_list once, not once per page."""
+    for _ in range(3):
+        page = CoursePageFactory.create()
+        ProductPageFAQ.objects.create(page=page, question="Q?", answer="<p>A.</p>")
+    with CaptureQueriesContext(connection) as captured:
+        resp = user_drf_client.get(
+            reverse("wagtailapi:pages:listing"),
+            {"type": "cms.coursepage", "fields": fields},
+        )
+    assert resp.status_code == 200
+    items = resp.json()["items"]
+    assert len(items) == 3
+    assert all(len(item["faqs"]) == 1 for item in items)
+    # One prefetch query for all pages, not one per page.
+    faq_queries = [
+        q for q in captured.captured_queries if "cms_productpagefaq" in q["sql"]
+    ]
+    assert len(faq_queries) == 1
