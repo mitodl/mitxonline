@@ -3,8 +3,14 @@
 from django.conf import settings
 from django.db import models
 from mitol.common.models import TimestampedModel
+from mitol.common.utils import now_in_utc
 
 from openedx.constants import (
+    COURSE_RUN_CLONE_STATUS_CHOICES,
+    COURSE_RUN_CLONE_STATUS_CLONED,
+    COURSE_RUN_CLONE_STATUS_CLONING,
+    COURSE_RUN_CLONE_STATUS_FAILED,
+    COURSE_RUN_CLONE_STATUS_PENDING,
     OPENEDX_PLATFORM_CHOICES,
     OPENEDX_USERNAME_MAX_LEN,
     PLATFORM_EDX,
@@ -52,6 +58,80 @@ class OpenEdxUser(TimestampedModel):
                 fields=["has_been_synced", "has_sync_error"], name="sync_state_idx"
             )
         ]
+
+
+class CourseRunClone(TimestampedModel):
+    """
+    Progress of cloning a source course run into edX for a new course run.
+
+    Written by the clone_courserun task, whichever path queued it. Without it,
+    a clone that exhausts its retries leaves a local run and product with no
+    course in edX, and nothing says so.
+    """
+
+    course_run = models.OneToOneField(
+        "courses.CourseRun",
+        on_delete=models.CASCADE,
+        related_name="edx_clone",
+    )
+    source_courseware_id = models.CharField(max_length=255)
+    status = models.CharField(
+        max_length=16,
+        choices=COURSE_RUN_CLONE_STATUS_CHOICES,
+        default=COURSE_RUN_CLONE_STATUS_PENDING,
+    )
+    attempts = models.PositiveIntegerField(default=0)
+    clone_requested_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Stamped just before edX is asked to clone. A retry that finds the "
+            "target already in edX treats it as ours only when this is set."
+        ),
+    )
+    error = models.TextField(blank=True, default="")
+
+    def start_attempt(self):
+        """Record that a clone attempt is starting, counting it atomically."""
+
+        CourseRunClone.objects.filter(pk=self.pk).update(
+            status=COURSE_RUN_CLONE_STATUS_CLONING,
+            attempts=models.F("attempts") + 1,
+            updated_on=now_in_utc(),
+        )
+        self.refresh_from_db()
+
+    def mark_requested(self):
+        """Record that edX is about to be asked to clone."""
+
+        self.clone_requested_at = now_in_utc()
+        self.save(update_fields=["clone_requested_at", "updated_on"])
+
+    def mark_cloned(self):
+        """Record that the clone finished."""
+
+        self.status = COURSE_RUN_CLONE_STATUS_CLONED
+        self.error = ""
+        self.save(update_fields=["status", "error", "updated_on"])
+
+    def mark_error(self, exc, *, final):
+        """
+        Record a failed attempt.
+
+        Args:
+        - exc (Exception): what the attempt raised
+        - final (bool): whether no further attempt is coming
+        """
+
+        self.error = f"{type(exc).__name__}: {exc}"
+        update_fields = ["error", "updated_on"]
+        if final:
+            self.status = COURSE_RUN_CLONE_STATUS_FAILED
+            update_fields.append("status")
+        self.save(update_fields=update_fields)
+
+    def __str__(self):
+        return f"CourseRunClone for {self.course_run_id} ({self.status})"
 
 
 class OpenEdxApiAuth(TimestampedModel):
