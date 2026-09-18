@@ -234,3 +234,62 @@ class TestGetTopicsFromPage:
             {"name": "Ångström Physics"},
         ]
         assert result == expected
+
+    def test_get_topics_from_page_does_not_dedupe_parent_against_direct(self):
+        """
+        A parent whose name matches a direct topic must appear twice.
+
+        This is the contract #3169 broke (it deduplicated parents against direct
+        topics), which is why #3213 reverted it. Pinning it here so the shape of
+        the ``topics`` array cannot be "tidied up" by accident.
+        """
+        science = CoursesTopicFactory.create(name="Science", parent=None)
+        # A direct topic with the same name as the parent, under a different
+        # parent, so unique_together ("name", "parent") still holds.
+        other = CoursesTopicFactory.create(name="Other", parent=None)
+        science_direct = CoursesTopicFactory.create(name="Science", parent=other)
+        physics = CoursesTopicFactory.create(name="Physics", parent=science)
+
+        mock_page = Mock()
+        mock_page.topics.all.return_value = [physics, science_direct]
+
+        result = get_topics_from_page(mock_page)
+
+        # Direct topics sorted by name, then the distinct parents appended.
+        assert result == [
+            {"name": "Physics"},
+            {"name": "Science"},
+            {"name": "Other"},
+            {"name": "Science"},
+        ]
+
+    def test_get_topics_from_page_orders_parents_by_model_ordering(self):
+        """
+        Parents come back in ``CoursesTopic.Meta.ordering`` order.
+
+        That is ``["parent__name", "name"]``, and Postgres sorts NULLs last for
+        ASC - so parents that themselves have a parent sort before top-level
+        ones, and the derived-in-Python ordering has to match.
+        """
+        top_b = CoursesTopicFactory.create(name="B-top", parent=None)
+        top_a = CoursesTopicFactory.create(name="A-top", parent=None)
+        # mid_* have a non-null parent, so they sort ahead of the top-level ones.
+        mid = CoursesTopicFactory.create(name="Zebra", parent=top_a)
+
+        leaf_of_top_b = CoursesTopicFactory.create(name="leaf1", parent=top_b)
+        leaf_of_top_a = CoursesTopicFactory.create(name="leaf2", parent=top_a)
+        leaf_of_mid = CoursesTopicFactory.create(name="leaf3", parent=mid)
+
+        mock_page = Mock()
+        mock_page.topics.all.return_value = [
+            leaf_of_top_b,
+            leaf_of_top_a,
+            leaf_of_mid,
+        ]
+
+        result = get_topics_from_page(mock_page)
+        parent_names = [entry["name"] for entry in result[3:]]
+
+        # "Zebra" has parent "A-top" (non-null) so it leads; "A-top" and
+        # "B-top" have no parent, so they sort last, by name.
+        assert parent_names == ["Zebra", "A-top", "B-top"]
