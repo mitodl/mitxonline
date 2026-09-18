@@ -1,21 +1,19 @@
 import React from "react";
 
-import { LayoutProps } from "@refinedev/core";
 import { Layout as AntdLayout, Grid } from "antd";
 
-export const Layout: React.FC<LayoutProps> = ({
-  children,
-  Sider,
-  Header,
-  Footer,
-  OffLayoutArea,
-}) => {
+import { Footer } from "../footer";
+import { Header } from "../header";
+import { OffLayoutArea } from "../offLayoutArea";
+import { Sider } from "../sider";
+
+export const Layout: React.FC<React.PropsWithChildren<{}>> = ({ children }) => {
   const breakpoint = Grid.useBreakpoint();
   return (
     <AntdLayout style={{ minHeight: "100vh", flexDirection: "row" }}>
-      {Sider && <Sider />}
+      <Sider />
       <AntdLayout>
-        {Header && <Header />}
+        <Header />
         <AntdLayout.Content>
           <div
             style={{
@@ -25,9 +23,9 @@ export const Layout: React.FC<LayoutProps> = ({
           >
             {children}
           </div>
-          {OffLayoutArea && <OffLayoutArea />}
+          <OffLayoutArea />
         </AntdLayout.Content>
-        {Footer && <Footer />}
+        <Footer />
       </AntdLayout>
     </AntdLayout>
   );
