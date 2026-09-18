@@ -14,6 +14,7 @@ from b2b.models import (
     ContractProgramItem,
     DiscountContractAttachmentRedemption,
     OrganizationPage,
+    OrganizationProvisioningAudit,
     UserOrganization,
 )
 from courses.models import CourseRun
@@ -392,3 +393,50 @@ class UserOrganizationAdmin(admin.ModelAdmin):
     list_filter = ["is_manager", "keep_until_seen", "organization"]
     search_fields = ["user__email", "user__username", "organization__name"]
     fields = ["user", "organization", "is_manager", "keep_until_seen"]
+
+
+@admin.register(OrganizationProvisioningAudit)
+class OrganizationProvisioningAuditAdmin(admin.ModelAdmin):
+    """Read-only view of the provisioning audit trail."""
+
+    list_display = [
+        "created_on",
+        "organization",
+        "action",
+        "identity_provider_alias",
+        "acting_user",
+    ]
+    list_filter = ["action"]
+    list_select_related = ["organization", "acting_user"]
+    search_fields = [
+        "organization__name",
+        "organization__org_key",
+        "identity_provider_alias",
+        "acting_user__email",
+    ]
+    readonly_fields = [
+        "created_on",
+        "organization",
+        "action",
+        "identity_provider_alias",
+        "acting_user",
+        "data_before",
+        "data_after",
+        "call_stack",
+    ]
+    fields = readonly_fields
+
+    def has_add_permission(self, request):  # noqa: ARG002
+        """Audit records are written by the provisioning functions only."""
+
+        return False
+
+    def has_change_permission(self, request, obj=None):  # noqa: ARG002
+        """Audit records are append-only."""
+
+        return False
+
+    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
+        """Audit records are append-only."""
+
+        return False

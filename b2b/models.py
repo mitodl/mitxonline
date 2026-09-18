@@ -32,10 +32,11 @@ from b2b.constants import (
     ONBOARDING_STATE_CHOICES,
     ONBOARDING_STATE_REQUESTED,
     ORG_INDEX_SLUG,
+    PROVISIONING_ACTION_CHOICES,
 )
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import Program
-from main.models import ValidateOnSaveMixin
+from main.models import AuditModel, ValidateOnSaveMixin
 from variants.models import SupportedVariant
 
 log = logging.getLogger(__name__)
@@ -974,6 +975,53 @@ class OrganizationIdentityProvider(TimestampedModel, ValidateOnSaveMixin):
         """Return a reasonable representation of the object as a string."""
 
         return f"OrganizationIdentityProvider: {self.alias} ({self.lifecycle_state})"
+
+
+class OrganizationProvisioningAudit(AuditModel):
+    """
+    One change made through the provisioning API, and who made it.
+
+    Before the API, a partner's SSO config changed only through a reviewed,
+    merged Pulumi PR, so the review was the record. This is the replacement
+    record. There is no approval step before an IdP goes active, so this is
+    how a change gets reviewed: after the fact.
+
+    Append-only. The IdP is recorded by alias rather than by foreign key so
+    its history outlives it. Credentials are never written here.
+    """
+
+    organization = models.ForeignKey(
+        "b2b.OrganizationPage",
+        on_delete=models.CASCADE,
+        related_name="provisioning_audits",
+    )
+    # AuditModel cascades, which would erase who changed a partner's SSO config
+    # when that staff account is retired.
+    acting_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL
+    )
+    identity_provider_alias = models.CharField(max_length=255, blank=True, default="")
+    action = models.CharField(max_length=64, choices=PROVISIONING_ACTION_CHOICES)
+
+    class Meta:
+        ordering = ["-created_on", "-id"]
+
+    @classmethod
+    def get_related_field_name(cls):
+        return "organization"
+
+    def save(self, *args, **kwargs):
+        """Refuse to rewrite an audit record."""
+
+        if self.pk is not None:
+            msg = "Provisioning audit records cannot be changed."
+            raise ValueError(msg)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        """Return a reasonable representation of the object as a string."""
+
+        return f"OrganizationProvisioningAudit: {self.action} on {self.organization_id}"
 
 
 def is_organization_manager(user, org_id):

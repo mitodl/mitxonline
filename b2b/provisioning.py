@@ -29,6 +29,13 @@ from b2b.constants import (
     IDP_STATE_DRAFT,
     IDP_STATE_KEYCLOAK_FLAGS,
     ONBOARDING_STATE_ORG_CREATED,
+    PROVISIONING_ACTION_IDP_CREATED,
+    PROVISIONING_ACTION_IDP_DELETED,
+    PROVISIONING_ACTION_IDP_METADATA_REFRESHED,
+    PROVISIONING_ACTION_IDP_TRANSITIONED,
+    PROVISIONING_ACTION_ONBOARDING_CHANGED,
+    PROVISIONING_ACTION_ORG_CREATED,
+    PROVISIONING_ACTION_ORG_UPDATED,
 )
 from b2b.exceptions import (
     AliasCollisionError,
@@ -49,6 +56,7 @@ from b2b.models import (
     OrganizationIndexPage,
     OrganizationOnboarding,
     OrganizationPage,
+    OrganizationProvisioningAudit,
 )
 
 log = logging.getLogger(__name__)
@@ -63,6 +71,40 @@ IDP_ATTRIBUTE_MAPPERS = {
     IDP_PROTOCOL_SAML: "saml-user-attribute-idp-mapper",
     IDP_PROTOCOL_OIDC: "oidc-user-attribute-idp-mapper",
 }
+
+
+def _audit(  # noqa: PLR0913
+    organization,
+    action,
+    *,
+    actor,
+    identity_provider_alias="",
+    data_before=None,
+    data_after=None,
+):
+    """
+    Record a provisioning change.
+
+    Called by every function below that changes something, after the change
+    has happened, so the audit trail covers any caller and not only the API.
+    """
+
+    OrganizationProvisioningAudit.objects.create(
+        organization=organization,
+        action=action,
+        acting_user=actor,
+        identity_provider_alias=identity_provider_alias,
+        data_before=data_before,
+        data_after=data_after,
+    )
+
+
+def _onboarding_snapshot(onboarding):
+    """Return the audited fields of an onboarding record."""
+
+    if onboarding is None:
+        return None
+    return {"state": onboarding.state, "notes": onboarding.notes}
 
 
 class KeycloakConnection:
@@ -162,6 +204,7 @@ def create_organization(  # noqa: PLR0913
     description="",
     redirect_url="",
     connection=None,
+    actor=None,
 ):
     """
     Create a Keycloak organization and the MITx Online records beside it.
@@ -187,6 +230,7 @@ def create_organization(  # noqa: PLR0913
     - description (str): free-form description
     - redirect_url (str): where Keycloak sends members after login
     - connection (KeycloakConnection): an existing connection, if any
+    - actor (User): who asked for this, for the audit trail
     Returns:
     - OrganizationPage: the new organization
     Raises:
@@ -295,6 +339,21 @@ def create_organization(  # noqa: PLR0913
                 state=ONBOARDING_STATE_ORG_CREATED,
                 state_changed_at=now_in_utc(),
             )
+
+            _audit(
+                organization,
+                PROVISIONING_ACTION_ORG_CREATED,
+                actor=actor,
+                data_after={
+                    "name": name,
+                    "org_key": org_key,
+                    "org_key_prefix": organization.org_key_prefix,
+                    "description": description,
+                    "redirect_url": redirect_url,
+                    "domains": list(domains),
+                    "sso_organization_id": str(sso_organization_id),
+                },
+            )
     except Exception as write_error:
         try:
             connection.organizations.delete(sso_organization_id)
@@ -327,6 +386,7 @@ def update_organization(  # noqa: PLR0913
     redirect_url=None,
     domains=None,
     connection=None,
+    actor=None,
 ):
     """
     Update an organization in both systems.
@@ -345,6 +405,7 @@ def update_organization(  # noqa: PLR0913
     - redirect_url (str): new post-login redirect, if changing
     - domains (list[str]): the complete new domain list, if changing
     - connection (KeycloakConnection): an existing connection, if any
+    - actor (User): who asked for this, for the audit trail
     Returns:
     - OrganizationPage: the updated organization
     Raises:
@@ -358,6 +419,24 @@ def update_organization(  # noqa: PLR0913
     keycloak_org = connection.organizations.get(organization.sso_organization_id)
     payload = keycloak_org.model_dump(by_alias=True, exclude_none=True)
 
+    current = {
+        "name": organization.name,
+        "description": organization.description,
+        "redirect_url": keycloak_org.redirect_url,
+        "domains": [domain.name for domain in keycloak_org.domains or []],
+    }
+    requested = {
+        "name": name,
+        "description": description,
+        "redirect_url": redirect_url,
+        "domains": list(domains) if domains is not None else None,
+    }
+    changed = {
+        field: value
+        for field, value in requested.items()
+        if value is not None and value != current[field]
+    }
+
     if name is not None:
         payload["name"] = name
         organization.name = name
@@ -370,9 +449,53 @@ def update_organization(  # noqa: PLR0913
         payload["domains"] = [{"name": domain, "verified": True} for domain in domains]
 
     connection.organizations.update(organization.sso_organization_id, payload)
-    organization.save()
+
+    with transaction.atomic():
+        organization.save()
+        if changed:
+            _audit(
+                organization,
+                PROVISIONING_ACTION_ORG_UPDATED,
+                actor=actor,
+                data_before={field: current[field] for field in changed},
+                data_after=changed,
+            )
 
     return organization
+
+
+def set_onboarding_state(organization, state, *, notes=None, actor=None):
+    """
+    Record where an organization is in the onboarding sequence.
+
+    Descriptive only: nothing gates on the state.
+
+    Args:
+    - organization (OrganizationPage): the organization
+    - state (str): the onboarding state to record
+    - notes (str): replacement notes, if any
+    - actor (User): who recorded it, for the audit trail
+    Returns:
+    - OrganizationOnboarding: the updated record
+    """
+
+    with transaction.atomic():
+        onboarding = OrganizationOnboarding.objects.filter(
+            organization=organization
+        ).first()
+        before = _onboarding_snapshot(onboarding)
+        onboarding = onboarding or OrganizationOnboarding(organization=organization)
+        onboarding.set_state(state, notes=notes)
+
+        _audit(
+            organization,
+            PROVISIONING_ACTION_ONBOARDING_CHANGED,
+            actor=actor,
+            data_before=before,
+            data_after=_onboarding_snapshot(onboarding),
+        )
+
+    return onboarding
 
 
 def parse_identity_provider_metadata(
@@ -469,6 +592,7 @@ def create_identity_provider(  # noqa: PLR0913
     attribute_map=None,
     attribute_name_map=None,
     connection=None,
+    actor=None,
 ):
     """
     Create an identity provider for an organization and link the two.
@@ -491,6 +615,7 @@ def create_identity_provider(  # noqa: PLR0913
     - attribute_map (dict): user attribute -> SAML friendly name / OIDC claim
     - attribute_name_map (dict): user attribute -> SAML attribute name
     - connection (KeycloakConnection): an existing connection, if any
+    - actor (User): who asked for this, for the audit trail
     Returns:
     - OrganizationIdentityProvider: the new record
     Raises:
@@ -559,16 +684,35 @@ def create_identity_provider(  # noqa: PLR0913
         connection.organizations.associate(
             ORG_IDP_ASSOCIATION, organization.sso_organization_id, alias
         )
-        identity_provider = OrganizationIdentityProvider.objects.create(
-            organization=organization,
-            alias=alias,
-            protocol=protocol,
-            display_name=display_name,
-            internal_id=internal_id or "",
-            metadata_source=metadata_url or metadata_xml or "",
-            metadata_artifact=metadata_artifact,
-            metadata_fetched_at=fetched_at,
-        )
+        with transaction.atomic():
+            identity_provider = OrganizationIdentityProvider.objects.create(
+                organization=organization,
+                alias=alias,
+                protocol=protocol,
+                display_name=display_name,
+                internal_id=internal_id or "",
+                metadata_source=metadata_url or metadata_xml or "",
+                metadata_artifact=metadata_artifact,
+                metadata_fetched_at=fetched_at,
+            )
+            # The client secret is left out on purpose: it went to Keycloak
+            # and is not stored anywhere on our side, this included.
+            _audit(
+                organization,
+                PROVISIONING_ACTION_IDP_CREATED,
+                actor=actor,
+                identity_provider_alias=alias,
+                data_after={
+                    "protocol": protocol,
+                    "display_name": display_name,
+                    "lifecycle_state": identity_provider.lifecycle_state,
+                    "metadata_url": metadata_url or None,
+                    "metadata_xml_uploaded": bool(metadata_xml),
+                    "client_id": client_id or None,
+                    "attribute_map": attribute_map or {},
+                    "attribute_name_map": attribute_name_map or {},
+                },
+            )
     except Exception:
         connection.identity_providers.delete(alias)
         raise
@@ -576,7 +720,9 @@ def create_identity_provider(  # noqa: PLR0913
     return identity_provider
 
 
-def refresh_identity_provider_metadata(identity_provider, *, connection=None):
+def refresh_identity_provider_metadata(
+    identity_provider, *, connection=None, actor=None
+):
     """
     Re-fetch the IdP's metadata and store what came back.
 
@@ -587,6 +733,7 @@ def refresh_identity_provider_metadata(identity_provider, *, connection=None):
     Args:
     - identity_provider (OrganizationIdentityProvider): the IdP to refresh
     - connection (KeycloakConnection): an existing connection, if any
+    - actor (User): who asked for this, for the audit trail
     Returns:
     - OrganizationIdentityProvider: the refreshed record
     """
@@ -606,14 +753,36 @@ def refresh_identity_provider_metadata(identity_provider, *, connection=None):
     payload["config"] = {**(payload.get("config") or {}), **config}
     connection.identity_providers.update(identity_provider.alias, payload)
 
+    before = identity_provider.metadata_artifact or {}
+    changed_keys = sorted(
+        key
+        for key in before.keys() | config.keys()
+        if before.get(key) != config.get(key)
+    )
+
     identity_provider.metadata_artifact = config
     identity_provider.metadata_fetched_at = now_in_utc()
-    identity_provider.save()
+
+    with transaction.atomic():
+        identity_provider.save()
+        # Only the keys that changed. A refresh that finds nothing new is still
+        # recorded, as an empty diff, because "somebody checked" is worth
+        # knowing when a partner rotates a certificate.
+        _audit(
+            identity_provider.organization,
+            PROVISIONING_ACTION_IDP_METADATA_REFRESHED,
+            actor=actor,
+            identity_provider_alias=identity_provider.alias,
+            data_before={key: before.get(key) for key in changed_keys},
+            data_after={key: config.get(key) for key in changed_keys},
+        )
 
     return identity_provider
 
 
-def transition_identity_provider(identity_provider, state, *, connection=None):
+def transition_identity_provider(
+    identity_provider, state, *, connection=None, actor=None
+):
     """
     Move an identity provider to a new lifecycle state.
 
@@ -626,6 +795,7 @@ def transition_identity_provider(identity_provider, state, *, connection=None):
     - identity_provider (OrganizationIdentityProvider): the IdP to move
     - state (str): the lifecycle state to move to
     - connection (KeycloakConnection): an existing connection, if any
+    - actor (User): who asked for this, for the audit trail
     Returns:
     - OrganizationIdentityProvider: the updated record
     Raises:
@@ -650,18 +820,29 @@ def transition_identity_provider(identity_provider, state, *, connection=None):
     connection.identity_providers.update(identity_provider.alias, payload)
 
     identity_provider.lifecycle_state = state
-    identity_provider.save()
+
+    with transaction.atomic():
+        identity_provider.save()
+        _audit(
+            identity_provider.organization,
+            PROVISIONING_ACTION_IDP_TRANSITIONED,
+            actor=actor,
+            identity_provider_alias=identity_provider.alias,
+            data_before={"lifecycle_state": current},
+            data_after={"lifecycle_state": state},
+        )
 
     return identity_provider
 
 
-def delete_identity_provider(identity_provider, *, connection=None):
+def delete_identity_provider(identity_provider, *, connection=None, actor=None):
     """
     Unlink and delete an identity provider.
 
     Args:
     - identity_provider (OrganizationIdentityProvider): the IdP to delete
     - connection (KeycloakConnection): an existing connection, if any
+    - actor (User): who asked for this, for the audit trail
     Raises:
     - OrganizationNotProvisionedError: the organization has no Keycloak record
     """
@@ -681,4 +862,18 @@ def delete_identity_provider(identity_provider, *, connection=None):
         identity_provider.alias,
     )
     connection.identity_providers.delete(identity_provider.alias)
-    identity_provider.delete()
+
+    with transaction.atomic():
+        _audit(
+            identity_provider.organization,
+            PROVISIONING_ACTION_IDP_DELETED,
+            actor=actor,
+            identity_provider_alias=identity_provider.alias,
+            data_before={
+                "protocol": identity_provider.protocol,
+                "display_name": identity_provider.display_name,
+                "lifecycle_state": identity_provider.lifecycle_state,
+                "metadata_source": identity_provider.metadata_source,
+            },
+        )
+        identity_provider.delete()
