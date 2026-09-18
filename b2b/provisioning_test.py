@@ -2,6 +2,7 @@
 
 import faker
 import pytest
+import requests
 from django.core.exceptions import ImproperlyConfigured
 
 from b2b.constants import (
@@ -33,6 +34,9 @@ from b2b.models import (
     OrganizationPage,
 )
 from b2b.provisioning import (
+    BackfillAction,
+    BackfillRow,
+    backfill_keycloak_organizations,
     create_identity_provider,
     create_organization,
     delete_identity_provider,
@@ -676,3 +680,169 @@ def test_create_organization_checks_the_index_page_before_touching_keycloak(
 
     connection.organizations.create.assert_not_called()
     connection.organizations.delete.assert_not_called()
+
+
+def _unlinked_organization(**overrides):
+    return OrganizationPageFactory.create(sso_organization_id=None, **overrides)
+
+
+def test_backfill_links_an_organization_to_the_realm_org_with_its_alias(connection):
+    """The realm's alias matches the org_key, case-insensitively, so it is linked."""
+
+    organization = _unlinked_organization(org_key="UTK")
+    keycloak_id = str(FAKE.uuid4())
+    connection.organizations.list_all.return_value = [
+        OrganizationRepresentation(id=keycloak_id, alias="utk")
+    ]
+
+    rows = backfill_keycloak_organizations(apply=True, connection=connection)
+
+    assert rows == [
+        BackfillRow("UTK", BackfillAction.LINK, applied=True, detail=keycloak_id)
+    ]
+    organization.refresh_from_db()
+    assert str(organization.sso_organization_id) == keycloak_id
+    assert organization.onboarding.state == ONBOARDING_STATE_ORG_CREATED
+    connection.organizations.create.assert_not_called()
+
+
+def test_backfill_is_a_dry_run_unless_applied(connection):
+    """Without apply, the report is produced and nothing is written."""
+
+    organization = _unlinked_organization(org_key="UTK")
+    connection.organizations.list_all.return_value = [
+        OrganizationRepresentation(id=str(FAKE.uuid4()), alias="utk")
+    ]
+
+    rows = backfill_keycloak_organizations(connection=connection)
+
+    assert [(row.action, row.applied) for row in rows] == [(BackfillAction.LINK, False)]
+    organization.refresh_from_db()
+    assert organization.sso_organization_id is None
+    assert not OrganizationOnboarding.objects.filter(organization=organization).exists()
+
+
+def test_backfill_reports_an_org_with_no_realm_match_without_creating_it(connection):
+    """Demo and test orgs have no Keycloak org and must not get one by default."""
+
+    organization = _unlinked_organization(org_key="acme")
+
+    rows = backfill_keycloak_organizations(apply=True, connection=connection)
+
+    assert rows == [BackfillRow("acme", BackfillAction.NO_KEYCLOAK_ORG)]
+    connection.organizations.create.assert_not_called()
+    organization.refresh_from_db()
+    assert organization.sso_organization_id is None
+
+
+def test_backfill_creates_the_missing_org_only_when_asked(connection):
+    """create_missing writes the Keycloak org with the org_key as alias, then links."""
+
+    organization = _unlinked_organization(org_key="MKS", name="MKS Instruments")
+
+    rows = backfill_keycloak_organizations(
+        apply=True, create_missing=True, connection=connection
+    )
+
+    payload = connection.organizations.create.call_args.args[0]
+    assert payload["alias"] == "MKS"
+    assert payload["name"] == "MKS Instruments"
+    assert rows[0].action == BackfillAction.CREATE
+    assert rows[0].applied
+    organization.refresh_from_db()
+    assert str(organization.sso_organization_id) == str(
+        connection.organizations.create.return_value
+    )
+
+
+def test_backfill_create_missing_dry_run_writes_nothing(connection):
+    """A dry run reports what would be created without calling Keycloak."""
+
+    _unlinked_organization(org_key="MKS")
+
+    rows = backfill_keycloak_organizations(create_missing=True, connection=connection)
+
+    assert [(row.action, row.applied) for row in rows] == [
+        (BackfillAction.CREATE, False)
+    ]
+    connection.organizations.create.assert_not_called()
+
+
+def test_backfill_reports_a_keycloak_failure_and_carries_on(connection):
+    """One rejected create must not abandon the rest of the run."""
+
+    _unlinked_organization(org_key="AAA")
+    second = _unlinked_organization(org_key="BBB")
+    connection.organizations.create.side_effect = [
+        requests.HTTPError("400 Bad Request"),
+        str(FAKE.uuid4()),
+    ]
+
+    rows = backfill_keycloak_organizations(
+        apply=True, create_missing=True, connection=connection
+    )
+
+    assert [row.action for row in rows] == [
+        BackfillAction.FAILED,
+        BackfillAction.CREATE,
+    ]
+    second.refresh_from_db()
+    assert second.sso_organization_id is not None
+
+
+def test_backfill_will_not_link_a_keycloak_org_that_is_already_linked(connection):
+    """A UUID belongs to one page; a second claimant is a conflict, not a link."""
+
+    linked = OrganizationPageFactory.create(org_key="OTHER")
+    _unlinked_organization(org_key="utk")
+    connection.organizations.list_all.return_value = [
+        OrganizationRepresentation(id=str(linked.sso_organization_id), alias="UTK")
+    ]
+
+    rows = backfill_keycloak_organizations(apply=True, connection=connection)
+
+    assert [row.action for row in rows] == [BackfillAction.CONFLICT]
+    assert OrganizationPage.objects.get(org_key="utk").sso_organization_id is None
+
+
+def test_backfill_can_be_limited_to_named_org_keys(connection):
+    """--org-key narrows the run, so one org can be piloted first."""
+
+    _unlinked_organization(org_key="AAA")
+    _unlinked_organization(org_key="BBB")
+
+    rows = backfill_keycloak_organizations(org_keys=["BBB"], connection=connection)
+
+    assert [row.org_key for row in rows] == ["BBB"]
+
+
+def test_backfill_refuses_to_guess_between_pages_that_differ_only_in_case(connection):
+    """Both pages are reported as conflicts and neither is linked."""
+
+    _unlinked_organization(org_key="UTK")
+    _unlinked_organization(org_key="utk")
+    connection.organizations.list_all.return_value = [
+        OrganizationRepresentation(id=str(FAKE.uuid4()), alias="utk")
+    ]
+
+    rows = backfill_keycloak_organizations(apply=True, connection=connection)
+
+    assert [row.action for row in rows] == [BackfillAction.CONFLICT] * 2
+    assert not OrganizationPage.objects.filter(
+        sso_organization_id__isnull=False
+    ).exists()
+
+
+def test_backfill_lists_the_rename_the_sync_will_apply(connection):
+    """The sync overwrites the name once linked, so the dry run shows it."""
+
+    _unlinked_organization(org_key="UTK", name="University of Tennessee")
+    keycloak_id = str(FAKE.uuid4())
+    connection.organizations.list_all.return_value = [
+        OrganizationRepresentation(id=keycloak_id, alias="utk", name="utk")
+    ]
+
+    rows = backfill_keycloak_organizations(connection=connection)
+
+    assert "University of Tennessee" in rows[0].detail
+    assert "'utk'" in rows[0].detail

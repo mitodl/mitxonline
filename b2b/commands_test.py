@@ -1,10 +1,13 @@
 """Tests for B2B management commands."""
 
+from io import StringIO
+
 import pytest
 from django.core.management import call_command
 
 from b2b.factories import ContractPageFactory
 from b2b.models import DiscountContractAttachmentRedemption
+from b2b.provisioning import BackfillAction, BackfillRow
 from courses.factories import CourseRunEnrollmentFactory, CourseRunFactory
 from ecommerce.factories import (
     DiscountFactory,
@@ -161,3 +164,25 @@ def test_b2b_courseware_remove_run_does_not_delete_used_discount_contract_attach
     ).exists()
 
     assert Discount.objects.filter(id=discount.id).exists()
+
+
+def test_backfill_keycloak_orgs_reports_and_only_writes_with_apply(mocker):
+    """The command is a dry run by default and passes its options through."""
+
+    backfill = mocker.patch(
+        "b2b.management.commands.backfill_keycloak_orgs.backfill_keycloak_organizations",
+        return_value=[
+            BackfillRow("UTK", BackfillAction.LINK, detail="kc-id"),
+            BackfillRow("acme", BackfillAction.NO_KEYCLOAK_ORG),
+        ],
+    )
+    out = StringIO()
+
+    call_command("backfill_keycloak_orgs", "--org-key", "UTK", stdout=out)
+
+    backfill.assert_called_once_with(
+        apply=False, create_missing=False, org_keys=["UTK"]
+    )
+    assert "UTK\twould link\tkc-id" in out.getvalue()
+    assert "acme\tno_keycloak_org" in out.getvalue()
+    assert "(dry run)" in out.getvalue()

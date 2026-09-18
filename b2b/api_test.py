@@ -28,6 +28,7 @@ from b2b.api import (
     ensure_contract_run_pricing,
     ensure_contract_run_products,
     ensure_enrollment_codes_exist,
+    find_unlinked_page_for_alias,
     get_active_contracts_from_basket_items,
     get_contract_products_with_bad_pricing,
     get_contract_runs_without_products,
@@ -2290,3 +2291,69 @@ def test_enroll_prereqs_existing_enrollment(mocker, change_status):
         assert result
         assert "result" in result
         assert result["result"] == USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED
+
+
+def test_reconcile_links_an_unlinked_page_to_the_keycloak_org_with_its_alias():
+    """A legacy page shares its org_key with the realm alias; link it, don't duplicate."""
+
+    legacy = factories.OrganizationPageFactory.create(
+        org_key="UTK", sso_organization_id=None
+    )
+    org = factories.OrganizationRepresentationFactory.create(alias="utk")
+
+    page, created = reconcile_single_keycloak_org(org)
+    page.save()
+
+    assert not created
+    assert page.pk == legacy.pk
+    assert str(page.sso_organization_id) == org.id
+    assert page.org_key == "UTK"
+    assert OrganizationPage.objects.filter(org_key__iexact="utk").count() == 1
+
+
+def test_reconcile_does_not_link_by_alias_when_the_page_is_already_linked():
+    """An org_key held by a page with a different Keycloak UUID is left alone."""
+
+    existing = factories.OrganizationPageFactory.create(org_key="UTK")
+    org = factories.OrganizationRepresentationFactory.create(alias="UTK")
+
+    page, created = reconcile_single_keycloak_org(org)
+
+    assert created
+    assert page.pk is None
+    existing.refresh_from_db()
+    assert str(existing.sso_organization_id) != org.id
+
+
+def test_reconcile_refuses_to_guess_between_two_unlinked_pages():
+    """Two unlinked pages that differ only in case make the link ambiguous."""
+
+    factories.OrganizationPageFactory.create(org_key="UTK", sso_organization_id=None)
+    factories.OrganizationPageFactory.create(org_key="utk", sso_organization_id=None)
+    org = factories.OrganizationRepresentationFactory.create(alias="utk")
+
+    with pytest.raises(ValidationError, match="more than one unlinked"):
+        reconcile_single_keycloak_org(org)
+
+
+def test_reconcile_does_not_link_on_a_truncated_alias():
+    """An alias longer than an org_key must not match a page by its first 30 characters."""
+
+    unrelated = factories.OrganizationPageFactory.create(
+        org_key="acme-corp-division-of-research", sso_organization_id=None
+    )
+    org = factories.OrganizationRepresentationFactory.create(
+        alias="acme-corp-division-of-research-and-dev"
+    )
+
+    assert find_unlinked_page_for_alias(org.alias) is None
+    unrelated.refresh_from_db()
+    assert unrelated.sso_organization_id is None
+
+
+def test_find_unlinked_page_for_alias_ignores_a_missing_alias():
+    """Keycloak allows an organization with no alias; there is nothing to match."""
+
+    factories.OrganizationPageFactory.create(sso_organization_id=None)
+
+    assert find_unlinked_page_for_alias(None) is None

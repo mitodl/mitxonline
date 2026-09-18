@@ -17,7 +17,11 @@ See docs/source/b2b/provisioning_api.md.
 """
 
 import logging
+from collections import Counter
+from dataclasses import dataclass
+from enum import Enum
 
+import requests
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from mitol.common.utils import now_in_utc
@@ -153,6 +157,45 @@ def _find_organization_by_alias(connection, alias):
     )
 
 
+def _create_keycloak_organization(  # noqa: PLR0913
+    connection, *, name, org_key, description="", redirect_url="", domains=()
+):
+    """
+    Create the Keycloak organization, aliased by org_key, and return its ID.
+
+    Args:
+    - connection (KeycloakConnection): the Keycloak connection to use.
+    - name (str): the organization's display name
+    - org_key (str): the immutable short key, used as the Keycloak alias
+    - description (str): free-form description
+    - redirect_url (str): where Keycloak sends members after login
+    - domains (list[str]): email domains to assert, written as verified
+    Returns:
+    - str or None: the new organization's ID, or None if Keycloak accepted the
+      create but the ID could not be found afterwards
+    """
+
+    sso_organization_id = connection.organizations.create(
+        {
+            "name": name,
+            "alias": org_key,
+            "enabled": True,
+            "description": description,
+            "redirectUrl": redirect_url,
+            "domains": [{"name": domain, "verified": True} for domain in domains],
+        }
+    )
+
+    if not sso_organization_id:
+        # Keycloak answers the create with 201 and an empty body, so the ID
+        # normally comes from the Location header. Fall back to looking the
+        # organization up by the alias we just claimed.
+        created = _find_organization_by_alias(connection, org_key)
+        sso_organization_id = created.id if created else None
+
+    return sso_organization_id
+
+
 def create_organization(  # noqa: PLR0913
     *,
     name,
@@ -240,23 +283,14 @@ def create_organization(  # noqa: PLR0913
     # are asserting them. That is defensible only while the asserting party is
     # MIT staff, and stops being so the moment the partner-facing wizard (C2)
     # lets a customer assert their own domain.
-    keycloak_payload = {
-        "name": name,
-        "alias": org_key,
-        "enabled": True,
-        "description": description,
-        "redirectUrl": redirect_url,
-        "domains": [{"name": domain, "verified": True} for domain in domains],
-    }
-
-    sso_organization_id = connection.organizations.create(keycloak_payload)
-
-    if not sso_organization_id:
-        # Keycloak answers the create with 201 and an empty body, so the ID
-        # normally comes from the Location header. Fall back to looking the
-        # organization up by the alias we just claimed.
-        created = _find_organization_by_alias(connection, org_key)
-        sso_organization_id = created.id if created else None
+    sso_organization_id = _create_keycloak_organization(
+        connection,
+        name=name,
+        org_key=org_key,
+        description=description,
+        redirect_url=redirect_url,
+        domains=domains,
+    )
 
     if not sso_organization_id:
         # Keycloak accepted the create but we cannot find what it made. Writing
@@ -682,3 +716,194 @@ def delete_identity_provider(identity_provider, *, connection=None):
     )
     connection.identity_providers.delete(identity_provider.alias)
     identity_provider.delete()
+
+
+class BackfillAction(str, Enum):
+    """What the backfill does, or would do, for one organization."""
+
+    LINK = "link"
+    CREATE = "create"
+    NO_KEYCLOAK_ORG = "no_keycloak_org"
+    CONFLICT = "conflict"
+    FAILED = "failed"
+
+
+@dataclass(frozen=True)
+class BackfillRow:
+    """The outcome for one organization that had no Keycloak UUID."""
+
+    org_key: str
+    action: BackfillAction
+    applied: bool = False
+    detail: str = ""
+
+
+def _link_organization(organization, sso_organization_id):
+    """
+    Record the Keycloak UUID and give the organization an onboarding record.
+
+    Uses a queryset update rather than save(): this is a data repair, and a
+    Wagtail save would run full_clean and write a page revision.
+    """
+
+    with transaction.atomic():
+        OrganizationPage.objects.filter(pk=organization.pk).update(
+            sso_organization_id=sso_organization_id
+        )
+        OrganizationOnboarding.objects.get_or_create(
+            organization=organization,
+            defaults={
+                "state": ONBOARDING_STATE_ORG_CREATED,
+                "state_changed_at": now_in_utc(),
+            },
+        )
+
+
+def backfill_keycloak_organizations(
+    *, apply=False, create_missing=False, org_keys=None, connection=None
+):
+    """
+    Give every OrganizationPage that has no Keycloak UUID one.
+
+    Each unlinked organization is matched to the realm organization whose alias
+    is its org_key. A match is linked. With no match, the organization is only
+    reported unless create_missing is set, because some of these are demo or test
+    organizations that should never exist in Keycloak.
+
+    Nothing is written unless apply is set. Creating in Keycloak first and
+    recording the UUID second needs no compensation: if the second step fails,
+    reconcile_keycloak_orgs links the organization by alias on its next run.
+
+    Args:
+    - apply (bool): write the changes; otherwise report what would be done
+    - create_missing (bool): create Keycloak organizations for pages with no match
+    - org_keys (list[str]): only consider these org_keys
+    - connection (KeycloakConnection): an existing connection, if any
+    Returns:
+    - list[BackfillRow]: one row per unlinked organization considered
+    """
+
+    connection = connection or KeycloakConnection()
+
+    keycloak_orgs_by_alias = {
+        org.alias.lower(): org
+        for org in connection.organizations.list_all()
+        if org.alias is not None
+    }
+    claimed_ids = {
+        str(sso_id)
+        for sso_id in OrganizationPage.objects.filter(
+            sso_organization_id__isnull=False
+        ).values_list("sso_organization_id", flat=True)
+    }
+
+    unlinked = OrganizationPage.objects.filter(sso_organization_id__isnull=True)
+    # Counted before --org-key narrows the run: two pages that differ only in
+    # case are ambiguous even when the operator named just one of them.
+    unlinked_key_counts = Counter(page.org_key.lower() for page in unlinked)
+    if org_keys:
+        unlinked = unlinked.filter(org_key__in=org_keys)
+
+    rows = []
+
+    for organization in unlinked.order_by("org_key"):
+        keycloak_org = keycloak_orgs_by_alias.get(organization.org_key.lower())
+
+        if keycloak_org is None:
+            if not create_missing:
+                rows.append(
+                    BackfillRow(organization.org_key, BackfillAction.NO_KEYCLOAK_ORG)
+                )
+                continue
+
+            try:
+                rows.append(_create_for_backfill(organization, connection, apply=apply))
+            except (
+                requests.RequestException,
+                OrphanedKeycloakOrganizationError,
+            ) as error:
+                log.exception("Could not create a Keycloak org for %s", organization)
+                rows.append(
+                    BackfillRow(
+                        organization.org_key, BackfillAction.FAILED, detail=str(error)
+                    )
+                )
+            continue
+
+        if unlinked_key_counts[organization.org_key.lower()] > 1:
+            rows.append(
+                BackfillRow(
+                    organization.org_key,
+                    BackfillAction.CONFLICT,
+                    detail=(
+                        "More than one unlinked organization has this org_key "
+                        "ignoring case, so the match is ambiguous."
+                    ),
+                )
+            )
+            continue
+
+        if keycloak_org.id in claimed_ids:
+            rows.append(
+                BackfillRow(
+                    organization.org_key,
+                    BackfillAction.CONFLICT,
+                    detail=(
+                        f"Keycloak organization {keycloak_org.id} is already "
+                        "linked to another organization."
+                    ),
+                )
+            )
+            continue
+
+        if apply:
+            _link_organization(organization, keycloak_org.id)
+        claimed_ids.add(keycloak_org.id)
+
+        detail = keycloak_org.id
+        if keycloak_org.name and keycloak_org.name != organization.name:
+            # The scheduled sync overwrites the page's name from Keycloak once
+            # linked, so surface the change here where it can still be reviewed.
+            detail += (
+                f" (sync will rename '{organization.name}' to '{keycloak_org.name}')"
+            )
+        rows.append(
+            BackfillRow(
+                organization.org_key,
+                BackfillAction.LINK,
+                applied=apply,
+                detail=detail,
+            )
+        )
+
+    return rows
+
+
+def _create_for_backfill(organization, connection, *, apply):
+    """Create the missing Keycloak organization for one page, and link it."""
+
+    if not apply:
+        return BackfillRow(organization.org_key, BackfillAction.CREATE)
+
+    sso_organization_id = _create_keycloak_organization(
+        connection,
+        name=organization.name,
+        org_key=organization.org_key,
+        description=organization.description,
+    )
+
+    if not sso_organization_id:
+        msg = (
+            f"Keycloak accepted the organization '{organization.org_key}' but "
+            "did not report its ID."
+        )
+        raise OrphanedKeycloakOrganizationError(msg)
+
+    _link_organization(organization, sso_organization_id)
+
+    return BackfillRow(
+        organization.org_key,
+        BackfillAction.CREATE,
+        applied=True,
+        detail=sso_organization_id,
+    )
