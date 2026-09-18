@@ -6,6 +6,9 @@
   "pre-commit": {
     "enabled": true
   },
+  "npm": {
+    "enabled": false
+  },
   "packageRules": [
     {
       "description": "pre-commit.ci autoupdate already owns every `rev:` in .pre-commit-config.yaml, so leave the pre-commit manager off by default to avoid two bots opening the same bump.",
