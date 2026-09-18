@@ -1,5 +1,6 @@
-import { useShow } from "@pankod/refine-core";
-import { Show, Typography, Tag, Row, Col, Space } from "@pankod/refine-antd";
+import { useShow } from "@refinedev/core";
+import { Show } from "@refinedev/antd";
+import { Typography, Tag, Row, Col, Space } from "antd";
 import dayjs from "dayjs";
 
 import { RedemptionList, UserAssignments, Products } from "components/discounts";

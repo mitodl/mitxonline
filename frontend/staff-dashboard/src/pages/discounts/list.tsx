@@ -1,18 +1,6 @@
-import {
-    List,
-    DateField,
-    ShowButton,
-    Table,
-    useTable,
-    Space,
-    EditButton,
-    Tag,
-    Row,
-    Col,
-    Card,
-    Button,
-} from "@pankod/refine-antd";
-import { CrudFilters, HttpError, useInvalidate, useNavigation } from "@pankod/refine-core";
+import { List, DateField, ShowButton, useTable, EditButton } from "@refinedev/antd";
+import { Table, Space, Tag, Row, Col, Card, Button } from "antd";
+import { CrudFilters, HttpError, useInvalidate, useNavigation } from "@refinedev/core";
 
 import { DiscountFilterForm } from "components/discounts/filter_form";
 
@@ -27,8 +15,7 @@ export const DiscountList: React.FC = () => {
         IDiscountFilters
     >({
         resource: 'discounts',
-        initialCurrent: 1,
-        initialPageSize: 40,
+
         onSearch: (params) => {
             const filters: CrudFilters = [];
             const { q, redemption_type, payment_type, is_redeemed } = params;
@@ -58,6 +45,11 @@ export const DiscountList: React.FC = () => {
             });
 
             return filters;
+        },
+
+        pagination: {
+            current: 1,
+            pageSize: 40
         }
     });
 

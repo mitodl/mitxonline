@@ -1,7 +1,10 @@
-import { Refine, useGetIdentity } from "@pankod/refine-core";
-import { Icons, notificationProvider } from "@pankod/refine-antd";
-import routerProvider from "@pankod/refine-react-router-v6";
-import "@pankod/refine-antd/dist/reset.css";
+import { Refine, useGetIdentity } from "@refinedev/core";
+import { notificationProvider } from "@refinedev/antd";
+
+import { BarcodeOutlined, FormOutlined } from "@ant-design/icons";
+
+import routerProvider from "@refinedev/react-router-v6/legacy";
+import "@refinedev/antd/dist/reset.css";
 import { useAuthProvider } from "hooks/useAuthProvider";
 import {
   Title,
@@ -21,7 +24,6 @@ import { Routes, Route } from "react-router-dom";
 
 import "styles/antd.less";
 
-const {UserOutlined, BarcodeOutlined, FormOutlined} = Icons;
 const axiosInterface = axios.create();
 
 axiosInterface.interceptors.request.use((config: any) => {
@@ -59,14 +61,14 @@ export default function App() {
 
   return (
     <Refine
-      routerProvider={{
+      legacyRouterProvider={{
         ...routerProvider,
         RouterComponent,
         routes: customRoutes
       }}
       notificationProvider={notificationProvider}
       dataProvider={xonlineProvider}
-      authProvider={authProvider}
+      legacyAuthProvider={authProvider}
       accessControlProvider={{
         can: async ({ action, params, resource }) => {
           let profile = localStorage.getItem("mitx-online-staff-profile");
@@ -107,7 +109,7 @@ export default function App() {
         {
           name: 'flexible_pricing',
           icon: <FormOutlined/>,
-          options: {
+          meta: {
             label: 'Flexible Pricing'
           },
           list: FlexiblePricingList,
