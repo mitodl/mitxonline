@@ -1,6 +1,6 @@
 """Serializers for the B2B API (v0)."""
 
-from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.utils import extend_schema_field, inline_serializer
 from rest_framework import serializers
 
 from b2b.models import ContractPage, OrganizationPage
@@ -169,3 +169,27 @@ class CreateB2BEnrollmentSerializer(serializers.Serializer):
         max_digits=None, decimal_places=2, read_only=True, required=False
     )
     checkout_result = GenerateCheckoutPayloadSerializer(required=False)
+
+
+class DataConsentSerializer(serializers.Serializer):
+    """
+    Records whether a user has consented to data sharing for a contract
+    """
+
+    consented = serializers.BooleanField(allow_null=False, required=True)
+
+
+# This kinda sucks, is there really no standard way to annotate the default behavior for a DRF validity exception?
+class DataConsentValidationErrorSerializer(serializers.Serializer):
+    """Default DRF is_valid(raise_exception=True) error shape for DataConsentSerializer."""
+
+    errors = inline_serializer(
+        name="DataConsentFieldErrors",
+        fields={
+            "consented": serializers.ListField(
+                child=serializers.CharField(),
+                required=False,
+                help_text="Errors for the 'consented' field, e.g. if missing or not a boolean.",
+            )
+        },
+    )

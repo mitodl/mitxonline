@@ -5,6 +5,7 @@ from django.urls import include, path
 from b2b.views.v0 import (
     AttachContractApi,
     ContractPageViewSet,
+    DataConsentAPI,
     Enroll,
     OrganizationPageViewSet,
 )
@@ -80,7 +81,6 @@ urlpatterns = [
         AttachContractApi.as_view(),
         name="attach-user",
     ),
-    # Probably not the place this is gonna live long term.
     path(r"webhook", ProcessMailgunWebhook.as_view(), name="mailgun-webhook"),
     # Service-to-service; delete along with b2b/views/v0/service.py once
     # org-manager status is visible in Keycloak (mitodl/hq#10594).
@@ -88,5 +88,10 @@ urlpatterns = [
         r"service/organization-manager-check/",
         OrganizationManagerCheckView.as_view(),
         name="service-organization-manager-check",
+    ),
+    path(
+        r"data_consent/<int:contract_id>/",
+        DataConsentAPI.as_view(),
+        name="data-consent",
     ),
 ]
