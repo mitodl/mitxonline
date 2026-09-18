@@ -13,7 +13,15 @@ from b2b.constants import (
     IDP_STATE_DISABLED,
     IDP_STATE_DRAFT,
     IDP_STATE_TESTING,
+    ONBOARDING_STATE_LIVE,
     ONBOARDING_STATE_ORG_CREATED,
+    PROVISIONING_ACTION_IDP_CREATED,
+    PROVISIONING_ACTION_IDP_DELETED,
+    PROVISIONING_ACTION_IDP_METADATA_REFRESHED,
+    PROVISIONING_ACTION_IDP_TRANSITIONED,
+    PROVISIONING_ACTION_ONBOARDING_CHANGED,
+    PROVISIONING_ACTION_ORG_CREATED,
+    PROVISIONING_ACTION_ORG_UPDATED,
 )
 from b2b.exceptions import (
     AliasCollisionError,
@@ -25,18 +33,21 @@ from b2b.exceptions import (
 from b2b.factories import OrganizationIndexPageFactory, OrganizationPageFactory
 from b2b.keycloak_admin_dataclasses import (
     IdentityProviderRepresentation,
+    OrganizationDomainRepresentation,
     OrganizationRepresentation,
 )
 from b2b.models import (
     OrganizationIdentityProvider,
     OrganizationOnboarding,
     OrganizationPage,
+    OrganizationProvisioningAudit,
 )
 from b2b.provisioning import (
     create_identity_provider,
     create_organization,
     delete_identity_provider,
     refresh_identity_provider_metadata,
+    set_onboarding_state,
     transition_identity_provider,
     update_organization,
 )
@@ -676,3 +687,246 @@ def test_create_organization_checks_the_index_page_before_touching_keycloak(
 
     connection.organizations.create.assert_not_called()
     connection.organizations.delete.assert_not_called()
+
+
+def _audits(organization):
+    return list(
+        OrganizationProvisioningAudit.objects.filter(
+            organization=organization
+        ).order_by("id")
+    )
+
+
+def test_create_organization_is_audited(connection, staff_user):
+    """Who created the organization, and with what, is recorded with it."""
+
+    organization = create_organization(
+        connection=connection, actor=staff_user, **_organization_kwargs()
+    )
+
+    (audit,) = _audits(organization)
+    assert audit.action == PROVISIONING_ACTION_ORG_CREATED
+    assert audit.acting_user == staff_user
+    assert audit.data_before is None
+    assert audit.data_after["org_key"] == "EXAMPLEU"
+    assert audit.data_after["domains"] == ["example.edu"]
+    assert audit.data_after["sso_organization_id"] == str(
+        organization.sso_organization_id
+    )
+
+
+def test_an_organization_that_cannot_be_audited_is_not_created(connection, mocker):
+    """
+    The audit row is in the same transaction as the records it describes.
+
+    An unaudited organization is the thing the audit trail exists to rule out,
+    so a failed audit write is compensated like any other failed local write.
+    """
+
+    mocker.patch(
+        "b2b.provisioning.OrganizationProvisioningAudit.objects.create",
+        side_effect=ValueError("no"),
+    )
+
+    with pytest.raises(ValueError, match="no"):
+        create_organization(connection=connection, **_organization_kwargs())
+
+    connection.organizations.delete.assert_called_once_with(
+        connection.organizations.create.return_value
+    )
+    assert not OrganizationPage.objects.filter(org_key="EXAMPLEU").exists()
+
+
+def test_update_organization_audits_only_what_changed(connection, staff_user):
+    """Fields sent unchanged are not reported as changes."""
+
+    organization = OrganizationPageFactory.create(name="Example University")
+    connection.organizations.get.return_value = OrganizationRepresentation(
+        id=str(organization.sso_organization_id),
+        name=organization.name,
+        alias=organization.org_key,
+        redirect_url="https://learn.mit.edu/old",
+        domains=[OrganizationDomainRepresentation(name="example.edu", verified=True)],
+    )
+
+    update_organization(
+        organization,
+        connection=connection,
+        actor=staff_user,
+        name="Example University",
+        domains=["example.edu", "example.org"],
+    )
+
+    (audit,) = _audits(organization)
+    assert audit.action == PROVISIONING_ACTION_ORG_UPDATED
+    assert audit.acting_user == staff_user
+    assert audit.data_before == {"domains": ["example.edu"]}
+    assert audit.data_after == {"domains": ["example.edu", "example.org"]}
+
+
+def test_update_organization_that_changes_nothing_is_not_audited(connection):
+    """A no-op PATCH is not a change to review."""
+
+    organization = OrganizationPageFactory.create()
+    connection.organizations.get.return_value = OrganizationRepresentation(
+        id=str(organization.sso_organization_id),
+        name=organization.name,
+        alias=organization.org_key,
+    )
+
+    update_organization(organization, connection=connection, name=organization.name)
+
+    assert _audits(organization) == []
+
+
+@pytest.mark.parametrize("has_onboarding", [True, False])
+def test_set_onboarding_state_is_audited(staff_user, has_onboarding):
+    """
+    The before state is recorded, and a missing onboarding record is created.
+
+    Organizations that predate the provisioning API have no onboarding row.
+    """
+
+    organization = OrganizationPageFactory.create()
+    if has_onboarding:
+        OrganizationOnboarding.objects.create(
+            organization=organization, state=ONBOARDING_STATE_ORG_CREATED
+        )
+
+    onboarding = set_onboarding_state(
+        organization, ONBOARDING_STATE_LIVE, notes="went live", actor=staff_user
+    )
+
+    assert onboarding.state == ONBOARDING_STATE_LIVE
+    (audit,) = _audits(organization)
+    assert audit.action == PROVISIONING_ACTION_ONBOARDING_CHANGED
+    assert audit.acting_user == staff_user
+    assert audit.data_before == (
+        {"state": ONBOARDING_STATE_ORG_CREATED, "notes": ""} if has_onboarding else None
+    )
+    assert audit.data_after == {"state": ONBOARDING_STATE_LIVE, "notes": "went live"}
+
+
+def test_create_identity_provider_audit_leaves_out_the_client_secret(
+    connection, mocked_import_config, staff_user
+):
+    """The secret goes to Keycloak and nowhere else, the audit trail included."""
+
+    organization = OrganizationPageFactory.create()
+    secret = FAKE.password()
+
+    create_identity_provider(
+        organization,
+        connection=connection,
+        actor=staff_user,
+        alias="exampleu-oidc",
+        protocol=IDP_PROTOCOL_OIDC,
+        metadata_url="https://idp.example.edu/.well-known/openid-configuration",
+        client_id="mitxonline",
+        client_secret=secret,
+    )
+
+    (audit,) = _audits(organization)
+    assert audit.action == PROVISIONING_ACTION_IDP_CREATED
+    assert audit.identity_provider_alias == "exampleu-oidc"
+    assert audit.data_after["client_id"] == "mitxonline"
+    assert audit.data_after["lifecycle_state"] == IDP_STATE_DRAFT
+    assert secret not in str(audit.data_after)
+    assert audit.data_before is None
+
+
+def test_transition_is_audited(connection, staff_user):
+    """Going live is the change most worth being able to attribute."""
+
+    organization = OrganizationPageFactory.create()
+    identity_provider = _identity_provider(organization, state=IDP_STATE_TESTING)
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, hide_on_login=True
+    )
+
+    transition_identity_provider(
+        identity_provider, IDP_STATE_ACTIVE, connection=connection, actor=staff_user
+    )
+
+    (audit,) = _audits(organization)
+    assert audit.action == PROVISIONING_ACTION_IDP_TRANSITIONED
+    assert audit.acting_user == staff_user
+    assert audit.identity_provider_alias == "exampleu"
+    assert audit.data_before == {"lifecycle_state": IDP_STATE_TESTING}
+    assert audit.data_after == {"lifecycle_state": IDP_STATE_ACTIVE}
+
+
+def test_a_refused_transition_is_not_audited(connection):
+    """Nothing changed, so there is nothing to record."""
+
+    organization = OrganizationPageFactory.create()
+    identity_provider = _identity_provider(organization)
+
+    with pytest.raises(InvalidLifecycleTransitionError):
+        transition_identity_provider(
+            identity_provider, IDP_STATE_ACTIVE, connection=connection
+        )
+
+    assert _audits(organization) == []
+
+
+def test_refresh_metadata_audits_the_changed_keys(connection, mocker, staff_user):
+    """A rotated certificate shows up as exactly that, not as the whole config."""
+
+    organization = OrganizationPageFactory.create()
+    identity_provider = _identity_provider(organization)
+    refreshed = {**PARSED_METADATA, "idpEntityId": "https://idp.example.edu/rotated"}
+    mocker.patch(
+        "b2b.provisioning.import_identity_provider_config", return_value=refreshed
+    )
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
+    )
+
+    refresh_identity_provider_metadata(
+        identity_provider, connection=connection, actor=staff_user
+    )
+
+    (audit,) = _audits(organization)
+    assert audit.action == PROVISIONING_ACTION_IDP_METADATA_REFRESHED
+    assert audit.data_before == {"idpEntityId": PARSED_METADATA["idpEntityId"]}
+    assert audit.data_after == {"idpEntityId": "https://idp.example.edu/rotated"}
+
+
+def test_delete_identity_provider_audit_outlives_the_provider(connection, staff_user):
+    """The alias is a string, so the record survives the row it describes."""
+
+    organization = OrganizationPageFactory.create()
+    identity_provider = _identity_provider(organization, state=IDP_STATE_DISABLED)
+
+    delete_identity_provider(identity_provider, connection=connection, actor=staff_user)
+
+    (audit,) = _audits(organization)
+    assert audit.action == PROVISIONING_ACTION_IDP_DELETED
+    assert audit.identity_provider_alias == "exampleu"
+    assert audit.data_before["lifecycle_state"] == IDP_STATE_DISABLED
+    assert not OrganizationIdentityProvider.objects.filter(alias="exampleu").exists()
+
+
+def test_audit_records_cannot_be_rewritten(staff_user):
+    """Append-only: saving an existing record is refused."""
+
+    organization = OrganizationPageFactory.create()
+    set_onboarding_state(organization, ONBOARDING_STATE_LIVE, actor=staff_user)
+    (audit,) = _audits(organization)
+
+    audit.data_after = {"state": "something else"}
+    with pytest.raises(ValueError, match="cannot be changed"):
+        audit.save()
+
+
+def test_audit_survives_the_actor_being_deleted(staff_user):
+    """Retiring a staff account must not erase what that account changed."""
+
+    organization = OrganizationPageFactory.create()
+    set_onboarding_state(organization, ONBOARDING_STATE_LIVE, actor=staff_user)
+
+    staff_user.delete()
+
+    (audit,) = _audits(organization)
+    assert audit.acting_user is None
