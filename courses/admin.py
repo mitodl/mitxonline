@@ -932,7 +932,7 @@ class CourseRunGradeAdmin(TimestampedModelAdmin):
         "user",
         "course_run",
     )
-    search_fields = ["user__email", "user__username"]
+    search_fields = ["user__email", "user__username", "course_run__courseware_id"]
     inlines = [CourseRunGradeAuditInline]
 
     def get_queryset(self, request):  # noqa: ARG002
