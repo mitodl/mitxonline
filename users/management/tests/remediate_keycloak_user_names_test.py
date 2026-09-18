@@ -52,9 +52,48 @@ def test_mitxonline_users_lookup_query_count_is_flat(django_assert_max_num_queri
         user.legal_address.save()
 
     with django_assert_max_num_queries(3):
-        by_id = COMMAND._mitxonline_users_by_scim_id()  # noqa: SLF001
+        by_id = COMMAND._mitxonline_users_by_scim_id(  # noqa: SLF001
+            [f"kc-{i}" for i in range(5)]
+        )
         for user in by_id.values():
             LearnUserAdapter(user)._resolve_name()  # noqa: SLF001
+
+
+@pytest.mark.django_db
+def test_mitxonline_users_lookup_is_scoped_to_the_page():
+    """Only the users on the current Keycloak page are loaded, so memory is
+    bounded by the page size rather than by every SCIM-linked user
+    """
+    on_page = UserFactory.create(scim_external_id="kc-on-page")
+    UserFactory.create(scim_external_id="kc-elsewhere")
+
+    by_id = COMMAND._mitxonline_users_by_scim_id(["kc-on-page"])  # noqa: SLF001
+
+    assert list(by_id) == ["kc-on-page"]
+    assert by_id["kc-on-page"].id == on_page.id
+
+
+@pytest.mark.django_db
+def test_report_counts_up_to_date_users_without_listing_them(mocker, tmp_path):
+    """Up-to-date users appear only as a count in the report"""
+    user = UserFactory.create(name="Joe Smith", scim_external_id="kc-1")
+    user.legal_address.first_name = "Joe"
+    user.legal_address.last_name = "Smith"
+    user.legal_address.save()
+
+    kc_user = UserRepresentation(
+        id="kc-1",
+        firstName="Joe",
+        lastName="Smith",
+        attributes={"fullName": ["Joe Smith"]},
+    )
+    client = _mock_client(mocker, [[kc_user]])
+    remediate_keycloak_user_names.bootstrap_client.return_value = client
+
+    report = _run(tmp_path, apply=False, limit=None)
+
+    assert report["up_to_date_count"] == 1
+    assert "up_to_date" not in report
 
 
 @pytest.mark.django_db
