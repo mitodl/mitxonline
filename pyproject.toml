@@ -31,7 +31,7 @@ dependencies = [
     "django-user-agents>=0.4.0,<0.5",
     "django-viewflow>=2.2.7,<3",
     "django-webpack-loader>=3.0.0,<4",
-    "djangorestframework==3.16.1",
+    "djangorestframework==3.17.2",
     "djoser>=2.1.0,<3",
     "drf-extensions>=0.8.0,<0.9",
     "drf-spectacular>=0.29.0,<0.30",
