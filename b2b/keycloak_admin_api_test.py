@@ -98,6 +98,28 @@ def test_client_init(settings, mocker):
     )
 
 
+def test_client_renews_expired_token(settings, mocker):
+    """An expired client_credentials token is re-fetched instead of raising
+    InvalidTokenError, so a long-running caller can outlive one token
+    """
+    client, _, mocked_token_request, mocked_openid_config = _mocked_admin_client(
+        settings, mocker
+    )
+    client.oauth_session.token = {
+        "access_token": FAKE.sha256(),
+        "token_type": "Bearer",
+        "expires_at": 1,
+    }
+
+    assert client.oauth_session.ensure_active_token(client.oauth_session.token)
+
+    assert mocked_token_request.call_count == 2
+    mocked_token_request.assert_called_with(
+        mocked_openid_config["token_endpoint"],
+        grant_type="client_credentials",
+    )
+
+
 def test_client_init_missing_base_url(settings):
     """Test that client init raises exception when KEYCLOAK_BASE_URL is missing."""
     settings.KEYCLOAK_BASE_URL = None
@@ -385,6 +407,7 @@ def test_client_init_oauth_session_configuration(settings, mocker):
         token_endpoint=mocked_openid_config["token_endpoint"],
         scope=settings.KEYCLOAK_ADMIN_CLIENT_SCOPES,
         verify=not client.skip_verify,
+        grant_type="client_credentials",
     )
 
     mock_oauth_session.fetch_token.assert_called_once_with(
