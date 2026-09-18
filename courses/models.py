@@ -785,6 +785,28 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             ).distinct()
         )
 
+    @cached_property
+    def is_enrollable(self):
+        """
+        Determines if the program is enrollable
+        """
+        now = now_in_utc()
+        return (
+            (self.enrollment_end is None or self.enrollment_end > now)
+            and self.enrollment_start is not None
+            and self.enrollment_start <= now
+            and self.live is True
+            and self.start_date is not None
+        )
+
+    def enrollable_for_contract(self, contract) -> bool:
+        """Determine if the run is enrollable for the specified contract."""
+
+        if not self.b2b_contracts.filter(pk=contract.id).exists():
+            return False
+
+        return self.is_enrollable
+
 
 class RelatedProgram(TimestampedModel, ValidateOnSaveMixin):
     """
@@ -2287,6 +2309,13 @@ class CourseRunEnrollment(EnrollmentModel):
             "longer retried automatically."
         ),
     )
+    b2b_contract = models.ForeignKey(
+        "b2b.ContractPage",
+        on_delete=models.DO_NOTHING,
+        related_name="course_run_enrollments",
+        null=True,
+        blank=True,
+    )
 
     objects = ActiveCourseRunEnrollmentManager()
     all_objects = CourseRunEnrollmentManager()
@@ -2424,6 +2453,13 @@ class ProgramEnrollment(EnrollmentModel):
 
     program = models.ForeignKey(
         "courses.Program", on_delete=models.CASCADE, related_name="enrollments"
+    )
+    b2b_contract = models.ForeignKey(
+        "b2b.ContractPage",
+        on_delete=models.DO_NOTHING,
+        related_name="program_enrollments",
+        null=True,
+        blank=True,
     )
 
     objects = ActiveProgramEnrollmentManager()
