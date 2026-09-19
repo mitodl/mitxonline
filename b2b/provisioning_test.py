@@ -3,6 +3,7 @@
 import faker
 import pytest
 from django.core.exceptions import ImproperlyConfigured
+from django.db.models import ProtectedError
 
 from b2b.constants import (
     IDP_ALLOWED_TRANSITIONS,
@@ -920,13 +921,38 @@ def test_audit_records_cannot_be_rewritten(staff_user):
         audit.save()
 
 
-def test_audit_survives_the_actor_being_deleted(staff_user):
-    """Retiring a staff account must not erase what that account changed."""
+def test_an_actor_with_audit_history_cannot_be_deleted(staff_user):
+    """Deleting the account would lose who made the change, so it is refused."""
 
     organization = OrganizationPageFactory.create()
     set_onboarding_state(organization, ONBOARDING_STATE_LIVE, actor=staff_user)
 
-    staff_user.delete()
+    with pytest.raises(ProtectedError):
+        staff_user.delete()
 
     (audit,) = _audits(organization)
-    assert audit.acting_user is None
+    assert audit.acting_user == staff_user
+
+
+def test_audit_records_the_org_key(staff_user):
+    """Every row carries the org_key, so history can be found without the page."""
+
+    organization = OrganizationPageFactory.create()
+    set_onboarding_state(organization, ONBOARDING_STATE_LIVE, actor=staff_user)
+
+    (audit,) = _audits(organization)
+    assert audit.org_key == organization.org_key
+
+
+def test_audit_survives_the_organization_being_deleted(staff_user):
+    """Deleting the page in Wagtail must not take its provisioning history with it."""
+
+    organization = OrganizationPageFactory.create()
+    org_key = organization.org_key
+    set_onboarding_state(organization, ONBOARDING_STATE_LIVE, actor=staff_user)
+
+    organization.delete()
+
+    (audit,) = OrganizationProvisioningAudit.objects.filter(org_key=org_key)
+    assert audit.organization is None
+    assert audit.acting_user == staff_user

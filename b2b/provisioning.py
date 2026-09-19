@@ -91,6 +91,7 @@ def _audit(  # noqa: PLR0913
 
     OrganizationProvisioningAudit.objects.create(
         organization=organization,
+        org_key=organization.org_key,
         action=action,
         acting_user=actor,
         identity_provider_alias=identity_provider_alias,
