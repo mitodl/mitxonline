@@ -13,6 +13,7 @@ from b2b.models import (
     OrganizationIdentityProvider,
     OrganizationOnboarding,
     OrganizationPage,
+    OrganizationProvisioningAudit,
 )
 
 
@@ -25,6 +26,25 @@ class OrganizationOnboardingSerializer(serializers.ModelSerializer):
         read_only_fields = ["state_changed_at"]
 
 
+class IdentityProviderServiceProviderSerializer(serializers.Serializer):
+    """
+    Our side of an IdP integration: what the partner configures their IdP with.
+
+    redirect_uri is the SAML assertion consumer service (ACS) URL for a SAML
+    IdP, and the OAuth redirect URI for an OIDC one.
+    """
+
+    entity_id = serializers.CharField(
+        allow_null=True, help_text="The SAML SP entity ID. Null for OIDC."
+    )
+    redirect_uri = serializers.CharField(
+        help_text="The SAML ACS URL, or the OIDC redirect URI."
+    )
+    metadata_url = serializers.CharField(
+        allow_null=True, help_text="The SAML SP metadata descriptor. Null for OIDC."
+    )
+
+
 class OrganizationIdentityProviderSerializer(serializers.ModelSerializer):
     """
     An identity provider we provisioned for an organization.
@@ -32,6 +52,8 @@ class OrganizationIdentityProviderSerializer(serializers.ModelSerializer):
     metadata_artifact is what Keycloak parsed out of the partner's metadata.
     Credentials are never written to it, so this is safe to serve.
     """
+
+    service_provider = IdentityProviderServiceProviderSerializer(read_only=True)
 
     class Meta:
         model = OrganizationIdentityProvider
@@ -45,6 +67,7 @@ class OrganizationIdentityProviderSerializer(serializers.ModelSerializer):
             "metadata_source",
             "metadata_artifact",
             "metadata_fetched_at",
+            "service_provider",
             "created_on",
             "updated_on",
         ]
@@ -237,3 +260,32 @@ class SetOnboardingStateSerializer(serializers.Serializer):
 
     state = serializers.ChoiceField(choices=ONBOARDING_STATE_CHOICES)
     notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class ProvisioningAuditActorSerializer(serializers.Serializer):
+    """The staff user who made a provisioning change."""
+
+    id = serializers.IntegerField()
+    username = serializers.CharField()
+    email = serializers.EmailField()
+
+
+class OrganizationProvisioningAuditSerializer(serializers.ModelSerializer):
+    """One recorded provisioning change."""
+
+    actor = ProvisioningAuditActorSerializer(
+        source="acting_user", read_only=True, allow_null=True
+    )
+
+    class Meta:
+        model = OrganizationProvisioningAudit
+        fields = [
+            "id",
+            "action",
+            "identity_provider_alias",
+            "actor",
+            "data_before",
+            "data_after",
+            "created_on",
+        ]
+        read_only_fields = fields
