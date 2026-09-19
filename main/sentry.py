@@ -9,6 +9,7 @@ from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
+from sentry_sdk.scrubber import DEFAULT_DENYLIST, EventScrubber
 
 # these errors occur when a shutdown is happening (usually caused by a SIGTERM)
 SHUTDOWN_ERRORS = (WorkerLostError, SystemExit)
@@ -40,6 +41,39 @@ def scrub_pg_detail(text):
     )
 
 
+# The SDK's EventScrubber matches whole key names, so "client_secret" and
+# Keycloak's "clientSecret" (the OIDC IdP config b2b.provisioning sends) pass
+# its default denylist, which only has "secret". The request body carries the
+# first and captured frame locals the second.
+SECRET_KEYS = ["client_secret", "clientsecret"]
+
+# Key matching cannot reach a secret inside a string: requests' frames hold the
+# JSON body it sent as bytes, and objects in frame locals arrive repr()d. This
+# blanks the value of any client-secret pair in JSON or repr form, including
+# one escaped inside another string.
+SECRET_PAIR_RE = re.compile(
+    r"(client_?secret\\*['\"]?\s*[:=]\s*\\*)(['\"])(.*?)(\\*\2)", re.IGNORECASE
+)
+
+
+def build_event_scrubber(*, send_default_pii):
+    """Return the SDK's scrubber, extended with our secret keys and made recursive.
+
+    Recursive because the secret sits nested in frame locals, e.g. the
+    identity provider payload's config["clientSecret"].
+    """
+    return EventScrubber(
+        denylist=[*DEFAULT_DENYLIST, *SECRET_KEYS],
+        recursive=True,
+        send_default_pii=send_default_pii,
+    )
+
+
+def scrub_secret_values(text):
+    """Blank the value of any client-secret key/value pair inside a string."""
+    return SECRET_PAIR_RE.sub(r"\1\2[Filtered]\4", text)
+
+
 def scrub_pg_details(event):
     """Truncate Postgres DETAIL lines everywhere in a Sentry event.
 
@@ -61,7 +95,7 @@ def scrub_pg_details(event):
 def _scrub_node(node):
     """Recurse through the serialized event, rewriting strings in place."""
     if isinstance(node, str):
-        return scrub_pg_detail(node)
+        return scrub_secret_values(scrub_pg_detail(node))
     if isinstance(node, dict):
         for key, value in node.items():
             node[key] = _scrub_node(value)
@@ -138,6 +172,7 @@ def init_sentry(  # noqa: PLR0913
         # checkout, profile and SCIM payloads.  Set explicitly so the choice is
         # findable here rather than in a dependency's defaults.
         max_request_body_size="small",
+        event_scrubber=build_event_scrubber(send_default_pii=send_default_pii),
         send_default_pii=send_default_pii,
         traces_sample_rate=traces_sample_rate,
         profiles_sample_rate=profiles_sample_rate,

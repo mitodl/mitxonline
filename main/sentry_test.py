@@ -2,6 +2,7 @@
 
 import json
 import logging
+from dataclasses import dataclass
 
 import pytest
 import sentry_sdk
@@ -10,8 +11,10 @@ from sentry_sdk.transport import Transport
 
 from main.sentry import (
     before_send,
+    build_event_scrubber,
     scrub_pg_detail,
     scrub_pg_details,
+    scrub_secret_values,
 )
 
 # A real MITXONLINE-6PK exception value, with the learner identifiers replaced.
@@ -196,3 +199,101 @@ def test_real_sdk_scrubs_params_and_local_variables(sentry_transport):
     assert len(sentry_transport.events) == 2
     for event in sentry_transport.events:
         assert "learner@example.invalid" not in json.dumps(event)
+
+
+OIDC_SECRET = "oidc-client-secret-value"  # noqa: S105
+
+
+@dataclass
+class IdentityProviderPayload:
+    """Stands in for a Keycloak representation object, which the SDK repr()s."""
+
+    alias: str
+    config: dict
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        json.dumps({"clientId": "partner", "clientSecret": OIDC_SECRET}),
+        repr(json.dumps({"client_secret": OIDC_SECRET}).encode()),
+        repr({"config": {"clientSecret": OIDC_SECRET}}),
+        f"IdentityProviderPayload(client_secret='{OIDC_SECRET}')",
+        repr(repr(json.dumps({"clientSecret": OIDC_SECRET}))),
+    ],
+)
+def test_secret_values_are_blanked_in_strings(text):
+    """JSON, repr()d bytes and dicts, keyword reprs and escaped nestings."""
+    scrubbed = scrub_secret_values(text)
+    assert OIDC_SECRET not in scrubbed
+    assert "[Filtered]" in scrubbed
+
+
+def test_scrubber_blanks_nested_secret_keys():
+    """The request body and nested frame locals, by key, at any depth."""
+    event = {
+        "request": {"data": {"alias": "partner", "client_secret": OIDC_SECRET}},
+        "exception": {
+            "values": [
+                {
+                    "stacktrace": {
+                        "frames": [
+                            {
+                                "vars": {
+                                    "data": {
+                                        "alias": "partner",
+                                        "config": {"clientSecret": OIDC_SECRET},
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+    }
+    build_event_scrubber(send_default_pii=False).scrub_event(event)
+    assert OIDC_SECRET not in repr(event)
+    frame_vars = event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]
+    assert frame_vars["data"]["alias"] == "partner"
+
+
+@pytest.fixture
+def scrubbing_sentry_transport():
+    """Initialize the real SDK with our scrubber as well as before_send."""
+    transport = FakeTransport()
+    sentry_sdk.init(
+        dsn="https://k@o0.ingest.sentry.io/0",
+        transport=transport,
+        before_send=before_send,
+        event_scrubber=build_event_scrubber(send_default_pii=False),
+        default_integrations=False,
+        integrations=[
+            LoggingIntegration(level=logging.INFO, event_level=logging.ERROR)
+        ],
+    )
+    yield transport
+    sentry_sdk.get_global_scope().set_client(None)
+
+
+def test_real_sdk_keeps_the_oidc_secret_out(scrubbing_sentry_transport):
+    """An IdP create that fails in Keycloak must not ship the secret in locals."""
+
+    def create_identity_provider(client_secret):
+        config = {"clientId": "partner", "clientSecret": client_secret}
+        payload = {"alias": "partner", "config": config}
+        body = json.dumps(payload).encode()
+        representation = IdentityProviderPayload(alias="partner", config=config)
+        msg = "Keycloak said no"
+        raise RuntimeError(msg, len(body), representation.alias)
+
+    try:
+        create_identity_provider(OIDC_SECRET)
+    except RuntimeError:
+        logging.getLogger("b2b").exception("Keycloak call failed during provisioning")
+    sentry_sdk.flush()
+
+    assert len(scrubbing_sentry_transport.events) == 1
+    event_json = json.dumps(scrubbing_sentry_transport.events[0])
+    assert OIDC_SECRET not in event_json
+    assert "Keycloak said no" in event_json
