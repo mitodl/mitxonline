@@ -110,7 +110,7 @@ const RefreshTableButton: React.FC<RefreshTableButtonProps> = (props) => {
 
 export const FlexiblePricingList: React.FC = () => {
     const invalidate = useInvalidate()
-    const {tableQueryResult, tableProps, searchFormProps} = useTable<
+    const {tableQuery, tableProps, searchFormProps} = useTable<
         IFlexiblePriceRequest,
         HttpError,
         IFlexiblePriceRequestFilters
@@ -165,7 +165,7 @@ export const FlexiblePricingList: React.FC = () => {
     }
 
     const refreshList = () => {
-        tableQueryResult.refetch()
+        tableQuery.refetch()
     }
 
     return (
@@ -187,7 +187,7 @@ export const FlexiblePricingList: React.FC = () => {
                 <Col sm={24}>
                     <List
                         title="Flexible Pricing Requests"
-                        headerProps={{ subTitle: <RefreshTableButton isFetching={tableQueryResult.isFetching} refreshList={refreshList} /> }}
+                        headerProps={{ subTitle: <RefreshTableButton isFetching={tableQuery.isFetching} refreshList={refreshList} /> }}
                     >
                         <Table {...tableProps} rowKey="id">
                             <Table.Column

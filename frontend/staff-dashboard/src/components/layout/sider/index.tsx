@@ -1,20 +1,19 @@
 import React, { useState } from "react";
 
-import { CanAccess, useLogout, useTitle, useNavigation, useMenu } from "@refinedev/core";
+import { CanAccess, useGo, useMenu } from "@refinedev/core";
 
 import { RightOutlined, LogoutOutlined } from "@ant-design/icons";
 
 import { Layout as AntdLayout, Menu, Grid, Typography, Space, Divider } from "antd";
+import { logOutOfMitxOnline } from "hooks/useAuthProvider";
+import { Title } from "../title";
 import { antLayoutSider, antLayoutSiderMobile } from "./styles";
 
 export const Sider: React.FC = () => {
   const [collapsed, setCollapsed] = useState<boolean>(false);
-  const { mutate: logout } = useLogout({
-    v3LegacyAuthProviderCompatible: true
-  });
-  const Title = useTitle();
+
   const { menuItems, selectedKey } = useMenu();
-  const { push } = useNavigation();
+  const go = useGo();
   const breakpoint = Grid.useBreakpoint();
 
   const isMobile = !breakpoint.lg;
@@ -29,17 +28,16 @@ export const Sider: React.FC = () => {
       style={isMobile ? antLayoutSiderMobile : antLayoutSider}
       theme="light"
     >
-      {Title && <Title collapsed={collapsed} />}
+      <Title collapsed={collapsed} />
       <Space/>
       <Menu
         selectedKeys={[selectedKey]}
         mode="inline"
         onClick={({ key }) => {
           if (key === "logout") {
-            localStorage.removeItem("mitx-online-staff-profile");
-            const logoutPath = (new URL(DATASOURCES_CONFIG.mitxOnline)).origin + "/logout/";
-            window.location.href = logoutPath;
-
+            // Not useLogout: it re-runs the auth check, whose redirect to
+            // /login would race this full-page navigation.
+            logOutOfMitxOnline();
             return;
           }
 
@@ -47,14 +45,17 @@ export const Sider: React.FC = () => {
             setCollapsed(true);
           }
 
-          push(key as string);
+          const item = menuItems.find((menuItem) => menuItem.key === key);
+          if (item?.route) {
+            go({ to: item.route });
+          }
         }}
       >
-        {menuItems.map(({ icon, label, route, name }) => {
-          const isSelected = route === selectedKey;
+        {menuItems.map(({ icon, label, key, name }) => {
+          const isSelected = key === selectedKey;
           return (
             <CanAccess
-              key={route}
+              key={key}
               resource={name.toLowerCase()}
               action="list"
               >
@@ -62,7 +63,7 @@ export const Sider: React.FC = () => {
                 style={{
                   fontWeight: isSelected ? "bold" : "normal",
                 }}
-                key={route}
+                key={key}
                 icon={icon}
               >
                 <div
