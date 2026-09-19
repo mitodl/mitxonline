@@ -50,9 +50,12 @@ SECRET_KEYS = ["client_secret", "clientsecret"]
 # Key matching cannot reach a secret inside a string: requests' frames hold the
 # JSON body it sent as bytes, and objects in frame locals arrive repr()d. This
 # blanks the value of any client-secret pair in JSON or repr form, including
-# one escaped inside another string.
+# one escaped inside another string. The value ends at a quote carrying exactly
+# the opening quote's backslashes, so a quote escaped inside the secret itself
+# (which carries more) does not end it early.
 SECRET_PAIR_RE = re.compile(
-    r"(client_?secret\\*['\"]?\s*[:=]\s*\\*)(['\"])(.*?)(\\*\2)", re.IGNORECASE
+    r"(client_?secret\\*['\"]?\s*[:=]\s*)(\\*)(['\"])(.*?)(?<!\\)(\2\3)",
+    re.IGNORECASE,
 )
 
 
@@ -71,7 +74,7 @@ def build_event_scrubber(*, send_default_pii):
 
 def scrub_secret_values(text):
     """Blank the value of any client-secret key/value pair inside a string."""
-    return SECRET_PAIR_RE.sub(r"\1\2[Filtered]\4", text)
+    return SECRET_PAIR_RE.sub(r"\1\2\3[Filtered]\5", text)
 
 
 def scrub_pg_details(event):
