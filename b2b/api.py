@@ -1768,13 +1768,55 @@ def reconcile_user_orgs(user, organizations):
     return (len(orgs_to_add), len(orgs_to_remove))
 
 
+def find_unlinked_page_for_alias(alias: str | None) -> OrganizationPage | None:
+    """
+    Find the OrganizationPage with no Keycloak UUID whose org_key is this alias.
+
+    Provisioning writes the org_key as the Keycloak alias verbatim, so a page
+    that predates provisioning and shares an org_key with a realm alias is the
+    same organization. The match ignores case, as the provisioning collision
+    checks do. A page that is already linked to some other Keycloak organization
+    is not a candidate.
+
+    Args:
+    - alias (str): the Keycloak organization alias
+    Returns:
+    - OrganizationPage or None: the page to link, if there is exactly one. None
+      too when the alias is missing or longer than an org_key can be.
+    Raises:
+    - ValidationError: more than one unlinked page matches, so linking would be a guess
+    """
+
+    # An alias longer than an org_key can never be one, and truncating it would
+    # match an unrelated page whose org_key is the alias's first 30 characters.
+    if alias is None or len(alias) > ORG_KEY_MAX_LENGTH:
+        return None
+
+    candidates = list(
+        OrganizationPage.objects.filter(
+            org_key__iexact=alias, sso_organization_id__isnull=True
+        )
+    )
+
+    if len(candidates) > 1:
+        msg = (
+            f"Keycloak alias '{alias}' matches more than one unlinked "
+            f"organization: {sorted(page.org_key for page in candidates)}."
+        )
+        raise ValidationError(msg)
+
+    return candidates[0] if candidates else None
+
+
 def reconcile_single_keycloak_org(keycloak_org: OrganizationRepresentation):
     """
     Reconcile a single Keycloak organization.
 
     This is the heavy lifting for reconcile_keycloak_orgs. When provided with a
     Keycloak organization, it creates or updates the corresponding
-    OrganizationPage record for the record.
+    OrganizationPage record for the record. A page that has no Keycloak UUID yet
+    but whose org_key is this organization's alias is linked to it rather than
+    duplicated (see find_unlinked_page_for_alias).
 
     This won't save the OrganizationPage.
 
@@ -1787,6 +1829,12 @@ def reconcile_single_keycloak_org(keycloak_org: OrganizationRepresentation):
     created_flag = False
 
     page = OrganizationPage.objects.filter(sso_organization_id=keycloak_org.id).first()
+
+    if not page:
+        page = find_unlinked_page_for_alias(keycloak_org.alias)
+        if page:
+            page.sso_organization_id = keycloak_org.id
+            log.info("Linked organization %s to Keycloak org %s", page, keycloak_org.id)
 
     if not page:
         page = OrganizationPage(
