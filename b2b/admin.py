@@ -401,6 +401,7 @@ class OrganizationProvisioningAuditAdmin(admin.ModelAdmin):
 
     list_display = [
         "created_on",
+        "org_key",
         "organization",
         "action",
         "identity_provider_alias",
@@ -409,13 +410,14 @@ class OrganizationProvisioningAuditAdmin(admin.ModelAdmin):
     list_filter = ["action"]
     list_select_related = ["organization", "acting_user"]
     search_fields = [
+        "org_key",
         "organization__name",
-        "organization__org_key",
         "identity_provider_alias",
         "acting_user__email",
     ]
     readonly_fields = [
         "created_on",
+        "org_key",
         "organization",
         "action",
         "identity_provider_alias",

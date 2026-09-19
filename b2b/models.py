@@ -1017,19 +1017,25 @@ class OrganizationProvisioningAudit(AuditModel):
     record. There is no approval step before an IdP goes active, so this is
     how a change gets reviewed: after the fact.
 
-    Append-only. The IdP is recorded by alias rather than by foreign key so
-    its history outlives it. Credentials are never written here.
+    Append-only, so nothing deleted elsewhere takes a record with it: the IdP
+    is recorded by alias, the organization's org_key is copied onto every
+    row, and deleting the organization's page only clears the foreign key.
+    Credentials are never written here.
     """
 
     organization = models.ForeignKey(
         "b2b.OrganizationPage",
-        on_delete=models.CASCADE,
+        null=True,
+        on_delete=models.SET_NULL,
         related_name="provisioning_audits",
     )
-    # AuditModel cascades, which would erase who changed a partner's SSO config
-    # when that staff account is retired.
+    org_key = models.CharField(max_length=30)
+    # main.models.AuditModel cascades, which would delete a staff account's
+    # provisioning history along with the account. PROTECT keeps the record
+    # and who made it; MITx Online retires users by deactivating them, so
+    # this only blocks an outright delete.
     acting_user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL
+        settings.AUTH_USER_MODEL, null=True, on_delete=models.PROTECT
     )
     identity_provider_alias = models.CharField(max_length=255, blank=True, default="")
     action = models.CharField(max_length=64, choices=PROVISIONING_ACTION_CHOICES)
@@ -1052,7 +1058,7 @@ class OrganizationProvisioningAudit(AuditModel):
     def __str__(self):
         """Return a reasonable representation of the object as a string."""
 
-        return f"OrganizationProvisioningAudit: {self.action} on {self.organization_id}"
+        return f"OrganizationProvisioningAudit: {self.action} on {self.org_key}"
 
 
 def is_organization_manager(user, org_id):

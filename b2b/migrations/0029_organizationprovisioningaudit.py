@@ -32,6 +32,7 @@ class Migration(migrations.Migration):
                 ),
                 ("data_before", models.JSONField(blank=True, null=True)),
                 ("data_after", models.JSONField(blank=True, null=True)),
+                ("org_key", models.CharField(max_length=30)),
                 (
                     "identity_provider_alias",
                     models.CharField(blank=True, default="", max_length=255),
@@ -61,14 +62,15 @@ class Migration(migrations.Migration):
                     "acting_user",
                     models.ForeignKey(
                         null=True,
-                        on_delete=django.db.models.deletion.SET_NULL,
+                        on_delete=django.db.models.deletion.PROTECT,
                         to=settings.AUTH_USER_MODEL,
                     ),
                 ),
                 (
                     "organization",
                     models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
                         related_name="provisioning_audits",
                         to="b2b.organizationpage",
                     ),
