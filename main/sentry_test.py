@@ -229,6 +229,25 @@ def test_secret_values_are_blanked_in_strings(text):
     assert "[Filtered]" in scrubbed
 
 
+QUOTED_SECRET = 'alpha"omega-tail'  # noqa: S105  # pragma: allowlist secret
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        json.dumps({"clientSecret": QUOTED_SECRET}),
+        repr(json.dumps({"client_secret": QUOTED_SECRET}).encode()),
+        repr(repr(json.dumps({"clientSecret": QUOTED_SECRET}))),
+        repr({"config": {"clientSecret": QUOTED_SECRET}}),
+    ],
+)
+def test_secret_with_a_quote_is_blanked_whole(text):
+    """An escaped quote inside the secret does not end the match early."""
+    scrubbed = scrub_secret_values(text)
+    assert "omega-tail" not in scrubbed
+    assert "[Filtered]" in scrubbed
+
+
 def test_scrubber_blanks_nested_secret_keys():
     """The request body and nested frame locals, by key, at any depth."""
     event = {
