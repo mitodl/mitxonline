@@ -17,6 +17,12 @@ firstName/lastName untouched rather than guessing.
 
 Default mode is dry-run: report every candidate and what would change,
 write nothing. Pass --apply to actually patch Keycloak.
+
+--fill-only narrows the candidates to users whose Keycloak fullName is empty,
+and patches only fullName for them. Nothing Keycloak already holds is
+overwritten: users whose fullName or firstName/lastName merely differ from
+mitxonline are counted as skipped instead, pending a decision on which side
+is authoritative.
 """
 
 import json
@@ -63,6 +69,13 @@ class Command(BaseCommand):
             "Ignored in dry-run mode (the report always covers everyone).",
         )
         parser.add_argument(
+            "--fill-only",
+            action="store_true",
+            help="Only fill an empty Keycloak fullName, and patch nothing "
+            "else. Users whose names differ but aren't blank are counted as "
+            "skipped, not patched.",
+        )
+        parser.add_argument(
             "--report-path",
             type=str,
             help="Write the JSON report to this path instead of stdout.",
@@ -72,12 +85,14 @@ class Command(BaseCommand):
         """Paginate Keycloak users, resolve the correct name, patch or report."""
         apply_changes = options.get("apply", False)
         limit = options.get("limit")
+        fill_only = options.get("fill_only", False)
         report_path = options.get("report_path")
 
         client = bootstrap_client(verify_realm=True)
 
         patched, would_patch, unpatchable = [], [], []
         up_to_date_count = 0
+        skipped_by_fill_only_count = 0
         patch_count = 0
 
         for keycloak_user, user in self._paired_users(client):
@@ -103,6 +118,15 @@ class Command(BaseCommand):
                 up_to_date_count += 1
                 continue
 
+            if fill_only:
+                if not full_name or current_full_name:
+                    skipped_by_fill_only_count += 1
+                    continue
+                # Only fullName is written in this mode, so the split name
+                # must not be patched, verified, or shown in the report row.
+                have_split_name = False
+                given_name = family_name = ""
+
             row = self._row(keycloak_user, user, given_name, family_name, full_name)
 
             if not apply_changes:
@@ -113,31 +137,12 @@ class Command(BaseCommand):
                 would_patch.append(row)
                 continue
 
-            patch = {}
-            if have_split_name:
-                # client.save() PUTs this dict as raw JSON straight to
-                # Keycloak's admin REST API - it never goes through
-                # UserRepresentation, so these must be Keycloak's actual
-                # wire-format field names (firstName/lastName), not the
-                # pydantic model's snake_case attribute names.
-                patch["firstName"] = given_name
-                patch["lastName"] = family_name
-            if full_name:
-                attributes = dict(keycloak_user.attributes or {})
-                attributes["fullName"] = [full_name]
-                patch["attributes"] = attributes
-
-            client.save(f"users/{keycloak_user.id}", patch)
-            # verify - don't just trust a 2xx
-            refetched = client.retrieve(f"users/{keycloak_user.id}", UserRepresentation)
-            names_verified = not have_split_name or (
-                (refetched.first_name or "") == given_name
-                and (refetched.last_name or "") == family_name
+            row["verified"] = self._patch_user(
+                client,
+                keycloak_user,
+                (given_name, family_name) if have_split_name else None,
+                full_name,
             )
-            full_name_verified = (
-                not full_name or _keycloak_full_name(refetched) == full_name
-            )
-            row["verified"] = names_verified and full_name_verified
             patched.append(row)
             patch_count += 1
 
@@ -146,20 +151,69 @@ class Command(BaseCommand):
                 f"{len(patched)} patched, {len(would_patch)} would-patch, "
                 f"{len(unpatchable)} unpatchable (no name data anywhere), "
                 f"{up_to_date_count} already up to date"
+                + (
+                    f", {skipped_by_fill_only_count} skipped by --fill-only "
+                    "(fullName already set, or no mitxonline name to fill it)"
+                    if fill_only
+                    else ""
+                )
             )
         )
         # Up-to-date users are counted, not listed: a row for each would grow
         # with the whole realm rather than with the users that need a fix.
         # would_patch and unpatchable still hold a row per user until the end.
-        self._write_report(
-            {
-                "patched": patched,
-                "would_patch": would_patch,
-                "unpatchable": unpatchable,
-                "up_to_date_count": up_to_date_count,
-            },
-            report_path,
+        report = {
+            "patched": patched,
+            "would_patch": would_patch,
+            "unpatchable": unpatchable,
+            "up_to_date_count": up_to_date_count,
+        }
+        if fill_only:
+            report["skipped_by_fill_only_count"] = skipped_by_fill_only_count
+        self._write_report(report, report_path)
+
+    @staticmethod
+    def _patch_user(client, keycloak_user, split_name, full_name):
+        """PUT the resolved names to Keycloak, then re-fetch to verify them.
+
+        :param split_name: ``(given_name, family_name)`` to write to
+            firstName/lastName, or None to leave them untouched.
+        :param full_name: value for the fullName attribute, or "" to leave it.
+        :returns: whether the re-fetched user carries every value written,
+            and every root field this didn't write is unchanged.
+        :rtype: bool
+        """
+        patch = {}
+        if split_name:
+            # client.save() PUTs this dict as raw JSON straight to
+            # Keycloak's admin REST API - it never goes through
+            # UserRepresentation, so these must be Keycloak's actual
+            # wire-format field names (firstName/lastName), not the
+            # pydantic model's snake_case attribute names.
+            patch["firstName"], patch["lastName"] = split_name
+        if full_name:
+            attributes = dict(keycloak_user.attributes or {})
+            attributes["fullName"] = [full_name]
+            patch["attributes"] = attributes
+
+        client.save(f"users/{keycloak_user.id}", patch)
+        # verify - don't just trust a 2xx
+        refetched = client.retrieve(f"users/{keycloak_user.id}", UserRepresentation)
+        if split_name:
+            names_verified = (refetched.first_name or "") == split_name[0] and (
+                refetched.last_name or ""
+            ) == split_name[1]
+        else:
+            # A PUT without firstName/lastName must leave them alone; check
+            # rather than assume, since a fill-only run sends ~360k of these.
+            names_verified = (refetched.first_name or "") == (
+                keycloak_user.first_name or ""
+            ) and (refetched.last_name or "") == (keycloak_user.last_name or "")
+        email_unchanged = (refetched.email or "") == (keycloak_user.email or "")
+        full_name_verified = (
+            not full_name or _keycloak_full_name(refetched) == full_name
         )
+        return names_verified and email_unchanged and full_name_verified
 
     def _paired_users(self, client):
         """Yield (keycloak_user, mitxonline_user) for each Keycloak page.
