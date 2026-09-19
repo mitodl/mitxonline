@@ -148,9 +148,9 @@ export const IdentityProviders: React.FC<{ organization: IProvisionedOrganizatio
                     render={(_, idp) => (
                         <Space>
                             <Dropdown
-                                disabled={isLoading}
+                                disabled={isLoading || !IDP_ALLOWED_TRANSITIONS[idp.lifecycle_state]}
                                 menu={{
-                                    items: IDP_ALLOWED_TRANSITIONS[idp.lifecycle_state].map((state) => ({
+                                    items: (IDP_ALLOWED_TRANSITIONS[idp.lifecycle_state] ?? []).map((state) => ({
                                         key: state,
                                         label: idpState(state)?.label ?? state,
                                     })),
