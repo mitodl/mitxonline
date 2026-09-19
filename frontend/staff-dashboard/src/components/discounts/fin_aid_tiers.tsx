@@ -1,8 +1,5 @@
-import {
-    Table,
-    useTable,
-    List,
-} from "@pankod/refine-antd";
+import { useTable, List } from "@refinedev/antd";
+import { Table } from "antd";
 
 export const FinAidTiers = (props: any) => {
     const { record } = props
