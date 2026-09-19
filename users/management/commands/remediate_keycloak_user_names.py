@@ -17,6 +17,12 @@ firstName/lastName untouched rather than guessing.
 
 Default mode is dry-run: report every candidate and what would change,
 write nothing. Pass --apply to actually patch Keycloak.
+
+--fill-only narrows the candidates to users whose Keycloak fullName is empty,
+and patches only fullName for them. Nothing Keycloak already holds is
+overwritten: users whose fullName or firstName/lastName merely differ from
+mitxonline are counted as skipped instead, pending a decision on which side
+is authoritative.
 """
 
 import json
@@ -39,6 +45,7 @@ class Outcome(StrEnum):
 
     UNPATCHABLE = "unpatchable"
     UP_TO_DATE = "up_to_date"
+    SKIPPED_FILL_ONLY = "skipped_fill_only"
     WOULD_PATCH = "would_patch"
     PATCHED = "patched"
 
@@ -73,6 +80,13 @@ class Command(BaseCommand):
             "Ignored in dry-run mode (the report always covers everyone).",
         )
         parser.add_argument(
+            "--fill-only",
+            action="store_true",
+            help="Only fill an empty Keycloak fullName, and patch nothing "
+            "else. Users whose names differ but aren't blank are counted as "
+            "skipped, not patched.",
+        )
+        parser.add_argument(
             "--report-path",
             type=str,
             help="Write the JSON report to this path instead of stdout.",
@@ -92,6 +106,7 @@ class Command(BaseCommand):
         """Paginate Keycloak users, resolve the correct name, patch or report."""
         apply_changes = options.get("apply", False)
         limit = options.get("limit")
+        fill_only = options.get("fill_only", False)
         report_path = options.get("report_path")
         offset = options.get("offset") or 0
 
@@ -99,6 +114,7 @@ class Command(BaseCommand):
 
         patched, would_patch, unpatchable = [], [], []
         up_to_date_count = 0
+        skipped_by_fill_only_count = 0
         patch_count = 0
         resume_offset = offset
 
@@ -107,13 +123,15 @@ class Command(BaseCommand):
                 resume_offset = page_offset
                 can_patch = apply_changes and (limit is None or patch_count < limit)
                 outcome, row = self._reconcile_user(
-                    client, keycloak_user, user, can_patch
+                    client, keycloak_user, user, can_patch, fill_only=fill_only
                 )
                 match outcome:
                     case Outcome.UNPATCHABLE:
                         unpatchable.append(row)
                     case Outcome.UP_TO_DATE:
                         up_to_date_count += 1
+                    case Outcome.SKIPPED_FILL_ONLY:
+                        skipped_by_fill_only_count += 1
                     case Outcome.WOULD_PATCH:
                         would_patch.append(row)
                     case Outcome.PATCHED:
@@ -137,21 +155,27 @@ class Command(BaseCommand):
                     f"{len(patched)} patched, {len(would_patch)} would-patch, "
                     f"{len(unpatchable)} unpatchable (no name data anywhere), "
                     f"{up_to_date_count} already up to date"
+                    + (
+                        f", {skipped_by_fill_only_count} skipped by --fill-only "
+                        "(fullName already set, or no mitxonline name to fill it)"
+                        if fill_only
+                        else ""
+                    )
                 )
             )
             # Up-to-date users are counted, not listed: a row for each would
             # grow with the whole realm rather than with the users that need
             # a fix. would_patch and unpatchable still hold a row per user.
-            self._write_report(
-                {
-                    "patched": patched,
-                    "would_patch": would_patch,
-                    "unpatchable": unpatchable,
-                    "up_to_date_count": up_to_date_count,
-                    "resume_offset": resume_offset,
-                },
-                report_path,
-            )
+            report = {
+                "patched": patched,
+                "would_patch": would_patch,
+                "unpatchable": unpatchable,
+                "up_to_date_count": up_to_date_count,
+                "resume_offset": resume_offset,
+            }
+            if fill_only:
+                report["skipped_by_fill_only_count"] = skipped_by_fill_only_count
+            self._write_report(report, report_path)
 
     def _paired_users(self, client, offset=0):
         """Yield (page_offset, keycloak_user, mitxonline_user) for each page.
@@ -194,12 +218,18 @@ class Command(BaseCommand):
             yield first, page
             first += PAGE_SIZE
 
-    def _reconcile_user(self, client, keycloak_user, user, can_patch):
+    def _reconcile_user(
+        self, client, keycloak_user, user, can_patch, *, fill_only=False
+    ):
         """Resolve one paired user's target name and patch it if eligible.
 
         can_patch is False for a dry run, or once --limit patches have
         already been applied this run - such a user is reported as
         would_patch rather than actually patched.
+
+        With fill_only, only a user whose Keycloak fullName is empty and who
+        has a mitxonline name is a candidate, and only fullName is written;
+        anyone else that would otherwise be patched is Outcome.SKIPPED_FILL_ONLY.
 
         Returns (Outcome, row); row is None for Outcome.UP_TO_DATE.
         """
@@ -223,20 +253,46 @@ class Command(BaseCommand):
         if names_match and full_name_matches:
             return Outcome.UP_TO_DATE, None
 
+        if fill_only:
+            if not full_name or current_full_name:
+                return Outcome.SKIPPED_FILL_ONLY, None
+            # Only fullName is written in this mode, so the split name must
+            # not be patched, verified, or shown in the report row.
+            have_split_name = False
+            given_name = family_name = ""
+
         row = self._row(keycloak_user, user, given_name, family_name, full_name)
 
         if not can_patch:
             return Outcome.WOULD_PATCH, row
 
+        row["verified"] = self._patch_user(
+            client,
+            keycloak_user,
+            (given_name, family_name) if have_split_name else None,
+            full_name,
+        )
+        return Outcome.PATCHED, row
+
+    @staticmethod
+    def _patch_user(client, keycloak_user, split_name, full_name):
+        """PUT the resolved names to Keycloak, then re-fetch to verify them.
+
+        :param split_name: ``(given_name, family_name)`` to write to
+            firstName/lastName, or None to leave them untouched.
+        :param full_name: value for the fullName attribute, or "" to leave it.
+        :returns: whether the re-fetched user carries every value written,
+            and every root field this didn't write is unchanged.
+        :rtype: bool
+        """
         patch = {}
-        if have_split_name:
+        if split_name:
             # client.save() PUTs this dict as raw JSON straight to
             # Keycloak's admin REST API - it never goes through
             # UserRepresentation, so these must be Keycloak's actual
             # wire-format field names (firstName/lastName), not the
             # pydantic model's snake_case attribute names.
-            patch["firstName"] = given_name
-            patch["lastName"] = family_name
+            patch["firstName"], patch["lastName"] = split_name
         if full_name:
             attributes = dict(keycloak_user.attributes or {})
             attributes["fullName"] = [full_name]
@@ -245,15 +301,21 @@ class Command(BaseCommand):
         client.save(f"users/{keycloak_user.id}", patch)
         # verify - don't just trust a 2xx
         refetched = client.retrieve(f"users/{keycloak_user.id}", UserRepresentation)
-        names_verified = not have_split_name or (
-            (refetched.first_name or "") == given_name
-            and (refetched.last_name or "") == family_name
-        )
+        if split_name:
+            names_verified = (refetched.first_name or "") == split_name[0] and (
+                refetched.last_name or ""
+            ) == split_name[1]
+        else:
+            # A PUT without firstName/lastName must leave them alone; check
+            # rather than assume, since a fill-only run sends ~360k of these.
+            names_verified = (refetched.first_name or "") == (
+                keycloak_user.first_name or ""
+            ) and (refetched.last_name or "") == (keycloak_user.last_name or "")
+        email_unchanged = (refetched.email or "") == (keycloak_user.email or "")
         full_name_verified = (
             not full_name or _keycloak_full_name(refetched) == full_name
         )
-        row["verified"] = names_verified and full_name_verified
-        return Outcome.PATCHED, row
+        return names_verified and email_unchanged and full_name_verified
 
     @staticmethod
     def _row(keycloak_user, user, given_name, family_name, full_name):
