@@ -846,3 +846,14 @@ def test_backfill_lists_the_rename_the_sync_will_apply(connection):
 
     assert "University of Tennessee" in rows[0].detail
     assert "'utk'" in rows[0].detail
+
+
+def test_backfill_org_key_filter_ignores_case(connection):
+    """--org-key utk must find UTK, not silently match nothing."""
+
+    _unlinked_organization(org_key="UTK")
+    _unlinked_organization(org_key="OTHER")
+
+    rows = backfill_keycloak_organizations(org_keys=["utk"], connection=connection)
+
+    assert [row.org_key for row in rows] == ["UTK"]

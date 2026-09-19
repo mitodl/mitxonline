@@ -20,10 +20,13 @@ import logging
 from collections import Counter
 from dataclasses import dataclass
 from enum import Enum
+from functools import reduce
+from operator import or_
 
 import requests
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
+from django.db.models import Q
 from mitol.common.utils import now_in_utc
 
 from b2b.constants import (
@@ -777,7 +780,7 @@ def backfill_keycloak_organizations(
     Args:
     - apply (bool): write the changes; otherwise report what would be done
     - create_missing (bool): create Keycloak organizations for pages with no match
-    - org_keys (list[str]): only consider these org_keys
+    - org_keys (list[str]): only consider these org_keys, ignoring case
     - connection (KeycloakConnection): an existing connection, if any
     Returns:
     - list[BackfillRow]: one row per unlinked organization considered
@@ -802,7 +805,9 @@ def backfill_keycloak_organizations(
     # case are ambiguous even when the operator named just one of them.
     unlinked_key_counts = Counter(page.org_key.lower() for page in unlinked)
     if org_keys:
-        unlinked = unlinked.filter(org_key__in=org_keys)
+        unlinked = unlinked.filter(
+            reduce(or_, (Q(org_key__iexact=org_key) for org_key in org_keys))
+        )
 
     rows = []
 
