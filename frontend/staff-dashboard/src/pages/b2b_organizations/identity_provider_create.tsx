@@ -248,7 +248,7 @@ export const IdentityProviderCreate: React.FC = () => {
                                     <Form.Item name={[name, "source"]} rules={[{ required: true }]}>
                                         <Input placeholder={protocol === "oidc" ? "Claim" : "SAML attribute"} />
                                     </Form.Item>
-                                    <MinusCircleOutlined onClick={() => remove(name)} />
+                                    <Button type="text" icon={<MinusCircleOutlined />} aria-label="Remove mapping" onClick={() => remove(name)} />
                                 </Space>
                             ))}
                             <Button type="dashed" onClick={() => add()} icon={<PlusOutlined />}>

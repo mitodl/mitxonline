@@ -40,7 +40,7 @@ const ServiceProviderDetails: React.FC<{ idp: IOrganizationIdentityProvider }> =
         )}
         <Descriptions.Item label="Metadata source">
             <Typography.Text style={{ wordBreak: "break-all" }}>
-                {idp.metadata_source.startsWith("<") ? "Pasted XML document" : idp.metadata_source}
+                {idp.metadata_source.trimStart().startsWith("<") ? "Pasted XML document" : idp.metadata_source}
             </Typography.Text>
         </Descriptions.Item>
         <Descriptions.Item label="Metadata fetched">
