@@ -78,6 +78,8 @@ class WagtailPagesAPIViewSet(PagesAPIViewSet):
         requested_fields = self.request.GET.get("fields", "").split(",")
         if "faqs" in requested_fields or "*" in requested_fields:
             queryset = queryset.prefetch_related("faqs_list")
+        if "testimonials" in requested_fields or "*" in requested_fields:
+            queryset = queryset.prefetch_related("testimonials_list")
 
         if model_type in annotation_map:
             queryset = queryset.annotate(

@@ -1,13 +1,14 @@
 """Tests for Wagtail API views."""
 
 import pytest
+import wagtail_factories
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework.test import APIClient
 
 from cms.factories import CoursePageFactory, ProgramPageFactory
-from cms.models import ProductPageFAQ
+from cms.models import ProductPageFAQ, ProductPageTestimonial
 
 pytestmark = [
     pytest.mark.django_db,
@@ -346,3 +347,113 @@ def test_course_page_listing_faqs_prefetched(user_drf_client, fields):
         q for q in captured.captured_queries if "cms_productpagefaq" in q["sql"]
     ]
     assert len(faq_queries) == 1
+
+
+def test_course_page_detail_exposes_testimonials_in_order(user_drf_client):
+    """CoursePage detail returns authored testimonials in sort order."""
+    page = CoursePageFactory.create()
+    ProductPageTestimonial.objects.create(
+        page=page,
+        quote="Second quote.",
+        name="Bob",
+        title="Engineer, Beta",
+        sort_order=1,
+    )
+    ProductPageTestimonial.objects.create(
+        page=page,
+        quote="First quote.",
+        name="Alice",
+        title="Manager, Acme",
+        sort_order=0,
+    )
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    testimonials = resp.json()["testimonials"]
+    assert [t["name"] for t in testimonials] == ["Alice", "Bob"]
+    assert testimonials[0]["quote"] == "First quote."
+    assert testimonials[0]["title"] == "Manager, Acme"
+    # id is exposed so the frontend can use it as a stable list key.
+    assert all(isinstance(t["id"], int) for t in testimonials)
+
+
+def test_program_page_detail_exposes_testimonials(user_drf_client):
+    """ProgramPage detail returns authored testimonials."""
+    page = ProgramPageFactory.create()
+    ProductPageTestimonial.objects.create(
+        page=page,
+        quote="Great program.",
+        name="Carol",
+    )
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    testimonials = resp.json()["testimonials"]
+    assert len(testimonials) == 1
+    assert testimonials[0]["name"] == "Carol"
+
+
+def test_course_page_detail_testimonials_empty_when_none_authored(user_drf_client):
+    """CoursePage detail returns an empty testimonials list when none authored."""
+    page = CoursePageFactory.create()
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    assert resp.json()["testimonials"] == []
+
+
+def test_testimonial_image_src_null_without_image(user_drf_client):
+    """A testimonial with no image serializes image_src as null."""
+    page = CoursePageFactory.create()
+    ProductPageTestimonial.objects.create(page=page, quote="No image.", name="Dan")
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    assert resp.json()["testimonials"][0]["image_src"] is None
+
+
+def test_testimonial_image_src_present_with_image(user_drf_client):
+    """A testimonial with an image serializes image_src as a URL string."""
+    page = CoursePageFactory.create()
+    ProductPageTestimonial.objects.create(
+        page=page,
+        quote="Has an image.",
+        name="Eve",
+        image=wagtail_factories.ImageFactory(),
+    )
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    image_src = resp.json()["testimonials"][0]["image_src"]
+    assert isinstance(image_src, str)
+    assert image_src
+
+
+@pytest.mark.skip_nplusone_check  # list endpoint has a pre-existing course N+1
+# "*" is the all-fields form the documented catalog routes use, so it must
+# prefetch testimonials too, not just the explicit "testimonials" token.
+@pytest.mark.parametrize("fields", ["testimonials", "*"])
+def test_course_page_listing_testimonials_prefetched(user_drf_client, fields):
+    """Listing course pages with testimonials hits testimonials_list once."""
+    for _ in range(3):
+        page = CoursePageFactory.create()
+        ProductPageTestimonial.objects.create(page=page, quote="Q.", name="Person")
+    with CaptureQueriesContext(connection) as captured:
+        resp = user_drf_client.get(
+            reverse("wagtailapi:pages:listing"),
+            {"type": "cms.coursepage", "fields": fields},
+        )
+    assert resp.status_code == 200
+    items = resp.json()["items"]
+    assert len(items) == 3
+    assert all(len(item["testimonials"]) == 1 for item in items)
+    # One prefetch query for all pages, not one per page.
+    testimonial_queries = [
+        q for q in captured.captured_queries if "cms_productpagetestimonial" in q["sql"]
+    ]
+    assert len(testimonial_queries) == 1
