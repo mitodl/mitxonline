@@ -765,6 +765,37 @@ def test_update_organization_audits_only_what_changed(connection, staff_user):
     assert audit.data_after == {"domains": ["example.edu", "example.org"]}
 
 
+def test_update_organization_audits_a_description_change(connection, staff_user):
+    """
+    The rich-text description is audited as a plain string.
+
+    Loaded the way the view loads it, so the before value is whatever the
+    RichTextField gives back from the database.
+    """
+
+    created = OrganizationPageFactory.create(description="<p>Old description</p>")
+    organization = OrganizationPage.objects.select_related("onboarding").get(
+        pk=created.pk
+    )
+    connection.organizations.get.return_value = OrganizationRepresentation(
+        id=str(organization.sso_organization_id),
+        name=organization.name,
+        alias=organization.org_key,
+    )
+
+    update_organization(
+        organization,
+        connection=connection,
+        actor=staff_user,
+        description="<p>New description</p>",
+    )
+
+    (audit,) = _audits(organization)
+    audit.refresh_from_db()
+    assert audit.data_before == {"description": "<p>Old description</p>"}
+    assert audit.data_after == {"description": "<p>New description</p>"}
+
+
 def test_update_organization_that_changes_nothing_is_not_audited(connection):
     """A no-op PATCH is not a change to review."""
 
