@@ -145,3 +145,68 @@ export interface IDiscountFilters {
     payment_type: string;
     is_redeemed: string;
 }
+
+export type OnboardingState =
+    | "requested"
+    | "org_created"
+    | "idp_configured"
+    | "idp_validated"
+    | "contract_ready"
+    | "live"
+    | "blocked";
+
+export type IdpLifecycleState = "draft" | "testing" | "active" | "disabled";
+
+export type IdpProtocol = "saml" | "oidc";
+
+export interface IOrganizationOnboarding {
+    state: OnboardingState;
+    state_changed_at: string;
+    notes: string;
+}
+
+export interface IServiceProviderDetails {
+    // entity_id and metadata_url are null for OIDC.
+    entity_id: string | null;
+    redirect_uri: string;
+    metadata_url: string | null;
+}
+
+export interface IOrganizationIdentityProvider {
+    id: number;
+    alias: string;
+    protocol: IdpProtocol;
+    display_name: string;
+    lifecycle_state: IdpLifecycleState;
+    internal_id: string;
+    metadata_source: string;
+    metadata_artifact: Record<string, string> | null;
+    metadata_fetched_at: string | null;
+    created_on: string;
+    updated_on: string;
+    service_provider: IServiceProviderDetails;
+}
+
+export interface IProvisionedOrganization {
+    id: number;
+    name: string;
+    org_key: string;
+    org_key_prefix: string;
+    description: string;
+    slug: string;
+    sso_organization_id: string | null;
+    domains: string[] | null;
+    redirect_url: string | null;
+    onboarding: IOrganizationOnboarding | null;
+    identity_providers: IOrganizationIdentityProvider[];
+}
+
+export interface IProvisioningEvent {
+    id: number;
+    action: string;
+    identity_provider_alias: string;
+    actor: { id: number; username: string; email: string } | null;
+    data_before: Record<string, unknown> | null;
+    data_after: Record<string, unknown> | null;
+    created_on: string;
+}
