@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         ("b2b", "0028_organizationidentityprovider_organizationonboarding"),
-        ("ecommerce", "0054_paid_amount_off_discounts"),
+        ("ecommerce", "0055_internal_redemption_type"),
     ]
 
     operations = [
