@@ -17,9 +17,7 @@ def flexible_price_application():
 
 
 @pytest.mark.skip_nplusone_check
-def test_finaid_admin(
-    admin_drf_client, user, flexible_price_application, mocker
-):
+def test_finaid_admin(admin_drf_client, user, flexible_price_application, mocker):
     """
     Test basic operation of the financial assistance admin viewset.
     """
