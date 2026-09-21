@@ -84,7 +84,6 @@ class FlexiblePriceSerializer(serializers.ModelSerializer):
         ]
 
 
-
 class FlexiblePriceIncomeSerializer(serializers.ModelSerializer):
     """
     Financial Assistance Requests income serializer
