@@ -85,7 +85,7 @@ from main.constants import (
     USER_MSG_TYPE_B2B_DISALLOWED,
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
     USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED,
-    USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT,
+    USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH,
     USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
 )
 from main.utils import date_to_datetime
@@ -498,11 +498,11 @@ def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
             assert Basket.objects.filter(user=user).count() == assert_test
 
         if not product_in_contract:
-            assert result["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT
+            assert result["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH
             return
 
         if not user_in_contract:
-            assert result["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT
+            assert result["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH
             return
 
         if not price_is_zero:
@@ -567,7 +567,7 @@ def test_enroll_in_program_for_b2b(program_in_contract, program_exists):
 
     product = ProductFactory.create(purchasable_object=run)
 
-    _enroll_in_program_for_b2b(user, product, program_id)
+    _enroll_in_program_for_b2b(user, product, program_id, contract)
 
     if program_in_contract and program_exists:
         assert ProgramEnrollment.objects.filter(user=user, program=program).exists()
@@ -1667,8 +1667,7 @@ def test_apply_available_discount_seat_limit():
     request = RequestFactory()
     request.user = user_orgs[2].user
 
-    # Test the validate step - this gets called before the apply call and should
-    # fail. (So, in real life, trying to add this third user should not work.)
+    # Test the validate step
 
     user_orgs[2].user.b2b_contracts.add(contract)
     user_orgs[2].user.save()
@@ -1677,7 +1676,7 @@ def test_apply_available_discount_seat_limit():
 
     # We've added the user to the contract - the seat limit is exceeded but because
     # we manually did it above this should return successfully.
-    assert result is None
+    assert result == contract
 
     # Calling this directly should result in a new discount being created.
 
@@ -1751,15 +1750,16 @@ def test_apply_available_discount_unlimited_seats(existing_discounts):
     request = RequestFactory()
     request.user = user_orgs[2].user
 
-    # Test the validate step - this gets called before the apply call and should
-    # fail. (So, in real life, trying to add this third user should not work.)
+    # Test the validate step
 
     user_orgs[2].user.b2b_contracts.add(contract)
     user_orgs[2].user.save()
 
     result = _validate_b2b_enrollment_prerequisites(user_orgs[2].user, products[0])
 
-    assert not result
+    # We've added the user to the contract - the seat limit is exceeded but because
+    # we manually did it above this should return successfully.
+    assert result == contract
 
     _apply_available_discount(request, products[0], basket)
 
@@ -2285,7 +2285,7 @@ def test_enroll_prereqs_existing_enrollment(mocker, change_status):
     result = _validate_b2b_enrollment_prerequisites(user, product)
 
     if change_status == ENROLL_CHANGE_STATUS_UNENROLLED:
-        assert not result
+        assert result == contract
     else:
         assert result
         assert "result" in result

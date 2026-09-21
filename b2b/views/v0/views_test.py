@@ -25,6 +25,7 @@ from main.constants import (
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
     USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED,
     USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT,
+    USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH,
     USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE,
     USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
 )
@@ -512,7 +513,7 @@ def test_b2b_enroll(  # noqa: PLR0915, PLR0913, C901
 
     if contract_active in ["date", "flag"]:
         assert resp.status_code == 400
-        assert resp.json()["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT
+        assert resp.json()["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH
         return
 
     if not run_is_enrollable:
