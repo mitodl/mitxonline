@@ -253,6 +253,79 @@ class CreateIdentityProviderSerializer(serializers.Serializer):
         return attrs
 
 
+class UpdateIdentityProviderSerializer(serializers.Serializer):
+    """
+    Request body for updating an identity provider.
+
+    The protocol comes from the instance, through the context, because which
+    fields make sense depends on it: a client secret on a SAML IdP would be
+    written into its Keycloak config and never read.
+
+    alias and protocol are rejected rather than ignored. Keycloak refuses an
+    alias change outright, and changing the protocol is a different identity
+    provider, not an edit to this one.
+    """
+
+    display_name = serializers.CharField(
+        max_length=255, required=False, allow_blank=True
+    )
+    metadata_url = serializers.URLField(required=False, allow_blank=True)
+    metadata_xml = serializers.CharField(required=False, allow_blank=True)
+    discovery_url = serializers.URLField(required=False, allow_blank=True)
+    client_id = serializers.CharField(required=False, allow_blank=True)
+    client_secret = serializers.CharField(required=False, allow_blank=True)
+    attribute_map = serializers.DictField(child=serializers.CharField(), required=False)
+    attribute_name_map = serializers.DictField(
+        child=serializers.CharField(), required=False
+    )
+
+    def validate(self, attrs):
+        """Check the fields against the identity provider's protocol."""
+
+        for immutable in ("alias", "protocol"):
+            if immutable in self.initial_data:
+                msg = (
+                    f"{immutable} cannot be changed. Delete the identity "
+                    "provider and create a new one - which unlinks every user "
+                    "brokered through it."
+                )
+                raise serializers.ValidationError({immutable: msg})
+
+        protocol = self.context["protocol"]
+        oidc_only = ("discovery_url", "client_id", "client_secret")
+        saml_only = ("metadata_url", "metadata_xml")
+
+        if protocol == IDP_PROTOCOL_OIDC:
+            if any(attrs.get(field) for field in saml_only):
+                msg = (
+                    "Send discovery_url rather than metadata_url or "
+                    "metadata_xml for an OIDC identity provider."
+                )
+                raise serializers.ValidationError(msg)
+            if attrs.get("discovery_url"):
+                # The saga takes one metadata source regardless of protocol;
+                # for OIDC that source is the discovery document.
+                attrs["metadata_url"] = attrs["discovery_url"]
+        elif protocol == IDP_PROTOCOL_SAML:
+            if any(attrs.get(field) for field in oidc_only):
+                msg = (
+                    "discovery_url, client_id and client_secret belong to an "
+                    "OIDC identity provider."
+                )
+                raise serializers.ValidationError(msg)
+            if attrs.get("metadata_url") and attrs.get("metadata_xml"):
+                msg = "Supply at most one of metadata_url or metadata_xml."
+                raise serializers.ValidationError(msg)
+
+        attrs.pop("discovery_url", None)
+
+        if not attrs:
+            msg = "Supply at least one field to update."
+            raise serializers.ValidationError(msg)
+
+        return attrs
+
+
 class IdentityProviderTransitionSerializer(serializers.Serializer):
     """Request body for moving an identity provider's lifecycle state."""
 

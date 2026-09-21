@@ -50,6 +50,7 @@ from b2b.provisioning import (
     refresh_identity_provider_metadata,
     set_onboarding_state,
     transition_identity_provider,
+    update_identity_provider,
     update_organization,
 )
 
@@ -596,6 +597,184 @@ def test_refresh_metadata_stores_what_came_back(connection, mocker):
     identity_provider.refresh_from_db()
     assert identity_provider.metadata_artifact == refreshed
     assert identity_provider.metadata_fetched_at is not None
+
+
+def _oidc_identity_provider(organization, alias="exampleu"):
+    return OrganizationIdentityProvider.objects.create(
+        organization=organization,
+        alias=alias,
+        protocol=IDP_PROTOCOL_OIDC,
+        lifecycle_state=IDP_STATE_ACTIVE,
+        metadata_source="https://idp.example.edu/.well-known/openid-configuration",
+        metadata_artifact={"authorizationUrl": "https://idp.example.edu/authorize"},
+    )
+
+
+def test_update_identity_provider_rotates_the_secret(connection):
+    """A rotation writes the new secret and leaves the rest of the IdP alone."""
+
+    identity_provider = _oidc_identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu",
+        enabled=True,
+        hide_on_login=False,
+        config={
+            "clientId": "mitxonline",
+            "clientSecret": "**********",
+            "authorizationUrl": "https://idp.example.edu/authorize",
+        },
+    )
+
+    rotated = FAKE.password()
+
+    update_identity_provider(
+        identity_provider, client_secret=rotated, connection=connection
+    )
+
+    _, payload = connection.identity_providers.update.call_args.args
+    assert payload["config"]["clientSecret"] == rotated
+    assert payload["config"]["clientId"] == "mitxonline"
+    assert payload["config"]["authorizationUrl"] == "https://idp.example.edu/authorize"
+    assert payload["enabled"] is True
+    assert payload["hideOnLogin"] is False
+
+
+def test_update_identity_provider_keeps_the_secret_out_of_our_database(connection):
+    """A rotated secret goes to Keycloak and nowhere else."""
+
+    identity_provider = _oidc_identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config={"clientId": "mitxonline"}
+    )
+
+    rotated = FAKE.password()
+
+    update_identity_provider(
+        identity_provider,
+        client_secret=rotated,
+        display_name="Example University",
+        connection=connection,
+    )
+
+    identity_provider.refresh_from_db()
+    assert identity_provider.display_name == "Example University"
+    assert rotated not in str(identity_provider.metadata_artifact)
+
+
+def test_update_identity_provider_returns_an_untouched_secret_masked(connection):
+    """
+    An edit that is not a rotation writes Keycloak's mask back unchanged.
+
+    Keycloak answers the admin GET with `**********` in place of the stored
+    client secret and restores the stored value when it sees that sentinel on
+    the way back in (IdentityProviderResource.updateIdpFromRep). Sending it
+    verbatim is what keeps a display-name edit from clearing the secret.
+    """
+
+    identity_provider = _oidc_identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu",
+        enabled=True,
+        config={"clientId": "mitxonline", "clientSecret": "**********"},
+    )
+
+    update_identity_provider(
+        identity_provider, display_name="Example U", connection=connection
+    )
+
+    _, payload = connection.identity_providers.update.call_args.args
+    assert payload["config"]["clientSecret"] == "**********"
+    assert payload["displayName"] == "Example U"
+
+
+def test_update_identity_provider_reparses_a_new_metadata_source(connection, mocker):
+    """A new metadata URL is parsed, stored and merged into the Keycloak config."""
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    reparsed = {"singleSignOnServiceUrl": "https://idp.example.edu/sso2"}
+    mocker.patch(
+        "b2b.provisioning.import_identity_provider_config", return_value=reparsed
+    )
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
+    )
+
+    update_identity_provider(
+        identity_provider,
+        metadata_url="https://idp.example.edu/metadata2.xml",
+        connection=connection,
+    )
+
+    _, payload = connection.identity_providers.update.call_args.args
+    assert (
+        payload["config"]["singleSignOnServiceUrl"]
+        == reparsed["singleSignOnServiceUrl"]
+    )
+    assert payload["config"]["useMetadataDescriptorUrl"] == "true"
+
+    identity_provider.refresh_from_db()
+    assert identity_provider.metadata_source == "https://idp.example.edu/metadata2.xml"
+    assert identity_provider.metadata_artifact == reparsed
+    assert identity_provider.metadata_fetched_at is not None
+
+
+def test_update_identity_provider_replaces_every_mapper(connection):
+    """The supplied maps are the whole mapper set, so the old ones go first."""
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
+    )
+    connection.client.get_raw.return_value = [{"id": "mapper-1"}, {"id": "mapper-2"}]
+
+    update_identity_provider(
+        identity_provider,
+        attribute_map={"email": "E-Mail Address"},
+        connection=connection,
+    )
+
+    assert [call.args[0] for call in connection.client.delete.call_args_list] == [
+        "identity-provider/instances/exampleu/mappers/mapper-1",
+        "identity-provider/instances/exampleu/mappers/mapper-2",
+    ]
+
+    endpoint, payload = connection.client.create_returning_id.call_args.args
+    assert endpoint == "identity-provider/instances/exampleu/mappers"
+    assert payload["config"]["attribute.friendly.name"] == "E-Mail Address"
+
+
+def test_update_identity_provider_leaves_the_mappers_alone_by_default(connection):
+    """An edit that names no map does not touch the mappers."""
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
+    )
+
+    update_identity_provider(
+        identity_provider, display_name="Example U", connection=connection
+    )
+
+    connection.client.get_raw.assert_not_called()
+    connection.client.delete.assert_not_called()
+    connection.client.create_returning_id.assert_not_called()
+
+
+def test_update_identity_provider_can_clear_the_mappers(connection):
+    """Empty maps are a deliberate instruction, not an omission."""
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
+    )
+    connection.client.get_raw.return_value = [{"id": "mapper-1"}]
+
+    update_identity_provider(identity_provider, attribute_map={}, connection=connection)
+
+    connection.client.delete.assert_called_once_with(
+        "identity-provider/instances/exampleu/mappers/mapper-1"
+    )
+    connection.client.create_returning_id.assert_not_called()
 
 
 def test_delete_identity_provider_unlinks_before_deleting(connection):

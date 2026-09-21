@@ -353,6 +353,26 @@ class KeycloakAdminClient:
 
         return location.rstrip("/").rsplit("/", 1)[-1] if location else None
 
+    def get_raw(self, endpoint):
+        """
+        GET the endpoint in the realm and return the decoded JSON body.
+
+        For collections with no generated representation class - an identity
+        provider's mappers are a list of flat dicts - so `list` cannot coerce
+        them.
+
+        Args:
+        - endpoint: The endpoint to use.
+
+        Returns:
+        - The decoded response body.
+        """
+
+        response = self.realm_request("GET", endpoint)
+        response.raise_for_status()
+
+        return response.json()
+
     def post_raw(self, endpoint, data):
         """
         POST to the endpoint in the realm and return the decoded JSON body.

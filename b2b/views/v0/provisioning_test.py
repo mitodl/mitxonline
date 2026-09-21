@@ -411,6 +411,95 @@ def test_create_identity_provider(admin_drf_client, mocker):
     assert response.json()["lifecycle_state"] == IDP_STATE_DRAFT
 
 
+def test_patch_identity_provider_is_staff_only(user_drf_client):
+    """A non-staff user cannot edit a partner's SSO configuration."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+
+    response = user_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu"),
+        {"display_name": "Example U"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_patch_identity_provider(admin_drf_client, mocker):
+    """An edit goes through the provisioning layer and returns the record."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    identity_provider = _identity_provider(organization)
+    mocked_update = mocker.patch(
+        "b2b.views.v0.provisioning.update_identity_provider",
+        return_value=identity_provider,
+    )
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu"),
+        {"display_name": "Example U", "attribute_map": {"email": "E-Mail Address"}},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert mocked_update.call_args.kwargs == {
+        "display_name": "Example U",
+        "attribute_map": {"email": "E-Mail Address"},
+    }
+
+
+def test_patch_identity_provider_rejects_an_alias_change(admin_drf_client):
+    """
+    The alias is rejected rather than ignored.
+
+    Keycloak refuses to change it, and the only other way to get a new alias is
+    delete and recreate, which unlinks every user brokered through the IdP.
+    """
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu"),
+        {"alias": "exampleu-2"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "alias" in response.json()["errors"]
+
+
+def test_patch_identity_provider_rejects_oidc_fields_on_a_saml_provider(
+    admin_drf_client,
+):
+    """A client secret on a SAML IdP would sit in its config unread."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu"),
+        {"client_id": "mitxonline", "client_secret": "shh"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_patch_identity_provider_rejects_an_empty_body(admin_drf_client):
+    """Nothing to change is a mistake worth reporting, not a no-op 200."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu"), {}, format="json"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
 def test_transition_rejects_skipping_testing(admin_drf_client):
     """Draft -> active is a 400: an IdP goes live only after a real login."""
 
