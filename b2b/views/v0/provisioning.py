@@ -453,7 +453,9 @@ class IdentityProviderProvisioningViewSet(
         request_serializer.is_valid(raise_exception=True)
 
         identity_provider = update_identity_provider(
-            identity_provider, **request_serializer.validated_data
+            identity_provider,
+            actor=request.user,
+            **request_serializer.validated_data,
         )
 
         return Response(self.get_serializer(identity_provider).data)
