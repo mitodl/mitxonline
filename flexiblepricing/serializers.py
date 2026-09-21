@@ -69,6 +69,20 @@ class FlexiblePriceSerializer(serializers.ModelSerializer):
             "justification",
             "country_of_residence",
         ]
+        read_only_fields = [
+            "id",
+            "user",
+            "status",
+            "income_usd",
+            "original_income",
+            "original_currency",
+            "country_of_income",
+            "date_exchange_rate",
+            "date_documents_sent",
+            "justification",
+            "country_of_residence",
+        ]
+
 
 
 class FlexiblePriceIncomeSerializer(serializers.ModelSerializer):

@@ -3,11 +3,8 @@ from rest_framework.routers import SimpleRouter
 from rest_framework_extensions.routers import NestedRouterMixin
 
 from flexiblepricing.views.v0 import (
-    CountryIncomeThresholdViewSet,
-    CurrencyExchangeRateViewSet,
     FlexiblePriceAdminViewSet,
     FlexiblePriceCoursewareViewSet,
-    FlexiblePriceViewSet,
 )
 
 
@@ -16,17 +13,6 @@ class SimpleRouterWithNesting(NestedRouterMixin, SimpleRouter):
 
 
 router = SimpleRouterWithNesting()
-router.register(
-    r"exchange_rates", CurrencyExchangeRateViewSet, basename="fp_exchangerates_api"
-)
-router.register(
-    r"income_thresholds",
-    CountryIncomeThresholdViewSet,
-    basename="fp_countryincomethresholds_api",
-)
-router.register(
-    r"applications", FlexiblePriceViewSet, basename="fp_flexiblepricing_api"
-)
 router.register(
     r"applications_admin",
     FlexiblePriceAdminViewSet,
