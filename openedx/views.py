@@ -3,9 +3,10 @@
 import logging
 
 from django.http import HttpResponse
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
 from oauth2_provider.contrib.rest_framework import OAuth2Authentication
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import (
     api_view,
@@ -265,7 +266,29 @@ class NotificationPreferencesView(APIView):
     authentication_classes = (SessionAuthentication,)
     permission_classes = (IsAuthenticated,)
 
-    @extend_schema(exclude=True)
+    @extend_schema(
+        operation_id="notification_preferences_retrieve",
+        summary="Get the learner's Open edX notification preferences",
+        description=(
+            "Proxies the learner's preferences from Open edX, which owns this "
+            "state. The body is the LMS response verbatim, so its shape follows "
+            "the LMS rather than this API."
+        ),
+        responses={
+            200: OpenApiResponse(
+                OpenApiTypes.OBJECT,
+                description="The LMS response, passed through unchanged.",
+            ),
+            409: inline_serializer(
+                name="NotificationPreferencesUnavailableResponse",
+                fields={"detail": serializers.CharField()},
+            ),
+            502: inline_serializer(
+                name="NotificationPreferencesUpstreamErrorResponse",
+                fields={"detail": serializers.CharField()},
+            ),
+        },
+    )
     def get(self, request):
         """Return the learner's current notification preferences"""
         try:
@@ -286,7 +309,34 @@ class NotificationPreferencesView(APIView):
                 status=_upstream_status(exc),
             )
 
-    @extend_schema(exclude=True)
+    @extend_schema(
+        operation_id="notification_preferences_update",
+        summary="Change one notification preference",
+        description=(
+            "Open edX updates a single channel per request, so each toggle or "
+            "cadence change is its own call. The body is the LMS response "
+            "verbatim."
+        ),
+        request=NotificationPreferenceUpdateSerializer,
+        responses={
+            200: OpenApiResponse(
+                OpenApiTypes.OBJECT,
+                description="The LMS response, passed through unchanged.",
+            ),
+            409: inline_serializer(
+                name="NotificationPreferenceUpdateUnavailableResponse",
+                fields={"detail": serializers.CharField()},
+            ),
+            429: inline_serializer(
+                name="NotificationPreferenceUpdateThrottledResponse",
+                fields={"detail": serializers.CharField()},
+            ),
+            502: inline_serializer(
+                name="NotificationPreferenceUpdateUpstreamErrorResponse",
+                fields={"detail": serializers.CharField()},
+            ),
+        },
+    )
     def put(self, request):
         """Update a single notification preference field"""
         serializer = NotificationPreferenceUpdateSerializer(data=request.data)
