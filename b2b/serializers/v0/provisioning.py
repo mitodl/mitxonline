@@ -314,13 +314,31 @@ class UpdateIdentityProviderSerializer(serializers.Serializer):
             msg = "Supply at most one of metadata_url or metadata_xml."
             raise serializers.ValidationError(msg)
 
-        # The maps replace the whole mapper set, so an edit that leaves both
-        # empty is a SAML IdP with no mappers - one that brokers users with no
-        # email or name. Creation refuses that; so does this.
         maps = ("attribute_map", "attribute_name_map")
-        if any(field in attrs for field in maps) and not any(
-            attrs.get(field) for field in maps
-        ):
+        supplied = [field for field in maps if field in attrs]
+
+        if not supplied:
+            return
+
+        # SAML splits its mappers across the two maps - friendly names in one,
+        # attribute names in the other - and the pair replaces the whole set.
+        # Sending one alone therefore deletes the other's mappers, which is
+        # never what an operator editing one mapping meant. Make the caller
+        # state the whole set, empty map included.
+        if len(supplied) != len(maps):
+            missing = next(field for field in maps if field not in supplied)
+            msg = (
+                "Send attribute_map and attribute_name_map together for a SAML "
+                "identity provider: the pair replaces the whole mapper set, so "
+                f"omitting {missing} would delete the mappers it holds. Send it "
+                "as an empty object if there are none."
+            )
+            raise serializers.ValidationError({missing: msg})
+
+        # An edit that leaves both empty is a SAML IdP with no mappers - one
+        # that brokers users with no email or name. Creation refuses that; so
+        # does this.
+        if not any(attrs.get(field) for field in maps):
             msg = (
                 "A SAML identity provider needs at least one attribute "
                 "mapper. Supply attribute_map or attribute_name_map."

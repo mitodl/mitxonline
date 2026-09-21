@@ -438,7 +438,11 @@ def test_patch_identity_provider(admin_drf_client, mocker):
 
     response = admin_drf_client.patch(
         _identity_provider_url(organization.org_key, "exampleu"),
-        {"display_name": "Example U", "attribute_map": {"email": "E-Mail Address"}},
+        {
+            "display_name": "Example U",
+            "attribute_map": {"email": "E-Mail Address"},
+            "attribute_name_map": {},
+        },
         format="json",
     )
 
@@ -446,7 +450,32 @@ def test_patch_identity_provider(admin_drf_client, mocker):
     assert mocked_update.call_args.kwargs == {
         "display_name": "Example U",
         "attribute_map": {"email": "E-Mail Address"},
+        "attribute_name_map": {},
     }
+
+
+def test_patch_identity_provider_refuses_one_saml_map_alone(admin_drf_client, mocker):
+    """
+    One map alone would delete the other's mappers.
+
+    SAML splits its mappers across friendly names and attribute names, and the
+    pair replaces the whole set, so an operator fixing one mapping must say
+    what the other holds rather than discover it emptied.
+    """
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+    mocked_update = mocker.patch("b2b.views.v0.provisioning.update_identity_provider")
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu"),
+        {"attribute_map": {"email": "E-Mail Address"}},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "attribute_name_map" in response.json()["errors"]
+    mocked_update.assert_not_called()
 
 
 def test_patch_identity_provider_takes_a_discovery_url_for_oidc(
@@ -558,7 +587,7 @@ def test_patch_identity_provider_refuses_to_clear_saml_mappers(admin_drf_client)
 
     response = admin_drf_client.patch(
         _identity_provider_url(organization.org_key, "exampleu"),
-        {"attribute_map": {}},
+        {"attribute_map": {}, "attribute_name_map": {}},
         format="json",
     )
 
