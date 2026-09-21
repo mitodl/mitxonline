@@ -266,18 +266,66 @@ class UpdateIdentityProviderSerializer(serializers.Serializer):
     provider, not an edit to this one.
     """
 
+    # Only the display name may be blanked. A blank anywhere else is an empty
+    # form field rather than an instruction: blanking client_secret would take
+    # the partner's login down, and blanking a metadata source would leave an
+    # IdP that cannot be refreshed.
     display_name = serializers.CharField(
         max_length=255, required=False, allow_blank=True
     )
-    metadata_url = serializers.URLField(required=False, allow_blank=True)
-    metadata_xml = serializers.CharField(required=False, allow_blank=True)
-    discovery_url = serializers.URLField(required=False, allow_blank=True)
-    client_id = serializers.CharField(required=False, allow_blank=True)
-    client_secret = serializers.CharField(required=False, allow_blank=True)
+    metadata_url = serializers.URLField(required=False)
+    metadata_xml = serializers.CharField(required=False)
+    discovery_url = serializers.URLField(required=False)
+    client_id = serializers.CharField(required=False)
+    client_secret = serializers.CharField(required=False)
     attribute_map = serializers.DictField(child=serializers.CharField(), required=False)
     attribute_name_map = serializers.DictField(
         child=serializers.CharField(), required=False
     )
+
+    def _validate_oidc(self, attrs):
+        """Check an OIDC identity provider's fields."""
+
+        if any(field in attrs for field in ("metadata_url", "metadata_xml")):
+            msg = (
+                "Send discovery_url rather than metadata_url or metadata_xml "
+                "for an OIDC identity provider."
+            )
+            raise serializers.ValidationError(msg)
+
+        if "discovery_url" in attrs:
+            # The saga takes one metadata source regardless of protocol; for
+            # OIDC that source is the discovery document.
+            attrs["metadata_url"] = attrs["discovery_url"]
+
+    def _validate_saml(self, attrs):
+        """Check a SAML identity provider's fields."""
+
+        if any(
+            field in attrs for field in ("discovery_url", "client_id", "client_secret")
+        ):
+            msg = (
+                "discovery_url, client_id and client_secret belong to an OIDC "
+                "identity provider."
+            )
+            raise serializers.ValidationError(msg)
+
+        if "metadata_url" in attrs and "metadata_xml" in attrs:
+            msg = "Supply at most one of metadata_url or metadata_xml."
+            raise serializers.ValidationError(msg)
+
+        # The maps replace the whole mapper set, so an edit that leaves both
+        # empty is a SAML IdP with no mappers - one that brokers users with no
+        # email or name. Creation refuses that; so does this.
+        maps = ("attribute_map", "attribute_name_map")
+        if any(field in attrs for field in maps) and not any(
+            attrs.get(field) for field in maps
+        ):
+            msg = (
+                "A SAML identity provider needs at least one attribute "
+                "mapper. Supply attribute_map or attribute_name_map."
+            )
+            raise serializers.ValidationError(msg)
 
     def validate(self, attrs):
         """Check the fields against the identity provider's protocol."""
@@ -291,31 +339,10 @@ class UpdateIdentityProviderSerializer(serializers.Serializer):
                 )
                 raise serializers.ValidationError({immutable: msg})
 
-        protocol = self.context["protocol"]
-        oidc_only = ("discovery_url", "client_id", "client_secret")
-        saml_only = ("metadata_url", "metadata_xml")
-
-        if protocol == IDP_PROTOCOL_OIDC:
-            if any(attrs.get(field) for field in saml_only):
-                msg = (
-                    "Send discovery_url rather than metadata_url or "
-                    "metadata_xml for an OIDC identity provider."
-                )
-                raise serializers.ValidationError(msg)
-            if attrs.get("discovery_url"):
-                # The saga takes one metadata source regardless of protocol;
-                # for OIDC that source is the discovery document.
-                attrs["metadata_url"] = attrs["discovery_url"]
-        elif protocol == IDP_PROTOCOL_SAML:
-            if any(attrs.get(field) for field in oidc_only):
-                msg = (
-                    "discovery_url, client_id and client_secret belong to an "
-                    "OIDC identity provider."
-                )
-                raise serializers.ValidationError(msg)
-            if attrs.get("metadata_url") and attrs.get("metadata_xml"):
-                msg = "Supply at most one of metadata_url or metadata_xml."
-                raise serializers.ValidationError(msg)
+        if self.context["protocol"] == IDP_PROTOCOL_OIDC:
+            self._validate_oidc(attrs)
+        else:
+            self._validate_saml(attrs)
 
         attrs.pop("discovery_url", None)
 

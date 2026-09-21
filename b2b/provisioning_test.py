@@ -33,6 +33,7 @@ from b2b.exceptions import (
 )
 from b2b.factories import OrganizationIndexPageFactory, OrganizationPageFactory
 from b2b.keycloak_admin_dataclasses import (
+    IdentityProviderMapperRepresentation,
     IdentityProviderRepresentation,
     OrganizationDomainRepresentation,
     OrganizationRepresentation,
@@ -614,10 +615,12 @@ def test_update_identity_provider_rotates_the_secret(connection):
     """A rotation writes the new secret and leaves the rest of the IdP alone."""
 
     identity_provider = _oidc_identity_provider(OrganizationPageFactory.create())
+    organization_id = str(FAKE.uuid4())
     connection.identity_providers.get.return_value = IdentityProviderRepresentation(
         alias="exampleu",
         enabled=True,
         hide_on_login=False,
+        organization_id=organization_id,
         config={
             "clientId": "mitxonline",
             "clientSecret": "**********",
@@ -637,6 +640,8 @@ def test_update_identity_provider_rotates_the_secret(connection):
     assert payload["config"]["authorizationUrl"] == "https://idp.example.edu/authorize"
     assert payload["enabled"] is True
     assert payload["hideOnLogin"] is False
+    # The org<->IdP link is Keycloak state the replacing PUT could drop.
+    assert payload["organizationId"] == organization_id
 
 
 def test_update_identity_provider_keeps_the_secret_out_of_our_database(connection):
@@ -718,14 +723,57 @@ def test_update_identity_provider_reparses_a_new_metadata_source(connection, moc
     assert identity_provider.metadata_fetched_at is not None
 
 
-def test_update_identity_provider_replaces_every_mapper(connection):
+def test_update_identity_provider_switching_to_xml_drops_the_descriptor_url(
+    connection, mocker
+):
+    """
+    Replacing a metadata URL with uploaded XML turns the URL off in Keycloak.
+
+    Left on, Keycloak keeps re-reading the descriptor the operator just
+    replaced, while our row records the XML they uploaded.
+    """
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    mocker.patch(
+        "b2b.provisioning.import_identity_provider_config",
+        return_value={"singleSignOnServiceUrl": "https://idp.example.edu/sso2"},
+    )
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu",
+        enabled=True,
+        config={
+            **PARSED_METADATA,
+            "metadataDescriptorUrl": "https://idp.example.edu/metadata.xml",
+            "useMetadataDescriptorUrl": "true",
+        },
+    )
+
+    update_identity_provider(
+        identity_provider,
+        metadata_xml="<EntityDescriptor />",
+        connection=connection,
+    )
+
+    _, payload = connection.identity_providers.update.call_args.args
+    assert payload["config"]["useMetadataDescriptorUrl"] == "false"
+    assert payload["config"]["metadataDescriptorUrl"] == ""
+
+
+def test_update_identity_provider_replaces_every_attribute_mapper(connection):
     """The supplied maps are the whole mapper set, so the old ones go first."""
 
     identity_provider = _identity_provider(OrganizationPageFactory.create())
     connection.identity_providers.get.return_value = IdentityProviderRepresentation(
         alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
     )
-    connection.client.get_raw.return_value = [{"id": "mapper-1"}, {"id": "mapper-2"}]
+    connection.client.list.return_value = [
+        IdentityProviderMapperRepresentation(
+            id="mapper-1", identity_provider_mapper="saml-user-attribute-idp-mapper"
+        ),
+        IdentityProviderMapperRepresentation(
+            id="mapper-2", identity_provider_mapper="saml-user-attribute-idp-mapper"
+        ),
+    ]
 
     update_identity_provider(
         identity_provider,
@@ -743,6 +791,39 @@ def test_update_identity_provider_replaces_every_mapper(connection):
     assert payload["config"]["attribute.friendly.name"] == "E-Mail Address"
 
 
+def test_update_identity_provider_keeps_mappers_of_other_types(connection):
+    """
+    A mapper that is not an attribute importer survives an attribute edit.
+
+    It was added out of band - a username template, a hardcoded role - and has
+    nothing to do with the maps being supplied.
+    """
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
+    )
+    connection.client.list.return_value = [
+        IdentityProviderMapperRepresentation(
+            id="attribute-mapper",
+            identity_provider_mapper="saml-user-attribute-idp-mapper",
+        ),
+        IdentityProviderMapperRepresentation(
+            id="role-mapper", identity_provider_mapper="oidc-hardcoded-role-idp-mapper"
+        ),
+    ]
+
+    update_identity_provider(
+        identity_provider,
+        attribute_map={"email": "E-Mail Address"},
+        connection=connection,
+    )
+
+    connection.client.delete.assert_called_once_with(
+        "identity-provider/instances/exampleu/mappers/attribute-mapper"
+    )
+
+
 def test_update_identity_provider_leaves_the_mappers_alone_by_default(connection):
     """An edit that names no map does not touch the mappers."""
 
@@ -755,19 +836,28 @@ def test_update_identity_provider_leaves_the_mappers_alone_by_default(connection
         identity_provider, display_name="Example U", connection=connection
     )
 
-    connection.client.get_raw.assert_not_called()
+    connection.client.list.assert_not_called()
     connection.client.delete.assert_not_called()
     connection.client.create_returning_id.assert_not_called()
 
 
 def test_update_identity_provider_can_clear_the_mappers(connection):
-    """Empty maps are a deliberate instruction, not an omission."""
+    """
+    Empty maps are a deliberate instruction, not an omission.
 
-    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    OIDC only, in practice: the API refuses to leave a SAML identity provider
+    with no mappers, because it would then broker users with no email or name.
+    """
+
+    identity_provider = _oidc_identity_provider(OrganizationPageFactory.create())
     connection.identity_providers.get.return_value = IdentityProviderRepresentation(
-        alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
+        alias="exampleu", enabled=True, config={"clientId": "mitxonline"}
     )
-    connection.client.get_raw.return_value = [{"id": "mapper-1"}]
+    connection.client.list.return_value = [
+        IdentityProviderMapperRepresentation(
+            id="mapper-1", identity_provider_mapper="oidc-user-attribute-idp-mapper"
+        )
+    ]
 
     update_identity_provider(identity_provider, attribute_map={}, connection=connection)
 

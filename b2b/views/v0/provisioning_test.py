@@ -449,6 +449,36 @@ def test_patch_identity_provider(admin_drf_client, mocker):
     }
 
 
+def test_patch_identity_provider_takes_a_discovery_url_for_oidc(
+    admin_drf_client, mocker
+):
+    """OIDC names its metadata source discovery_url; the saga takes one source."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    identity_provider = OrganizationIdentityProvider.objects.create(
+        organization=organization,
+        alias="exampleu-oidc",
+        protocol=IDP_PROTOCOL_OIDC,
+        lifecycle_state=IDP_STATE_ACTIVE,
+        metadata_source="https://idp.example.edu/.well-known/openid-configuration",
+    )
+    mocked_update = mocker.patch(
+        "b2b.views.v0.provisioning.update_identity_provider",
+        return_value=identity_provider,
+    )
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu-oidc"),
+        {"discovery_url": "https://idp.example.edu/.well-known/openid-configuration2"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert mocked_update.call_args.kwargs == {
+        "metadata_url": "https://idp.example.edu/.well-known/openid-configuration2"
+    }
+
+
 def test_patch_identity_provider_rejects_an_alias_change(admin_drf_client):
     """
     The alias is rejected rather than ignored.
@@ -481,6 +511,54 @@ def test_patch_identity_provider_rejects_oidc_fields_on_a_saml_provider(
     response = admin_drf_client.patch(
         _identity_provider_url(organization.org_key, "exampleu"),
         {"client_id": "mitxonline", "client_secret": "shh"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_patch_identity_provider_rejects_a_blank_secret(admin_drf_client, mocker):
+    """
+    A blank client secret is an empty form field, not an instruction.
+
+    Writing it through would leave the partner's IdP with no secret and their
+    logins failing. Creation refuses the same input.
+    """
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    OrganizationIdentityProvider.objects.create(
+        organization=organization,
+        alias="exampleu-oidc",
+        protocol=IDP_PROTOCOL_OIDC,
+        lifecycle_state=IDP_STATE_ACTIVE,
+        metadata_source="https://idp.example.edu/.well-known/openid-configuration",
+    )
+    mocked_update = mocker.patch("b2b.views.v0.provisioning.update_identity_provider")
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu-oidc"),
+        {"client_secret": ""},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    mocked_update.assert_not_called()
+
+
+def test_patch_identity_provider_refuses_to_clear_saml_mappers(admin_drf_client):
+    """
+    A SAML IdP with no mappers brokers users with no email or name.
+
+    The maps replace the whole mapper set, so an edit that leaves both empty
+    would do exactly what creation refuses to do.
+    """
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu"),
+        {"attribute_map": {}},
         format="json",
     )
 

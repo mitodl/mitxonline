@@ -10290,15 +10290,20 @@ components:
         metadata_url:
           type: string
           format: uri
+          minLength: 1
         metadata_xml:
           type: string
+          minLength: 1
         discovery_url:
           type: string
           format: uri
+          minLength: 1
         client_id:
           type: string
+          minLength: 1
         client_secret:
           type: string
+          minLength: 1
         attribute_map:
           type: object
           additionalProperties:

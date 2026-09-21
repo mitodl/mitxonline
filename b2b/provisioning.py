@@ -51,6 +51,7 @@ from b2b.keycloak_admin_api import (
     get_keycloak_model,
     import_identity_provider_config,
 )
+from b2b.keycloak_admin_dataclasses import IdentityProviderMapperRepresentation
 from b2b.models import (
     OrganizationIdentityProvider,
     OrganizationIndexPage,
@@ -592,6 +593,11 @@ def _replace_attribute_mappers(
     mapper an operator meant to change - Keycloak keys them by a generated id,
     and the only name we give them is `{alias}-{attribute}-mapper`.
 
+    Only the attribute importers are replaced. A mapper of another type - a
+    username template, a hardcoded role - was added out of band and has nothing
+    to do with the maps being supplied, so an attribute edit does not destroy
+    it.
+
     Args:
     - connection (KeycloakConnection): the Keycloak connection to use
     - alias (str): the IdP alias
@@ -601,9 +607,11 @@ def _replace_attribute_mappers(
     """
 
     endpoint = f"identity-provider/instances/{alias}/mappers"
+    existing = connection.client.list(endpoint, IdentityProviderMapperRepresentation)
 
-    for mapper in connection.client.get_raw(endpoint):
-        connection.client.delete(f"{endpoint}/{mapper['id']}")
+    for mapper in existing:
+        if mapper.identity_provider_mapper in IDP_ATTRIBUTE_MAPPERS.values():
+            connection.client.delete(f"{endpoint}/{mapper.id}")
 
     _create_attribute_mappers(
         connection, alias, protocol, attribute_map, attribute_name_map
@@ -780,6 +788,13 @@ def update_identity_provider(  # noqa: PLR0913
     value when it sees the sentinel (IdentityProviderResource.updateIdpFromRep,
     Keycloak main). The alias cannot change here and Keycloak rejects it too.
 
+    There is no compensation. The IdP write, the mapper replacement and our
+    save happen in that order, and a failure part way through leaves Keycloak
+    ahead of our row - on a SAML IdP, possibly with fewer mappers than it
+    started with. Every step is idempotent for the same request body, so the
+    recovery is to send the same PATCH again; unlike a create, there is nothing
+    half-made to delete.
+
     Args:
     - identity_provider (OrganizationIdentityProvider): the IdP to update
     - display_name (str): new display name, if changing
@@ -813,11 +828,15 @@ def update_identity_provider(  # noqa: PLR0913
 
     if metadata_artifact is not None:
         config.update(metadata_artifact)
-        if identity_provider.protocol == IDP_PROTOCOL_SAML and metadata_url:
+        if identity_provider.protocol == IDP_PROTOCOL_SAML:
+            # Whichever source is not in use has to be turned off explicitly.
+            # An IdP created from a URL keeps re-reading that URL otherwise,
+            # so an operator who replaces it with uploaded XML gets a 200 and
+            # a realm still following the descriptor they just replaced.
             config.update(
                 {
-                    "metadataDescriptorUrl": metadata_url,
-                    "useMetadataDescriptorUrl": "true",
+                    "metadataDescriptorUrl": metadata_url or "",
+                    "useMetadataDescriptorUrl": "true" if metadata_url else "false",
                 }
             )
     if client_id is not None:
