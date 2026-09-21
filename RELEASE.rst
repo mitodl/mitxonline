@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.167.0
+---------------
+
+- Update dependency django to v5.2.17 [SECURITY] (#3762)
+- feat: FAQs on product pages (mitxonline CMS side) (#3961)
+
 Version 1.166.7
 ---------------
 
