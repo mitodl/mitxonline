@@ -1222,7 +1222,7 @@ class PendingOrder(Order):
     @transaction.atomic
     def _get_or_create(
         self,
-        products: List[Tuple[Product, ContractPage]],  # noqa: UP006
+        products: List[Tuple[Product, ContractPage | None]],  # noqa: UP006
         user: User,
         discounts: List[Discount] | None = None,  # noqa: UP006
         gateway_type: str = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
@@ -1301,7 +1301,9 @@ class PendingOrder(Order):
                         redemption_date=now,
                         redeemed_by=user,
                         redeemed_discount=discount,
-                        source_line=source_line_for(discount, user, products),
+                        source_line=source_line_for(
+                            discount, user, [product[0] for product in products]
+                        ),
                     )
 
         # Create or get Line for each product.  Calculate the Order total based on Lines and discount.
@@ -1385,7 +1387,9 @@ class PendingOrder(Order):
             PendingOrder: the created pending order
         """
 
-        order = cls._get_or_create(cls, [product], user, [discount], gateway_type)
+        order = cls._get_or_create(
+            cls, [(product, None)], user, [discount], gateway_type
+        )
 
         return order  # noqa: RET504
 
