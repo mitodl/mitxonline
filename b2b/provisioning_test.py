@@ -759,6 +759,51 @@ def test_update_identity_provider_switching_to_xml_drops_the_descriptor_url(
     assert payload["config"]["metadataDescriptorUrl"] == ""
 
 
+def test_update_identity_provider_drops_keys_the_new_metadata_omits(connection, mocker):
+    """
+    A key the new document does not define stops being live in Keycloak.
+
+    Overlaying would leave an old signing certificate or a withdrawn logout
+    endpoint in the realm while metadata_artifact says it is gone.
+    """
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    identity_provider.metadata_artifact = {
+        **PARSED_METADATA,
+        "signingCertificate": "old-certificate",
+    }
+    identity_provider.save()
+
+    reparsed = {"singleSignOnServiceUrl": "https://idp.example.edu/sso2"}
+    mocker.patch(
+        "b2b.provisioning.import_identity_provider_config", return_value=reparsed
+    )
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu",
+        enabled=True,
+        config={
+            **identity_provider.metadata_artifact,
+            "clientId": "mitxonline",
+        },
+    )
+
+    update_identity_provider(
+        identity_provider,
+        metadata_url="https://idp.example.edu/metadata2.xml",
+        connection=connection,
+    )
+
+    _, payload = connection.identity_providers.update.call_args.args
+    assert "signingCertificate" not in payload["config"]
+    assert "idpEntityId" not in payload["config"]
+    assert (
+        payload["config"]["singleSignOnServiceUrl"]
+        == reparsed["singleSignOnServiceUrl"]
+    )
+    # Not metadata, so not ours to drop.
+    assert payload["config"]["clientId"] == "mitxonline"
+
+
 def test_update_identity_provider_replaces_every_attribute_mapper(connection):
     """The supplied maps are the whole mapper set, so the old ones go first."""
 

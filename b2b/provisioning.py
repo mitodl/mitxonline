@@ -759,6 +759,44 @@ def create_identity_provider(  # noqa: PLR0913
     return identity_provider
 
 
+def _replace_metadata_config(
+    config, identity_provider, metadata_artifact, metadata_url
+):
+    """
+    Swap the metadata-derived keys in an IdP's Keycloak config for new ones.
+
+    Drops what the old document put there before applying the new one.
+    Overlaying would leave any key the new document does not define - an old
+    SAML signing certificate, an OIDC logout endpoint the partner removed -
+    live in Keycloak while our artifact says it is gone. The stored artifact is
+    exactly the set of keys metadata owns, so the credentials and the lifecycle
+    flags are untouched.
+
+    Args:
+    - config (dict): the IdP's current Keycloak config, modified in place
+    - identity_provider (OrganizationIdentityProvider): the IdP being updated
+    - metadata_artifact (dict): what Keycloak parsed out of the new document
+    - metadata_url (str): the new metadata URL, if the source is a URL
+    """
+
+    for stale_key in identity_provider.metadata_artifact or {}:
+        config.pop(stale_key, None)
+
+    config.update(metadata_artifact)
+
+    if identity_provider.protocol == IDP_PROTOCOL_SAML:
+        # Whichever source is not in use has to be turned off explicitly. An
+        # IdP created from a URL keeps re-reading that URL otherwise, so an
+        # operator who replaces it with uploaded XML gets a 200 and a realm
+        # still following the descriptor they just replaced.
+        config.update(
+            {
+                "metadataDescriptorUrl": metadata_url or "",
+                "useMetadataDescriptorUrl": "true" if metadata_url else "false",
+            }
+        )
+
+
 def update_identity_provider(  # noqa: PLR0913
     identity_provider,
     *,
@@ -827,18 +865,9 @@ def update_identity_provider(  # noqa: PLR0913
     config = dict(payload.get("config") or {})
 
     if metadata_artifact is not None:
-        config.update(metadata_artifact)
-        if identity_provider.protocol == IDP_PROTOCOL_SAML:
-            # Whichever source is not in use has to be turned off explicitly.
-            # An IdP created from a URL keeps re-reading that URL otherwise,
-            # so an operator who replaces it with uploaded XML gets a 200 and
-            # a realm still following the descriptor they just replaced.
-            config.update(
-                {
-                    "metadataDescriptorUrl": metadata_url or "",
-                    "useMetadataDescriptorUrl": "true" if metadata_url else "false",
-                }
-            )
+        _replace_metadata_config(
+            config, identity_provider, metadata_artifact, metadata_url
+        )
     if client_id is not None:
         config["clientId"] = client_id
     if client_secret is not None:
