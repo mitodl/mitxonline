@@ -1010,6 +1010,38 @@ def test_create_run_enrollments_skips_exports_check_when_requested(
     )
 
 
+def test_create_run_enrollments_skip_enrollment_emails(
+    mocker, user, django_capture_on_commit_callbacks
+):
+    """skip_enrollment_emails=True suppresses both the new-enrollment email
+    and the reactivation email, without affecting the enrollments created.
+    """
+    new_run, reactivated_run = CourseRunFactory.create_batch(2)
+    CourseRunEnrollmentFactory.create(
+        user=user,
+        run=reactivated_run,
+        change_status=ENROLL_CHANGE_STATUS_REFUNDED,
+        active=False,
+    )
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    patched_send_enrollment_email = mocker.patch(
+        "courses.api.mail_api.send_course_run_enrollment_email"
+    )
+    patched_subscribe_emails = mocker.patch(
+        "courses.tasks.subscribe_edx_course_emails.delay"
+    )
+
+    successful_enrollments, edx_request_success = create_run_enrollments(
+        user, [new_run, reactivated_run], skip_enrollment_emails=True
+    )
+
+    with django_capture_on_commit_callbacks(execute=True):
+        assert edx_request_success is True
+        assert len(successful_enrollments) == 2
+        patched_send_enrollment_email.assert_not_called()
+        patched_subscribe_emails.assert_not_called()
+
+
 def test_create_program_enrollments_verifies_exports_for_verified_mode(mocker, user):
     """Verified program enrollments should require an accepted export check."""
     program = ProgramFactory.create()
