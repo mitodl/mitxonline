@@ -20,6 +20,7 @@ from b2b.constants import (
     PROVISIONING_ACTION_IDP_DELETED,
     PROVISIONING_ACTION_IDP_METADATA_REFRESHED,
     PROVISIONING_ACTION_IDP_TRANSITIONED,
+    PROVISIONING_ACTION_IDP_UPDATED,
     PROVISIONING_ACTION_ONBOARDING_CHANGED,
     PROVISIONING_ACTION_ORG_CREATED,
     PROVISIONING_ACTION_ORG_UPDATED,
@@ -642,6 +643,111 @@ def test_update_identity_provider_rotates_the_secret(connection):
     assert payload["hideOnLogin"] is False
     # The org<->IdP link is Keycloak state the replacing PUT could drop.
     assert payload["organizationId"] == organization_id
+
+
+def test_update_identity_provider_audits_the_change(connection, staff_user):
+    """
+    An edit lands in the change history with who made it.
+
+    The audit trail is what replaced the reviewed Pulumi PR, so an IdP edit
+    that is not in it is a partner's SSO changing with no record.
+    """
+
+    identity_provider = _oidc_identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu",
+        enabled=True,
+        config={"clientId": "mitxonline", "clientSecret": "**********"},
+    )
+
+    update_identity_provider(
+        identity_provider,
+        display_name="Example University",
+        client_id="mitxonline-2",
+        connection=connection,
+        actor=staff_user,
+    )
+
+    (audit,) = OrganizationProvisioningAudit.objects.filter(
+        action=PROVISIONING_ACTION_IDP_UPDATED
+    )
+    assert audit.acting_user == staff_user
+    assert audit.identity_provider_alias == "exampleu"
+    assert audit.data_before["display_name"] == ""
+    assert audit.data_after["display_name"] == "Example University"
+    assert audit.data_before["config"]["clientId"] == "mitxonline"
+    assert audit.data_after["config"]["clientId"] == "mitxonline-2"
+
+
+def test_update_identity_provider_audits_a_rotation_without_the_secret(
+    connection, staff_user
+):
+    """That a rotation happened is recorded; the new secret is not."""
+
+    identity_provider = _oidc_identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu",
+        enabled=True,
+        config={"clientId": "mitxonline", "clientSecret": "**********"},
+    )
+    rotated = FAKE.password()
+
+    update_identity_provider(
+        identity_provider,
+        client_secret=rotated,
+        connection=connection,
+        actor=staff_user,
+    )
+
+    (audit,) = OrganizationProvisioningAudit.objects.filter(
+        action=PROVISIONING_ACTION_IDP_UPDATED
+    )
+    assert audit.data_after["client_secret_rotated"] is True
+    assert rotated not in str(audit.data_before) + str(audit.data_after)
+
+
+def test_update_identity_provider_audits_the_mappers_it_replaced(
+    connection, staff_user
+):
+    """
+    The mappers an edit removed are only readable from the audit record.
+
+    They are gone from Keycloak by the time the call returns, so recording
+    what the operator replaced is the only way to answer what was there.
+    """
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
+    )
+    connection.client.list.return_value = [
+        IdentityProviderMapperRepresentation(
+            id="mapper-1",
+            name="exampleu-email-mapper",
+            identity_provider_mapper="saml-user-attribute-idp-mapper",
+            config={"attribute.friendly.name": "E-Mail", "user.attribute": "email"},
+        )
+    ]
+
+    update_identity_provider(
+        identity_provider,
+        attribute_map={"email": "E-Mail Address"},
+        attribute_name_map={},
+        connection=connection,
+        actor=staff_user,
+    )
+
+    (audit,) = OrganizationProvisioningAudit.objects.filter(
+        action=PROVISIONING_ACTION_IDP_UPDATED
+    )
+    assert audit.data_before["attribute_mappers"] == [
+        {
+            "name": "exampleu-email-mapper",
+            "config": {"attribute.friendly.name": "E-Mail", "user.attribute": "email"},
+        }
+    ]
+    assert audit.data_after["attribute_map"] == {"email": "E-Mail Address"}
+    assert audit.data_after["attribute_name_map"] == {}
 
 
 def test_update_identity_provider_keeps_the_secret_out_of_our_database(connection):

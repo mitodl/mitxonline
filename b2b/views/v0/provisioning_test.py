@@ -447,7 +447,9 @@ def test_patch_identity_provider(admin_drf_client, mocker):
     )
 
     assert response.status_code == status.HTTP_200_OK
-    assert mocked_update.call_args.kwargs == {
+    kwargs = mocked_update.call_args.kwargs
+    assert kwargs.pop("actor").is_staff
+    assert kwargs == {
         "display_name": "Example U",
         "attribute_map": {"email": "E-Mail Address"},
         "attribute_name_map": {},
@@ -503,7 +505,9 @@ def test_patch_identity_provider_takes_a_discovery_url_for_oidc(
     )
 
     assert response.status_code == status.HTTP_200_OK
-    assert mocked_update.call_args.kwargs == {
+    kwargs = mocked_update.call_args.kwargs
+    assert kwargs.pop("actor").is_staff
+    assert kwargs == {
         "metadata_url": "https://idp.example.edu/.well-known/openid-configuration2"
     }
 
