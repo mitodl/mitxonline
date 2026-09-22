@@ -7,6 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         ("b2b", "0029_userb2bcontract"),
+        ("users", "0044_alter_user_b2b_contracts"),
     ]
 
     operations = [
