@@ -205,6 +205,7 @@ class TestEnrollLearnerInRun:
             keep_failed_enrollments=True,
             mode="verified",
             skip_compliance_check=False,
+            skip_enrollment_emails=False,
         )
 
 
@@ -281,6 +282,7 @@ class TestBulkEnrollLearnersUtil:
             mode="verified",
             keep_failed_enrollments=True,
             skip_compliance_check=False,
+            skip_enrollment_emails=False,
         )
 
     def test_one_bad_row_does_not_abort_the_batch(self, mocker):
@@ -373,6 +375,7 @@ class TestBulkEnrollLearnersUtil:
                     keep_failed_enrollments=False,
                     mode=EDX_DEFAULT_ENROLLMENT_MODE,
                     skip_compliance_check=True,
+                    skip_enrollment_emails=False,
                 )
                 for user in users
             ]

@@ -184,6 +184,7 @@ def create_run_enrollments(  # noqa: C901, PLR0913
     keep_failed_enrollments=None,
     mode=EDX_DEFAULT_ENROLLMENT_MODE,
     skip_compliance_check=False,
+    skip_enrollment_emails=False,
 ):
     """
     Creates local records of a user's enrollment in course runs, and attempts to enroll them
@@ -205,6 +206,8 @@ def create_run_enrollments(  # noqa: C901, PLR0913
         mode (str): The course mode
         skip_compliance_check (bool): If True, bypass the export compliance
             check. Operator-run management commands only.
+        skip_enrollment_emails (bool): If True, don't send the learner the
+            enrollment confirmation email. Operator-run management commands only.
 
     Returns:
         (list of CourseRunEnrollment, bool): A list of enrollment objects that were successfully
@@ -307,7 +310,8 @@ def create_run_enrollments(  # noqa: C901, PLR0913
                     if enrollment_mode_changed:
                         enrollment.enrollment_mode = mode
                     enrollment.reactivate_and_save()
-                    transaction.on_commit(send_enrollment_emails)
+                    if not skip_enrollment_emails:
+                        transaction.on_commit(send_enrollment_emails)
         except:  # pylint: disable=bare-except  # noqa: PERF203, E722
             mail_api.send_enrollment_failure_message(user, run, details=format_exc())
             log.exception(
@@ -317,7 +321,11 @@ def create_run_enrollments(  # noqa: C901, PLR0913
             )
         else:
             successful_enrollments.append(enrollment)
-            if enrollment.edx_enrolled and not is_enrollment_downgraded:
+            if (
+                enrollment.edx_enrolled
+                and not is_enrollment_downgraded
+                and not skip_enrollment_emails
+            ):
                 # Do not send enrollment email if the user was downgraded.
                 mail_api.send_course_run_enrollment_email(enrollment)
     return successful_enrollments, edx_request_success
