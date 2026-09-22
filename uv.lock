@@ -227,14 +227,14 @@ wheels = [
 
 [[package]]
 name = "bleach"
-version = "6.3.0"
+version = "6.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "webencodings" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/07/18/3c8523962314be6bf4c8989c79ad9531c825210dd13a8669f6b84336e8bd/bleach-6.3.0.tar.gz", hash = "sha256:6f3b91b1c0a02bb9a78b5a454c92506aa0fdf197e1d5e114d2e00c6f64306d22", size = 203533, upload-time = "2025-10-27T17:57:39.211Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/48/3c/e12ac860709702bd5ebeb9b56a4fe334f1001246ee1b8f2b7ee28912df7d/bleach-6.4.0.tar.gz", hash = "sha256:4202482733d85cedd04e59fcb2f89f4e4c7c385a78d3c3c23c30446843a37452", size = 204857, upload-time = "2026-06-05T13:01:13.734Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cd/3a/577b549de0cc09d95f11087ee63c739bba856cd3952697eec4c4bb91350a/bleach-6.3.0-py3-none-any.whl", hash = "sha256:fe10ec77c93ddf3d13a73b035abaac7a9f5e436513864ccdad516693213c65d6", size = 164437, upload-time = "2025-10-27T17:57:37.538Z" },
+    { url = "https://files.pythonhosted.org/packages/58/9d/40b6267367182187139a4000b82a3b287d84d745bccd808e75d916920e9d/bleach-6.4.0-py3-none-any.whl", hash = "sha256:4b6b6a54fff2e69a3dde9d21cc6301220bee3c3cb792187d11403fd795031081", size = 165109, upload-time = "2026-06-05T13:01:12.504Z" },
 ]
 
 [[package]]
@@ -1101,14 +1101,14 @@ wheels = [
 
 [[package]]
 name = "djangorestframework"
-version = "3.16.1"
+version = "3.17.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8a/95/5376fe618646fde6899b3cdc85fd959716bb67542e273a76a80d9f326f27/djangorestframework-3.16.1.tar.gz", hash = "sha256:166809528b1aced0a17dc66c24492af18049f2c9420dbd0be29422029cfc3ff7", size = 1089735, upload-time = "2025-08-06T17:50:53.251Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3b/35/c96055e700fdff25da3a7b7756cfd1d4dc54f38b9bc6d6c5e19e3a0fdc20/djangorestframework-3.17.2.tar.gz", hash = "sha256:89ed713b6dc83e1539f214b7d10808ae19bb8511004beba886225da6d5c9dafa", size = 906683, upload-time = "2026-08-05T07:47:22.5Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b0/ce/bf8b9d3f415be4ac5588545b5fcdbbb841977db1c1d923f7568eeabe1689/djangorestframework-3.16.1-py3-none-any.whl", hash = "sha256:33a59f47fb9c85ede792cbf88bde71893bcda0667bc573f784649521f1102cec", size = 1080442, upload-time = "2025-08-06T17:50:50.667Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/46/c14108e400b208c394325eb63fbae06c81341b6447fa1a6f9da718b17fe7/djangorestframework-3.17.2-py3-none-any.whl", hash = "sha256:cb0546a7415d5b46c04e0f4fe0a54b2109f4fdd5e83ca773c8c6183a6493d042", size = 899109, upload-time = "2026-08-05T07:47:20.853Z" },
 ]
 
 [[package]]
@@ -2325,7 +2325,7 @@ requires-dist = [
     { name = "django-user-agents", specifier = ">=0.4.0,<0.5" },
     { name = "django-viewflow", specifier = ">=2.2.7,<3" },
     { name = "django-webpack-loader", specifier = ">=3.0.0,<4" },
-    { name = "djangorestframework", specifier = "==3.16.1" },
+    { name = "djangorestframework", specifier = "==3.17.2" },
     { name = "djangorestframework-api-key", specifier = ">=3.1.0,<4" },
     { name = "djoser", specifier = ">=2.1.0,<3" },
     { name = "drf-extensions", specifier = ">=0.8.0,<0.9" },
@@ -2373,7 +2373,7 @@ requires-dist = [
     { name = "urllib3", specifier = ">=2.0.0,<3" },
     { name = "urllib3-future", directory = "shims/urllib3-future" },
     { name = "user-util", specifier = ">=0.1.5,<0.2" },
-    { name = "wagtail", specifier = "==7.3.3" },
+    { name = "wagtail", specifier = "==7.3.4" },
     { name = "wagtail-metadata", specifier = ">=5.0.0,<6" },
 ]
 
@@ -3967,11 +3967,11 @@ wheels = [
 
 [[package]]
 name = "urllib3"
-version = "2.6.3"
+version = "2.7.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/c7/24/5f1b3bdffd70275f6661c76461e25f024d5a38a46f04aaca912426a2b1d3/urllib3-2.6.3.tar.gz", hash = "sha256:1b62b6884944a57dbe321509ab94fd4d3b307075e0c2eae991ac71ee15ad38ed", size = 435556, upload-time = "2026-01-07T16:24:43.925Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/53/0c/06f8b233b8fd13b9e5ee11424ef85419ba0d8ba0b3138bf360be2ff56953/urllib3-2.7.0.tar.gz", hash = "sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c", size = 433602, upload-time = "2026-05-07T16:13:18.596Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/39/08/aaaad47bc4e9dc8c725e68f9d04865dbcb2052843ff09c97b08904852d84/urllib3-2.6.3-py3-none-any.whl", hash = "sha256:bf272323e553dfb2e87d9bfd225ca7b0f467b919d7bbd355436d3fd37cb0acd4", size = 131584, upload-time = "2026-01-07T16:24:42.685Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/3e/5db95bcf282c52709639744ca2a8b149baccf648e39c8cc87553df9eae0c/urllib3-2.7.0-py3-none-any.whl", hash = "sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897", size = 131087, upload-time = "2026-05-07T16:13:17.151Z" },
 ]
 
 [[package]]
@@ -4028,7 +4028,7 @@ wheels = [
 
 [[package]]
 name = "wagtail"
-version = "7.3.3"
+version = "7.3.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyascii" },
@@ -4050,9 +4050,9 @@ dependencies = [
     { name = "telepath" },
     { name = "willow", extra = ["heif"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4b/b2/cde7f0adade51936a2b9e92437af9ac4b78db45e91c8aa011467bb8bab7f/wagtail-7.3.3.tar.gz", hash = "sha256:2ab1f0984734d623fb90b35d4c0a6be119504b00d9005b036f78eb462ed44713", size = 6875229, upload-time = "2026-06-15T15:27:10.486Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/00/3f/5731e6010db528b5e4da201e65f67703c89770e5be6be49b5a1ea4c42876/wagtail-7.3.4.tar.gz", hash = "sha256:30816255dfbb97238050a6687f04b2b4eb88f5201993c48df36d68fab0a70505", size = 6897983, upload-time = "2026-08-20T15:28:10.932Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/ff/ee5d8cffe1c2f65fd2032c13cc3b3a47755ae5ef51c8ee44df02f30614e9/wagtail-7.3.3-py3-none-any.whl", hash = "sha256:0beb7efbf21078397eeab69de579a455b3ad0c4d86ef7ce197d2dbb6a6c7be59", size = 9491178, upload-time = "2026-06-15T15:27:03.443Z" },
+    { url = "https://files.pythonhosted.org/packages/4e/63/c34864d49075491157c5215a827406b5663d6025710b3eea00b99592f791/wagtail-7.3.4-py3-none-any.whl", hash = "sha256:2eab9f6a872b967a55f2575a38b4f83a3d406a34d5dab456e0a21c91fd57bcca", size = 9492859, upload-time = "2026-08-20T15:28:00.066Z" },
 ]
 
 [[package]]
