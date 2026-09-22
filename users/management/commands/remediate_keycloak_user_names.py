@@ -76,16 +76,11 @@ class Command(BaseCommand):
 
         client = bootstrap_client(verify_realm=True)
 
-        mitxonline_users_by_scim_id = self._mitxonline_users_by_scim_id()
-
-        patched, would_patch, unpatchable, up_to_date = [], [], [], []
+        patched, would_patch, unpatchable = [], [], []
+        up_to_date_count = 0
         patch_count = 0
 
-        for keycloak_user in self._paginate_keycloak_users(client):
-            user = mitxonline_users_by_scim_id.get(keycloak_user.id)
-            if user is None:
-                continue  # not a user we can trace back to mitxonline
-
+        for keycloak_user, user in self._paired_users(client):
             adapter = LearnUserAdapter(user)
             given_name, family_name = adapter._resolve_name()  # noqa: SLF001
             have_split_name = bool(given_name)
@@ -105,9 +100,7 @@ class Command(BaseCommand):
             full_name_matches = not full_name or current_full_name == full_name
 
             if names_match and full_name_matches:
-                up_to_date.append(
-                    self._row(keycloak_user, user, given_name, family_name, full_name)
-                )
+                up_to_date_count += 1
                 continue
 
             row = self._row(keycloak_user, user, given_name, family_name, full_name)
@@ -152,28 +145,45 @@ class Command(BaseCommand):
             self.style.SUCCESS(
                 f"{len(patched)} patched, {len(would_patch)} would-patch, "
                 f"{len(unpatchable)} unpatchable (no name data anywhere), "
-                f"{len(up_to_date)} already up to date"
+                f"{up_to_date_count} already up to date"
             )
         )
+        # Up-to-date users are counted, not listed: a row for each would grow
+        # with the whole realm rather than with the users that need a fix.
+        # would_patch and unpatchable still hold a row per user until the end.
         self._write_report(
             {
                 "patched": patched,
                 "would_patch": would_patch,
                 "unpatchable": unpatchable,
-                "up_to_date": up_to_date,
+                "up_to_date_count": up_to_date_count,
             },
             report_path,
         )
 
-    def _mitxonline_users_by_scim_id(self):
+    def _paired_users(self, client):
+        """Yield (keycloak_user, mitxonline_user) for each Keycloak page.
+
+        mitxonline users are loaded one Keycloak page at a time, so memory
+        stays at one page of each rather than every synced user at once.
+        """
+        for page in self._paginate_keycloak_users(client):
+            users_by_scim_id = self._mitxonline_users_by_scim_id(
+                [keycloak_user.id for keycloak_user in page]
+            )
+            for keycloak_user in page:
+                user = users_by_scim_id.get(keycloak_user.id)
+                if user is not None:  # otherwise not traceable to mitxonline
+                    yield keycloak_user, user
+
+    def _mitxonline_users_by_scim_id(self, scim_ids):
         # LearnUserAdapter.__init__ touches user_profile and openedx_user on
         # every instantiation (not just legal_address), so both need covering
         # here or the loop in handle() does 2 extra queries per user.
         # user_profile is a real OneToOneField; openedx_user reads the
         # `openedx_users` relation, which select_related cannot target.
         users = (
-            User.objects.filter(is_active=True)
-            .exclude(scim_external_id__isnull=True)
+            User.objects.filter(is_active=True, scim_external_id__in=scim_ids)
             .select_related("legal_address", "user_profile")
             .prefetch_related("openedx_users")
         )
@@ -185,7 +195,7 @@ class Command(BaseCommand):
             page = client.list("users", UserRepresentation, first=first, max=PAGE_SIZE)
             if not page:
                 return
-            yield from page
+            yield page
             first += PAGE_SIZE
 
     @staticmethod
