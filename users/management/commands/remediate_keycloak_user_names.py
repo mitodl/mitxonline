@@ -20,6 +20,7 @@ write nothing. Pass --apply to actually patch Keycloak.
 """
 
 import json
+from enum import StrEnum
 
 from django.contrib.auth import get_user_model
 from django.core.management import BaseCommand
@@ -31,6 +32,15 @@ from users.adapters import LearnUserAdapter
 User = get_user_model()
 
 PAGE_SIZE = 100
+
+
+class Outcome(StrEnum):
+    """What happened to one paired user in a run."""
+
+    UNPATCHABLE = "unpatchable"
+    UP_TO_DATE = "up_to_date"
+    WOULD_PATCH = "would_patch"
+    PATCHED = "patched"
 
 
 def _keycloak_full_name(keycloak_user):
@@ -96,18 +106,19 @@ class Command(BaseCommand):
             for page_offset, keycloak_user, user in self._paired_users(client, offset):
                 resume_offset = page_offset
                 can_patch = apply_changes and (limit is None or patch_count < limit)
-                category, row = self._reconcile_user(
+                outcome, row = self._reconcile_user(
                     client, keycloak_user, user, can_patch
                 )
-                if category == "unpatchable":
-                    unpatchable.append(row)
-                elif category == "up_to_date":
-                    up_to_date_count += 1
-                elif category == "would_patch":
-                    would_patch.append(row)
-                else:  # "patched"
-                    patched.append(row)
-                    patch_count += 1
+                match outcome:
+                    case Outcome.UNPATCHABLE:
+                        unpatchable.append(row)
+                    case Outcome.UP_TO_DATE:
+                        up_to_date_count += 1
+                    case Outcome.WOULD_PATCH:
+                        would_patch.append(row)
+                    case Outcome.PATCHED:
+                        patched.append(row)
+                        patch_count += 1
         except Exception:
             self.stdout.write(
                 self.style.ERROR(
@@ -190,8 +201,7 @@ class Command(BaseCommand):
         already been applied this run - such a user is reported as
         would_patch rather than actually patched.
 
-        Returns (category, row): category is one of "unpatchable",
-        "up_to_date" (row is None), "would_patch", or "patched".
+        Returns (Outcome, row); row is None for Outcome.UP_TO_DATE.
         """
         adapter = LearnUserAdapter(user)
         given_name, family_name = adapter._resolve_name()  # noqa: SLF001
@@ -199,7 +209,7 @@ class Command(BaseCommand):
         full_name = (user.name or "").strip()
 
         if not have_split_name and not full_name:
-            return "unpatchable", self._row(
+            return Outcome.UNPATCHABLE, self._row(
                 keycloak_user, user, given_name, family_name, full_name
             )
 
@@ -211,12 +221,12 @@ class Command(BaseCommand):
         full_name_matches = not full_name or current_full_name == full_name
 
         if names_match and full_name_matches:
-            return "up_to_date", None
+            return Outcome.UP_TO_DATE, None
 
         row = self._row(keycloak_user, user, given_name, family_name, full_name)
 
         if not can_patch:
-            return "would_patch", row
+            return Outcome.WOULD_PATCH, row
 
         patch = {}
         if have_split_name:
@@ -243,7 +253,7 @@ class Command(BaseCommand):
             not full_name or _keycloak_full_name(refetched) == full_name
         )
         row["verified"] = names_verified and full_name_verified
-        return "patched", row
+        return Outcome.PATCHED, row
 
     @staticmethod
     def _row(keycloak_user, user, given_name, family_name, full_name):
