@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 1.168.1
+---------------
+
+- Skip emails when ernolling learners (#4002)
+- chore(deps): security updates for urllib3, wagtail, bleach and djangorestframework (#4000)
+- Disable npm manager in renovate.  (#3991)
+
 Version 1.168.0
 ---------------
 
