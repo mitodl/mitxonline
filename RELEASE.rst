@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.168.0
+---------------
+
+- Fix the pre-commit errors (#4003)
+- Make /api/v2/courses/ query count flat in course count (#3886)
+- fix: make the CyberSource SDK work against the real urllib3 (#3984)
+- Merge commit from fork
+
 Version 1.167.0
 ---------------
 
