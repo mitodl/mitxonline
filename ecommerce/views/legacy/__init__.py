@@ -38,11 +38,17 @@ from rest_framework.viewsets import (
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.api import is_product_courserun, is_product_program
-from courses.models import Course, CourseRun, Program, ProgramRun
+from courses.models import Course, CourseRun, Program, ProgramEnrollment, ProgramRun
 from courses.utils import is_uai_course_run, is_uai_program, is_xpro_course_run
 from ecommerce import api
 from ecommerce.constants import PAYMENT_TYPE_FINANCIAL_ASSISTANCE
 from ecommerce.discounts import DiscountType
+from ecommerce.exceptions import (
+    VerifiedProgramCourseNotInProgramError,
+    VerifiedProgramInvalidBasketError,
+    VerifiedProgramInvalidOrderError,
+    VerifiedProgramNoEnrollmentError,
+)
 from ecommerce.models import (
     Basket,
     BasketDiscount,
@@ -91,6 +97,7 @@ from main.constants import (
 )
 from main.utils import redirect_with_user_message
 from main.views import RefinePagination
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
 
 log = logging.getLogger(__name__)
@@ -1004,10 +1011,6 @@ class CheckoutProductView(RedirectView):
     def get_redirect_url(self, *args, **kwargs):
         """Populate the basket before redirecting"""
         with transaction.atomic():
-            basket = api.establish_basket_for_request(self.request, for_update=True)
-            basket.basket_items.all().delete()
-            BasketDiscount.objects.filter(redeemed_basket=basket).delete()
-
             # Incoming product ids from internal checkout
             all_product_ids = self.request.GET.getlist("product_id")
 
@@ -1016,6 +1019,16 @@ class CheckoutProductView(RedirectView):
             course_run_ids = self.request.GET.getlist("course_run_id")
             course_ids = self.request.GET.getlist("course_id")
             program_ids = self.request.GET.getlist("program_id")
+
+            dashboard_redirect_url = self._enroll_via_verified_program(
+                all_product_ids, course_run_ids, course_ids, program_ids
+            )
+            if dashboard_redirect_url is not None:
+                return dashboard_redirect_url
+
+            basket = api.establish_basket_for_request(self.request, for_update=True)
+            basket.basket_items.all().delete()
+            BasketDiscount.objects.filter(redeemed_basket=basket).delete()
 
             all_product_ids.extend(
                 list(
@@ -1036,6 +1049,63 @@ class CheckoutProductView(RedirectView):
                 BasketItem.objects.create(basket=basket, product=product)
 
         return super().get_redirect_url(*args, **kwargs)
+
+    def _enroll_via_verified_program(
+        self, product_ids, course_run_ids, course_ids, program_ids
+    ):
+        """
+        If this is a request for a single course run, and the learner already
+        holds a verified enrollment in a program that run's course belongs
+        to, create the verified run enrollment directly (they've already
+        paid for it via the program) and return the dashboard URL to redirect
+        to instead of the cart.
+
+        Returns None if the request doesn't qualify for the shortcut, so the
+        caller falls back to the normal basket flow.
+        """
+        if product_ids or program_ids or not self.request.user.is_authenticated:
+            return None
+
+        runs = list(
+            CourseRun.objects.filter(
+                Q(courseware_id__in=course_run_ids) | Q(courseware_id__in=course_ids)
+            )
+        )
+        if len(runs) != 1:
+            return None
+        run = runs[0]
+
+        program_enrollment = (
+            ProgramEnrollment.objects.filter(
+                user=self.request.user,
+                enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+                active=True,
+                program__all_requirements__course=run.course,
+            )
+            .distinct()
+            .first()
+        )
+        if program_enrollment is None:
+            return None
+
+        try:
+            api.create_verified_program_course_run_enrollment(
+                self.request, run, program_enrollment.program
+            )
+        except (
+            VerifiedProgramNoEnrollmentError,
+            VerifiedProgramCourseNotInProgramError,
+            VerifiedProgramInvalidBasketError,
+            VerifiedProgramInvalidOrderError,
+        ):
+            log.exception(
+                "Failed to create verified program course enrollment for user %s, run %s",
+                self.request.user,
+                run.courseware_id,
+            )
+            return None
+
+        return reverse("user-dashboard")
 
 
 class AnonymousCheckoutView(LoginRequiredMixin, RedirectView):
