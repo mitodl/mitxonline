@@ -46,6 +46,7 @@ from ecommerce.api import (
     create_verified_program_course_run_enrollment,
     create_verified_program_discount,
     cull_anonymous_baskets,
+    downgrade_enrollments_from_order,
     downgrade_learner_from_order,
     establish_basket,
     establish_basket_for_request,
@@ -610,6 +611,65 @@ def test_downgrade_learner_from_order_skips_unenrolled_learner(mocker, user):
     downgrade_learner_from_order(order_id=order.id)
 
     create_run_enrollments_mock.assert_not_called()
+
+
+def test_order_purchased_programs(user):
+    """Order.purchased_programs should return only the Program lines on the order."""
+    program = ProgramFactory.create()
+    line = make_purchase(user, program, Decimal("500.00"))
+
+    assert line.order.purchased_programs == [program]
+    assert line.order.purchased_runs == []
+
+
+def test_order_purchased_programs_empty_for_course_run_order(user):
+    """Order.purchased_programs should be empty for a course-run-only order."""
+    run = CourseRunFactory.create()
+    line = make_purchase(user, run, Decimal("500.00"))
+
+    assert line.order.purchased_programs == []
+
+
+def test_downgrade_enrollments_from_order_dispatches_program_downgrade(mocker, user):
+    """
+    downgrade_enrollments_from_order should call
+    downgrade_program_enrollment_and_verified_runs for each purchased
+    program on the order.
+    """
+    program = ProgramFactory.create()
+    line = make_purchase(user, program, Decimal("500.00"))
+
+    downgrade_learner_mock = mocker.patch("ecommerce.api.downgrade_learner_from_order")
+    downgrade_program_mock = mocker.patch(
+        "ecommerce.api.downgrade_program_enrollment_and_verified_runs"
+    )
+
+    downgrade_enrollments_from_order(order_id=line.order.id)
+
+    downgrade_learner_mock.assert_called_once_with(line.order.id)
+    downgrade_program_mock.assert_called_once_with(user, program)
+
+
+def test_downgrade_enrollments_from_order_skips_program_downgrade_for_course_run_order(
+    mocker, user
+):
+    """
+    A course-run-only order should not trigger any program downgrade -
+    regression coverage that the dispatch change doesn't alter the existing
+    course-run-only refund path.
+    """
+    run = CourseRunFactory.create()
+    line = make_purchase(user, run, Decimal("500.00"))
+
+    downgrade_learner_mock = mocker.patch("ecommerce.api.downgrade_learner_from_order")
+    downgrade_program_mock = mocker.patch(
+        "ecommerce.api.downgrade_program_enrollment_and_verified_runs"
+    )
+
+    downgrade_enrollments_from_order(order_id=line.order.id)
+
+    downgrade_learner_mock.assert_called_once_with(line.order.id)
+    downgrade_program_mock.assert_not_called()
 
 
 @pytest.mark.skip_nplusone_check
