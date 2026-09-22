@@ -1031,15 +1031,15 @@ def test_create_run_enrollments_skip_enrollment_emails(
         "courses.tasks.subscribe_edx_course_emails.delay"
     )
 
-    successful_enrollments, edx_request_success = create_run_enrollments(
-        user, [new_run, reactivated_run], skip_enrollment_emails=True
-    )
-
     with django_capture_on_commit_callbacks(execute=True):
-        assert edx_request_success is True
-        assert len(successful_enrollments) == 2
-        patched_send_enrollment_email.assert_not_called()
-        patched_subscribe_emails.assert_not_called()
+        successful_enrollments, edx_request_success = create_run_enrollments(
+            user, [new_run, reactivated_run], skip_enrollment_emails=True
+        )
+
+    assert edx_request_success is True
+    assert len(successful_enrollments) == 2
+    patched_send_enrollment_email.assert_not_called()
+    patched_subscribe_emails.assert_not_called()
 
 
 def test_create_program_enrollments_verifies_exports_for_verified_mode(mocker, user):
