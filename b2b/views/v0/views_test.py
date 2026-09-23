@@ -19,7 +19,7 @@ from b2b.constants import (
 from b2b.factories import ContractPageFactory
 from b2b.models import DiscountContractAttachmentRedemption, UserOrganization
 from courses.factories import CourseRunFactory
-from courses.models import CourseRun, CourseRunEnrollment
+from courses.models import CourseRunEnrollment
 from ecommerce.constants import DISCOUNT_TYPE_FIXED_PRICE
 from ecommerce.factories import ProductFactory, UnlimitedUseDiscountFactory
 from ecommerce.models import DiscountProduct
@@ -883,11 +883,7 @@ def test_enroll_passes_contract_slug_to_api(mocker, send_slug):
     assert kwargs["contract_slug"] == (contract.slug if send_slug else None)
 
 
-@pytest.mark.xfail(
-    raises=CourseRun.MultipleObjectsReturned,
-    strict=True,
-    reason="The run lookup joins b2b_contracts, so it returns one row per contract.",
-)
+@pytest.mark.skip_nplusone_check
 def test_enroll_multi_contract_run_with_slug(mocker):
     """
     Enrolling through the API in a run that's in two contracts should use the

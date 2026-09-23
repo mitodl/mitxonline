@@ -1363,7 +1363,9 @@ def _determine_contract_for_user_product(  # noqa: PLR0911
 
     user_contract_ids = list(user.b2b_contracts.values_list("id", flat=True))
     item_b2b_contracts = (
-        item.b2b_contracts if isinstance(item, CourseRun) else item.contract_memberships
+        item.b2b_contracts.all()
+        if isinstance(item, CourseRun)
+        else ContractPage.objects.filter(contract_programs__program=item)
     )
 
     if program and not program.contract_memberships.exists():
@@ -1448,26 +1450,24 @@ def _determine_contract_for_user_product(  # noqa: PLR0911
 
         return contract_matches.pop()
 
-    if (
-        user.b2b_contracts.filter(slug=contract_slug).exists()
-        and item_b2b_contracts.filter(slug=contract_slug).exists()
-        and (
-            not program
-            or program.contract_memberships.filter(
-                contract__slug=contract_slug
-            ).exists()
-        )
-    ):
-        return item_b2b_contracts.filter(slug=contract_slug).get().id
-
-    log.error(
-        "User %s tried to use product %s (and/or program %s) for contract %s but one or more parts of the transaction weren't in the contract",
-        user,
-        product,
-        program,
-        contract_slug,
+    contract_qs = item_b2b_contracts.filter(
+        slug=contract_slug, id__in=user_contract_ids
     )
-    return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+    if program:
+        contract_qs = contract_qs.filter(contract_programs__program=program)
+    contract = contract_qs.first()
+
+    if not contract:
+        log.error(
+            "User %s tried to use product %s (and/or program %s) for contract %s but one or more parts of the transaction weren't in the contract",
+            user,
+            product,
+            program,
+            contract_slug,
+        )
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
+    return contract.id
 
 
 def _validate_b2b_enrollment_prerequisites(  # noqa: PLR0911

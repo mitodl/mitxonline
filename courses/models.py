@@ -812,7 +812,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     def enrollable_for_contract(self, contract) -> bool:
         """Determine if the run is enrollable for the specified contract."""
 
-        if not self.b2b_contracts.filter(pk=contract.id).exists():
+        if not self.contract_memberships.filter(contract_id=contract.id).exists():
             return False
 
         return self.is_enrollable
