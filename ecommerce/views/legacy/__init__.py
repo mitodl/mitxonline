@@ -55,6 +55,7 @@ from ecommerce.exceptions import (
     VerifiedProgramInvalidBasketError,
     VerifiedProgramInvalidOrderError,
     VerifiedProgramNoEnrollmentError,
+    VerifiedProgramNoProductError,
 )
 from ecommerce.models import (
     Basket,
@@ -1113,6 +1114,7 @@ class CheckoutProductView(RedirectView):
         except (
             VerifiedProgramNoEnrollmentError,
             VerifiedProgramCourseNotInProgramError,
+            VerifiedProgramNoProductError,
             VerifiedProgramInvalidBasketError,
             VerifiedProgramInvalidOrderError,
         ):

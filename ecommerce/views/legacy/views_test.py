@@ -920,6 +920,34 @@ def test_checkout_product(
 
 
 @pytest.mark.dont_mock_enrollments
+def test_checkout_product_with_no_active_product_uses_cart(user, user_client):
+    """
+    Verifies that /cart/add?course_id=? falls back to the normal cart flow
+    (instead of a 500) when the run's course belongs to a verified program
+    enrollment but the run itself has no active Product to purchase.
+    """
+    program = ProgramFactory.create()
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        ProductFactory.create(purchasable_object=program)
+        # No product for course_run itself -- this is the case that used to
+        # 500 instead of falling back to the cart.
+
+    ProgramEnrollmentFactory.create(
+        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    resp = user_client.get(
+        reverse("checkout-product"), {"course_id": course_run.courseware_id}
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
+
+
+@pytest.mark.dont_mock_enrollments
 def test_checkout_product_with_verified_program_enrollment(user, user_client):
     """
     Verifies that /cart/add?course_id=? skips the cart and redirects straight
