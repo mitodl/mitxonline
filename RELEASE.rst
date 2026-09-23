@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.168.3
+---------------
+
+- feat(product-pages): expose CMS-managed testimonials on course and program pages (#3987)
+
 Version 1.168.2
 ---------------
 
