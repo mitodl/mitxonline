@@ -1184,11 +1184,20 @@ class Order(TimestampedModel):
     def purchased_runs(self):
         """Return a list of purchased CourseRuns"""
 
-        # TODO: handle programs  # noqa: FIX002, TD002, TD003
         return [
             line.purchased_object
             for line in self.lines.all()
             if isinstance(line.purchased_object, CourseRun)
+        ]
+
+    @property
+    def purchased_programs(self):
+        """Return a list of purchased Programs"""
+
+        return [
+            line.purchased_object
+            for line in self.lines.all()
+            if isinstance(line.purchased_object, Program)
         ]
 
     def __str__(self):

@@ -28,14 +28,15 @@ def perform_unenrollment_from_order(order_id):
 @app.task(acks_late=True)
 def perform_downgrade_from_order(order_id):
     """
-    Task to perform enrollment downgrade from courses against a specific order
+    Task to perform enrollment downgrade from courses/programs against a
+    specific order
 
     Args:
        order_id (int): Id of the order
     """
-    from ecommerce.api import downgrade_learner_from_order
+    from ecommerce.api import downgrade_enrollments_from_order
 
-    downgrade_learner_from_order(order_id)
+    downgrade_enrollments_from_order(order_id)
 
 
 @app.task

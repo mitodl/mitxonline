@@ -29,7 +29,11 @@ from b2b.api import (
     get_active_contracts_from_basket_items,
     is_discount_supplied_for_b2b_purchase,
 )
-from courses.api import create_run_enrollments, deactivate_run_enrollment
+from courses.api import (
+    create_run_enrollments,
+    deactivate_run_enrollment,
+    downgrade_program_enrollment_and_verified_runs,
+)
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.models import CourseRunEnrollment
 from courses.utils import is_uai_course_run, is_xpro_course_run
@@ -757,6 +761,25 @@ def downgrade_learner_from_order(order_id):
         keep_failed_enrollments=True,
         mode=EDX_ENROLLMENT_AUDIT_MODE,
     )
+
+
+def downgrade_enrollments_from_order(order_id):
+    """
+    Downgrade all enrollments tied to a refunded order back to audit -
+    course-run enrollments (via downgrade_learner_from_order) and, for a
+    program purchase, the ProgramEnrollment and the program's course-run
+    enrollments that are verified only because of it (via
+    downgrade_program_enrollment_and_verified_runs).
+
+    An order only ever carries one purchasable-line kind in practice, so
+    each branch is simply a no-op when its kind of line isn't present.
+    """
+    order = Order.objects.get(pk=order_id)
+
+    downgrade_learner_from_order(order_id)
+
+    for program in order.purchased_programs:
+        downgrade_program_enrollment_and_verified_runs(order.purchaser, program)
 
 
 def unenroll_learner_from_order(order_id):

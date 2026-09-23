@@ -511,6 +511,80 @@ def downgrade_learner(enrollment):
     )
 
 
+def downgrade_program_enrollment_and_verified_runs(user, program):
+    """
+    Downgrade a user's ProgramEnrollment to audit, and downgrade the
+    program's course-run enrollments that are verified only because of the
+    program purchase.
+
+    A course run's verified enrollment is left alone (not downgraded) if
+    either:
+    - it's a B2B-provisioned run (has a b2b_contract or a b2b_contracts
+      entry) - governed by its contract, not this payment, or
+    - the learner has a separate PaidCourseRun for it backed by a fulfilled
+      order with total_price_paid > 0 - a genuine, independent purchase of
+      that specific run.
+
+    Otherwise the run is downgraded, whether its verified mode came from
+    upgrade_audit_run_enrollments_for_program_purchase (no order at all) or
+    from a $0 order (see create_verified_program_course_run_enrollment,
+    which creates a real but zero-value order for a program-verified learner
+    enrolling directly in one of the program's runs).
+
+    Args:
+        user (User): The user whose program enrollment is being downgraded
+        program (Program): The program that was refunded
+
+    Returns:
+        tuple[ProgramEnrollment | None, list of CourseRunEnrollment]: the
+        downgraded program enrollment (None if there wasn't one to downgrade),
+        and the course-run enrollments that were downgraded.
+    """
+    program_enrollment = ProgramEnrollment.all_objects.filter(
+        user=user, program=program
+    ).first()
+
+    downgraded_program_enrollment = None
+    if (
+        program_enrollment is not None
+        and program_enrollment.active
+        and program_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    ):
+        downgraded_program_enrollments = create_program_enrollments(
+            user, [program], enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+        )
+        downgraded_program_enrollment = first_or_none(downgraded_program_enrollments)
+
+    verified_run_enrollments = CourseRunEnrollment.get_program_run_enrollments(
+        user=user, program=program
+    ).filter(enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE)
+
+    eligible_runs = []
+    for run_enrollment in verified_run_enrollments:
+        run = run_enrollment.run
+        if run.b2b_contract_id or run.b2b_contracts.exists():
+            continue
+        if PaidCourseRun.objects.filter(
+            user=user,
+            course_run=run,
+            order__state=OrderStatus.FULFILLED,
+            order__total_price_paid__gt=0,
+        ).exists():
+            continue
+        eligible_runs.append(run)
+
+    if not eligible_runs:
+        return downgraded_program_enrollment, []
+
+    downgraded_run_enrollments, _ = create_run_enrollments(
+        user,
+        eligible_runs,
+        mode=EDX_ENROLLMENT_AUDIT_MODE,
+        keep_failed_enrollments=True,
+    )
+    return downgraded_program_enrollment, downgraded_run_enrollments
+
+
 def deactivate_run_enrollment(
     run_enrollment,
     change_status,

@@ -746,6 +746,49 @@ class ProductPageFAQ(Orderable):
         return self.question
 
 
+class ProductPageTestimonial(Orderable):
+    """A single testimonial shown on a course/program product page."""
+
+    # ParentalKey needs a concrete target, but ProductPage is abstract, so this
+    # points at Page (same as faqs_list/linked_instructors). Only
+    # CoursePage/ProgramPage surface it, via their InlinePanel + testimonials
+    # APIField.
+    page = ParentalKey(Page, on_delete=models.CASCADE, related_name="testimonials_list")
+    quote = models.TextField(
+        help_text="The testimonial quote. Aim for 600 characters or fewer.",
+    )
+    name = models.CharField(
+        max_length=255,
+        help_text="Name of the person quoted. Aim for 40 characters or fewer.",
+    )
+    title = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text=(
+            "Optional role/affiliation, e.g. 'Product Manager, Acme'. "
+            "Aim for 80 characters or fewer."
+        ),
+    )
+    image = models.ForeignKey(
+        Image,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="Optional photo of the person quoted.",
+    )
+
+    panels = [
+        FieldPanel("quote"),
+        FieldPanel("name"),
+        FieldPanel("title"),
+        FieldPanel("image"),
+    ]
+
+    def __str__(self):
+        return self.name
+
+
 class HomePage(VideoPlayerConfigMixin):
     """
     Site home page
@@ -1325,6 +1368,7 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
             label="Faculty Members",
         ),
         InlinePanel("faqs_list", label="FAQs"),
+        InlinePanel("testimonials_list", label="Testimonials"),
     ]
     api_fields = [
         APIField("description", serializer=RichTextSerializer()),
@@ -1347,6 +1391,7 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         APIField("faculty_section_title"),
         APIField("faculty"),
         APIField("faqs"),
+        APIField("testimonials"),
         APIField("certificate_page", serializer=ProductChildPageSerializer()),
         APIField("how_youll_learn"),
     ]
@@ -1417,6 +1462,19 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
 
         # Orderable's default ordering already sorts by sort_order.
         return ProductPageFAQSerializer(self.faqs_list.all(), many=True).data
+
+    @property
+    def testimonials(self):
+        """
+        Returns the testimonials for this product page, ordered, for the
+        wagtail API.
+        """
+        from cms.serializers import ProductPageTestimonialSerializer  # noqa: PLC0415
+
+        # Orderable's default ordering already sorts by sort_order.
+        return ProductPageTestimonialSerializer(
+            self.testimonials_list.all(), many=True
+        ).data
 
     @property
     def product(self):
