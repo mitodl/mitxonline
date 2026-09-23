@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.168.2
+---------------
+
+- Add custom through model for User.b2b_contracts (#3951)
+
 Version 1.168.1
 ---------------
 
