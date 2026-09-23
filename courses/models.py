@@ -1273,13 +1273,14 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         contract_ids = {
             getattr(contract, "id", contract) for contract in (user_contracts or [])
         }
-        # ``b2b_contracts`` is an M2M, so this reads its prefetch cache when the
-        # caller prefetched it and falls back to a query per run when it did not
-        # - same shape as the ``b2b_contracts__in`` filter it replaces.
+        # ``b2b_contract_ids`` is annotated onto the run by the caller that
+        # loaded it (CourseViewSet does) and falls back to a query per run when
+        # it was not - same shape as the ``b2b_contracts__in`` filter this
+        # replaces, without hydrating a ContractPage per row.
         return self._select_first_unexpired_run(
             run
             for run in self._courseruns_with_contracts()
-            if any(contract.id in contract_ids for contract in run.b2b_contracts.all())
+            if not contract_ids.isdisjoint(run.b2b_contract_ids)
         )
 
     @cached_property
@@ -1339,18 +1340,19 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
 
     def _courseruns_with_contracts(self):
         """
-        Return this course's runs with ``b2b_contracts`` available.
+        Return this course's runs with their contract ids available.
 
-        Calling ``prefetch_related`` on the related manager unconditionally
-        would clone the prefetched queryset, and a clone starts with an empty
-        result cache - so a caller that already prefetched ``courseruns``
-        (``CourseViewSet`` does, with ``b2b_contracts`` inside it) would still
-        pay one query per course. Read the cache when it is populated and only
-        build a new queryset when it is not.
+        Annotating unconditionally would clone the prefetched queryset, and a
+        clone starts with an empty result cache - so a caller that already
+        prefetched ``courseruns`` (``CourseViewSet`` does, with the same two
+        annotations on it) would still pay one query per course. Read the cache
+        when it is populated and only build a new queryset when it is not.
         """
+        from courses.utils import active_contract_id_annotations  # noqa: PLC0415
+
         if is_prefetched(self, "courseruns"):
             return self.courseruns.all()
-        return self.courseruns.prefetch_related("b2b_contracts").all()
+        return self.courseruns.annotate(**active_contract_id_annotations()).all()
 
     @lru_method_cache(max_size=12, typed=True)
     def get_filtered_runs(
@@ -1375,7 +1377,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             courseruns = filter(
                 lambda run: (
                     run.b2b_contract_organization_id == org_id
-                    or any(c.organization_id == org_id for c in run.b2b_contracts.all())
+                    or org_id in run.b2b_contract_org_ids
                 ),
                 courseruns,
             )
@@ -1384,7 +1386,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             courseruns = filter(
                 lambda run: (
                     run.b2b_contract_id == contract_id
-                    or any(c.id == contract_id for c in run.b2b_contracts.all())
+                    or contract_id in run.b2b_contract_ids
                 ),
                 courseruns,
             )
@@ -1906,6 +1908,37 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
         if self.b2b_contract_id is None:
             return None
         return self.b2b_contract.organization_id
+
+    @cached_property
+    def b2b_contract_ids(self) -> list[int]:
+        """
+        Ids of the active contracts this run is attached to via ``b2b_contracts``.
+
+        Lazy path, same contract as ``b2b_contract_organization_id``:
+        ``CourseViewSet`` annotates this name onto its ``courseruns`` prefetch
+        with an ``ArraySubquery``, and because ``cached_property`` is a
+        non-data descriptor the annotated value in the instance ``__dict__``
+        shadows this method. ``b2b_contracts`` resolves through
+        ``ContractPage._default_manager`` - ``ActiveContractManager`` - so this
+        is filtered to active, in-window contracts, and the annotation goes
+        through ``ContractPage.active_objects`` to match.
+        """
+        if not self.pk:
+            return []
+        return list(self.b2b_contracts.values_list("id", flat=True))
+
+    @cached_property
+    def b2b_contract_org_ids(self) -> list[int]:
+        """
+        Organization ids of the active contracts this run is attached to.
+
+        Lazy counterpart to the ``b2b_contract_org_ids`` annotation; see
+        ``b2b_contract_ids`` for how the two fit together. Not deduplicated:
+        callers only ever test membership.
+        """
+        if not self.pk:
+            return []
+        return list(self.b2b_contracts.values_list("organization_id", flat=True))
 
     @property
     def contract_group_ids(self):

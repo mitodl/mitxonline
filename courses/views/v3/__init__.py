@@ -8,7 +8,7 @@ import re
 import django_filters
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models import Prefetch, Q
+from django.db.models import F, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
@@ -110,12 +110,19 @@ class UserEnrollmentsApiViewSet(
 
     queryset = (
         CourseRunEnrollment.objects.select_related(
-            # these possibly get joined anyway via filer, so select over prefetch
+            # this possibly gets joined anyway via filer, so select over prefetch
             "run",
-            "run__b2b_contract",
         )
+        # Not select_related("run__b2b_contract"): ContractPage is a Wagtail
+        # Page and a ClusterableModel, so that hydrates the most expensive model
+        # class in the project once per enrollment, and
+        # UserEnrollmentSerializer.get_b2b_organization_id reads exactly one
+        # integer off it.
+        .annotate(b2b_contract_organization_id=F("run__b2b_contract__organization_id"))
         .prefetch_related(
-            "run__b2b_contracts",
+            # No "run__b2b_contracts": nothing on this path reads the M2M. The
+            # serializer only touches the deprecated b2b_contract FK, and
+            # UserEnrollmentFilterSet filters the M2M in SQL.
             "run__course",
             "run__course__page",
             Prefetch(

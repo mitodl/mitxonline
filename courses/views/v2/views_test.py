@@ -3244,10 +3244,11 @@ def test_course_queryset_courseruns_prefetch_avoids_contract_pages():
     """
     Inspect the queryset directly, without a request.
 
-    ``select_related("b2b_contract")`` and a bare ``"b2b_contracts"`` lookup
-    both reintroduce the full Wagtail page fetch, and neither shows up as an
-    extra query - only as a slower one - so the query-count budget cannot
-    catch a regression here.
+    ``select_related("b2b_contract")`` and any ``"b2b_contracts"`` prefetch
+    reintroduce ContractPage hydration, and neither shows up as an extra query
+    - only as a slower one - so the query-count budget cannot catch a
+    regression here. The ``b2b_contracts`` prefetch in particular cost ~930ms
+    of pure Python in production on a course with 149 runs.
     """
     view = CourseViewSet()
     view.validated_params = CourseViewSet.validated_params
@@ -3260,13 +3261,76 @@ def test_course_queryset_courseruns_prefetch_avoids_contract_pages():
 
     assert not runs_qs.query.select_related, runs_qs.query.select_related
     assert "b2b_contract_organization_id" in runs_qs.query.annotations
+    assert "b2b_contract_ids" in runs_qs.query.annotations
+    assert "b2b_contract_org_ids" in runs_qs.query.annotations
 
-    contracts = next(
+    assert not [
         lookup
         for lookup in runs_qs._prefetch_related_lookups  # noqa: SLF001
         if getattr(lookup, "prefetch_to", None) == "b2b_contracts"
-    )
-    assert contracts.queryset.query.deferred_loading[1] is False, (
-        "the contracts prefetch must use only(), not defer()"
-    )
-    assert "organization_id" in contracts.queryset.query.deferred_loading[0]
+    ], "b2b_contracts must arrive as id arrays, not as a ContractPage prefetch"
+
+    # The arrays must go through active_objects, or the prefetch's long-
+    # standing active/in-window filtering silently widens.
+    contract_sql = str(runs_qs.query.annotations["b2b_contract_ids"].query)
+    assert "active" in contract_sql
+    assert "contract_start" in contract_sql
+    assert "contract_end" in contract_sql
+
+
+@pytest.mark.parametrize("filter_by", [None, "org_id", "contract_id"])
+def test_courses_list_never_queries_the_contract_m2m(b2b_contracted_course, filter_by):
+    """
+    No request may issue the ``b2b_contracts`` prefetch, on any filter.
+
+    That prefetch loaded one ContractPage - a Wagtail Page and a
+    ClusterableModel - per (run, contract) pair, and built a related manager
+    and a queryset clone per run on top. In production it cost ~930ms of pure
+    Python on a course detail with 149 runs, against 3-8ms for the
+    ``to_attr``-style sibling prefetches over the same runs, in a request whose
+    total SQL time was 22ms. ``active_contract_id_annotations`` replaces it
+    with two ``ARRAY(subquery)`` columns on the courseruns query.
+    """
+    client, _course, org, contract = b2b_contracted_course
+    params = {}
+    if filter_by == "org_id":
+        params = {"org_id": org.id}
+    elif filter_by == "contract_id":
+        params = {"contract_id": contract.id}
+
+    with CaptureQueriesContext(connection) as ctx:
+        resp = client.get(reverse("v2:courses_api-list"), params)
+    assert resp.status_code == status.HTTP_200_OK
+
+    prefetches = [
+        query["sql"]
+        for query in ctx.captured_queries
+        if "_prefetch_related_val_courserun_id" in query["sql"]
+        and "courses_courserun_b2b_contracts" in query["sql"]
+    ]
+    assert not prefetches, prefetches
+
+
+def test_course_detail_never_queries_the_contract_m2m(b2b_contracted_course):
+    """
+    Same for the detail route, which is where the production traces came from.
+
+    ``ReadableIdLookupMixin.get_object`` filters the very same queryset, so the
+    detail route carries every prefetch the list route does.
+    """
+    client, course, _org, _contract = b2b_contracted_course
+
+    with CaptureQueriesContext(connection) as ctx:
+        resp = client.get(
+            reverse("v2:courses_api-detail", kwargs={"pk": course.id}),
+            {"live": "True"},
+        )
+    assert resp.status_code == status.HTTP_200_OK
+
+    prefetches = [
+        query["sql"]
+        for query in ctx.captured_queries
+        if "_prefetch_related_val_courserun_id" in query["sql"]
+        and "courses_courserun_b2b_contracts" in query["sql"]
+    ]
+    assert not prefetches, prefetches
