@@ -1374,7 +1374,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         if org_id is not None:
             courseruns = filter(
                 lambda run: (
-                    getattr(run.b2b_contract, "organization_id", None) == org_id
+                    run.b2b_contract_organization_id == org_id
                     or any(c.organization_id == org_id for c in run.b2b_contracts.all())
                 ),
                 courseruns,
@@ -1383,7 +1383,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         if contract_id is not None:
             courseruns = filter(
                 lambda run: (
-                    getattr(run.b2b_contract, "id", None) == contract_id
+                    run.b2b_contract_id == contract_id
                     or any(c.id == contract_id for c in run.b2b_contracts.all())
                 ),
                 courseruns,
@@ -1891,6 +1891,21 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
             using=using,
             update_fields=update_fields,
         )
+
+    @cached_property
+    def b2b_contract_organization_id(self) -> int | None:
+        """
+        Organization owning the deprecated single-contract ``b2b_contract`` FK.
+
+        This is the lazy path, for callers that reach a run without annotating.
+        ``CourseViewSet`` annotates this same name onto its ``courseruns``
+        prefetch; ``cached_property`` is a non-data descriptor, so the value the
+        annotation writes into the instance ``__dict__`` shadows this method and
+        the contract page is never loaded there.
+        """
+        if self.b2b_contract_id is None:
+            return None
+        return self.b2b_contract.organization_id
 
     @property
     def contract_group_ids(self):

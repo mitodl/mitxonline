@@ -7,7 +7,7 @@ from datetime import timedelta
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
-from django.db.models import Prefetch
+from django.db.models import F, Prefetch
 from django.test.utils import CaptureQueriesContext
 from mitol.common.utils.datetime import now_in_utc
 from wagtail.models import Page
@@ -1557,6 +1557,70 @@ def test_get_filtered_runs_reuses_prefetched_courseruns(django_assert_num_querie
         runs = course.get_filtered_runs(courserun_is_enrollable=None)
 
     assert runs == [course_run]
+
+
+def test_b2b_contract_organization_id_prefers_annotation(django_assert_num_queries):
+    """
+    The annotation must shadow the cached_property, with no query.
+
+    ``CourseViewSet`` annotates ``b2b_contract_organization_id`` instead of
+    select_related'ing the contract, which would drag a whole Wagtail page per
+    run. cached_property is a non-data descriptor, so the value Django's
+    ModelIterable setattr's into ``__dict__`` wins over the method body - if
+    that ever stops holding, this falls back to one query per run.
+    """
+    contract = ContractPageFactory.create()
+    CourseRunFactory.create(b2b_contract=contract)
+
+    run = CourseRun.objects.annotate(
+        b2b_contract_organization_id=F("b2b_contract__organization_id")
+    ).get(b2b_contract=contract)
+
+    with django_assert_num_queries(0):
+        assert run.b2b_contract_organization_id == contract.organization_id
+
+
+def test_b2b_contract_organization_id_without_annotation():
+    """Unannotated callers still resolve, via the relation."""
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(b2b_contract=contract)
+
+    assert CourseRun.objects.get(pk=run.pk).b2b_contract_organization_id == (
+        contract.organization_id
+    )
+    assert CourseRunFactory.create().b2b_contract_organization_id is None
+
+
+@pytest.mark.parametrize("filter_name", ["org_id", "contract_id"])
+def test_get_filtered_runs_excludes_inactive_b2b_contracts(filter_name):
+    """
+    An inactive contract must not match through the M2M.
+
+    ``b2b_contracts`` reads ContractPage's default manager
+    (ActiveContractManager), so the prefetch has always been filtered to
+    active, in-window contracts. This is the guard on narrowing that prefetch
+    with the right manager.
+    """
+    course = CourseFactory.create()
+    contract = ContractPageFactory.create(active=True)
+    course_run = CourseRunFactory.create(course=course, b2b_only=True)
+    course_run.b2b_contracts.add(contract)
+
+    filter_value = contract.organization_id if filter_name == "org_id" else contract.id
+    assert course.get_filtered_runs(
+        courserun_is_enrollable=None, **{filter_name: filter_value}
+    ) == [course_run]
+
+    contract.active = False
+    contract.save()
+    course = Course.objects.get(pk=course.pk)
+
+    assert (
+        course.get_filtered_runs(
+            courserun_is_enrollable=None, **{filter_name: filter_value}
+        )
+        == []
+    )
 
 
 # Test for course run constraints

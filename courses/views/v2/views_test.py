@@ -65,6 +65,7 @@ from courses.serializers.v2.certificates import (
 from courses.serializers.v2.courses import (
     CourseRunWithCourseSerializer,
     CourseWithCourseRunsSerializer,
+    _get_canonical_runs_per_tag,
 )
 from courses.serializers.v2.departments import (
     DepartmentWithCoursesAndProgramsSerializer,
@@ -3127,3 +3128,145 @@ def test_courses_list_count_query_is_pk_only(user_drf_client):
     # order_by() was cleared, so the compiler cannot append the ordering
     # column to the DISTINCT select list.
     assert "title" not in count_sql, count_sql
+
+
+@pytest.fixture
+def b2b_contracted_course(contract_ready_course, mock_course_run_clone):
+    """
+    A course with a run under an active contract, and a user who can see it.
+
+    Attaches the contract both ways - the deprecated ``b2b_contract`` FK and
+    the ``b2b_contracts`` M2M - because the org/contract filters and
+    ``Course.get_filtered_runs`` each consult both.
+    """
+    org = OrganizationPageFactory(name="Contract Org")
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    user.b2b_organizations.add(org)
+    user.b2b_contracts.add(contract)
+    user.refresh_from_db()
+
+    (course, _) = contract_ready_course
+    create_contract_run(contract, course)
+    for run in course.courseruns.filter(b2b_contract=contract):
+        run.b2b_contracts.add(contract)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+    return client, course, org, contract
+
+
+@pytest.mark.parametrize("filter_by", ["org_id", "contract_id", "both"])
+def test_courses_list_does_not_select_contract_page_columns(
+    b2b_contracted_course, filter_by
+):
+    """
+    The b2b contract prefetches must not hydrate whole Wagtail pages.
+
+    ``ContractPage`` is a Wagtail Page, so an unnarrowed ``b2b_contracts``
+    prefetch (or a ``select_related("b2b_contract")``) selects the full
+    multi-table row - ~50 columns including two RichTextFields - once per
+    (run, contract) pair. Only the pk and ``organization_id`` are ever read,
+    and deserializing the rest was ~900ms of a 1.4s production request.
+    """
+    client, _, org, contract = b2b_contracted_course
+    params = {"org_id": org.id, "contract_id": contract.id}
+    if filter_by != "both":
+        params = {filter_by: params[filter_by]}
+
+    with CaptureQueriesContext(connection) as ctx:
+        resp = client.get(reverse("v2:courses_api-list"), params)
+    assert resp.status_code == status.HTTP_200_OK
+
+    for query in ctx.captured_queries:
+        sql = query["sql"]
+        if "b2b_contractpage" not in sql:
+            continue
+        # organization_id and the active/date predicate still need the table
+        # joined; nothing may select a payload column off it.
+        for column in ("description", "welcome_message", "name", "google_sheet_target"):
+            assert f'"b2b_contractpage"."{column}"' not in sql, sql
+
+
+def test_courses_list_b2b_runs_match_unprefetched_queryset(b2b_contracted_course):
+    """
+    Annotated, prefetched and lazy paths must agree.
+
+    The viewset annotates ``b2b_contract_organization_id`` and narrows the
+    ``b2b_contracts`` prefetch; a bare ``Course.objects.get()`` has neither, so
+    comparing the two exercises every fallback in ``get_filtered_runs``.
+    """
+    client, course, org, contract = b2b_contracted_course
+
+    for params, org_id, contract_id in (
+        ({"org_id": org.id}, org.id, None),
+        ({"contract_id": contract.id}, None, contract.id),
+        ({"org_id": org.id, "contract_id": contract.id}, org.id, contract.id),
+    ):
+        resp = client.get(reverse("v2:courses_api-list"), params)
+        assert resp.status_code == status.HTTP_200_OK
+        result = next(r for r in resp.json()["results"] if r["id"] == course.id)
+
+        bare = Course.objects.get(pk=course.id)
+        expected = _get_canonical_runs_per_tag(
+            bare.get_filtered_runs(
+                courserun_is_enrollable=None, org_id=org_id, contract_id=contract_id
+            )
+        )
+        assert [run["id"] for run in result["courseruns"]] == [
+            run.id for run in expected
+        ], params
+        assert result["courseruns"], params
+
+
+def test_courses_list_excludes_runs_of_a_deactivated_contract(b2b_contracted_course):
+    """
+    Deactivating a contract must drop its runs from the payload.
+
+    The ``b2b_contracts`` prefetch is what applies ActiveContractManager, so
+    narrowing it with the wrong manager would silently keep serving runs from
+    inactive or out-of-window contracts.
+    """
+    client, course, _org, contract = b2b_contracted_course
+
+    resp = client.get(reverse("v2:courses_api-list"), {"contract_id": contract.id})
+    result = next(r for r in resp.json()["results"] if r["id"] == course.id)
+    assert result["courseruns"]
+
+    contract.active = False
+    contract.save()
+
+    resp = client.get(reverse("v2:courses_api-list"), {"contract_id": contract.id})
+    assert resp.json()["results"] == []
+
+
+def test_course_queryset_courseruns_prefetch_avoids_contract_pages():
+    """
+    Inspect the queryset directly, without a request.
+
+    ``select_related("b2b_contract")`` and a bare ``"b2b_contracts"`` lookup
+    both reintroduce the full Wagtail page fetch, and neither shows up as an
+    extra query - only as a slower one - so the query-count budget cannot
+    catch a regression here.
+    """
+    view = CourseViewSet()
+    view.validated_params = CourseViewSet.validated_params
+    prefetch = next(
+        lookup
+        for lookup in view.get_queryset()._prefetch_related_lookups  # noqa: SLF001
+        if getattr(lookup, "prefetch_to", None) == "courseruns"
+    )
+    runs_qs = prefetch.queryset
+
+    assert not runs_qs.query.select_related, runs_qs.query.select_related
+    assert "b2b_contract_organization_id" in runs_qs.query.annotations
+
+    contracts = next(
+        lookup
+        for lookup in runs_qs._prefetch_related_lookups  # noqa: SLF001
+        if getattr(lookup, "prefetch_to", None) == "b2b_contracts"
+    )
+    assert contracts.queryset.query.deferred_loading[1] is False, (
+        "the contracts prefetch must use only(), not defer()"
+    )
+    assert "organization_id" in contracts.queryset.query.deferred_loading[0]
