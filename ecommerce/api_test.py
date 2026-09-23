@@ -338,6 +338,27 @@ def test_cybersource_order_no_transaction(fulfilled_order):
     assert "There is no associated transaction" in message
 
 
+def test_cybersource_refund_zero_value_order():
+    """
+    A $0 order (free enrollment, admin-fulfilled, etc.) has nothing to refund
+    via the payment gateway. refund_order should say so explicitly and never
+    reach the payment gateway, instead of the payment gateway's generic
+    "invalid transaction dictionary" error - the transaction data for a $0
+    order was never shaped like a real CyberSource payload in the first
+    place (see ZERO_PAYMENT_DATA/ADMIN_FULFILLED_PAYMENT_DATA).
+    """
+    zero_value_order = OrderFactory.create(
+        state=OrderStatus.FULFILLED, total_price_paid=Decimal("0.00")
+    )
+
+    refund_response, message = refund_order(order_id=zero_value_order.id)
+
+    assert refund_response is False
+    assert zero_value_order.reference_number in message
+    assert "$0" in message
+    assert "nothing to refund via the payment gateway" in message
+
+
 @pytest.mark.parametrize(
     "order_state, unenroll",  # noqa: PT006
     [

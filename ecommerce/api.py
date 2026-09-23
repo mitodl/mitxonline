@@ -666,6 +666,14 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
         log.error(message)
         return False, message
 
+    if order.total_price_paid == 0:
+        message = (
+            f"Order {order.reference_number} was a $0 transaction (no payment "
+            "was collected) - there is nothing to refund via the payment gateway."
+        )
+        log.error(message)
+        return False, message
+
     order_recent_transaction = order.transactions.first()
 
     if not order_recent_transaction:
