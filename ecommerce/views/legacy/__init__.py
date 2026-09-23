@@ -38,7 +38,14 @@ from rest_framework.viewsets import (
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.api import is_product_courserun, is_product_program
-from courses.models import Course, CourseRun, Program, ProgramEnrollment, ProgramRun
+from courses.models import (
+    Course,
+    CourseRun,
+    CourseRunEnrollment,
+    Program,
+    ProgramEnrollment,
+    ProgramRun,
+)
 from courses.utils import is_uai_course_run, is_uai_program, is_xpro_course_run
 from ecommerce import api
 from ecommerce.constants import PAYMENT_TYPE_FINANCIAL_ASSISTANCE
@@ -1087,6 +1094,17 @@ class CheckoutProductView(RedirectView):
         )
         if program_enrollment is None:
             return None
+
+        if CourseRunEnrollment.objects.filter(
+            user=self.request.user,
+            run=run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        ).exists():
+            # Already fully enrolled at the verified level for this run --
+            # nothing to purchase, so skip straight to the dashboard instead
+            # of falling through to the cart.
+            return reverse("user-dashboard")
 
         try:
             api.create_verified_program_course_run_enrollment(

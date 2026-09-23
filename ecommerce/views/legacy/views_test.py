@@ -20,6 +20,7 @@ from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
 from courses.factories import (
+    CourseRunEnrollmentFactory,
     CourseRunFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
@@ -946,6 +947,37 @@ def test_checkout_product_with_verified_program_enrollment(user, user_client):
 
     enrollment = CourseRunEnrollment.objects.get(user=user, run=course_run)
     assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    assert not BasketItem.objects.filter(basket__user=user).exists()
+
+
+@pytest.mark.dont_mock_enrollments
+def test_checkout_product_with_existing_verified_run_enrollment(user, user_client):
+    """
+    Verifies that /cart/add?course_id=? skips straight to the dashboard,
+    without touching the basket, when the learner already holds a verified
+    enrollment in the run itself (e.g. they've already used the shortcut
+    once, or revisit the link).
+    """
+    program = ProgramFactory.create()
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        ProductFactory.create(purchasable_object=program)
+        ProductFactory.create(purchasable_object=course_run)
+
+    ProgramEnrollmentFactory.create(
+        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    CourseRunEnrollmentFactory.create(
+        user=user, run=course_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    resp = user_client.get(
+        reverse("checkout-product"), {"course_id": course_run.courseware_id}
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("user-dashboard")
     assert not BasketItem.objects.filter(basket__user=user).exists()
 
 
