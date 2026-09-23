@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.168.4
+---------------
+
+- Stop hydrating B2B ContractPage rows in /api/v2/courses/ (#4013)
+- Google Sheets: Process program refunds and downgrade enrollments (#4011)
+
 Version 1.168.3
 ---------------
 
