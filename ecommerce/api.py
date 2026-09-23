@@ -675,6 +675,14 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
 
     transaction_dict = order_recent_transaction.data
 
+    # Ensure the payment gateway can find the transaction ID — it may be stored
+    # on the model field but absent from the raw data blob (e.g. legacy records).
+    if "transaction_id" not in transaction_dict:
+        transaction_dict = {
+            **transaction_dict,
+            "transaction_id": order_recent_transaction.transaction_id,
+        }
+
     # Check for a PayPal payment - if there's one, we can't process it
     if "paypal_token" in transaction_dict:
         raise Exception(  # noqa: TRY002

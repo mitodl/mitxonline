@@ -902,7 +902,9 @@ class OrderFlow:
             transaction_payload["transaction_id"] = uuid.uuid4()
         elif self.order.gateway_type == MITOL_PAYMENT_GATEWAY_CYBERSOURCE:
             transaction_payload["transaction_id"] = payment_data.get("transaction_id")
-            transaction_payload["amount"] = payment_data.get("amount", Decimal(0))
+            # SA responses use req_amount; REST API responses use amount
+            raw_amount = payment_data.get("amount") or payment_data.get("req_amount", 0)
+            transaction_payload["amount"] = Decimal(str(raw_amount))
         elif self.order.gateway_type == MITOL_PAYMENT_GATEWAY_STRIPE:
             # This expects the Event, which has a unique ID.
             transaction_payload["transaction_id"] = payment_data.get("id")
