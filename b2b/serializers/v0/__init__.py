@@ -145,12 +145,20 @@ class B2BEnrollRequestSerializer(serializers.Serializer):
 
     Accepts an optional program_id so the user can be enrolled in the
     appropriate program alongside the course run enrollment.
+    Accepts an optional contract_slug so it can identify which contract
+    the user is working in, so the enrollments can be linked back to the
+    right contract.
     """
 
     program_id = serializers.CharField(
         required=False,
         allow_blank=True,
         help_text="The readable_id of the program to enroll the user in.",
+    )
+    contract_slug = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="The slug for the contract the user is in.",
     )
 
 
