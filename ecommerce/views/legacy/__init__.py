@@ -1025,11 +1025,11 @@ class CheckoutProductView(RedirectView):
             # If the request is from an external source we would have course_id as query param
             # Note that course_id passed in param corresponds to course run's courseware_id on mitxonline
             course_run_ids = self.request.GET.getlist("course_run_id")
-            course_ids = self.request.GET.getlist("course_id")
+            courseware_ids = self.request.GET.getlist("course_id")
             program_ids = self.request.GET.getlist("program_id")
 
             dashboard_redirect_url = self._enroll_via_verified_program(
-                all_product_ids, course_run_ids, course_ids, program_ids
+                all_product_ids, course_run_ids, courseware_ids, program_ids
             )
             if dashboard_redirect_url is not None:
                 return dashboard_redirect_url
@@ -1042,7 +1042,7 @@ class CheckoutProductView(RedirectView):
                 list(
                     CourseRun.objects.filter(
                         Q(courseware_id__in=course_run_ids)
-                        | Q(courseware_id__in=course_ids)
+                        | Q(courseware_id__in=courseware_ids)
                     ).values_list("products__id", flat=True)
                 )
             )
@@ -1059,7 +1059,7 @@ class CheckoutProductView(RedirectView):
         return super().get_redirect_url(*args, **kwargs)
 
     def _enroll_via_verified_program(
-        self, product_ids, course_run_ids, course_ids, program_ids
+        self, product_ids, course_run_ids, courseware_ids, program_ids
     ):
         """
         If this is a request for a single course run, and the learner already
@@ -1076,13 +1076,17 @@ class CheckoutProductView(RedirectView):
 
         runs = list(
             CourseRun.objects.filter(
-                Q(courseware_id__in=course_run_ids) | Q(courseware_id__in=course_ids)
+                Q(courseware_id__in=course_run_ids)
+                | Q(courseware_id__in=courseware_ids)
             )
         )
         if len(runs) != 1:
             return None
         run = runs[0]
 
+        # order_by keeps this deterministic if the learner somehow holds more
+        # than one matching verified program enrollment (e.g. the course is
+        # in multiple programs) -- prefer the most recently created one.
         program_enrollment = (
             ProgramEnrollment.objects.filter(
                 user=self.request.user,
@@ -1091,6 +1095,7 @@ class CheckoutProductView(RedirectView):
                 program__all_requirements__course=run.course,
             )
             .distinct()
+            .order_by("-id")
             .first()
         )
         if program_enrollment is None:
@@ -1119,8 +1124,8 @@ class CheckoutProductView(RedirectView):
             VerifiedProgramInvalidOrderError,
         ):
             log.exception(
-                "Failed to create verified program course enrollment for user %s, run %s",
-                self.request.user,
+                "Failed to create verified program course enrollment for user id %s, run %s",
+                self.request.user.id,
                 run.courseware_id,
             )
             return None

@@ -935,7 +935,10 @@ def test_checkout_product_with_no_active_product_uses_cart(user, user_client):
         # 500 instead of falling back to the cart.
 
     ProgramEnrollmentFactory.create(
-        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        program=program,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
     )
 
     resp = user_client.get(
@@ -963,7 +966,10 @@ def test_checkout_product_with_verified_program_enrollment(user, user_client):
         ProductFactory.create(purchasable_object=course_run)
 
     ProgramEnrollmentFactory.create(
-        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        program=program,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
     )
 
     resp = user_client.get(
@@ -975,7 +981,7 @@ def test_checkout_product_with_verified_program_enrollment(user, user_client):
 
     enrollment = CourseRunEnrollment.objects.get(user=user, run=course_run)
     assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
-    assert not BasketItem.objects.filter(basket__user=user).exists()
+    assert not Basket.objects.filter(user=user).exists()
 
 
 @pytest.mark.dont_mock_enrollments
@@ -994,10 +1000,16 @@ def test_checkout_product_with_existing_verified_run_enrollment(user, user_clien
         ProductFactory.create(purchasable_object=course_run)
 
     ProgramEnrollmentFactory.create(
-        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        program=program,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
     )
     CourseRunEnrollmentFactory.create(
-        user=user, run=course_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        user=user,
+        run=course_run,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
     )
 
     resp = user_client.get(
@@ -1006,7 +1018,7 @@ def test_checkout_product_with_existing_verified_run_enrollment(user, user_clien
 
     assert resp.status_code == 302
     assert resp.url == reverse("user-dashboard")
-    assert not BasketItem.objects.filter(basket__user=user).exists()
+    assert not Basket.objects.filter(user=user).exists()
 
 
 def test_checkout_product_with_audit_program_enrollment_uses_cart(user, user_client):
