@@ -12,6 +12,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from freezegun import freeze_time
 from mitol.common.utils import now_in_utc
+from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
 from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
@@ -474,7 +475,6 @@ def test_create_transaction_with_no_transaction_id():
 )
 def test_create_transaction_cybersource_amount(payment_data):
     """CyberSource SA responses (req_amount) and REST responses (amount) both store the correct amount."""
-    from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
 
     order = OrderFactory.create(
         state=OrderStatus.FULFILLED,
