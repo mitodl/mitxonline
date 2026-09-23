@@ -10033,7 +10033,9 @@ components:
       enum:
       - b2b-disallowed
       - b2b-error-already-enrolled
+      - b2b-error-ambiguous-contract
       - b2b-error-no-contract
+      - b2b-error-no-matching-contract
       - b2b-error-no-product
       - b2b-error-missing-enrollment-code
       - b2b-error-invalid-enrollment-code
@@ -10044,7 +10046,9 @@ components:
       description: |-
         * `b2b-disallowed` - b2b-disallowed
         * `b2b-error-already-enrolled` - b2b-error-already-enrolled
+        * `b2b-error-ambiguous-contract` - b2b-error-ambiguous-contract
         * `b2b-error-no-contract` - b2b-error-no-contract
+        * `b2b-error-no-matching-contract` - b2b-error-no-matching-contract
         * `b2b-error-no-product` - b2b-error-no-product
         * `b2b-error-missing-enrollment-code` - b2b-error-missing-enrollment-code
         * `b2b-error-invalid-enrollment-code` - b2b-error-invalid-enrollment-code
@@ -10054,7 +10058,9 @@ components:
       x-enum-descriptions:
       - b2b-disallowed
       - b2b-error-already-enrolled
+      - b2b-error-ambiguous-contract
       - b2b-error-no-contract
+      - b2b-error-no-matching-contract
       - b2b-error-no-product
       - b2b-error-missing-enrollment-code
       - b2b-error-invalid-enrollment-code
