@@ -30,6 +30,8 @@ from b2b.serializers.v0 import (
     B2BEnrollRequestSerializer,
     ContractPageSerializer,
     CreateB2BEnrollmentSerializer,
+    DataConsentSerializer,
+    DataConsentValidationErrorSerializer,
     OrganizationPageSerializer,
 )
 from courses.models import CourseRun
@@ -371,3 +373,36 @@ class AttachContractApi(APIView):
         user.save()
 
         return contracts_attached, contract_full
+
+
+class DataConsentAPI(APIView):
+    """View for recording data consent for a user on a contract."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=DataConsentSerializer,
+        responses={
+            204: None,
+            400: DataConsentValidationErrorSerializer,
+            403: None,
+        },
+    )
+    def post(self, request, contract_id: int):
+
+        user = request.user
+        b2b_contract_membership = user.b2b_contracts.through.objects.filter(
+            contract_page=contract_id
+        ).first()
+        if not b2b_contract_membership:
+            # Users shouldn't be able to provide data consent for contracts they're not in
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        request_serializer = DataConsentSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        consent_value = request_serializer.validated_data["consented"]
+        b2b_contract_membership.consented_to_data_sharing = consent_value
+        b2b_contract_membership.consent_modified_at = now_in_utc()
+        b2b_contract_membership.save()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
