@@ -30,7 +30,6 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
-from b2b.models import ContractPage
 from cms.models import CoursePage
 from compliance.exceptions import ExportComplianceCheckError
 from courses.api import (
@@ -73,6 +72,7 @@ from courses.serializers.v2.programs import (
     UserProgramEnrollmentDetailSerializer,
 )
 from courses.utils import (
+    active_contract_id_annotations,
     get_enrollable_courses,
     get_program_certificate_by_enrollment,
     get_unenrollable_courses,
@@ -459,42 +459,33 @@ class CourseViewSet(
             "enrollment_modes",
             to_attr="prefetched_enrollment_modes",
         )
-        # b2b_contracts is prefetched because get_first_unexpired_b2b_run and
-        # get_filtered_runs now match contracts in Python over the loaded runs
-        # rather than with a b2b_contracts__in filter - without it each run
-        # costs a query.
+        # get_first_unexpired_b2b_run and get_filtered_runs match contracts in
+        # Python over the loaded runs rather than with a b2b_contracts__in
+        # filter - without the contract ids on hand each run costs a query.
         #
-        # Narrowed to organization_id because that and the pk are all those two
-        # methods read. ContractPage is a Wagtail Page, so the unnarrowed
-        # prefetch selects the whole multi-table row - ~50 columns including two
-        # RichTextFields - once per (run, contract) pair.
+        # They come across as integer arrays rather than as a
+        # Prefetch("b2b_contracts"). ContractPage is a Wagtail Page and a
+        # ClusterableModel, and a prefetch without to_attr also builds a related
+        # manager and a queryset clone per run: in production that pair cost
+        # ~930ms of pure Python on a course with 149 runs, against 3-8ms for the
+        # to_attr-style sibling prefetches over the same runs. The two methods
+        # only ever read a contract's pk and organization_id, so arrays of those
+        # carry everything and instantiate nothing.
         #
-        # active_objects, not objects: the M2M related manager is built from
-        # ContractPage._default_manager, which is ActiveContractManager because
-        # active_objects is ContractPage's only *local* manager (see
-        # CourseRunAdmin.formfield_for_foreignkey for the same reasoning). So
-        # this prefetch has always filtered to active, in-window contracts, and
-        # ContractPage.objects - Wagtail's inherited, unfiltered PageManager -
-        # would silently widen it.
-        #
-        # ``contract.id`` stays free under only(): it is the MTI parent's pk, so
-        # DeferredAttribute._check_parent_chain resolves it from the loaded
-        # page_ptr_id rather than reloading the row.
-        contracts_prefetch = Prefetch(
-            "b2b_contracts",
-            queryset=ContractPage.active_objects.only("organization_id"),
-        )
         # The deprecated single-contract FK is annotated rather than
         # select_related for the same reason: the only read of it is
         # get_filtered_runs comparing organization_id, and the serializer's
-        # "b2b_contract" field renders the pk straight off b2b_contract_id. The
-        # alias matches CourseRun.b2b_contract_organization_id, so the
-        # annotation shadows that cached_property.
+        # "b2b_contract" field renders the pk straight off b2b_contract_id. All
+        # three aliases match cached_property fallbacks on CourseRun, so the
+        # annotations shadow them.
         course_runs_prefetch = Prefetch(
             "courseruns",
             queryset=CourseRun.objects.order_by("id")
-            .annotate(b2b_contract_organization_id=F("b2b_contract__organization_id"))
-            .prefetch_related(contracts_prefetch, modes_prefetch, products_prefetch),
+            .annotate(
+                b2b_contract_organization_id=F("b2b_contract__organization_id"),
+                **active_contract_id_annotations(),
+            )
+            .prefetch_related(modes_prefetch, products_prefetch),
         )
         # Topics are serialized per course along with their parent topics, whose
         # sort key is CoursesTopic.Meta.ordering == ["parent__name", "name"] -

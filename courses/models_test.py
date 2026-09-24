@@ -13,6 +13,7 @@ from mitol.common.utils.datetime import now_in_utc
 from wagtail.models import Page
 
 from b2b.factories import ContractPageFactory
+from b2b.models import ContractPage
 from cms.factories import (
     CertificatePageFactory,
     CoursePageFactory,
@@ -45,7 +46,7 @@ from courses.models import (
     ProgramRequirementNodeType,
     limit_to_certificate_pages,
 )
-from courses.utils import get_dated_courseruns
+from courses.utils import active_contract_id_annotations, get_dated_courseruns
 from ecommerce.factories import OrderFactory, ProductFactory
 from ecommerce.models import OrderStatus
 from main.test_utils import format_as_iso8601
@@ -1621,6 +1622,115 @@ def test_get_filtered_runs_excludes_inactive_b2b_contracts(filter_name):
         )
         == []
     )
+
+
+def test_b2b_contract_id_arrays_prefer_annotation(django_assert_num_queries):
+    """
+    The ArraySubquery annotations must shadow the cached_properties, no query.
+
+    ``CourseViewSet`` annotates these instead of prefetching ``b2b_contracts``,
+    which hydrated a ContractPage - a Wagtail Page and a ClusterableModel - per
+    (run, contract) pair and cost ~930ms of pure Python in production on a
+    course with 149 runs. Same non-data-descriptor trick as
+    ``b2b_contract_organization_id``.
+    """
+    contract = ContractPageFactory.create()
+    course_run = CourseRunFactory.create()
+    course_run.b2b_contracts.add(contract)
+
+    run = CourseRun.objects.annotate(**active_contract_id_annotations()).get(
+        pk=course_run.pk
+    )
+
+    with django_assert_num_queries(0):
+        assert run.b2b_contract_ids == [contract.id]
+        assert run.b2b_contract_org_ids == [contract.organization_id]
+
+
+def test_b2b_contract_id_arrays_without_annotation():
+    """Unannotated callers still resolve, via the M2M."""
+    contract = ContractPageFactory.create()
+    course_run = CourseRunFactory.create()
+    course_run.b2b_contracts.add(contract)
+
+    run = CourseRun.objects.get(pk=course_run.pk)
+    assert run.b2b_contract_ids == [contract.id]
+    assert run.b2b_contract_org_ids == [contract.organization_id]
+
+    unattached = CourseRun.objects.get(pk=CourseRunFactory.create().pk)
+    assert unattached.b2b_contract_ids == []
+    assert unattached.b2b_contract_org_ids == []
+
+
+def test_b2b_contract_id_arrays_exclude_out_of_window_contracts():
+    """
+    The annotation must inherit ActiveContractManager's date window.
+
+    ``b2b_contracts`` resolves through ContractPage._default_manager, so the
+    prefetch this replaces was always filtered to active, in-window contracts.
+    Both paths - annotated and lazy - have to keep filtering the same way.
+    """
+    now = now_in_utc()
+    contract = ContractPageFactory.create(active=True)
+    course_run = CourseRunFactory.create()
+    # Attach while in-window: the related manager is ActiveContractManager, so
+    # add() cannot see an out-of-window contract. Expire it afterwards with an
+    # update() that bypasses the same manager.
+    course_run.b2b_contracts.add(contract)
+    ContractPage.objects.filter(pk=contract.pk).update(
+        contract_start=now - timedelta(days=30), contract_end=now - timedelta(days=1)
+    )
+
+    annotated = CourseRun.objects.annotate(**active_contract_id_annotations()).get(
+        pk=course_run.pk
+    )
+    lazy = CourseRun.objects.get(pk=course_run.pk)
+
+    assert annotated.b2b_contract_ids == []
+    assert lazy.b2b_contract_ids == []
+
+
+@pytest.mark.parametrize("annotate", [True, False])
+@pytest.mark.parametrize("filter_name", ["org_id", "contract_id"])
+def test_get_filtered_runs_matches_contracts_on_both_paths(annotate, filter_name):
+    """get_filtered_runs matches the same runs annotated or not."""
+    course = CourseFactory.create()
+    contract = ContractPageFactory.create(active=True)
+    matching = CourseRunFactory.create(course=course, b2b_only=True)
+    matching.b2b_contracts.add(contract)
+    CourseRunFactory.create(course=course, b2b_only=True)
+
+    course = Course.objects.get(pk=course.pk)
+    if annotate:
+        course = Course.objects.prefetch_related(
+            Prefetch(
+                "courseruns",
+                queryset=CourseRun.objects.annotate(**active_contract_id_annotations()),
+            )
+        ).get(pk=course.pk)
+
+    filter_value = contract.organization_id if filter_name == "org_id" else contract.id
+    assert course.get_filtered_runs(
+        courserun_is_enrollable=None, **{filter_name: filter_value}
+    ) == [matching]
+
+
+def test_get_first_unexpired_b2b_run_uses_contract_id_array():
+    """get_first_unexpired_b2b_run matches off the id array, not ContractPages."""
+    course = CourseFactory.create()
+    contract = ContractPageFactory.create(active=True)
+    other_contract = ContractPageFactory.create(active=True)
+    run = CourseRunFactory.create(course=course, b2b_only=True, in_progress=True)
+    run.b2b_contracts.add(contract)
+
+    course = Course.objects.get(pk=course.pk)
+    assert course.get_first_unexpired_b2b_run([contract.id]) == run
+
+    course = Course.objects.get(pk=course.pk)
+    assert course.get_first_unexpired_b2b_run([other_contract.id]) is None
+
+    course = Course.objects.get(pk=course.pk)
+    assert course.get_first_unexpired_b2b_run([]) is None
 
 
 # Test for course run constraints
