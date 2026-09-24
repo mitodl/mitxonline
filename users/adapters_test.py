@@ -1,8 +1,13 @@
 import pytest
 from mitol.scim.requests import InMemoryHttpRequest
 
-from users.adapters import LearnUserAdapter
+from users.adapters import (
+    EDX_SYNC_ATTRS,
+    EDX_UNSYNCED_ATTRS,
+    LearnUserAdapter,
+)
 from users.factories import UserFactory
+from users.models import User
 
 pytestmark = pytest.mark.django_db
 
@@ -200,3 +205,231 @@ def test_learn_user_adapter_blank_fields():
     assert user.name == "Joe Smith"
     assert user.legal_address.first_name == "Joe"
     assert user.legal_address.last_name == "Smith"
+
+
+def _sync_mocks(mocker):
+    """Patch on_commit to run inline and return the two queued task mocks.
+
+    on_commit is patched at users.adapters, matching courses/signals_test.py -
+    pytest.mark.django_db wraps each test in a transaction that never commits,
+    so registered callbacks would otherwise never run.
+    """
+    mocker.patch(
+        "users.adapters.transaction.on_commit", side_effect=lambda callback: callback()
+    )
+    return (
+        mocker.patch("openedx.tasks.update_edx_user_profile.delay"),
+        mocker.patch("openedx.tasks.change_edx_user_email_async.delay"),
+    )
+
+
+def _unchanged_payload(user, **overrides):
+    """A from_dict payload that reproduces the user's current state.
+
+    from_dict() writes userName unconditionally, so it always has to be present
+    or the save would blank the username out.
+    """
+    return {
+        "active": user.is_active,
+        "userName": user.username,
+        "externalId": user.scim_external_id or "1",
+        "fullName": user.name,
+        **overrides,
+    }
+
+
+def test_edx_sync_attrs_cover_to_dict():
+    """Every to_dict() key must be classified as either synced to Open edX or
+    explicitly not synced. Diffing runs over _scim_attrs() - the same data
+    to_dict() is built from - filtered to an allow-list, so an unclassified
+    attribute would silently never reach edX; this test makes adding or renaming
+    an attribute fail loudly instead of quietly changing what gets synced.
+    """
+    user = UserFactory.create()
+
+    assert not (EDX_SYNC_ATTRS & EDX_UNSYNCED_ATTRS)
+    assert set(_adapter(user).to_dict().keys()) == EDX_SYNC_ATTRS | EDX_UNSYNCED_ATTRS
+
+
+def test_scim_name_change_queues_edx_profile_update(mocker):
+    """A SCIM full name change pushes the profile to Open edX"""
+    mock_profile, mock_email = _sync_mocks(mocker)
+    user = UserFactory.create(name="Joe Smith")
+
+    adapter = LearnUserAdapter(user)
+    adapter.from_dict(_unchanged_payload(user, fullName="Joseph Smith"))
+    adapter.save()
+
+    user.refresh_from_db()
+    assert user.name == "Joseph Smith"
+    mock_profile.assert_called_once_with(user.id)
+    mock_email.assert_not_called()
+
+
+def test_scim_legal_address_name_change_queues_edx_profile_update(mocker):
+    """A change to name.givenName/familyName queues the profile push too, even
+    though those live on LegalAddress rather than on User - the diff runs over
+    the SCIM representation, not over a hand-listed set of User columns
+    """
+    mock_profile, mock_email = _sync_mocks(mocker)
+    user = UserFactory.create(name="Joe Smith")
+    user.legal_address.first_name = "Joe"
+    user.legal_address.last_name = "Smith"
+    user.legal_address.save()
+
+    adapter = LearnUserAdapter(user)
+    adapter.from_dict(
+        _unchanged_payload(user, name={"givenName": "Joseph", "familyName": "Smythe"})
+    )
+    adapter.save()
+
+    mock_profile.assert_called_once_with(user.id)
+    mock_email.assert_not_called()
+
+
+def test_scim_email_change_queues_edx_email_update(mocker):
+    """A SCIM email change pushes the email to Open edX"""
+    mock_profile, mock_email = _sync_mocks(mocker)
+    user = UserFactory.create(email="old@example.com")
+
+    adapter = LearnUserAdapter(user)
+    adapter.from_dict(
+        _unchanged_payload(user, emails=[{"value": "new@example.com", "primary": True}])
+    )
+    adapter.save()
+
+    user.refresh_from_db()
+    assert user.email == "new@example.com"
+    mock_email.assert_called_once_with(user.id)
+    mock_profile.assert_not_called()
+
+
+def test_scim_email_case_change_does_not_queue_edx_email_update(mocker):
+    """A case-only email change is not a real change - update_edx_user_email
+    costs a full Open edX OAuth handshake, so it must not fire for one
+    """
+    mock_profile, mock_email = _sync_mocks(mocker)
+    user = UserFactory.create(email="joe@example.com")
+
+    adapter = LearnUserAdapter(user)
+    adapter.from_dict(
+        _unchanged_payload(user, emails=[{"value": "JOE@example.com", "primary": True}])
+    )
+    adapter.save()
+
+    mock_email.assert_not_called()
+    mock_profile.assert_not_called()
+
+
+def test_scim_no_op_save_queues_nothing(mocker):
+    """A SCIM write that changes nothing queues no Open edX work"""
+    mock_profile, mock_email = _sync_mocks(mocker)
+    user = UserFactory.create(name="Joe Smith")
+
+    adapter = LearnUserAdapter(user)
+    adapter.from_dict(_unchanged_payload(user))
+    adapter.save()
+
+    mock_profile.assert_not_called()
+    mock_email.assert_not_called()
+
+
+def test_scim_unknown_attributes_queue_nothing(mocker):
+    """Attributes we do not model must never trigger an Open edX push.
+
+    The diff is taken over to_dict(), which is rendered from our own models and
+    never echoes unrecognized request keys, and is then filtered to
+    EDX_SYNC_ATTRS - so an undocumented attribute cannot queue edX work.
+    """
+    mock_profile, mock_email = _sync_mocks(mocker)
+    user = UserFactory.create(name="Joe Smith")
+
+    adapter = LearnUserAdapter(user)
+    adapter.from_dict(
+        _unchanged_payload(
+            user,
+            nickName="Joey",
+            title="Dr",
+            **{"urn:ietf:params:scim:schemas:extension:custom:2.0:User": {"dept": "x"}},
+        )
+    )
+    adapter.save()
+
+    mock_profile.assert_not_called()
+    mock_email.assert_not_called()
+
+
+def test_scim_active_change_queues_nothing(mocker):
+    """The active flag is deliberately not synced: Open edX lists is_active in
+    AccountUserSerializer.read_only_fields, and sending a read-only key makes
+    edX 400 the entire PATCH - which would take the name sync down with it
+    """
+    mock_profile, mock_email = _sync_mocks(mocker)
+    user = UserFactory.create(is_active=True)
+
+    adapter = LearnUserAdapter(user)
+    adapter.from_dict(_unchanged_payload(user, active=False))
+    adapter.save()
+
+    user.refresh_from_db()
+    assert user.is_active is False
+    mock_profile.assert_not_called()
+    mock_email.assert_not_called()
+
+
+def test_scim_create_queues_nothing(mocker):
+    """A newly created SCIM user has no Open edX account to update yet"""
+    mock_profile, mock_email = _sync_mocks(mocker)
+
+    adapter = LearnUserAdapter(User())
+    adapter.from_dict(
+        {
+            "active": True,
+            "userName": "brandnew",
+            "externalId": "kc-brandnew",
+            "fullName": "Brand New",
+            "emails": [{"value": "brandnew@example.com", "primary": True}],
+        }
+    )
+    adapter.save()
+
+    assert User.objects.filter(username="brandnew").exists()
+    mock_profile.assert_not_called()
+    mock_email.assert_not_called()
+
+
+def test_scim_multi_operation_patch_queues_profile_update_once(mocker):
+    """django_scim calls save() once per PATCH operation, so a request touching
+    the name twice must still queue a single Open edX profile push
+    """
+    mock_profile, _ = _sync_mocks(mocker)
+    user = UserFactory.create(name="Joe Smith")
+
+    adapter = LearnUserAdapter(user)
+    adapter.handle_operations(
+        [
+            {"op": "replace", "path": None, "value": {"fullName": "Joseph Smith"}},
+            {"op": "replace", "path": None, "value": {"fullName": "Joe Smythe"}},
+        ]
+    )
+
+    user.refresh_from_db()
+    assert user.name == "Joe Smythe"
+    mock_profile.assert_called_once_with(user.id)
+
+
+def test_scim_save_survives_broker_failure(mocker, caplog):
+    """A broker outage must not turn a SCIM write into a 500 - the user is still
+    saved and the failure is only logged
+    """
+    mock_profile, _ = _sync_mocks(mocker)
+    mock_profile.side_effect = Exception("broker down")
+    user = UserFactory.create(name="Joe Smith")
+
+    adapter = LearnUserAdapter(user)
+    adapter.from_dict(_unchanged_payload(user, fullName="Joseph Smith"))
+    adapter.save()
+
+    user.refresh_from_db()
+    assert user.name == "Joseph Smith"
+    assert "Failed to queue edX profile update" in caplog.text
