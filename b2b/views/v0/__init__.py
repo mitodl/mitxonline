@@ -391,8 +391,9 @@ class DataConsentAPI(APIView):
     def post(self, request, contract_id: int):
 
         user = request.user
-        b2b_contract_membership = user.b2b_contracts.through.objects.filter(
-            contract_page=contract_id
+        # user_b2b_contracts gives back UserB2BContract rows, scoped to the user from the request
+        b2b_contract_membership = user.user_b2b_contracts.filter(
+            contract_page_id=contract_id
         ).first()
         if not b2b_contract_membership:
             # Users shouldn't be able to provide data consent for contracts they're not in

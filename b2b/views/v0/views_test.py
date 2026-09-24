@@ -922,3 +922,48 @@ def test_data_consent_success(user):
     assert membership.consented_to_data_sharing is False
     assert membership.consent_modified_at is not None
     assert membership.consent_modified_at >= first_modified_at
+
+
+def test_data_consent_non_member_cannot_modify_other_members_consent(user):
+    """A non-member should get a 403 even when the contract has other members."""
+    contract = ContractPageFactory.create()
+    other_user = UserFactory.create()
+    other_user.b2b_contracts.add(contract)
+
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:data-consent", kwargs={"contract_id": contract.id})
+    resp = client.post(url, data={"consented": True}, format="json")
+
+    assert resp.status_code == 403
+    other_membership = UserB2BContract.objects.get(
+        user=other_user, contract_page=contract
+    )
+    assert other_membership.consented_to_data_sharing is None
+    assert other_membership.consent_modified_at is None
+
+
+def test_data_consent_only_modifies_callers_membership(user):
+    """With multiple members, only the caller's consent should change."""
+    contract = ContractPageFactory.create()
+    # Created first so it would be returned by an unscoped .first()
+    other_user = UserFactory.create()
+    other_user.b2b_contracts.add(contract)
+    user.b2b_contracts.add(contract)
+
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:data-consent", kwargs={"contract_id": contract.id})
+    resp = client.post(url, data={"consented": True}, format="json")
+
+    assert resp.status_code == 204
+    membership = UserB2BContract.objects.get(user=user, contract_page=contract)
+    assert membership.consented_to_data_sharing is True
+    assert membership.consent_modified_at is not None
+    other_membership = UserB2BContract.objects.get(
+        user=other_user, contract_page=contract
+    )
+    assert other_membership.consented_to_data_sharing is None
+    assert other_membership.consent_modified_at is None
