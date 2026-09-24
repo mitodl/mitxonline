@@ -52,6 +52,7 @@ from b2b.models import (
     OrganizationIndexPage,
     OrganizationOnboarding,
     OrganizationPage,
+    UserB2BContract,
     UserOrganization,
 )
 from b2b.tasks import queue_contract_sheet_update_post_save, queue_enrollment_code_check
@@ -96,6 +97,8 @@ def get_user_b2b_organizations(user):
         user: The user to get organizations for.
     Returns:
         QuerySet of OrganizationPage with _user_active_contracts prefetched.
+        Each contract has the user's own UserB2BContract row prefetched as
+        _user_memberships.
     """
 
     return OrganizationPage.objects.filter(
@@ -108,7 +111,12 @@ def get_user_b2b_organizations(user):
                     "contract_programs",
                     queryset=ContractProgramItem.objects.order_by("sort_order"),
                     to_attr="_contract_program_ids",
-                )
+                ),
+                Prefetch(
+                    "b2b_contract_users",
+                    queryset=UserB2BContract.objects.filter(user=user),
+                    to_attr="_user_memberships",
+                ),
             ).filter(active=True, users=user),
             to_attr="_user_active_contracts",
         )
