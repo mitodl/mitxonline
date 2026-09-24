@@ -1,6 +1,7 @@
 # ruff: noqa: SLF001
 """Tests for the Keycloak admin API."""
 
+import base64
 import json
 from urllib.parse import urljoin
 
@@ -96,6 +97,49 @@ def test_client_init(settings, mocker):
         mocked_openid_config["token_endpoint"],
         grant_type="client_credentials",
     )
+
+
+def test_client_renews_expired_token(settings, mocker):
+    """An expired client_credentials token is re-fetched with the client's
+    credentials instead of raising InvalidTokenError, so a long-running caller
+    can outlive one token. Only the HTTP POST is mocked, so authlib's real
+    renewal path has to attach client_id/client_secret itself.
+    """
+    client, _, mocked_token_request, mocked_openid_config = _mocked_admin_client(
+        settings, mocker
+    )
+    mocker.stop(mocked_token_request)
+    renewed_access_token = FAKE.sha256()
+    mocked_post = mocker.patch(
+        "authlib.integrations.requests_client.OAuth2Session.post",
+        return_value=_faked_response(
+            {
+                "access_token": renewed_access_token,
+                "expires_in": 300,
+                "token_type": "Bearer",
+            }
+        ),
+    )
+    client.oauth_session.token = {
+        "access_token": FAKE.sha256(),
+        "token_type": "Bearer",
+        "expires_at": 1,
+    }
+
+    assert client.oauth_session.ensure_active_token()
+
+    (url,), kwargs = mocked_post.call_args
+    assert url == mocked_openid_config["token_endpoint"]
+    assert kwargs["data"]["grant_type"] == "client_credentials"
+    signed = kwargs["auth"](
+        requests.Request("POST", url, data=kwargs["data"]).prepare()
+    )
+    credentials = base64.b64encode(
+        f"{settings.KEYCLOAK_ADMIN_CLIENT_ID}:"
+        f"{settings.KEYCLOAK_ADMIN_CLIENT_SECRET}".encode()
+    ).decode()
+    assert signed.headers["Authorization"] == f"Basic {credentials}"
+    assert client.oauth_session.token["access_token"] == renewed_access_token
 
 
 def test_client_init_missing_base_url(settings):
@@ -385,6 +429,7 @@ def test_client_init_oauth_session_configuration(settings, mocker):
         token_endpoint=mocked_openid_config["token_endpoint"],
         scope=settings.KEYCLOAK_ADMIN_CLIENT_SCOPES,
         verify=not client.skip_verify,
+        grant_type="client_credentials",
     )
 
     mock_oauth_session.fetch_token.assert_called_once_with(
