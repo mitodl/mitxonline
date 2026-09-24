@@ -79,6 +79,7 @@ from ecommerce.exceptions import (
     VerifiedProgramInvalidBasketError,
     VerifiedProgramInvalidOrderError,
     VerifiedProgramNoEnrollmentError,
+    VerifiedProgramNoProductError,
 )
 from ecommerce.models import (
     Basket,
@@ -1526,6 +1527,7 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
       enrollment
     - VerifiedProgramCourseNotInProgramError if the run's course is not in the
       program's requirements
+    - VerifiedProgramNoProductError if the run has no active Product to purchase
     - VerifiedProgramInvalidBasketError if the basket isn't zero value
     - VerifiedProgramInvalidOrderError if the order doesn't get processed through
     """
@@ -1545,9 +1547,13 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
     discount = create_verified_program_discount(program)
 
     cr_ctype = ContentType.objects.get_for_model(courserun)
-    product = Product.objects.filter(
-        content_type=cr_ctype, object_id=courserun.id, is_active=True
-    ).get()
+    try:
+        product = Product.objects.filter(
+            content_type=cr_ctype, object_id=courserun.id, is_active=True
+        ).get()
+    except Product.DoesNotExist as exc:
+        msg = f"No active product for course run {courserun}"
+        raise VerifiedProgramNoProductError(msg) from exc
 
     basket = establish_basket(request)
 
