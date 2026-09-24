@@ -534,6 +534,31 @@ def test_order_refund_failure_no_exception(mocker, fulfilled_transaction):
     assert not downgrade_task_mock.called
 
 
+def test_order_refund_missing_transaction_id_in_data(mocker, fulfilled_order):
+    """Refund should succeed when transaction_id is absent from Transaction.data but present on the model field."""
+    payment_amount = 10.00
+    # Simulate a legacy record where .data lacks transaction_id
+    transaction = TransactionFactory.create(
+        transaction_id="legacy-txn-id",
+        transaction_type=TRANSACTION_TYPE_PAYMENT,
+        data={"req_amount": payment_amount, "req_currency": "USD"},
+        order=fulfilled_order,
+    )
+    sample_response = ProcessorResponse(
+        state=ProcessorResponse.STATE_PENDING,
+        response_data={"id": "12345"},
+        transaction_id="legacy-txn-id",
+        message="",
+        response_code="",
+    )
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.start_refund",
+        return_value=sample_response,
+    )
+    refund_success, _ = refund_order(order_id=transaction.order.id)
+    assert refund_success is True
+
+
 def test_paypal_refunds(fulfilled_paypal_transaction):
     """PayPal transactions should fail before they get to the payment gateway."""
 

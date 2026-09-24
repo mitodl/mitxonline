@@ -12,6 +12,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from freezegun import freeze_time
 from mitol.common.utils import now_in_utc
+from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
 from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
@@ -461,6 +462,30 @@ def test_create_transaction_with_no_transaction_id():
         ).count()
         == 0
     )
+
+
+@pytest.mark.parametrize(
+    "payment_data",
+    [
+        # Secure Acceptance response uses req_amount
+        {"transaction_id": "cs-txn-1", "req_amount": "175.00", "req_currency": "USD"},
+        # REST API response uses amount
+        {"transaction_id": "cs-txn-2", "amount": "175.00", "req_currency": "USD"},
+    ],
+)
+def test_create_transaction_cybersource_amount(payment_data):
+    """CyberSource SA responses (req_amount) and REST responses (amount) both store the correct amount."""
+
+    order = OrderFactory.create(
+        state=OrderStatus.FULFILLED,
+        total_price_paid=Decimal("175.00"),
+        gateway_type=MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+    )
+    order_flow = order.get_object_flow()
+    order_flow.create_transaction(payment_data)
+
+    txn = Transaction.objects.get(transaction_id=payment_data["transaction_id"])
+    assert txn.amount == Decimal("175.00")
 
 
 @pytest.mark.parametrize(
