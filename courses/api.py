@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from collections import Counter, namedtuple
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from traceback import format_exc
@@ -33,7 +34,11 @@ from rest_framework.status import HTTP_404_NOT_FOUND
 from b2b.api import process_add_org_membership
 from cms.api import create_default_courseware_page
 from compliance.api import verify_user_with_exports
-from compliance.exceptions import ExportComplianceCheckError, ExportComplianceError
+from compliance.exceptions import (
+    ExportComplianceCheckError,
+    ExportComplianceDataError,
+    ExportComplianceError,
+)
 from courses import mail_api
 from courses.constants import (
     COURSE_KEY_PATTERN,
@@ -100,6 +105,13 @@ if TYPE_CHECKING:
 
 
 log = logging.getLogger(__name__)
+
+#: Support-facing code for a learner whose profile is missing the fields
+#: required to run an export compliance check at all. Unlike
+#: ``ExportComplianceError.error_code`` this is not set on the exception, so
+#: that the existing enrollment endpoints keep their bare error detail.
+MISSING_COMPLIANCE_DATA_CODE = "CS_701"
+
 UserEnrollments = namedtuple(  # noqa: PYI024
     "UserEnrollments",
     [
@@ -495,6 +507,56 @@ def _verify_exports_compliance_for_enrollment(user, courseware_object) -> None:
         result.reason_code,
     )
     raise ExportComplianceError(user, result.decision, result.reason_code)
+
+
+@dataclass(frozen=True)
+class EnrollmentEligibility:
+    """Whether a user may enroll in a courseware object, and why not if they can't."""
+
+    enrollable: bool
+    reason_code: str | None = None
+
+
+def check_enrollment_eligibility(user, courseware_object) -> EnrollmentEligibility:
+    """
+    Report whether `user` may enroll in `courseware_object` without enrolling them.
+
+    Only covers export compliance - this says nothing about whether the run is
+    open for enrollment, live, or already enrolled in.
+
+    Runs the same check the enrollment path runs, so it reuses a cached
+    compliance result when there is one and falls through to a live CyberSource
+    call (logging an ExportComplianceLog record) when there isn't.
+
+    Args:
+        user (User): The user to check
+        courseware_object (CourseRun or Program): What they want to enroll in
+
+    Returns:
+        EnrollmentEligibility: `enrollable` plus a support-facing `reason_code`
+            when the user is blocked.
+    """
+    try:
+        _verify_exports_compliance_for_enrollment(user, courseware_object)
+    except ExportComplianceError as exc:
+        return EnrollmentEligibility(enrollable=False, reason_code=exc.error_code)
+    except ExportComplianceDataError:
+        # The user's profile is missing fields we need to even run the check.
+        # Distinct from a rejection: they can fix this themselves.
+        return EnrollmentEligibility(
+            enrollable=False, reason_code=MISSING_COMPLIANCE_DATA_CODE
+        )
+    except ExportComplianceCheckError:
+        # A compliance failure mode this endpoint has no code for yet. Fail
+        # closed rather than 500, but do not invent a code for it.
+        log.exception(
+            "Unrecognized export compliance failure for user=%s courseware_object=%s",
+            user.id,
+            courseware_object,
+        )
+        return EnrollmentEligibility(enrollable=False)
+
+    return EnrollmentEligibility(enrollable=True)
 
 
 def downgrade_learner(enrollment):

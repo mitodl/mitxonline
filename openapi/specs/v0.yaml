@@ -4351,6 +4351,40 @@ paths:
           description: No response body
         '404':
           description: No response body
+  /api/v3/course_runs/{run_id}/enrollment-eligible/:
+    post:
+      operationId: course_runs_enrollment_eligible
+      description: |-
+        Report whether the authenticated user may enroll, without enrolling them. Only covers export compliance - it says nothing about whether the run or program is open for enrollment, live, or already enrolled in.
+
+        A POST because a cache miss triggers a live CyberSource export compliance check and records its result. Rate limited per user, so ask at the point of intent rather than pre-flighting a whole catalogue page.
+      parameters:
+      - in: path
+        name: run_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - course_runs
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrollmentEligibility'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrollmentEligibilityNotFound'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrollmentEligibilityThrottled'
+          description: ''
   /api/v3/courses/{course_id}/ol_openedx_outline/:
     get:
       operationId: course_outline_retrieve_v3
@@ -4632,6 +4666,40 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v3/programs/{program_id}/enrollment-eligible/:
+    post:
+      operationId: programs_enrollment_eligible
+      description: |-
+        Report whether the authenticated user may enroll, without enrolling them. Only covers export compliance - it says nothing about whether the run or program is open for enrollment, live, or already enrolled in.
+
+        A POST because a cache miss triggers a live CyberSource export compliance check and records its result. Rate limited per user, so ask at the point of intent rather than pre-flighting a whole catalogue page.
+      parameters:
+      - in: path
+        name: program_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - programs
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrollmentEligibility'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrollmentEligibilityNotFound'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrollmentEligibilityThrottled'
+          description: ''
   /enrollments/:
     post:
       operationId: api_enrollments_create
@@ -7233,6 +7301,36 @@ components:
       - clicked
       - failed
       - pending
+    EnrollmentEligibility:
+      type: object
+      description: Whether a user may enroll, and a support-facing code when they
+        may not.
+      properties:
+        enrollable:
+          type: boolean
+        reason_code:
+          type: string
+          nullable: true
+          description: Null when enrollable. CS_700 when an export compliance check
+            rejected the learner; CS_701 when their profile is missing the information
+            needed to run that check.
+      required:
+      - enrollable
+      - reason_code
+    EnrollmentEligibilityNotFound:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    EnrollmentEligibilityThrottled:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
     EnrollmentMode:
       type: object
       description: Enrollment mode serializer.
