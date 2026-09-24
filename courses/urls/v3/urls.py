@@ -31,4 +31,14 @@ urlpatterns += [
         v3.get_course_variant_runs,
         name="course_variant_runs",
     ),
+    path(
+        "course_runs/<int:run_id>/enrollment-eligible/",
+        v3.course_run_enrollment_eligible,
+        name="course_run_enrollment_eligible",
+    ),
+    path(
+        "programs/<int:program_id>/enrollment-eligible/",
+        v3.program_enrollment_eligible,
+        name="program_enrollment_eligible",
+    ),
 ]
