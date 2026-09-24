@@ -12,6 +12,7 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.views.generic import TemplateView
 from mitol.common.admin import TimestampedModelAdmin
+from mitol.payment_gateway.models import StripeWebhookSecret, StripeWebhookSecretRoute
 from reversion.admin import VersionAdmin
 from viewflow import fsm
 
@@ -594,3 +595,31 @@ class StripeEventLogAdmin(ReadOnlyModelAdmin):
         StripeEventTypeNamespaceFilter,
         "event_type",
     ]
+
+
+class StripeWebhookSecretRouteInline(admin.TabularInline):
+    """Inline for the routes for the webhook secret"""
+
+    model = StripeWebhookSecretRoute
+
+
+@admin.register(StripeWebhookSecret)
+class StripeWebhookSecretAdmin(admin.ModelAdmin):
+    """Admin for the Stripe Webhook Secrets model from payment_gateway."""
+
+    model = StripeWebhookSecret
+    list_display = [
+        "secret_name",
+        "is_active",
+    ]
+    list_filter = [
+        "is_active",
+    ]
+    inlines = [
+        StripeWebhookSecretRouteInline,
+    ]
+
+    def get_queryset(self, request):  # noqa: ARG002
+        """Return the all_objects manager."""
+
+        return StripeWebhookSecret.all_objects
