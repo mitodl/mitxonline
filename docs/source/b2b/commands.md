@@ -4,12 +4,22 @@ B2B system data can be (and sometimes is required to be) managed through a set o
 
 ## Management Commands
 
-There are three management commands:
+There are four management commands:
 - [](#b2b_contract) - manages contracts and organizations
 - [](#b2b_courseware) - manages courseware within a contract
 - [](#b2b_list) - lists out data
+- [](#backfill_keycloak_orgs) - links organizations to their Keycloak organization
 
 This document will go over the basic use of the management commands. To get the full documentation for the command, run the command or subcommand with the `--help` option.
+
+### backfill_keycloak_orgs
+
+:Name: backfill_keycloak_orgs
+:Description: Gives organizations that have no Keycloak UUID one.
+:Description:
+    Organizations that predate the provisioning API may have no Keycloak UUID, so their members are never added to Keycloak. This command matches each of them to the Keycloak organization whose alias is the organization's `org_key` (ignoring case) and records its UUID. The scheduled Keycloak sync does the same match. Once an organization is linked, the sync also overwrites its name, title and description from Keycloak, as it does for every linked organization, so the dry run lists any name that would change.
+
+    It only reports unless you pass `--apply`. Organizations with no matching Keycloak organization are reported and left alone; pass `--create-missing` to create them in Keycloak instead. Some of them are demo or test organizations that should not exist in Keycloak, so review the dry run first. `--org-key` limits the run to one organization and can be repeated.
 
 ### b2b_contract
 
