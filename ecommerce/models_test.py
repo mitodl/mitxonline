@@ -15,7 +15,8 @@ from mitol.common.utils import now_in_utc
 from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
-from courses.factories import CourseRunFactory, ProgramFactory
+from compliance.api import ExportComplianceResult
+from courses.factories import BlockedCountryFactory, CourseRunFactory, ProgramFactory
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
@@ -2069,3 +2070,47 @@ def test_chaining_credits_each_dollar_at_most_once(user):
     assert resolve_program_child_purchase(user, parent_product).amount == Decimal(
         "200.00"
     )
+
+
+@pytest.mark.parametrize(
+    "blocked_country",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "compliance",
+    [
+        True,
+        False,
+    ],
+)
+def test_has_user_blocked_products(mocker, blocked_country, compliance):
+    """Test that the blocked countries check works as expected."""
+
+    mocked_compliance_check = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        side_effect=lambda *_: ExportComplianceResult(
+            decision="DECLINED" if compliance else "COMPLETED",
+            reason_code=0,
+            request_id="request_id",
+            raw={},
+        ),
+    )
+
+    courserun = CourseRunFactory.create()
+    product = ProductFactory.create(purchasable_object=courserun)
+    basket_item = BasketItemFactory.create(product=product)
+    user = basket_item.basket.user
+
+    blocked_country_record = BlockedCountryFactory.create(course=courserun.course)
+
+    if blocked_country:
+        user.legal_address.country = blocked_country_record.country
+        user.save()
+
+    assert basket_item.basket.has_user_blocked_products(user) == (
+        blocked_country or compliance
+    )
+    mocked_compliance_check.assert_called()

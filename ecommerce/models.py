@@ -18,6 +18,7 @@ from django.db.models import Count, Q, TextChoices
 from django.utils.functional import cached_property
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
+from mitol.olposthog.features import is_enabled
 from mitol.payment_gateway.constants import (
     MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
     MITOL_PAYMENT_GATEWAY_STRIPE,
@@ -26,6 +27,7 @@ from reversion.models import Version
 from viewflow import this
 from viewflow.fsm import State
 
+from compliance.exceptions import ExportComplianceError
 from courses.models import CourseRun, PaidCourseRun, Program
 from courses.utils import is_contract_order, is_uai_order, is_xpro_order
 from ecommerce.constants import (
@@ -48,6 +50,7 @@ from ecommerce.constants import (
     TRANSACTION_TYPES,
 )
 from ecommerce.tasks import send_ecommerce_order_receipt, send_order_refund_email
+from main import features
 from main.plugin_manager import get_plugin_manager
 from users.models import User
 
@@ -147,6 +150,24 @@ class Basket(TimestampedModel):
     def has_user_blocked_products(self, user):
         """Return true if any of the courses in the basket block user's country"""
         basket_items = self.basket_items.prefetch_related("product")
+
+        if basket_items.count() == 0:
+            return False
+
+        if is_enabled(
+            features.EXPORT_COMPLIANCE_CHECK_ENABLED,
+            default=False,
+            opt_unique_id=user.global_id,
+        ):
+            from courses.api import (  # noqa: PLC0415
+                _verify_exports_compliance_for_enrollment,
+            )
+
+            try:
+                _verify_exports_compliance_for_enrollment(user, basket_items[0])
+            except ExportComplianceError:
+                return True
+
         return any(
             [  # noqa: C419
                 item.product.purchasable_object.course.is_country_blocked(user)
