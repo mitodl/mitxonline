@@ -47,3 +47,11 @@ class VerifiedProgramCourseNotInProgramError(Exception):
     run whose course is not in that program's requirements. The program's
     internal discount would otherwise price the run at zero.
     """
+
+
+class VerifiedProgramNoProductError(Exception):
+    """
+    Raised if a verified enrollment in a program's course run is requested for a
+    run that has no active Product to purchase (e.g. it was deactivated, or one
+    was never created for individual purchase).
+    """
