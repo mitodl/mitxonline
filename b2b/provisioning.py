@@ -1118,6 +1118,8 @@ def transition_identity_provider(
     - InvalidLifecycleTransitionError: the transition is not allowed
     """
 
+    connection = connection or KeycloakConnection()
+
     with transaction.atomic():
         identity_provider = _locked(identity_provider)
         current = identity_provider.lifecycle_state
@@ -1128,8 +1130,6 @@ def transition_identity_provider(
                 f"'{current}' to '{state}'."
             )
             raise InvalidLifecycleTransitionError(msg)
-
-        connection = connection or KeycloakConnection()
 
         keycloak_idp = connection.identity_providers.get(identity_provider.alias)
         payload = keycloak_idp.model_dump(by_alias=True, exclude_none=True)
