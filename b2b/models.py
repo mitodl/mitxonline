@@ -678,6 +678,7 @@ class ContractPage(Page, ClusterableModel):
         *,
         skip_edx=False,
         no_reruns=True,
+        org_prefix=UAI_COURSEWARE_ID_PREFIX,
         ignore_langs=False,
         only_lang=None,
         filter_variants=None,
@@ -689,9 +690,12 @@ class ContractPage(Page, ClusterableModel):
 
         Args:
         - program (courses.Program): the program to add
+        Kwargs:
+        - org_prefix (str|None): passed to create_contract_run; None uses the
+          organization's own prefix
 
         Returns:
-        - tuple: Tuple with three integers:
+        - tuple: Tuple with two integers:
             - number of course runs created
             - number of courses with no source run
         """
@@ -717,6 +721,7 @@ class ContractPage(Page, ClusterableModel):
                 course,
                 no_reruns=no_reruns,
                 skip_edx=skip_edx,
+                org_prefix=org_prefix,
                 ignore_langs=ignore_langs,
                 only_lang=only_lang,
                 filter_variants=filter_variants,

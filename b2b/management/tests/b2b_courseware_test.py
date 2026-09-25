@@ -111,7 +111,6 @@ def test_add_program(mock_clone_courserun, with_languages, no_create_runs, try_r
         courseware=str(program.readable_id),
         no_create_runs=no_create_runs,
         allow_reruns=True,
-        force=False,
         can_import="",
         prefix="",
         make_code=False,
@@ -134,7 +133,6 @@ def test_add_program(mock_clone_courserun, with_languages, no_create_runs, try_r
         courseware=str(program.readable_id),
         no_create_runs=no_create_runs,
         allow_reruns=try_reruns,
-        force=False,
         can_import="",
         prefix="",
         make_code=False,
@@ -188,7 +186,6 @@ def test_add_course(mock_clone_courserun, with_languages, no_create_runs, try_re
         courseware=str(run.course.readable_id),
         no_create_runs=no_create_runs,
         allow_reruns=True,
-        force=False,
         can_import="",
         prefix="",
         make_code=False,
@@ -211,7 +208,6 @@ def test_add_course(mock_clone_courserun, with_languages, no_create_runs, try_re
         courseware=str(run.course.readable_id),
         no_create_runs=no_create_runs,
         allow_reruns=try_reruns,
-        force=False,
         can_import="",
         prefix="",
         make_code=False,
@@ -235,7 +231,6 @@ def test_add_courserun():
         courseware=str(run.courseware_id),
         no_create_runs=False,
         allow_reruns=True,
-        force=False,
         can_import="",
         prefix="",
         make_code=False,
@@ -245,19 +240,13 @@ def test_add_courserun():
     assert run.b2b_contract == contract
 
 
-@pytest.mark.parametrize(
-    "force",
-    [
-        True,
-        False,
-    ],
-)
-def test_add_courserun_existing_contract(force):
-    """Test adding an extant courserun to a contract."""
+def test_add_courserun_existing_contract():
+    """A run already in another contract is left where it is."""
 
     contract = ContractPageFactory.create()
     existing_contract = ContractPageFactory.create()
     run = CourseRunFactory.create(b2b_contract=existing_contract)
+    run.b2b_contracts.add(existing_contract)
     command = b2b_courseware.Command()
 
     command.handle(
@@ -266,14 +255,14 @@ def test_add_courserun_existing_contract(force):
         courseware=str(run.courseware_id),
         no_create_runs=False,
         allow_reruns=True,
-        force=force,
         can_import="",
         prefix="",
         make_code=False,
     )
 
     run.refresh_from_db()
-    assert run.b2b_contract == (contract if force else existing_contract)
+    assert run.b2b_contract == existing_contract
+    assert not run.b2b_contracts.filter(id=contract.id).exists()
 
 
 @pytest.mark.parametrize(
@@ -305,7 +294,6 @@ def test_add_course_ignore_langs(mock_clone_courserun, explicit_primary):
         contract=str(contract.id),
         courseware=str(run.course.readable_id),
         allow_reruns=True,
-        force=False,
         can_import="",
         prefix="",
         make_code=False,
@@ -354,7 +342,6 @@ def test_add_program_ignore_langs(mock_clone_courserun, explicit_primary):
         contract=str(contract.id),
         courseware=str(program.readable_id),
         allow_reruns=True,
-        force=False,
         can_import="",
         prefix="",
         make_code=False,
@@ -398,7 +385,6 @@ def test_add_course_specific_lang(mock_clone_courserun, explicit_primary):
         contract=str(contract.id),
         courseware=str(run.course.readable_id),
         allow_reruns=True,
-        force=False,
         can_import="",
         prefix="",
         make_code=False,
@@ -452,7 +438,6 @@ def test_add_program_specific_lang(mock_clone_courserun, explicit_primary):
         contract=str(contract.id),
         courseware=str(program.readable_id),
         allow_reruns=True,
-        force=False,
         can_import="",
         prefix="",
         make_code=False,
@@ -584,7 +569,6 @@ def test_add_course_variants(mock_clone_courserun, add_filtering):
         contract=str(contract.id),
         courseware=str(course.readable_id),
         allow_reruns=False,
-        force=False,
         can_import="",
         prefix="",
         make_code=False,
@@ -596,4 +580,26 @@ def test_add_course_variants(mock_clone_courserun, add_filtering):
     assert contract_runs.count() == len(language_check)
     assert contract_runs.filter(language__in=language_check).count() == len(
         language_check
+    )
+
+
+def test_remove_course_prints_summary(capsys):
+    """Removing a course should print a removal summary, like removing a program does."""
+
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(b2b_contract=contract)
+    command = b2b_courseware.Command()
+
+    command.handle(
+        subcommand="remove",
+        contract=str(contract.id),
+        courseware=str(run.course.readable_id),
+        additional_courseware=None,
+        remove_program_runs=False,
+    )
+
+    output = capsys.readouterr().out
+    assert (
+        f"Removed {run.course.readable_id} from contract {contract}, with 1 of its runs."
+        in output
     )
