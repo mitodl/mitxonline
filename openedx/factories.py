@@ -35,8 +35,10 @@ class OpenEdxApiAuthFactory(DjangoModelFactory):
     user = SubFactory("users.factories.UserFactory", no_openedx_api_auth=True)
     refresh_token = Faker("pystr", max_chars=30)
     access_token = Faker("pystr", max_chars=30)
+    # The floor keeps the token outside every refresh window
+    # (OPENEDX_AUTH_MAX_TTL_IN_SECONDS), so a test never takes the refresh path by chance.
     access_token_expires_on = Faker(
-        "future_datetime", end_date="+10h", tzinfo=ZoneInfo("UTC")
+        "date_time_between", start_date="+2h", end_date="+10h", tzinfo=ZoneInfo("UTC")
     )
 
     class Meta:
