@@ -124,6 +124,27 @@ IDP_ALLOWED_TRANSITIONS = {
     IDP_STATE_DISABLED: [IDP_STATE_TESTING, IDP_STATE_ACTIVE],
 }
 
+PROVISIONING_ACTION_ORG_CREATED = "organization_created"
+PROVISIONING_ACTION_ORG_UPDATED = "organization_updated"
+PROVISIONING_ACTION_ONBOARDING_CHANGED = "onboarding_changed"
+PROVISIONING_ACTION_IDP_CREATED = "identity_provider_created"
+PROVISIONING_ACTION_IDP_TRANSITIONED = "identity_provider_transitioned"
+PROVISIONING_ACTION_IDP_METADATA_REFRESHED = "identity_provider_metadata_refreshed"
+PROVISIONING_ACTION_IDP_DELETED = "identity_provider_deleted"
+
+PROVISIONING_ACTION_CHOICES = [
+    (PROVISIONING_ACTION_ORG_CREATED, "Organization created"),
+    (PROVISIONING_ACTION_ORG_UPDATED, "Organization updated"),
+    (PROVISIONING_ACTION_ONBOARDING_CHANGED, "Onboarding state changed"),
+    (PROVISIONING_ACTION_IDP_CREATED, "Identity provider created"),
+    (PROVISIONING_ACTION_IDP_TRANSITIONED, "Identity provider state changed"),
+    (
+        PROVISIONING_ACTION_IDP_METADATA_REFRESHED,
+        "Identity provider metadata refreshed",
+    ),
+    (PROVISIONING_ACTION_IDP_DELETED, "Identity provider deleted"),
+]
+
 MAILGUN_LOGS_API_URL = "https://api.mailgun.net/v1/analytics/logs"
 MAILGUN_LOGS_PAGE_LIMIT = 100
 MAILGUN_LOGS_DESC = "timestamp:desc"

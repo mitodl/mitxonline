@@ -2,6 +2,7 @@
 
 import logging
 from decimal import Decimal
+from urllib.parse import urljoin
 
 from django.conf import settings
 from django.contrib import admin
@@ -28,14 +29,16 @@ from b2b.constants import (
     CONTRACT_MEMBERSHIP_TYPE_CHOICES,
     IDP_LIFECYCLE_CHOICES,
     IDP_PROTOCOL_CHOICES,
+    IDP_PROTOCOL_SAML,
     IDP_STATE_DRAFT,
     ONBOARDING_STATE_CHOICES,
     ONBOARDING_STATE_REQUESTED,
     ORG_INDEX_SLUG,
+    PROVISIONING_ACTION_CHOICES,
 )
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import Program
-from main.models import ValidateOnSaveMixin
+from main.models import AuditModel, ValidateOnSaveMixin
 from variants.models import SupportedVariant
 
 log = logging.getLogger(__name__)
@@ -975,10 +978,92 @@ class OrganizationIdentityProvider(TimestampedModel, ValidateOnSaveMixin):
     )
     metadata_fetched_at = models.DateTimeField(null=True, blank=True)
 
+    @property
+    def service_provider(self):
+        """
+        Return what the partner's IdP needs to know about our side.
+
+        These are Keycloak's broker URLs for this alias, which is what an
+        operator hands the partner's engineers. The SP entity ID is only
+        meaningful for SAML; Keycloak uses the realm URL unless the IdP config
+        sets entityId.
+
+        Returns:
+        - dict: entity_id (SAML only), redirect_uri (the SAML ACS URL or the
+          OIDC redirect URI) and metadata_url (the SAML SP descriptor)
+        """
+
+        realm_url = urljoin(
+            settings.KEYCLOAK_BASE_URL, f"/realms/{settings.KEYCLOAK_REALM_NAME}"
+        )
+        endpoint = f"{realm_url}/broker/{self.alias}/endpoint"
+
+        if self.protocol != IDP_PROTOCOL_SAML:
+            return {"entity_id": None, "redirect_uri": endpoint, "metadata_url": None}
+
+        return {
+            "entity_id": (self.metadata_artifact or {}).get("entityId") or realm_url,
+            "redirect_uri": endpoint,
+            "metadata_url": f"{endpoint}/descriptor",
+        }
+
     def __str__(self):
         """Return a reasonable representation of the object as a string."""
 
         return f"OrganizationIdentityProvider: {self.alias} ({self.lifecycle_state})"
+
+
+class OrganizationProvisioningAudit(AuditModel):
+    """
+    One change made through the provisioning API, and who made it.
+
+    Before the API, a partner's SSO config changed only through a reviewed,
+    merged Pulumi PR, so the review was the record. This is the replacement
+    record. There is no approval step before an IdP goes active, so this is
+    how a change gets reviewed: after the fact.
+
+    Append-only, so nothing deleted elsewhere takes a record with it: the IdP
+    is recorded by alias, the organization's org_key is copied onto every
+    row, and deleting the organization's page only clears the foreign key.
+    Credentials are never written here.
+    """
+
+    organization = models.ForeignKey(
+        "b2b.OrganizationPage",
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="provisioning_audits",
+    )
+    org_key = models.CharField(max_length=30)
+    # main.models.AuditModel cascades, which would delete a staff account's
+    # provisioning history along with the account. PROTECT keeps the record
+    # and who made it; MITx Online retires users by deactivating them, so
+    # this only blocks an outright delete.
+    acting_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, on_delete=models.PROTECT
+    )
+    identity_provider_alias = models.CharField(max_length=255, blank=True, default="")
+    action = models.CharField(max_length=64, choices=PROVISIONING_ACTION_CHOICES)
+
+    class Meta:
+        ordering = ["-created_on", "-id"]
+
+    @classmethod
+    def get_related_field_name(cls):
+        return "organization"
+
+    def save(self, *args, **kwargs):
+        """Refuse to rewrite an audit record."""
+
+        if self.pk is not None:
+            msg = "Provisioning audit records cannot be changed."
+            raise ValueError(msg)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        """Return a reasonable representation of the object as a string."""
+
+        return f"OrganizationProvisioningAudit: {self.action} on {self.org_key}"
 
 
 def is_organization_manager(user, org_id):

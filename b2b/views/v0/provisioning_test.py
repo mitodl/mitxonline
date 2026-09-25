@@ -5,6 +5,7 @@ import pytest
 from django.urls import reverse
 from requests.exceptions import HTTPError
 from rest_framework import status
+from rest_framework.test import APIClient
 
 from b2b.constants import (
     IDP_PROTOCOL_OIDC,
@@ -13,6 +14,8 @@ from b2b.constants import (
     IDP_STATE_DRAFT,
     IDP_STATE_TESTING,
     ONBOARDING_STATE_LIVE,
+    ONBOARDING_STATE_ORG_CREATED,
+    PROVISIONING_ACTION_ONBOARDING_CHANGED,
 )
 from b2b.exceptions import AliasCollisionError, OrganizationNameCollisionError
 from b2b.factories import OrganizationIndexPageFactory, OrganizationPageFactory
@@ -20,7 +23,13 @@ from b2b.keycloak_admin_dataclasses import (
     OrganizationDomainRepresentation,
     OrganizationRepresentation,
 )
-from b2b.models import OrganizationIdentityProvider, OrganizationPage
+from b2b.models import (
+    OrganizationIdentityProvider,
+    OrganizationOnboarding,
+    OrganizationPage,
+    OrganizationProvisioningAudit,
+)
+from b2b.provisioning import set_onboarding_state
 
 pytestmark = [pytest.mark.django_db]
 FAKE = faker.Faker()
@@ -96,9 +105,6 @@ CREATE_BODY = {
 def test_create_organization_requires_staff(user_drf_client):
     """
     An org manager is a customer-side role and must not provision.
-
-    IsAdminOrReadOnly grants write to is_staff only; a plain authenticated user
-    gets read access and nothing else.
     """
 
     response = user_drf_client.post(_organizations_url(), CREATE_BODY, format="json")
@@ -484,3 +490,236 @@ def test_parse_metadata_is_staff_only(user_drf_client):
     )
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.fixture
+def staff_drf_client(staff_user):
+    """A DRF client for an is_staff user who is not a superuser."""
+
+    client = APIClient()
+    client.force_authenticate(user=staff_user)
+    return client
+
+
+def _events_url(org_key):
+    return reverse(
+        "b2b:b2b-provisioning-organization-events", kwargs={"org_key": org_key}
+    )
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        lambda _organization: _organizations_url(),
+        lambda organization: _organization_url(organization.org_key),
+        lambda organization: _identity_providers_url(organization.org_key),
+        lambda organization: _identity_provider_url(organization.org_key, "exampleu"),
+        lambda organization: _events_url(organization.org_key),
+    ],
+)
+def test_reads_are_staff_only(user_drf_client, url):
+    """
+    Partner SSO config is not for any signed-in learner to read.
+
+    The routes were IsAdminOrReadOnly, which let any authenticated user list an
+    organization's identity providers and their parsed metadata.
+    """
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+
+    response = user_drf_client.get(url(organization))
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_list_organizations(staff_drf_client, mocked_connection):
+    """
+    The list carries onboarding and IdPs, and does not ask Keycloak per row.
+
+    domains and redirect_url are Keycloak-only, so they are null in the list.
+    """
+
+    organization = OrganizationPageFactory.create(name="Example University")
+    OrganizationOnboarding.objects.create(
+        organization=organization, state=ONBOARDING_STATE_LIVE
+    )
+    _identity_provider(organization)
+    OrganizationPageFactory.create(name="Other University")
+
+    response = staff_drf_client.get(_organizations_url())
+
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["count"] == 2
+    first = body["results"][0]
+    assert first["org_key"] == organization.org_key
+    assert first["onboarding"]["state"] == ONBOARDING_STATE_LIVE
+    assert [idp["alias"] for idp in first["identity_providers"]] == ["exampleu"]
+    assert first["domains"] is None
+    assert first["redirect_url"] is None
+    assert body["results"][1]["onboarding"] is None
+    mocked_connection.organizations.get.assert_not_called()
+
+
+def test_list_organizations_query_count_does_not_grow_with_rows(
+    staff_drf_client, django_assert_num_queries
+):
+    """Onboarding and IdPs are joined and prefetched, not fetched per row."""
+
+    for index in range(5):
+        organization = OrganizationPageFactory.create(name=f"University {index}")
+        OrganizationOnboarding.objects.create(organization=organization)
+        _identity_provider(organization, alias=f"idp-{index}")
+
+    # The request's django_site lookup, the count, the page with its onboarding
+    # joined, and the IdP prefetch.
+    with django_assert_num_queries(4):
+        response = staff_drf_client.get(_organizations_url())
+
+    assert response.json()["count"] == 5
+
+
+def test_list_organizations_paginates_with_the_refine_params(staff_drf_client):
+    """The staff dashboard sends o (offset) and l (limit)."""
+
+    for index in range(3):
+        OrganizationPageFactory.create(name=f"University {index}")
+
+    response = staff_drf_client.get(_organizations_url(), {"o": 1, "l": 1})
+
+    body = response.json()
+    assert body["count"] == 3
+    assert [org["name"] for org in body["results"]] == ["University 1"]
+
+
+@pytest.mark.parametrize("q", ["exam", "EXAMPLEU", "exampleu"])
+def test_list_organizations_searches_name_and_org_key(staff_drf_client, q):
+    """Q matches the name or the org key, case-insensitively."""
+
+    OrganizationPageFactory.create(name="Example University", org_key="EXAMPLEU")
+    OrganizationPageFactory.create(name="Other University", org_key="OTHERU")
+
+    response = staff_drf_client.get(_organizations_url(), {"q": q})
+
+    assert [org["org_key"] for org in response.json()["results"]] == ["EXAMPLEU"]
+
+
+def test_list_organizations_filters_on_onboarding_state(staff_drf_client):
+    """The "what is left" view: organizations at a given stage."""
+
+    live = OrganizationPageFactory.create(name="Live University")
+    OrganizationOnboarding.objects.create(
+        organization=live, state=ONBOARDING_STATE_LIVE
+    )
+    OrganizationPageFactory.create(name="Pending University")
+
+    response = staff_drf_client.get(
+        _organizations_url(), {"onboarding_state": ONBOARDING_STATE_LIVE}
+    )
+
+    assert [org["org_key"] for org in response.json()["results"]] == [live.org_key]
+
+
+def test_identity_provider_includes_the_service_provider_details(
+    staff_drf_client, settings
+):
+    """An operator hands the partner these, so the API serves them."""
+
+    settings.KEYCLOAK_BASE_URL = "https://sso.example.mit.edu"
+    settings.KEYCLOAK_REALM_NAME = "olapps"
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+
+    response = staff_drf_client.get(
+        _identity_provider_url(organization.org_key, "exampleu")
+    )
+
+    assert response.json()["service_provider"] == {
+        "entity_id": "https://sso.example.mit.edu/realms/olapps",
+        "redirect_uri": "https://sso.example.mit.edu/realms/olapps/broker/exampleu/endpoint",
+        "metadata_url": "https://sso.example.mit.edu/realms/olapps/broker/exampleu/endpoint/descriptor",
+    }
+
+
+def test_set_onboarding_state_records_who_did_it(staff_drf_client, staff_user):
+    """The view passes the requesting user through to the audit trail."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+
+    staff_drf_client.post(
+        reverse(
+            "b2b:b2b-provisioning-organization-onboarding",
+            kwargs={"org_key": organization.org_key},
+        ),
+        {"state": ONBOARDING_STATE_LIVE},
+        format="json",
+    )
+
+    audit = OrganizationProvisioningAudit.objects.get(organization=organization)
+    assert audit.acting_user == staff_user
+    assert audit.action == PROVISIONING_ACTION_ONBOARDING_CHANGED
+
+
+def test_transition_passes_the_actor(staff_drf_client, staff_user, mocker):
+    """Every write route hands the requesting user to the service function."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    identity_provider = _identity_provider(organization, state=IDP_STATE_TESTING)
+    mocked_transition = mocker.patch(
+        "b2b.views.v0.provisioning.transition_identity_provider",
+        return_value=identity_provider,
+    )
+
+    staff_drf_client.post(
+        _identity_provider_url(organization.org_key, "exampleu", suffix="transition"),
+        {"state": IDP_STATE_ACTIVE},
+        format="json",
+    )
+
+    assert mocked_transition.call_args.kwargs["actor"] == staff_user
+
+
+def test_events_are_newest_first_and_paginated(staff_drf_client, staff_user):
+    """The review trail for an organization, most recent change on top."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    for state in (ONBOARDING_STATE_ORG_CREATED, ONBOARDING_STATE_LIVE):
+        set_onboarding_state(organization, state, actor=staff_user)
+    set_onboarding_state(
+        OrganizationPageFactory.create(org_key="OTHERU"), ONBOARDING_STATE_LIVE
+    )
+
+    response = staff_drf_client.get(_events_url(organization.org_key), {"l": 1})
+
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["count"] == 2
+    (event,) = body["results"]
+    assert event["action"] == PROVISIONING_ACTION_ONBOARDING_CHANGED
+    assert event["data_after"]["state"] == ONBOARDING_STATE_LIVE
+    assert event["actor"] == {
+        "id": staff_user.id,
+        "username": staff_user.username,
+        "email": staff_user.email,
+    }
+    assert set(event) == {
+        "id",
+        "action",
+        "identity_provider_alias",
+        "actor",
+        "data_before",
+        "data_after",
+        "created_on",
+    }
+
+
+def test_events_for_a_system_change_have_no_actor(staff_drf_client):
+    """A change with no requesting user (a command, a task) has a null actor."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    set_onboarding_state(organization, ONBOARDING_STATE_LIVE)
+
+    response = staff_drf_client.get(_events_url(organization.org_key))
+
+    assert response.json()["results"][0]["actor"] is None
