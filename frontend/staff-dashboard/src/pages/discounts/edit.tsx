@@ -1,11 +1,5 @@
-import {
-    useForm,
-    Form,
-    Input,
-    InputNumber,
-    Select,
-    Edit,
- } from "@pankod/refine-antd";
+import { useForm, Edit } from "@refinedev/antd";
+import { Form, Input, InputNumber, Select } from "antd";
 import { DiscountForm } from "components/discounts/discounts";
 
 import { IDiscount } from "interfaces";

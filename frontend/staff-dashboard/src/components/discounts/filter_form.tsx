@@ -1,12 +1,8 @@
 import React from "react"
-import {
-    Button,
-    Select,
-    FormProps,
-    Form,
-    Input,
-    Icons,
-} from "@pankod/refine-antd";
+
+import { SearchOutlined } from "@ant-design/icons";
+
+import { Button, Select, FormProps, Form, Input } from "antd";
 import {Discount_Redemption_Types} from "../../constants";
 
 export const DiscountFilterForm: React.FC<{ formProps: FormProps }> = ({ formProps }) => {
@@ -50,7 +46,7 @@ export const DiscountFilterForm: React.FC<{ formProps: FormProps }> = ({ formPro
               <Input
                 placeholder="Discount Code"
                 style={{ minWidth: 400 }}
-                prefix={<Icons.SearchOutlined />}
+                prefix={<SearchOutlined />}
                 allowClear={true}
             ></Input>
           </Form.Item>
