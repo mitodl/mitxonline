@@ -13,6 +13,16 @@ collision, not deletion: organization and IdP aliases are realm-wide, so an
 alias created here will break a later pulumi up that declares the same name.
 Every create in this module checks the realm before writing.
 
+Keycloak has no transactions, so the ordering of each operation is what keeps
+the two systems and the audit trail consistent. A create writes Keycloak first
+and compensates by deleting what it made if our write fails. Everything that
+changes an existing resource locks our row, reads Keycloak, writes our row and
+its audit record, and writes Keycloak last, all in one atomic block: a failed
+local write stops before Keycloak is touched, and a failed Keycloak write rolls
+our row and the audit record back with it. The lock is what makes the state a
+change is checked against, and recorded as data_before, the current one. The
+window left is a commit that fails after Keycloak accepted the write.
+
 See docs/source/b2b/provisioning_api.md.
 """
 
@@ -100,6 +110,18 @@ def _audit(  # noqa: PLR0913
         data_before=data_before,
         data_after=data_after,
     )
+
+
+def _locked(instance):
+    """
+    Re-read a row under a lock that is held until the transaction ends.
+
+    The caller's instance may be stale, and two concurrent changes to the same
+    row would otherwise both check and audit against the same starting state.
+    Must be called inside transaction.atomic().
+    """
+
+    return type(instance).objects.select_for_update().get(pk=instance.pk)
 
 
 def _onboarding_snapshot(onboarding):
@@ -419,41 +441,43 @@ def update_organization(  # noqa: PLR0913
 
     connection = connection or KeycloakConnection()
 
-    keycloak_org = connection.organizations.get(organization.sso_organization_id)
-    payload = keycloak_org.model_dump(by_alias=True, exclude_none=True)
-
-    current = {
-        "name": organization.name,
-        "description": organization.description,
-        "redirect_url": keycloak_org.redirect_url,
-        "domains": [domain.name for domain in keycloak_org.domains or []],
-    }
-    requested = {
-        "name": name,
-        "description": description,
-        "redirect_url": redirect_url,
-        "domains": list(domains) if domains is not None else None,
-    }
-    changed = {
-        field: value
-        for field, value in requested.items()
-        if value is not None and value != current[field]
-    }
-
-    if name is not None:
-        payload["name"] = name
-        organization.name = name
-    if description is not None:
-        payload["description"] = description
-        organization.description = description
-    if redirect_url is not None:
-        payload["redirectUrl"] = redirect_url
-    if domains is not None:
-        payload["domains"] = [{"name": domain, "verified": True} for domain in domains]
-
-    connection.organizations.update(organization.sso_organization_id, payload)
-
     with transaction.atomic():
+        organization = _locked(organization)
+
+        keycloak_org = connection.organizations.get(organization.sso_organization_id)
+        payload = keycloak_org.model_dump(by_alias=True, exclude_none=True)
+
+        current = {
+            "name": organization.name,
+            "description": organization.description,
+            "redirect_url": keycloak_org.redirect_url,
+            "domains": [domain.name for domain in keycloak_org.domains or []],
+        }
+        requested = {
+            "name": name,
+            "description": description,
+            "redirect_url": redirect_url,
+            "domains": list(domains) if domains is not None else None,
+        }
+        changed = {
+            field: value
+            for field, value in requested.items()
+            if value is not None and value != current[field]
+        }
+
+        if name is not None:
+            payload["name"] = name
+            organization.name = name
+        if description is not None:
+            payload["description"] = description
+            organization.description = description
+        if redirect_url is not None:
+            payload["redirectUrl"] = redirect_url
+        if domains is not None:
+            payload["domains"] = [
+                {"name": domain, "verified": True} for domain in domains
+            ]
+
         organization.save()
         if changed:
             _audit(
@@ -463,6 +487,8 @@ def update_organization(  # noqa: PLR0913
                 data_before={field: current[field] for field in changed},
                 data_after=changed,
             )
+
+        connection.organizations.update(organization.sso_organization_id, payload)
 
     return organization
 
@@ -582,8 +608,29 @@ def _create_attribute_mappers(
         )
 
 
-def _replace_attribute_mappers(
-    connection, alias, protocol, attribute_map, attribute_name_map
+def _attribute_importer_mappers(connection, alias):
+    """
+    Return the IdP's attribute-importer mappers.
+
+    Only the attribute importers are ever replaced. A mapper of another type - a
+    username template, a hardcoded role - was added out of band and has nothing
+    to do with the maps being supplied, so an attribute edit does not destroy
+    it.
+    """
+
+    existing = connection.client.list(
+        f"identity-provider/instances/{alias}/mappers",
+        IdentityProviderMapperRepresentation,
+    )
+    return [
+        mapper
+        for mapper in existing
+        if mapper.identity_provider_mapper in IDP_ATTRIBUTE_MAPPERS.values()
+    ]
+
+
+def _replace_attribute_mappers(  # noqa: PLR0913
+    connection, alias, protocol, existing, attribute_map, attribute_name_map
 ):
     """
     Replace the IdP's attribute-importer mappers with the supplied set.
@@ -594,40 +641,23 @@ def _replace_attribute_mappers(
     mapper an operator meant to change - Keycloak keys them by a generated id,
     and the only name we give them is `{alias}-{attribute}-mapper`.
 
-    Only the attribute importers are replaced. A mapper of another type - a
-    username template, a hardcoded role - was added out of band and has nothing
-    to do with the maps being supplied, so an attribute edit does not destroy
-    it.
-
     Args:
     - connection (KeycloakConnection): the Keycloak connection to use
     - alias (str): the IdP alias
     - protocol (str): "saml" or "oidc"
+    - existing (list): the mappers to remove, from _attribute_importer_mappers
     - attribute_map (dict): user attribute -> SAML friendly name / OIDC claim
     - attribute_name_map (dict): user attribute -> SAML attribute name
-    Returns:
-    - list[dict]: the mappers that were removed, for the audit record. They
-      are gone from Keycloak once this returns, so this is the only place the
-      set an operator replaced can still be read.
     """
 
-    endpoint = f"identity-provider/instances/{alias}/mappers"
-    existing = connection.client.list(endpoint, IdentityProviderMapperRepresentation)
-
-    removed = [
-        mapper
-        for mapper in existing
-        if mapper.identity_provider_mapper in IDP_ATTRIBUTE_MAPPERS.values()
-    ]
-
-    for mapper in removed:
-        connection.client.delete(f"{endpoint}/{mapper.id}")
+    for mapper in existing:
+        connection.client.delete(
+            f"identity-provider/instances/{alias}/mappers/{mapper.id}"
+        )
 
     _create_attribute_mappers(
         connection, alias, protocol, attribute_map, attribute_name_map
     )
-
-    return [{"name": mapper.name, "config": mapper.config} for mapper in removed]
 
 
 def create_identity_provider(  # noqa: PLR0913
@@ -890,9 +920,9 @@ def update_identity_provider(  # noqa: PLR0913
     value when it sees the sentinel (IdentityProviderResource.updateIdpFromRep,
     Keycloak main). The alias cannot change here and Keycloak rejects it too.
 
-    There is no compensation. The IdP write, the mapper replacement and our
-    save happen in that order, and a failure part way through leaves Keycloak
-    ahead of our row - on a SAML IdP, possibly with fewer mappers than it
+    The IdP write and the mapper replacement are two Keycloak writes, made after
+    our save, so a failure between them rolls our row back and leaves Keycloak
+    with the new IdP config - on a SAML IdP, possibly with fewer mappers than it
     started with. Every step is idempotent for the same request body, so the
     recovery is to send the same PATCH again; unlike a create, there is nothing
     half-made to delete.
@@ -924,55 +954,61 @@ def update_identity_provider(  # noqa: PLR0913
             connection=connection,
         )
 
-    keycloak_idp = connection.identity_providers.get(identity_provider.alias)
-    payload = keycloak_idp.model_dump(by_alias=True, exclude_none=True)
-    config = dict(payload.get("config") or {})
-    config_before = dict(config)
-
-    if metadata_artifact is not None:
-        _replace_metadata_config(
-            config, identity_provider, metadata_artifact, metadata_url
-        )
-    if client_id is not None:
-        config["clientId"] = client_id
-    if client_secret is not None:
-        config["clientSecret"] = client_secret
-    if display_name is not None:
-        payload["displayName"] = display_name
-
-    payload["config"] = config
-    connection.identity_providers.update(identity_provider.alias, payload)
-
-    data_before, data_after = _identity_provider_update_diff(
-        identity_provider,
-        config_before=config_before,
-        config_after=config,
-        display_name=display_name,
-        metadata_source=metadata_source,
-        rotated_secret=client_secret is not None,
-    )
-
-    if attribute_map is not None or attribute_name_map is not None:
-        data_before["attribute_mappers"] = _replace_attribute_mappers(
-            connection,
-            identity_provider.alias,
-            identity_provider.protocol,
-            attribute_map,
-            attribute_name_map,
-        )
-        data_after["attribute_map"] = attribute_map or {}
-        data_after["attribute_name_map"] = attribute_name_map or {}
-
-    if display_name is not None:
-        identity_provider.display_name = display_name
-    if metadata_artifact is not None:
-        # The artifact stays what Keycloak parsed and nothing else: this field
-        # is served back over the API, and an OIDC update carries a secret.
-        identity_provider.metadata_source = metadata_source
-        identity_provider.metadata_artifact = metadata_artifact
-        identity_provider.metadata_fetched_at = now_in_utc()
+    replace_mappers = attribute_map is not None or attribute_name_map is not None
 
     with transaction.atomic():
+        identity_provider = _locked(identity_provider)
+
+        keycloak_idp = connection.identity_providers.get(identity_provider.alias)
+        payload = keycloak_idp.model_dump(by_alias=True, exclude_none=True)
+        config = dict(payload.get("config") or {})
+        config_before = dict(config)
+
+        if metadata_artifact is not None:
+            _replace_metadata_config(
+                config, identity_provider, metadata_artifact, metadata_url
+            )
+        if client_id is not None:
+            config["clientId"] = client_id
+        if client_secret is not None:
+            config["clientSecret"] = client_secret
+        if display_name is not None:
+            payload["displayName"] = display_name
+
+        payload["config"] = config
+
+        data_before, data_after = _identity_provider_update_diff(
+            identity_provider,
+            config_before=config_before,
+            config_after=config,
+            display_name=display_name,
+            metadata_source=metadata_source,
+            rotated_secret=client_secret is not None,
+        )
+
+        if replace_mappers:
+            existing_mappers = _attribute_importer_mappers(
+                connection, identity_provider.alias
+            )
+            # Gone from Keycloak once the replacement runs, so the audit record
+            # is the only place the set an operator replaced can still be read.
+            data_before["attribute_mappers"] = [
+                {"name": mapper.name, "config": mapper.config}
+                for mapper in existing_mappers
+            ]
+            data_after["attribute_map"] = attribute_map or {}
+            data_after["attribute_name_map"] = attribute_name_map or {}
+
+        if display_name is not None:
+            identity_provider.display_name = display_name
+        if metadata_artifact is not None:
+            # The artifact stays what Keycloak parsed and nothing else: this
+            # field is served back over the API, and an OIDC update carries a
+            # secret.
+            identity_provider.metadata_source = metadata_source
+            identity_provider.metadata_artifact = metadata_artifact
+            identity_provider.metadata_fetched_at = now_in_utc()
+
         identity_provider.save()
         _audit(
             identity_provider.organization,
@@ -982,6 +1018,17 @@ def update_identity_provider(  # noqa: PLR0913
             data_before=data_before,
             data_after=data_after,
         )
+
+        connection.identity_providers.update(identity_provider.alias, payload)
+        if replace_mappers:
+            _replace_attribute_mappers(
+                connection,
+                identity_provider.alias,
+                identity_provider.protocol,
+                existing_mappers,
+                attribute_map,
+                attribute_name_map,
+            )
 
     return identity_provider
 
@@ -1014,22 +1061,23 @@ def refresh_identity_provider_metadata(
         connection=connection,
     )
 
-    keycloak_idp = connection.identity_providers.get(identity_provider.alias)
-    payload = keycloak_idp.model_dump(by_alias=True, exclude_none=True)
-    payload["config"] = {**(payload.get("config") or {}), **config}
-    connection.identity_providers.update(identity_provider.alias, payload)
-
-    before = identity_provider.metadata_artifact or {}
-    changed_keys = sorted(
-        key
-        for key in before.keys() | config.keys()
-        if before.get(key) != config.get(key)
-    )
-
-    identity_provider.metadata_artifact = config
-    identity_provider.metadata_fetched_at = now_in_utc()
-
     with transaction.atomic():
+        identity_provider = _locked(identity_provider)
+
+        keycloak_idp = connection.identity_providers.get(identity_provider.alias)
+        payload = keycloak_idp.model_dump(by_alias=True, exclude_none=True)
+        payload["config"] = {**(payload.get("config") or {}), **config}
+
+        before = identity_provider.metadata_artifact or {}
+        changed_keys = sorted(
+            key
+            for key in before.keys() | config.keys()
+            if before.get(key) != config.get(key)
+        )
+
+        identity_provider.metadata_artifact = config
+        identity_provider.metadata_fetched_at = now_in_utc()
+
         identity_provider.save()
         # Only the keys that changed. A refresh that finds nothing new is still
         # recorded, as an empty diff, because "somebody checked" is worth
@@ -1043,6 +1091,8 @@ def refresh_identity_provider_metadata(
             data_after={key: config.get(key) for key in changed_keys},
         )
 
+        connection.identity_providers.update(identity_provider.alias, payload)
+
     return identity_provider
 
 
@@ -1054,8 +1104,7 @@ def transition_identity_provider(
 
     The only thing that moves the lifecycle, and it writes Keycloak's own
     enabled/hideOnLogin in the same operation so our record and the realm cannot
-    drift. Keycloak goes first: our row lagging the realm is recoverable, a
-    partner integration disabled without our knowing is not.
+    drift.
 
     Args:
     - identity_provider (OrganizationIdentityProvider): the IdP to move
@@ -1068,26 +1117,24 @@ def transition_identity_provider(
     - InvalidLifecycleTransitionError: the transition is not allowed
     """
 
-    current = identity_provider.lifecycle_state
-
-    if state not in IDP_ALLOWED_TRANSITIONS[current]:
-        msg = (
-            f"Cannot move identity provider '{identity_provider.alias}' from "
-            f"'{current}' to '{state}'."
-        )
-        raise InvalidLifecycleTransitionError(msg)
-
-    connection = connection or KeycloakConnection()
-    flags = IDP_STATE_KEYCLOAK_FLAGS[state]
-
-    keycloak_idp = connection.identity_providers.get(identity_provider.alias)
-    payload = keycloak_idp.model_dump(by_alias=True, exclude_none=True)
-    payload.update(flags)
-    connection.identity_providers.update(identity_provider.alias, payload)
-
-    identity_provider.lifecycle_state = state
-
     with transaction.atomic():
+        identity_provider = _locked(identity_provider)
+        current = identity_provider.lifecycle_state
+
+        if state not in IDP_ALLOWED_TRANSITIONS[current]:
+            msg = (
+                f"Cannot move identity provider '{identity_provider.alias}' from "
+                f"'{current}' to '{state}'."
+            )
+            raise InvalidLifecycleTransitionError(msg)
+
+        connection = connection or KeycloakConnection()
+
+        keycloak_idp = connection.identity_providers.get(identity_provider.alias)
+        payload = keycloak_idp.model_dump(by_alias=True, exclude_none=True)
+        payload.update(IDP_STATE_KEYCLOAK_FLAGS[state])
+
+        identity_provider.lifecycle_state = state
         identity_provider.save()
         _audit(
             identity_provider.organization,
@@ -1097,6 +1144,8 @@ def transition_identity_provider(
             data_before={"lifecycle_state": current},
             data_after={"lifecycle_state": state},
         )
+
+        connection.identity_providers.update(identity_provider.alias, payload)
 
     return identity_provider
 
@@ -1122,14 +1171,8 @@ def delete_identity_provider(identity_provider, *, connection=None, actor=None):
 
     connection = connection or KeycloakConnection()
 
-    connection.organizations.disassociate(
-        ORG_IDP_ASSOCIATION,
-        identity_provider.organization.sso_organization_id,
-        identity_provider.alias,
-    )
-    connection.identity_providers.delete(identity_provider.alias)
-
     with transaction.atomic():
+        identity_provider = _locked(identity_provider)
         _audit(
             identity_provider.organization,
             PROVISIONING_ACTION_IDP_DELETED,
@@ -1143,3 +1186,10 @@ def delete_identity_provider(identity_provider, *, connection=None, actor=None):
             },
         )
         identity_provider.delete()
+
+        connection.organizations.disassociate(
+            ORG_IDP_ASSOCIATION,
+            identity_provider.organization.sso_organization_id,
+            identity_provider.alias,
+        )
+        connection.identity_providers.delete(identity_provider.alias)

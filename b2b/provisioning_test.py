@@ -1407,3 +1407,174 @@ def test_audit_survives_the_organization_being_deleted(staff_user):
     (audit,) = OrganizationProvisioningAudit.objects.filter(org_key=org_key)
     assert audit.organization is None
     assert audit.acting_user == staff_user
+
+
+def _organization_update(connection, mocker):
+    organization = OrganizationPageFactory.create(name="Example University")
+    connection.organizations.get.return_value = OrganizationRepresentation(
+        id=str(organization.sso_organization_id),
+        name=organization.name,
+        alias=organization.org_key,
+    )
+
+    def unchanged():
+        organization.refresh_from_db()
+        return organization.name == "Example University"
+
+    return (
+        lambda: update_organization(
+            organization, name="Renamed", connection=connection
+        ),
+        connection.organizations.update,
+        unchanged,
+    )
+
+
+def _identity_provider_update(connection, mocker):
+    identity_provider = _oidc_identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config={"clientId": "mitxonline"}
+    )
+
+    def unchanged():
+        identity_provider.refresh_from_db()
+        return identity_provider.display_name == ""
+
+    return (
+        lambda: update_identity_provider(
+            identity_provider, display_name="Renamed", connection=connection
+        ),
+        connection.identity_providers.update,
+        unchanged,
+    )
+
+
+def _metadata_refresh(connection, mocker):
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    mocker.patch(
+        "b2b.provisioning.import_identity_provider_config",
+        return_value={"idpEntityId": "https://idp.example.edu/rotated"},
+    )
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
+    )
+
+    def unchanged():
+        identity_provider.refresh_from_db()
+        return identity_provider.metadata_artifact == PARSED_METADATA
+
+    return (
+        lambda: refresh_identity_provider_metadata(
+            identity_provider, connection=connection
+        ),
+        connection.identity_providers.update,
+        unchanged,
+    )
+
+
+def _transition(connection, mocker):
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=False, hide_on_login=True
+    )
+
+    def unchanged():
+        identity_provider.refresh_from_db()
+        return identity_provider.lifecycle_state == IDP_STATE_DRAFT
+
+    return (
+        lambda: transition_identity_provider(
+            identity_provider, IDP_STATE_TESTING, connection=connection
+        ),
+        connection.identity_providers.update,
+        unchanged,
+    )
+
+
+def _deletion(connection, mocker):
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+
+    return (
+        lambda: delete_identity_provider(identity_provider, connection=connection),
+        connection.organizations.disassociate,
+        OrganizationIdentityProvider.objects.filter(alias="exampleu").exists,
+    )
+
+
+CHANGES_TO_EXISTING_RESOURCES = pytest.mark.parametrize(
+    "setup",
+    [
+        _organization_update,
+        _identity_provider_update,
+        _metadata_refresh,
+        _transition,
+        _deletion,
+    ],
+)
+
+
+@CHANGES_TO_EXISTING_RESOURCES
+def test_a_failed_local_write_never_reaches_keycloak(connection, mocker, setup):
+    """
+    Our row and its audit record are written before Keycloak is.
+
+    Otherwise a failed save leaves a change in the realm that neither our row
+    nor the audit trail knows about.
+    """
+
+    change, keycloak_write, unchanged = setup(connection, mocker)
+    mocker.patch(
+        "b2b.provisioning.OrganizationProvisioningAudit.objects.create",
+        side_effect=ValueError("no"),
+    )
+
+    with pytest.raises(ValueError, match="no"):
+        change()
+
+    keycloak_write.assert_not_called()
+    assert unchanged()
+
+
+@CHANGES_TO_EXISTING_RESOURCES
+def test_a_failed_keycloak_write_rolls_back_our_row_and_its_audit(
+    connection, mocker, setup
+):
+    """A change Keycloak refused is neither applied nor recorded here."""
+
+    change, keycloak_write, unchanged = setup(connection, mocker)
+    keycloak_write.side_effect = RuntimeError("keycloak said no")
+
+    with pytest.raises(RuntimeError, match="keycloak said no"):
+        change()
+
+    assert unchanged()
+    assert not OrganizationProvisioningAudit.objects.exists()
+
+
+def test_transition_checks_and_audits_the_stored_state_not_the_callers(
+    connection, staff_user
+):
+    """
+    The state is re-read under a lock before the transition is checked.
+
+    Two concurrent transitions would otherwise both pass the check against the
+    same starting state and both record it as data_before.
+    """
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    stale = OrganizationIdentityProvider.objects.get(pk=identity_provider.pk)
+    identity_provider.lifecycle_state = IDP_STATE_TESTING
+    identity_provider.save()
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, hide_on_login=True
+    )
+
+    # draft -> active is refused, so this only succeeds against the stored state.
+    transition_identity_provider(
+        stale, IDP_STATE_ACTIVE, connection=connection, actor=staff_user
+    )
+
+    (audit,) = OrganizationProvisioningAudit.objects.filter(
+        action=PROVISIONING_ACTION_IDP_TRANSITIONED
+    )
+    assert audit.data_before == {"lifecycle_state": IDP_STATE_TESTING}
