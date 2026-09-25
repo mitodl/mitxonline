@@ -15,6 +15,7 @@ from mitol.common.utils import now_in_utc
 from b2b.constants import (
     CONTRACT_MEMBERSHIP_TYPE_CHOICES,
 )
+from b2b.contracts import create_contract
 from b2b.exceptions import SourceCourseIncompleteError
 from b2b.models import (
     ContractPage,
@@ -288,20 +289,19 @@ class Command(BaseCommand):
             )
             raise CommandError(msg)
 
-        contract = ContractPage(
+        contract = create_contract(
+            org,
             name=contract_name,
-            description=description or "",
             membership_type=membership_type,
-            organization=org,
+            description=description or "",
             contract_start=start_date,
             contract_end=end_date,
             max_learners=max_learners,
             enrollment_fixed_price=price,
         )
-        org.add_child(instance=contract)
-        contract.save()
         self.stdout.write(
-            f"Created contract '{contract_name}' for organization '{organization_name}'"
+            f"Created contract '{contract_name}' (ID {contract.id}) for "
+            f"organization '{organization_name}'"
         )
 
     def handle_modify(self, *args, **kwargs):  # noqa: ARG002, C901

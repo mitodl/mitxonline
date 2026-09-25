@@ -1,5 +1,5 @@
 import React from "react";
-import { TitleProps, useRouterContext } from "@pankod/refine-core";
+import { TitleProps, useRouterContext } from "@refinedev/core";
 
 import logoImg from "../../../images/MIT-logo-black-red-72x38.svg";
 

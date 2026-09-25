@@ -1,4 +1,4 @@
-import { AuthProvider } from "@pankod/refine-core";
+import { LegacyAuthProvider as AuthProvider } from "@refinedev/core";
 import axios from "axios";
 
 export function useAuthProvider(): AuthProvider {

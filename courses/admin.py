@@ -740,6 +740,7 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
         "user__username",
         "run__courseware_id",
         "run__title",
+        "b2b_contract__slug",
     ]
     list_filter = [
         "active",
@@ -747,6 +748,7 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
         "edx_enrolled",
         "enrollment_mode",
         RepairExhaustedFilter,
+        "b2b_contract__slug",
     ]
     list_display = (
         "id",
@@ -757,6 +759,7 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
         "created_on",
         "edx_enrollment_retry_count",
         "repair_exhausted",
+        "b2b_contract__slug",
     )
     raw_id_fields = (
         "user",
@@ -816,6 +819,15 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
     def get_run_courseware_id(self, obj):
         """Returns the related CourseRun courseware_id"""
         return obj.run.courseware_id
+
+    @admin.display(
+        description="B2B Contract",
+        ordering="b2b_contract__slug",
+    )
+    def get_b2b_contract(self, obj):
+        """Return the associated B2B contract."""
+
+        return obj.b2b_contract.slug
 
     @admin.action(description="Retry all failed Open edX enrollments")
     def retry_all_failed_edx_enrollment(self, request, queryset):  # noqa: ARG002

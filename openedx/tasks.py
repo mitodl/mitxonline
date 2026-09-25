@@ -5,6 +5,7 @@ import random
 
 import celery
 from django.conf import settings
+from django.core.cache import cache
 from edx_api.course_runs.exceptions import CourseRunAPIError
 from mitol.common.utils.collections import chunks
 from requests.exceptions import HTTPError, RequestException
@@ -12,10 +13,15 @@ from requests.exceptions import HTTPError, RequestException
 from main.celery import app
 from openedx import api
 from openedx.exceptions import OpenEdXOAuth2Error
+from openedx.models import CourseRunClone
 from users.api import get_user_by_id
 from users.models import User
 
 log = logging.getLogger()
+
+# Longer than one clone attempt (the edX clone call plus pushing run data and
+# modes). If a worker dies holding it, the next delivery waits this long.
+CLONE_COURSERUN_LOCK_TIMEOUT = 3600
 
 
 def get_clone_courserun_retry_countdown(current_retry: int) -> int:
@@ -123,24 +129,58 @@ def update_edx_user_profile(user_id):
     max_retries=settings.OPENEDX_COURSE_CLONE_MAX_RETRIES,
 )
 def clone_courserun(self, target_id: int, base_key: str):
-    """Queue call to clone an existing course run."""
+    """
+    Queue call to clone an existing course run.
+
+    Every attempt is recorded on the run's CourseRunClone, which is created
+    here if whoever queued the task did not create it.
+
+    acks_late means a message can be delivered twice, so attempts for one run
+    are serialized on a cache lock. A delivery that finds the lock held leaves
+    the record alone: the attempt holding it will record the outcome. The
+    record is loaded after the lock is taken, so the clone_requested_at check
+    in process_course_run_clone sees the previous attempt's stamp.
+    """
 
     from courses.models import CourseRun  # noqa: PLC0415
 
-    target_course = CourseRun.all_objects.get(pk=target_id)
+    lock_key = f"clone_courserun_lock:{target_id}"
+    if not cache.add(lock_key, self.request.id, timeout=CLONE_COURSERUN_LOCK_TIMEOUT):
+        log.info(
+            "clone_courserun already running for course run %s, skipping this delivery",
+            target_id,
+        )
+        return
 
     try:
-        api.process_course_run_clone(target_course, base_key)
+        _clone_courserun_attempt(
+            self, CourseRun.all_objects.get(pk=target_id), base_key
+        )
+    finally:
+        cache.delete(lock_key)
+
+
+def _clone_courserun_attempt(task, target_course, base_key: str):
+    """Run one clone attempt for clone_courserun while it holds the run's lock."""
+
+    clone, _ = CourseRunClone.objects.get_or_create(
+        course_run=target_course, defaults={"source_courseware_id": base_key}
+    )
+    clone.start_attempt()
+
+    try:
+        api.process_course_run_clone(target_course, base_key, clone=clone)
     except (
         CourseRunAPIError,
         HTTPError,
         OpenEdXOAuth2Error,
         RequestException,
     ) as exc:
-        retry_count = getattr(self.request, "retries", 0)
+        retry_count = getattr(task.request, "retries", 0)
         attempt_number = retry_count + 1
 
-        if retry_count >= self.max_retries:
+        if retry_count >= task.max_retries:
+            clone.mark_error(exc, final=True)
             log.exception(
                 "clone_courserun exhausted retries for target=%s base=%s after "
                 "%s attempts",
@@ -150,6 +190,7 @@ def clone_courserun(self, target_id: int, base_key: str):
             )
             raise
 
+        clone.mark_error(exc, final=False)
         countdown = get_clone_courserun_retry_countdown(retry_count)
 
         log.warning(
@@ -159,7 +200,12 @@ def clone_courserun(self, target_id: int, base_key: str):
             base_key,
             countdown,
             attempt_number,
-            self.max_retries + 1,
+            task.max_retries + 1,
             exc,
         )
-        raise self.retry(exc=exc, countdown=countdown) from exc
+        raise task.retry(exc=exc, countdown=countdown) from exc
+    except Exception as exc:
+        clone.mark_error(exc, final=True)
+        raise
+
+    clone.mark_cloned()

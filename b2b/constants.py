@@ -66,6 +66,21 @@ ONBOARDING_STATE_CHOICES = [
     (ONBOARDING_STATE_BLOCKED, "Blocked"),
 ]
 
+# How far a contract's setup has got, as the staff contract API reports it.
+# in_progress while an edX clone for a contract run is pending or running, or
+# the contract has fewer enrollment codes than it needs; failed when any clone
+# has failed. MITx Online's own rows are written before a write request
+# returns, so they never hold a contract in progress.
+CONTRACT_SETUP_STATUS_IN_PROGRESS = "in_progress"
+CONTRACT_SETUP_STATUS_COMPLETE = "complete"
+CONTRACT_SETUP_STATUS_FAILED = "failed"
+
+CONTRACT_SETUP_STATUS_CHOICES = [
+    (CONTRACT_SETUP_STATUS_IN_PROGRESS, "In progress"),
+    (CONTRACT_SETUP_STATUS_COMPLETE, "Complete"),
+    (CONTRACT_SETUP_STATUS_FAILED, "Failed"),
+]
+
 IDP_PROTOCOL_SAML = "saml"
 IDP_PROTOCOL_OIDC = "oidc"
 IDP_PROTOCOL_CHOICES = [
@@ -108,6 +123,27 @@ IDP_ALLOWED_TRANSITIONS = {
     IDP_STATE_ACTIVE: [IDP_STATE_TESTING, IDP_STATE_DISABLED],
     IDP_STATE_DISABLED: [IDP_STATE_TESTING, IDP_STATE_ACTIVE],
 }
+
+PROVISIONING_ACTION_ORG_CREATED = "organization_created"
+PROVISIONING_ACTION_ORG_UPDATED = "organization_updated"
+PROVISIONING_ACTION_ONBOARDING_CHANGED = "onboarding_changed"
+PROVISIONING_ACTION_IDP_CREATED = "identity_provider_created"
+PROVISIONING_ACTION_IDP_TRANSITIONED = "identity_provider_transitioned"
+PROVISIONING_ACTION_IDP_METADATA_REFRESHED = "identity_provider_metadata_refreshed"
+PROVISIONING_ACTION_IDP_DELETED = "identity_provider_deleted"
+
+PROVISIONING_ACTION_CHOICES = [
+    (PROVISIONING_ACTION_ORG_CREATED, "Organization created"),
+    (PROVISIONING_ACTION_ORG_UPDATED, "Organization updated"),
+    (PROVISIONING_ACTION_ONBOARDING_CHANGED, "Onboarding state changed"),
+    (PROVISIONING_ACTION_IDP_CREATED, "Identity provider created"),
+    (PROVISIONING_ACTION_IDP_TRANSITIONED, "Identity provider state changed"),
+    (
+        PROVISIONING_ACTION_IDP_METADATA_REFRESHED,
+        "Identity provider metadata refreshed",
+    ),
+    (PROVISIONING_ACTION_IDP_DELETED, "Identity provider deleted"),
+]
 
 MAILGUN_LOGS_API_URL = "https://api.mailgun.net/v1/analytics/logs"
 MAILGUN_LOGS_PAGE_LIMIT = 100

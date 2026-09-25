@@ -5,6 +5,7 @@ from django.urls import include, path
 from b2b.views.v0 import (
     AttachContractApi,
     ContractPageViewSet,
+    DataConsentAPI,
     Enroll,
     OrganizationPageViewSet,
 )
@@ -14,6 +15,7 @@ from b2b.views.v0.manager import (
     ProcessMailgunWebhook,
 )
 from b2b.views.v0.provisioning import (
+    ContractProvisioningViewSet,
     IdentityProviderProvisioningViewSet,
     OrganizationProvisioningViewSet,
     ParseMetadataView,
@@ -66,6 +68,15 @@ provisioning_org.register(
         "organization__org_key",
     ],
 )
+# Staff-only contract setup (capability C3).
+provisioning_org.register(
+    r"contracts",
+    ContractProvisioningViewSet,
+    basename="b2b-provisioning-organization-contract",
+    parents_query_lookups=[
+        "organization__org_key",
+    ],
+)
 v0_router.register(
     r"provisioning/parse-metadata",
     ParseMetadataView,
@@ -80,7 +91,6 @@ urlpatterns = [
         AttachContractApi.as_view(),
         name="attach-user",
     ),
-    # Probably not the place this is gonna live long term.
     path(r"webhook", ProcessMailgunWebhook.as_view(), name="mailgun-webhook"),
     # Service-to-service; delete along with b2b/views/v0/service.py once
     # org-manager status is visible in Keycloak (mitodl/hq#10594).
@@ -88,5 +98,10 @@ urlpatterns = [
         r"service/organization-manager-check/",
         OrganizationManagerCheckView.as_view(),
         name="service-organization-manager-check",
+    ),
+    path(
+        r"data_consent/<int:contract_id>/",
+        DataConsentAPI.as_view(),
+        name="data-consent",
     ),
 ]

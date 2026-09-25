@@ -17,14 +17,22 @@ from b2b.constants import (
     CONTRACT_MEMBERSHIP_MANAGED,
 )
 from b2b.factories import ContractPageFactory
-from b2b.models import DiscountContractAttachmentRedemption, UserOrganization
+from b2b.models import (
+    DiscountContractAttachmentRedemption,
+    UserB2BContract,
+    UserOrganization,
+)
 from courses.factories import CourseRunFactory
 from courses.models import CourseRunEnrollment
+from ecommerce.constants import DISCOUNT_TYPE_FIXED_PRICE
 from ecommerce.factories import ProductFactory, UnlimitedUseDiscountFactory
+from ecommerce.models import DiscountProduct
 from main.constants import (
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
     USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED,
+    USER_MSG_TYPE_B2B_ERROR_AMBIGUOUS_CONTRACT,
     USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT,
+    USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH,
     USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE,
     USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
 )
@@ -512,7 +520,7 @@ def test_b2b_enroll(  # noqa: PLR0915, PLR0913, C901
 
     if contract_active in ["date", "flag"]:
         assert resp.status_code == 400
-        assert resp.json()["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT
+        assert resp.json()["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH
         return
 
     if not run_is_enrollable:
@@ -846,6 +854,81 @@ def test_enroll_omits_program_id_when_not_provided(mocker):
     assert kwargs["program_id"] is None
 
 
+@pytest.mark.parametrize("send_slug", [True, False])
+def test_enroll_passes_contract_slug_to_api(mocker, send_slug):
+    """The contract_slug from the request body should be forwarded to create_b2b_enrollment."""
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED,
+        enrollment_fixed_price=0,
+    )
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
+    ProductFactory.create(purchasable_object=courserun)
+
+    mocked_enroll = mocker.patch(
+        "b2b.views.v0.create_b2b_enrollment",
+        return_value={"result": USER_MSG_TYPE_B2B_ENROLL_SUCCESS},
+    )
+
+    user = UserFactory.create()
+    user.b2b_contracts.add(contract)
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
+    resp = client.post(
+        url,
+        data={"contract_slug": contract.slug} if send_slug else {},
+        format="json",
+    )
+
+    assert resp.status_code == 201
+    _, kwargs = mocked_enroll.call_args
+    assert kwargs["contract_slug"] == (contract.slug if send_slug else None)
+
+
+@pytest.mark.skip_nplusone_check
+def test_enroll_multi_contract_run_with_slug(mocker):
+    """
+    Enrolling through the API in a run that's in two contracts should use the
+    contract named in the request.
+    """
+    mocker.patch("openedx.api.enroll_in_edx_course_runs")
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch("hubspot_sync.tasks.sync_cart_add_event_with_hubspot.apply_async")
+
+    contracts = ContractPageFactory.create_batch(
+        2, membership_type=CONTRACT_MEMBERSHIP_MANAGED, enrollment_fixed_price=0
+    )
+    courserun = CourseRunFactory.create(b2b_only=True, b2b_contracts=contracts)
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=courserun, price=0)
+    discount = UnlimitedUseDiscountFactory.create(
+        is_bulk=True, discount_type=DISCOUNT_TYPE_FIXED_PRICE, amount=0
+    )
+    DiscountProduct.objects.create(discount=discount, product=product)
+
+    user = UserFactory.create()
+    user.b2b_contracts.add(*contracts)
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
+
+    resp = client.post(url, format="json")
+    assert resp.status_code == 400
+    assert resp.json()["result"] == USER_MSG_TYPE_B2B_ERROR_AMBIGUOUS_CONTRACT
+
+    resp = client.post(url, data={"contract_slug": contracts[1].slug}, format="json")
+    assert resp.status_code == 201
+    assert resp.json()["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+    assert (
+        CourseRunEnrollment.objects.get(user=user, run=courserun).b2b_contract
+        == contracts[1]
+    )
+
+
 def test_enroll_courserun_without_b2b_contract_not_found(mocker):
     """A course run that exists but has no b2b_contract should not be matched."""
     mocker.patch("b2b.views.v0.create_b2b_enrollment")
@@ -859,3 +942,107 @@ def test_enroll_courserun_without_b2b_contract_not_found(mocker):
     url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
     with pytest.raises(Exception):  # noqa: B017, PT011
         client.post(url)
+
+
+def test_data_consent_forbidden_when_not_a_contract_member(user):
+    """A user who isn't attached to the contract should get a 403."""
+    contract = ContractPageFactory.create()
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:data-consent", kwargs={"contract_id": contract.id})
+    resp = client.post(url, data={"consented": True}, format="json")
+
+    assert resp.status_code == 403
+    assert not UserB2BContract.objects.filter(
+        user=user, contract_page=contract
+    ).exists()
+
+
+def test_data_consent_invalid_body(user):
+    """A request missing the required 'consented' field should return 400."""
+    contract = ContractPageFactory.create()
+    user.b2b_contracts.add(contract)
+
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:data-consent", kwargs={"contract_id": contract.id})
+    resp = client.post(url, data={}, format="json")
+
+    assert resp.status_code == 400
+    assert "consented" in resp.json()["errors"]
+
+    membership = UserB2BContract.objects.get(user=user, contract_page=contract)
+    assert membership.consented_to_data_sharing is None
+    assert membership.consent_modified_at is None
+
+
+def test_data_consent_success(user):
+    """A contract member can set consent, and later change their mind."""
+    contract = ContractPageFactory.create()
+    user.b2b_contracts.add(contract)
+
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:data-consent", kwargs={"contract_id": contract.id})
+
+    resp = client.post(url, data={"consented": True}, format="json")
+    assert resp.status_code == 204
+    membership = UserB2BContract.objects.get(user=user, contract_page=contract)
+    assert membership.consented_to_data_sharing is True
+    first_modified_at = membership.consent_modified_at
+    assert first_modified_at is not None
+
+    resp = client.post(url, data={"consented": False}, format="json")
+    assert resp.status_code == 204
+    membership.refresh_from_db()
+    assert membership.consented_to_data_sharing is False
+    assert membership.consent_modified_at is not None
+    assert membership.consent_modified_at >= first_modified_at
+
+
+def test_data_consent_non_member_cannot_modify_other_members_consent(user):
+    """A non-member should get a 403 even when the contract has other members."""
+    contract = ContractPageFactory.create()
+    other_user = UserFactory.create()
+    other_user.b2b_contracts.add(contract)
+
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:data-consent", kwargs={"contract_id": contract.id})
+    resp = client.post(url, data={"consented": True}, format="json")
+
+    assert resp.status_code == 403
+    other_membership = UserB2BContract.objects.get(
+        user=other_user, contract_page=contract
+    )
+    assert other_membership.consented_to_data_sharing is None
+    assert other_membership.consent_modified_at is None
+
+
+def test_data_consent_only_modifies_callers_membership(user):
+    """With multiple members, only the caller's consent should change."""
+    contract = ContractPageFactory.create()
+    # Created first so it would be returned by an unscoped .first()
+    other_user = UserFactory.create()
+    other_user.b2b_contracts.add(contract)
+    user.b2b_contracts.add(contract)
+
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:data-consent", kwargs={"contract_id": contract.id})
+    resp = client.post(url, data={"consented": True}, format="json")
+
+    assert resp.status_code == 204
+    membership = UserB2BContract.objects.get(user=user, contract_page=contract)
+    assert membership.consented_to_data_sharing is True
+    assert membership.consent_modified_at is not None
+    other_membership = UserB2BContract.objects.get(
+        user=other_user, contract_page=contract
+    )
+    assert other_membership.consented_to_data_sharing is None
+    assert other_membership.consent_modified_at is None

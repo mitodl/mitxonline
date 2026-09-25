@@ -528,6 +528,7 @@ def test_audit(user, is_program):
         "user": enrollment.user.id,
         "username": enrollment.user.edx_username,
         "enrollment_mode": enrollment.enrollment_mode,
+        "b2b_contract": None,
     }
     if not is_program:
         expected["edx_enrolled"] = enrollment.edx_enrolled

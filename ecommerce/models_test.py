@@ -12,11 +12,19 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from freezegun import freeze_time
 from mitol.common.utils import now_in_utc
+from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
 from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
 from compliance.api import ExportComplianceResult
-from courses.factories import BlockedCountryFactory, CourseRunFactory, ProgramFactory
+from courses.factories import (
+    BlockedCountryFactory,
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+    ProgramEnrollmentFactory,
+    ProgramFactory,
+)
+from courses.models import CourseRunEnrollment, ProgramEnrollment
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
@@ -47,6 +55,7 @@ from ecommerce.factories import (
     make_purchase,
 )
 from ecommerce.fixtures import stripe_event
+from ecommerce.hooks.process_transaction_line import _link_b2b_course_run_contracts
 from ecommerce.models import (
     Basket,
     BasketDiscount,
@@ -67,6 +76,7 @@ from ecommerce.models import (
     Transaction,
     UserDiscount,
 )
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -462,6 +472,30 @@ def test_create_transaction_with_no_transaction_id():
         ).count()
         == 0
     )
+
+
+@pytest.mark.parametrize(
+    "payment_data",
+    [
+        # Secure Acceptance response uses req_amount
+        {"transaction_id": "cs-txn-1", "req_amount": "175.00", "req_currency": "USD"},
+        # REST API response uses amount
+        {"transaction_id": "cs-txn-2", "amount": "175.00", "req_currency": "USD"},
+    ],
+)
+def test_create_transaction_cybersource_amount(payment_data):
+    """CyberSource SA responses (req_amount) and REST responses (amount) both store the correct amount."""
+
+    order = OrderFactory.create(
+        state=OrderStatus.FULFILLED,
+        total_price_paid=Decimal("175.00"),
+        gateway_type=MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+    )
+    order_flow = order.get_object_flow()
+    order_flow.create_transaction(payment_data)
+
+    txn = Transaction.objects.get(transaction_id=payment_data["transaction_id"])
+    assert txn.amount == Decimal("175.00")
 
 
 @pytest.mark.parametrize(
@@ -2114,3 +2148,153 @@ def test_has_user_blocked_products(mocker, blocked_country, compliance):
         blocked_country or compliance
     )
     mocked_compliance_check.assert_called()
+
+
+def test_basket_get_products_contracts(user):
+    """get_products_contracts should pair each basket product with its B2B contract."""
+
+    contract = ContractPageFactory.create()
+    b2b_item = BasketItemFactory.create(basket__user=user, b2b_contract=contract)
+    regular_item = BasketItemFactory.create(basket=b2b_item.basket)
+
+    assert sorted(
+        b2b_item.basket.get_products_contracts(), key=lambda pair: pair[0].id
+    ) == sorted(
+        [(b2b_item.product, contract), (regular_item.product, None)],
+        key=lambda pair: pair[0].id,
+    )
+
+
+def test_create_from_basket_copies_b2b_contract_to_lines(user):
+    """Creating an order from a basket should carry each item's contract onto its line."""
+
+    contract = ContractPageFactory.create()
+    b2b_run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
+    with reversion.create_revision():
+        b2b_product = ProductFactory.create(purchasable_object=b2b_run)
+        regular_product = ProductFactory.create()
+
+    basket = BasketFactory.create(user=user)
+    BasketItem.objects.create(basket=basket, product=b2b_product, b2b_contract=contract)
+    BasketItem.objects.create(basket=basket, product=regular_product)
+
+    order = PendingOrder.create_from_basket(basket)
+
+    assert order.lines.get(purchased_object_id=b2b_run.id).b2b_contract == contract
+    assert (
+        order.lines.get(purchased_object_id=regular_product.object_id).b2b_contract
+        is None
+    )
+
+
+@pytest.mark.parametrize("line_has_contract", [True, False])
+def test_link_b2b_course_run_contracts(user, line_has_contract):
+    """
+    The verified enrollment for the purchased run should get the line's contract.
+
+    Enrollments that don't belong to the purchase - another user's enrollment in
+    the same run, or the purchaser's enrollment in a different run of the same
+    contract - should be left alone.
+    """
+
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
+    other_run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
+    other_user = UserFactory.create()
+
+    enrollment = CourseRunEnrollmentFactory.create(
+        user=user, run=run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    other_run_enrollment = CourseRunEnrollmentFactory.create(
+        user=user, run=other_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    other_user_enrollment = CourseRunEnrollmentFactory.create(
+        user=other_user, run=run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    line = make_purchase(user, run, Decimal("0.00"))
+    line.b2b_contract = contract if line_has_contract else None
+    line.save()
+
+    _link_b2b_course_run_contracts(line)
+
+    enrollment.refresh_from_db()
+    other_run_enrollment.refresh_from_db()
+    other_user_enrollment.refresh_from_db()
+
+    assert enrollment.b2b_contract == (contract if line_has_contract else None)
+    assert other_run_enrollment.b2b_contract is None
+    assert other_user_enrollment.b2b_contract is None
+
+
+def test_link_b2b_course_run_contracts_ignores_audit_enrollment(user):
+    """Only the verified enrollment should be linked to the contract."""
+
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
+    enrollment = CourseRunEnrollmentFactory.create(
+        user=user, run=run, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+
+    line = make_purchase(user, run, Decimal("0.00"))
+    line.b2b_contract = contract
+    line.save()
+
+    _link_b2b_course_run_contracts(line)
+
+    enrollment.refresh_from_db()
+    assert enrollment.b2b_contract is None
+
+
+def test_link_b2b_course_run_contracts_skips_programs(user):
+    """Program lines aren't handled by this hook, so enrollments are left alone."""
+
+    contract = ContractPageFactory.create()
+    program = ProgramFactory.create(b2b_only=True)
+    program_enrollment = ProgramEnrollmentFactory.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    line = make_purchase(user, program, Decimal("0.00"))
+    line.b2b_contract = contract
+    line.save()
+
+    assert _link_b2b_course_run_contracts(line) is None
+
+    program_enrollment.refresh_from_db()
+    assert program_enrollment.b2b_contract is None
+    assert not CourseRunEnrollment.all_objects.filter(user=user).exists()
+    assert ProgramEnrollment.all_objects.filter(user=user).count() == 1
+
+
+@pytest.mark.skip_nplusone_check
+def test_fulfill_links_b2b_contract_to_enrollment(
+    mocker, user, django_capture_on_commit_callbacks
+):
+    """
+    Fulfilling an order with a B2B line should run the hooks in order: create the
+    enrollment, then link it to the line's contract.
+    """
+
+    mocker.patch("openedx.api.enroll_in_edx_course_runs")
+    mocker.patch("ecommerce.tasks.send_ecommerce_order_receipt.delay")
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
+
+    contract = ContractPageFactory.create()
+    other_contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(
+        b2b_only=True, b2b_contracts=[contract, other_contract]
+    )
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run, price=Decimal(0))
+
+    basket = BasketFactory.create(user=user)
+    BasketItem.objects.create(basket=basket, product=product, b2b_contract=contract)
+    order = PendingOrder.create_from_basket(basket)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        order.get_object_flow().fulfill(ZERO_PAYMENT_DATA, skip_receipt=True)
+
+    enrollment = CourseRunEnrollment.objects.get(user=user, run=run)
+    assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    assert enrollment.b2b_contract == contract
