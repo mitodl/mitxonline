@@ -79,6 +79,7 @@ from main import constants as main_constants
 from main.utils import date_to_datetime
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.tasks import clone_courserun
+from users.models import User
 
 log = logging.getLogger(__name__)
 
@@ -1337,16 +1338,158 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
     return (total_created, total_updated, total_errors)
 
 
-def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict, None]:  # noqa: PLR0911
+def _determine_contract_for_user_product(  # noqa: PLR0911
+    user: User,
+    product: Product,
+    *,
+    program: Program | None = None,
+    contract_slug: str | None = None,
+):
+    """
+    Determine what the contract should be for the given options supplied.
+
+    If the contract slug is specified, then this just needs to validate everything -
+    make sure the product item, user and program (if there) are all part of that
+    contract. If there's no contract slug, this figures out what contract overlaps
+    these pieces (user, item, program); if it's just one, then this continues on
+    as if that one had been specified explicitly; otherwise, return an error.
+    """
+
+    item = product.purchasable_object
+
+    if not item:
+        msg = f"_determine_contract_for_user_product: Product {product} doesn't appear to have a purchasable object."
+        raise ValueError(msg)
+
+    user_contract_ids = list(user.b2b_contracts.values_list("id", flat=True))
+    item_b2b_contracts = (
+        item.b2b_contracts.all()
+        if isinstance(item, CourseRun)
+        else ContractPage.objects.filter(contract_programs__program=item)
+    )
+
+    if program and not program.contract_memberships.exists():
+        log.error(
+            "_determine_contract_for_user_product: User %s tried to use product %s with program %s but program is not attached to any contracts",
+            user,
+            product,
+            program,
+        )
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
+    if (
+        not contract_slug
+        or not ContractPage.objects.filter(slug=contract_slug).exists()
+    ):
+        log.info(
+            "_determine_contract_for_user_product: no contract specified for %s purchasing %s",
+            user,
+            product,
+        )
+
+        if not item_b2b_contracts.filter(id__in=user_contract_ids).exists():
+            log.info(
+                "_determine_contract_for_user_product: no contract match between for %s purchasing %s",
+                user,
+                product,
+            )
+            return {
+                "result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH,
+                "failed_match": "item",
+            }
+
+        if (
+            program
+            and not program.contract_memberships.filter(
+                contract__id__in=user_contract_ids
+            ).exists()
+        ):
+            log.info(
+                "_determine_contract_for_user_product: no contract match between %s purchasing %s for program %s",
+                user,
+                product,
+                program,
+            )
+
+            return {
+                "result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH,
+                "failed_match": "program",
+            }
+
+        overlap_item_contracts = set(
+            item_b2b_contracts.filter(id__in=user_contract_ids).values_list(
+                "id", flat=True
+            )
+        )
+
+        log.info(
+            "Item contracts: %s", ",".join([str(i) for i in overlap_item_contracts])
+        )
+
+        if program:
+            program_overlaps = set(
+                program.contract_memberships.filter(
+                    contract__id__in=user_contract_ids
+                ).values_list("contract__id", flat=True)
+            )
+            log.info(
+                "Program contracts: %s", ",".join([str(i) for i in program_overlaps])
+            )
+            overlap_item_contracts = program_overlaps & overlap_item_contracts
+
+        contract_matches = set(user_contract_ids) & overlap_item_contracts
+
+        if len(contract_matches) != 1:
+            log.error(
+                "User %s tried to use product %s but the contract to use is ambiguous (%s)",
+                user,
+                product,
+                ",".join([str(i) for i in contract_matches]),
+            )
+            return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_AMBIGUOUS_CONTRACT}
+
+        return contract_matches.pop()
+
+    contract_qs = item_b2b_contracts.filter(
+        slug=contract_slug, id__in=user_contract_ids
+    )
+    if program:
+        contract_qs = contract_qs.filter(contract_programs__program=program)
+    contract = contract_qs.first()
+
+    if not contract:
+        log.error(
+            "User %s tried to use product %s (and/or program %s) for contract %s but one or more parts of the transaction weren't in the contract",
+            user,
+            product,
+            program,
+            contract_slug,
+        )
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
+    return contract.id
+
+
+def _validate_b2b_enrollment_prerequisites(  # noqa: PLR0911
+    user,
+    product: Product,
+    *,
+    program: Program | None = None,
+    contract_slug: str | None = None,
+) -> Union[dict, None]:
     """
     Validate prerequisites for B2B enrollment.
 
     Returns:
-        dict with error result if validation fails, None if validation passes.
+        dict with error result if validation fails, applicable contract if validation passes.
     """
     if not user.is_authenticated:
         log.error("B2B enroll: attempted to use %s with no user account", product)
         return {"result": main_constants.USER_MSG_TYPE_B2B_DISALLOWED}
+
+    contract_resolution_result = _determine_contract_for_user_product(
+        user, product, contract_slug=contract_slug, program=program
+    )
 
     purchasable_object = product.purchasable_object
     if not purchasable_object:
@@ -1356,34 +1499,12 @@ def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT}
 
-    contract = None
-    if isinstance(purchasable_object, CourseRun):
-        if purchasable_object.b2b_contracts.count() > 1:
-            # More than one contract attached to this run, so this is ambiguous.
-            # This should be updated to accept a particular contract but for now it
-            # will just bail out if there's more than one to consider.
-            log.error(
-                "B2B enroll: run %s has more than one contract", purchasable_object
-            )
-            return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+    if isinstance(contract_resolution_result, dict):
+        return contract_resolution_result
 
-        contract = purchasable_object.b2b_contracts.first()
+    contract = ContractPage.active_objects.filter(pk=contract_resolution_result).first()
 
     if not contract:
-        log.error("B2B enroll: run %s has no contract", purchasable_object)
-        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
-
-    if isinstance(
-        purchasable_object, CourseRun
-    ) and not purchasable_object.enrollable_for_contract(contract):
-        log.error(
-            "B2B enroll: attempted to use %s but %s is not enrollable for B2B",
-            product,
-            purchasable_object,
-        )
-        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
-
-    if not ContractPage.active_objects.filter(id=contract.id).exists():
         log.error(
             "B2B enroll: %s attempted to use %s but contract %s either doesn't exist or is invalid",
             user,
@@ -1392,14 +1513,22 @@ def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
 
-    if not user.b2b_contracts.filter(id=contract.id).exists():
+    if not isinstance(purchasable_object, (CourseRun, Program)):
         log.error(
-            "B2B enroll: attempted to use %s but %s is not in the contract %s",
+            "B2B enroll: attempted to use %s but %s is not a program or course run",
             product,
-            user,
+            purchasable_object,
+        )
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
+
+    if not purchasable_object.enrollable_for_contract(contract):
+        log.error(
+            "B2B enroll: attempted to use %s but %s is not enrollable for B2B contract %s",
+            product,
+            purchasable_object,
             contract,
         )
-        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
 
     if (
         isinstance(purchasable_object, CourseRun)
@@ -1421,10 +1550,12 @@ def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED}
 
-    return None
+    return contract
 
 
-def _prepare_basket_for_b2b_enrollment(request, product: Product) -> Basket:
+def _prepare_basket_for_b2b_enrollment(
+    request, product: Product, contract: ContractPage
+) -> Basket:
     """
     Prepare basket for B2B enrollment by clearing it and adding the product.
 
@@ -1439,7 +1570,9 @@ def _prepare_basket_for_b2b_enrollment(request, product: Product) -> Basket:
     basket.basket_items.all().delete()
     basket.discounts.all().delete()
 
-    item = BasketItem.objects.create(product=product, basket=basket, quantity=1)
+    item = BasketItem.objects.create(
+        product=product, basket=basket, quantity=1, b2b_contract=contract
+    )
     item.save()
 
     # Sync with HubSpot for CourseRun
@@ -1460,7 +1593,9 @@ def _prepare_basket_for_b2b_enrollment(request, product: Product) -> Basket:
     return basket
 
 
-def _apply_available_discount(request, product: Product, basket: Basket) -> None:
+def _apply_available_discount(
+    request, product: Product, basket: Basket, contract: ContractPage
+) -> None:
     """Apply available discount to the basket if one exists."""
 
     # Changed to only check redemption count if the discount isn't unlimited -
@@ -1485,12 +1620,13 @@ def _apply_available_discount(request, product: Product, basket: Basket) -> None
 
         if (
             not product.purchasable_object
-            or product.purchasable_object.b2b_contracts.count() != 1
+            or not product.purchasable_object.b2b_contracts.filter(
+                pk=contract.id
+            ).exists()
         ):
-            msg = f"Product {product} has no purchasable object or the purchasable object has <> 1 B2B contract"
+            msg = f"Product {product} has no purchasable object or the purchasable object is not in contract {contract}"
             raise ValueError(msg)
 
-        contract = product.purchasable_object.b2b_contracts.first()
         discount_amount = contract.enrollment_fixed_price
         redemption_type = (
             REDEMPTION_TYPE_ONE_TIME
@@ -1513,7 +1649,13 @@ def _apply_available_discount(request, product: Product, basket: Basket) -> None
     basket_discount.save()
 
 
-def create_b2b_enrollment(request, product: Product, program_id: str | None = None):
+def create_b2b_enrollment(
+    request,
+    product: Product,
+    *,
+    program_id: str | None = None,
+    contract_slug: str | None = None,
+):
     """
     Create a B2B enrollment for the given product for the current user.
 
@@ -1538,6 +1680,7 @@ def create_b2b_enrollment(request, product: Product, program_id: str | None = No
     - request: The HTTP request object containing the user and basket data.
     - product: The Product object representing the B2B product to enroll in.
     - program_id: Optional readable_id of the program to enroll the user in.
+    - contract_slug: Optional slug of the contract the user's enrollments should belong to.
     Returns: a dict containing
     - "result": the result of the attempt; one of the USER_MSG_TYPE_B2B constants.
     - "order": the order ID if the enrollment was successful and no checkout is needed.
@@ -1546,12 +1689,18 @@ def create_b2b_enrollment(request, product: Product, program_id: str | None = No
     """
     from ecommerce.api import generate_checkout_payload  # noqa: PLC0415
 
+    program = None
+    if program_id:
+        program = Program.objects.get(readable_id=program_id)
+
     # Validate prerequisites for B2B enrollment
-    validation_error = _validate_b2b_enrollment_prerequisites(request.user, product)
+    prereq_check = _validate_b2b_enrollment_prerequisites(
+        request.user, product, program=program, contract_slug=contract_slug
+    )
 
     if (
-        validation_error
-        and validation_error.get("result", None)
+        isinstance(prereq_check, dict)
+        and prereq_check.get("result", None)
         == main_constants.USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED
     ):
         # User has a verified enrollment in the run already - try to find the
@@ -1569,14 +1718,16 @@ def create_b2b_enrollment(request, product: Product, program_id: str | None = No
             "order": order.id if order else "",
         }
 
-    if validation_error:
-        return validation_error
+    if not isinstance(prereq_check, ContractPage):
+        return prereq_check
+
+    contract = prereq_check
 
     # Prepare the basket for enrollment
-    basket = _prepare_basket_for_b2b_enrollment(request, product)
+    basket = _prepare_basket_for_b2b_enrollment(request, product, contract)
 
     # Apply any available discount to the basket
-    _apply_available_discount(request, product, basket)
+    _apply_available_discount(request, product, basket, contract)
 
     # Calculate basket total more efficiently
     basket_price = sum(item.discounted_price for item in basket.basket_items.all())
@@ -1588,7 +1739,7 @@ def create_b2b_enrollment(request, product: Product, program_id: str | None = No
         if "no_checkout" in response:
             # Course run enrollment succeeded - now handle program enrollment
             if program_id:
-                _enroll_in_program_for_b2b(request.user, product, program_id)
+                _enroll_in_program_for_b2b(request.user, product, program_id, contract)
 
             return {
                 "result": main_constants.USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
@@ -1607,7 +1758,9 @@ def create_b2b_enrollment(request, product: Product, program_id: str | None = No
     }
 
 
-def _enroll_in_program_for_b2b(user, product: Product, program_id: str):
+def _enroll_in_program_for_b2b(
+    user, product: Product, program_id: str, contract: ContractPage
+):
     """
     Enroll the user in the specified program as part of a B2B course enrollment.
 
@@ -1649,9 +1802,14 @@ def _enroll_in_program_for_b2b(user, product: Product, program_id: str):
         )
         return
 
-    create_program_enrollments(
+    created_enrollments = create_program_enrollments(
         user, [program], enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
+
+    if contract:
+        for program_enrollment in created_enrollments:
+            program_enrollment.b2b_contract = contract
+            program_enrollment.save()
 
     log.info(
         "B2B enroll: created program enrollment for user %s in program %s",

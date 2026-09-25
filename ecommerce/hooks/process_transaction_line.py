@@ -4,7 +4,13 @@ import logging
 
 import pluggy
 
-from courses.models import CourseRun, PaidCourseRun, PaidProgram, Program
+from courses.models import (
+    CourseRun,
+    CourseRunEnrollment,
+    PaidCourseRun,
+    PaidProgram,
+    Program,
+)
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 
 hookimpl = pluggy.HookimplMarker("mitxonline")
@@ -37,6 +43,36 @@ def _create_courserun_enrollment(line) -> str | None:
     )
 
     log.debug("Created course run enrollment for %s", purchased_run)
+
+
+def _link_b2b_course_run_contracts(line) -> str | None:
+    """If the purchased line was a B2B run, make the resulting enrollment a B2B enrollment"""
+
+    purchased_run = line.purchased_object
+
+    if not isinstance(purchased_run, CourseRun):
+        log.debug(
+            "_link_b2b_course_run_contracts: Item purchased %s is not a course run, skipping",
+            purchased_run,
+        )
+        return
+
+    enrollment_qs = CourseRunEnrollment.objects.filter(
+        run=purchased_run,
+        user=line.order.purchaser,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
+
+    if enrollment_qs.count() != 1:
+        log.error(
+            "_link_b2b_course_run_contracts: Purchaser %s has an improper number of enrollments (%s) for %s in order %s",
+            line.order.purchaser,
+            enrollment_qs.count(),
+            purchased_run,
+            line.order.reference_number,
+        )
+
+    enrollment_qs.update(b2b_contract=line.b2b_contract)
 
 
 def _create_program_enrollment(line) -> str | None:
@@ -87,3 +123,9 @@ class CreateEnrollments:
         """Call the internal function (so we can test it)"""
 
         return _create_program_enrollment(line=line)
+
+    @hookimpl(specname="process_transaction_line", trylast=True)
+    def link_b2b_courserun_enrollment(self, line) -> str | None:
+        """Call the internal function"""
+
+        return _link_b2b_course_run_contracts(line)

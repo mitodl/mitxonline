@@ -4712,10 +4712,16 @@ components:
 
         Accepts an optional program_id so the user can be enrolled in the
         appropriate program alongside the course run enrollment.
+        Accepts an optional contract_slug so it can identify which contract
+        the user is working in, so the enrollments can be linked back to the
+        right contract.
       properties:
         program_id:
           type: string
           description: The readable_id of the program to enroll the user in.
+        contract_slug:
+          type: string
+          description: The slug for the contract the user is in.
     BaseContractPage:
       type: object
       description: Simplified serializer for the ContractPage model.
@@ -10093,7 +10099,9 @@ components:
       enum:
       - b2b-disallowed
       - b2b-error-already-enrolled
+      - b2b-error-ambiguous-contract
       - b2b-error-no-contract
+      - b2b-error-no-matching-contract
       - b2b-error-no-product
       - b2b-error-missing-enrollment-code
       - b2b-error-invalid-enrollment-code
@@ -10104,7 +10112,9 @@ components:
       description: |-
         * `b2b-disallowed` - b2b-disallowed
         * `b2b-error-already-enrolled` - b2b-error-already-enrolled
+        * `b2b-error-ambiguous-contract` - b2b-error-ambiguous-contract
         * `b2b-error-no-contract` - b2b-error-no-contract
+        * `b2b-error-no-matching-contract` - b2b-error-no-matching-contract
         * `b2b-error-no-product` - b2b-error-no-product
         * `b2b-error-missing-enrollment-code` - b2b-error-missing-enrollment-code
         * `b2b-error-invalid-enrollment-code` - b2b-error-invalid-enrollment-code
@@ -10114,7 +10124,9 @@ components:
       x-enum-descriptions:
       - b2b-disallowed
       - b2b-error-already-enrolled
+      - b2b-error-ambiguous-contract
       - b2b-error-no-contract
+      - b2b-error-no-matching-contract
       - b2b-error-no-product
       - b2b-error-missing-enrollment-code
       - b2b-error-invalid-enrollment-code

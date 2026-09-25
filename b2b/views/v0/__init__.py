@@ -160,9 +160,11 @@ class Enroll(APIView):
         """Create an enrollment for the given course run."""
 
         course_run_content_type = ContentType.objects.get_for_model(CourseRun)
-        courserun = CourseRun.objects.filter(
-            courseware_id=readable_id, b2b_contracts__isnull=False
-        ).get()
+        courserun = (
+            CourseRun.objects.annotate(b2b_contract_count=Count("b2b_contracts"))
+            .filter(courseware_id=readable_id, b2b_contract_count__gt=0)
+            .get()
+        )
         product = Product.objects.filter(
             content_type=course_run_content_type, object_id=courserun.id
         ).get()
@@ -171,13 +173,16 @@ class Enroll(APIView):
         request_serializer = B2BEnrollRequestSerializer(data=request.data)
         request_serializer.is_valid(raise_exception=True)
         program_id = request_serializer.validated_data.get("program_id")
+        contract_slug = request_serializer.validated_data.get("contract_slug")
 
-        response = create_b2b_enrollment(request, product, program_id=program_id)
+        response = create_b2b_enrollment(
+            request, product, program_id=program_id, contract_slug=contract_slug
+        )
 
         return Response(
             CreateB2BEnrollmentSerializer(response).data,
             status=status.HTTP_201_CREATED
-            if response["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+            if response and response["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
             else status.HTTP_400_BAD_REQUEST,
         )
 
