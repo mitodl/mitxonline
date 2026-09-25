@@ -1640,9 +1640,67 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrganizationIdentityProvider'
           description: ''
+    patch:
+      operationId: b2b_provisioning_organizations_identity_providers_partial_update
+      description: |-
+        Update an identity provider in place.
+
+        Without this, rotating a partner's OIDC client secret or fixing a
+        mapper means deleting the IdP and creating it again, and Keycloak's
+        delete takes every user's federated identity link with it.
+      parameters:
+      - in: path
+        name: alias
+        schema:
+          type: string
+          description: The Keycloak IdP alias. Realm-wide, not per-organization.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateIdentityProviderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateIdentityProviderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateIdentityProviderRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationIdentityProvider'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
     delete:
       operationId: b2b_provisioning_organizations_identity_providers_destroy
-      description: Unlink and delete an identity provider.
+      description: |-
+        Unlink and delete an identity provider.
+
+        Destructive beyond this API: Keycloak deletes every user's federated
+        identity link to the provider along with it, so everyone who has signed
+        in through it re-links on their next login. Prefer PATCH.
       parameters:
       - in: path
         name: alias
@@ -5194,6 +5252,7 @@ components:
       - organization_updated
       - onboarding_changed
       - identity_provider_created
+      - identity_provider_updated
       - identity_provider_transitioned
       - identity_provider_metadata_refreshed
       - identity_provider_deleted
@@ -5203,6 +5262,7 @@ components:
         * `organization_updated` - Organization updated
         * `onboarding_changed` - Onboarding state changed
         * `identity_provider_created` - Identity provider created
+        * `identity_provider_updated` - Identity provider updated
         * `identity_provider_transitioned` - Identity provider state changed
         * `identity_provider_metadata_refreshed` - Identity provider metadata refreshed
         * `identity_provider_deleted` - Identity provider deleted
@@ -5211,6 +5271,7 @@ components:
       - Organization updated
       - Onboarding state changed
       - Identity provider created
+      - Identity provider updated
       - Identity provider state changed
       - Identity provider metadata refreshed
       - Identity provider deleted
@@ -10213,6 +10274,49 @@ components:
         receive_emails:
           type: boolean
           description: Whether to receive course emails
+    PatchedUpdateIdentityProviderRequest:
+      type: object
+      description: |-
+        Request body for updating an identity provider.
+
+        The protocol comes from the instance, through the context, because which
+        fields make sense depends on it: a client secret on a SAML IdP would be
+        written into its Keycloak config and never read.
+
+        alias and protocol are rejected rather than ignored. Keycloak refuses an
+        alias change outright, and changing the protocol is a different identity
+        provider, not an edit to this one.
+      properties:
+        display_name:
+          type: string
+          maxLength: 255
+        metadata_url:
+          type: string
+          format: uri
+          minLength: 1
+        metadata_xml:
+          type: string
+          minLength: 1
+        discovery_url:
+          type: string
+          format: uri
+          minLength: 1
+        client_id:
+          type: string
+          minLength: 1
+        client_secret:
+          type: string
+          minLength: 1
+        attribute_map:
+          type: object
+          additionalProperties:
+            type: string
+            minLength: 1
+        attribute_name_map:
+          type: object
+          additionalProperties:
+            type: string
+            minLength: 1
     PatchedUpdateOrganizationRequest:
       type: object
       description: |-

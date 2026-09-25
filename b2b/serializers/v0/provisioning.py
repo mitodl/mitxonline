@@ -253,6 +253,124 @@ class CreateIdentityProviderSerializer(serializers.Serializer):
         return attrs
 
 
+class UpdateIdentityProviderSerializer(serializers.Serializer):
+    """
+    Request body for updating an identity provider.
+
+    The protocol comes from the instance, through the context, because which
+    fields make sense depends on it: a client secret on a SAML IdP would be
+    written into its Keycloak config and never read.
+
+    alias and protocol are rejected rather than ignored. Keycloak refuses an
+    alias change outright, and changing the protocol is a different identity
+    provider, not an edit to this one.
+    """
+
+    # Only the display name may be blanked. A blank anywhere else is an empty
+    # form field rather than an instruction: blanking client_secret would take
+    # the partner's login down, and blanking a metadata source would leave an
+    # IdP that cannot be refreshed.
+    display_name = serializers.CharField(
+        max_length=255, required=False, allow_blank=True
+    )
+    metadata_url = serializers.URLField(required=False)
+    metadata_xml = serializers.CharField(required=False)
+    discovery_url = serializers.URLField(required=False)
+    client_id = serializers.CharField(required=False)
+    client_secret = serializers.CharField(required=False)
+    attribute_map = serializers.DictField(child=serializers.CharField(), required=False)
+    attribute_name_map = serializers.DictField(
+        child=serializers.CharField(), required=False
+    )
+
+    def _validate_oidc(self, attrs):
+        """Check an OIDC identity provider's fields."""
+
+        if any(field in attrs for field in ("metadata_url", "metadata_xml")):
+            msg = (
+                "Send discovery_url rather than metadata_url or metadata_xml "
+                "for an OIDC identity provider."
+            )
+            raise serializers.ValidationError(msg)
+
+        if "discovery_url" in attrs:
+            # The saga takes one metadata source regardless of protocol; for
+            # OIDC that source is the discovery document.
+            attrs["metadata_url"] = attrs["discovery_url"]
+
+    def _validate_saml(self, attrs):
+        """Check a SAML identity provider's fields."""
+
+        if any(
+            field in attrs for field in ("discovery_url", "client_id", "client_secret")
+        ):
+            msg = (
+                "discovery_url, client_id and client_secret belong to an OIDC "
+                "identity provider."
+            )
+            raise serializers.ValidationError(msg)
+
+        if "metadata_url" in attrs and "metadata_xml" in attrs:
+            msg = "Supply at most one of metadata_url or metadata_xml."
+            raise serializers.ValidationError(msg)
+
+        maps = ("attribute_map", "attribute_name_map")
+        supplied = [field for field in maps if field in attrs]
+
+        if not supplied:
+            return
+
+        # SAML splits its mappers across the two maps - friendly names in one,
+        # attribute names in the other - and the pair replaces the whole set.
+        # Sending one alone therefore deletes the other's mappers, which is
+        # never what an operator editing one mapping meant. Make the caller
+        # state the whole set, empty map included.
+        if len(supplied) != len(maps):
+            missing = next(field for field in maps if field not in supplied)
+            msg = (
+                "Send attribute_map and attribute_name_map together for a SAML "
+                "identity provider: the pair replaces the whole mapper set, so "
+                f"omitting {missing} would delete the mappers it holds. Send it "
+                "as an empty object if there are none."
+            )
+            raise serializers.ValidationError({missing: msg})
+
+        # An edit that leaves both empty is a SAML IdP with no mappers - one
+        # that brokers users with no email or name. Creation refuses that; so
+        # does this.
+        if not any(attrs.get(field) for field in maps):
+            msg = (
+                "A SAML identity provider needs at least one attribute "
+                "mapper. Supply attribute_map or attribute_name_map."
+            )
+            raise serializers.ValidationError(msg)
+
+    def validate(self, attrs):
+        """Check the fields against the identity provider's protocol."""
+
+        for immutable in ("alias", "protocol"):
+            if immutable in self.initial_data:
+                msg = (
+                    f"{immutable} cannot be changed. Delete the identity "
+                    "provider and create a new one - which unlinks every user "
+                    "brokered through it."
+                )
+                raise serializers.ValidationError({immutable: msg})
+
+        if self.context["protocol"] == IDP_PROTOCOL_OIDC:
+            self._validate_oidc(attrs)
+        else:
+            self._validate_saml(attrs)
+
+        attrs.pop("discovery_url", None)
+
+        if not attrs:
+            msg = "Supply at least one field to update."
+            raise serializers.ValidationError(msg)
+
+        return attrs
+
+
 class IdentityProviderTransitionSerializer(serializers.Serializer):
     """Request body for moving an identity provider's lifecycle state."""
 
