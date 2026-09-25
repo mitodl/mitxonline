@@ -418,7 +418,12 @@ def _edx_user_exists(user):
         if client is None:
             return False
         client.user_info.get_user_info()
-    except:  # noqa: E722
+    except Exception:  # noqa: BLE001
+        log.warning(
+            "_edx_user_exists: could not verify edX user for: %s",
+            user.id,
+            exc_info=True,
+        )
         return False
     return True
 
