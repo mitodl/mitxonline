@@ -1,10 +1,10 @@
 import React from "react";
-import { TitleProps, useRouterContext } from "@refinedev/core";
+import { TitleProps } from "@refinedev/core";
+import { Link } from "react-router-dom";
 
 import logoImg from "../../../images/MIT-logo-black-red-72x38.svg";
 
 export const Title: React.FC<TitleProps> = ({collapsed}) => {
-  const { Link } = useRouterContext();
   return collapsed ? (
     <Link to="/">
       <img
