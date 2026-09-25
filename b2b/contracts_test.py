@@ -4,6 +4,7 @@ from decimal import Decimal
 
 import pytest
 
+from b2b.api import ensure_enrollment_codes_exist
 from b2b.constants import (
     CONTRACT_MEMBERSHIP_AUTO,
     CONTRACT_MEMBERSHIP_CODE,
@@ -14,14 +15,17 @@ from b2b.contracts import (
     create_contract,
     ensure_default_variant,
     expected_enrollment_code_count,
+    expire_unused_enrollment_codes,
     remove_courseware_from_contract,
 )
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
+from b2b.models import DiscountContractAttachmentRedemption
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     ProgramFactory,
 )
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -175,3 +179,26 @@ def test_expected_enrollment_code_count(membership_type, price, max_learners, ex
         add_courseware_to_contract(contract, _source_run().course, skip_edx=True)
 
     assert expected_enrollment_code_count(contract) == expected
+
+
+@pytest.mark.parametrize("dry_run", [True, False])
+def test_expire_unused_enrollment_codes(mocker, dry_run):
+    """Unused codes leave the contract; a redeemed one stays."""
+
+    mocker.patch("b2b.tasks.queue_contract_sheet_update_post_save.delay")
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_CODE, max_learners=3
+    )
+    add_courseware_to_contract(contract, _source_run().course, skip_edx=True)
+    ensure_enrollment_codes_exist(contract)
+    redeemed = contract.get_discounts().first()
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=redeemed, contract=contract, user=UserFactory.create()
+    )
+
+    expired = expire_unused_enrollment_codes(contract, dry_run=dry_run)
+
+    assert len(expired) == 2
+    assert all(deleted for _, deleted in expired)
+    assert redeemed.discount_code not in [code for code, _ in expired]
+    assert contract.get_discounts().distinct().count() == (3 if dry_run else 1)
