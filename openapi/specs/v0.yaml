@@ -4,6 +4,80 @@ info:
   version: 0.0.1 (v0)
   description: MIT public API
 paths:
+  /api/notification-preferences/:
+    get:
+      operationId: notification_preferences_retrieve
+      description: Proxies the learner's preferences from Open edX, which owns this
+        state. The body is the LMS response verbatim, so its shape follows the LMS
+        rather than this API.
+      summary: Get the learner's Open edX notification preferences
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: The LMS response, passed through unchanged.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreferencesUnavailableResponse'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreferencesUpstreamErrorResponse'
+          description: ''
+    put:
+      operationId: notification_preferences_update
+      description: Open edX updates a single channel per request, so each toggle or
+        cadence change is its own call. The body is the LMS response verbatim.
+      summary: Change one notification preference
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationPreferenceUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationPreferenceUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationPreferenceUpdateRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: The LMS response, passed through unchanged.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreferenceUpdateUnavailableResponse'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreferenceUpdateThrottledResponse'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreferenceUpdateUpstreamErrorResponse'
+          description: ''
   /api/records/program/{id}/:
     get:
       operationId: learner_record_retrieve_by_id
@@ -7270,6 +7344,20 @@ components:
       description: '* `course` - course'
       x-enum-descriptions:
       - course
+    EmailCadenceEnum:
+      enum:
+      - Daily
+      - Weekly
+      - Immediately
+      type: string
+      description: |-
+        * `Daily` - Daily
+        * `Weekly` - Weekly
+        * `Immediately` - Immediately
+      x-enum-descriptions:
+      - Daily
+      - Weekly
+      - Immediately
     EmailStatusEnum:
       enum:
       - delivered
@@ -8225,6 +8313,84 @@ components:
       - operator
       - course
       - program
+    NotificationChannelEnum:
+      enum:
+      - web
+      - push
+      - email
+      - email_cadence
+      type: string
+      description: |-
+        * `web` - web
+        * `push` - push
+        * `email` - email
+        * `email_cadence` - email_cadence
+      x-enum-descriptions:
+      - web
+      - push
+      - email
+      - email_cadence
+    NotificationPreferenceUpdateRequest:
+      type: object
+      description: |-
+        Validates one field-level notification preference change.
+
+        The upstream Open edX API updates a single channel per request, so each
+        toggle or cadence change is its own payload. Validating locally keeps a
+        malformed change from spending one of the learner's LMS rate-limited
+        requests, and gives the frontend a useful 400 instead of a 502.
+      properties:
+        notification_app:
+          type: string
+          minLength: 1
+        notification_type:
+          type: string
+          minLength: 1
+        notification_channel:
+          $ref: '#/components/schemas/NotificationChannelEnum'
+        value:
+          type: boolean
+        email_cadence:
+          $ref: '#/components/schemas/EmailCadenceEnum'
+      required:
+      - notification_app
+      - notification_channel
+      - notification_type
+    NotificationPreferenceUpdateThrottledResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    NotificationPreferenceUpdateUnavailableResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    NotificationPreferenceUpdateUpstreamErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    NotificationPreferencesUnavailableResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    NotificationPreferencesUpstreamErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
     NullEnum:
       enum:
       - null
