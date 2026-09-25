@@ -38,6 +38,7 @@ from courses import mail_api
 from courses.constants import (
     COURSE_KEY_PATTERN,
     ENROLL_CHANGE_STATUS_DEFERRED,
+    ENROLL_CHANGE_STATUS_REFUNDED,
     ENROLL_CHANGE_STATUS_UNENROLLED,
     PROGRAM_TEXT_ID_PREFIX,
 )
@@ -554,6 +555,13 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
             user, [program], enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
         )
         downgraded_program_enrollment = first_or_none(downgraded_program_enrollments)
+        if downgraded_program_enrollment is not None:
+            # create_program_enrollments has no change_status kwarg, so tag
+            # the refund onto the enrollment directly - active stays True,
+            # this is audit-trail/reporting only (e.g. HubSpot sync), not a
+            # deactivation.
+            downgraded_program_enrollment.change_status = ENROLL_CHANGE_STATUS_REFUNDED
+            downgraded_program_enrollment.save_and_log(None)
 
     verified_run_enrollments = CourseRunEnrollment.get_program_run_enrollments(
         user=user, program=program
@@ -580,6 +588,7 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
         user,
         eligible_runs,
         mode=EDX_ENROLLMENT_AUDIT_MODE,
+        change_status=ENROLL_CHANGE_STATUS_REFUNDED,
         keep_failed_enrollments=True,
     )
     return downgraded_program_enrollment, downgraded_run_enrollments
