@@ -379,6 +379,12 @@ class CertificatePage(CourseProgramChildPage):
         help_text="For verifiable credentials issued for this certificate, this is the criteria narrative field. It should be something descriptive, like a list of completed courses, and may be plaintext or markdown. If it is not supplied, no verifiable credential will be provisioned for those certificates.",
     )
 
+    verifiable_credential_description = models.TextField(  # noqa: DJ001
+        null=True,
+        blank=True,
+        help_text="For verifiable credentials issued for this certificate, this is the description field. It is a template shared across every learner who earns this credential, so it should not include a specific learner's name. NOTE: this field is not yet wired into credential issuance (see mitodl/hq#13417).",
+    )
+
     should_provision_verifiable_credential = models.BooleanField(
         default=False,
         help_text="Whether a verifiable credential should be provisioned for this certificate.",
@@ -390,6 +396,7 @@ class CertificatePage(CourseProgramChildPage):
         FieldPanel("overrides"),
         FieldPanel("signatories"),
         FieldPanel("verifiable_credential_criteria", widget=Textarea),
+        FieldPanel("verifiable_credential_description", widget=Textarea),
         FieldPanel("should_provision_verifiable_credential"),
     ]
     api_fields = [
