@@ -1449,6 +1449,31 @@ def _identity_provider_update(connection, mocker):
     )
 
 
+def _mapper_replacement(connection, mocker):
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
+    )
+    connection.client.list.return_value = [
+        IdentityProviderMapperRepresentation(
+            id="mapper-1",
+            name="exampleu-email-mapper",
+            identity_provider_mapper="saml-user-attribute-idp-mapper",
+            config={"attribute.friendly.name": "E-Mail", "user.attribute": "email"},
+        )
+    ]
+
+    return (
+        lambda: update_identity_provider(
+            identity_provider,
+            attribute_map={"email": "E-Mail Address"},
+            connection=connection,
+        ),
+        connection.client.delete,
+        lambda: True,
+    )
+
+
 def _metadata_refresh(connection, mocker):
     identity_provider = _identity_provider(OrganizationPageFactory.create())
     mocker.patch(
@@ -1506,6 +1531,7 @@ CHANGES_TO_EXISTING_RESOURCES = pytest.mark.parametrize(
     [
         _organization_update,
         _identity_provider_update,
+        _mapper_replacement,
         _metadata_refresh,
         _transition,
         _deletion,

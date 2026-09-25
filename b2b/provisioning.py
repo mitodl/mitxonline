@@ -437,12 +437,11 @@ def update_organization(  # noqa: PLR0913
     - OrganizationNotProvisionedError: the organization has no Keycloak record
     """
 
-    _require_provisioned(organization)
-
     connection = connection or KeycloakConnection()
 
     with transaction.atomic():
         organization = _locked(organization)
+        _require_provisioned(organization)
 
         keycloak_org = connection.organizations.get(organization.sso_organization_id)
         payload = keycloak_org.model_dump(by_alias=True, exclude_none=True)
@@ -1052,17 +1051,19 @@ def refresh_identity_provider_metadata(
     """
 
     connection = connection or KeycloakConnection()
-    source = identity_provider.metadata_source
-
-    config = parse_identity_provider_metadata(
-        identity_provider.protocol,
-        metadata_url=source if not source.lstrip().startswith("<") else None,
-        metadata_xml=source if source.lstrip().startswith("<") else None,
-        connection=connection,
-    )
 
     with transaction.atomic():
+        # Locked before the fetch, so an update that changes the source while
+        # this is fetching cannot be overwritten with the old source's metadata.
         identity_provider = _locked(identity_provider)
+        source = identity_provider.metadata_source
+
+        config = parse_identity_provider_metadata(
+            identity_provider.protocol,
+            metadata_url=source if not source.lstrip().startswith("<") else None,
+            metadata_xml=source if source.lstrip().startswith("<") else None,
+            connection=connection,
+        )
 
         keycloak_idp = connection.identity_providers.get(identity_provider.alias)
         payload = keycloak_idp.model_dump(by_alias=True, exclude_none=True)
@@ -1167,12 +1168,11 @@ def delete_identity_provider(identity_provider, *, connection=None, actor=None):
     # (content_panels) and is nullable, so staff can blank it in the Wagtail
     # admin after the IdP exists. Without the guard the unlink 502s and the IdP
     # can never be deleted, with a message blaming Keycloak.
-    _require_provisioned(identity_provider.organization)
-
     connection = connection or KeycloakConnection()
 
     with transaction.atomic():
         identity_provider = _locked(identity_provider)
+        _require_provisioned(identity_provider.organization)
         _audit(
             identity_provider.organization,
             PROVISIONING_ACTION_IDP_DELETED,
