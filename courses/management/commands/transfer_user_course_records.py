@@ -22,6 +22,15 @@ from users.api import fetch_user
 
 User = get_user_model()
 
+# How to identify a skipped record of each kind in the summary output.
+_SKIPPED_RECORD_IDENTIFIER = {
+    "course_run_enrollments": lambda record: record.run.courseware_id,
+    "course_run_grades": lambda record: record.course_run.courseware_id,
+    "course_run_certificates": lambda record: record.course_run.courseware_id,
+    "program_enrollments": lambda record: record.program.readable_id,
+    "program_certificates": lambda record: record.program.readable_id,
+}
+
 
 class Command(BaseCommand):
     """
@@ -80,7 +89,7 @@ class Command(BaseCommand):
             raise CommandError("Source and destination users must be different.")  # noqa: EM101
 
         source_records = self._load_source_records(source_user)
-        to_transfer, skipped_counts = self._partition_conflicts(
+        to_transfer, skipped_records = self._partition_conflicts(
             source_records, destination_user
         )
         orders_to_transfer = self._verified_orders(source_user, to_transfer)
@@ -97,7 +106,7 @@ class Command(BaseCommand):
             )
 
         self._print_result(
-            source_user, destination_user, transfer_counts, skipped_counts
+            source_user, destination_user, transfer_counts, skipped_records
         )
 
     def _fetch_user(self, email, option_name):
@@ -164,7 +173,9 @@ class Command(BaseCommand):
         each model's unique-with-user constraint is defined on). Conflicting
         records are skipped rather than aborting the whole transfer.
 
-        Returns (to_transfer, skipped_counts).
+        Returns (to_transfer, skipped_records) - both dicts of label ->
+        list of records, so the caller can report exactly which course
+        run/program each skip was for.
         """
         conflicting_run_ids = set(
             CourseRunEnrollment.all_objects.filter(user=destination_user).values_list(
@@ -219,11 +230,34 @@ class Command(BaseCommand):
                 if certificate.program_id not in conflicting_cert_program_ids
             ],
         }
-        skipped_counts = {
-            label: len(source_records[label]) - len(to_transfer[label])
-            for label in source_records
+        skipped_records = {
+            "course_run_enrollments": [
+                enrollment
+                for enrollment in source_records["course_run_enrollments"]
+                if enrollment.run_id in conflicting_run_ids
+            ],
+            "course_run_grades": [
+                grade
+                for grade in source_records["course_run_grades"]
+                if grade.course_run_id in conflicting_graded_run_ids
+            ],
+            "course_run_certificates": [
+                certificate
+                for certificate in source_records["course_run_certificates"]
+                if certificate.course_run_id in conflicting_cert_run_ids
+            ],
+            "program_enrollments": [
+                enrollment
+                for enrollment in source_records["program_enrollments"]
+                if enrollment.program_id in conflicting_program_ids
+            ],
+            "program_certificates": [
+                certificate
+                for certificate in source_records["program_certificates"]
+                if certificate.program_id in conflicting_cert_program_ids
+            ],
         }
-        return to_transfer, skipped_counts
+        return to_transfer, skipped_records
 
     def _verified_orders(self, source_user, to_transfer):
         """
@@ -301,9 +335,14 @@ class Command(BaseCommand):
         return counts
 
     def _print_result(
-        self, source_user, destination_user, transfer_counts, skipped_counts
+        self, source_user, destination_user, transfer_counts, skipped_records
     ):
-        """Print a summary of what was transferred and what was skipped."""
+        """
+        Print a summary of what was transferred and what was skipped - each
+        skipped record is listed by its course run's courseware_id or
+        program's readable_id, so it's clear exactly which ones need a
+        human to look at, not just how many.
+        """
         self.stdout.write(
             self.style.SUCCESS(
                 "Transferred records from {source_email} to {destination_email}: "
@@ -316,14 +355,20 @@ class Command(BaseCommand):
                 )
             )
         )
-        if any(skipped_counts.values()):
+        if any(skipped_records.values()):
             self.stdout.write(
                 self.style.WARNING(
                     "Skipped (destination already has a matching record): "
                     + ", ".join(
-                        f"{label}={count}"
-                        for label, count in skipped_counts.items()
-                        if count
+                        f"{label}={len(records)}"
+                        for label, records in skipped_records.items()
+                        if records
                     )
                 )
             )
+            for label, records in skipped_records.items():
+                if not records:
+                    continue
+                get_identifier = _SKIPPED_RECORD_IDENTIFIER[label]
+                identifiers = ", ".join(get_identifier(record) for record in records)
+                self.stdout.write(self.style.WARNING(f"  {label}: {identifiers}"))
