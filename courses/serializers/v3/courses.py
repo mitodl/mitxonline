@@ -187,3 +187,18 @@ class CourseVariantRunsResponseSerializer(serializers.Serializer):
 
     id = serializers.IntegerField()
     courseruns = BaseCourseRunSerializer(many=True)
+
+
+@extend_schema_serializer(component_name="EnrollmentEligibility")
+class EnrollmentEligibilitySerializer(serializers.Serializer):
+    """Whether a user may enroll, and a support-facing code when they may not."""
+
+    enrollable = serializers.BooleanField()
+    reason_code = serializers.CharField(
+        allow_null=True,
+        help_text=(
+            "Null when enrollable. CS_700 when an export compliance check "
+            "rejected the learner; CS_701 when their profile is missing the "
+            "information needed to run that check."
+        ),
+    )

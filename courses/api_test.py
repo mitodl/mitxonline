@@ -37,10 +37,18 @@ from b2b.factories import (
 )
 from cms.factories import CourseIndexPageFactory
 from cms.models import CoursePage, ProgramPage
-from compliance.api import ExportComplianceResult
-from compliance.exceptions import ExportComplianceError
+from compliance.api import ExportComplianceResult, verify_user_with_exports
+from compliance.exceptions import (
+    ExportComplianceCheckError,
+    ExportComplianceDataError,
+    ExportComplianceError,
+)
+from compliance.factories import ExportComplianceLogFactory
+from compliance.models import ExportComplianceDecision
 from courses.api import (
+    MISSING_COMPLIANCE_DATA_CODE,
     check_course_modes,
+    check_enrollment_eligibility,
     create_local_enrollment,
     create_program_enrollments,
     create_run_enrollments,
@@ -1360,6 +1368,139 @@ def test_create_program_enrollments_rejects_nonaccepted_exports(mocker, user):
 
     patched_verify.assert_called_once_with(user, program)
     assert not ProgramEnrollment.objects.filter(user=user, program=program).exists()
+
+
+def _courseware_object(kind):
+    """Build the courseware object for an eligibility test."""
+    return CourseRunFactory.create() if kind == "run" else ProgramFactory.create()
+
+
+@pytest.mark.parametrize("courseware_kind", ["run", "program"])
+def test_check_enrollment_eligibility_accepted(mocker, user, courseware_kind):
+    """An accepted compliance decision means the user may enroll."""
+    courseware_object = _courseware_object(courseware_kind)
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="COMPLETED",
+            reason_code=100,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+
+    eligibility = check_enrollment_eligibility(user, courseware_object)
+
+    assert eligibility.enrollable is True
+    assert eligibility.reason_code is None
+    patched_verify.assert_called_once_with(user, courseware_object)
+
+
+@pytest.mark.parametrize("courseware_kind", ["run", "program"])
+def test_check_enrollment_eligibility_rejected(mocker, user, courseware_kind):
+    """A non-accepted compliance decision blocks enrollment with CS_700."""
+    courseware_object = _courseware_object(courseware_kind)
+    mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="DECLINED",
+            reason_code=102,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+
+    eligibility = check_enrollment_eligibility(user, courseware_object)
+
+    assert eligibility.enrollable is False
+    assert eligibility.reason_code == ExportComplianceError.error_code
+    assert eligibility.reason_code == "CS_700"
+
+
+def test_check_enrollment_eligibility_missing_profile_data(mocker, user):
+    """A profile too incomplete to run the check gets its own code, not CS_700."""
+    run = CourseRunFactory.create()
+    mocker.patch(
+        "courses.api.verify_user_with_exports",
+        side_effect=ExportComplianceDataError(user, ["postal_code", "state"]),
+    )
+
+    eligibility = check_enrollment_eligibility(user, run)
+
+    assert eligibility.enrollable is False
+    assert eligibility.reason_code == MISSING_COMPLIANCE_DATA_CODE
+    assert eligibility.reason_code == "CS_701"
+
+
+def test_check_enrollment_eligibility_unrecognized_failure_fails_closed(mocker, user):
+    """An unrecognized compliance failure blocks enrollment without a code."""
+    run = CourseRunFactory.create()
+    mocker.patch(
+        "courses.api.verify_user_with_exports",
+        side_effect=ExportComplianceCheckError("something new"),
+    )
+
+    eligibility = check_enrollment_eligibility(user, run)
+
+    assert eligibility.enrollable is False
+    assert eligibility.reason_code is None
+
+
+def test_check_enrollment_eligibility_skips_check_when_feature_disabled(
+    settings, mocker, user
+):
+    """With the flag off the user is eligible and CyberSource is never consulted."""
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = False
+    run = CourseRunFactory.create()
+    patched_verify = mocker.patch("courses.api.verify_user_with_exports")
+
+    eligibility = check_enrollment_eligibility(user, run)
+
+    assert eligibility.enrollable is True
+    assert eligibility.reason_code is None
+    patched_verify.assert_not_called()
+
+
+def test_check_enrollment_eligibility_reuses_cached_log(
+    mocker, user, export_compliance_keypair
+):
+    """A cached compliance log answers the question without calling CyberSource."""
+    run = CourseRunFactory.create()
+    ExportComplianceLogFactory.create(
+        user=user,
+        courseware_object=run,
+        decision=ExportComplianceDecision.DECLINED,
+        reason_code="MATCH-DPL",
+    )
+    # Unpatch the autouse mock so the real cache lookup in compliance.api runs.
+    mocker.patch("courses.api.verify_user_with_exports", verify_user_with_exports)
+    patched_client = mocker.patch("compliance.api.get_cybersource_client")
+
+    eligibility = check_enrollment_eligibility(user, run)
+
+    assert eligibility.enrollable is False
+    assert eligibility.reason_code == "CS_700"
+    patched_client.assert_not_called()
+
+
+def test_check_enrollment_eligibility_does_not_enroll(mocker, user):
+    """The check must never create an enrollment as a side effect."""
+    run = CourseRunFactory.create()
+    mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="COMPLETED",
+            reason_code=100,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+    assert check_enrollment_eligibility(user, run).enrollable is True
+
+    patched_edx_enroll.assert_not_called()
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
 
 
 class TestDeactivateEnrollments:
