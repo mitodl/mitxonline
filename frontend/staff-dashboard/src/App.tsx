@@ -31,10 +31,8 @@ const accessControlProvider = {
       return { can: true };
     }
 
-    if (_.get(profile, 'is_staff')) {
-      if (resource == 'flexible_pricing') {
-        return { can: true };
-      }
+    if (_.get(profile, 'is_staff') && resource == 'flexible_pricing') {
+      return { can: true };
     }
 
     return { can: false, reason: 'Your account is not allowed to do that.' };
