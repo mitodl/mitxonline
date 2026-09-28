@@ -2056,14 +2056,17 @@ def _notification_preferences_headers(user):
     # internally, so failures arrive as HTTPError / OpenEdXOAuth2Error. Those
     # are not all the same thing, and the difference matters to the learner:
     #
-    #   * no OpenEdxUser / no OpenEdxApiAuth row, or the token endpoint
-    #     rejecting the grant with a 400 -> this learner has no usable Open edX
-    #     identity, which is the "still being set up" case (NoEdxApiAuthError).
-    #   * anything else -- a 5xx from the token endpoint, bad client
-    #     credentials, a handshake that never came back with a code -> the
-    #     token service or its configuration is at fault, not this learner's
-    #     account. Surface it as an upstream failure so a synced learner gets
-    #     an accurate, retryable status instead of a misleading 409.
+    #   * no OpenEdxUser / no OpenEdxApiAuth row -> this learner has no usable
+    #     Open edX identity, which is the "still being set up" case
+    #     (NoEdxApiAuthError). A dead refresh token lands here too: the refresh
+    #     recovers from invalid_grant itself by re-authorizing, and raises
+    #     NoEdxApiAuthError when there is no synced account to re-authorize.
+    #   * any HTTPError that still escapes -- a 5xx, bad client credentials,
+    #     or a 400 the refresh deliberately does not recover from
+    #     (misconfiguration) -- or a handshake that never came back with a code
+    #     -> the token service or its configuration is at fault, not this
+    #     learner's account. Surface it as an upstream failure so a synced
+    #     learner gets an accurate, retryable status instead of a misleading 409.
     try:
         if create_edx_auth_token(user) is None:
             raise NoEdxApiAuthError(f"{user!s} is not yet synced with edX")  # noqa: EM102
@@ -2073,16 +2076,15 @@ def _notification_preferences_headers(user):
             f"{user!s} does not have an associated OpenEdxApiAuth"  # noqa: EM102
         )
     except HTTPError as exc:
-        upstream_status = getattr(exc.response, "status_code", None)
-        if upstream_status == status.HTTP_400_BAD_REQUEST:
-            # The grant itself was rejected (a revoked or invalid refresh
-            # token), so there is no usable auth for this learner.
-            raise NoEdxApiAuthError(  # noqa: B904
-                f"Open edX rejected the token grant for {user!s}: {exc!s}"  # noqa: EM102
-            )
         raise EdxApiNotificationPreferencesError(  # noqa: B904
             f"Open edX token service failed for {user!s}: {exc!s}",  # noqa: EM102
-            status_code=upstream_status,
+            status_code=getattr(exc.response, "status_code", None),
+        )
+    except requests.exceptions.RequestException as exc:
+        # Must follow the HTTPError branch, which is a subclass: this is the
+        # token service timing out or refusing the connection.
+        raise EdxApiNotificationPreferencesError(  # noqa: B904
+            f"Could not reach the Open edX token service for {user!s}: {exc!s}"  # noqa: EM102
         )
     except OpenEdXOAuth2Error as exc:
         raise EdxApiNotificationPreferencesError(  # noqa: B904
@@ -2106,11 +2108,19 @@ def get_notification_preferences(user):
         NoEdxApiAuthError: if the user has no usable Open edX auth
         EdxApiNotificationPreferencesError: if the LMS rejects the request
     """
-    resp = requests.get(
-        edx_url(OPENEDX_NOTIFICATION_PREFERENCES_PATH),
-        headers=_notification_preferences_headers(user),
-        timeout=settings.EDX_API_CLIENT_TIMEOUT,
-    )
+    headers = _notification_preferences_headers(user)
+    try:
+        resp = requests.get(
+            edx_url(OPENEDX_NOTIFICATION_PREFERENCES_PATH),
+            headers=headers,
+            timeout=settings.EDX_API_CLIENT_TIMEOUT,
+        )
+    except requests.exceptions.RequestException as exc:
+        # A timeout or connection failure is still an upstream failure; without
+        # this it escapes the view as a 500 instead of a 502.
+        raise EdxApiNotificationPreferencesError(
+            f"Could not reach Open edX to fetch notification preferences: {exc!s}"  # noqa: EM102
+        ) from exc
 
     if resp.status_code != status.HTTP_200_OK:
         raise EdxApiNotificationPreferencesError(
@@ -2118,7 +2128,12 @@ def get_notification_preferences(user):
             status_code=resp.status_code,
         )
 
-    return resp.json()
+    try:
+        return resp.json()
+    except requests.exceptions.JSONDecodeError as exc:
+        raise EdxApiNotificationPreferencesError(
+            "Open edX returned notification preferences that were not valid JSON"  # noqa: EM101
+        ) from exc
 
 
 def update_notification_preference(user, preference):
@@ -2140,15 +2155,21 @@ def update_notification_preference(user, preference):
         NoEdxApiAuthError: if the user has no usable Open edX auth
         EdxApiNotificationPreferencesError: if the LMS rejects the request
     """
-    resp = requests.put(
-        edx_url(OPENEDX_NOTIFICATION_PREFERENCES_PATH),
-        json=preference,
-        headers={
-            **_notification_preferences_headers(user),
-            "Content-Type": "application/json",
-        },
-        timeout=settings.EDX_API_CLIENT_TIMEOUT,
-    )
+    headers = {
+        **_notification_preferences_headers(user),
+        "Content-Type": "application/json",
+    }
+    try:
+        resp = requests.put(
+            edx_url(OPENEDX_NOTIFICATION_PREFERENCES_PATH),
+            json=preference,
+            headers=headers,
+            timeout=settings.EDX_API_CLIENT_TIMEOUT,
+        )
+    except requests.exceptions.RequestException as exc:
+        raise EdxApiNotificationPreferencesError(
+            f"Could not reach Open edX to update notification preferences: {exc!s}"  # noqa: EM102
+        ) from exc
 
     if resp.status_code != status.HTTP_200_OK:
         raise EdxApiNotificationPreferencesError(
@@ -2156,4 +2177,9 @@ def update_notification_preference(user, preference):
             status_code=resp.status_code,
         )
 
-    return resp.json()
+    try:
+        return resp.json()
+    except requests.exceptions.JSONDecodeError as exc:
+        raise EdxApiNotificationPreferencesError(
+            "Open edX returned a notification preferences update that was not valid JSON"  # noqa: EM101
+        ) from exc

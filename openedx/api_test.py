@@ -10,6 +10,7 @@ from urllib.parse import parse_qsl
 
 import factory
 import pytest
+import requests
 import responses
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ImproperlyConfigured
@@ -2293,6 +2294,72 @@ def test_update_notification_preference_upstream_error(settings, mocker, synced_
 
 
 @pytest.mark.parametrize(
+    ("method", "api_func"),
+    [
+        (responses.GET, get_notification_preferences),
+        (responses.PUT, lambda user: update_notification_preference(user, {})),
+    ],
+)
+@pytest.mark.parametrize(
+    "network_error",
+    [requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError],
+)
+@responses.activate
+def test_notification_preferences_network_error(  # noqa: PLR0913
+    settings, mocker, synced_user, method, api_func, network_error
+):
+    """A timeout or dropped connection to the LMS is an upstream error, not a crash"""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    responses.add(
+        method,
+        f"{settings.OPENEDX_API_BASE_URL}{OPENEDX_NOTIFICATION_PREFERENCES_PATH}",
+        body=network_error("unreachable"),
+    )
+
+    with pytest.raises(EdxApiNotificationPreferencesError) as exc_info:
+        api_func(synced_user)
+
+    assert exc_info.value.status_code is None
+
+
+@pytest.mark.parametrize(
+    ("method", "api_func"),
+    [
+        (responses.GET, get_notification_preferences),
+        (responses.PUT, lambda user: update_notification_preference(user, {})),
+    ],
+)
+@responses.activate
+def test_notification_preferences_invalid_json(
+    settings, mocker, synced_user, method, api_func
+):
+    """A 200 whose body is not JSON is an upstream error, not a crash"""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    responses.add(
+        method,
+        f"{settings.OPENEDX_API_BASE_URL}{OPENEDX_NOTIFICATION_PREFERENCES_PATH}",
+        body="<html>not json</html>",
+        status=status.HTTP_200_OK,
+    )
+
+    with pytest.raises(EdxApiNotificationPreferencesError):
+        api_func(synced_user)
+
+
+def test_notification_preferences_token_service_unreachable(mocker, user):
+    """A network failure while refreshing the token is an upstream error, not a crash"""
+    mocker.patch(
+        "openedx.api.create_edx_auth_token",
+        side_effect=requests.exceptions.ReadTimeout("token service timed out"),
+    )
+
+    with pytest.raises(EdxApiNotificationPreferencesError):
+        get_notification_preferences(user)
+
+
+@pytest.mark.parametrize(
     "api_func",
     [
         get_notification_preferences,
@@ -2324,25 +2391,16 @@ def _http_error(status_code):
     return HTTPError(f"{status_code} from the token endpoint", response=response)
 
 
-def test_notification_preferences_rejected_grant_is_a_409(mocker, user):
-    """
-    A 400 from the token endpoint means the grant itself was rejected (revoked
-    or invalid refresh token), so this learner genuinely has no usable auth.
-    """
-    mocker.patch("openedx.api.create_edx_auth_token", side_effect=_http_error(400))
-
-    with pytest.raises(NoEdxApiAuthError):
-        get_notification_preferences(user)
-
-
-@pytest.mark.parametrize("upstream_status", [401, 403, 500, 502, 503])
+@pytest.mark.parametrize("upstream_status", [400, 401, 403, 500, 502, 503])
 def test_notification_preferences_token_service_failure_is_not_a_409(
     mocker, user, upstream_status
 ):
     """
     A token-service or credentials failure is not this learner's account being
     unprovisioned -- it must not masquerade as the 409 "still being set up"
-    state, or a synced learner gets a permanent, non-retryable message.
+    state, or a synced learner gets a permanent, non-retryable message. That
+    includes a 400: a dead grant never gets this far, because the refresh
+    recovers from invalid_grant itself.
     """
     mocker.patch(
         "openedx.api.create_edx_auth_token",
@@ -2366,24 +2424,43 @@ def test_notification_preferences_oauth_handshake_failure_is_not_a_409(mocker, u
         get_notification_preferences(user)
 
 
-def test_notification_preferences_refresh_rejected_is_a_409(mocker, user):
-    """A refresh the LMS rejects with a 400 leaves no usable auth"""
+def test_notification_preferences_dead_grant_without_account_is_a_409(mocker, user):
+    """
+    A dead refresh token with no synced account to re-authorize against is the
+    one refresh failure that means this learner has no usable auth: the refresh
+    raises NoEdxApiAuthError itself, and that must still surface as a 409.
+    """
+    OpenEdxApiAuth.objects.filter(user=user).update(
+        access_token_expires_on=now_in_utc() - timedelta(hours=1)
+    )
     mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
-    mocker.patch("openedx.api.get_valid_edx_api_auth", side_effect=_http_error(400))
+    mocker.patch(
+        "openedx.api._refresh_edx_api_auth",
+        side_effect=NoEdxApiAuthError("no synced account to re-authorize"),
+    )
 
     with pytest.raises(NoEdxApiAuthError):
         get_notification_preferences(user)
 
 
-def test_notification_preferences_refresh_outage_is_not_a_409(mocker, user):
-    """A 503 while refreshing is transient, so it must not read as a 409"""
+@pytest.mark.parametrize("upstream_status", [400, 503])
+def test_notification_preferences_refresh_failure_is_not_a_409(
+    mocker, user, upstream_status
+):
+    """
+    A refresh HTTPError that escapes is unrecoverable misconfiguration (400) or
+    an outage (503), not a missing account, so it must not read as a 409
+    """
     mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
-    mocker.patch("openedx.api.get_valid_edx_api_auth", side_effect=_http_error(503))
+    mocker.patch(
+        "openedx.api.get_valid_edx_api_auth",
+        side_effect=_http_error(upstream_status),
+    )
 
     with pytest.raises(EdxApiNotificationPreferencesError) as exc_info:
         get_notification_preferences(user)
 
-    assert exc_info.value.status_code == 503
+    assert exc_info.value.status_code == upstream_status
 
 
 @responses.activate
