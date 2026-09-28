@@ -39,7 +39,6 @@ def populate_enrollment_contracts(apps, schema_editor):
     contract_program_enrollments = ProgramEnrollment.objects.filter(
         program__contract_memberships__isnull=False, active=True
     ).all()
-    updated_enrollments = []
 
     for enrollment in contract_program_enrollments.iterator(chunk_size=CHUNK_SIZE):
         if not enrollment.active:
@@ -67,11 +66,7 @@ def populate_enrollment_contracts(apps, schema_editor):
             continue
 
         enrollment.b2b_contract = first_user_contract
-        updated_enrollments.append(enrollment)
-
-        if len(updated_enrollments) > CHUNK_SIZE:
-            ProgramEnrollment.objects.bulk_update(updated_enrollments, ["b2b_contract"])
-            updated_enrollments = []
+        enrollment.save()
 
 
 def reverse_noop(apps, schema_editor):
