@@ -3,6 +3,13 @@ import { AutoComplete, Form, FormProps, Input, Select } from "antd";
 
 const COMMON_ORG_KEY_PREFIXES = ["UAI_", "B2B_"].map((value) => ({ value }));
 
+// Mirrors ORG_KEY_PATTERN in b2b/constants.py: both values end up in every
+// contract run's course key.
+const ORG_KEY_RULE = {
+    pattern: /^[A-Za-z0-9_.-]+$/,
+    message: "Use only letters, digits, underscores, hyphens and periods.",
+};
+
 interface IOrganizationFormProps {
     formProps: FormProps;
     creating: boolean;
@@ -19,7 +26,7 @@ export const OrganizationForm: React.FC<IOrganizationFormProps> = ({ formProps, 
                 <Form.Item
                     label="Org key"
                     name="org_key"
-                    rules={[{ required: true, max: 30 }]}
+                    rules={[{ required: true, max: 30 }, ORG_KEY_RULE]}
                     extra="Part of every courseware ID for this organization, so it cannot change after the organization is created."
                 >
                     <Input />
@@ -27,7 +34,7 @@ export const OrganizationForm: React.FC<IOrganizationFormProps> = ({ formProps, 
                 <Form.Item
                     label="Org key prefix"
                     name="org_key_prefix"
-                    rules={[{ max: 30 }]}
+                    rules={[{ max: 30 }, ORG_KEY_RULE]}
                     extra="Prepended to the org key in courseware IDs. UAI_ runs send enrollment email as MIT Learn and are flagged as UAI in HubSpot. Leave blank for no prefix."
                 >
                     <AutoComplete options={COMMON_ORG_KEY_PREFIXES} placeholder="No prefix" allowClear />

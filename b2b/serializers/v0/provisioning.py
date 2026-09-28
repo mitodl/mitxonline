@@ -1,5 +1,6 @@
 """Serializers for the staff-only B2B provisioning API (v0)."""
 
+from django.core.validators import RegexValidator
 from rest_framework import serializers
 
 from b2b.constants import (
@@ -9,6 +10,8 @@ from b2b.constants import (
     IDP_PROTOCOL_OIDC,
     IDP_PROTOCOL_SAML,
     ONBOARDING_STATE_CHOICES,
+    ORG_KEY_PATTERN,
+    ORG_KEY_PATTERN_MESSAGE,
 )
 from b2b.models import (
     ContractPage,
@@ -129,9 +132,15 @@ class CreateOrganizationSerializer(serializers.Serializer):
     """Request body for provisioning a new organization."""
 
     name = serializers.CharField(max_length=255)
-    org_key = serializers.CharField(max_length=30)
+    org_key = serializers.CharField(
+        max_length=30,
+        validators=[RegexValidator(ORG_KEY_PATTERN, ORG_KEY_PATTERN_MESSAGE)],
+    )
     org_key_prefix = serializers.CharField(
-        max_length=30, required=False, allow_blank=True
+        max_length=30,
+        required=False,
+        allow_blank=True,
+        validators=[RegexValidator(ORG_KEY_PATTERN, ORG_KEY_PATTERN_MESSAGE)],
     )
     domains = serializers.ListField(
         child=serializers.CharField(), required=False, default=list

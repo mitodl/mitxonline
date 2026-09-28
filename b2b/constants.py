@@ -2,6 +2,12 @@
 
 ORG_INDEX_SLUG = "organizations"
 
+# org_key_prefix + org_key is the org segment of every contract run's course
+# key, org_key is also the Keycloak alias and a URL path segment. This is the
+# ASCII subset of what opaque-keys allows in a course key org.
+ORG_KEY_PATTERN = r"^[A-Za-z0-9_.\-]+$"
+ORG_KEY_PATTERN_MESSAGE = "Use only letters, digits, underscores, hyphens and periods."
+
 CONTRACT_MEMBERSHIP_MANAGED = "managed"
 CONTRACT_MEMBERSHIP_MANAGED_NAME = "Managed"
 CONTRACT_MEMBERSHIP_CODE = "code"
