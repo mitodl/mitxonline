@@ -19,7 +19,7 @@ from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
 from modelcluster.fields import ParentalKey
 from requests.exceptions import HTTPError
-from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel
+from wagtail.admin.panels import FieldPanel, HelpPanel, InlinePanel, MultiFieldPanel
 from wagtail.fields import RichTextField
 from wagtail.models import ClusterableModel, Orderable, Page
 
@@ -107,11 +107,27 @@ class OrganizationIndexPage(OrganizationObjectIndexPage):
     slug = ORG_INDEX_SLUG
 
 
+class StaffDashboardOrganizationPanel(HelpPanel):
+    """Links an organization's Wagtail page to its staff dashboard page."""
+
+    class BoundPanel(HelpPanel.BoundPanel):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.content = format_html(
+                'Edit this organization and its SSO setup in the <a href="{}">staff '
+                "dashboard</a>. Contracts are still managed here, as child pages.",
+                f"/staff-dashboard/b2b_organizations/show/{self.instance.org_key}",
+            )
+
+
 class OrganizationPage(Page):
     """Stores information about an organization we have a relationship with."""
 
     parent_page_types = ["b2b.OrganizationIndexPage"]
     subpage_types = ["b2b.ContractPage"]
+    # Organizations are created and edited in the staff dashboard, which also
+    # provisions them in Keycloak.
+    is_creatable = False
 
     name = models.CharField(max_length=255, help_text="The name of the organization")
     org_key = models.CharField(
@@ -140,10 +156,13 @@ class OrganizationPage(Page):
         help_text="The UUID for the organization in the SSO provider.",
     )
 
+    # The staff dashboard has no logo upload, and sso_organization_id stays
+    # editable here to link organizations created before the dashboard.
     content_panels = [
-        FieldPanel("name"),
-        FieldPanel("description"),
-        FieldPanel("org_key"),
+        StaffDashboardOrganizationPanel(),
+        FieldPanel("name", read_only=True),
+        FieldPanel("description", read_only=True),
+        FieldPanel("org_key", read_only=True),
         FieldPanel("logo"),
         FieldPanel("sso_organization_id"),
     ]
