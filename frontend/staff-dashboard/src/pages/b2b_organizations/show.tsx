@@ -1,12 +1,14 @@
 import React from "react";
 import { EditButton, RefreshButton, Show } from "@refinedev/antd";
 import { useShow } from "@refinedev/core";
-import { Card, Col, Descriptions, Row, Space, Tag, Typography } from "antd";
+import { Button, Card, Col, Descriptions, Row, Space, Tag, Typography } from "antd";
+import { ExportOutlined } from "@ant-design/icons";
 
 import { IdentityProviders } from "components/b2b/identity_providers";
 import { OnboardingCard } from "components/b2b/onboarding_card";
 import { ProvisioningEvents } from "components/b2b/provisioning_events";
 import { IProvisionedOrganization } from "interfaces";
+import { mitxOnlineUrl } from "utils";
 
 export const OrganizationShow: React.FC = () => {
     const { query } = useShow<IProvisionedOrganization>();
@@ -19,6 +21,16 @@ export const OrganizationShow: React.FC = () => {
             headerButtons={({ refreshButtonProps }) => (
                 <>
                     <RefreshButton {...refreshButtonProps} />
+                    {/* Contracts are still managed in Wagtail, as child pages of the organization. */}
+                    {organization && (
+                        <Button
+                            icon={<ExportOutlined />}
+                            href={mitxOnlineUrl(`/cms/pages/${organization.id}/`)}
+                            target="_blank"
+                        >
+                            Contracts in Wagtail
+                        </Button>
+                    )}
                     <EditButton recordItemId={organization?.org_key} />
                 </>
             )}
@@ -61,7 +73,16 @@ export const OrganizationShow: React.FC = () => {
                         <OnboardingCard organization={organization} />
                     </Col>
                     <Col span={24}>
-                        <IdentityProviders organization={organization} />
+                        {organization.sso_organization_id ? (
+                            <IdentityProviders organization={organization} />
+                        ) : (
+                            <Card title="Identity providers">
+                                <Typography.Text type="secondary">
+                                    This organization is not linked to a Keycloak organization, so it cannot have
+                                    identity providers.
+                                </Typography.Text>
+                            </Card>
+                        )}
                     </Col>
                     <Col span={24}>
                         <ProvisioningEvents orgKey={organization.org_key} />
