@@ -54,6 +54,15 @@ export default function App() {
           authProvider={authProvider}
           accessControlProvider={accessControlProvider}
           resources={[
+            // Hidden from the menu. Registering "/" gives the page breadcrumbs
+            // their home link, which the legacy DashboardPage prop used to do.
+            {
+              name: "dashboard",
+              list: "/",
+              meta: {
+                hide: true,
+              },
+            },
             {
               name: "discounts",
               list: "/discounts",
