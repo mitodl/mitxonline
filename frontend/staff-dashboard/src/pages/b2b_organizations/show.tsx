@@ -64,7 +64,9 @@ export const OrganizationShow: React.FC = () => {
                                     )}
                                 </Descriptions.Item>
                                 {organization.description && (
-                                    <Descriptions.Item label="Description">{organization.description}</Descriptions.Item>
+                                    <Descriptions.Item label="Description">
+                                        <span style={{ whiteSpace: "pre-wrap" }}>{organization.description}</span>
+                                    </Descriptions.Item>
                                 )}
                             </Descriptions>
                         </Card>

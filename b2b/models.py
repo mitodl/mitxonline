@@ -142,7 +142,9 @@ class OrganizationPage(Page):
         blank=True,
         default="",
     )
-    description = RichTextField(
+    # Plain text: it is also written to the Keycloak organization, which shows
+    # it as-is.
+    description = models.TextField(
         blank=True, help_text="Any useful extra information about the organization"
     )
     logo = models.ImageField(
