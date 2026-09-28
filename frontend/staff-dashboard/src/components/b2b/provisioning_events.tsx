@@ -55,9 +55,10 @@ export const ProvisioningEvents: React.FC<{ orgKey: string }> = ({ orgKey }) => 
                     title="When"
                     render={(_, event) => dayjs(event.created_on).format("YYYY-MM-DD HH:mm")}
                 />
+                {/* || rather than ??: a user row can have a blank email. */}
                 <Table.Column<IProvisioningEvent>
                     title="Who"
-                    render={(_, event) => event.actor?.email ?? event.actor?.username ?? "System"}
+                    render={(_, event) => event.actor?.email || event.actor?.username || "System"}
                 />
                 <Table.Column<IProvisioningEvent>
                     title="What"

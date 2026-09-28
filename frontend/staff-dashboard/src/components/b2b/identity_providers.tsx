@@ -164,7 +164,14 @@ export const IdentityProviders: React.FC<{ organization: IProvisionedOrganizatio
                             <Button size="small" icon={<ReloadOutlined />} disabled={isLoading} onClick={() => refreshMetadata(idp)}>
                                 Refresh metadata
                             </Button>
-                            <Button size="small" danger icon={<DeleteOutlined />} disabled={isLoading} onClick={() => remove(idp)} />
+                            <Button
+                                size="small"
+                                danger
+                                icon={<DeleteOutlined />}
+                                aria-label={`Delete identity provider ${idp.alias}`}
+                                disabled={isLoading}
+                                onClick={() => remove(idp)}
+                            />
                         </Space>
                     )}
                 />
