@@ -187,6 +187,7 @@ B2B features support bulk course access for organizations:
 **Factories:** Use `factory_boy` for test data generation. Factory classes live in `factories.py` within each app:
 ```python
 from courses.factories import CourseFactory, CourseRunFactory
+
 course = CourseFactory.create()
 ```
 
@@ -221,12 +222,12 @@ Test suite includes checks for:
 ```python
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
+
 @extend_schema(
-    parameters=[OpenApiParameter(name='readable_id', type=str)],
-    responses={200: CourseSerializer}
+    parameters=[OpenApiParameter(name="readable_id", type=str)],
+    responses={200: CourseSerializer},
 )
-def list(self, request):
-    ...
+def list(self, request): ...
 ```
 
 **Queryset optimization:** Use `extend_schema_get_queryset` decorator (from `openapi/utils.py`) when queryset depends on request context not available at schema generation time.
