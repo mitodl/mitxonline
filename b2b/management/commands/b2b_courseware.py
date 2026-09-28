@@ -15,7 +15,6 @@ from b2b.contracts import add_courseware_to_contract, remove_courseware_from_con
 from b2b.models import ContractPage
 from b2b.tasks import queue_enrollment_code_check
 from courses.api import resolve_courseware_object_from_id
-from courses.constants import UAI_COURSEWARE_ID_PREFIX
 
 log = logging.getLogger(__name__)
 
@@ -116,7 +115,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
         )
         add_subparser.add_argument(
             "--prefix",
-            help=f"Organization prefix for the resulting course run. (Defaults to the org setting, or {UAI_COURSEWARE_ID_PREFIX}.)",
+            help="Organization prefix for the resulting course run. (Defaults to the org setting.)",
             type=str,
         )
         add_subparser.add_argument(

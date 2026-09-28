@@ -1,5 +1,7 @@
 import React from "react";
-import { Form, FormProps, Input, Select } from "antd";
+import { AutoComplete, Form, FormProps, Input, Select } from "antd";
+
+const COMMON_ORG_KEY_PREFIXES = ["UAI_", "B2B_"].map((value) => ({ value }));
 
 interface IOrganizationFormProps {
     formProps: FormProps;
@@ -22,8 +24,13 @@ export const OrganizationForm: React.FC<IOrganizationFormProps> = ({ formProps, 
                 >
                     <Input />
                 </Form.Item>
-                <Form.Item label="Org key prefix" name="org_key_prefix" rules={[{ max: 30 }]}>
-                    <Input placeholder="UAI_" />
+                <Form.Item
+                    label="Org key prefix"
+                    name="org_key_prefix"
+                    rules={[{ max: 30 }]}
+                    extra="Prepended to the org key in courseware IDs. UAI_ runs send enrollment email as MIT Learn and are flagged as UAI in HubSpot. Leave blank for no prefix."
+                >
+                    <AutoComplete options={COMMON_ORG_KEY_PREFIXES} placeholder="No prefix" allowClear />
                 </Form.Item>
             </>
         )}

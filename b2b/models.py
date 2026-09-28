@@ -36,7 +36,6 @@ from b2b.constants import (
     ORG_INDEX_SLUG,
     PROVISIONING_ACTION_CHOICES,
 )
-from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import Program
 from main.models import AuditModel, ValidateOnSaveMixin
 from variants.models import SupportedVariant
@@ -137,9 +136,11 @@ class OrganizationPage(Page):
     )
     org_key_prefix = models.CharField(
         max_length=30,
-        help_text="The prefix to append to the org key (defaults to UAI_).",
+        help_text=(
+            "Prepended to the org key in courseware IDs, e.g. UAI_. Blank means no prefix."
+        ),
         blank=True,
-        default=UAI_COURSEWARE_ID_PREFIX,
+        default="",
     )
     description = RichTextField(
         blank=True, help_text="Any useful extra information about the organization"
@@ -700,7 +701,7 @@ class ContractPage(Page, ClusterableModel):
         *,
         skip_edx=False,
         no_reruns=True,
-        org_prefix=UAI_COURSEWARE_ID_PREFIX,
+        org_prefix=None,
         ignore_langs=False,
         only_lang=None,
         filter_variants=None,

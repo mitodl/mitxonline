@@ -10891,7 +10891,8 @@ components:
         org_key_prefix:
           type: string
           readOnly: true
-          description: The prefix to append to the org key (defaults to UAI_).
+          description: Prepended to the org key in courseware IDs, e.g. UAI_. Blank
+            means no prefix.
         description:
           type: string
           readOnly: true
