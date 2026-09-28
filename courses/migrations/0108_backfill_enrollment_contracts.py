@@ -6,6 +6,8 @@ from django.db import migrations
 
 log = logging.getLogger(__name__)
 
+CHUNK_SIZE = 100
+
 
 def populate_enrollment_contracts(apps, schema_editor):
     """
@@ -18,7 +20,7 @@ def populate_enrollment_contracts(apps, schema_editor):
         run__b2b_contract__isnull=False
     ).all()
 
-    for enrollment in contract_course_run_enrollments:
+    for enrollment in contract_course_run_enrollments.iterator(chunk_size=CHUNK_SIZE):
         # We haven't dropped the b2b_contract FK as of yet, so use that to determine
         # the ownership for the enrollment.
         enrollment.b2b_contract = enrollment.run.b2b_contract
@@ -35,11 +37,11 @@ def populate_enrollment_contracts(apps, schema_editor):
     # be for no longer valid contracts; if the user re-enrolls in the program,
     # that will cause the enrollment to be linked up to the correct contract.
     contract_program_enrollments = ProgramEnrollment.objects.filter(
-        program__contract_memberships__isnull=False
+        program__contract_memberships__isnull=False, active=True
     ).all()
     updated_enrollments = []
 
-    for enrollment in contract_program_enrollments:
+    for enrollment in contract_program_enrollments.iterator(chunk_size=CHUNK_SIZE):
         if not enrollment.active:
             log.info("Enrollment %s inactive - skipping", enrollment)
             continue
@@ -67,8 +69,9 @@ def populate_enrollment_contracts(apps, schema_editor):
         enrollment.b2b_contract = first_user_contract
         updated_enrollments.append(enrollment)
 
-    if len(updated_enrollments) > 0:
-        ProgramEnrollment.objects.bulk_update(updated_enrollments, ["b2b_contract"])
+        if len(updated_enrollments) > CHUNK_SIZE:
+            ProgramEnrollment.objects.bulk_update(updated_enrollments, ["b2b_contract"])
+            updated_enrollments = []
 
 
 def reverse_noop(apps, schema_editor):
@@ -76,6 +79,7 @@ def reverse_noop(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    atomic = False
     dependencies = [
         ("courses", "0107_add_enrollment_contract_fks"),
     ]
