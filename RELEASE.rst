@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.169.2
+---------------
+
+- Make migration non-atomic; chunk batches into 100s (#4043)
+
 Version 1.169.1
 ---------------
 
