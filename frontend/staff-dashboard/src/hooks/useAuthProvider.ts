@@ -1,5 +1,13 @@
-import { LegacyAuthProvider as AuthProvider } from "@refinedev/core";
+import { AuthProvider } from "@refinedev/core";
 import axios from "axios";
+
+export const PROFILE_KEY = "mitx-online-staff-profile";
+
+// A full-page navigation to MITx Online's logout view.
+export const logOutOfMitxOnline = () => {
+  localStorage.removeItem(PROFILE_KEY);
+  window.location.href = (new URL(DATASOURCES_CONFIG.mitxOnline)).origin + "/logout/";
+};
 
 export function useAuthProvider(): AuthProvider {
   const http = axios.create({
@@ -7,50 +15,38 @@ export function useAuthProvider(): AuthProvider {
   });
   const _ = require("lodash");
 
-  const getProfile = async () => {
-    const profile = await http.get('v0/users/me');
-
-    return Promise.resolve(profile.data);
-  }
-
   return {
+    // Sign-in happens on MITx Online itself (see pages/login.tsx), so there
+    // is nothing to submit here.
     login: async () => {
-      const profile = await getProfile();
-
-      if (_.get(profile, "data.is_staff") === true) {
-        localStorage.setItem('mitx-online-staff-profile', JSON.stringify(profile.data));
-        return Promise.resolve();
-      }
-
-      localStorage.removeItem("mitx-online-staff-profile");
-
-      return Promise.reject({
-        name: "Not Authenticated",
-        message: "Your account doesn't have permission to view this page."
-      });
+      return { success: false, redirectTo: "/login" };
     },
     logout: async () => {
-      localStorage.removeItem("mitx-online-staff-profile");
-      const logoutPath = (new URL(DATASOURCES_CONFIG.mitxOnline)).origin + "/logout/";
-      window.location.href = logoutPath;
-      return Promise.resolve();
+      logOutOfMitxOnline();
+      return { success: true };
     },
-    checkError: async () => {
-      return Promise.resolve();
+    onError: async () => {
+      return {};
     },
-    checkAuth: async () => {
-      const profile = await http.get('v0/users/me');
+    check: async () => {
+      let profile;
+      try {
+        profile = await http.get('v0/users/me');
+      } catch (error) {
+        localStorage.removeItem(PROFILE_KEY);
+        return { authenticated: false, redirectTo: "/login", error: error as Error };
+      }
 
       if (
         _.get(profile, "data.is_superuser") === true ||
         _.get(profile, "data.is_staff") === true
       ) {
-        localStorage.setItem('mitx-online-staff-profile', JSON.stringify(profile.data));
-        return Promise.resolve();
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(profile.data));
+        return { authenticated: true };
       }
-      return Promise.reject({
-        redirectPath: (new URL(DATASOURCES_CONFIG.mitxOnline)).origin + "/login"
-      });
+
+      localStorage.removeItem(PROFILE_KEY);
+      return { authenticated: false, redirectTo: "/login" };
     },
     getPermissions: async () => {
       /*
@@ -62,25 +58,25 @@ export function useAuthProvider(): AuthProvider {
       could use this to determine permissions outside of those two flags. (This
       data is visible here.)
       */
-      let profile = localStorage.getItem("mitx-online-staff-profile");
+      let profile = localStorage.getItem(PROFILE_KEY);
 
       if (profile) {
         profile = JSON.parse(profile);
 
         if (_.get(profile, "is_superuser")) {
-          return Promise.resolve(["superuser"]);
+          return ["superuser"];
         }
 
         if (_.get(profile, "is_staff")) {
-          return Promise.resolve(["staff"]);
+          return ["staff"];
         }
       }
 
-      return Promise.resolve([]);
+      return [];
     },
-    getUserIdentity: async () => {
-      let profile = localStorage.getItem("mitx-online-staff-profile");
-      return profile ? Promise.resolve(JSON.parse(profile)) : Promise.reject()
+    getIdentity: async () => {
+      const profile = localStorage.getItem(PROFILE_KEY);
+      return profile ? JSON.parse(profile) : null;
     },
   };
 };

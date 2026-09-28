@@ -8,8 +8,8 @@ import { FinAidTiers } from "components/discounts/fin_aid_tiers";
 const { Title, Text } = Typography;
 
 export const DiscountShow = () => {
-    const { queryResult } = useShow();
-    const { data, isLoading } = queryResult;
+    const { query } = useShow();
+    const { data, isLoading } = query;
     const record = data?.data;
 
     return (

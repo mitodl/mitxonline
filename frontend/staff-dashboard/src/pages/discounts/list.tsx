@@ -1,6 +1,6 @@
 import { List, DateField, ShowButton, useTable, EditButton } from "@refinedev/antd";
 import { Table, Space, Tag, Row, Col, Card, Button } from "antd";
-import { CrudFilters, HttpError, useInvalidate, useNavigation } from "@refinedev/core";
+import { CrudFilters, HttpError, useGo, useInvalidate } from "@refinedev/core";
 
 import { DiscountFilterForm } from "components/discounts/filter_form";
 
@@ -8,8 +8,8 @@ import { IDiscount, IDiscountFilters } from "interfaces";
 
 export const DiscountList: React.FC = () => {
     const invalidate = useInvalidate()
-    const navigation = useNavigation()
-    const {tableQueryResult, tableProps, searchFormProps} = useTable<
+    const go = useGo()
+    const {tableQuery, tableProps, searchFormProps} = useTable<
         IDiscount,
         HttpError,
         IDiscountFilters
@@ -54,7 +54,7 @@ export const DiscountList: React.FC = () => {
     });
 
     const refreshList = () => {
-        tableQueryResult.refetch()
+        tableQuery.refetch()
     }
 
     return (
@@ -72,7 +72,7 @@ export const DiscountList: React.FC = () => {
                     <List>
                         <Row justify="end" gutter={[10, 10]}>
                             <Col sm={24}>
-                                <Button style={{ "float": "right", "marginBottom": "5px" }} onClick={() => { navigation.push("/discounts/create_batch"); }}>Bulk Create</Button>
+                                <Button style={{ "float": "right", "marginBottom": "5px" }} onClick={() => { go({ to: "/discounts/create_batch" }); }}>Bulk Create</Button>
                             </Col>
                         </Row>
 
