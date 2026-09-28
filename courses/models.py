@@ -26,7 +26,6 @@ from django.utils.functional import cached_property
 from django.utils.html import format_html
 from django.utils.text import slugify
 from django_countries.fields import CountryField
-from lru_method_cache import lru_method_cache
 from mitol.common.models import TimestampedModel, TimestampedModelQuerySet
 from mitol.common.utils.datetime import now_in_utc
 from mitol.common.utils.queryset import is_prefetched
@@ -1374,7 +1373,6 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             return self.courseruns.all()
         return self.courseruns.prefetch_related("b2b_contracts").all()
 
-    @lru_method_cache(max_size=12, typed=True)
     def get_filtered_runs(
         self,
         *,
