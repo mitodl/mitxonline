@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.168.5
+---------------
+
+- Add migration to add data consent boolean, timestamps (#3969)
+- Skip cart for verified program course enrollments (#4008)
+
 Version 1.168.4
 ---------------
 
