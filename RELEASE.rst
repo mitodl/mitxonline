@@ -1,6 +1,21 @@
 Release Notes
 =============
 
+Version 1.169.0
+---------------
+
+- Remove the leaking method cache from Course.get_filtered_runs (#4037)
+- Upgrade the staff dashboard from Refine 3 to Refine 4 (staff UI 2/4) (#3995)
+- Add the staff provisioning list, SP details and audit trail (staff UI 1/4) (#3994)
+- Add the staff contract provisioning API (C3 3/3) (#3965)
+- Move contract setup out of the management commands into b2b.contracts (C3 2/3) (#3964)
+- Track contract run edX clones and make the clone safe to retry (C3 1/3) (#3963)
+- Add an admin for Stripe webhook secrets (#4024)
+- Track the contract that an enrollment belongs to (#3944)
+- Fix bug in recording consent values on incorrect row (#4025)
+- Initial implementation of simple data consent api. (#3977)
+- Fix CyberSource refund handling (#4016)
+
 Version 1.168.5
 ---------------
 
