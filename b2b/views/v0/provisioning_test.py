@@ -524,6 +524,62 @@ def test_patch_identity_provider_refuses_one_saml_map_alone(admin_drf_client, mo
     mocked_update.assert_not_called()
 
 
+def test_patch_identity_provider_refuses_one_attribute_in_both_saml_maps(
+    admin_drf_client, mocker
+):
+    """Each mapper is named after its user attribute, so the two would collide."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+    mocked_update = mocker.patch("b2b.views.v0.provisioning.update_identity_provider")
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu"),
+        {
+            "attribute_map": {"email": "E-Mail Address"},
+            "attribute_name_map": {"email": "urn:oid:0.9.2342.19200300.100.1.3"},
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    mocked_update.assert_not_called()
+
+
+def test_patch_identity_provider_rejects_attribute_name_map_for_oidc(
+    admin_drf_client, mocker
+):
+    """
+    attribute_name_map is SAML's attribute Name; OIDC only has claims.
+
+    On OIDC both maps build the same claim mapper under the same name, and the
+    replacement deletes the old set before the collision surfaces.
+    """
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    OrganizationIdentityProvider.objects.create(
+        organization=organization,
+        alias="exampleu-oidc",
+        protocol=IDP_PROTOCOL_OIDC,
+        lifecycle_state=IDP_STATE_ACTIVE,
+        metadata_source="https://idp.example.edu/.well-known/openid-configuration",
+    )
+    mocked_update = mocker.patch("b2b.views.v0.provisioning.update_identity_provider")
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu-oidc"),
+        {
+            "attribute_map": {"email": "email"},
+            "attribute_name_map": {"email": "email"},
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "attribute_name_map" in response.json()["errors"]
+    mocked_update.assert_not_called()
+
+
 def test_patch_identity_provider_takes_a_discovery_url_for_oidc(
     admin_drf_client, mocker
 ):

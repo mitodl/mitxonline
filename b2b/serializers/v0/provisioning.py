@@ -302,6 +302,17 @@ class UpdateIdentityProviderSerializer(serializers.Serializer):
             )
             raise serializers.ValidationError(msg)
 
+        # attribute_name_map matches a SAML attribute's Name rather than its
+        # FriendlyName. OIDC has only claims, so both maps would build the same
+        # claim mapper under the same name, and the second create collides
+        # after the replacement has already deleted the old set.
+        if "attribute_name_map" in attrs:
+            msg = (
+                "attribute_name_map belongs to a SAML identity provider. Send "
+                "OIDC claim mappings in attribute_map."
+            )
+            raise serializers.ValidationError({"attribute_name_map": msg})
+
         if "discovery_url" in attrs:
             # The saga takes one metadata source regardless of protocol; for
             # OIDC that source is the discovery document.
@@ -343,6 +354,17 @@ class UpdateIdentityProviderSerializer(serializers.Serializer):
                 "as an empty object if there are none."
             )
             raise serializers.ValidationError({missing: msg})
+
+        # Each mapper is named after its user attribute, so one attribute in
+        # both maps is two mappers with the same name.
+        duplicated = sorted(attrs["attribute_map"].keys() & attrs["attribute_name_map"])
+        if duplicated:
+            msg = (
+                "Map each user attribute once, by FriendlyName or by Name: "
+                f"{', '.join(duplicated)} is in both attribute_map and "
+                "attribute_name_map."
+            )
+            raise serializers.ValidationError(msg)
 
         # An edit that leaves both empty is a SAML IdP with no mappers - one
         # that brokers users with no email or name. Creation refuses that; so
