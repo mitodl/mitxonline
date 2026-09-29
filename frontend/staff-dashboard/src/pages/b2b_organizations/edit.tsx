@@ -9,14 +9,18 @@ import { IProvisionedOrganization } from "interfaces";
 type EditableField = "name" | "description" | "redirect_url" | "domains";
 const EDITABLE_FIELDS: EditableField[] = ["name", "description", "redirect_url", "domains"];
 
+const emptyValue = (field: EditableField) => (field === "domains" ? [] : "");
+
 // Send only what the operator changed. Keycloak can hold a null redirect URL,
 // which the update endpoint rejects, and any domains sent are rewritten as
 // verified, so resubmitting untouched fields has side effects.
 const changedFields = (values: Partial<IProvisionedOrganization>, original?: IProvisionedOrganization) =>
     Object.fromEntries(
         EDITABLE_FIELDS.filter(
-            (field) => JSON.stringify(values[field] ?? "") !== JSON.stringify(original?.[field] ?? ""),
-        ).map((field) => [field, values[field] ?? ""]),
+            (field) =>
+                JSON.stringify(values[field] ?? emptyValue(field)) !==
+                JSON.stringify(original?.[field] ?? emptyValue(field)),
+        ).map((field) => [field, values[field] ?? emptyValue(field)]),
     );
 
 export const OrganizationEdit = () => {

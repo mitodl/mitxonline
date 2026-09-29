@@ -157,6 +157,21 @@ def test_create_organization_rejects_a_key_that_breaks_a_course_key(
     create.assert_not_called()
 
 
+def test_create_organization_accepts_a_blank_key_prefix(admin_drf_client, mocker):
+    """A blank prefix means no prefix, so the key pattern must not reject it."""
+
+    mocker.patch(
+        "b2b.views.v0.provisioning.create_organization",
+        return_value=OrganizationPageFactory.create(org_key="EXAMPLEU"),
+    )
+
+    response = admin_drf_client.post(
+        _organizations_url(), {**CREATE_BODY, "org_key_prefix": ""}, format="json"
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+
+
 def test_create_organization_alias_collision_is_a_conflict(admin_drf_client, mocker):
     """A taken alias is 409 with the reason, not a 500."""
 
