@@ -578,26 +578,39 @@ def test_fill_only_skips_user_with_no_mitxonline_name(mocker, tmp_path):
 
 
 @pytest.mark.django_db
-def test_patch_is_unverified_when_an_untouched_field_changes(mocker, tmp_path):
+def test_run_aborts_when_an_untouched_field_changes(mocker, tmp_path):
     """If Keycloak changes a root field the PUT didn't include (here
-    firstName, blanked by a fullName-only PUT), the row is not verified
+    firstName, blanked by a fullName-only PUT), the run stops before the next
+    user's PUT, and the report still carries the resume_offset
     """
-    user = UserFactory.create(name="Ann Lee", scim_external_id="kc-1")
-    user.legal_address.first_name = ""
-    user.legal_address.last_name = ""
-    user.legal_address.save()
+    for scim_id, name in (("kc-1", "Ann Lee"), ("kc-2", "Bo Chan")):
+        user = UserFactory.create(name=name, scim_external_id=scim_id)
+        user.legal_address.first_name = ""
+        user.legal_address.last_name = ""
+        user.legal_address.save()
 
     client = _mock_client(
-        mocker, [[UserRepresentation(id="kc-1", firstName="Ann", lastName="Lee")]]
+        mocker,
+        [
+            [
+                UserRepresentation(id="kc-1", firstName="Ann", lastName="Lee"),
+                UserRepresentation(id="kc-2", firstName="Bo", lastName="Chan"),
+            ]
+        ],
     )
     client.retrieve.return_value = UserRepresentation(
         id="kc-1", firstName="", lastName="Lee", attributes={"fullName": ["Ann Lee"]}
     )
     remediate_keycloak_user_names.bootstrap_client.return_value = client
 
-    report = _run(tmp_path, apply=True, limit=None, fill_only=True)
+    report_path = tmp_path / "report.json"
+    with pytest.raises(remediate_keycloak_user_names.UntouchedFieldChangedError):
+        COMMAND.handle(
+            apply=True, limit=None, fill_only=True, report_path=str(report_path)
+        )
 
-    assert [row["verified"] for row in report["patched"]] == [False]
+    assert client.save.call_count == 1
+    assert json.loads(report_path.read_text())["resume_offset"] == 0
 
 
 @pytest.mark.django_db

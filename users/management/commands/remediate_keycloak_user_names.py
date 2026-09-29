@@ -40,6 +40,15 @@ User = get_user_model()
 PAGE_SIZE = 100
 
 
+class UntouchedFieldChangedError(RuntimeError):
+    """Keycloak altered a root field the PUT did not include.
+
+    Raised rather than reported per row: if omitted fields are being cleared,
+    every further PUT does the same damage, so the run stops before the next
+    one and the resume_offset in the report says where to pick up.
+    """
+
+
 class Outcome(StrEnum):
     """What happened to one paired user in a run."""
 
@@ -281,9 +290,10 @@ class Command(BaseCommand):
         :param split_name: ``(given_name, family_name)`` to write to
             firstName/lastName, or None to leave them untouched.
         :param full_name: value for the fullName attribute, or "" to leave it.
-        :returns: whether the re-fetched user carries every value written,
-            and every root field this didn't write is unchanged.
+        :returns: whether the re-fetched user carries every value written.
         :rtype: bool
+        :raises UntouchedFieldChangedError: if email, or firstName/lastName
+            when ``split_name`` is None, changed although the PUT omitted them.
         """
         patch = {}
         if split_name:
@@ -301,21 +311,32 @@ class Command(BaseCommand):
         client.save(f"users/{keycloak_user.id}", patch)
         # verify - don't just trust a 2xx
         refetched = client.retrieve(f"users/{keycloak_user.id}", UserRepresentation)
+        # A PUT that omits a root field must leave it alone; check rather than
+        # assume, since a fill-only run sends ~360k of these.
+        untouched = {"email": (keycloak_user.email, refetched.email)}
         if split_name:
             names_verified = (refetched.first_name or "") == split_name[0] and (
                 refetched.last_name or ""
             ) == split_name[1]
         else:
-            # A PUT without firstName/lastName must leave them alone; check
-            # rather than assume, since a fill-only run sends ~360k of these.
-            names_verified = (refetched.first_name or "") == (
-                keycloak_user.first_name or ""
-            ) and (refetched.last_name or "") == (keycloak_user.last_name or "")
-        email_unchanged = (refetched.email or "") == (keycloak_user.email or "")
+            names_verified = True
+            untouched["first_name"] = (keycloak_user.first_name, refetched.first_name)
+            untouched["last_name"] = (keycloak_user.last_name, refetched.last_name)
+        changed = [
+            field
+            for field, (before, after) in untouched.items()
+            if (before or "") != (after or "")
+        ]
+        if changed:
+            msg = (
+                f"Keycloak changed {', '.join(changed)} on user "
+                f"{keycloak_user.id} although the PUT omitted them"
+            )
+            raise UntouchedFieldChangedError(msg)
         full_name_verified = (
             not full_name or _keycloak_full_name(refetched) == full_name
         )
-        return names_verified and email_unchanged and full_name_verified
+        return names_verified and full_name_verified
 
     @staticmethod
     def _row(keycloak_user, user, given_name, family_name, full_name):
