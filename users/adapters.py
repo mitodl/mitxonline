@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from users.models import User
 
 #: Attributes whose change queues update_edx_user_profile.
-EDX_PROFILE_SYNC_ATTRS = frozenset({"fullName", "name", "displayName"})
+EDX_PROFILE_SYNC_ATTRS = frozenset({"fullName", "displayName"})
 
 #: Separate from the profile attrs because update_edx_user_email re-runs the
 #: Open edX OAuth handshake rather than PATCHing - edX treats email as read-only.
@@ -22,15 +22,27 @@ EDX_EMAIL_SYNC_ATTRS = frozenset({"emails"})
 #: nothing outside this set may queue Open edX work.
 EDX_SYNC_ATTRS = EDX_PROFILE_SYNC_ATTRS | EDX_EMAIL_SYNC_ATTRS
 
-#: Deliberately not synced. id/schemas/groups/externalId are protocol
-#: scaffolding; meta changes on every save. userName and active are real data,
-#: but edX lists both in AccountUserSerializer.read_only_fields and 400s the
-#: whole PATCH on a read-only key, which would take the name sync with it - and
-#: it exposes no reactivate endpoint, so active could only ever sync one-way.
+#: Deliberately not synced, for three different reasons.
+#:
+#: id/schemas/groups/externalId are protocol scaffolding; meta changes on every
+#: save.
+#:
+#: userName and active are real data, but edX lists both in
+#: AccountUserSerializer.read_only_fields and 400s the whole PATCH on a
+#: read-only key, which would take the name sync with it - and it exposes no
+#: reactivate endpoint, so active could only ever sync one-way.
+#:
+#: name is real data that edX has nowhere to put. name.givenName/familyName
+#: write to LegalAddress, which feeds SDN screening and HubSpot, while
+#: update_edx_user_profile sends only name (the flat fullName)/country/state/
+#: gender/year_of_birth/level_of_education. Nothing there derives from
+#: first_name/last_name, so queueing on a change here would PATCH edX with the
+#: payload it already has.
+#:
 #: test_edx_sync_attrs_cover_to_dict asserts this plus EDX_SYNC_ATTRS covers
 #: to_dict(), so a new attribute fails the suite instead of being dropped.
 EDX_UNSYNCED_ATTRS = frozenset(
-    {"id", "schemas", "groups", "externalId", "meta", "userName", "active"}
+    {"id", "schemas", "groups", "externalId", "meta", "userName", "active", "name"}
 )
 
 
@@ -88,13 +100,16 @@ class LearnUserAdapter(UserAdapter):
             None if self.is_new_user else self._edx_sync_snapshot()
         )
         self._edx_profile_sync_queued = False
+        self._edx_email_sync_queued = False
 
     def _edx_sync_snapshot(self) -> dict:
         """
         Snapshot the Open edX-relevant SCIM attributes, for diffing across a save.
 
-        Reading through _scim_attrs() means the diff follows the adapter's schema,
-        so LegalAddress-backed name.givenName is covered like any other attribute.
+        Reading through _scim_attrs() means the diff follows the adapter's schema
+        rather than a hand-listed set of User columns, so an attribute backed by a
+        related model is covered like any other - the filter to EDX_SYNC_ATTRS,
+        not the source of the value, decides what is watched.
         """
         snapshot = self._scim_attrs()
         return {key: snapshot.get(key) for key in EDX_SYNC_ATTRS}
@@ -235,9 +250,14 @@ class LearnUserAdapter(UserAdapter):
 
         # on_commit, not inline: PatchView.patch and super().save() both open atomic
         # blocks, so a worker could otherwise read the row before it is committed.
+        #
+        # Each push is queued at most once per adapter. handle_operations() calls
+        # save() per PATCH operation, and both tasks re-read the user by id, so the
+        # first one already sees the values the request ends on.
         if changed & EDX_PROFILE_SYNC_ATTRS and not self._edx_profile_sync_queued:
             self._edx_profile_sync_queued = True
             transaction.on_commit(partial(queue_edx_user_profile_update, self.obj))
 
-        if changed & EDX_EMAIL_SYNC_ATTRS:
+        if changed & EDX_EMAIL_SYNC_ATTRS and not self._edx_email_sync_queued:
+            self._edx_email_sync_queued = True
             transaction.on_commit(partial(queue_edx_user_email_change, self.obj))
