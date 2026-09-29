@@ -1921,8 +1921,8 @@ def process_stripe_refund_updated(event: stripe.Event):  # noqa: PLR0911
     Refunds for Stripe orders are issued in Stripe, so this records them in
     MITx Online once they've succeeded: the order is moved to the refunded
     state, the refund is logged as a transaction, and the learner's enrollments
-    are downgraded. Stripe sends both event types for the same refund, so the
-    order is locked and skipped if it's already been refunded.
+    are downgraded. Stripe may send both event types for the same refund, so
+    the order is locked and skipped if it's already been refunded.
 
     Args:
     - event (stripe.Event): the refund event

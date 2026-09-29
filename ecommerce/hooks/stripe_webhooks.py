@@ -58,8 +58,8 @@ class RefundEvents:
     """
     Wrapper class for refund events.
 
-    Stripe sends both of these for a refund; processing skips orders that are
-    already refunded, so whichever arrives second is a no-op.
+    Stripe may send both of these for a refund; processing skips orders that
+    are already refunded, so whichever arrives second is a no-op.
     """
 
     @hookimpl(specname="stripe_event")
