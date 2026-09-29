@@ -12,7 +12,14 @@ fake = Faker()
 # Ceiling for GET /api/internal/courses/. This is a per-request budget, not a
 # per-course one: it must stay constant as the number of courses on the page
 # grows. Tighten it as prefetches improve; never scale it by row count.
-INGESTIBLE_COURSES_QUERY_BUDGET = 21
+#
+# Went 21 -> 22 when the topics prefetch stopped passing a queryset. A
+# Prefetch carrying one cannot be used on CoursePage.topics without handing
+# every page the same QuerySet object - see CourseViewSet.get_queryset - so
+# the parent chain is prefetched by name instead, which costs a query per
+# level rather than riding along on a select_related. Still flat: 22 at 1, 5
+# and 20 courses.
+INGESTIBLE_COURSES_QUERY_BUDGET = 22
 
 
 def _get_courses(client, page_size):
