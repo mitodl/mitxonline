@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.169.4
+---------------
+
+- Enrolling users should skip repair user if it is already synced (#4045)
+- Return the user's data sharing consent on their B2B contracts (#4039)
+
 Version 1.169.3
 ---------------
 
