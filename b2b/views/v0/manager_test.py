@@ -2412,7 +2412,8 @@ def _wait_for_lock_waiter(timeout_seconds=10):
             cursor.execute("SELECT pg_stat_clear_snapshot()")
             cursor.execute(
                 "SELECT count(*) FROM pg_stat_activity "
-                "WHERE wait_event_type = 'Lock' AND pid <> pg_backend_pid()"
+                "WHERE wait_event_type = 'Lock' AND pid <> pg_backend_pid() "
+                "AND datname = current_database()"
             )
             if cursor.fetchone()[0]:
                 return
