@@ -7700,9 +7700,11 @@ components:
         org_key:
           type: string
           minLength: 1
+          pattern: ^[A-Za-z0-9_.\-]+$
           maxLength: 30
         org_key_prefix:
           type: string
+          pattern: ^[A-Za-z0-9_.\-]+$
           maxLength: 30
         domains:
           type: array
