@@ -111,6 +111,54 @@ class OrganizationPageSerializer(serializers.ModelSerializer):
         ]
 
 
+class UserContractPageSerializer(ContractPageSerializer):
+    """
+    A contract the requesting user belongs to, with the user's data sharing
+    consent for it.
+    """
+
+    consented_to_data_sharing = serializers.SerializerMethodField(
+        help_text=(
+            "Whether the user consented to share their learner data with the "
+            "organization: null if never asked, true if consented, false if "
+            "declined or withdrawn."
+        )
+    )
+
+    @extend_schema_field(serializers.BooleanField(allow_null=True))
+    def get_consented_to_data_sharing(self, instance):
+        """Get the user's consent value from the prefetched membership row"""
+        # Prefetched by b2b.api.get_user_b2b_organizations
+        memberships = instance._user_memberships  # noqa: SLF001
+        return memberships[0].consented_to_data_sharing if memberships else None
+
+    class Meta(ContractPageSerializer.Meta):
+        fields = [
+            *ContractPageSerializer.Meta.fields,
+            "consented_to_data_sharing",
+        ]
+        read_only_fields = [
+            *ContractPageSerializer.Meta.read_only_fields,
+            "consented_to_data_sharing",
+        ]
+
+
+class UserOrganizationPageSerializer(OrganizationPageSerializer):
+    """
+    An organization the requesting user belongs to, with the user's active
+    contracts in it.
+    """
+
+    @extend_schema_field(UserContractPageSerializer(many=True))
+    def get_contracts(self, instance):
+        """Get the user's active contracts, with the user's consent"""
+        # Prefetched by b2b.api.get_user_b2b_organizations
+        return UserContractPageSerializer(
+            instance._user_active_contracts,  # noqa: SLF001
+            many=True,
+        ).data
+
+
 class GenerateCheckoutPayloadSerializer(serializers.Serializer):
     """
     Serializer for the result from ecommerce.api.generate_checkout_payload.
