@@ -1,5 +1,6 @@
 """Tests for models."""
 
+from importlib import import_module
 from uuid import uuid4
 
 import faker
@@ -238,3 +239,27 @@ def test_attach_user_no_sso_id(mocker, has_keycloak_id):
     result = org.attach_user(user)
     assert result == has_keycloak_id
     assert patched_add_membership.called == has_keycloak_id
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("", ""),
+        ("Plain text stays as it is.", "Plain text stays as it is."),
+        ("<p>One</p><p>Two &amp; three</p>", "One\nTwo & three"),
+        ("<p>Line<br/>break</p>", "Line\nbreak"),
+        (
+            '<p>See <a linktype="page" id="3">the page</a></p><p></p><p></p><p>End</p>',
+            "See the page\n\nEnd",
+        ),
+        ("<ul><li>a</li><li>b</li></ul>", "a\nb"),
+    ],
+)
+def test_organization_description_html_to_text(value, expected):
+    """The description migration keeps the text and one line per block."""
+
+    migration = import_module(
+        "b2b.migrations.0033_organizationpage_description_plain_text"
+    )
+
+    assert migration.html_to_text(value) == expected

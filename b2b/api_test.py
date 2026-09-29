@@ -57,7 +57,7 @@ from b2b.models import (
     OrganizationPage,
     UserOrganization,
 )
-from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED, UAI_COURSEWARE_ID_PREFIX
+from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
@@ -1268,7 +1268,7 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
             existing_run.course,
             skip_edx=False,
             require_designated_source_run=False,
-            org_prefix=UAI_COURSEWARE_ID_PREFIX,
+            org_prefix=None,
         )
         assert result == (mock_run, mock_product)
     else:
@@ -1312,7 +1312,7 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
                 imported_course,
                 skip_edx=False,
                 require_designated_source_run=False,
-                org_prefix=UAI_COURSEWARE_ID_PREFIX,
+                org_prefix=None,
             )
             assert result == (mock_run, mock_product)
         else:
@@ -1390,7 +1390,7 @@ def test_import_and_create_contract_run_with_all_kwargs(mocker):
         imported_course,
         skip_edx=True,
         require_designated_source_run=True,
-        org_prefix=UAI_COURSEWARE_ID_PREFIX,
+        org_prefix=None,
     )
 
     assert result == (mock_run, mock_product)
@@ -1428,7 +1428,7 @@ def test_import_and_create_contract_run_with_string_departments(mocker):
         existing_run.course,
         skip_edx=False,
         require_designated_source_run=False,
-        org_prefix=UAI_COURSEWARE_ID_PREFIX,
+        org_prefix=None,
     )
     assert result == (mock_run, mock_product)
 
@@ -1622,6 +1622,34 @@ def test_create_contract_run_key():
         assert new_course_key.run == B2B_RUN_TAG_FORMAT.format(
             run_idx=run_idx, contract_id=contract_id, year=next_year.year
         )
+
+
+@pytest.mark.parametrize(
+    ("org_key_prefix", "org_prefix", "expected_prefix"),
+    [
+        ("UAI_", None, "UAI_"),
+        ("", None, ""),
+        ("B2B_", None, "B2B_"),
+        ("UAI_", "", ""),
+        ("", "B2B_", "B2B_"),
+    ],
+)
+def test_create_contract_run_key_prefix(org_key_prefix, org_prefix, expected_prefix):
+    """None uses the organization's prefix, and a blank prefix means no prefix."""
+
+    contract = ContractPageFactory.create(organization__org_key_prefix=org_key_prefix)
+    course = CourseFactory.create()
+    source_run = CourseRunFactory.create(
+        course=course,
+        courseware_id=f"{course.readable_id}+SOURCE",
+        run_tag="SOURCE",
+    )
+
+    new_course_key = CourseKey.from_string(
+        create_contract_run_key(source_run, contract, org_prefix=org_prefix)
+    )
+
+    assert new_course_key.org == f"{expected_prefix}{contract.organization.org_key}"
 
 
 def test_apply_available_discount_seat_limit():

@@ -57,7 +57,7 @@ from b2b.models import (
 )
 from b2b.tasks import queue_contract_sheet_update_post_save, queue_enrollment_code_check
 from cms.api import get_home_page
-from courses.constants import ALL_ENROLL_CHANGE_STATUSES, UAI_COURSEWARE_ID_PREFIX
+from courses.constants import ALL_ENROLL_CHANGE_STATUSES
 from courses.models import Course, CourseRun, Department, EnrollmentMode, Program
 from courses.utils import is_uai_course_run, is_uai_program, is_xpro_course_run
 from ecommerce.constants import (
@@ -311,17 +311,14 @@ def create_contract_run_key(
     - source_course (CourseRun): the source course to get the original key from
     - contract (ContractPage): the contract the target run is for
     Kwargs:
-    - org_prefix (str|None): the prefix to use for the org part of the key
+    - org_prefix (str|None): the prefix to use for the org part of the key; None
+      uses the organization's prefix, and "" means no prefix
     Returns:
     - str, the new key
     """
 
-    if not org_prefix:
-        org_prefix = (
-            contract.organization.org_key_prefix
-            if contract.organization.org_key_prefix
-            else UAI_COURSEWARE_ID_PREFIX
-        )
+    if org_prefix is None:
+        org_prefix = contract.organization.org_key_prefix
 
     source_id = CourseKey.from_string(source_course.readable_id)
     new_course_key = (
@@ -370,7 +367,7 @@ def import_and_create_contract_run(  # noqa: PLR0913
     ingest_content_files_for_ai: bool = True,
     skip_edx: bool = False,
     require_designated_source_run: bool = False,
-    org_prefix=UAI_COURSEWARE_ID_PREFIX,
+    org_prefix: str | None = None,
 ):
     """
     Create a contract run for the given course, importing it from edX if necessary.
@@ -575,7 +572,7 @@ def create_contract_run(  # noqa: PLR0913
     *,
     skip_edx=False,
     require_designated_source_run=True,
-    org_prefix: str | None = UAI_COURSEWARE_ID_PREFIX,
+    org_prefix: str | None = None,
     no_reruns: bool = False,
     queue_codes: bool = False,
     ignore_langs: bool = False,
@@ -625,7 +622,7 @@ def create_contract_run(  # noqa: PLR0913
     Keyword Args:
         skip_edx (bool): Don't try to create a course run in edX.
         require_designated_source_run (bool): Require a flagged source run.
-        org_prefix (str): Organization prefix. For UAI courses, this should be "UAI_".
+        org_prefix (str|None): Organization prefix; None uses the organization's.
         no_reruns (bool): Don't rerun the course - raise an exception instead.
         queue_codes (bool): Queue enrollment code generation after saving.
         ignore_langs (bool): Only create a run for the primary language.
