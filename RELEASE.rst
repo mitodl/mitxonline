@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.169.3
+---------------
+
+- Add CyberSource compliance check to order generation pre-flight (#4022)
+
 Version 1.169.2
 ---------------
 
