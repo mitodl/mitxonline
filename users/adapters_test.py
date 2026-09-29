@@ -266,10 +266,12 @@ def test_scim_name_change_queues_edx_profile_update(mocker):
     mock_email.assert_not_called()
 
 
-def test_scim_legal_address_name_change_queues_edx_profile_update(mocker):
-    """A change to name.givenName/familyName queues the profile push too, even
-    though those live on LegalAddress rather than on User - the diff runs over
-    the SCIM representation, not over a hand-listed set of User columns
+def test_scim_legal_address_name_change_queues_nothing(mocker):
+    """A change to name.givenName/familyName queues no Open edX work: it lands on
+    LegalAddress, and update_edx_user_profile sends name (the flat fullName),
+    country, state, gender, year_of_birth and level_of_education - none of which
+    derive from first_name/last_name. Queueing here would PATCH edX with exactly
+    the payload it already has.
     """
     mock_profile, mock_email = _sync_mocks(mocker)
     user = UserFactory.create(name="Joe Smith")
@@ -283,7 +285,10 @@ def test_scim_legal_address_name_change_queues_edx_profile_update(mocker):
     )
     adapter.save()
 
-    mock_profile.assert_called_once_with(user.id)
+    user.legal_address.refresh_from_db()
+    assert user.legal_address.first_name == "Joseph"
+    assert user.legal_address.last_name == "Smythe"
+    mock_profile.assert_not_called()
     mock_email.assert_not_called()
 
 
@@ -416,6 +421,35 @@ def test_scim_multi_operation_patch_queues_profile_update_once(mocker):
     user.refresh_from_db()
     assert user.name == "Joe Smythe"
     mock_profile.assert_called_once_with(user.id)
+
+
+def test_scim_multi_operation_patch_queues_email_update_once(mocker):
+    """The same de-duplication as the profile push, and it matters more here:
+    update_edx_user_email costs a full Open edX OAuth handshake. The task
+    re-reads the user by id, so one run already sees the final address.
+    """
+    _, mock_email = _sync_mocks(mocker)
+    user = UserFactory.create(email="old@example.com")
+
+    adapter = LearnUserAdapter(user)
+    adapter.handle_operations(
+        [
+            {
+                "op": "replace",
+                "path": None,
+                "value": {"emails": [{"value": "mid@example.com", "primary": True}]},
+            },
+            {
+                "op": "replace",
+                "path": None,
+                "value": {"emails": [{"value": "new@example.com", "primary": True}]},
+            },
+        ]
+    )
+
+    user.refresh_from_db()
+    assert user.email == "new@example.com"
+    mock_email.assert_called_once_with(user.id)
 
 
 def test_scim_save_survives_broker_failure(mocker, caplog):
