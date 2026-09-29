@@ -12,7 +12,7 @@ a Session (like, say, from stripe_checkout_session) in there. You'll want to mak
 
 import json
 
-from stripe import Event, PaymentIntent, convert_to_stripe_object
+from stripe import Event, PaymentIntent, Refund, convert_to_stripe_object
 from stripe.checkout import Session
 
 
@@ -108,6 +108,17 @@ def stripe_checkout_session() -> Session:
   "return_url": null,
   "ui_mode": "hosted_page"
 }""")
+    )
+
+
+def stripe_refund() -> Refund:
+    """Return a fake Refund."""
+
+    # From the example at https://docs.stripe.com/api/refunds/object
+    return convert_to_stripe_object(
+        json.loads(
+            """{"id": "re_1Nispe2eZvKYlo2Cd31jOCgZ","object": "refund","amount": 1000,"balance_transaction": "txn_1Nispe2eZvKYlo2CYezqFhEx","charge": "ch_1NirD82eZvKYlo2CIvbtLWuY","created": 1692942318,"currency": "usd","destination_details": {"card": {"reference": "123456789012","reference_status": "available","reference_type": "acquirer_reference_number","type": "refund"},"type": "card"},"metadata": {},"payment_intent": "pi_1GszsK2eZvKYlo2CfhZyoZLp","reason": null,"receipt_number": null,"source_transfer_reversal": null,"status": "succeeded","transfer_reversal": null}"""  # pragma: allowlist secret
+        )
     )
 
 

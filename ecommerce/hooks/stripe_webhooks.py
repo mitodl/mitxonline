@@ -52,3 +52,28 @@ class CheckoutSessionEvents:
             return process_stripe_checkout_expired(event)
 
         return True
+
+
+class RefundEvents:
+    """
+    Wrapper class for refund events.
+
+    Stripe sends both of these for a refund; processing skips orders that are
+    already refunded, so whichever arrives second is a no-op.
+    """
+
+    @hookimpl(specname="stripe_event")
+    def refund_webhooks(self, event: Event):
+        """
+        Call the function to process refund events.
+
+        This includes these events:
+        - refund.updated
+        - charge.refund.updated
+        """
+        from ecommerce.api import process_stripe_refund_updated  # noqa: PLC0415
+
+        if event.type in constants.STRIPE_EVENTS_REFUND:
+            return process_stripe_refund_updated(event)
+
+        return True
