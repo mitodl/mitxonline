@@ -1264,11 +1264,17 @@ def enroll_in_edx_course_runs(
     """
     edx_client = get_edx_api_service_client()
 
-    try:
-        repair_faulty_edx_user(user)
-    except Exception as exc:
-        msg = f"Failed to verify/create user {user.edx_username} in OpenEdX"
-        raise OpenEdxUserMissingError(msg) from exc
+    # repair_faulty_edx_user's own check re-verifies existence against edX
+    # over HTTP even when we already know locally that the user is synced
+    # (see create_edx_user's `has_been_synced and _edx_user_exists(user)`),
+    # so only pay for that round trip - plus the fresh AccessToken/OpenEdxUser
+    # writes repair performs - when there's an actual local sign of trouble.
+    if not user.openedx_user_exists:
+        try:
+            repair_faulty_edx_user(user)
+        except Exception as exc:
+            msg = f"Failed to verify/create user {user.edx_username} in OpenEdX"
+            raise OpenEdxUserMissingError(msg) from exc
 
     if not user.openedx_user_exists:
         msg = f"User {user.edx_username} does not exist in OpenEdX and could not be created"

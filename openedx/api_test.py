@@ -79,7 +79,7 @@ from openedx.exceptions import (
     UnknownEdxApiEnrollException,
     UserNameUpdateFailedException,
 )
-from openedx.factories import OpenEdxApiAuthFactory
+from openedx.factories import OpenEdxApiAuthFactory, OpenEdxUserFactory
 from openedx.models import CourseRunClone, OpenEdxApiAuth, OpenEdxUser
 from openedx.utils import SyncResult
 from users.factories import UserFactory
@@ -1127,6 +1127,56 @@ def test_enroll_in_edx_course_runs(settings, mocker, user, has_edx_username):
 
     if not has_edx_username:
         assert user.openedx_users.exists()
+
+
+def test_enroll_in_edx_course_runs_skips_repair_when_already_synced(mocker):
+    """
+    enroll_in_edx_course_runs should not call repair_faulty_edx_user for a
+    user who's already synced locally - repair's own check re-verifies
+    existence against edX over HTTP even when nothing's wrong, so paying for
+    that (plus the AccessToken/OpenEdxUser writes repair performs) on every
+    enrollment call is wasted work for the common case.
+    """
+    user = UserFactory.create()  # has a synced openedx_user by default
+    mock_client = mocker.MagicMock()
+    mock_client.enrollments.create_student_enrollment = mocker.Mock(
+        return_value=mocker.Mock(is_active=True)
+    )
+    mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
+    mocker.patch("openedx.api.get_edx_api_service_client", return_value=mock_client)
+    patched_repair = mocker.patch("openedx.api.repair_faulty_edx_user")
+    course_run = CourseRunFactory.build()
+
+    enroll_in_edx_course_runs(user, [course_run])
+
+    patched_repair.assert_not_called()
+
+
+def test_enroll_in_edx_course_runs_repairs_when_not_synced(mocker):
+    """
+    enroll_in_edx_course_runs should still call repair_faulty_edx_user when
+    the user isn't known to be synced locally - the self-heal behavior for a
+    genuinely faulty user is preserved.
+    """
+    user = UserFactory.create(no_openedx_user=True)
+    mock_client = mocker.MagicMock()
+    mock_client.enrollments.create_student_enrollment = mocker.Mock(
+        return_value=mocker.Mock(is_active=True)
+    )
+    mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
+    mocker.patch("openedx.api.get_edx_api_service_client", return_value=mock_client)
+
+    def fake_repair(repaired_user):
+        OpenEdxUserFactory.create(user=repaired_user, has_been_synced=True)
+
+    patched_repair = mocker.patch(
+        "openedx.api.repair_faulty_edx_user", side_effect=fake_repair
+    )
+    course_run = CourseRunFactory.build()
+
+    enroll_in_edx_course_runs(user, [course_run])
+
+    patched_repair.assert_called_once_with(user)
 
 
 def test_enroll_api_fail(mocker, user):
