@@ -1,6 +1,7 @@
 """Sentry setup and configuration"""
 
 import logging
+import re
 
 import sentry_sdk
 from celery.exceptions import WorkerLostError
@@ -8,11 +9,104 @@ from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
+from sentry_sdk.scrubber import DEFAULT_DENYLIST, EventScrubber
 
 # these errors occur when a shutdown is happening (usually caused by a SIGTERM)
 SHUTDOWN_ERRORS = (WorkerLostError, SystemExit)
 
 log = logging.getLogger()
+
+
+# Postgres appends a DETAIL line to constraint violations that echoes the whole
+# offending row -- on a users table that is the learner's name, email and
+# external UUID.  psycopg puts it in str(exc), so it ships inside the exception
+# value, where no SDK privacy setting reaches it: send_default_pii governs
+# user/cookie/header capture and max_request_body_size governs request bodies,
+# and neither touches exception text.
+#
+# The newline is matched both raw and as a literal backslash-n: the SDK repr()s
+# frame locals and non-string logging params during serialization, so there the
+# DETAIL line arrives as "...constraint\\nDETAIL: ..." inside a repr string.
+PG_DETAIL_RE = re.compile(r"(\n|\\n)DETAIL:.*", re.DOTALL)
+
+
+def scrub_pg_detail(text):
+    """Truncate a Postgres error string at its DETAIL line.
+
+    Keeps the primary message, which is what identifies the failure, and drops
+    the row echo plus any HINT/CONTEXT Postgres appends after it.
+    """
+    return PG_DETAIL_RE.sub(
+        lambda match: match.group(1) + "DETAIL:  [scrubbed]", text, count=1
+    )
+
+
+# The SDK's EventScrubber matches whole key names, so "client_secret" and
+# Keycloak's "clientSecret" (the OIDC IdP config b2b.provisioning sends) pass
+# its default denylist, which only has "secret". The request body carries the
+# first and captured frame locals the second.
+SECRET_KEYS = ["client_secret", "clientsecret"]
+
+# Key matching cannot reach a secret inside a string: requests' frames hold the
+# JSON body it sent as bytes, and objects in frame locals arrive repr()d. This
+# blanks the value of any client-secret pair in JSON or repr form, including
+# one escaped inside another string. The value ends at a quote carrying exactly
+# the opening quote's backslashes, so a quote escaped inside the secret itself
+# (which carries more) does not end it early.
+SECRET_PAIR_RE = re.compile(
+    r"(client_?secret\\*['\"]?\s*[:=]\s*)(\\*)(['\"])(.*?)(?<!\\)(\2\3)",
+    re.IGNORECASE,
+)
+
+
+def build_event_scrubber(*, send_default_pii):
+    """Return the SDK's scrubber, extended with our secret keys and made recursive.
+
+    Recursive because the secret sits nested in frame locals, e.g. the
+    identity provider payload's config["clientSecret"].
+    """
+    return EventScrubber(
+        denylist=[*DEFAULT_DENYLIST, *SECRET_KEYS],
+        recursive=True,
+        send_default_pii=send_default_pii,
+    )
+
+
+def scrub_secret_values(text):
+    """Blank the value of any client-secret key/value pair inside a string."""
+    return SECRET_PAIR_RE.sub(r"\1\2\3[Filtered]\5", text)
+
+
+def scrub_pg_details(event):
+    """Truncate Postgres DETAIL lines everywhere in a Sentry event.
+
+    The row echo reaches Sentry through more fields than the exception value:
+    LoggingIntegration puts the log message in a breadcrumb
+    (BreadcrumbHandler._breadcrumb_from_record), logger.error("...: %s", exc)
+    puts it in logentry.params (EventHandler._emit), and captured stack-frame
+    locals carry it in frame vars because include_local_variables defaults to
+    True (serialize_frame).  Walking the whole event covers those without
+    enumerating them, and does not go stale when the SDK adds another.
+
+    Safe to walk naively because Client._prepare_event serializes the event
+    before calling before_send, so every leaf here is already a JSON
+    primitive -- no live exception objects to coerce.
+    """
+    return _scrub_node(event)
+
+
+def _scrub_node(node):
+    """Recurse through the serialized event, rewriting strings in place."""
+    if isinstance(node, str):
+        return scrub_secret_values(scrub_pg_detail(node))
+    if isinstance(node, dict):
+        for key, value in node.items():
+            node[key] = _scrub_node(value)
+        return node
+    if isinstance(node, list):
+        node[:] = [_scrub_node(item) for item in node]
+        return node
+    return node
 
 
 def before_send(event, hint):
@@ -31,7 +125,7 @@ def before_send(event, hint):
         if isinstance(exc_value, SHUTDOWN_ERRORS):
             # so we don't want to report expected shutdown errors to sentry
             return None
-    return event
+    return scrub_pg_details(event)
 
 
 def init_sentry(  # noqa: PLR0913
@@ -74,6 +168,14 @@ def init_sentry(  # noqa: PLR0913
         environment=environment,
         release=version,
         before_send=before_send,
+        # Request bodies are NOT gated on send_default_pii: the SDK sets
+        # request.data unconditionally (RequestExtractor.extract_into_event)
+        # and this is the only control (request_body_within_bounds).  Left
+        # unset it defaults to "medium", i.e. 10,000-byte bodies -- enrollment,
+        # checkout, profile and SCIM payloads.  Set explicitly so the choice is
+        # findable here rather than in a dependency's defaults.
+        max_request_body_size="small",
+        event_scrubber=build_event_scrubber(send_default_pii=send_default_pii),
         send_default_pii=send_default_pii,
         traces_sample_rate=traces_sample_rate,
         profiles_sample_rate=profiles_sample_rate,

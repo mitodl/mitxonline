@@ -2,6 +2,7 @@
 
 import logging
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from urllib.parse import urljoin
@@ -28,10 +29,14 @@ from b2b.api import (
     get_active_contracts_from_basket_items,
     is_discount_supplied_for_b2b_purchase,
 )
-from courses.api import create_run_enrollments, deactivate_run_enrollment
+from courses.api import (
+    create_run_enrollments,
+    deactivate_run_enrollment,
+    downgrade_program_enrollment_and_verified_runs,
+)
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.models import CourseRunEnrollment
-from courses.utils import is_uai_course_run
+from courses.utils import is_uai_course_run, is_xpro_course_run
 from ecommerce.constants import (
     ADMIN_FULFILLED_PAYMENT_DATA,
     ALL_DISCOUNT_TYPES,
@@ -42,6 +47,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     PAYMENT_TYPE_SALES,
+    REDEMPTION_TYPE_INTERNAL,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
@@ -63,10 +69,17 @@ from ecommerce.constants import (
     STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
     ZERO_PAYMENT_DATA,
 )
+from ecommerce.discount_sources import (
+    double_spent_source_line_ids,
+    fulfilled_paid_amount_off_redemptions,
+    source_line_for,
+)
 from ecommerce.exceptions import (
+    VerifiedProgramCourseNotInProgramError,
     VerifiedProgramInvalidBasketError,
     VerifiedProgramInvalidOrderError,
     VerifiedProgramNoEnrollmentError,
+    VerifiedProgramNoProductError,
 )
 from ecommerce.models import (
     Basket,
@@ -76,6 +89,7 @@ from ecommerce.models import (
     DiscountProduct,
     DiscountRedemption,
     FulfilledOrder,
+    Line,
     Order,
     OrderStatus,
     PendingOrder,
@@ -275,7 +289,7 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
     return payload
 
 
-def check_discount_for_products(discount, basket):
+def check_discount_for_products(discount, basket, products=None):
     """
     Checks the validity of the discount against what's in the basket.
 
@@ -286,13 +300,14 @@ def check_discount_for_products(discount, basket):
     Args:
         - basket (Basket): the current basket
         - discount (Discount|string: the discount to apply (if a string, loads the discount code specified)
+        - products (list or None): basket.get_products(), for a caller that already has it
     Returns:
         boolean
     """
     if not isinstance(discount, Discount):
         discount = Discount.objects.filter(discount_code=discount).first()
 
-    basket_products = basket.get_products()
+    basket_products = basket.get_products() if products is None else products
 
     return discount.check_validity_with_products(basket_products)
 
@@ -307,10 +322,14 @@ def check_basket_discounts_for_validity(request):
     """
     basket = establish_basket(request)
 
+    basket_products = basket.get_products()
+
     for basket_discount in basket.discounts.all():
         if not basket_discount.redeemed_discount.is_redeemable_by(
-            basket.user
-        ) or not check_discount_for_products(basket_discount.redeemed_discount, basket):
+            basket.user, basket_products
+        ) or not check_discount_for_products(
+            basket_discount.redeemed_discount, basket, basket_products
+        ):
             return False
 
     return True
@@ -358,10 +377,11 @@ def apply_user_discounts(request):
             discount = user_discount.discount
 
     if discount:
+        basket_products = basket.get_products()
         # check for product specificity in the discount
         if not check_discount_for_products(
-            discount, basket
-        ) or not discount.is_redeemable_by(user):
+            discount, basket, basket_products
+        ) or not discount.is_redeemable_by(user, basket_products):
             return
 
         bd = BasketDiscount(
@@ -660,6 +680,14 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
 
     transaction_dict = order_recent_transaction.data
 
+    # Ensure the payment gateway can find the transaction ID — it may be stored
+    # on the model field but absent from the raw data blob (e.g. legacy records).
+    if "transaction_id" not in transaction_dict:
+        transaction_dict = {
+            **transaction_dict,
+            "transaction_id": order_recent_transaction.transaction_id,
+        }
+
     # Check for a PayPal payment - if there's one, we can't process it
     if "paypal_token" in transaction_dict:
         raise Exception(  # noqa: TRY002
@@ -733,7 +761,27 @@ def downgrade_learner_from_order(order_id):
         runs=active_runs,
         keep_failed_enrollments=True,
         mode=EDX_ENROLLMENT_AUDIT_MODE,
+        change_status=ENROLL_CHANGE_STATUS_REFUNDED,
     )
+
+
+def downgrade_enrollments_from_order(order_id):
+    """
+    Downgrade all enrollments tied to a refunded order back to audit -
+    course-run enrollments (via downgrade_learner_from_order) and, for a
+    program purchase, the ProgramEnrollment and the program's course-run
+    enrollments that are verified only because of it (via
+    downgrade_program_enrollment_and_verified_runs).
+
+    An order only ever carries one purchasable-line kind in practice, so
+    each branch is simply a no-op when its kind of line isn't present.
+    """
+    order = Order.objects.get(pk=order_id)
+
+    downgrade_learner_from_order(order_id)
+
+    for program in order.purchased_programs:
+        downgrade_program_enrollment_and_verified_runs(order.purchaser, program)
 
 
 def unenroll_learner_from_order(order_id):
@@ -955,8 +1003,8 @@ def check_and_process_pending_orders_for_resolution(
 
 def check_for_duplicate_discount_redemptions():
     """
-    Checks for multiple redemptions for discount codes, and makes noise if there
-    are any.
+    Checks for multiple redemptions for discount codes, and makes noise if
+    there are any.
 
     For discounts that are one-time or one-time-per-user redemptions, there's a
     possibility that the code can be redeemed more than once. This will check
@@ -1025,6 +1073,34 @@ def check_for_duplicate_discount_redemptions():
             seen.append(redemption.redeemed_discount.id)
 
     return seen
+
+
+def check_for_double_spent_sources():
+    """
+    The safety net behind OrderFlow.fulfill's source check: log every source
+    line funding a fulfilled paid-amount-off redemption on more than one order,
+    naming the orders to review.
+
+    Returns:
+    - List of the double-spent source line IDs
+    """
+    double_spent = double_spent_source_line_ids()
+    for source_line_id in double_spent:
+        reference_numbers = (
+            fulfilled_paid_amount_off_redemptions()
+            .filter(source_line_id=source_line_id)
+            .order_by("redeemed_order__reference_number")
+            .values_list("redeemed_order__reference_number", flat=True)
+            .distinct()
+        )
+        log.error(
+            "Line %s funds fulfilled paid-amount-off redemptions on more than one "
+            "order (%s); review manually.",
+            source_line_id,
+            ", ".join(reference_numbers),
+        )
+
+    return double_spent
 
 
 def _coerce_supplied_date(value):
@@ -1149,6 +1225,140 @@ def generate_discount_code(**kwargs):  # noqa: C901
     return generated_codes
 
 
+def _active_discounts() -> QuerySet[Discount]:
+    """Every discount inside its activation and expiration window right now."""
+    now = now_in_utc()
+    return Discount.objects.filter(
+        Q(activation_date__lte=now) | Q(activation_date=None),
+        Q(expiration_date__gt=now) | Q(expiration_date=None),
+    )
+
+
+def _discounts_offered_to(user, flexible_price_discounts) -> QuerySet[Discount]:
+    """
+    Every active discount on offer to ``user``: the automatic ones, the ones
+    tied to this learner, and ``flexible_price_discounts``, the
+    financial-assistance tier discounts already determined for the products in
+    question.
+
+    A tier discount carries no product links, so naming its id is what offers
+    it for the product it was determined for and no other.
+
+    Offered is not the same as applicable: an automatic discount may also carry
+    UserDiscount rows naming other learners, and product scope, redemption
+    limits and the program-child-purchase source are all still open. Callers
+    narrow from here.
+    """
+    return _active_discounts().filter(
+        Q(automatic=True)
+        | Q(user_discount_discount__user=user)
+        | Q(pk__in=[discount.id for discount in flexible_price_discounts])
+    )
+
+
+@dataclass(frozen=True)
+class UserPriceQuote:
+    """
+    What this user pays for one product, and why.
+
+    ``flexible_price_discount`` is the learner's approved financial assistance
+    discount whether or not it won the price -- a tier whose redemptions are
+    spent, one another candidate undercuts, and the top tier that prices at
+    list all still answer "is this learner approved for aid", which is a
+    different question from what checkout charges.
+
+    ``source_line`` is the prior purchase a winning paid-amount-off discount
+    spends, so the caller can name the credit without resolving it again.
+    """
+
+    discount: Discount | None
+    price: Decimal
+    flexible_price_discount: Discount | None
+    source_line: Line | None
+
+
+def quote_user_price(product, user) -> UserPriceQuote:
+    """
+    What checkout charges ``user`` for ``product``.
+
+    The cheapest applicable discount wins, which is the rule
+    apply_discount_to_basket applies: it keeps a candidate only when the
+    candidate prices an item at or below the applied price, so no class of
+    discount outranks another.
+
+    The price therefore agrees with what the basket charges for the
+    single-item baskets checkout builds; only the discount named can differ,
+    in two ways. On an exact tie the basket keeps whichever discount it applied
+    last while this names the lowest id. And a discount that beats no other
+    candidate but still quotes the list price is recorded on the basket, while
+    this reports no discount, because the basket's price is the discount's
+    price capped at the list price.
+
+    Applicability restates is_valid_for_basket for a single product: the
+    discount is inside its window, in scope for the product, offered to this
+    learner rather than tied to another, inside its redemption limits, and --
+    for a program-child-purchase discount -- backed by an unconsumed
+    qualifying prior purchase. The first three are the candidate query;
+    discount_product enforces the rest.
+
+    The work is bounded by the discounts that can price this product, not by
+    anything about the request. Checkout's own bound is looser: it checks every
+    discount on offer to the learner, in scope for the basket or not.
+
+    Args:
+        product (Product): the product to price
+        user (User or None): the learner, or None/anonymous for list price
+    Returns:
+        UserPriceQuote
+    """
+    if user is None or user.is_anonymous:
+        return UserPriceQuote(
+            discount=None,
+            price=product.price,
+            flexible_price_discount=None,
+            source_line=None,
+        )
+
+    finaid = determine_courseware_flexible_price_discount(product, user)
+    candidates = (
+        _discounts_offered_to(user, [finaid] if finaid else [])
+        .filter(
+            # A discount carrying DiscountProduct rows applies only to the
+            # products named by them; one carrying none applies to everything.
+            # Scoping in SQL rather than per candidate is what keeps the cost
+            # independent of how many discounts are live for other products.
+            Q(products__isnull=True) | Q(products__product=product)
+        )
+        .filter(
+            # A discount carrying UserDiscount rows is offered only to the
+            # users named by them. The two filters join the rows separately, so
+            # this one excludes a discount tied to another learner even where
+            # _discounts_offered_to admitted it for being automatic.
+            Q(user_discount_discount__isnull=True)
+            | Q(user_discount_discount__user=user)
+        )
+        .distinct()
+        # Ordering is what makes a price tie resolve on the lowest id rather
+        # than on however the database returned the rows.
+        .order_by("id")
+    )
+
+    best, best_price = None, product.price
+    for discount in candidates:
+        price = discount.discount_product(product, user)
+        if price is not None and price < best_price:
+            best, best_price = discount, price
+    return UserPriceQuote(
+        discount=best,
+        price=best_price,
+        flexible_price_discount=finaid,
+        # discount_product resolves a paid-amount-off winner's source to price
+        # it and discards the line; resolving that one discount a second time
+        # is cheaper than threading the line out through every pricing caller.
+        source_line=source_line_for(best, user, [product]) if best else None,
+    )
+
+
 def get_auto_apply_discounts_for_basket(basket_id: int) -> QuerySet[Discount]:
     """
     Get the auto-apply discounts that can be applied to a basket.
@@ -1166,42 +1376,45 @@ def get_auto_apply_discounts_for_basket(basket_id: int) -> QuerySet[Discount]:
         QuerySet: The auto-apply discounts that can be applied to the basket.
     """
     basket = Basket.objects.get(pk=basket_id)
-    products = basket.get_products()
-
-    finaid_discounts = []
-
-    for product in products:
-        finaid_discount = determine_courseware_flexible_price_discount(
-            product, basket.user
+    flexible_price_discounts = [
+        discount
+        for product in basket.get_products()
+        if (
+            discount := determine_courseware_flexible_price_discount(
+                product, basket.user
+            )
         )
-
-        if finaid_discount:
-            finaid_discounts.append(finaid_discount.id)
-
-    return Discount.objects.filter(
-        Q(activation_date__lte=now_in_utc()) | Q(activation_date=None),
-        Q(expiration_date__gt=now_in_utc()) | Q(expiration_date=None),
-    ).filter(
-        Q(user_discount_discount__user=basket.user)
-        | Q(pk__in=finaid_discounts)
-        | Q(automatic=True)
-    )
+    ]
+    return _discounts_offered_to(basket.user, flexible_price_discounts)
 
 
-def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid=False):  # noqa: C901
+def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid=False):
     """
     Apply a discount to a basket.
 
     Discount application is subject to rules:
-    - The discount itself must be valid on its face (not inactive, applies to products, etc.)
-    - The discount is not a financial assistance tier discount, unless allow_finaid is set
-    - The discount provides a better price to the learner than any other applied discount
-    - The discount is not overriding a user discount
+    - The discount itself must be valid on its face (inside its
+      activation/expiration window, applies to products, tied to no user or to
+      this one, within its redemption limits, and -- for a
+      program-child-purchase discount -- the learner still holds an unconsumed
+      qualifying prior purchase among the basket's products)
+    - The discount is not a discount marked as financial assistance
+      (``payment_type``), unless allow_finaid is set
+    - The discount prices some basket item at or below that item's current
+      discounted price
 
-    If a user discount is supplied to this function, then that discount will be
-    applied _unless_ a financial assistance discount is also applied. User
-    discounts take precedence over any other discount, other than financial
-    assistance discounts.
+    For the single-item baskets checkout builds -- ``_create_basket_from_product``
+    and ``create_basket_with_products`` in ecommerce/views/v0 empty the basket
+    before adding, unless ENABLE_MULTIPLE_CART_ITEMS is on, which it is not by
+    default -- the cheapest applicable discount wins whatever order the
+    candidates arrive in: no class of discount outranks another, so a user-tied
+    discount, a financial assistance tier discount, an automatic discount and a
+    typed-in code all compete on price alone, and a candidate that ties the
+    applied price replaces it, which is why the basket view applies the code the
+    learner typed in last. With several items the rule is bullet 3 exactly: a
+    candidate is kept when it prices *some* item at or below the applied price,
+    so which candidates survive, and the basket total, depend on the order they
+    arrive in.
 
     This function is not for use with B2B or verified program enrollment code
     redemption. Those use cases have their own redemption code paths because
@@ -1219,65 +1432,16 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
         }
 
         if basket.discounts.count() > 0 and basket.basket_items.count() > 0:
-            # Check to make sure the supplied discount can be applied. This means
-            # that it should not override any user discounts that are applied,
-            # and it should be better than the other discounts in the basket.
+            found_better = False
 
-            if discount.user_discount_discount.filter(user=basket.user).exists():
-                # This is a user discount.
-                # Check for an existing tier discount - user discount shouldn't override that
-                finaid_discounts = [
-                    basket_discount
-                    for basket_discount in basket.discounts.all()
-                    if basket_discount.redeemed_discount.flexible_price_tiers.count()
-                    > 0
-                ]
+            for item in basket.basket_items.all():
+                test_price = discount.discount_product(item.product, basket.user)
+                if test_price is not None and item.discounted_price >= test_price:
+                    found_better = True
+                    break
 
-                if len(finaid_discounts) > 0:
-                    # There is a finaid discount, so don't apply this user one.
-                    return
-            else:
-                is_finaid_discount = discount.flexible_price_tiers.exists()
-                has_user_discount = (
-                    basket.discounts.filter(
-                        redeemed_discount__user_discount_discount__user=basket.user
-                    ).count()
-                    > 0
-                )
-
-                if is_finaid_discount and not allow_finaid:
-                    # Financial assistance discount; bail unless the flag is set
-                    return
-
-                if has_user_discount and is_finaid_discount and allow_finaid:
-                    # Basket has a user discount applied; this is a finaid
-                    # discount (and we're allowed to apply it); apply the
-                    # discount without further evaluation.
-
-                    BasketDiscount.objects.update_or_create(
-                        redeemed_by=basket.user,
-                        redeemed_basket=basket,
-                        defaults=defaults,
-                        create_defaults=defaults,
-                    )
-                    return
-
-                if has_user_discount:
-                    # This basket has a user discount applied; this isn't a
-                    # finaid discount that we're permitting to be applied; so
-                    # skip this one.
-                    return
-
-                found_better = False
-
-                for item in basket.basket_items.all():
-                    test_price = discount.discount_product(item.product, basket.user)
-                    if test_price is not None and item.discounted_price >= test_price:
-                        found_better = True
-                        break
-
-                if not found_better:
-                    return
+            if not found_better:
+                return
 
         BasketDiscount.objects.update_or_create(
             redeemed_by=basket.user,
@@ -1296,8 +1460,10 @@ def create_verified_program_discount(program):
     codes - this creates one for the program that is set up to make the order
     zero-value, so the learner doesn't have to pay for upgraded enrollments.
 
-    This will create a single discount, with the "verified program" flag set,
-    with unlimited redemptions, set to 100% off.
+    This creates a single 100%-off discount with the "internal" redemption type
+    and no redemption cap: learners cannot redeem it, and it prices whatever the
+    verified-enrollment flow attaches it to. Callers are responsible for
+    checking the run belongs to the program before attaching it.
 
     If a discount already exists for this purpose, this will return it.
 
@@ -1316,7 +1482,9 @@ def create_verified_program_discount(program):
         Q(activation_date__isnull=True) | Q(activation_date__lte=now_in_utc()),
         Q(expiration_date__isnull=True) | Q(expiration_date__gte=now_in_utc()),
         products__product=product,
-        is_program_discount=True,
+        redemption_type=REDEMPTION_TYPE_INTERNAL,
+        discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+        amount=100,
     )
 
     if existing_discount_qs.exists():
@@ -1326,11 +1494,10 @@ def create_verified_program_discount(program):
         amount=Decimal(100),
         automatic=False,
         discount_type=DISCOUNT_TYPE_PERCENT_OFF,
-        redemption_type=REDEMPTION_TYPE_UNLIMITED,
+        redemption_type=REDEMPTION_TYPE_INTERNAL,
         payment_type=PAYMENT_TYPE_SALES,
         discount_code=f"{program.readable_id}-{uuid.uuid4()}",
         is_bulk=True,
-        is_program_discount=True,
     )
 
     DiscountProduct.objects.create(discount=discount, product=product)
@@ -1367,6 +1534,9 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
     Raises:
     - VerifiedProgramNoEnrollmentError if the learner doesn't have a program
       enrollment
+    - VerifiedProgramCourseNotInProgramError if the run's course is not in the
+      program's requirements
+    - VerifiedProgramNoProductError if the run has no active Product to purchase
     - VerifiedProgramInvalidBasketError if the basket isn't zero value
     - VerifiedProgramInvalidOrderError if the order doesn't get processed through
     """
@@ -1377,12 +1547,22 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
         msg = f"No verified enrollment for {request.user} for program {program}"
         raise VerifiedProgramNoEnrollmentError(msg)
 
+    # The program's internal discount prices whatever it is attached to, so
+    # membership is decided here, against the current requirements tree.
+    if not program.courses_qset.filter(courseruns=courserun).exists():
+        msg = f"Course run {courserun} is not in program {program}"
+        raise VerifiedProgramCourseNotInProgramError(msg)
+
     discount = create_verified_program_discount(program)
 
     cr_ctype = ContentType.objects.get_for_model(courserun)
-    product = Product.objects.filter(
-        content_type=cr_ctype, object_id=courserun.id, is_active=True
-    ).get()
+    try:
+        product = Product.objects.filter(
+            content_type=cr_ctype, object_id=courserun.id, is_active=True
+        ).get()
+    except Product.DoesNotExist as exc:
+        msg = f"No active product for course run {courserun}"
+        raise VerifiedProgramNoProductError(msg) from exc
 
     basket = establish_basket(request)
 
@@ -1401,7 +1581,10 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
 
     # Sync with HubSpot for CourseRun and Program products
     sync_hubspot_cart_add(
-        request.user, product, is_uai=(is_uai_course_run(product.purchasable_object))
+        request.user,
+        product,
+        is_uai=is_uai_course_run(product.purchasable_object),
+        is_xpro=is_xpro_course_run(product.purchasable_object),
     )
 
     if Decimal(

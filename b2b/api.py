@@ -16,7 +16,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Manager, Prefetch, Q
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
@@ -32,6 +32,7 @@ from b2b.constants import (
     MAILGUN_LOGS_DESC,
     MAILGUN_LOGS_PAGE_LIMIT,
     MAILGUN_LOGS_RETENTION_DAYS,
+    ONBOARDING_STATE_ORG_CREATED,
     ORG_KEY_MAX_LENGTH,
     RETIREMENT_CONTRACT_NAME,
     RETIREMENT_ORG_KEY,
@@ -49,14 +50,16 @@ from b2b.models import (
     ContractProgramItem,
     DiscountContractAttachmentRedemption,
     OrganizationIndexPage,
+    OrganizationOnboarding,
     OrganizationPage,
+    UserB2BContract,
     UserOrganization,
 )
 from b2b.tasks import queue_contract_sheet_update_post_save, queue_enrollment_code_check
 from cms.api import get_home_page
-from courses.constants import ALL_ENROLL_CHANGE_STATUSES, UAI_COURSEWARE_ID_PREFIX
+from courses.constants import ALL_ENROLL_CHANGE_STATUSES
 from courses.models import Course, CourseRun, Department, EnrollmentMode, Program
-from courses.utils import is_uai_course_run, is_uai_program
+from courses.utils import is_uai_course_run, is_uai_program, is_xpro_course_run
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     PAYMENT_TYPE_SALES,
@@ -76,7 +79,9 @@ from hubspot_sync.task_helpers import sync_hubspot_cart_add
 from main import constants as main_constants
 from main.utils import date_to_datetime
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.models import CourseRunClone
 from openedx.tasks import clone_courserun
+from users.models import User
 
 log = logging.getLogger(__name__)
 
@@ -92,6 +97,8 @@ def get_user_b2b_organizations(user):
         user: The user to get organizations for.
     Returns:
         QuerySet of OrganizationPage with _user_active_contracts prefetched.
+        Each contract has the user's own UserB2BContract row prefetched as
+        _user_memberships.
     """
 
     return OrganizationPage.objects.filter(
@@ -104,7 +111,12 @@ def get_user_b2b_organizations(user):
                     "contract_programs",
                     queryset=ContractProgramItem.objects.order_by("sort_order"),
                     to_attr="_contract_program_ids",
-                )
+                ),
+                Prefetch(
+                    "b2b_contract_users",
+                    queryset=UserB2BContract.objects.filter(user=user),
+                    to_attr="_user_memberships",
+                ),
             ).filter(active=True, users=user),
             to_attr="_user_active_contracts",
         )
@@ -139,12 +151,12 @@ def get_or_create_retirement_contract() -> ContractPage:
     """
     Get (or create) the holding contract that retired course runs live in.
 
-    Moving a retired run here rather than nulling its ``b2b_contract`` matters:
-    ``CourseRunQuerySet.exclude_b2b()`` is ``b2b_contract__isnull=True``, so a
-    run with no contract becomes a candidate for the *public* catalog. Parking
-    it against an inactive contract keeps it out of the public catalog and out
-    of every org/contract catalog query, which filter on
-    ``b2b_contract__active=True``.
+    Retired course runs can be moved to a retirement contract - previously, this
+    was because the only way to determine if a course run was for B2B was whether
+    it had a linked contract (so just removing the contract FK would make the run
+    potentially appear in the public catalog). We have a specific flag to
+    signify a B2B run now, but we may still want to move the run out of the
+    contract.
 
     Both pages are created unpublished so they are never served, and the
     contract is inactive with a zero learner cap. The org has no
@@ -207,13 +219,15 @@ def get_or_create_retirement_contract() -> ContractPage:
 
 def check_retirement_contract_collision(run: CourseRun, contract: ContractPage) -> None:
     """
-    Check that moving the run into the holding contract won't break a constraint.
+    Check that moving the run into the holding contract won't break a rule.
 
-    ``CourseRun`` has two unique constraints that include ``b2b_contract`` with
-    ``nulls_distinct=False`` - ``unique_primary_language_per_group`` and
-    ``unique_language_per_group``. Collisions are unlikely in practice because
-    the B2B run tag embeds the source contract ID and year, but an
-    ``IntegrityError`` mid-command is a much worse outcome than a clear refusal.
+    ``CourseRun`` enforces two uniqueness rules per contract group -
+    ``unique_primary_language_per_group`` and ``unique_language_per_group``
+    (formerly database constraints, now validated in
+    ``CourseRun.validate_b2b_contract_group_uniqueness``). Collisions are
+    unlikely in practice because the B2B run tag embeds the source contract ID
+    and year, but a ``ValidationError`` mid-command is a much worse outcome
+    than a clear refusal.
 
     Args:
         run (CourseRun): the run being moved.
@@ -226,7 +240,7 @@ def check_retirement_contract_collision(run: CourseRun, contract: ContractPage) 
         course=run.course,
         run_tag=run.run_tag,
         is_source_run=run.is_source_run,
-        b2b_contract=contract,
+        b2b_contracts=contract,
     ).exclude(pk=run.pk)
 
     if (
@@ -268,13 +282,14 @@ def move_run_to_retirement_contract(run: CourseRun) -> ContractPage:
 
     contract = get_or_create_retirement_contract()
 
-    if run.b2b_contract_id == contract.id:
+    if run.b2b_contracts.filter(pk=contract.pk).exists():
         return contract
 
     check_retirement_contract_collision(run, contract)
 
     run.b2b_contract = contract
     run.save()
+    run.b2b_contracts.add(contract)
 
     log.info("Moved course run %s to %s", run.courseware_id, contract)
 
@@ -296,17 +311,14 @@ def create_contract_run_key(
     - source_course (CourseRun): the source course to get the original key from
     - contract (ContractPage): the contract the target run is for
     Kwargs:
-    - org_prefix (str|None): the prefix to use for the org part of the key
+    - org_prefix (str|None): the prefix to use for the org part of the key; None
+      uses the organization's prefix, and "" means no prefix
     Returns:
     - str, the new key
     """
 
-    if not org_prefix:
-        org_prefix = (
-            contract.organization.org_key_prefix
-            if contract.organization.org_key_prefix
-            else UAI_COURSEWARE_ID_PREFIX
-        )
+    if org_prefix is None:
+        org_prefix = contract.organization.org_key_prefix
 
     source_id = CourseKey.from_string(source_course.readable_id)
     new_course_key = (
@@ -355,7 +367,7 @@ def import_and_create_contract_run(  # noqa: PLR0913
     ingest_content_files_for_ai: bool = True,
     skip_edx: bool = False,
     require_designated_source_run: bool = False,
-    org_prefix=UAI_COURSEWARE_ID_PREFIX,
+    org_prefix: str | None = None,
 ):
     """
     Create a contract run for the given course, importing it from edX if necessary.
@@ -560,7 +572,7 @@ def create_contract_run(  # noqa: PLR0913
     *,
     skip_edx=False,
     require_designated_source_run=True,
-    org_prefix: str | None = UAI_COURSEWARE_ID_PREFIX,
+    org_prefix: str | None = None,
     no_reruns: bool = False,
     queue_codes: bool = False,
     ignore_langs: bool = False,
@@ -610,7 +622,7 @@ def create_contract_run(  # noqa: PLR0913
     Keyword Args:
         skip_edx (bool): Don't try to create a course run in edX.
         require_designated_source_run (bool): Require a flagged source run.
-        org_prefix (str): Organization prefix. For UAI courses, this should be "UAI_".
+        org_prefix (str|None): Organization prefix; None uses the organization's.
         no_reruns (bool): Don't rerun the course - raise an exception instead.
         queue_codes (bool): Queue enrollment code generation after saving.
         ignore_langs (bool): Only create a run for the primary language.
@@ -679,11 +691,14 @@ def create_contract_run(  # noqa: PLR0913
         if (
             CourseRun.objects.filter(
                 course=course,
-                b2b_contract=contract,
                 language=clone_course_run.language,
                 variant_industry=clone_course_run.variant_industry,
                 variant_length=clone_course_run.variant_length,
-            ).exists()
+            )
+            .filter(
+                Q(b2b_contract=contract) | Q(b2b_contracts__in=[contract]),
+            )
+            .exists()
             and no_reruns
         ):
             msg = (
@@ -706,6 +721,7 @@ def create_contract_run(  # noqa: PLR0913
             is_self_paced=True,
             live=True,
             b2b_contract=contract,
+            b2b_only=True,
             language=clone_course_run.language,
             is_primary_language=clone_course_run.is_primary_language,
             variant_length=clone_course_run.variant_length,
@@ -713,12 +729,18 @@ def create_contract_run(  # noqa: PLR0913
         )
         course_run.save()
 
+        course_run.b2b_contracts.add(contract)
+
         required_modes = EnrollmentMode.objects.filter(
             mode_slug__in=[EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE]
         ).all()
         course_run.enrollment_modes.add(*required_modes)
 
         if not skip_edx:
+            CourseRunClone.objects.create(
+                course_run=course_run,
+                source_courseware_id=clone_course_run.courseware_id,
+            )
             clone_courserun.delay(course_run.id, clone_course_run.courseware_id)
 
         log.info(
@@ -762,8 +784,8 @@ def create_contract_run(  # noqa: PLR0913
     if queue_codes:
         queue_enrollment_code_check.delay(contract.id)
 
-    # Saving the contract here triggers any shoring up of related data,
-    # like generating enrollment codes.
+    # Saving the contract does not generate enrollment codes; ContractPage.save
+    # only sets the title. Pass queue_codes, or queue the check separately.
     contract.save()
 
     return results
@@ -856,8 +878,9 @@ def get_active_contracts_from_basket_items(basket: Basket):
     contract_ids = []
     for item in items:
         purchasable = item.product.purchasable_object
-        if hasattr(purchasable, "b2b_contract") and purchasable.b2b_contract:
-            contract_ids.append(purchasable.b2b_contract.id)
+        if hasattr(purchasable, "b2b_contracts") and purchasable.b2b_contracts.exists():
+            item_contract_ids = purchasable.b2b_contracts.values_list("id", flat=True)
+            contract_ids.extend([contract_id for contract_id in item_contract_ids])  # noqa: C416
 
     if contract_ids:
         return list(ContractPage.objects.filter(id__in=contract_ids, active=True))
@@ -1325,55 +1348,197 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
     return (total_created, total_updated, total_errors)
 
 
-def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict, None]:  # noqa: PLR0911
+def _determine_contract_for_user_product(  # noqa: PLR0911
+    user: User,
+    product: Product,
+    *,
+    program: Program | None = None,
+    contract_slug: str | None = None,
+):
+    """
+    Determine what the contract should be for the given options supplied.
+
+    If the contract slug is specified, then this just needs to validate everything -
+    make sure the product item, user and program (if there) are all part of that
+    contract. If there's no contract slug, this figures out what contract overlaps
+    these pieces (user, item, program); if it's just one, then this continues on
+    as if that one had been specified explicitly; otherwise, return an error.
+    """
+
+    item = product.purchasable_object
+
+    if not item:
+        msg = f"_determine_contract_for_user_product: Product {product} doesn't appear to have a purchasable object."
+        raise ValueError(msg)
+
+    user_contract_ids = list(user.b2b_contracts.values_list("id", flat=True))
+    item_b2b_contracts = (
+        item.b2b_contracts.all()
+        if isinstance(item, CourseRun)
+        else ContractPage.objects.filter(contract_programs__program=item)
+    )
+
+    if program and not program.contract_memberships.exists():
+        log.error(
+            "_determine_contract_for_user_product: User %s tried to use product %s with program %s but program is not attached to any contracts",
+            user,
+            product,
+            program,
+        )
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
+    if (
+        not contract_slug
+        or not ContractPage.objects.filter(slug=contract_slug).exists()
+    ):
+        log.info(
+            "_determine_contract_for_user_product: no contract specified for %s purchasing %s",
+            user,
+            product,
+        )
+
+        if not item_b2b_contracts.filter(id__in=user_contract_ids).exists():
+            log.info(
+                "_determine_contract_for_user_product: no contract match between for %s purchasing %s",
+                user,
+                product,
+            )
+            return {
+                "result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH,
+                "failed_match": "item",
+            }
+
+        if (
+            program
+            and not program.contract_memberships.filter(
+                contract__id__in=user_contract_ids
+            ).exists()
+        ):
+            log.info(
+                "_determine_contract_for_user_product: no contract match between %s purchasing %s for program %s",
+                user,
+                product,
+                program,
+            )
+
+            return {
+                "result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH,
+                "failed_match": "program",
+            }
+
+        overlap_item_contracts = set(
+            item_b2b_contracts.filter(id__in=user_contract_ids).values_list(
+                "id", flat=True
+            )
+        )
+
+        log.info(
+            "Item contracts: %s", ",".join([str(i) for i in overlap_item_contracts])
+        )
+
+        if program:
+            program_overlaps = set(
+                program.contract_memberships.filter(
+                    contract__id__in=user_contract_ids
+                ).values_list("contract__id", flat=True)
+            )
+            log.info(
+                "Program contracts: %s", ",".join([str(i) for i in program_overlaps])
+            )
+            overlap_item_contracts = program_overlaps & overlap_item_contracts
+
+        contract_matches = set(user_contract_ids) & overlap_item_contracts
+
+        if len(contract_matches) != 1:
+            log.error(
+                "User %s tried to use product %s but the contract to use is ambiguous (%s)",
+                user,
+                product,
+                ",".join([str(i) for i in contract_matches]),
+            )
+            return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_AMBIGUOUS_CONTRACT}
+
+        return contract_matches.pop()
+
+    contract_qs = item_b2b_contracts.filter(
+        slug=contract_slug, id__in=user_contract_ids
+    )
+    if program:
+        contract_qs = contract_qs.filter(contract_programs__program=program)
+    contract = contract_qs.first()
+
+    if not contract:
+        log.error(
+            "User %s tried to use product %s (and/or program %s) for contract %s but one or more parts of the transaction weren't in the contract",
+            user,
+            product,
+            program,
+            contract_slug,
+        )
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
+    return contract.id
+
+
+def _validate_b2b_enrollment_prerequisites(  # noqa: PLR0911
+    user,
+    product: Product,
+    *,
+    program: Program | None = None,
+    contract_slug: str | None = None,
+) -> Union[dict, None]:
     """
     Validate prerequisites for B2B enrollment.
 
     Returns:
-        dict with error result if validation fails, None if validation passes.
+        dict with error result if validation fails, applicable contract if validation passes.
     """
     if not user.is_authenticated:
         log.error("B2B enroll: attempted to use %s with no user account", product)
         return {"result": main_constants.USER_MSG_TYPE_B2B_DISALLOWED}
 
+    contract_resolution_result = _determine_contract_for_user_product(
+        user, product, contract_slug=contract_slug, program=program
+    )
+
     purchasable_object = product.purchasable_object
-    if not purchasable_object or not purchasable_object.b2b_contract:
+    if not purchasable_object:
         log.error(
             "B2B enroll: attempted to use %s but product has no purchasable object",
             product,
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT}
 
-    if (
-        isinstance(purchasable_object, CourseRun)
-        and not purchasable_object.is_enrollable_for_b2b
-    ):
+    if isinstance(contract_resolution_result, dict):
+        return contract_resolution_result
+
+    contract = ContractPage.active_objects.filter(pk=contract_resolution_result).first()
+
+    if not contract:
         log.error(
-            "B2B enroll: attempted to use %s but %s is not enrollable for B2B",
+            "B2B enroll: %s attempted to use %s but contract %s either doesn't exist or is invalid",
+            user,
+            product,
+            contract,
+        )
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
+    if not isinstance(purchasable_object, (CourseRun, Program)):
+        log.error(
+            "B2B enroll: attempted to use %s but %s is not a program or course run",
             product,
             purchasable_object,
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
 
-    if not ContractPage.active_objects.filter(
-        id=purchasable_object.b2b_contract.id
-    ).exists():
+    if not purchasable_object.enrollable_for_contract(contract):
         log.error(
-            "B2B enroll: %s attempted to use %s but contract %s either doesn't exist or is invalid",
-            user,
+            "B2B enroll: attempted to use %s but %s is not enrollable for B2B contract %s",
             product,
-            purchasable_object.b2b_contract,
+            purchasable_object,
+            contract,
         )
-        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
-
-    if not user.b2b_contracts.filter(id=purchasable_object.b2b_contract.id).exists():
-        log.error(
-            "B2B enroll: attempted to use %s but %s is not in the contract %s",
-            product,
-            user,
-            purchasable_object.b2b_contract,
-        )
-        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
 
     if (
         isinstance(purchasable_object, CourseRun)
@@ -1395,10 +1560,12 @@ def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED}
 
-    return None
+    return contract
 
 
-def _prepare_basket_for_b2b_enrollment(request, product: Product) -> Basket:
+def _prepare_basket_for_b2b_enrollment(
+    request, product: Product, contract: ContractPage
+) -> Basket:
     """
     Prepare basket for B2B enrollment by clearing it and adding the product.
 
@@ -1413,7 +1580,9 @@ def _prepare_basket_for_b2b_enrollment(request, product: Product) -> Basket:
     basket.basket_items.all().delete()
     basket.discounts.all().delete()
 
-    item = BasketItem.objects.create(product=product, basket=basket, quantity=1)
+    item = BasketItem.objects.create(
+        product=product, basket=basket, quantity=1, b2b_contract=contract
+    )
     item.save()
 
     # Sync with HubSpot for CourseRun
@@ -1425,12 +1594,18 @@ def _prepare_basket_for_b2b_enrollment(request, product: Product) -> Basket:
             and is_uai_course_run(product.purchasable_object)
         )
         or (is_product_program(product) and is_uai_program(product.purchasable_object)),
+        is_xpro=(
+            is_product_courserun(product)
+            and is_xpro_course_run(product.purchasable_object)
+        ),
     )
 
     return basket
 
 
-def _apply_available_discount(request, product: Product, basket: Basket) -> None:
+def _apply_available_discount(
+    request, product: Product, basket: Basket, contract: ContractPage
+) -> None:
     """Apply available discount to the basket if one exists."""
 
     # Changed to only check redemption count if the discount isn't unlimited -
@@ -1455,16 +1630,17 @@ def _apply_available_discount(request, product: Product, basket: Basket) -> None
 
         if (
             not product.purchasable_object
-            or not product.purchasable_object.b2b_contract
+            or not product.purchasable_object.b2b_contracts.filter(
+                pk=contract.id
+            ).exists()
         ):
-            msg = f"Product {product} has no purchasable object or the purchasable object has no B2B contract"
+            msg = f"Product {product} has no purchasable object or the purchasable object is not in contract {contract}"
             raise ValueError(msg)
 
-        discount_amount = product.purchasable_object.b2b_contract.enrollment_fixed_price
+        discount_amount = contract.enrollment_fixed_price
         redemption_type = (
             REDEMPTION_TYPE_ONE_TIME
-            if product.purchasable_object.b2b_contract.max_learners
-            and product.purchasable_object.b2b_contract.max_learners > 0
+            if contract.max_learners and contract.max_learners > 0
             else REDEMPTION_TYPE_UNLIMITED
         )
 
@@ -1483,7 +1659,13 @@ def _apply_available_discount(request, product: Product, basket: Basket) -> None
     basket_discount.save()
 
 
-def create_b2b_enrollment(request, product: Product, program_id: str | None = None):
+def create_b2b_enrollment(
+    request,
+    product: Product,
+    *,
+    program_id: str | None = None,
+    contract_slug: str | None = None,
+):
     """
     Create a B2B enrollment for the given product for the current user.
 
@@ -1508,6 +1690,7 @@ def create_b2b_enrollment(request, product: Product, program_id: str | None = No
     - request: The HTTP request object containing the user and basket data.
     - product: The Product object representing the B2B product to enroll in.
     - program_id: Optional readable_id of the program to enroll the user in.
+    - contract_slug: Optional slug of the contract the user's enrollments should belong to.
     Returns: a dict containing
     - "result": the result of the attempt; one of the USER_MSG_TYPE_B2B constants.
     - "order": the order ID if the enrollment was successful and no checkout is needed.
@@ -1516,12 +1699,18 @@ def create_b2b_enrollment(request, product: Product, program_id: str | None = No
     """
     from ecommerce.api import generate_checkout_payload  # noqa: PLC0415
 
+    program = None
+    if program_id:
+        program = Program.objects.get(readable_id=program_id)
+
     # Validate prerequisites for B2B enrollment
-    validation_error = _validate_b2b_enrollment_prerequisites(request.user, product)
+    prereq_check = _validate_b2b_enrollment_prerequisites(
+        request.user, product, program=program, contract_slug=contract_slug
+    )
 
     if (
-        validation_error
-        and validation_error.get("result", None)
+        isinstance(prereq_check, dict)
+        and prereq_check.get("result", None)
         == main_constants.USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED
     ):
         # User has a verified enrollment in the run already - try to find the
@@ -1539,14 +1728,16 @@ def create_b2b_enrollment(request, product: Product, program_id: str | None = No
             "order": order.id if order else "",
         }
 
-    if validation_error:
-        return validation_error
+    if not isinstance(prereq_check, ContractPage):
+        return prereq_check
+
+    contract = prereq_check
 
     # Prepare the basket for enrollment
-    basket = _prepare_basket_for_b2b_enrollment(request, product)
+    basket = _prepare_basket_for_b2b_enrollment(request, product, contract)
 
     # Apply any available discount to the basket
-    _apply_available_discount(request, product, basket)
+    _apply_available_discount(request, product, basket, contract)
 
     # Calculate basket total more efficiently
     basket_price = sum(item.discounted_price for item in basket.basket_items.all())
@@ -1558,7 +1749,7 @@ def create_b2b_enrollment(request, product: Product, program_id: str | None = No
         if "no_checkout" in response:
             # Course run enrollment succeeded - now handle program enrollment
             if program_id:
-                _enroll_in_program_for_b2b(request.user, product, program_id)
+                _enroll_in_program_for_b2b(request.user, product, program_id, contract)
 
             return {
                 "result": main_constants.USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
@@ -1577,12 +1768,15 @@ def create_b2b_enrollment(request, product: Product, program_id: str | None = No
     }
 
 
-def _enroll_in_program_for_b2b(user, product: Product, program_id: str):
+def _enroll_in_program_for_b2b(
+    user, product: Product, program_id: str, contract: ContractPage
+):
     """
     Enroll the user in the specified program as part of a B2B course enrollment.
 
-    Validates that the program belongs to the same contract as the course run
-    being enrolled in, then creates a ProgramEnrollment if one doesn't exist.
+    Validates that the program belongs to a contract that the specified course
+    also belongs to, and creates a verified ProgramEnrollment if one doesn't
+    exist.
 
     Args:
     - user: The user to enroll.
@@ -1593,7 +1787,10 @@ def _enroll_in_program_for_b2b(user, product: Product, program_id: str):
     from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE  # noqa: PLC0415
 
     purchasable_object = product.purchasable_object
-    contract = purchasable_object.b2b_contract
+
+    if not isinstance(purchasable_object, CourseRun):
+        msg = f"Product {purchasable_object} is not for a course run."
+        raise TypeError(msg)
 
     try:
         program = Program.objects.get(readable_id=program_id)
@@ -1606,18 +1803,23 @@ def _enroll_in_program_for_b2b(user, product: Product, program_id: str):
 
     # Validate the program belongs to the same contract as the course run
     if not ContractProgramItem.objects.filter(
-        contract=contract, program=program
+        contract__in=purchasable_object.b2b_contracts.all(), program=program
     ).exists():
         log.warning(
-            "B2B enroll: program %s is not in contract %s, skipping program enrollment",
+            "B2B enroll: program %s and course %s do not share a contract, skipping program enrollment",
             program_id,
-            contract,
+            purchasable_object.courseware_id,
         )
         return
 
-    create_program_enrollments(
+    created_enrollments = create_program_enrollments(
         user, [program], enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
+
+    if contract:
+        for program_enrollment in created_enrollments:
+            program_enrollment.b2b_contract = contract
+            program_enrollment.save()
 
     log.info(
         "B2B enroll: created program enrollment for user %s in program %s",
@@ -1782,31 +1984,65 @@ def reconcile_keycloak_orgs():
     create or update corresponding records in MITx Online. This does not manage
     memberships, just base org info.
 
+    Since the provisioning API (capability C1) writes both systems together,
+    this is a drift reconciler rather than the primary create path: it adopts
+    the organizations Pulumi still owns, ones made in the console, and ones left
+    behind by a provisioning saga whose compensating delete also failed. That
+    last case is why it has to see the whole realm, not a first page of it.
+
     Returns
     - tuple (created, updated): number of orgs created and updated
     """
 
     org_model = get_keycloak_model(*KCAM_ORGANIZATIONS)
-    orgs = org_model.list()
+    orgs = org_model.list_all()
     parent_org_page = OrganizationIndexPage.objects.first()
     created_count = 0
     updated_count = 0
 
     for org in orgs:
         try:
-            page, created = reconcile_single_keycloak_org(org)
+            # Each org gets its own savepoint. Postgres aborts the whole
+            # transaction on any failed statement, so catching a database error
+            # and carrying on with the loop only works if that error was
+            # contained - otherwise every later query raises
+            # TransactionManagementError and skipping one org still loses the
+            # rest of the pass, just less legibly.
+            with transaction.atomic():
+                page, created = reconcile_single_keycloak_org(org)
 
+                if created:
+                    parent_org_page.add_child(instance=page)
+                    page.save()
+                    parent_org_page.save()
+                else:
+                    page.save()
+
+                # An adopted organization needs an onboarding record too, so
+                # that orgs that arrived this way show up in the same place as
+                # the ones the provisioning API made.
+                OrganizationOnboarding.objects.get_or_create(
+                    organization=page,
+                    defaults={
+                        "state": ONBOARDING_STATE_ORG_CREATED,
+                        "state_changed_at": now_in_utc(),
+                    },
+                )
+
+            # Counted after the savepoint commits, so a rolled-back org is not
+            # reported as reconciled.
             if created:
                 created_count += 1
-                parent_org_page.add_child(instance=page)
-                page.save()
-                parent_org_page.save()
             else:
                 updated_count += 1
-                page.save()
-        except ValidationError:  # noqa: PERF203
+        except (ValidationError, IntegrityError):  # noqa: PERF203
+            # IntegrityError because OrganizationOnboarding.organization is a
+            # OneToOneField: a concurrent provisioning saga or a second
+            # reconcile run can insert the row between this one's check and its
+            # insert. The per-org catch is the point - one org losing that race
+            # must not abandon the rest of the pass.
             log.exception(
-                "Validation error: could not create or update organization for Keycloak org %s",
+                "Could not create or update organization for Keycloak org %s",
                 org.id,
             )
 

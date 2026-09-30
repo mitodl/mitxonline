@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from django.contrib import admin
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.db.models import Count
+from django.urls import reverse
 from django.utils.html import format_html
 
 from b2b.api import get_events_for_message_ids, should_persist_event
@@ -13,6 +14,7 @@ from b2b.models import (
     ContractProgramItem,
     DiscountContractAttachmentRedemption,
     OrganizationPage,
+    OrganizationProvisioningAudit,
     UserOrganization,
 )
 from courses.models import CourseRun
@@ -103,11 +105,10 @@ class ContractPageProgramInline(DisplayOnlyAdminMixin, admin.TabularInline):
 class ContractPageCourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
     """Inline to display course runs for contract pages."""
 
-    model = CourseRun
-    fk_name = "b2b_contract"
+    model = CourseRun.b2b_contracts.through
     extra = 0
     fields = [
-        "title_linked",
+        "courseware_id",
         "title",
         "run_tag",
         "language",
@@ -115,7 +116,7 @@ class ContractPageCourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
         "variant_industry",
     ]
     readonly_fields = [
-        "title_linked",
+        "courseware_id",
         "title",
         "run_tag",
         "language",
@@ -125,6 +126,36 @@ class ContractPageCourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
 
     verbose_name = "Contract Course Run"
     verbose_name_plural = "Contract Course Runs"
+
+    @admin.display(description="Courseware ID")
+    def courseware_id(self, obj):
+        admin_link = reverse("admin:courses_courserun_change", args=(obj.courserun.id,))
+        course_admin_link = reverse(
+            "admin:courses_course_change", args=(obj.courserun.course.id,)
+        )
+        return format_html(
+            f'{obj.courserun.courseware_id}<br />Admins: <a href="{admin_link}">Run</a> -  <a href="{course_admin_link}">Course</a>'
+        )
+
+    @admin.display(description="Course Title")
+    def title(self, obj):
+        return obj.courserun.title
+
+    @admin.display(description="Run Tag")
+    def run_tag(self, obj):
+        return obj.courserun.run_tag
+
+    @admin.display(description="Language")
+    def language(self, obj):
+        return obj.courserun.language
+
+    @admin.display(description="Variant Length")
+    def variant_length(self, obj):
+        return obj.courserun.variant_length
+
+    @admin.display(description="Variant Industry")
+    def variant_industry(self, obj):
+        return obj.courserun.variant_industry
 
 
 @admin.register(DiscountContractAttachmentRedemption)
@@ -362,3 +393,52 @@ class UserOrganizationAdmin(admin.ModelAdmin):
     list_filter = ["is_manager", "keep_until_seen", "organization"]
     search_fields = ["user__email", "user__username", "organization__name"]
     fields = ["user", "organization", "is_manager", "keep_until_seen"]
+
+
+@admin.register(OrganizationProvisioningAudit)
+class OrganizationProvisioningAuditAdmin(admin.ModelAdmin):
+    """Read-only view of the provisioning audit trail."""
+
+    list_display = [
+        "created_on",
+        "org_key",
+        "organization",
+        "action",
+        "identity_provider_alias",
+        "acting_user",
+    ]
+    list_filter = ["action"]
+    list_select_related = ["organization", "acting_user"]
+    search_fields = [
+        "org_key",
+        "organization__name",
+        "identity_provider_alias",
+        "acting_user__email",
+    ]
+    readonly_fields = [
+        "created_on",
+        "org_key",
+        "organization",
+        "action",
+        "identity_provider_alias",
+        "acting_user",
+        "data_before",
+        "data_after",
+        "call_stack",
+    ]
+    fields = readonly_fields
+
+    def has_add_permission(self, request):  # noqa: ARG002
+        """Audit records are written by the provisioning functions only."""
+
+        return False
+
+    def has_change_permission(self, request, obj=None):  # noqa: ARG002
+        """Audit records are append-only."""
+
+        return False
+
+    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
+        """Audit records are append-only."""
+
+        return False

@@ -12,6 +12,7 @@ from cms.models import (
     HomePage,
     InstructorIndexPage,
     InstructorPage,
+    ProductPageFAQ,
     ProgramIndexPage,
     ProgramPage,
     ResourcePage,
@@ -179,3 +180,14 @@ class InstructorPageFactory(wagtail_factories.PageFactory):
 
     class Meta:
         model = InstructorPage
+
+
+class ProductPageFAQFactory(factory.django.DjangoModelFactory):
+    """Factory for a single product page FAQ."""
+
+    page = factory.SubFactory(CoursePageFactory)
+    question = factory.Faker("sentence")
+    answer = factory.Faker("paragraph")
+
+    class Meta:
+        model = ProductPageFAQ

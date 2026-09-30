@@ -52,7 +52,7 @@ from openedx.exceptions import (
     UnknownEdxApiEnrollException,
     UserNameUpdateFailedException,
 )
-from openedx.models import OpenEdxApiAuth, OpenEdxUser
+from openedx.models import CourseRunClone, OpenEdxApiAuth, OpenEdxUser
 from openedx.utils import SyncResult, edx_url
 
 log = logging.getLogger(__name__)
@@ -1264,11 +1264,17 @@ def enroll_in_edx_course_runs(
     """
     edx_client = get_edx_api_service_client()
 
-    try:
-        repair_faulty_edx_user(user)
-    except Exception as exc:
-        msg = f"Failed to verify/create user {user.edx_username} in OpenEdX"
-        raise OpenEdxUserMissingError(msg) from exc
+    # repair_faulty_edx_user's own check re-verifies existence against edX
+    # over HTTP even when we already know locally that the user is synced
+    # (see create_edx_user's `has_been_synced and _edx_user_exists(user)`),
+    # so only pay for that round trip - plus the fresh AccessToken/OpenEdxUser
+    # writes repair performs - when there's an actual local sign of trouble.
+    if not user.openedx_user_exists:
+        try:
+            repair_faulty_edx_user(user)
+        except Exception as exc:
+            msg = f"Failed to verify/create user {user.edx_username} in OpenEdX"
+            raise OpenEdxUserMissingError(msg) from exc
 
     if not user.openedx_user_exists:
         msg = f"User {user.edx_username} does not exist in OpenEdX and could not be created"
@@ -1806,7 +1812,12 @@ def fix_cloned_run_data(target_course: CourseRun, *, edx_client=None) -> CourseR
     )
 
 
-def process_course_run_clone(target_course: CourseRun, base_course_key: str):
+def process_course_run_clone(
+    target_course: CourseRun,
+    base_course_key: str,
+    *,
+    clone: CourseRunClone | None = None,
+):
     """
     Clone a course run in edX, using details from a set of MITx Online runs.
 
@@ -1829,12 +1840,16 @@ def process_course_run_clone(target_course: CourseRun, base_course_key: str):
     The base course can just be a course run key (as a string); it does not need
     to exist in MITx Online.
 
-    The target course must _not_ exist in edX.
+    The target course must _not_ exist in edX, unless `clone` shows an earlier
+    attempt already asked edX to create it. Then the clone request is skipped
+    and only the run data and modes are pushed, so a retry after a clone call
+    that edX completed but we did not see finish does not fail forever.
 
     Args:
     - target_course (CourseRun): The CourseRun to create in edX.
     Kwargs:
     - base_course_key (str): The key of the course to re-run.
+    - clone (CourseRunClone): the run's clone progress record, if tracked.
     """
 
     edx_client = get_edx_api_jwt_client(
@@ -1849,20 +1864,42 @@ def process_course_run_clone(target_course: CourseRun, base_course_key: str):
 
     try:
         get_edx_course(target_course.readable_id, client=edx_client)
+    except CourseRunAPIError as exc:
+        # Only a 404 says the target is absent. Anything else (auth, a 5xx) says
+        # nothing about it, and treating it as absent would stamp the request
+        # and clone over whatever is there. Re-raise so the task retries.
+        cause = exc.__cause__
+        if not (
+            isinstance(cause, HTTPError)
+            and cause.response is not None
+            and cause.response.status_code == status.HTTP_404_NOT_FOUND
+        ):
+            raise
+        target_exists = False
+    else:
+        target_exists = True
 
+    if target_exists and not (clone and clone.clone_requested_at):
         msg = f"Course ID {target_course.readable_id} was found in edX. Can't continue."
         raise ValueError(msg)
-    except CourseRunAPIError:
-        # An HTTP error is good in this case. We don't want the target course to exist.
-        pass
 
-    resp = clone_edx_course(
-        base_course_key, target_course.readable_id, client=edx_client
-    )
+    if target_exists:
+        log.info(
+            "Course ID %s is already in edX from an earlier clone attempt, "
+            "skipping the clone request",
+            target_course.readable_id,
+        )
+    else:
+        if clone:
+            clone.mark_requested()
 
-    if not resp:
-        msg = f"Couldn't clone {base_course_key} to {target_course.readable_id}."
-        raise ValueError(msg)
+        resp = clone_edx_course(
+            base_course_key, target_course.readable_id, client=edx_client
+        )
+
+        if not resp:
+            msg = f"Couldn't clone {base_course_key} to {target_course.readable_id}."
+            raise ValueError(msg)
 
     # We should have the target course in edX now. We need to update it with the
     # data from our course run.

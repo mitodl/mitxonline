@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable  # noqa: TC003
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import List  # noqa: UP035
+from typing import TYPE_CHECKING, List, Tuple  # noqa: UP035
 from zoneinfo import ZoneInfo
 
 import reversion
@@ -13,10 +14,11 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import TextChoices
+from django.db.models import Count, Q, TextChoices
 from django.utils.functional import cached_property
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
+from mitol.olposthog.features import is_enabled
 from mitol.payment_gateway.constants import (
     MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
     MITOL_PAYMENT_GATEWAY_STRIPE,
@@ -25,8 +27,9 @@ from reversion.models import Version
 from viewflow import this
 from viewflow.fsm import State
 
+from compliance.exceptions import ExportComplianceError
 from courses.models import CourseRun, PaidCourseRun, Program
-from courses.utils import is_contract_order, is_uai_order
+from courses.utils import is_contract_order, is_uai_order, is_xpro_order
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
@@ -35,6 +38,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPES,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     PAYMENT_TYPES,
+    REDEMPTION_TYPE_INTERNAL,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
@@ -46,8 +50,12 @@ from ecommerce.constants import (
     TRANSACTION_TYPES,
 )
 from ecommerce.tasks import send_ecommerce_order_receipt, send_order_refund_email
+from main import features
 from main.plugin_manager import get_plugin_manager
 from users.models import User
+
+if TYPE_CHECKING:
+    from b2b.models import ContractPage
 
 User = get_user_model()  # noqa: F811
 
@@ -145,6 +153,24 @@ class Basket(TimestampedModel):
     def has_user_blocked_products(self, user):
         """Return true if any of the courses in the basket block user's country"""
         basket_items = self.basket_items.prefetch_related("product")
+
+        if basket_items.count() == 0:
+            return False
+
+        if is_enabled(
+            features.EXPORT_COMPLIANCE_CHECK_ENABLED,
+            default=False,
+            opt_unique_id=user.global_id,
+        ):
+            from courses.api import (  # noqa: PLC0415
+                _verify_exports_compliance_for_enrollment,
+            )
+
+            try:
+                _verify_exports_compliance_for_enrollment(user, basket_items[0])
+            except ExportComplianceError:
+                return True
+
         return any(
             [  # noqa: C419
                 item.product.purchasable_object.course.is_country_blocked(user)
@@ -225,6 +251,16 @@ class Basket(TimestampedModel):
 
         return [item.product for item in self.basket_items.select_related("product")]
 
+    def get_products_contracts(self):
+        """
+        get_products, but adds in the contracts too.
+        """
+
+        return [
+            (item.product, item.b2b_contract)
+            for item in self.basket_items.select_related("product")
+        ]
+
 
 class BasketItem(TimestampedModel):
     """Represents one or more products in a user's basket."""
@@ -236,12 +272,20 @@ class BasketItem(TimestampedModel):
         Basket, on_delete=models.CASCADE, related_name="basket_items"
     )
     quantity = models.PositiveIntegerField(default=1)
+    b2b_contract = models.ForeignKey(
+        "b2b.ContractPage", on_delete=models.DO_NOTHING, related_name="+", null=True
+    )
 
     @cached_property
     def discounted_price(self):
         """Return the price of the product with discounts"""
+        from ecommerce.discount_sources import (  # noqa: PLC0415
+            has_paid_amount_off,
+            resolved_amounts_for_user,
+        )
         from ecommerce.discounts import DiscountType  # noqa: PLC0415
 
+        products = self.basket.get_products()
         discounts = [
             discount_redemption.redeemed_discount
             for discount_redemption in self.basket.discounts.prefetch_related(
@@ -253,6 +297,14 @@ class BasketItem(TimestampedModel):
             DiscountType.get_discounted_price(
                 discounts,
                 self.product,
+                # basket.user is a lazy FK: touch it only when a paid-amount-off
+                # discount is on the basket, so an ordinary cart pays no
+                # resolver cost at all.
+                resolved_amounts=(
+                    resolved_amounts_for_user(self.basket.user, discounts, products)
+                    if has_paid_amount_off(discounts)
+                    else {}
+                ),
             ).quantize(Decimal("0.01"))
             * self.quantity
         )
@@ -268,11 +320,11 @@ PROGRAM_PRODUCTS_ONLY_ERROR = (
 )
 
 
-def validate_program_child_purchase_shape(
+def validate_discount_shape(
     *, discount_type, redemption_type, amount, automatic, discount=None
 ):
     """
-    Enforce the paid-amount-off / program-child-purchase shape on unsaved values.
+    Enforce the row-local shape rules for a Discount on unsaved values.
 
     Raises django.core.exceptions.ValidationError. DRF's Serializer.run_validation
     turns that into a 400 when it comes from validate(), so serializers call this
@@ -308,6 +360,11 @@ def validate_program_child_purchase_shape(
         ):
             raise ValidationError(PROGRAM_PRODUCTS_ONLY_ERROR)
 
+    if redemption_type == REDEMPTION_TYPE_INTERNAL and automatic:
+        raise ValidationError(
+            "An internal discount cannot be automatic; only application code that has checked eligibility may attach one."  # noqa: EM101
+        )
+
 
 def validate_program_child_purchase_product(*, redemption_type, product):
     """Enforce the program-products clause for a single product link."""
@@ -328,7 +385,16 @@ class Discount(TimestampedModel):
     )
     automatic = models.BooleanField(default=False)
     discount_type = models.CharField(choices=DISCOUNT_TYPES, max_length=30)
-    redemption_type = models.CharField(choices=REDEMPTION_TYPES, max_length=30)
+    redemption_type = models.CharField(
+        choices=REDEMPTION_TYPES,
+        max_length=30,
+        help_text=(
+            "'internal' discounts are attached by application code that has "
+            "verified the learner's eligibility (e.g. verified program "
+            "enrollment). Learners cannot redeem them and pricing does not "
+            "re-check the product."
+        ),
+    )
     payment_type = models.CharField(null=True, choices=PAYMENT_TYPES, max_length=30)  # noqa: DJ001
     max_redemptions = models.PositiveIntegerField(null=True, default=0)
     discount_code = models.CharField(max_length=100)
@@ -347,7 +413,7 @@ class Discount(TimestampedModel):
         null=True,
         blank=True,
         default=False,
-        help_text="Discount is only for creating verified course run enrollments for a program.",
+        help_text="Deprecated and unused; superseded by redemption_type 'internal'.",
     )
     # Only for B2B enrollment codes where the contract has a Google Sheet configured.
     # This is just to save time/energy when we want to update the sheet later.
@@ -361,9 +427,9 @@ class Discount(TimestampedModel):
 
     class Meta:
         # A storage-layer backstop for the row-local clauses of
-        # validate_program_child_purchase_shape, because bulk_create and queryset
-        # update() skip save(). The cross-table program-products clause can't
-        # be expressed here.
+        # validate_discount_shape, because bulk_create and queryset update()
+        # skip save(). The cross-table program-products clause can't be
+        # expressed here.
         #
         # The type constraint is one-way on purpose: a program-child-purchase
         # redemption may pair with a standard calculation (e.g. a
@@ -385,6 +451,11 @@ class Discount(TimestampedModel):
                 )
                 | models.Q(automatic=True),
                 name="program_child_purchase_requires_automatic",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(redemption_type=REDEMPTION_TYPE_INTERNAL)
+                | models.Q(automatic=False),
+                name="internal_discount_never_automatic",
             ),
         ]
 
@@ -410,8 +481,8 @@ class Discount(TimestampedModel):
 
         return True
 
-    def check_program_child_purchase_validity(self, *, include_product_links=False):
-        validate_program_child_purchase_shape(
+    def check_shape_validity(self, *, include_product_links=False):
+        validate_discount_shape(
             discount_type=self.discount_type,
             redemption_type=self.redemption_type,
             amount=self.amount,
@@ -429,12 +500,12 @@ class Discount(TimestampedModel):
         # row fail with an error about products. clean() and the serializers
         # enforce that clause where the edit is actually being made, and
         # DiscountProduct.save() guards the attach direction.
-        self.check_program_child_purchase_validity()
+        self.check_shape_validity()
         super().save(*args, **kwargs)
 
     def clean(self, *args, **kwargs):
         self.check_date_validity()
-        self.check_program_child_purchase_validity(include_product_links=True)
+        self.check_shape_validity(include_product_links=True)
         super().clean(*args, **kwargs)
 
     @cached_property
@@ -442,22 +513,50 @@ class Discount(TimestampedModel):
         """Returns True if the discount has been redeemed"""
         return DiscountRedemption.objects.filter(redeemed_discount=self).exists()
 
-    def is_redeemable_by(self, user: User):
+    def is_redeemable_by(self, user: User, products: Iterable[Product] | None = None):
         """
-        Enforces the redemption rules for a given discount.
+        Enforces the redemption rules for a given discount: whether its type is
+        learner-redeemable at all, how often it may be redeemed, whether it is
+        inside its date window, and — for a program-child-purchase redemption —
+        whether this user still holds an unconsumed qualifying purchase for one
+        of the products in hand.
+
+        Independent of check_validity_with_products (product scope and
+        liveness); is_valid_for_basket composes the two.
+
+        ``products`` is context for the program-child-purchase arm alone.
+        Omitting it means no product is in hand (a code redemption, the CMS
+        finaid quote), and a program-child-purchase discount is never
+        redeemable there.
 
         Args:
             - user (User): The user requesting the discount.
+            - products (Iterable[Product] or None): the products the discount is
+              being checked against — the basket's, or the one being priced.
         Returns:
             - boolean
         """
-        # A program-child-purchase discount is redeemable only by a learner
-        # holding the qualifying purchase; that eligibility is decided per source
-        # line — a question this method has no way to answer until the resolver
-        # lands (hq#11846). Refuse rather than fall through to the unlimited
-        # semantics at the bottom, which would let any code-redemption endpoint
-        # attach one.
         if self.redemption_type == REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE:
+            from ecommerce.discount_sources import resolve_for_discount  # noqa: PLC0415
+
+            if products is None:
+                return False
+            if resolve_for_discount(self, user, products) is None:
+                return False
+
+        return self._within_redemption_limits(user)
+
+    def _within_redemption_limits(self, user: User) -> bool:
+        """
+        The redemption-type, redemption-count and date-window rules, without the
+        source check.
+        """
+        # An internal discount is attached only by application code that has
+        # already decided eligibility (see REDEMPTION_TYPE_INTERNAL). The rule
+        # belongs at this depth rather than in is_redeemable_by because
+        # discount_product, and so quote_user_price, reaches the redemption
+        # rules through here.
+        if self.redemption_type == REDEMPTION_TYPE_INTERNAL:
             return False
 
         if (
@@ -489,6 +588,14 @@ class Discount(TimestampedModel):
 
         return self.valid_now()
 
+    def applies_to_products(self, products) -> bool:
+        """True when the discount has no product links, or one of ``products`` is linked."""
+        scope = self.products.aggregate(
+            linked=Count("id"),
+            matching=Count("id", filter=Q(product_id__in=[p.id for p in products])),
+        )
+        return not scope["linked"] or bool(scope["matching"])
+
     def check_validity_with_products(self, products: list):
         """
         Checks if the discount is valid for product
@@ -499,12 +606,7 @@ class Discount(TimestampedModel):
         Returns:
             Boolean
         """
-        if self.products.exists() and not (
-            self.products.filter(product__in=products).exists()
-        ):
-            return False
-
-        return self.valid_now()
+        return self.applies_to_products(products) and self.valid_now()
 
     def valid_now(self):
         """Returns True if the discount is valid right now"""
@@ -525,8 +627,9 @@ class Discount(TimestampedModel):
         Check if the discount is valid for the basket.
 
         Performs the finaid gate and user-tied-discount checks, then delegates
-        product scope to check_validity_with_products and the redemption-limit
-        and date-window rules to is_redeemable_by.
+        product scope to check_validity_with_products and the redemption-limit,
+        date-window and program-child-purchase eligibility rules to
+        is_redeemable_by.
 
         Financial assistance discounts are excluded by default, because this
         check is used for discount codes that are submitted by the user, and
@@ -556,11 +659,13 @@ class Discount(TimestampedModel):
                 or self.user_discount_discount.filter(user=basket.user).count() > 0
             )
 
+        if not allow_finaid and self.payment_type == PAYMENT_TYPE_FINANCIAL_ASSISTANCE:
+            return False
+        products = basket.get_products()
         return (
-            (allow_finaid or self.payment_type != PAYMENT_TYPE_FINANCIAL_ASSISTANCE)
-            and self.check_validity_with_products(basket.get_products())
+            self.check_validity_with_products(products)
             and _discount_user_has_discount()
-            and self.is_redeemable_by(basket.user)
+            and self.is_redeemable_by(basket.user, products)
         )
 
     def friendly_format(self):
@@ -580,22 +685,42 @@ class Discount(TimestampedModel):
 
     def discount_product(self, product, user=None):
         """
-        Returns the calculated discount amount for a given product.
+        Returns the price of ``product`` after this discount.
 
         Args:
             product (Product): the product to discount
             user (User or None): the current user
         Returns:
-            Number; the calculated amount of the discounts
+            Decimal; the discounted price, or None when ``user`` may not redeem
+            this discount for ``product``
         """
+        from ecommerce.discount_sources import (  # noqa: PLC0415
+            resolve_for_discount,
+            spends_source,
+        )
         from ecommerce.discounts import DiscountType  # noqa: PLC0415
 
-        if (user is None and self.valid_now()) or self.is_redeemable_by(user):
-            return DiscountType.get_discounted_price([self], product).quantize(
-                Decimal("0.01")
-            )
-
-        return None
+        resolved_amounts = {}
+        if user is None:
+            # No user bypasses the eligibility arm and resolves no amount, so a
+            # program-child-purchase discount quotes full price here; only
+            # callers that have already gated the discount on a real user may
+            # pass None.
+            if not self.valid_now():
+                return None
+        else:
+            if not self._within_redemption_limits(user):
+                return None
+            if self.redemption_type == REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE:
+                # One resolve serves both the eligibility check and the amount.
+                resolution = resolve_for_discount(self, user, [product])
+                if resolution is None:
+                    return None
+                if spends_source(self):
+                    resolved_amounts = {self.id: resolution.amount}
+        return DiscountType.get_discounted_price(
+            [self], product, resolved_amounts=resolved_amounts
+        ).quantize(Decimal("0.01"))
 
     def b2b_contracts(self):
         """Return the applicable B2B contract(s), if any."""
@@ -611,11 +736,9 @@ class Discount(TimestampedModel):
         courserun_ids = products_qs.all().values_list("product__object_id", flat=True)
 
         return ContractPage.objects.filter(
-            pk__in=CourseRun.objects.filter(
-                pk__in=courserun_ids, b2b_contract__isnull=False
-            )
+            pk__in=CourseRun.objects.filter(pk__in=courserun_ids)
             .all()
-            .values_list("b2b_contract", flat=True)
+            .values_list("b2b_contracts__id", flat=True)
         ).all()
 
 
@@ -697,6 +820,7 @@ class OrderRefundStatus(TextChoices):
     REQUESTED = "requested"
     DENIED = "denied"
     ELIGIBLE = "eligible"
+    REVIEW_REQUIRED = "review_required"
     WINDOW_CLOSED = "window_closed"
     INELIGIBLE = "ineligible"
 
@@ -815,7 +939,9 @@ class OrderFlow:
             transaction_payload["transaction_id"] = uuid.uuid4()
         elif self.order.gateway_type == MITOL_PAYMENT_GATEWAY_CYBERSOURCE:
             transaction_payload["transaction_id"] = payment_data.get("transaction_id")
-            transaction_payload["amount"] = payment_data.get("amount", Decimal(0))
+            # SA responses use req_amount; REST API responses use amount
+            raw_amount = payment_data.get("amount") or payment_data.get("req_amount", 0)
+            transaction_payload["amount"] = Decimal(str(raw_amount))
         elif self.order.gateway_type == MITOL_PAYMENT_GATEWAY_STRIPE:
             # This expects the Event, which has a unique ID.
             transaction_payload["transaction_id"] = payment_data.get("id")
@@ -869,9 +995,17 @@ class OrderFlow:
         skip_fulfillment=False,  # noqa: FBT002
     ):
         """Fulfill the order - create a transaction, send email, trigger plugins."""
+        from ecommerce.discount_sources import log_source_anomalies  # noqa: PLC0415
 
         # record the transaction
         self.create_transaction(payment_data)
+
+        # Monitoring only: it logs and never raises, which is what keeps a
+        # charged order from being stranded (viewflow restores the initial
+        # state on any exception in a transition body, wherever it happens).
+        # Running after the transaction just keeps the Transaction row on a
+        # query failure.
+        log_source_anomalies(self.order)
 
         # record all the courseruns in the order (unless we're told not to)
         if not skip_fulfillment:
@@ -884,6 +1018,7 @@ class OrderFlow:
             and not skip_receipt
             and not skip_fulfillment
             and not is_uai_order(self.order)
+            and not is_xpro_order(self.order)
             and not is_contract_order(self.order)
         ):
             transaction.on_commit(self.order.send_ecommerce_order_receipt)
@@ -967,7 +1102,12 @@ class Order(TimestampedModel):
 
     @property
     def is_refund_eligible(self):
-        """Return True if the learner could request a refund for this order now."""
+        """
+        True when `refund_status` is `eligible`: the in-window self-service case.
+
+        A `review_required` or `window_closed` order is still submittable
+        through the free-text request path; see `refund_status`.
+        """
         return self.refund_status == OrderRefundStatus.ELIGIBLE
 
     @cached_property
@@ -984,9 +1124,37 @@ class Order(TimestampedModel):
         return any(run.b2b_contract_id for run in self.purchased_runs)
 
     @cached_property
+    def funds_fulfilled_redemption(self):
+        """
+        True when a line of this order funds a paid-amount-off redemption on a
+        fulfilled order (hq#11846).
+
+        One query per order. Querysets that serialize many orders annotate
+        this name with ``funds_fulfilled_redemption_exists()`` instead: the
+        annotation lands in the instance dict, which is where a cached_property
+        reads from, so the per-order query never runs.
+        """
+        from ecommerce.discount_sources import (  # noqa: PLC0415
+            fulfilled_redemptions_funded_by,
+        )
+
+        return fulfilled_redemptions_funded_by(self).exists()
+
+    @cached_property
     def latest_refund_request(self):
         """Return the learner's most recent refund request for this order, if any."""
-        return self.refund_requests.order_by("-created_on").first()
+        # Sorted in Python off `.all()` so that a caller's
+        # `prefetch_related("refund_requests")` serves this: `order_by()` on a
+        # related manager clones the queryset, which bypasses the prefetch cache
+        # and costs one query per order on the history endpoint. RefundRequest
+        # declares no Meta.ordering, so the ordering cannot be left to the
+        # database either; pk breaks ties so the answer does not depend on the
+        # order rows come back in.
+        requests = sorted(
+            self.refund_requests.all(),
+            key=lambda request: (request.created_on, request.pk),
+        )
+        return requests[-1] if requests else None
 
     @property
     def refund_reviewed_on(self):
@@ -1008,12 +1176,15 @@ class Order(TimestampedModel):
         Return where this order sits in the self-service refund flow.
 
         Precedence matters: a refund that already happened settles the question,
-        then any request the learner has made, and only then whether they could
-        make one right now.
+        then any request the learner has made, then whether the order is
+        refundable at all, then whether a person has to review it, and only then
+        the window.
 
-        The final branch deliberately mirrors what `RefundRequestSerializer`
-        accepts, so anything but `eligible` or `window_closed` means a request
-        would be rejected.
+        `eligible` means the in-window request form with preset reasons.
+        `review_required` and `window_closed` are both still submittable through
+        the free-text path — `RefundRequestSerializer` gates on ownership,
+        fulfilled state, B2B and an existing pending request, never on the
+        window — and land in the manual queue instead.
         """
         if self.state in (OrderStatus.REFUNDED, OrderStatus.PARTIALLY_REFUNDED):
             return OrderRefundStatus.COMPLETED
@@ -1031,6 +1202,12 @@ class Order(TimestampedModel):
         if self.state != OrderStatus.FULFILLED or self.is_b2b_order:
             return OrderRefundStatus.INELIGIBLE
 
+        # Refunding this order would leave the credit it funded in place —
+        # clawback is out of scope — so the request is accepted but reviewed
+        # by a person regardless of the window.
+        if self.funds_fulfilled_redemption:
+            return OrderRefundStatus.REVIEW_REQUIRED
+
         return (
             OrderRefundStatus.ELIGIBLE
             if self.is_within_refund_window
@@ -1044,11 +1221,20 @@ class Order(TimestampedModel):
     def purchased_runs(self):
         """Return a list of purchased CourseRuns"""
 
-        # TODO: handle programs  # noqa: FIX002, TD002, TD003
         return [
             line.purchased_object
             for line in self.lines.all()
             if isinstance(line.purchased_object, CourseRun)
+        ]
+
+    @property
+    def purchased_programs(self):
+        """Return a list of purchased Programs"""
+
+        return [
+            line.purchased_object
+            for line in self.lines.all()
+            if isinstance(line.purchased_object, Program)
         ]
 
     def __str__(self):
@@ -1068,7 +1254,7 @@ class PendingOrder(Order):
     @transaction.atomic
     def _get_or_create(
         self,
-        products: List[Product],  # noqa: UP006
+        products: List[Tuple[Product, ContractPage | None]],  # noqa: UP006
         user: User,
         discounts: List[Discount] | None = None,  # noqa: UP006
         gateway_type: str = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
@@ -1093,7 +1279,7 @@ class PendingOrder(Order):
         """
         # Get the details from each Product.
         product_versions, product_object_ids, product_content_types = [], [], []
-        for product in products:
+        for product, _ in products:
             # Per docs, this should sort most recent first.
             product_version = Version.objects.get_for_object(product).first()
 
@@ -1138,6 +1324,8 @@ class PendingOrder(Order):
 
         # Apply any discounts to the PendingOrder
         if discounts:
+            from ecommerce.discount_sources import source_line_for  # noqa: PLC0415
+
             now = now_in_utc()
             for discount in discounts:
                 if discount:
@@ -1145,11 +1333,15 @@ class PendingOrder(Order):
                         redemption_date=now,
                         redeemed_by=user,
                         redeemed_discount=discount,
+                        source_line=source_line_for(
+                            discount, user, [product[0] for product in products]
+                        ),
                     )
 
         # Create or get Line for each product.  Calculate the Order total based on Lines and discount.
         total = 0
-        for i, product in enumerate(products):
+        for i, product_tuple in enumerate(products):
+            product, contract = product_tuple
             line, created = Line.objects.get_or_create(
                 order=order,
                 purchased_object_id=product.object_id,
@@ -1166,6 +1358,7 @@ class PendingOrder(Order):
                             order, product_versions[i]
                         )
                     ),
+                    "b2b_contract": contract,
                 },
             )
             if not created:
@@ -1197,7 +1390,7 @@ class PendingOrder(Order):
         Returns:
             PendingOrder: the created pending order
         """
-        products = basket.get_products()
+        products = basket.get_products_contracts()
         discounts = [
             basket_discount.redeemed_discount
             for basket_discount in basket.discounts.all()
@@ -1226,7 +1419,9 @@ class PendingOrder(Order):
             PendingOrder: the created pending order
         """
 
-        order = cls._get_or_create(cls, [product], user, [discount], gateway_type)
+        order = cls._get_or_create(
+            cls, [(product, None)], user, [discount], gateway_type
+        )
 
         return order  # noqa: RET504
 
@@ -1303,6 +1498,29 @@ class PartiallyRefundedOrder(Order):
         proxy = True
 
 
+def _product_from_version(version):
+    """Reconstruct the Product a reversion Version snapshots.
+
+    The Product is unsaved and its row may be gone: an order line has to render
+    what was bought even after the product is deleted, so the fields come from
+    the Version's `field_dict` rather than from a lookup. Callers holding a
+    `Line` want `Line.product`, which caches this -- the returned instance
+    resolves its generic `purchasable_object`, and the CMS pages under it, once
+    per instance, so rebuilding per reader multiplies that walk.
+    """
+    if version is None:
+        return None
+    field_dict = version.field_dict
+    return Product(
+        id=field_dict["id"],
+        content_type_id=field_dict["content_type_id"],
+        object_id=field_dict["object_id"],
+        price=field_dict["price"],
+        description=field_dict["description"],
+        is_active=field_dict["is_active"],
+    )
+
+
 class Line(TimestampedModel):
     """A line in an Order."""
 
@@ -1327,6 +1545,9 @@ class Line(TimestampedModel):
         decimal_places=5,
         max_digits=20,
         help_text="Post-discount price of one unit, recorded when the order was priced.",
+    )
+    b2b_contract = models.ForeignKey(
+        "b2b.ContractPage", on_delete=models.DO_NOTHING, related_name="+", null=True
     )
 
     # denormalized reference which otherwise requires the lookup: line.product_version.product.purchasable_object
@@ -1370,19 +1591,22 @@ class Line(TimestampedModel):
     @staticmethod
     def compute_discounted_unit_price_for(order, product_version):
         """Price of one unit of product_version under the discounts currently on order."""
-        from ecommerce.discounts import (  # noqa: PLC0415
-            DiscountType,
-            product_from_version,
+        from ecommerce.discount_sources import (  # noqa: PLC0415
+            resolved_amounts_from_redemptions,
         )
+        from ecommerce.discounts import DiscountType  # noqa: PLC0415
 
-        discounts = [
-            discount_redemption.redeemed_discount
-            for discount_redemption in order.discounts.all()
-        ]
+        # source_line is joined for the paid-amount-off rows rather than
+        # fetched lazily per row.
+        redemptions = list(
+            order.discounts.select_related("redeemed_discount", "source_line")
+        )
+        discounts = [redemption.redeemed_discount for redemption in redemptions]
 
         return DiscountType.get_discounted_price(
             discounts,
-            product_from_version(product_version),
+            _product_from_version(product_version),
+            resolved_amounts=resolved_amounts_from_redemptions(redemptions),
         ).quantize(Decimal("0.01"))
 
     def compute_discounted_unit_price(self):
@@ -1427,9 +1651,16 @@ class Line(TimestampedModel):
 
     @cached_property
     def product(self):
-        from ecommerce.discounts import product_from_version  # noqa: PLC0415
+        return _product_from_version(self.product_version)
 
-        return product_from_version(self.product_version)
+    @cached_property
+    def product_content_type(self):
+        """Return the content type of the product this line snapshots."""
+        # `product` is rebuilt in Python from a reversion Version, so traversing
+        # its `content_type` FK would cost a query per line and no prefetch can
+        # reach it. The id is in the Version's field_dict, and `get_for_id` is
+        # process-cached, so resolving it from the id is free.
+        return ContentType.objects.get_for_id(self.product.content_type_id)
 
     @cached_property
     def courseware(self):

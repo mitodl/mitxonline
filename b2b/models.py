@@ -2,6 +2,7 @@
 
 import logging
 from decimal import Decimal
+from urllib.parse import urljoin
 
 from django.conf import settings
 from django.contrib import admin
@@ -18,7 +19,7 @@ from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
 from modelcluster.fields import ParentalKey
 from requests.exceptions import HTTPError
-from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel
+from wagtail.admin.panels import FieldPanel, HelpPanel, InlinePanel, MultiFieldPanel
 from wagtail.fields import RichTextField
 from wagtail.models import ClusterableModel, Orderable, Page
 
@@ -26,10 +27,17 @@ from b2b.constants import (
     CONTRACT_MEMBERSHIP_AUTOS,
     CONTRACT_MEMBERSHIP_MANAGED,
     CONTRACT_MEMBERSHIP_TYPE_CHOICES,
+    IDP_LIFECYCLE_CHOICES,
+    IDP_PROTOCOL_CHOICES,
+    IDP_PROTOCOL_SAML,
+    IDP_STATE_DRAFT,
+    ONBOARDING_STATE_CHOICES,
+    ONBOARDING_STATE_REQUESTED,
     ORG_INDEX_SLUG,
+    PROVISIONING_ACTION_CHOICES,
 )
-from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import Program
+from main.models import AuditModel, ValidateOnSaveMixin
 from variants.models import SupportedVariant
 
 log = logging.getLogger(__name__)
@@ -98,11 +106,27 @@ class OrganizationIndexPage(OrganizationObjectIndexPage):
     slug = ORG_INDEX_SLUG
 
 
+class StaffDashboardOrganizationPanel(HelpPanel):
+    """Links an organization's Wagtail page to its staff dashboard page."""
+
+    class BoundPanel(HelpPanel.BoundPanel):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.content = format_html(
+                'Edit this organization and its SSO setup in the <a href="{}">staff '
+                "dashboard</a>. Contracts are still managed here, as child pages.",
+                f"/staff-dashboard/b2b_organizations/show/{self.instance.org_key}",
+            )
+
+
 class OrganizationPage(Page):
     """Stores information about an organization we have a relationship with."""
 
     parent_page_types = ["b2b.OrganizationIndexPage"]
     subpage_types = ["b2b.ContractPage"]
+    # Organizations are created and edited in the staff dashboard, which also
+    # provisions them in Keycloak.
+    is_creatable = False
 
     name = models.CharField(max_length=255, help_text="The name of the organization")
     org_key = models.CharField(
@@ -112,11 +136,15 @@ class OrganizationPage(Page):
     )
     org_key_prefix = models.CharField(
         max_length=30,
-        help_text="The prefix to append to the org key (defaults to UAI_).",
+        help_text=(
+            "Prepended to the org key in courseware IDs, e.g. UAI_. Blank means no prefix."
+        ),
         blank=True,
-        default=UAI_COURSEWARE_ID_PREFIX,
+        default="",
     )
-    description = RichTextField(
+    # Plain text: it is also written to the Keycloak organization, which shows
+    # it as-is.
+    description = models.TextField(
         blank=True, help_text="Any useful extra information about the organization"
     )
     logo = models.ImageField(
@@ -131,15 +159,24 @@ class OrganizationPage(Page):
         help_text="The UUID for the organization in the SSO provider.",
     )
 
+    # The staff dashboard has no logo upload, and sso_organization_id stays
+    # editable here to link organizations created before the dashboard.
     content_panels = [
-        FieldPanel("name"),
-        FieldPanel("description"),
-        FieldPanel("org_key"),
+        StaffDashboardOrganizationPanel(),
+        FieldPanel("name", read_only=True),
+        FieldPanel("description", read_only=True),
+        FieldPanel("org_key", read_only=True),
         FieldPanel("logo"),
         FieldPanel("sso_organization_id"),
     ]
 
     # Use default promote_panels from Page to allow manual slug editing
+
+    @staticmethod
+    def slug_for_name(name):
+        """Return the slug a new organization with this name is saved under."""
+
+        return slugify(f"org-{name}")
 
     def save(self, clean=True, user=None, log_action=False, **kwargs):  # noqa: FBT002
         """Save the page, and update the slug and title appropriately."""
@@ -147,7 +184,7 @@ class OrganizationPage(Page):
         self.title = str(self.name)
 
         if not self.slug:
-            self.slug = slugify(f"org-{self.name}")
+            self.slug = self.slug_for_name(self.name)
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
 
     def get_learners(self):
@@ -215,7 +252,7 @@ class OrganizationPage(Page):
 
         return user.b2b_contracts.through.objects.filter(
             user_id=user.id,
-            contractpage_id__in=self.contracts.filter(
+            contract_page_id__in=self.contracts.filter(
                 membership_type__in=CONTRACT_MEMBERSHIP_AUTOS
             ).values_list("id", flat=True),
         ).delete()
@@ -537,7 +574,9 @@ class ContractPage(Page, ClusterableModel):
         from courses.models import CourseRun  # noqa: PLC0415
 
         return (
-            CourseRun.objects.prefetch_related("course").filter(b2b_contract=self).all()
+            CourseRun.objects.prefetch_related("course")
+            .filter(b2b_contracts=self)
+            .all()
         )
 
     def get_variant_courses(self, *, only_relevant=False):
@@ -611,7 +650,7 @@ class ContractPage(Page, ClusterableModel):
 
         return (
             CourseRunEnrollment.objects.prefetch_related("run", "run__course")
-            .filter(run__b2b_contract=self, change_status__isnull=True)
+            .filter(run__b2b_contracts=self, change_status__isnull=True)
             .all()
         )
 
@@ -664,6 +703,7 @@ class ContractPage(Page, ClusterableModel):
         *,
         skip_edx=False,
         no_reruns=True,
+        org_prefix=None,
         ignore_langs=False,
         only_lang=None,
         filter_variants=None,
@@ -675,9 +715,12 @@ class ContractPage(Page, ClusterableModel):
 
         Args:
         - program (courses.Program): the program to add
+        Kwargs:
+        - org_prefix (str|None): passed to create_contract_run; None uses the
+          organization's own prefix
 
         Returns:
-        - tuple: Tuple with three integers:
+        - tuple: Tuple with two integers:
             - number of course runs created
             - number of courses with no source run
         """
@@ -703,6 +746,7 @@ class ContractPage(Page, ClusterableModel):
                 course,
                 no_reruns=no_reruns,
                 skip_edx=skip_edx,
+                org_prefix=org_prefix,
                 ignore_langs=ignore_langs,
                 only_lang=only_lang,
                 filter_variants=filter_variants,
@@ -857,6 +901,193 @@ class UserOrganization(models.Model):
         return f"UserOrganization: {self.user} in {self.organization}"
 
 
+class OrganizationOnboarding(TimestampedModel, ValidateOnSaveMixin):
+    """
+    Where an organization is in the B2B onboarding sequence.
+
+    The system of record that did not exist before: onboarding state lived in
+    people's heads and in four separate systems. The state is descriptive, not
+    enforcing - nothing gates on it. A state machine that blocks operators
+    before the operators trust it is a state machine they work around.
+    """
+
+    organization = models.OneToOneField(
+        "b2b.OrganizationPage",
+        on_delete=models.CASCADE,
+        related_name="onboarding",
+    )
+    state = models.CharField(
+        max_length=32,
+        choices=ONBOARDING_STATE_CHOICES,
+        default=ONBOARDING_STATE_REQUESTED,
+    )
+    state_changed_at = models.DateTimeField(default=now_in_utc)
+    notes = models.TextField(
+        blank=True,
+        default="",
+        help_text="Free-form operator notes; holds the reason when state is blocked.",
+    )
+
+    def set_state(self, state, notes=None):
+        """
+        Move to the given onboarding state and stamp when it happened.
+
+        Args:
+        - state (str): the state to move to
+        - notes (str): replacement notes, if any
+        """
+
+        self.state = state
+        self.state_changed_at = now_in_utc()
+        if notes is not None:
+            self.notes = notes
+        self.save()
+
+    def __str__(self):
+        """Return a reasonable representation of the object as a string."""
+
+        return f"OrganizationOnboarding: {self.organization} is {self.state}"
+
+
+class OrganizationIdentityProvider(TimestampedModel, ValidateOnSaveMixin):
+    """
+    An identity provider we provisioned in Keycloak for an organization.
+
+    Keycloak has no field for where an IdP is in its rollout, so the lifecycle
+    state lives here - but it is written through to Keycloak's `enabled` and
+    `hideOnLogin` on every transition (see IDP_STATE_KEYCLOAK_FLAGS) so the two
+    representations cannot drift apart silently.
+    """
+
+    organization = models.ForeignKey(
+        "b2b.OrganizationPage",
+        on_delete=models.CASCADE,
+        related_name="identity_providers",
+    )
+    alias = models.CharField(
+        max_length=255,
+        unique=True,
+        help_text="The Keycloak IdP alias. Realm-wide, not per-organization.",
+    )
+    protocol = models.CharField(max_length=8, choices=IDP_PROTOCOL_CHOICES)
+    lifecycle_state = models.CharField(
+        max_length=16,
+        choices=IDP_LIFECYCLE_CHOICES,
+        default=IDP_STATE_DRAFT,
+    )
+    display_name = models.CharField(max_length=255, blank=True, default="")
+    internal_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Keycloak's internalId for the IdP instance.",
+    )
+    metadata_source = models.TextField(
+        help_text=(
+            "The metadata URL, or the inline XML, the config was parsed from. "
+            "Not blankable: refreshing an IdP re-reads this, so a row without "
+            "one cannot be refreshed."
+        ),
+    )
+    metadata_artifact = models.JSONField(
+        null=True,
+        blank=True,
+        help_text=(
+            "The config map Keycloak parsed out of the metadata. Persisted so a "
+            "partner's metadata endpoint going away can neither destroy config "
+            "nor block a deploy."
+        ),
+    )
+    metadata_fetched_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def service_provider(self):
+        """
+        Return what the partner's IdP needs to know about our side.
+
+        These are Keycloak's broker URLs for this alias, which is what an
+        operator hands the partner's engineers. The SP entity ID is only
+        meaningful for SAML; Keycloak uses the realm URL unless the IdP config
+        sets entityId.
+
+        Returns:
+        - dict: entity_id (SAML only), redirect_uri (the SAML ACS URL or the
+          OIDC redirect URI) and metadata_url (the SAML SP descriptor)
+        """
+
+        realm_url = urljoin(
+            settings.KEYCLOAK_BASE_URL, f"/realms/{settings.KEYCLOAK_REALM_NAME}"
+        )
+        endpoint = f"{realm_url}/broker/{self.alias}/endpoint"
+
+        if self.protocol != IDP_PROTOCOL_SAML:
+            return {"entity_id": None, "redirect_uri": endpoint, "metadata_url": None}
+
+        return {
+            "entity_id": (self.metadata_artifact or {}).get("entityId") or realm_url,
+            "redirect_uri": endpoint,
+            "metadata_url": f"{endpoint}/descriptor",
+        }
+
+    def __str__(self):
+        """Return a reasonable representation of the object as a string."""
+
+        return f"OrganizationIdentityProvider: {self.alias} ({self.lifecycle_state})"
+
+
+class OrganizationProvisioningAudit(AuditModel):
+    """
+    One change made through the provisioning API, and who made it.
+
+    Before the API, a partner's SSO config changed only through a reviewed,
+    merged Pulumi PR, so the review was the record. This is the replacement
+    record. There is no approval step before an IdP goes active, so this is
+    how a change gets reviewed: after the fact.
+
+    Append-only, so nothing deleted elsewhere takes a record with it: the IdP
+    is recorded by alias, the organization's org_key is copied onto every
+    row, and deleting the organization's page only clears the foreign key.
+    Credentials are never written here.
+    """
+
+    organization = models.ForeignKey(
+        "b2b.OrganizationPage",
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="provisioning_audits",
+    )
+    org_key = models.CharField(max_length=30)
+    # main.models.AuditModel cascades, which would delete a staff account's
+    # provisioning history along with the account. PROTECT keeps the record
+    # and who made it; MITx Online retires users by deactivating them, so
+    # this only blocks an outright delete.
+    acting_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, on_delete=models.PROTECT
+    )
+    identity_provider_alias = models.CharField(max_length=255, blank=True, default="")
+    action = models.CharField(max_length=64, choices=PROVISIONING_ACTION_CHOICES)
+
+    class Meta:
+        ordering = ["-created_on", "-id"]
+
+    @classmethod
+    def get_related_field_name(cls):
+        return "organization"
+
+    def save(self, *args, **kwargs):
+        """Refuse to rewrite an audit record."""
+
+        if self.pk is not None:
+            msg = "Provisioning audit records cannot be changed."
+            raise ValueError(msg)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        """Return a reasonable representation of the object as a string."""
+
+        return f"OrganizationProvisioningAudit: {self.action} on {self.org_key}"
+
+
 def is_organization_manager(user, org_id):
     """
     Check if a user is a manager of the specified organization.
@@ -874,3 +1105,24 @@ def is_organization_manager(user, org_id):
     return UserOrganization.objects.filter(
         user=user, organization_id=org_id, is_manager=True
     ).exists()
+
+
+class UserB2BContract(TimestampedModel):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="user_b2b_contracts",
+    )
+    contract_page = models.ForeignKey(
+        "b2b.ContractPage",
+        on_delete=models.CASCADE,
+        related_name="b2b_contract_users",
+    )
+    consented_to_data_sharing = models.BooleanField(null=True)
+    consent_modified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ("user", "contract_page")
+
+    def __str__(self):
+        return f"UserB2BContract: {self.user} in {self.contract_page}"

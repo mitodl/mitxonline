@@ -5,7 +5,9 @@ Course models
 
 import logging
 import uuid
+from dataclasses import dataclass
 from decimal import ROUND_HALF_EVEN, Decimal
+from typing import TYPE_CHECKING
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
@@ -24,9 +26,9 @@ from django.utils.functional import cached_property
 from django.utils.html import format_html
 from django.utils.text import slugify
 from django_countries.fields import CountryField
-from lru_method_cache import lru_method_cache
 from mitol.common.models import TimestampedModel, TimestampedModelQuerySet
 from mitol.common.utils.datetime import now_in_utc
+from mitol.common.utils.queryset import is_prefetched
 from mitol.openedx.utils import get_course_number
 from modelcluster.fields import ParentalKey
 from prefetch import Prefetcher, PrefetchManagerMixin, PrefetchQuerySet
@@ -52,6 +54,13 @@ from openedx.constants import (
     EDX_ENROLLMENTS_PAID_MODES,
 )
 from variants.models import SupportedVariant, VariantOptionsModel
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    # Import-time only: b2b.models imports Program from this module at module
+    # scope, so a runtime import here would be circular.
+    from b2b.models import Contract
 
 User = get_user_model()
 
@@ -785,6 +794,28 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             ).distinct()
         )
 
+    @cached_property
+    def is_enrollable(self):
+        """
+        Determines if the program is enrollable
+        """
+        now = now_in_utc()
+        return (
+            (self.enrollment_end is None or self.enrollment_end > now)
+            and self.enrollment_start is not None
+            and self.enrollment_start <= now
+            and self.live is True
+            and self.start_date is not None
+        )
+
+    def enrollable_for_contract(self, contract) -> bool:
+        """Determine if the run is enrollable for the specified contract."""
+
+        if not self.contract_memberships.filter(contract_id=contract.id).exists():
+            return False
+
+        return self.is_enrollable
+
 
 class RelatedProgram(TimestampedModel, ValidateOnSaveMixin):
     """
@@ -905,15 +936,27 @@ class CourseQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):  # pylint: dis
         return self.filter(in_programs__program=program)
 
 
+def default_program_queryset() -> ProgramQuerySet:
+    """
+    The program scope used when a caller does not name one.
+
+    Non-b2b is the safest default: a b2b-only program is not part of the public
+    catalog, so it must not supply a course's programs list nor - which is the
+    same question asked twice - its financial assistance form URL.
+
+    Returns:
+        ProgramQuerySet: every program outside the b2b-only catalog
+    """
+    return Program.objects.filter(b2b_only=False)
+
+
 class CourseProgramPrefetcher(Prefetcher):
     """Prefetcher for Course programs."""
 
-    queryset: CourseQuerySet
+    queryset: ProgramQuerySet
 
     def __init__(self, *args, **kwargs):
-        self.queryset = kwargs.pop(  # safest default is non-b2b
-            "queryset", Program.objects.filter(b2b_only=False)
-        )
+        self.queryset = kwargs.pop("queryset", default_program_queryset())
         super().__init__(*args, **kwargs)
 
     @staticmethod
@@ -932,6 +975,9 @@ class CourseProgramPrefetcher(Prefetcher):
                 "all_requirements__course_id",
                 distinct=True,
                 filter=Q(all_requirements__node_type=ProgramRequirementNodeType.COURSE),
+                # A program can join on a course_id whose node_type is not
+                # COURSE, which aggregates to NULL rather than an empty array.
+                default=[],
             )
         )
 
@@ -944,6 +990,94 @@ class CourseProgramPrefetcher(Prefetcher):
         course.programs = programs or []
 
 
+@dataclass(frozen=True)
+class FinancialAssistanceFormUrl:
+    """One course's resolved financial assistance form URL."""
+
+    course_id: int
+    url: str
+
+
+class _PrefetchRows(list):
+    """
+    Rows returned from a ``Prefetcher.filter()``.
+
+    django-prefetch calls ``.using()`` on the return value when the queryset was
+    bound to a database (prefetch.py:262). These rows are computed rather than
+    fetched, so there is nothing to rebind.
+    """
+
+    def using(self, _db):
+        """Nothing to rebind; these rows were computed, not fetched."""
+        return self
+
+
+class CourseFinancialAssistanceFormUrlPrefetcher(Prefetcher):
+    """
+    Resolve each course's financial assistance form URL in the view's queryset.
+
+    The URL is chosen by a priority cascade over Wagtail child pages, program
+    pages and related programs, which costs 4-8 queries per course if done
+    during serialization. Resolving it here means the serializer only ever reads
+    an attribute.
+
+    Scoped to ``program_queryset``, which must be the same programs the caller
+    hands the ``programs`` prefetch: the URL is chosen by walking a course's
+    programs, so a program the caller filtered out must not be able to supply it
+    either.
+
+    Holds no *result* state on ``self``. ``PrefetchQuerySet._clone()`` shares the
+    ``_prefetch`` dict by reference, so a class-level ``queryset =
+    ...prefetch(...)`` reuses one Prefetcher instance across every request in the
+    process; results are carried in ``filter()``'s return value instead.
+    Configuration set once in ``__init__`` and only ever read is safe under that
+    same sharing - ``CourseProgramPrefetcher`` has always worked this way.
+    """
+
+    program_queryset: ProgramQuerySet
+
+    def __init__(self, *args, **kwargs):
+        self.program_queryset = kwargs.pop(
+            "program_queryset", default_program_queryset()
+        )
+        super().__init__(*args, **kwargs)
+
+    @staticmethod
+    def mapper(course):
+        """Map each course to Course.id"""
+        return course.id
+
+    def filter(self, course_ids):
+        """Resolve every id at once, one row per id."""
+        # Local import: cms.api imports courses.models at module scope.
+        from cms.api import resolve_financial_assistance_form_urls  # noqa: PLC0415
+
+        course_ids = list(course_ids)
+        urls = resolve_financial_assistance_form_urls(
+            course_ids, program_queryset=self.program_queryset
+        )
+        # A row for every id, including courses with no form, so each one
+        # reaches the two-arg decorator() call - the one-arg pass runs before
+        # filter() and so cannot see these results.
+        return _PrefetchRows(
+            FinancialAssistanceFormUrl(course_id, urls.get(course_id, ""))
+            for course_id in course_ids
+        )
+
+    @staticmethod
+    def reverse_mapper(row):
+        return [row.course_id]
+
+    @staticmethod
+    def decorator(course, rows=None):
+        url = rows[0].url if rows else ""
+        # On the course so required_prefetches can see it, and on the page
+        # because that is the instance CoursePageSerializer receives.
+        course.financial_assistance_form_url = url
+        if course.course_page is not None:
+            course.course_page.financial_assistance_form_url = url
+
+
 class CourseManager(models.Manager.from_queryset(CourseQuerySet), PrefetchManagerMixin):
     """Manager for Course"""
 
@@ -951,7 +1085,10 @@ class CourseManager(models.Manager.from_queryset(CourseQuerySet), PrefetchManage
     def get_queryset_class(cls):
         return CourseQuerySet
 
-    prefetch_definitions = {"programs": CourseProgramPrefetcher}
+    prefetch_definitions = {
+        "programs": CourseProgramPrefetcher,
+        "financial_assistance_form_url": CourseFinancialAssistanceFormUrlPrefetcher,
+    }
 
 
 class Course(TimestampedModel, ValidateOnSaveMixin):
@@ -1028,6 +1165,51 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             return [p for p in relevant_run.prefetched_products if p.is_active]
         return list(relevant_run.products.filter(is_active=True).all())
 
+    @staticmethod
+    def _select_first_unexpired_run(runs):
+        """
+        Pick the first unexpired/enrollable run from an in-memory iterable.
+
+        This works over already-loaded runs so it can use the ``courseruns``
+        prefetch cache instead of issuing a query per course. It mirrors the SQL
+        it replaces: enrollable runs in a usable language, preferring runs that
+        have not ended, ordered by start date with primary-language runs winning
+        ties.
+
+        ``CourseRun.is_enrollable`` is exactly equivalent to
+        ``CourseRunQuerySet.get_enrollable_filter()`` - same four conditions
+        against the same ``now_in_utc()`` - which is what makes this a faithful
+        translation rather than an approximation.
+
+        Args:
+            runs: iterable of CourseRun objects to choose from
+
+        Returns:
+            CourseRun or None: An unexpired/enrollable course run
+        """
+        candidates = [
+            run
+            for run in runs
+            if run.is_enrollable
+            and (run.is_primary_language or run.language in ["", "en"])
+        ]
+        if not candidates:
+            return None
+
+        # is_enrollable guarantees start_date is not None, so this never
+        # compares None. The trailing id makes ties deterministic, where the
+        # SQL .first() left them up to the database.
+        def sort_key(run):
+            return (run.start_date, not run.is_primary_language, run.id)
+
+        now = now_in_utc()
+        unended = [
+            run for run in candidates if run.end_date is None or run.end_date > now
+        ]
+
+        # Prefer runs that have not ended; fall back to any enrollable run.
+        return min(unended or candidates, key=sort_key)
+
     @cached_property
     def first_unexpired_run(self):
         """
@@ -1037,28 +1219,22 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         Returns:
             CourseRun or None: An unexpired/enrollable course run
         """
-        # Use the CourseRunQuerySet.enrollable() method to eliminate code duplication
-        # First try to find non-past enrollable runs (end_date is None or in the future)
-        best_run = (
-            self.courseruns.filter(b2b_contract__isnull=True)
-            .enrollable()
-            .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
-            .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
-            .order_by("start_date", "-is_primary_language")
-            .first()
+        return self._select_first_unexpired_run(
+            run for run in self.courseruns.all() if not run.b2b_only
         )
 
-        # If no non-past runs found, look for any enrollable runs (including archived)
-        if best_run is None:
-            best_run = (
-                self.courseruns.filter(b2b_contract__isnull=True)
-                .enrollable()
-                .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
-                .order_by("start_date", "-is_primary_language")
-                .first()
-            )
+    @cached_property
+    def has_dated_courseruns(self) -> bool:
+        """
+        Whether this course has at least one enrollable, non-self-paced run.
 
-        return best_run
+        Mirrors ``courses.utils.get_dated_courseruns``, which filters on
+        ``get_enrollable_filter() & Q(is_self_paced=False)``. Reads the
+        ``courseruns`` prefetch cache rather than issuing a COUNT per course.
+        """
+        return any(
+            run.is_enrollable and not run.is_self_paced for run in self.courseruns.all()
+        )
 
     @cached_property
     def include_in_learn_catalog(self) -> bool:
@@ -1096,7 +1272,9 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             default_variant=True,
         ).first()
 
-    def get_first_unexpired_b2b_run(self, user_contracts):
+    def get_first_unexpired_b2b_run(
+        self, user_contracts: "Iterable[int | Contract] | None"
+    ) -> "CourseRun | None":
         """
         Gets the first unexpired/enrollable CourseRun associated with both this
         Course and the user's specified contracts.
@@ -1104,33 +1282,26 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         First means in start date order ascending.
 
         Args:
-        - user_contracts (list of int): the current user's contracts
+        - user_contracts (iterable of int or Contract): the current user's
+          contracts, as ids or as model instances
 
         Returns:
             CourseRun or None: An unexpired/enrollable course run
         """
-        # Use the CourseRunQuerySet.enrollable() method to eliminate code duplication
-        # First try to find non-past enrollable runs (end_date is None or in the future)
-        best_run = (
-            self.courseruns.filter(b2b_contract__in=user_contracts)
-            .enrollable()
-            .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
-            .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
-            .order_by("start_date", "-is_primary_language")
-            .first()
+        # Ids or instances, matching what the ``b2b_contracts__in`` filter this
+        # replaces would have accepted. Callers pass ids today
+        # (CourseViewSet.get_serializer_context builds them with values_list).
+        contract_ids = {
+            getattr(contract, "id", contract) for contract in (user_contracts or [])
+        }
+        # ``b2b_contracts`` is an M2M, so this reads its prefetch cache when the
+        # caller prefetched it and falls back to a query per run when it did not
+        # - same shape as the ``b2b_contracts__in`` filter it replaces.
+        return self._select_first_unexpired_run(
+            run
+            for run in self._courseruns_with_contracts()
+            if any(contract.id in contract_ids for contract in run.b2b_contracts.all())
         )
-
-        # If no non-past runs found, look for any enrollable runs (including archived)
-        if best_run is None:
-            best_run = (
-                self.courseruns.filter(b2b_contract__in=user_contracts)
-                .enrollable()
-                .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
-                .order_by("start_date", "-is_primary_language")
-                .first()
-            )
-
-        return best_run
 
     @cached_property
     def programs(self) -> list[Program]:
@@ -1187,7 +1358,21 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         """Flag to indicate if this is a run"""
         return False
 
-    @lru_method_cache(max_size=12, typed=True)
+    def _courseruns_with_contracts(self):
+        """
+        Return this course's runs with ``b2b_contracts`` available.
+
+        Calling ``prefetch_related`` on the related manager unconditionally
+        would clone the prefetched queryset, and a clone starts with an empty
+        result cache - so a caller that already prefetched ``courseruns``
+        (``CourseViewSet`` does, with ``b2b_contracts`` inside it) would still
+        pay one query per course. Read the cache when it is populated and only
+        build a new queryset when it is not.
+        """
+        if is_prefetched(self, "courseruns"):
+            return self.courseruns.all()
+        return self.courseruns.prefetch_related("b2b_contracts").all()
+
     def get_filtered_runs(
         self,
         *,
@@ -1196,12 +1381,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         contract_id: int | None = None,
     ) -> list["CourseRun"]:
         """Return sorted course runs respecting org/contract/enrollability context."""
-        courseruns = (
-            self.prefetched_courseruns
-            if hasattr(self, "prefetched_courseruns")
-            else list(self.courseruns.all())
-        )
-        courseruns = sorted(courseruns, key=lambda r: r.id)
+        courseruns = sorted(self._courseruns_with_contracts(), key=lambda r: r.id)
 
         if courserun_is_enrollable is not None:
             courseruns = filter(
@@ -1214,19 +1394,23 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         if org_id is not None:
             courseruns = filter(
                 lambda run: (
-                    getattr(run.b2b_contract, "organization_id", None) == org_id
+                    run.b2b_contract_organization_id == org_id
+                    or any(c.organization_id == org_id for c in run.b2b_contracts.all())
                 ),
                 courseruns,
             )
 
         if contract_id is not None:
             courseruns = filter(
-                lambda run: getattr(run.b2b_contract, "id", None) == contract_id,
+                lambda run: (
+                    run.b2b_contract_id == contract_id
+                    or any(c.id == contract_id for c in run.b2b_contracts.all())
+                ),
                 courseruns,
             )
 
         if org_id is None and contract_id is None:
-            courseruns = filter(lambda run: run.b2b_contract_id is None, courseruns)
+            courseruns = filter(lambda run: not run.b2b_only, courseruns)
 
         return list(courseruns)
 
@@ -1247,18 +1431,47 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         title = f"{self.readable_id} | {self.title}"
         return title if len(title) <= 100 else title[:97] + "..."  # noqa: PLR2004
 
+    def clean(self):
+        """
+        Guard against a Course's readable_id being set to a CourseRun's full
+        courseware_id (e.g. "course-v1:MITxT+JPAL101SPAx+1T2023") instead of
+        the course-level ID (e.g. "course-v1:MITxT+JPAL101SPAx"). Links built
+        from a readable_id in that shape 404 once redirected to the Learn
+        front end, since a run ID isn't a valid course readable_id there.
+
+        Only checked when readable_id is being newly set or changed, so
+        existing rows that already have a colliding value (from before this
+        validation existed) aren't blocked from being saved for unrelated
+        reasons.
+        """
+        if not self.readable_id:
+            return
+
+        unchanged = (
+            self.pk
+            and Course.objects.filter(pk=self.pk, readable_id=self.readable_id).exists()
+        )
+        if (
+            not unchanged
+            and CourseRun.objects.filter(courseware_id=self.readable_id).exists()
+        ):
+            raise ValidationError(
+                "readable_id matches an existing CourseRun's courseware_id. "  # noqa: EM101
+                "It should be the course-level ID without a run tag."
+            )
+
 
 class CourseRunQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):  # pylint: disable=missing-docstring
     def exclude_b2b(self):
         """Exclude B2B course runs."""
 
-        return self.filter(b2b_contract__isnull=True)
+        return self.filter(b2b_only=False)
 
     def live(self, *, include_b2b=False):
         """Applies a filter for Course runs with live=True"""
 
         queryset = self.filter(live=True)
-        return queryset if include_b2b else queryset.filter(b2b_contract__isnull=True)
+        return queryset if include_b2b else queryset.filter(b2b_only=False)
 
     def available(self, *, include_b2b=False):
         """Applies a filter for Course runs with end_date in future"""
@@ -1267,7 +1480,7 @@ class CourseRunQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):  # pylint: 
 
         if include_b2b:
             return self.filter(q_filter)
-        return self.filter(b2b_contract__isnull=True).filter(q_filter)
+        return self.filter(b2b_only=False).filter(q_filter)
 
     def enrollable(self, enrollment_end_date=None):
         """
@@ -1440,7 +1653,16 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
         null=True,
         blank=True,
         on_delete=models.DO_NOTHING,
+        related_name="+",
+    )
+    b2b_contracts = models.ManyToManyField(
+        "b2b.ContractPage",
+        blank=True,
         related_name="course_runs",
+        help_text="B2B contracts this course run is attached to.",
+    )
+    b2b_only = models.BooleanField(
+        default=False, help_text="Indicates if the course run is B2B only"
     )
     is_source_run = models.BooleanField(
         default=False,
@@ -1466,29 +1688,17 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
         return format_html(f'{self.courseware_id} <a href="{dj_change_url}">Admin</a>')
 
     class Meta:
+        # The ``unique_primary_language_per_group`` and
+        # ``unique_language_per_group`` rules used to live here as database
+        # UniqueConstraints that included the now-deprecated ``b2b_contract``
+        # FK. A run can now belong to multiple contracts through the
+        # ``b2b_contracts`` ManyToManyField, and M2M fields cannot participate
+        # in a UniqueConstraint, so the rules are enforced in application code
+        # instead - see ``CourseRun.validate_b2b_contract_group_uniqueness``,
+        # which runs from ``clean()``/``save()`` and from the ``m2m_changed``
+        # handler in ``courses/signals.py`` (which covers direct mutations such
+        # as ``run.b2b_contracts.add(contract)``).
         unique_together = ("course", "courseware_id", "run_tag")
-        constraints = [
-            UniqueConstraint(
-                fields=["course", "run_tag", "is_source_run", "b2b_contract"],
-                condition=Q(is_primary_language=True),
-                nulls_distinct=False,
-                name="unique_primary_language_per_group",
-            ),
-            UniqueConstraint(
-                fields=[
-                    "course",
-                    "run_tag",
-                    "language",
-                    "is_source_run",
-                    "b2b_contract",
-                    "variant_length",
-                    "variant_industry",
-                ],
-                condition=~Q(language=""),
-                nulls_distinct=False,
-                name="unique_language_per_group",
-            ),
-        ]
 
     @property
     def is_past(self):
@@ -1565,26 +1775,6 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
             and self.enrollment_start <= now
             and self.live is True
             and self.start_date is not None
-        )
-
-    @cached_property
-    def is_enrollable_for_b2b(self):
-        """Determine if the run is enrollable for B2B purchases."""
-
-        if not self.b2b_contract:
-            return False
-
-        if not self.b2b_contract.max_learners:
-            return self.is_enrollable
-
-        contract_enrollments = self.enrollments.filter(
-            active=True, change_status=None
-        ).count()
-
-        return (
-            self.b2b_contract.max_learners > 0
-            and self.b2b_contract.max_learners > contract_enrollments
-            and self.is_enrollable
         )
 
     @property
@@ -1674,8 +1864,26 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
         Validate that the expiration date is:
         1. Later than end_date if end_date is set
         2. Later than start_date if start_date is set
+
+        Also enforces the B2B contract group uniqueness rules that used to be
+        database constraints.
         """
         self.clean_language()
+
+        if self.pk:
+            self.validate_b2b_contract_group_uniqueness(self.contract_group_ids)
+        elif self.b2b_contract_id:
+            # The deprecated FK is populated before the first save, so the
+            # group it names is already known and can be checked now.
+            self.validate_b2b_contract_group_uniqueness([self.b2b_contract_id])
+        elif not self.b2b_only:
+            # An unsaved row has no primary key, so `b2b_contracts` can't be
+            # queried yet - B2B runs get their contracts attached immediately
+            # after this first save. Only rows that are unambiguously public
+            # are checked here (against the public group); everything else is
+            # validated by the `m2m_changed` handler in courses/signals once
+            # its contracts are attached.
+            self.validate_b2b_contract_group_uniqueness([])
 
         if not self.expiration_date:
             return
@@ -1703,6 +1911,116 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
             using=using,
             update_fields=update_fields,
         )
+
+    @cached_property
+    def b2b_contract_organization_id(self) -> int | None:
+        """
+        Organization owning the deprecated single-contract ``b2b_contract`` FK.
+
+        This is the lazy path, for callers that reach a run without annotating.
+        ``CourseViewSet`` annotates this same name onto its ``courseruns``
+        prefetch; ``cached_property`` is a non-data descriptor, so the value the
+        annotation writes into the instance ``__dict__`` shadows this method and
+        the contract page is never loaded there.
+        """
+        if self.b2b_contract_id is None:
+            return None
+        return self.b2b_contract.organization_id
+
+    @property
+    def contract_group_ids(self):
+        """
+        Return the ids of every contract group this run belongs to, combining
+        the ``b2b_contracts`` M2M with the deprecated ``b2b_contract`` FK.
+        """
+        ids = set(self.b2b_contracts.values_list("id", flat=True)) if self.pk else set()
+
+        if self.b2b_contract_id:
+            ids.add(self.b2b_contract_id)
+
+        return ids
+
+    def validate_b2b_contract_group_uniqueness(self, contract_ids):
+        """
+        Enforce, in application code, the uniqueness rules that used to be the
+        ``unique_primary_language_per_group`` and ``unique_language_per_group``
+        database constraints.
+
+        Those constraints grouped runs by contract using the deprecated
+        ``b2b_contract`` FK. Now that a run can be attached to several
+        contracts via ``b2b_contracts``, the rules are applied once per
+        contract group: within a given contract (or within the "no contract"
+        group) no two runs may share the same
+        ``(course, run_tag, is_source_run)`` combination as the primary
+        language run, nor the same
+        ``(course, run_tag, is_source_run, language, variant_length, variant_industry)``
+        combination.
+
+        Args:
+            contract_ids (Collection): the ``ContractPage`` ids this run is (or
+                is about to be) associated with. An empty collection checks the
+                "no contract" group.
+
+        Raises:
+            ValidationError: if another run already occupies the same slot in
+                any of the contract groups being checked.
+        """
+        # `None` stands for the "no contract" group, which is a valid group in
+        # its own right and must be checked when the run has no contracts.
+        groups_to_check = list(contract_ids) or [None]
+
+        for contract_id in groups_to_check:
+            siblings = CourseRun.all_objects.filter(
+                course=self.course,
+                run_tag=self.run_tag,
+                is_source_run=self.is_source_run,
+            ).exclude(pk=self.pk)
+
+            # Runs can be linked to a contract through the M2M or through the
+            # deprecated FK (which is still written directly in places), so
+            # both have to be considered when building a group.
+            siblings = (
+                siblings.filter(
+                    Q(b2b_contracts__id=contract_id) | Q(b2b_contract_id=contract_id)
+                )
+                if contract_id is not None
+                else siblings.filter(
+                    b2b_contracts__isnull=True, b2b_contract__isnull=True
+                )
+            )
+            if (
+                self.is_primary_language
+                and siblings.filter(is_primary_language=True).exists()
+            ):
+                msg = (
+                    f"A primary-language run for {self.course.readable_id} with "
+                    f"run tag '{self.run_tag}' already exists in this contract group."
+                )
+                raise ValidationError(msg)
+
+            if (
+                self.language
+                and siblings.filter(
+                    language=self.language,
+                    variant_length=self.variant_length,
+                    variant_industry=self.variant_industry,
+                ).exists()
+            ):
+                msg = (
+                    f"A run for {self.course.readable_id} with run tag "
+                    f"'{self.run_tag}', language '{self.language}' and variant "
+                    f"'{self.variant_length}/{self.variant_industry}' already "
+                    "exists in this contract group."
+                )
+                raise ValidationError(msg)
+
+    def enrollable_for_contract(self, contract) -> bool:
+        """Determine if the run is enrollable for the specified contract."""
+
+        if not self.b2b_contracts.filter(pk=contract.id).exists():
+            return False
+
+        return self.is_enrollable
 
 
 def limit_to_certificate_pages():
@@ -2164,6 +2482,13 @@ class CourseRunEnrollment(EnrollmentModel):
             "longer retried automatically."
         ),
     )
+    b2b_contract = models.ForeignKey(
+        "b2b.ContractPage",
+        on_delete=models.DO_NOTHING,
+        related_name="course_run_enrollments",
+        null=True,
+        blank=True,
+    )
 
     objects = ActiveCourseRunEnrollmentManager()
     all_objects = CourseRunEnrollmentManager()
@@ -2301,6 +2626,13 @@ class ProgramEnrollment(EnrollmentModel):
 
     program = models.ForeignKey(
         "courses.Program", on_delete=models.CASCADE, related_name="enrollments"
+    )
+    b2b_contract = models.ForeignKey(
+        "b2b.ContractPage",
+        on_delete=models.DO_NOTHING,
+        related_name="program_enrollments",
+        null=True,
+        blank=True,
     )
 
     objects = ActiveProgramEnrollmentManager()

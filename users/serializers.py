@@ -11,7 +11,7 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from rest_framework import serializers
 
 from b2b.api import get_user_b2b_organizations
-from b2b.serializers.v0 import OrganizationPageSerializer
+from b2b.serializers.v0 import UserOrganizationPageSerializer
 from compliance.api import get_missing_export_compliance_fields
 from hubspot_sync.task_helpers import sync_hubspot_user
 
@@ -240,13 +240,13 @@ class UserSerializer(serializers.ModelSerializer):
     def get_grants(self, instance):
         return instance.get_all_permissions()
 
-    @extend_schema_field(OrganizationPageSerializer(many=True))
+    @extend_schema_field(UserOrganizationPageSerializer(many=True))
     def get_b2b_organizations(self, instance):
         """Get the organizations for the user"""
         if instance.is_anonymous:
             return []
 
-        return OrganizationPageSerializer(
+        return UserOrganizationPageSerializer(
             get_user_b2b_organizations(instance), many=True
         ).data
 

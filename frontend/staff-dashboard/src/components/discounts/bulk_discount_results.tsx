@@ -1,9 +1,5 @@
-import { Show, Row, Col } from "@pankod/refine-antd";
-import {
-  Table,
-  Button,
-  Card,
-} from "@pankod/refine-antd";
+import { Show } from "@refinedev/antd";
+import { Row, Col, Table, Button, Card } from "antd";
 
 import fileDownload from 'js-file-download';
 

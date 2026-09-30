@@ -15,11 +15,11 @@ from mitol.common.utils import now_in_utc
 from b2b.constants import (
     CONTRACT_MEMBERSHIP_TYPE_CHOICES,
 )
+from b2b.contracts import create_contract
 from b2b.exceptions import SourceCourseIncompleteError
 from b2b.models import (
     ContractPage,
     ContractProgramItem,
-    OrganizationIndexPage,
     OrganizationPage,
 )
 from courses.models import (
@@ -131,16 +131,12 @@ class Command(BaseCommand):
             type=str,
             help="The end date of the contract.",
         )
-        create_parser.add_argument(
-            "--create",
-            action="store_true",
-            help="Create an organization if it does not exist.",
-        )
-        create_parser.add_argument(
-            "--org-key",
-            type=str,
-            help="The org key to use for the new organization.",
-        )
+        # No --create: this used to build an OrganizationPage with no
+        # sso_organization_id, and orgs in that state are silently broken -
+        # attach_user() returns False without doing anything, so every
+        # membership write is a no-op (mitodl/hq#10552). Provision the
+        # organization through /api/v0/b2b/provisioning/organizations/ instead,
+        # which writes Keycloak and MITx Online together.
         create_parser.add_argument(
             "--max-learners",
             type=int,
@@ -272,10 +268,8 @@ class Command(BaseCommand):
         description = kwargs.pop("description")
         start_date = kwargs.pop("start")
         end_date = kwargs.pop("end")
-        create_organization = kwargs.pop("create")
         max_learners = kwargs.pop("max_learners")
         price = kwargs.pop("price")
-        new_org_key = kwargs.pop("org_key")
 
         self.stdout.write(
             f"Creating contract '{contract_name}' for organization '{organization_name}'"
@@ -287,36 +281,27 @@ class Command(BaseCommand):
 
         log.info("Got organization %s", org)
 
-        if not org and create_organization:
-            if not new_org_key:
-                msg = f"To create '{organization_name}', you must supply an org key."
-                raise CommandError(msg)
-
-            parent = OrganizationIndexPage.objects.first()
-            org = OrganizationPage(name=organization_name, org_key=new_org_key)
-            parent.add_child(instance=org)
-            org.save()
-            parent.save()
-            org.refresh_from_db()
-            self.stdout.write(f"Created organization '{organization_name}'")
-        elif not org:
-            msg = f"Organization '{organization_name}' does not exist. Use --create to create it."
+        if not org:
+            msg = (
+                f"Organization '{organization_name}' does not exist. Create it "
+                "through POST /api/v0/b2b/provisioning/organizations/, which "
+                "creates the Keycloak organization alongside it."
+            )
             raise CommandError(msg)
 
-        contract = ContractPage(
+        contract = create_contract(
+            org,
             name=contract_name,
-            description=description or "",
             membership_type=membership_type,
-            organization=org,
+            description=description or "",
             contract_start=start_date,
             contract_end=end_date,
             max_learners=max_learners,
             enrollment_fixed_price=price,
         )
-        org.add_child(instance=contract)
-        contract.save()
         self.stdout.write(
-            f"Created contract '{contract_name}' for organization '{organization_name}'"
+            f"Created contract '{contract_name}' (ID {contract.id}) for "
+            f"organization '{organization_name}'"
         )
 
     def handle_modify(self, *args, **kwargs):  # noqa: ARG002, C901
@@ -428,7 +413,7 @@ class Command(BaseCommand):
                     # them correctly and create_contract_run can find them.
                     non_b2b = (
                         CourseRun.all_objects.filter(
-                            course=course, b2b_contract__isnull=True
+                            course=course, b2b_contracts__isnull=True
                         )
                         .exclude(Q(is_source_run=True) | Q(run_tag="SOURCE"))
                         .prefetch_related("enrollment_modes")

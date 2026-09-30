@@ -173,7 +173,7 @@ def _build_bill_to(user) -> dict[str, str]:
     if legal_address and legal_address.last_name:
         bill_to["last_name"] = legal_address.last_name
     if legal_address and legal_address.country:
-        bill_to["country"] = legal_address.country
+        bill_to["country"] = str(legal_address.country)
     if legal_address and legal_address.street_address_1:
         bill_to["address1"] = legal_address.street_address_1
     if legal_address and legal_address.street_address_2:
@@ -182,7 +182,7 @@ def _build_bill_to(user) -> dict[str, str]:
         bill_to["locality"] = legal_address.city
     if legal_address and legal_address.state:
         bill_to["administrative_area"] = _normalize_administrative_area(
-            legal_address.country,
+            str(legal_address.country),
             legal_address.state,
         )
     if legal_address and legal_address.postal_code:

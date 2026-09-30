@@ -88,7 +88,7 @@ export class OrderSummaryCard extends React.Component<Props, State> {
   }
 
   renderAppliedCoupons() {
-    const { discounts } = this.props
+    const { discounts, totalPrice, discountedPrice } = this.props
 
     if (discounts === null || discounts.length === 0) {
       return null
@@ -104,6 +104,15 @@ export class OrderSummaryCard extends React.Component<Props, State> {
 
     case "dollars-off":
       discountAmountText = `-${formatLocalePrice(discountAmount)}`
+      break
+
+    case "paid-amount-off":
+      // The API stores this discount's amount as 0: its value is the price
+      // already paid for a purchase in the program, resolved per learner and
+      // only visible here as the gap between the two basket prices.
+      discountAmountText = `-${formatLocalePrice(
+        totalPrice - discountedPrice
+      )}`
       break
 
     default:

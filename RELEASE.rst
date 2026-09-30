@@ -1,6 +1,157 @@
 Release Notes
 =============
 
+Version 1.169.4
+---------------
+
+- Enrolling users should skip repair user if it is already synced (#4045)
+- Return the user's data sharing consent on their B2B contracts (#4039)
+
+Version 1.169.3
+---------------
+
+- Add CyberSource compliance check to order generation pre-flight (#4022)
+
+Version 1.169.2
+---------------
+
+- Make migration non-atomic; chunk batches into 100s (#4043)
+
+Version 1.169.1
+---------------
+
+- Fix the program enrollment backfill so that it skips some enrollments rather than crashing out (#4040)
+- Move the staff dashboard onto Refine 4's router and auth provider (staff UI 3/4) (#3996)
+- Remove the leaking method cache from Course.get_filtered_runs (#4037)
+- Upgrade the staff dashboard from Refine 3 to Refine 4 (staff UI 2/4) (#3995)
+- Add the staff provisioning list, SP details and audit trail (staff UI 1/4) (#3994)
+- Add the staff contract provisioning API (C3 3/3) (#3965)
+- Move contract setup out of the management commands into b2b.contracts (C3 2/3) (#3964)
+- Track contract run edX clones and make the clone safe to retry (C3 1/3) (#3963)
+- Add an admin for Stripe webhook secrets (#4024)
+- Track the contract that an enrollment belongs to (#3944)
+- Fix bug in recording consent values on incorrect row (#4025)
+- Initial implementation of simple data consent api. (#3977)
+- Fix CyberSource refund handling (#4016)
+
+Version 1.168.5
+---------------
+
+- Add migration to add data consent boolean, timestamps (#3969)
+- Skip cart for verified program course enrollments (#4008)
+
+Version 1.168.4
+---------------
+
+- Stop hydrating B2B ContractPage rows in /api/v2/courses/ (#4013)
+- Google Sheets: Process program refunds and downgrade enrollments (#4011)
+
+Version 1.168.3
+---------------
+
+- feat(product-pages): expose CMS-managed testimonials on course and program pages (#3987)
+
+Version 1.168.2
+---------------
+
+- Add custom through model for User.b2b_contracts (#3951)
+
+Version 1.168.1
+---------------
+
+- Skip emails when ernolling learners (#4002)
+- chore(deps): security updates for urllib3, wagtail, bleach and djangorestframework (#4000)
+- Disable npm manager in renovate.  (#3991)
+
+Version 1.168.0
+---------------
+
+- Fix the pre-commit errors (#4003)
+- Make /api/v2/courses/ query count flat in course count (#3886)
+- fix: make the CyberSource SDK work against the real urllib3 (#3984)
+- Merge commit from fork
+
+Version 1.167.0
+---------------
+
+- Update dependency django to v5.2.17 [SECURITY] (#3762)
+- feat: FAQs on product pages (mitxonline CMS side) (#3961)
+
+Version 1.166.7
+---------------
+
+- Scope the CSRF cookie domain by Origin and re-issue it when missing (#3978)
+- Make verified-program discounts an "internal" redemption type (#3972)
+
+Version 1.166.5
+---------------
+
+- feat: add --skip-compliance-check flag to enroll_learners (#3980)
+- Expose some new B2B fields in CourseRunAdmin (#3968)
+- fix: reject Course.readable_id values that collide with a CourseRun's courseware_id (#3960)
+
+Version 1.166.4
+---------------
+
+- Disallow the urllib3-future package (#3975)
+
+Version 1.166.3
+---------------
+
+- feat: GET /api/v0/products/{id}/user_pricing/ per-user price quote (#3959)
+- Return 409 when a new organization's name reuses a page slug (#3955)
+- Restrict B2B page access to admins (#3957)
+- fix(sentry): cap request bodies at 1KB and scrub Postgres DETAIL rows (#3936)
+
+Version 1.166.2
+---------------
+
+- Add XPro HubSpot routing for ecommerce events (#3947)
+- Search compliance logs in the admin (#3962)
+
+Version 1.166.1
+---------------
+
+- Fix enrollable_for_contract so it just checks that the run is in the contract (#3954)
+- Only sync changed users to HubSpot during cert generation, and in batches (#3946)
+- Add admin filters for compliance logs (#3952)
+
+Version 1.166.0
+---------------
+
+- feat (hq11846): Complete your Purchase, paid-amount-off discount behavior (#3926)
+- Retire b2b_contract create --create, demote the org sync to a reconciler (C1 5/5) (#3932)
+- Expose the provisioning API under /api/v0/b2b/provisioning/ (C1 4/5) (#3931)
+- Provision Keycloak organizations and IdPs at runtime (C1 3/5) (#3930)
+- Add the B2B onboarding and identity provider records (C1 2/5) (#3929)
+- Give the Keycloak admin client the calls provisioning needs (C1 1/5) (#3928)
+- Harden test for locals (#3950)
+- chore: pin mitol-drf-lint in the drf-serializer-orm-check hook (#3943)
+- Reuse prefetched course runs in the v2 course API again (#3948)
+
+Version 1.165.4
+---------------
+
+- Skip duplicate learner records when transfering (#3942)
+- Update B2B provisioning; allow public course attachment (#3903)
+- Respect product-scoped discounts in pricing (#3937)
+- Cut per-order queries on GET /api/v0/orders/history/ from 17 to 10 (#3934)
+
+Version 1.165.3
+---------------
+
+- Optimize course API pagination query (#3939)
+- ENABLE_MULTIPLE_CART_ITEMS=False should disable multi-product baskets even through APIs   (#3909)
+
+Version 1.165.2
+---------------
+
+- fix: Handle payment gateway refund errors in admin (#3803)
+- Remove 'screen' from Dockerfile dependencies (#3927)
+- fix: remap issued-certificate signatory references (#3921)
+- feat (hq11846): Complete your Purchase, Discount Creation (#3916)
+- Fix Content-Type on Keycloak organization member association requests (#3923)
+
 Version 1.165.1 (Released September 02, 2026)
 ---------------
 

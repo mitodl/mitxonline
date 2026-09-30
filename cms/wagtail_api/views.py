@@ -73,6 +73,15 @@ class WagtailPagesAPIViewSet(PagesAPIViewSet):
         model_type = self.request.GET.get("type", "").lower()
         annotation_key = self.request.GET.get("annotation", "readable_id")
 
+        # "*" is the all-fields form the documented catalog routes use, so treat
+        # it the same as an explicit faqs request.
+        requested_fields = self.request.GET.get("fields", "").split(",")
+        if "faqs" in requested_fields or "*" in requested_fields:
+            queryset = queryset.prefetch_related("faqs_list")
+        if "testimonials" in requested_fields or "*" in requested_fields:
+            # Go through to the image FK so image_src doesn't do a query per row.
+            queryset = queryset.prefetch_related("testimonials_list__image")
+
         if model_type in annotation_map:
             queryset = queryset.annotate(
                 **{annotation_key: F(f"{annotation_map[model_type]}__{annotation_key}")}

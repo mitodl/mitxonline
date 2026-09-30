@@ -1,11 +1,7 @@
-import { useUpdate, useNotification } from "@pankod/refine-core";
+import { useUpdate, useNotification } from "@refinedev/core";
 import React from "react"
 const { useState } = React;
-import {
-    Select,
-    Modal,
-    Input
-} from "@pankod/refine-antd";
+import { Select, Modal, Input } from "antd";
 
 import { IDiscount, IFlexiblePriceRequest, IFlexiblePriceStatusModalProps } from "interfaces";
 import { formatDiscount } from "utils";

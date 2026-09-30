@@ -1,14 +1,6 @@
-import {
-    Table,
-    useTable,
-    List,
-    Button,
-    Modal,
-    Row,
-    Col,
-    Input,
-} from "@pankod/refine-antd";
-import { useUpdate, useDelete } from "@pankod/refine-core";
+import { useTable, List } from "@refinedev/antd";
+import { Table, Button, Modal, Row, Col, Input } from "antd";
+import { useUpdate, useDelete } from "@refinedev/core";
 import { PlusSquareOutlined } from "@ant-design/icons";
 import { useState } from "react";
 
@@ -28,11 +20,14 @@ const UserResult = (props: IUserAssignmentResultProps) => {
     const { searchTerm, onAdd } = props;
     const { tableProps } = useTable<IUser>({
         resource: 'user_search',
-        permanentFilter: [{
-            field: "search",
-            operator: "eq",
-            value: searchTerm
-        }]
+
+        filters: {
+            permanent: [{
+                field: "search",
+                operator: "eq",
+                value: searchTerm
+            }]
+        }
     });
 
     return (<Table {...tableProps} rowKey="id">

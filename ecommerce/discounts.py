@@ -7,23 +7,9 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
+    REDEMPTION_TYPE_INTERNAL,
 )
 from ecommerce.models import Discount, Product
-
-
-def product_from_version(version):
-    """Reconstruct a Product from its reversion Version's serialized data."""
-    if version is None:
-        return None
-    field_dict = version.field_dict
-    return Product(
-        id=field_dict["id"],
-        content_type_id=field_dict["content_type_id"],
-        object_id=field_dict["object_id"],
-        price=field_dict["price"],
-        description=field_dict["description"],
-        is_active=field_dict["is_active"],
-    )
 
 
 @dataclass
@@ -74,6 +60,14 @@ class DiscountType(abc.ABC):
         return price
 
     def get_product_price(self, product: Product):
+        # An internal discount's product links say what it is for, not what it
+        # prices; the code that attached it decided eligibility (see
+        # REDEMPTION_TYPE_INTERNAL).
+        if (
+            self.discount.redemption_type != REDEMPTION_TYPE_INTERNAL
+            and not self.discount.applies_to_products([product])
+        ):
+            return product.price
         return self.get_product_version_price(product)
 
     @abc.abstractmethod

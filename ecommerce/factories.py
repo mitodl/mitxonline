@@ -1,11 +1,19 @@
+from decimal import Decimal
+from types import SimpleNamespace
+
 import faker
+import reversion
 from factory import LazyAttribute, SubFactory, fuzzy
 from factory.django import DjangoModelFactory
+from reversion.models import Version
 
 from courses.factories import CourseRunFactory, ProgramFactory
+from courses.models import CourseRun
 from ecommerce import models
 from ecommerce.constants import (
     DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+    DISCOUNT_TYPE_PERCENT_OFF,
+    REDEMPTION_TYPE_INTERNAL,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
@@ -78,6 +86,12 @@ class PaidAmountOffDiscountFactory(DiscountFactory):
     automatic = True
 
 
+class InternalDiscountFactory(DiscountFactory):
+    amount = 100
+    discount_type = DISCOUNT_TYPE_PERCENT_OFF
+    redemption_type = REDEMPTION_TYPE_INTERNAL
+
+
 class BasketFactory(DjangoModelFactory):
     """Factory for Basket"""
 
@@ -140,3 +154,60 @@ class DiscountRedemptionFactory(DjangoModelFactory):
 
     class Meta:
         model = models.DiscountRedemption
+
+
+def make_purchase(
+    user,
+    purchasable,
+    price,
+    *,
+    paid=None,
+    state=models.OrderStatus.FULFILLED,
+):
+    """
+    An order for ``purchasable`` with one line listed at ``price`` and charged
+    ``paid`` (defaults to ``price``). Returns the Line.
+
+    The Product is created inside a revision because Line.product_version is
+    non-null and reversion only records a Version for objects saved under one.
+    """
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=purchasable, price=price)
+    charged = price if paid is None else paid
+    order = OrderFactory.create(purchaser=user, state=state, total_price_paid=charged)
+    return models.Line.objects.create(
+        order=order,
+        purchased_object_id=product.object_id,
+        purchased_content_type_id=product.content_type_id,
+        product_version=Version.objects.get_for_object(product).first(),
+        quantity=1,
+        discounted_unit_price=charged,
+    )
+
+
+def make_paid_amount_off_offer(user, purchased):
+    """
+    One learner holding exactly one qualifying source for a paid-amount-off
+    discount: a $999 program product whose requirement tree contains
+    ``purchased`` -- a course run or a sub-program -- and a $100 fulfilled
+    purchase of it. Resolving the discount returns a 100.00 credit, so the
+    program prices at 899.00.
+    """
+    program = ProgramFactory.create()
+    program.add_requirement(
+        purchased.course if isinstance(purchased, CourseRun) else purchased
+    )
+    source_line = make_purchase(user, purchased, Decimal("100.00"))
+    with reversion.create_revision():
+        program_product = ProgramProductFactory.create(
+            purchasable_object=program, price=Decimal("999.00")
+        )
+    discount = PaidAmountOffDiscountFactory.create()
+    models.DiscountProduct.objects.create(discount=discount, product=program_product)
+    return SimpleNamespace(
+        user=user,
+        program_product=program_product,
+        program_product_version=Version.objects.get_for_object(program_product).first(),
+        source_line=source_line,
+        discount=discount,
+    )

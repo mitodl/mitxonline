@@ -1,23 +1,9 @@
-import { CrudFilters, HttpError, useInvalidate, useList } from "@pankod/refine-core";
+import { CrudFilters, HttpError, useInvalidate, useList } from "@refinedev/core";
 import React from "react"
 const { useState } = React;
-import {
-    Button,
-    List,
-    DateField,
-    Table,
-    useTable,
-    Space,
-    Select,
-    FormProps,
-    Form,
-    Input,
-    Icons,
-    Row,
-    Col,
-    Card
-} from "@pankod/refine-antd";
-import { ReloadOutlined } from "@ant-design/icons"
+import { List, DateField, useTable } from "@refinedev/antd";
+import { Button, Table, Space, Select, FormProps, Form, Input, Row, Col, Card } from "antd";
+import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { Spin } from "antd"
 
 import { IFlexiblePriceRequest, IFlexiblePriceRequestFilters } from "interfaces";
@@ -74,7 +60,7 @@ const FlexiblePricingFilterForm: React.FC<{ formProps: FormProps }> = ({ formPro
     return (
         <Form layout="inline" {...formProps}>
             <Form.Item label="Search by Name" name="q">
-                <Input placeholder="Name, username, email address" prefix={<Icons.SearchOutlined />}></Input>
+                <Input placeholder="Name, username, email address" prefix={<SearchOutlined />}></Input>
             </Form.Item>
             <Form.Item label="Search by Status" name="status">
                 <Select
@@ -124,12 +110,13 @@ const RefreshTableButton: React.FC<RefreshTableButtonProps> = (props) => {
 
 export const FlexiblePricingList: React.FC = () => {
     const invalidate = useInvalidate()
-    const {tableQueryResult, tableProps, searchFormProps} = useTable<
+    const {tableQuery, tableProps, searchFormProps} = useTable<
         IFlexiblePriceRequest,
         HttpError,
         IFlexiblePriceRequestFilters
     >({
         resource: 'flexible_pricing/applications_admin',
+
         onSearch: (params) => {
             const filters: CrudFilters = [];
             const { q, status, courseware } = params;
@@ -178,7 +165,7 @@ export const FlexiblePricingList: React.FC = () => {
     }
 
     const refreshList = () => {
-        tableQueryResult.refetch()
+        tableQuery.refetch()
     }
 
     return (
@@ -200,7 +187,7 @@ export const FlexiblePricingList: React.FC = () => {
                 <Col sm={24}>
                     <List
                         title="Flexible Pricing Requests"
-                        headerProps={{ subTitle: <RefreshTableButton isFetching={tableQueryResult.isFetching} refreshList={refreshList} /> }}
+                        headerProps={{ subTitle: <RefreshTableButton isFetching={tableQuery.isFetching} refreshList={refreshList} /> }}
                     >
                         <Table {...tableProps} rowKey="id">
                             <Table.Column

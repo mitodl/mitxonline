@@ -12,10 +12,13 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.views.generic import TemplateView
 from mitol.common.admin import TimestampedModelAdmin
+from mitol.payment_gateway.models import StripeWebhookSecret, StripeWebhookSecretRoute
 from reversion.admin import VersionAdmin
 from viewflow import fsm
 
 from ecommerce.api import refund_order
+from ecommerce.constants import REDEMPTION_TYPE_INTERNAL
+from ecommerce.discount_sources import fulfilled_redemptions_funded_by
 from ecommerce.forms import AdminRefundOrderForm
 from ecommerce.models import (
     Basket,
@@ -153,6 +156,7 @@ class BasketItemAdmin(VersionAdmin):
 @admin.register(Discount)
 class DiscountAdmin(admin.ModelAdmin):
     model = Discount
+    exclude = ["is_program_discount"]
     search_fields = ["discount_type", "redemption_type", "discount_code"]
     list_display = [
         "id",
@@ -163,6 +167,14 @@ class DiscountAdmin(admin.ModelAdmin):
         "payment_type",
     ]
     list_filter = ["discount_type", "redemption_type", "payment_type"]
+
+    def get_readonly_fields(self, request, obj=None):  # noqa: ARG002
+        # An internal discount's code is visible on receipts, so any other
+        # redemption type would make that code live. DiscountShapeMixin refuses
+        # the same change over the API.
+        if obj is not None and obj.redemption_type == REDEMPTION_TYPE_INTERNAL:
+            return ("redemption_type",)
+        return ()
 
 
 @admin.register(DiscountProduct)
@@ -402,6 +414,11 @@ class RefundedOrderAdmin(FlowOrderAdmin):
         return super().get_queryset(request).filter(state=OrderStatus.REFUNDED)
 
 
+def _used_source_redemptions(order):
+    """Paid-amount-off credits a line of this order funded, which a refund leaves in place."""
+    return fulfilled_redemptions_funded_by(order)
+
+
 class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
     template_name = "refund_order_confirm.html"
     permission_required = "is_superuser"
@@ -476,6 +493,7 @@ class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, Template
                     "form_valid": refund_form.is_valid(),
                     "errors": errors,
                     "error_messages": error_messages,
+                    "used_source_redemptions": _used_source_redemptions(order),
                 },
             )
         except NotImplementedError:
@@ -521,6 +539,7 @@ class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, Template
                 "order": order,
                 "form_valid": True,
                 "errors": {},
+                "used_source_redemptions": _used_source_redemptions(order),
             },
         )
 
@@ -576,3 +595,31 @@ class StripeEventLogAdmin(ReadOnlyModelAdmin):
         StripeEventTypeNamespaceFilter,
         "event_type",
     ]
+
+
+class StripeWebhookSecretRouteInline(admin.TabularInline):
+    """Inline for the routes for the webhook secret"""
+
+    model = StripeWebhookSecretRoute
+
+
+@admin.register(StripeWebhookSecret)
+class StripeWebhookSecretAdmin(admin.ModelAdmin):
+    """Admin for the Stripe Webhook Secrets model from payment_gateway."""
+
+    model = StripeWebhookSecret
+    list_display = [
+        "secret_name",
+        "is_active",
+    ]
+    list_filter = [
+        "is_active",
+    ]
+    inlines = [
+        StripeWebhookSecretRouteInline,
+    ]
+
+    def get_queryset(self, request):  # noqa: ARG002
+        """Return the all_objects manager."""
+
+        return StripeWebhookSecret.all_objects

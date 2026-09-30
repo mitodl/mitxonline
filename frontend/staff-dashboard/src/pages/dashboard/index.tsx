@@ -1,4 +1,4 @@
-import { Typography } from "@pankod/refine-antd"
+import { Typography } from "antd";
 
 export const DashboardPage: React.FC = () => {
     return <>

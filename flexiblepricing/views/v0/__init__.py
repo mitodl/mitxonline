@@ -6,7 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.db.models import Q
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.permissions import IsAdminUser
 from rest_framework.viewsets import ModelViewSet
 
 from flexiblepricing import models, serializers
@@ -16,30 +16,6 @@ from flexiblepricing.tasks import (
     notify_flexible_price_status_change_email,
 )
 from main.views import RefinePagination
-
-
-class CurrencyExchangeRateViewSet(ModelViewSet):
-    queryset = models.CurrencyExchangeRate.objects.all()
-    serializer_class = serializers.CurrencyExchangeRateSerializer
-    authentication_classes = (SessionAuthentication, TokenAuthentication)
-    permission_classes = (IsAuthenticated,)
-
-
-class CountryIncomeThresholdViewSet(ModelViewSet):
-    queryset = models.CountryIncomeThreshold.objects.all()
-    serializer_class = serializers.CountryIncomeThresholdSerializer
-    authentication_classes = (SessionAuthentication, TokenAuthentication)
-    permission_classes = (IsAuthenticated,)
-
-
-class FlexiblePriceViewSet(ModelViewSet):
-    serializer_class = serializers.FlexiblePriceSerializer
-    authentication_classes = (SessionAuthentication, TokenAuthentication)
-    permission_classes = (IsAuthenticated,)
-    pagination_class = RefinePagination
-
-    def get_queryset(self):
-        return models.FlexiblePrice.objects.filter(user=self.request.user).all()
 
 
 class FlexiblePriceCoursewareViewSet(ModelViewSet):

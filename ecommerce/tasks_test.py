@@ -90,6 +90,8 @@ def test_delayed_downgrade_user(mocker, user):
     Test that unenroll task properly calls the unenrollment functionality against an order
     """
 
-    downgrade_learner_mock = mocker.patch("ecommerce.api.downgrade_learner_from_order")
+    downgrade_learner_mock = mocker.patch(
+        "ecommerce.api.downgrade_enrollments_from_order"
+    )
     perform_downgrade_from_order.delay(order_id=1)
     downgrade_learner_mock.assert_called()

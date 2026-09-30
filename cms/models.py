@@ -44,7 +44,7 @@ from wagtail.embeds.embeds import get_embed
 from wagtail.embeds.exceptions import EmbedException
 from wagtail.fields import RichTextField, StreamField
 from wagtail.images.models import Image
-from wagtail.models import Page
+from wagtail.models import Orderable, Page
 from wagtail.search import index
 from wagtail.snippets.models import register_snippet
 from wagtailmetadata.models import MetadataPageMixin
@@ -725,6 +725,70 @@ class InstructorPageLink(models.Model):  # noqa: DJ008
     ]
 
 
+class ProductPageFAQ(Orderable):
+    """A single frequently asked question shown on a course/program product page."""
+
+    # ParentalKey needs a concrete target, but ProductPage is abstract, so this
+    # points at Page (same as linked_instructors). Only CoursePage/ProgramPage
+    # surface it, via their InlinePanel + faqs APIField.
+    page = ParentalKey(Page, on_delete=models.CASCADE, related_name="faqs_list")
+    question = models.TextField(help_text="The frequently asked question.")
+    answer = RichTextField(
+        help_text="The answer. Supports links and basic formatting.",
+    )
+
+    panels = [
+        FieldPanel("question"),
+        FieldPanel("answer"),
+    ]
+
+    def __str__(self):
+        return self.question
+
+
+class ProductPageTestimonial(Orderable):
+    """A single testimonial shown on a course/program product page."""
+
+    # ParentalKey needs a concrete target, but ProductPage is abstract, so this
+    # points at Page (same as faqs_list/linked_instructors). Only
+    # CoursePage/ProgramPage surface it, via their InlinePanel + testimonials
+    # APIField.
+    page = ParentalKey(Page, on_delete=models.CASCADE, related_name="testimonials_list")
+    quote = models.TextField(
+        help_text="The testimonial quote. Aim for 600 characters or fewer.",
+    )
+    name = models.CharField(
+        max_length=255,
+        help_text="Name of the person quoted. Aim for 40 characters or fewer.",
+    )
+    title = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text=(
+            "Optional role/affiliation, e.g. 'Product Manager, Acme'. "
+            "Aim for 80 characters or fewer."
+        ),
+    )
+    image = models.ForeignKey(
+        Image,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="Optional photo of the person quoted.",
+    )
+
+    panels = [
+        FieldPanel("quote"),
+        FieldPanel("name"),
+        FieldPanel("title"),
+        FieldPanel("image"),
+    ]
+
+    def __str__(self):
+        return self.name
+
+
 class HomePage(VideoPlayerConfigMixin):
     """
     Site home page
@@ -1160,7 +1224,11 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
     faq_url = models.URLField(  # noqa: DJ001
         null=True,
         blank=True,
-        help_text="URL a relevant FAQ page or entry for the course/program.",
+        help_text=(
+            "External link to a separate FAQ page (opens in a new tab on the "
+            "legacy site). For on-page FAQs shown on MIT Learn, use the FAQs "
+            "section below instead."
+        ),
     )
 
     video_url = models.URLField(  # noqa: DJ001
@@ -1299,6 +1367,8 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
             "linked_instructors",
             label="Faculty Members",
         ),
+        InlinePanel("faqs_list", label="FAQs"),
+        InlinePanel("testimonials_list", label="Testimonials"),
     ]
     api_fields = [
         APIField("description", serializer=RichTextSerializer()),
@@ -1320,6 +1390,8 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         APIField("video_url"),
         APIField("faculty_section_title"),
         APIField("faculty"),
+        APIField("faqs"),
+        APIField("testimonials"),
         APIField("certificate_page", serializer=ProductChildPageSerializer()),
         APIField("how_youll_learn"),
     ]
@@ -1380,6 +1452,29 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
             member.linked_instructor_page for member in self.linked_instructors.all()
         ]
         return InstructorPageSerializer(instructor_pages, many=True).data
+
+    @property
+    def faqs(self):
+        """
+        Returns the FAQs for this product page, ordered, for the wagtail API.
+        """
+        from cms.serializers import ProductPageFAQSerializer  # noqa: PLC0415
+
+        # Orderable's default ordering already sorts by sort_order.
+        return ProductPageFAQSerializer(self.faqs_list.all(), many=True).data
+
+    @property
+    def testimonials(self):
+        """
+        Returns the testimonials for this product page, ordered, for the
+        wagtail API.
+        """
+        from cms.serializers import ProductPageTestimonialSerializer  # noqa: PLC0415
+
+        # Orderable's default ordering already sorts by sort_order.
+        return ProductPageTestimonialSerializer(
+            self.testimonials_list.all(), many=True
+        ).data
 
     @property
     def product(self):
@@ -1486,6 +1581,26 @@ class CoursePage(ProductPage):
         """Gets the product associated with this page"""
         return self.course
 
+    @cached_property
+    def financial_assistance_form_url(self) -> str:
+        """
+        URL of the financial assistance form for this course.
+
+        This is the lazy path, for callers that reach a CoursePage without going
+        through a Course queryset (ecommerce, v1 programs). API paths should
+        instead let the view's queryset resolve it -
+        ``Course.objects.prefetch("financial_assistance_form_url")`` writes this
+        name into the instance ``__dict__``, which shadows this property so
+        nothing queries during serialization.
+        """
+        from cms.api import resolve_financial_assistance_form_urls  # noqa: PLC0415
+
+        if self.course_id is None:
+            return ""
+        return resolve_financial_assistance_form_urls([self.course_id]).get(
+            self.course_id, ""
+        )
+
     def _get_current_finaid(self, request):
         """
         Returns information about financial aid for the current learner.
@@ -1571,7 +1686,9 @@ class CoursePage(ProductPage):
         if self.course_id is None:
             return None
 
-        course = Course.objects.prefetch("programs").get(id=self.course_id)
+        course = Course.objects.prefetch(
+            "programs", "financial_assistance_form_url"
+        ).get(id=self.course_id)
 
         return CourseSerializer(course).data
 

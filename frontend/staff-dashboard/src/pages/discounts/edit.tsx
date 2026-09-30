@@ -1,19 +1,13 @@
-import {
-    useForm,
-    Form,
-    Input,
-    InputNumber,
-    Select,
-    Edit,
- } from "@pankod/refine-antd";
+import { useForm, Edit } from "@refinedev/antd";
+import { Form, Input, InputNumber, Select } from "antd";
 import { DiscountForm } from "components/discounts/discounts";
 
 import { IDiscount } from "interfaces";
 
 
 export const DiscountEdit = () => {
-    const { formProps, saveButtonProps, queryResult } = useForm<IDiscount>();
-    const discount_type = queryResult?.data?.data.discount_type
+    const { formProps, saveButtonProps, query } = useForm<IDiscount>();
+    const discount_type = query?.data?.data.discount_type
 
     return (
         <div>

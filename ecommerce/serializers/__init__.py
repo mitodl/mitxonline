@@ -16,18 +16,17 @@ from ecommerce.constants import (
     BULK_GENERATION_REDEMPTION_TYPES,
     CYBERSOURCE_CARD_TYPES,
     DISCOUNT_TYPE_DOLLARS_OFF,
-    DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPES,
+    REDEMPTION_TYPE_INTERNAL,
     TRANSACTION_TYPE_REFUND,
 )
-from ecommerce.discounts import product_from_version
 from ecommerce.models import (
     Basket,
     BasketItem,
     Order,
     Product,
-    validate_program_child_purchase_shape,
+    validate_discount_shape,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from main.settings import TIME_ZONE
@@ -188,48 +187,61 @@ def discount_is_price_neutral(discount) -> bool:
     never move a price.
 
     A percent-off or dollars-off discount of 0 subtracts nothing. A
-    paid-amount-off discount stores 0 too, and its real per-user value is
-    resolved elsewhere (hq#11846), so nothing renderable exists for it yet;
-    the resolver revisits its visibility.
+    paid-amount-off discount stores 0 too but is not in this set: its value is
+    resolved per user, and it only attaches to a basket when a source resolves
+    (Discount.is_redeemable_by), so an attached one always moves the price.
 
     A fixed-price discount is not in this set even at 0 — it sets the price
     rather than reducing it, and a fixed price equal to the product price is a
     real B2B-contract shape the shopper needs to see confirmed.
     """
-    return discount.discount_type == DISCOUNT_TYPE_PAID_AMOUNT_OFF or (
-        discount.amount == 0
-        and discount.discount_type
-        in (DISCOUNT_TYPE_PERCENT_OFF, DISCOUNT_TYPE_DOLLARS_OFF)
+    return discount.amount == 0 and discount.discount_type in (
+        DISCOUNT_TYPE_PERCENT_OFF,
+        DISCOUNT_TYPE_DOLLARS_OFF,
     )
 
 
-class ProgramChildPurchaseShapeMixin:
+class DiscountShapeMixin:
     """
-    Runs the paid-amount-off / program-child-purchase shape rules over the
-    merged field values, so a PATCH that would make the stored row invalid is
-    a 400 rather than an unconverted ValidationError out of Model.save().
+    Runs the Discount shape rules over the merged field values, so a PATCH that
+    would make the stored row invalid is a 400 rather than an unconverted
+    ValidationError out of Model.save(). Also enforces the one rule those
+    row-local checks cannot see: an internal discount may not be re-typed.
 
     Mix into any serializer that writes a Discount.
     """
 
     def validate(self, attrs):
-        def _value(name, default=None):
+        def _merged(name, default=None):
             if name in attrs:
                 return attrs[name]
             return getattr(self.instance, name, default)
 
-        validate_program_child_purchase_shape(
-            discount_type=_value("discount_type"),
-            redemption_type=_value("redemption_type"),
-            amount=_value("amount"),
-            automatic=_value("automatic", default=False),
+        # An internal discount's code is visible on receipts, so any other
+        # redemption type would make that code live. The model cannot carry
+        # this rule: by the time save() runs, the instance holds the new value
+        # and the stored one is gone.
+        if (
+            self.instance is not None
+            and self.instance.redemption_type == REDEMPTION_TYPE_INTERNAL
+            and _merged("redemption_type") != REDEMPTION_TYPE_INTERNAL
+        ):
+            raise serializers.ValidationError(
+                {"redemption_type": "An internal discount cannot change type."}
+            )
+
+        validate_discount_shape(
+            discount_type=_merged("discount_type"),
+            redemption_type=_merged("redemption_type"),
+            amount=_merged("amount"),
+            automatic=_merged("automatic", default=False),
             discount=self.instance,
         )
 
         return super().validate(attrs)
 
 
-class DiscountSerializer(ProgramChildPurchaseShapeMixin, serializers.ModelSerializer):
+class DiscountSerializer(DiscountShapeMixin, serializers.ModelSerializer):
     """Serializes a discount."""
 
     class Meta:
@@ -420,18 +432,12 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
 
 
 class LineSerializer(serializers.ModelSerializer):
-    product = serializers.SerializerMethodField()
+    product = ProductSerializer(read_only=True)
     quantity = serializers.IntegerField()
     item_description = serializers.CharField()
     unit_price = serializers.DecimalField(max_digits=9, decimal_places=2)
     total_price = serializers.DecimalField(max_digits=9, decimal_places=2)
     id = serializers.IntegerField()
-
-    @extend_schema_field(ProductSerializer)
-    def get_product(self, instance):
-        return ProductSerializer(
-            instance=product_from_version(instance.product_version)
-        ).data
 
     class Meta:
         fields = [
@@ -628,10 +634,11 @@ class OrderHistorySerializer(serializers.ModelSerializer):
         titles = []
 
         for line in instance.lines.all():
-            product = product_from_version(line.product_version)
-            if product.content_type.model == "courserun":
+            product = line.product
+            content_type = line.product_content_type
+            if content_type.model == "courserun":
                 titles.append(product.purchasable_object.course.title)
-            elif product.content_type.model == "programrun":
+            elif content_type.model == "programrun":
                 titles.append(product.description)
             else:
                 titles.append(f"No Title - {product.id}")

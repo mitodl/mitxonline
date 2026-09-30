@@ -116,6 +116,96 @@ class TestMultipleCartItems:
         assert response.data == 2
 
     @override_settings(ENABLE_MULTIPLE_CART_ITEMS=False)
+    def test_create_basket_from_product_single_item_mode_replaces(
+        self, user_drf_client, user
+    ):
+        """With flag disabled, create_basket_from_product replaces existing basket items"""
+        existing_product = ProductFactory.create()
+        new_product = ProductFactory.create()
+
+        basket = BasketFactory.create(user=user)
+        BasketItemFactory.create(basket=basket, product=existing_product)
+
+        assert basket.basket_items.count() == 1
+
+        response = user_drf_client.post(
+            f"/api/v0/baskets/create_from_product/{new_product.id}/",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        basket.refresh_from_db()
+        assert basket.basket_items.count() == 1
+        assert basket.basket_items.first().product == new_product
+
+    @override_settings(ENABLE_MULTIPLE_CART_ITEMS=True)
+    def test_create_basket_from_product_multiple_items_mode_keeps_existing(
+        self, user_drf_client, user
+    ):
+        """With flag enabled, create_basket_from_product keeps existing basket items"""
+        existing_product = ProductFactory.create()
+        new_product = ProductFactory.create()
+
+        basket = BasketFactory.create(user=user)
+        BasketItemFactory.create(basket=basket, product=existing_product)
+
+        assert basket.basket_items.count() == 1
+
+        response = user_drf_client.post(
+            f"/api/v0/baskets/create_from_product/{new_product.id}/",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        basket.refresh_from_db()
+        assert basket.basket_items.count() == 2
+
+    @override_settings(ENABLE_MULTIPLE_CART_ITEMS=False)
+    def test_create_basket_with_products_single_item_mode_replaces(
+        self, user_drf_client, user
+    ):
+        """With flag disabled, create_basket_with_products replaces existing basket items"""
+        existing_product = ProductFactory.create()
+        new_product = ProductFactory.create()
+
+        basket = BasketFactory.create(user=user)
+        BasketItemFactory.create(basket=basket, product=existing_product)
+
+        assert basket.basket_items.count() == 1
+
+        response = user_drf_client.post(
+            "/api/v0/baskets/create_with_products/",
+            data={"product_ids": [{"product_id": new_product.id, "quantity": 1}]},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        basket.refresh_from_db()
+        assert basket.basket_items.count() == 1
+        assert basket.basket_items.first().product == new_product
+
+    @override_settings(ENABLE_MULTIPLE_CART_ITEMS=False)
+    def test_create_basket_with_products_single_item_mode_rejects_multiple(
+        self,
+        user_drf_client,
+        user,  # noqa: ARG002
+    ):
+        """With flag disabled, create_basket_with_products rejects multiple products"""
+        product1 = ProductFactory.create()
+        product2 = ProductFactory.create()
+
+        response = user_drf_client.post(
+            "/api/v0/baskets/create_with_products/",
+            data={
+                "product_ids": [
+                    {"product_id": product1.id, "quantity": 1},
+                    {"product_id": product2.id, "quantity": 1},
+                ]
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    @override_settings(ENABLE_MULTIPLE_CART_ITEMS=False)
     def test_existing_basket_item_viewset_still_works(self, user_drf_client, user):
         """Test that the existing BasketItemViewSet still works regardless of feature flag"""
         product1 = ProductFactory.create()

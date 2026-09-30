@@ -4,7 +4,7 @@ Signals for mitxonline course certificates
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models.signals import post_save
+from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
 
 from courses.api import generate_multiple_programs_certificate
@@ -116,6 +116,46 @@ def purge_fastly_cache_on_course_run_save(
         lambda: queue_fastly_surrogate_key_purge.delay(
             surrogate_key, settings.MIT_LEARN_FASTLY_SERVICE_ID
         )
+    )
+
+
+@receiver(
+    m2m_changed,
+    sender=CourseRun.b2b_contracts.through,
+    dispatch_uid="courserun_b2b_contracts_changed",
+)
+def validate_course_run_b2b_contracts(
+    sender,  # noqa: ARG001
+    instance,
+    action,
+    pk_set,
+    *,
+    reverse,
+    **kwargs,  # noqa: ARG001
+):
+    """
+    Re-check the B2B contract group uniqueness rules whenever
+    ``CourseRun.b2b_contracts`` gains associations.
+
+    ``run.b2b_contracts.add(...)`` and ``contract.course_runs.add(...)`` bypass
+    ``CourseRun.save()``/``clean()``, so this is where the rules that used to be
+    database UniqueConstraints on ``b2b_contract`` get enforced for M2M writes.
+    See ``CourseRun.validate_b2b_contract_group_uniqueness``.
+    """
+    if action != "pre_add":
+        return
+
+    if reverse:
+        # instance is a ContractPage, pk_set holds the CourseRun ids being added
+        for run in CourseRun.all_objects.filter(pk__in=pk_set or []):
+            run.validate_b2b_contract_group_uniqueness(
+                {*run.contract_group_ids, instance.pk}
+            )
+        return
+
+    # instance is a CourseRun, pk_set holds the ContractPage ids being added
+    instance.validate_b2b_contract_group_uniqueness(
+        {*instance.contract_group_ids, *(pk_set or [])}
     )
 
 

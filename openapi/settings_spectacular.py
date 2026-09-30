@@ -13,10 +13,19 @@ open_spectacular_settings = {
     "AUTHENTICATION_WHITELIST": [],
     "SCHEMA_PATH_PREFIX": "/api/v[0-9]",
     # drf-spectacular names an enum component after its field, so two choice
-    # sets on a field called discount_type collide and both get a hash suffix.
-    # BulkDiscountSerializer restricts discount_type and redemption_type to the
-    # subset bulk generation can produce, so name every set on those two fields.
+    # sets on a field of the same name collide and both get a hash suffix
+    # (DiscountTypeEnum -> DiscountType3beEnum). A hashed name is neither
+    # stable across regenerations nor meaningful, and renaming a component
+    # that has already been published breaks generated clients. Name every
+    # choice set on a field name that more than one of them uses.
+    #
+    # Keep this as ONE dict. Two `ENUM_NAME_OVERRIDES` keys in this literal is
+    # valid Python that silently discards the first, and it is what a rebase
+    # produces when two branches each add their own - no conflict, no error,
+    # just the other branch's overrides quietly gone.
     "ENUM_NAME_OVERRIDES": {
+        # BulkDiscountSerializer restricts discount_type and redemption_type to
+        # the subset bulk generation can produce.
         "DiscountTypeEnum": "ecommerce.constants.DISCOUNT_TYPES",
         "RedemptionTypeEnum": "ecommerce.constants.REDEMPTION_TYPES",
         "BulkGenerationDiscountTypeEnum": (
@@ -24,6 +33,20 @@ open_spectacular_settings = {
         ),
         "BulkGenerationRedemptionTypeEnum": (
             "ecommerce.constants.BULK_GENERATION_REDEMPTION_TYPES"
+        ),
+        # `state` is used by ecommerce's Order and by both b2b provisioning
+        # models. StateEnum is pinned to the one that was published first.
+        "StateEnum": "ecommerce.models.OrderStatus",
+        "OnboardingStateEnum": "b2b.constants.ONBOARDING_STATE_CHOICES",
+        "IdentityProviderLifecycleStateEnum": "b2b.constants.IDP_LIFECYCLE_CHOICES",
+        "IdentityProviderProtocolEnum": "b2b.constants.IDP_PROTOCOL_CHOICES",
+        "DiscountSourceTypeEnum": "ecommerce.constants.DISCOUNT_SOURCE_TYPES",
+        # `status` and `clone_status` on the staff contract API's setup status.
+        # Unpinned they publish as StatusEnum and CloneStatusEnum, and the next
+        # `status` choice set would hash-suffix StatusEnum.
+        "ContractSetupStatusEnum": "b2b.constants.CONTRACT_SETUP_STATUS_CHOICES",
+        "CourseRunCloneStatusEnum": (
+            "openedx.constants.COURSE_RUN_CLONE_STATUS_CHOICES"
         ),
     },
     "POSTPROCESSING_HOOKS": [

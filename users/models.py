@@ -310,6 +310,7 @@ class User(
         blank=True,
         related_name="users",
         help_text="The contracts the user is associated with.",
+        through="b2b.UserB2BContract",
     )
     b2b_organizations = models.ManyToManyField(
         "b2b.OrganizationPage",
@@ -341,7 +342,14 @@ class User(
         """Returns the edx username"""
         if self.pk is None:
             return None
-        return self.openedx_users.first()
+        # Sorted in Python off `.all()` so that a caller's
+        # `prefetch_related("openedx_users")` serves this. `first()` looks
+        # equivalent but costs a query per serialized row on list endpoints:
+        # OpenEdxUser declares no Meta.ordering, so `first()` re-orders by pk,
+        # and that clone drops the prefetched result cache. Sorting by pk here
+        # applies the same order it would have.
+        openedx_users = sorted(self.openedx_users.all(), key=lambda user: user.pk)
+        return openedx_users[0] if openedx_users else None
 
     @property
     def edx_username(self) -> str | None:

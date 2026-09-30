@@ -6,13 +6,14 @@ from http import HTTPStatus
 from urllib.parse import urljoin
 
 from django.conf import settings
-from django.db.models import Exists, OuterRef, Prefetch, Q
+from django.db.models import Exists, OuterRef, Q
 from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError
 
 from courses.constants import (
     COURSEWARE_URL_PATTERN_TEMPLATE,
     UAI_COURSEWARE_ID_PREFIX,
+    XPRO_COURSEWARE_ID_PREFIX,
 )
 from courses.models import (
     CourseRun,
@@ -22,6 +23,25 @@ from courses.models import (
 )
 
 log = logging.getLogger(__name__)
+
+
+def verified_courserun_exists(manager=None):
+    """
+    Build an Exists() annotation for whether a course has a verified run.
+
+    Args:
+        manager: CourseRun manager to search. Defaults to ``CourseRun.objects``,
+            which excludes source runs. The ETL views pass ``all_objects``
+            because they report on source runs too.
+    """
+    from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE  # noqa: PLC0415
+
+    return Exists(
+        (manager or CourseRun.objects).filter(
+            course_id=OuterRef("pk"),
+            enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+    )
 
 
 def live_certificate_page_exists():
@@ -153,12 +173,15 @@ def get_unenrollable_courses(queryset):
         queryset: Queryset of Course objects
     """
     courseruns_qs = CourseRun.objects.unenrollable()
-    return (
-        queryset.prefetch_related(Prefetch("courseruns", queryset=courseruns_qs))
-        .prefetch_related("courseruns__course")
-        .filter(courseruns__id__in=courseruns_qs.values_list("id", flat=True))
-        .distinct()
-    )
+    # Deliberately does not prefetch "courseruns" here. Callers (notably
+    # CourseViewSet) build a richer Prefetch for that relation, and re-declaring
+    # it would silently replace theirs, dropping select_related("b2b_contract")
+    # and the prefetched_enrollment_modes / prefetched_products caches.
+    # Course.get_filtered_runs applies the is_enrollable predicate in Python, so
+    # narrowing the prefetch was redundant anyway.
+    return queryset.filter(
+        courseruns__id__in=courseruns_qs.values_list("id", flat=True)
+    ).distinct()
 
 
 def get_archived_courseruns(queryset):
@@ -188,6 +211,50 @@ def get_dated_courseruns(queryset):
     return queryset.filter(
         CourseRunQuerySet.get_enrollable_filter() & Q(is_self_paced=False)
     )
+
+
+def is_xpro_course_run(course_run):
+    """
+    Check if a course run is an XPro course run.
+
+    Args:
+        course_run: CourseRun instance
+
+    Returns:
+        bool: True if the course run is XPro, False otherwise
+    """
+    if not course_run or not course_run.courseware_id:
+        return False
+
+    courseware_id = course_run.courseware_id
+    return courseware_id.startswith(
+        (XPRO_COURSEWARE_ID_PREFIX, f"course-v1:{XPRO_COURSEWARE_ID_PREFIX}")
+    )
+
+
+def is_xpro_order(order):
+    """
+    Check if an order contains any XPro course runs.
+
+    Args:
+        order: Order instance
+
+    Returns:
+        bool: True if the order contains XPro course runs, False otherwise
+    """
+    for line in order.lines.all():
+        purchasable_object = getattr(line, "purchased_object", None)
+        if not purchasable_object and hasattr(line.product, "purchasable_object"):
+            purchasable_object = line.product.purchasable_object
+
+        if not purchasable_object:
+            continue
+
+        if isinstance(purchasable_object, CourseRun) and is_xpro_course_run(
+            purchasable_object
+        ):
+            return True
+    return False
 
 
 def is_uai_course_run(course_run):

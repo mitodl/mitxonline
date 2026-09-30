@@ -1,28 +1,25 @@
-import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
-import {
-    Pagination,
-    CrudSorting,
-    CrudFilters,
-    CrudOperators,
-    DataProvider,
-} from "@pankod/refine-core"
-import dataProvider from "@pankod/refine-simple-rest";
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from "axios";
+import { Pagination, CrudSorting, CrudFilters, CrudOperators, DataProvider } from "@refinedev/core";
+import dataProvider from "@refinedev/simple-rest";
 import { stringify } from "query-string";
 
 axios.defaults.withCredentials = true;
+// axios 0.x sent the CSRF header with every credentialed request; since 1.6.0
+// it only goes to the page's own origin. Keep sending it to the API, which is
+// not always on the page's origin, and to nothing else.
+axios.defaults.withXSRFToken = (config) =>
+    !!config.url && new URL(config.url, window.location.href).origin ===
+        new URL(DATASOURCES_CONFIG.mitxOnline, window.location.href).origin;
 axios.defaults.xsrfCookieName = 'csrf_mitxonline';
 axios.defaults.xsrfHeaderName = 'X-CSRFToken';
 
 const axiosInterface = axios.create();
 
-axiosInterface.interceptors.request.use((config: AxiosRequestConfig) => {
+axiosInterface.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     let token = sessionStorage.getItem(`oidc.user:${OIDC_CONFIG.authority}:${OIDC_CONFIG.client_id}`);
 
     if (token !== null) {
         token = JSON.parse(token).access_token;
-        if (!config.headers) {
-            config.headers = {};
-        }
         config.headers.Authorization = `Bearer ${token}`;
     }
 
@@ -109,18 +106,18 @@ const useDrfDataProvider = (
 ): DataProvider => {
     const simpleDataProvider = dataProvider(apiUrl, httpClient);
 
-    simpleDataProvider.getList = async ({ resource, pagination, filters, sort }) => {
+    simpleDataProvider.getList = async ({ resource, pagination, filters, sorters }) => {
         const url = `${apiUrl}/${resource}/`;
 
         const query = {
             ...generateFilter(filters),
-            ...generateSort(sort),
+            ...generateSort(sorters),
             ...generatePagination(pagination),
         }
 
         const uri = `${url}?${stringify(query)}`;
 
-        const { data, headers } = await httpClient.get(uri);
+        const { data } = await httpClient.get(uri);
 
         if (data.hasOwnProperty('results')) {
             return {

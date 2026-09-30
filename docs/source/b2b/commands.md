@@ -16,13 +16,13 @@ This document will go over the basic use of the management commands. To get the 
 :Name: b2b_contract
 :Description: Manages organizations and contracts within the B2B system.
 :Subcommands:
-    `create` - creates a new contract (and optionally organization)
+    `create` - creates a new contract, with a default variant set
 
     `modify` - changes the parameters for an existing contract
 :Description:
-    The `b2b_contract` command can be used to set up a new contract. It can also create an organization for you, if necessary.
+    The `b2b_contract` command can be used to set up a new contract for an existing organization. Organizations are created through the provisioning API (`POST /api/v0/b2b/provisioning/organizations/`), which creates the Keycloak organization alongside it.
 
-    It can also be used to modify an existing contract. Changing certain parameters - pricing, seat count, and activation dates especially - will also caused _unredeemed_ enrollment codes to be updated, and new ones to be created, where appropriate.
+    It can also be used to modify an existing contract. Modifying a contract does not touch its enrollment codes. After changing the price, seat count or membership type, run `b2b_codes validate` to bring the codes in line.
 
 ### b2b_courseware
 
@@ -40,7 +40,7 @@ This document will go over the basic use of the management commands. To get the 
     :::
 
     In `add` mode, the command adds courseware to the contract.
-    - If the object specified is a course run, it will be added to the contract (unless it's already associated with a contract, and `--force` isn't set)
+    - If the object specified is a course run, it will be added to the contract, unless it is already in another contract, in which case it is left alone.
     - If the object specified is a course, a contract course run will be created.
     - If the object specified is a program, the program will be added to the contract, and it will create contract runs for each course in the program.
 

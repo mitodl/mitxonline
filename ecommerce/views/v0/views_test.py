@@ -10,8 +10,10 @@ from zoneinfo import ZoneInfo
 import freezegun
 import pytest
 import reversion
+from django.db import connection
 from django.forms.models import model_to_dict
-from django.test import Client
+from django.test import Client, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.dateparse import parse_datetime
 from mitol.common.utils.datetime import now_in_utc
@@ -19,6 +21,7 @@ from reversion.models import Version
 
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE, CONTRACT_MEMBERSHIP_MANAGED
 from b2b.factories import ContractPageFactory
+from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
 from courses.factories import (
     BlockedCountryFactory,
     CourseRunEnrollmentFactory,
@@ -33,6 +36,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_CUSTOMER_SUPPORT,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    REDEMPTION_TYPE_INTERNAL,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
     REDEMPTION_TYPE_UNLIMITED,
@@ -43,12 +47,17 @@ from ecommerce.factories import (
     BasketFactory,
     BasketItemFactory,
     DiscountFactory,
+    DiscountRedemptionFactory,
+    InternalDiscountFactory,
     LineFactory,
     OrderFactory,
     PaidAmountOffDiscountFactory,
     ProductFactory,
+    ProgramProductFactory,
     TransactionFactory,
     UnlimitedUseDiscountFactory,
+    make_paid_amount_off_offer,
+    make_purchase,
 )
 from ecommerce.models import (
     Basket,
@@ -58,6 +67,7 @@ from ecommerce.models import (
     DiscountProduct,
     DiscountRedemption,
     Order,
+    OrderRefundStatus,
     OrderStatus,
     RefundRequest,
     RefundRequestStatus,
@@ -70,7 +80,11 @@ from ecommerce.serializers import (
     ProductSerializer,
 )
 from flexiblepricing.constants import FlexiblePriceStatus
-from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
+from flexiblepricing.factories import (
+    FlexiblePriceFactory,
+    FlexiblePriceTierFactory,
+    approve_flexible_price,
+)
 from main.constants import (
     USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
     USER_MSG_TYPE_BASKET_EMPTY,
@@ -258,6 +272,90 @@ def test_product_user_flexible_price_unauthenticated(client, products):
     assert resp_data["product_flexible_price"] is None
 
 
+@pytest.mark.parametrize("purchased_a_program", [False, True])
+def test_user_pricing_quotes_the_paid_amount_off_credit(
+    user_client, user, purchased_a_program
+):
+    """
+    An eligible learner sees the program at price minus their child purchase,
+    and the credit names the courseware they bought: a run purchase names its
+    course, a sub-program purchase names the program.
+    """
+    purchased = (
+        ProgramFactory.create() if purchased_a_program else CourseRunFactory.create()
+    )
+    offer = make_paid_amount_off_offer(user, purchased)
+    credited = purchased if purchased_a_program else purchased.course
+
+    resp = user_client.get(
+        reverse(
+            "v0:products_api-user-pricing",
+            kwargs={"pk": offer.program_product.id},
+        )
+    )
+
+    assert resp.status_code == 200
+    quoted = resp.json()
+    assert quoted["user_price"] == "899.00"
+    assert quoted["discount"]["discount_type"] == DISCOUNT_TYPE_PAID_AMOUNT_OFF
+    assert quoted["discount"]["amount_off"] == "100.00"
+    assert quoted["discount"]["source"] == {
+        "type": CONTENT_TYPE_MODEL_PROGRAM
+        if purchased_a_program
+        else CONTENT_TYPE_MODEL_COURSE,
+        "readable_id": credited.readable_id,
+        "title": credited.title,
+    }
+
+
+def test_user_pricing_requires_a_signed_in_user(client):
+    """
+    An anonymous request is a 403, not a list-price quote: the answer is
+    per-user, and a silent anonymous fallback would hide a caller whose
+    session did not reach this host.
+    """
+    product = ProductFactory.create()
+
+    resp = client.get(
+        reverse("v0:products_api-user-pricing", kwargs={"pk": product.id})
+    )
+
+    assert resp.status_code == 403
+
+
+def test_user_pricing_returns_the_single_product_flexible_price_data(user_client, user):
+    """hq#12799: the response carries exactly what user_flexible_price returns."""
+    product = ProductFactory.create()
+    finaid = approve_flexible_price(user, product.purchasable_object.course, 50)
+
+    single = user_client.get(
+        reverse("v0:products_api-user-flexible-price", kwargs={"pk": product.id})
+    ).json()
+    quoted = user_client.get(
+        reverse("v0:products_api-user-pricing", kwargs={"pk": product.id})
+    ).json()
+
+    assert single["product_flexible_price"]["id"] == finaid.id
+    assert {key: quoted[key] for key in single} == single
+    assert quoted["discount"]["id"] == finaid.id
+    assert quoted["discount"]["payment_type"] == PAYMENT_TYPE_FINANCIAL_ASSISTANCE
+    assert quoted["discount"]["source"] is None
+
+
+def test_user_pricing_404s_for_a_product_the_queryset_excludes(user_client):
+    """A product whose run closed enrollment is a 404, like an unknown id."""
+    closed_run = CourseRunFactory.create(
+        enrollment_end=now_in_utc() - timedelta(days=1)
+    )
+    closed = ProductFactory.create(purchasable_object=closed_run)
+
+    resp = user_client.get(
+        reverse("v0:products_api-user-pricing", kwargs={"pk": closed.id})
+    )
+
+    assert resp.status_code == 404
+
+
 def test_get_basket(user_drf_client, user):
     """Test the view that returns a state of Basket"""
     basket = BasketFactory.create(user=user)
@@ -342,6 +440,7 @@ def test_add_basket_item(user_drf_client, user):
 @pytest.mark.parametrize("existing_basket", [True, False])
 @pytest.mark.parametrize("add_discount", [True, False])
 @pytest.mark.parametrize("bad_product", [True, False])
+@override_settings(ENABLE_MULTIPLE_CART_ITEMS=True)
 def test_create_basket_with_products(
     user, user_client, existing_basket, add_discount, bad_product
 ):
@@ -597,6 +696,25 @@ def test_create_basket_with_product(  # noqa: PLR0913
 # whole test in its own outer transaction, so this is the only way to
 # actually exercise (and catch regressions in) that requirement.
 @pytest.mark.django_db(transaction=True)
+def test_create_basket_from_product_lists_the_paid_amount_off_credit(
+    mocker, user_drf_client, paid_amount_off_source
+):
+    """The cart shows the automatic credit as a discount line, not just a lower total."""
+    mocker.patch("ecommerce.views.v0.sync_hubspot_cart_add")
+    url = reverse(
+        "v0:baskets_api-create_from_product",
+        kwargs={"product_id": paid_amount_off_source.program_product.id},
+    )
+
+    response = user_drf_client.post(url)
+
+    assert response.status_code == 201
+    assert Decimal(response.data["discounted_price"]) == Decimal("899.00")
+    assert [d["redeemed_discount"]["id"] for d in response.data["discounts"]] == [
+        paid_amount_off_source.discount.id
+    ]
+
+
 def test_create_basket_from_product_anonymous(mocker):
     """
     Test that an anonymous caller can create a basket via create_from_product,
@@ -729,6 +847,22 @@ def test_redeem_discount(  # noqa: PLR0913
         assert resp_json["message"] == "Discount applied"
 
 
+def test_redeem_internal_discount_is_not_found(user, user_drf_client, products):
+    """An internal discount's code is inert at the cart, even when it links to the product in the basket."""
+    basket = create_basket(user, products)
+    discount = InternalDiscountFactory.create()
+    DiscountProduct.objects.create(
+        discount=discount, product=basket.basket_items.first().product
+    )
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
+    )
+
+    assert resp.status_code == 404
+    assert basket.discounts.count() == 0
+
+
 # Discount tests
 
 
@@ -807,6 +941,37 @@ def test_discount_rest_api(admin_drf_client, user_drf_client):
 
     assert resp.status_code == 204
     assert Discount.objects.filter(pk=discount_payload["id"]).count() == 0
+
+
+def test_discount_rest_api_refuses_to_retype_an_internal_discount(admin_drf_client):
+    """Staff can edit discounts over the API, but re-typing an internal one would make its code live."""
+    discount = InternalDiscountFactory.create()
+
+    resp = admin_drf_client.patch(
+        reverse("v0:discounts_api-detail", kwargs={"pk": discount.id}),
+        {"redemption_type": REDEMPTION_TYPE_UNLIMITED},
+    )
+
+    assert resp.status_code == 400
+    discount.refresh_from_db()
+    assert discount.redemption_type == REDEMPTION_TYPE_INTERNAL
+
+
+def test_discount_rest_api_refuses_an_automatic_internal_discount(admin_drf_client):
+    """The API mirror of the internal shape rule returns a 400, not a 500."""
+    resp = admin_drf_client.post(
+        reverse("v0:discounts_api-list"),
+        {
+            "amount": 100,
+            "automatic": True,
+            "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+            "redemption_type": REDEMPTION_TYPE_INTERNAL,
+            "discount_code": "automatic-internal",
+        },
+    )
+
+    assert resp.status_code == 400
+    assert not Discount.objects.filter(discount_code="automatic-internal").exists()
 
 
 def test_attaching_a_non_program_product_to_a_program_child_purchase_discount_is_a_400(
@@ -1136,15 +1301,17 @@ def test_bulk_discount_create_rejects_ambiguous_code_sources(admin_drf_client, e
         pytest.param(
             {"redemption_type": REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE}, id="redemption"
         ),
+        pytest.param({"redemption_type": REDEMPTION_TYPE_INTERNAL}, id="internal"),
     ],
 )
 def test_bulk_discount_create_rejects_the_new_discount_and_redemption_types(
     admin_drf_client, override
 ):
     """
-    A paid-amount-off discount needs the matching redemption type, and a
+    A paid-amount-off discount needs the matching redemption type, a
     program-child-purchase discount needs automatic plus the program product
-    links, so bulk generation refuses both rather than raising its way to a 500.
+    links, and an internal discount is never learner-redeemable, so bulk
+    generation refuses all three rather than raising its way to a 500.
     """
     resp = admin_drf_client.post(
         reverse("v0:discounts_api-create_batch"),
@@ -1538,7 +1705,6 @@ def test_start_checkout_with_bad_discount(user, user_drf_client):
     assert resp.status_code == 400
 
 
-@pytest.mark.skip_nplusone_check
 def test_order_history_list(user, user_drf_client):
     """Test that we can get a user's order history."""
     with reversion.create_revision():
@@ -1578,7 +1744,6 @@ def test_order_history_list(user, user_drf_client):
             ]
 
 
-@pytest.mark.skip_nplusone_check
 def test_order_history_retrieve(user, user_drf_client):
     """Test that we can get a user's order history."""
     with reversion.create_revision():
@@ -1598,6 +1763,89 @@ def test_order_history_retrieve(user, user_drf_client):
     returned_order = returned_orders[0]
     assert returned_order["id"] == order_1.id
     assert returned_order["lines"][0]["id"] == order_1_line.id
+
+
+# Each extra order on the page costs this many queries, all of them rooted in
+# `LineSerializer.product`: `Line.product` rebuilds an unsaved Product from a
+# reversion Version, so its generic `purchasable_object` — and the course, course
+# page, feature image, instructors, flexible-pricing form and current price under
+# it — resolve per line. A prefetch on the view's Order queryset cannot reach
+# them; serializing `line.purchased_object`, which is already prefetched, instead
+# of `product.purchasable_object` could.
+QUERIES_PER_ADDITIONAL_ORDER = 10
+
+# What one request costs before any order is serialized.
+FIXED_QUERIES_PER_PAGE = 6
+
+
+def _create_order_with_line(user):
+    """Create one fulfilled order carrying a single course-run line."""
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    LineFactory.create(
+        order=order,
+        product_version=Version.objects.get_for_object(product).last(),
+    )
+
+
+def _order_history_query_count(user_drf_client):
+    """Query count for one page of order history."""
+    with CaptureQueriesContext(connection) as queries:
+        resp = user_drf_client.get(reverse("v0:orderhistory_api-list"))
+    assert resp.status_code == 200
+    return len(queries.captured_queries)
+
+
+def test_order_history_query_count_grows_only_by_the_known_page_walk(
+    user, user_drf_client
+):
+    """
+    Pin what a page of order history costs in queries, and what a row adds.
+
+    Two row counts rather than one: the difference isolates a per-row
+    regression, which an absolute count alone cannot distinguish from a rise in
+    fixed cost, and the totals catch a regression that runs once per request,
+    which the difference alone cancels out. Any drop here is welcome and means
+    lowering a constant.
+    """
+    for _ in range(2):
+        _create_order_with_line(user)
+    # The ContentType and Site caches are process-wide, so the first request in
+    # a process pays their misses. Warm them ahead of both measurements.
+    _order_history_query_count(user_drf_client)
+    two_orders = _order_history_query_count(user_drf_client)
+
+    for _ in range(4):
+        _create_order_with_line(user)
+    six_orders = _order_history_query_count(user_drf_client)
+
+    assert six_orders - two_orders == 4 * QUERIES_PER_ADDITIONAL_ORDER
+    assert two_orders == FIXED_QUERIES_PER_PAGE + 2 * QUERIES_PER_ADDITIONAL_ORDER
+    assert six_orders == FIXED_QUERIES_PER_PAGE + 6 * QUERIES_PER_ADDITIONAL_ORDER
+
+
+def test_order_history_titles_follow_the_snapshotted_product(user, user_drf_client):
+    """
+    A title is decided by the product the line snapshots, not by the line's own
+    denormalized `purchased_content_type`.
+
+    The two agree wherever the app creates Lines, so a disagreement is the
+    symptom of reading the column instead: a program product would take the
+    course-run branch and dereference `.course` on a `Program`.
+    """
+    with reversion.create_revision():
+        product = ProgramProductFactory.create()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    LineFactory.create(
+        order=order,
+        product_version=Version.objects.get_for_object(product).last(),
+    )
+
+    resp = user_drf_client.get(reverse("v0:orderhistory_api-list"))
+
+    assert resp.status_code == 200
+    assert resp.json()["results"][0]["titles"] == [f"No Title - {product.id}"]
 
 
 @pytest.mark.skip_nplusone_check
@@ -1883,7 +2131,6 @@ def test_refund_request_b2b_order(user, user_drf_client):
     assert "order" in resp.json()["errors"]
 
 
-@pytest.mark.skip_nplusone_check
 def test_order_history_includes_refund_eligible(user, user_drf_client):
     """Order history responses include the refund_eligible field."""
     with reversion.create_revision():
@@ -1938,6 +2185,62 @@ def test_refund_request_duplicate_rejected(user, user_drf_client):
     assert resp.status_code == 400
     assert "order" in resp.json()["errors"]
     assert RefundRequest.objects.filter(order=order).count() == 1
+
+
+def test_refund_request_accepted_when_review_is_required(
+    paid_amount_off_source, user_drf_client
+):
+    """A used-source order can still request a refund — it just gets a human."""
+    order = paid_amount_off_source.source_line.order
+    DiscountRedemptionFactory.create(
+        redeemed_discount=paid_amount_off_source.discount,
+        source_line=paid_amount_off_source.source_line,
+        redeemed_order=OrderFactory.create(state=OrderStatus.FULFILLED),
+    )
+    assert order.refund_status == OrderRefundStatus.REVIEW_REQUIRED
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": "other",
+            "refund_reason_text": "I upgraded to the full program.",
+            "consent_given": True,
+        },
+    )
+
+    assert resp.status_code == 201
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize("order_count", [2, 6])
+def test_order_history_answers_funded_credits_in_the_page_query(
+    user, user_drf_client, order_count
+):
+    """The funded-credit check is one EXISTS in the list query, not one per order."""
+    lines = [
+        make_purchase(user, CourseRunFactory.create(), Decimal("100.00"))
+        for _ in range(order_count)
+    ]
+    DiscountRedemptionFactory.create(
+        redeemed_discount=PaidAmountOffDiscountFactory.create(),
+        source_line=lines[0],
+        redeemed_order=OrderFactory.create(state=OrderStatus.FULFILLED),
+    )
+
+    with CaptureQueriesContext(connection) as ctx:
+        resp = user_drf_client.get(reverse("v0:orderhistory_api-list"))
+
+    assert resp.status_code == 200
+    eligible = {
+        order["id"]: order["refund_eligible"] for order in resp.json()["results"]
+    }
+    assert eligible[lines[0].order.id] is False
+    assert all(eligible[line.order.id] for line in lines[1:])
+    assert (
+        sum("ecommerce_discountredemption" in q["sql"] for q in ctx.captured_queries)
+        == 1
+    )
 
 
 def test_refund_request_allowed_after_denial(user, user_drf_client):

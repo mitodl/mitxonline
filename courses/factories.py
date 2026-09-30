@@ -128,7 +128,9 @@ class CourseFactory(DjangoModelFactory):
     """Factory for Courses"""
 
     title = fuzzy.FuzzyText(prefix="Course ")
-    readable_id = factory.Sequence("course-v1:PyT+Course{0}".format)
+    readable_id = factory.LazyFunction(
+        lambda: f"course-v1:PyT+{''.join(FAKE.words(nb=3, unique=True))}"
+    )
     live = True
     departments = factory.SubFactory(DepartmentFactory)
 
@@ -196,6 +198,7 @@ class CourseRunFactory(DjangoModelFactory):
 
     live = True
     b2b_contract = None
+    b2b_only = False
     is_source_run = False
     language = ""
     is_primary_language = False
@@ -223,10 +226,36 @@ class CourseRunFactory(DjangoModelFactory):
                 EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
             )
 
+    @factory.post_generation
+    def b2b_contracts(self, create, extracted, **kwargs):  # noqa: ARG002
+        """
+        Handle assignment of B2B contracts.
+
+        If the test is setting b2b_contract, then copy that into the
+        b2b_contracts many-to-many. Having this here is a deliberate
+        choice - in non-test code, it should be fixed to use the right
+        field.
+        """
+
+        if not create:
+            return
+
+        if extracted is not None:
+            self.b2b_contracts.set(extracted)
+
+        if self.b2b_contract is not None:
+            self.b2b_contracts.add(self.b2b_contract)
+
     class Meta:
         model = CourseRun
 
     class Params:
+        # Dates that move into the future use an explicit "+1d" floor rather than
+        # Faker's future_datetime, which starts one second from now. A run whose
+        # start_date or end_date falls inside a test's own runtime changes state
+        # mid-test - is_archived flips, first_unexpired_run moves on - which makes
+        # any expected-vs-actual comparison flaky. past_datetime needs no such
+        # floor: it moves further into the past as the test runs.
         past_start = factory.Trait(
             start_date=factory.Faker("past_datetime", tzinfo=ZoneInfo("UTC"))
         )
@@ -235,10 +264,20 @@ class CourseRunFactory(DjangoModelFactory):
         )
         in_progress = factory.Trait(
             start_date=factory.Faker("past_datetime", tzinfo=ZoneInfo("UTC")),
-            end_date=factory.Faker("future_datetime", tzinfo=ZoneInfo("UTC")),
+            end_date=factory.Faker(
+                "date_time_between",
+                start_date="+1d",
+                end_date="+1y",
+                tzinfo=ZoneInfo("UTC"),
+            ),
         )
         in_future = factory.Trait(
-            start_date=factory.Faker("future_datetime", tzinfo=ZoneInfo("UTC")),
+            start_date=factory.Faker(
+                "date_time_between",
+                start_date="+1d",
+                end_date="+30d",
+                tzinfo=ZoneInfo("UTC"),
+            ),
             end_date=None,
         )
         completed = factory.Trait(

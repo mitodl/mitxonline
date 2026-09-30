@@ -5,11 +5,12 @@ MITx Online API-ready views, migrated from Unified Ecommerce.
 import logging
 
 import django_filters
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import Http404
 from django.shortcuts import redirect
 from django.views import View
@@ -34,6 +35,7 @@ from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.api import is_product_courserun, is_product_program
+from b2b.serializers.v0.manager import DetailErrorSerializer
 from courses.models import (
     Course,
     CourseRun,
@@ -42,7 +44,7 @@ from courses.models import (
     Program,
     ProgramRun,
 )
-from courses.utils import is_uai_course_run, is_uai_program
+from courses.utils import is_uai_course_run, is_uai_program, is_xpro_course_run
 from ecommerce.api import (
     apply_discount_to_basket,
     establish_basket,
@@ -50,7 +52,9 @@ from ecommerce.api import (
     generate_checkout_payload,
     generate_discount_code,
     get_auto_apply_discounts_for_basket,
+    quote_user_price,
 )
+from ecommerce.discount_sources import funds_fulfilled_redemption_exists
 from ecommerce.exceptions import ProductBlockedError
 from ecommerce.models import (
     Basket,
@@ -59,6 +63,7 @@ from ecommerce.models import (
     Discount,
     DiscountProduct,
     DiscountRedemption,
+    Line,
     Order,
     OrderStatus,
     Product,
@@ -79,6 +84,7 @@ from ecommerce.serializers.v0 import (
     RefundRequestSerializer,
     UserDiscountMetaSerializer,
     UserDiscountSerializer,
+    UserPricingProductSerializer,
     V0DiscountSerializer,
     requests,
 )
@@ -124,7 +130,9 @@ class BasketItemViewSet(ModelViewSet):
         if getattr(self, "swagger_fake_view", False):
             return BasketItem.objects.none()
 
-        return BasketItem.objects.filter(basket__user=self.request.user)
+        # BasketItem has no Meta.ordering, so without this the row order is
+        # whatever Postgres hands back - it varies between requests.
+        return BasketItem.objects.filter(basket__user=self.request.user).order_by("id")
 
 
 @extend_schema_view(
@@ -244,6 +252,11 @@ def _create_basket_from_product(
     with transaction.atomic():
         basket = establish_basket_for_request(request, for_update=True)
 
+        if not getattr(settings, "ENABLE_MULTIPLE_CART_ITEMS", False):
+            basket.basket_items.all().delete()
+            # Don't clear discounts here — the read→delete→reapply logic below
+            # already preserves and re-checks them correctly.
+
         # FUTURE: This is where the basket_add hook was called.
 
         (_, created) = BasketItem.objects.update_or_create(
@@ -261,6 +274,10 @@ def _create_basket_from_product(
                 or (
                     is_product_program(product)
                     and is_uai_program(product.purchasable_object)
+                ),
+                is_xpro=(
+                    is_product_courserun(product)
+                    and is_xpro_course_run(product.purchasable_object)
                 ),
             )
 
@@ -418,6 +435,16 @@ def create_basket_with_products(request):
             {"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND
         )
 
+    allow_multiple_items = getattr(settings, "ENABLE_MULTIPLE_CART_ITEMS", False)
+    if not allow_multiple_items:
+        if len(products) > 1:
+            return Response(
+                {"error": "Multiple cart items are not enabled."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        basket.basket_items.all().delete()
+        BasketDiscount.objects.filter(redeemed_basket=basket).delete()
+
     try:
         for product, quantity in products:
             # FUTURE: this is where the basket_add hook is called
@@ -435,6 +462,10 @@ def create_basket_with_products(request):
                 or (
                     is_product_program(product)
                     and is_uai_program(product.purchasable_object)
+                ),
+                is_xpro=(
+                    is_product_courserun(product)
+                    and is_xpro_course_run(product.purchasable_object)
                 ),
             )
     except ProductBlockedError:
@@ -624,7 +655,11 @@ class ProductViewSet(ReadOnlyModelViewSet):
 
     @extend_schema(
         operation_id="products_user_flexible_price_retrieve",
-        description="Retrieve a product with user-specific flexible price information",
+        description=(
+            "Retrieve a product with user-specific flexible price information. "
+            "Use `user_pricing` instead."
+        ),
+        deprecated=True,
         responses={
             200: ProductFlexiblePriceSerializer,
         },
@@ -640,6 +675,42 @@ class ProductViewSet(ReadOnlyModelViewSet):
         product = self.get_object()
         serializer = ProductFlexiblePriceSerializer(
             product, context={"request": request}
+        )
+        return Response(serializer.data)
+
+    @extend_schema(
+        operation_id="products_user_pricing_retrieve",
+        description=(
+            "The price this user pays for this product, computed the way "
+            "checkout computes it (financial assistance, user-tied and "
+            "automatic discounts, including paid-amount-off credit for a "
+            "qualifying prior purchase). The response also carries "
+            "product_flexible_price exactly as the deprecated "
+            "user_flexible_price endpoint returns it, so a caller moves over "
+            "field for field. Anonymous requests are a 403; an unknown or "
+            "no-longer-purchasable product is a 404."
+        ),
+        responses={
+            200: UserPricingProductSerializer,
+            403: DetailErrorSerializer,
+            404: DetailErrorSerializer,
+        },
+    )
+    @action(
+        detail=True,
+        methods=["get"],
+        permission_classes=[IsAuthenticated],
+        url_path="user_pricing",
+    )
+    def user_pricing(self, request, **kwargs):  # noqa: ARG002
+        """Quote the per-user price of a product."""
+        product = self.get_object()
+        serializer = UserPricingProductSerializer(
+            product,
+            context={
+                "request": request,
+                "quote": quote_user_price(product, request.user),
+            },
         )
         return Response(serializer.data)
 
@@ -959,8 +1030,30 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
         return (
             Order.objects.filter(purchaser=self.request.user)
             .filter(state__in=[OrderStatus.FULFILLED, OrderStatus.REFUNDED])
-            # Every serialized order reads both, once per row.
-            .prefetch_related("refund_requests", "lines__purchased_object")
+            .select_related("purchaser")
+            .prefetch_related(
+                # select_related builds a separate purchaser instance per row,
+                # so User.openedx_user (behind the serializer's `username`)
+                # needs its own prefetch to stay off the per-row path.
+                "purchaser__openedx_users",
+                # `refund_requests` feeds Order.latest_refund_request.
+                "refund_requests",
+                # `product_version` is read by Line.product and
+                # Line.item_description; `purchased_object` feeds
+                # Order.purchased_runs, behind both is_b2b_order and
+                # refund_deadline. `purchased_object` is nested rather than a
+                # sibling "lines__purchased_object" lookup, which is
+                # order-dependent: declared ahead of this Prefetch it raises
+                # "'lines' lookup was already seen with a different queryset".
+                Prefetch(
+                    "lines",
+                    queryset=Line.objects.select_related(
+                        "product_version"
+                    ).prefetch_related("purchased_object"),
+                ),
+            )
+            # Read by Order.refund_status for every fulfilled row.
+            .annotate(funds_fulfilled_redemption=funds_fulfilled_redemption_exists())
             .order_by("-created_on")
             .all()
         )

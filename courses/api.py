@@ -38,6 +38,7 @@ from courses import mail_api
 from courses.constants import (
     COURSE_KEY_PATTERN,
     ENROLL_CHANGE_STATUS_DEFERRED,
+    ENROLL_CHANGE_STATUS_REFUNDED,
     ENROLL_CHANGE_STATUS_UNENROLLED,
     PROGRAM_TEXT_ID_PREFIX,
 )
@@ -176,13 +177,15 @@ def create_local_enrollment(user, run, *, mode=EDX_DEFAULT_ENROLLMENT_MODE):
     return enrollment, created
 
 
-def create_run_enrollments(  # noqa: C901
+def create_run_enrollments(  # noqa: C901, PLR0913
     user,
     runs,
     *,
     change_status=None,
     keep_failed_enrollments=None,
     mode=EDX_DEFAULT_ENROLLMENT_MODE,
+    skip_compliance_check=False,
+    skip_enrollment_emails=False,
 ):
     """
     Creates local records of a user's enrollment in course runs, and attempts to enroll them
@@ -202,13 +205,27 @@ def create_run_enrollments(  # noqa: C901
             in the database even if the enrollment fails in edX.
             If None, defaults to the value of the IGNORE_EDX_FAILURES feature flag.
         mode (str): The course mode
+        skip_compliance_check (bool): If True, bypass the export compliance
+            check. Operator-run management commands only.
+        skip_enrollment_emails (bool): If True, don't send the learner the
+            enrollment confirmation email. Operator-run management commands only.
 
     Returns:
         (list of CourseRunEnrollment, bool): A list of enrollment objects that were successfully
             created in mitxonline, paired with a boolean indicating whether or not the edX enrollment API call was successful
             for all of the given course runs
     """
-    _verify_exports_compliance_for_enrollment(user, runs[0])
+    # Pre-existing: only runs[0] is screened, so runs[1:] go unscreened for the
+    # two multi-run callers (upgrade_audit_run_enrollments_for_program_purchase,
+    # ecommerce.api.downgrade_learner_from_order).
+    if skip_compliance_check:
+        log.warning(
+            "Skipping export compliance check for user=%s run=%s",
+            user.id,
+            runs[0].courseware_id,
+        )
+    else:
+        _verify_exports_compliance_for_enrollment(user, runs[0])
 
     if keep_failed_enrollments is None:
         keep_failed_enrollments = settings.FEATURES.get(
@@ -294,7 +311,8 @@ def create_run_enrollments(  # noqa: C901
                     if enrollment_mode_changed:
                         enrollment.enrollment_mode = mode
                     enrollment.reactivate_and_save()
-                    transaction.on_commit(send_enrollment_emails)
+                    if not skip_enrollment_emails:
+                        transaction.on_commit(send_enrollment_emails)
         except:  # pylint: disable=bare-except  # noqa: PERF203, E722
             mail_api.send_enrollment_failure_message(user, run, details=format_exc())
             log.exception(
@@ -304,7 +322,11 @@ def create_run_enrollments(  # noqa: C901
             )
         else:
             successful_enrollments.append(enrollment)
-            if enrollment.edx_enrolled and not is_enrollment_downgraded:
+            if (
+                enrollment.edx_enrolled
+                and not is_enrollment_downgraded
+                and not skip_enrollment_emails
+            ):
                 # Do not send enrollment email if the user was downgraded.
                 mail_api.send_course_run_enrollment_email(enrollment)
     return successful_enrollments, edx_request_success
@@ -488,6 +510,88 @@ def downgrade_learner(enrollment):
         keep_failed_enrollments=True,
         mode=EDX_ENROLLMENT_AUDIT_MODE,
     )
+
+
+def downgrade_program_enrollment_and_verified_runs(user, program):
+    """
+    Downgrade a user's ProgramEnrollment to audit, and downgrade the
+    program's course-run enrollments that are verified only because of the
+    program purchase.
+
+    A course run's verified enrollment is left alone (not downgraded) if
+    either:
+    - it's a B2B-provisioned run (has a b2b_contract or a b2b_contracts
+      entry) - governed by its contract, not this payment, or
+    - the learner has a separate PaidCourseRun for it backed by a fulfilled
+      order with total_price_paid > 0 - a genuine, independent purchase of
+      that specific run.
+
+    Otherwise the run is downgraded, whether its verified mode came from
+    upgrade_audit_run_enrollments_for_program_purchase (no order at all) or
+    from a $0 order (see create_verified_program_course_run_enrollment,
+    which creates a real but zero-value order for a program-verified learner
+    enrolling directly in one of the program's runs).
+
+    Args:
+        user (User): The user whose program enrollment is being downgraded
+        program (Program): The program that was refunded
+
+    Returns:
+        tuple[ProgramEnrollment | None, list of CourseRunEnrollment]: the
+        downgraded program enrollment (None if there wasn't one to downgrade),
+        and the course-run enrollments that were downgraded.
+    """
+    program_enrollment = ProgramEnrollment.all_objects.filter(
+        user=user, program=program
+    ).first()
+
+    downgraded_program_enrollment = None
+    if (
+        program_enrollment is not None
+        and program_enrollment.active
+        and program_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    ):
+        downgraded_program_enrollments = create_program_enrollments(
+            user, [program], enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+        )
+        downgraded_program_enrollment = first_or_none(downgraded_program_enrollments)
+        if downgraded_program_enrollment is not None:
+            # create_program_enrollments has no change_status kwarg, so tag
+            # the refund onto the enrollment directly - active stays True,
+            # this is audit-trail/reporting only (e.g. HubSpot sync), not a
+            # deactivation.
+            downgraded_program_enrollment.change_status = ENROLL_CHANGE_STATUS_REFUNDED
+            downgraded_program_enrollment.save_and_log(None)
+
+    verified_run_enrollments = CourseRunEnrollment.get_program_run_enrollments(
+        user=user, program=program
+    ).filter(enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE)
+
+    eligible_runs = []
+    for run_enrollment in verified_run_enrollments:
+        run = run_enrollment.run
+        if run.b2b_contract_id or run.b2b_contracts.exists():
+            continue
+        if PaidCourseRun.objects.filter(
+            user=user,
+            course_run=run,
+            order__state=OrderStatus.FULFILLED,
+            order__total_price_paid__gt=0,
+        ).exists():
+            continue
+        eligible_runs.append(run)
+
+    if not eligible_runs:
+        return downgraded_program_enrollment, []
+
+    downgraded_run_enrollments, _ = create_run_enrollments(
+        user,
+        eligible_runs,
+        mode=EDX_ENROLLMENT_AUDIT_MODE,
+        change_status=ENROLL_CHANGE_STATUS_REFUNDED,
+        keep_failed_enrollments=True,
+    )
+    return downgraded_program_enrollment, downgraded_run_enrollments
 
 
 def deactivate_run_enrollment(
@@ -1034,13 +1138,20 @@ def is_program_text_id(item_text_id):
     return item_text_id.startswith(PROGRAM_TEXT_ID_PREFIX)
 
 
-def process_course_run_grade_certificate(course_run_grade, should_force_create=False):  # noqa: FBT002
+def process_course_run_grade_certificate(
+    course_run_grade,
+    should_force_create=False,  # noqa: FBT002
+    *,
+    defer_hubspot_sync=False,
+):
     """
     Ensure that the course run certificate is in line with the values in the course run grade
 
     Args:
         course_run_grade (courses.models.CourseRunGrade): The course run grade for which to generate/delete the certificate
         should_force_create (bool): If True, it will force the certificate creation without matching criteria
+        defer_hubspot_sync (bool): If True, skip the per-user HubSpot sync; the
+            caller is responsible for batch-syncing users whose certificates changed
     Returns:
         Tuple[ CourseRunCertificate, bool, bool ]: A Tuple containing None or CourseRunCertificate object,
             A bool representing if the certificate is created, A bool representing if a certificate is deleted
@@ -1058,7 +1169,8 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
         delete_count, _ = CourseRunCertificate.objects.filter(
             user=user, course_run=course_run
         ).delete()
-        sync_hubspot_user(user)
+        if delete_count > 0 and not defer_hubspot_sync:
+            sync_hubspot_user(user)
         return None, False, (delete_count > 0)
 
     elif should_create:
@@ -1089,7 +1201,8 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
             certificate, created = CourseRunCertificate.objects.get_or_create(
                 user=user, course_run=course_run
             )
-            sync_hubspot_user(user)
+            if created and not defer_hubspot_sync:
+                sync_hubspot_user(user)
             if not certificate.verifiable_credential_id:
                 create_verifiable_credential(certificate)
             return certificate, created, False  # noqa: TRY300
@@ -1148,7 +1261,13 @@ def generate_course_run_certificates(  # noqa: C901
     Returns:
         None
     """
+    from hubspot_sync.task_helpers import sync_hubspot_users_batch  # noqa: PLC0415
+
     now = now_in_utc()
+    # Batch HubSpot syncs only on bulk invocations (periodic task / whole-run
+    # processing); single-user calls (e.g. the edX webhook) keep the
+    # real-time per-user sync.
+    defer_hubspot_sync = user is None
 
     if course_run:
         course_runs = [course_run]
@@ -1164,6 +1283,7 @@ def generate_course_run_certificates(  # noqa: C901
             get_edx_grades_with_users(run, user=user)
         )
         stats = Counter()
+        changed_cert_user_ids = set()
         for edx_grade, run_user in edx_grade_user_iter:
             try:
                 course_run_grade, created, updated = ensure_course_run_grade(
@@ -1200,7 +1320,8 @@ def generate_course_run_certificates(  # noqa: C901
             ):
                 try:
                     _, created, deleted = process_course_run_grade_certificate(
-                        course_run_grade=course_run_grade
+                        course_run_grade=course_run_grade,
+                        defer_hubspot_sync=defer_hubspot_sync,
                     )
                 except Exception:
                     stats["failed_certificates"] += 1
@@ -1212,12 +1333,14 @@ def generate_course_run_certificates(  # noqa: C901
                     continue
 
                 if deleted:
+                    changed_cert_user_ids.add(run_user.id)
                     log.warning(
                         "Certificate deleted for user %s and course_run %s",
                         run_user,
                         run,
                     )
                 elif created:
+                    changed_cert_user_ids.add(run_user.id)
                     log.warning(
                         "Certificate created for user %s and course_run %s",
                         run_user,
@@ -1225,6 +1348,8 @@ def generate_course_run_certificates(  # noqa: C901
                     )
                     stats["generated_certificates"] += 1
 
+        if defer_hubspot_sync:
+            sync_hubspot_users_batch(changed_cert_user_ids)
         log.info(
             f"Finished processing course run {run}: created grades for {stats['created_grades']} users, updated grades for {stats['updated_grades']} users, generated certificates for {stats['generated_certificates']} users, failed certificates for {stats['failed_certificates']} users"  # noqa: G004
         )

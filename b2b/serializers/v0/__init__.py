@@ -1,6 +1,6 @@
 """Serializers for the B2B API (v0)."""
 
-from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.utils import extend_schema_field, inline_serializer
 from rest_framework import serializers
 
 from b2b.models import ContractPage, OrganizationPage
@@ -111,6 +111,54 @@ class OrganizationPageSerializer(serializers.ModelSerializer):
         ]
 
 
+class UserContractPageSerializer(ContractPageSerializer):
+    """
+    A contract the requesting user belongs to, with the user's data sharing
+    consent for it.
+    """
+
+    consented_to_data_sharing = serializers.SerializerMethodField(
+        help_text=(
+            "Whether the user consented to share their learner data with the "
+            "organization: null if never asked, true if consented, false if "
+            "declined or withdrawn."
+        )
+    )
+
+    @extend_schema_field(serializers.BooleanField(allow_null=True))
+    def get_consented_to_data_sharing(self, instance):
+        """Get the user's consent value from the prefetched membership row"""
+        # Prefetched by b2b.api.get_user_b2b_organizations
+        memberships = instance._user_memberships  # noqa: SLF001
+        return memberships[0].consented_to_data_sharing if memberships else None
+
+    class Meta(ContractPageSerializer.Meta):
+        fields = [
+            *ContractPageSerializer.Meta.fields,
+            "consented_to_data_sharing",
+        ]
+        read_only_fields = [
+            *ContractPageSerializer.Meta.read_only_fields,
+            "consented_to_data_sharing",
+        ]
+
+
+class UserOrganizationPageSerializer(OrganizationPageSerializer):
+    """
+    An organization the requesting user belongs to, with the user's active
+    contracts in it.
+    """
+
+    @extend_schema_field(UserContractPageSerializer(many=True))
+    def get_contracts(self, instance):
+        """Get the user's active contracts, with the user's consent"""
+        # Prefetched by b2b.api.get_user_b2b_organizations
+        return UserContractPageSerializer(
+            instance._user_active_contracts,  # noqa: SLF001
+            many=True,
+        ).data
+
+
 class GenerateCheckoutPayloadSerializer(serializers.Serializer):
     """
     Serializer for the result from ecommerce.api.generate_checkout_payload.
@@ -145,12 +193,20 @@ class B2BEnrollRequestSerializer(serializers.Serializer):
 
     Accepts an optional program_id so the user can be enrolled in the
     appropriate program alongside the course run enrollment.
+    Accepts an optional contract_slug so it can identify which contract
+    the user is working in, so the enrollments can be linked back to the
+    right contract.
     """
 
     program_id = serializers.CharField(
         required=False,
         allow_blank=True,
         help_text="The readable_id of the program to enroll the user in.",
+    )
+    contract_slug = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="The slug for the contract the user is in.",
     )
 
 
@@ -169,3 +225,27 @@ class CreateB2BEnrollmentSerializer(serializers.Serializer):
         max_digits=None, decimal_places=2, read_only=True, required=False
     )
     checkout_result = GenerateCheckoutPayloadSerializer(required=False)
+
+
+class DataConsentSerializer(serializers.Serializer):
+    """
+    Records whether a user has consented to data sharing for a contract
+    """
+
+    consented = serializers.BooleanField(allow_null=False, required=True)
+
+
+# This kinda sucks, is there really no standard way to annotate the default behavior for a DRF validity exception?
+class DataConsentValidationErrorSerializer(serializers.Serializer):
+    """Default DRF is_valid(raise_exception=True) error shape for DataConsentSerializer."""
+
+    errors = inline_serializer(
+        name="DataConsentFieldErrors",
+        fields={
+            "consented": serializers.ListField(
+                child=serializers.CharField(),
+                required=False,
+                help_text="Errors for the 'consented' field, e.g. if missing or not a boolean.",
+            )
+        },
+    )

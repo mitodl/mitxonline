@@ -5,8 +5,8 @@ Check B2B contract variants for validity.
 from django.core.management import BaseCommand
 from django.core.management.base import CommandParser
 
+from b2b.contracts import ensure_default_variant
 from b2b.models import ContractPage
-from variants.models import SupportedVariant
 
 
 class Command(BaseCommand):
@@ -60,12 +60,7 @@ class Command(BaseCommand):
                 self.stdout.write(
                     "'fix-default' flag set, creating a default variant set for the contract."
                 )
-                default_variant = SupportedVariant.objects.create(
-                    variant_object=contract_obj,
-                    language="en",
-                    b2b_only=False,
-                    default_variant=True,
-                )
+                default_variant = ensure_default_variant(contract_obj)
             else:
                 return
 

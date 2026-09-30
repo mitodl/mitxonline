@@ -246,6 +246,7 @@ def b2b_courses(fake, course_catalog_data):
 
         run.b2b_contract = contract
         run.save()
+        run.b2b_contracts.add(contract)
 
         course_runs.append(run)
         course_runs_by_contract_id[contract.id].append(run)

@@ -1,7 +1,4 @@
-import {
-    useForm,
-    Create,
- } from "@pankod/refine-antd";
+import { useForm, Create } from "@refinedev/antd";
 import { DiscountForm } from "components/discounts/discounts";
 
 import { IDiscount } from "interfaces";

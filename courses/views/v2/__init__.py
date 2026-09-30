@@ -8,7 +8,7 @@ from functools import cached_property
 import django_filters
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count, Prefetch, Q
+from django.db.models import F, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -23,7 +23,6 @@ from rest_framework.decorators import (
     api_view,
     permission_classes,
 )
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import (
     AllowAny,
     IsAuthenticated,
@@ -31,6 +30,7 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
+from b2b.models import ContractPage
 from cms.models import CoursePage
 from compliance.exceptions import ExportComplianceCheckError
 from courses.api import (
@@ -77,10 +77,12 @@ from courses.utils import (
     get_program_certificate_by_enrollment,
     get_unenrollable_courses,
     live_certificate_page_exists,
+    verified_courserun_exists,
 )
 from ecommerce.api import create_verified_program_course_run_enrollment
 from ecommerce.models import Product
 from main import features
+from main.pagination import Pagination
 from openapi.utils import extend_schema_get_queryset
 from openedx.api import sync_enrollments_with_edx
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
@@ -88,15 +90,6 @@ from variants.models import SupportedVariant
 
 log = logging.getLogger(__name__)
 VPE_MAX_PROGRAMS = 2
-
-
-class Pagination(PageNumberPagination):
-    """Paginator class for infinite loading"""
-
-    page_size = 12
-    page_size_query_param = "page_size"
-    max_page_size = 100
-    ordering = "-created_on"
 
 
 def user_has_org_access(user, org_id):
@@ -257,14 +250,17 @@ class ProgramViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
                         "elective_flag",
                     ),
                 ),
+                # A plain lookup, not a Prefetch with a queryset: see
+                # CourseViewSet.get_queryset. Giving a Prefetch on
+                # CoursePage.topics any queryset - here it was .only("name") -
+                # hands every page one shared QuerySet object, so the last page
+                # in the batch decides what every page carries. Nothing reads
+                # these topics today (ProgramSerializer.get_topics queries them
+                # itself), but the prefetch must not be the broken shape if
+                # something starts to.
                 Prefetch(
                     "all_requirements__course__page",
-                    queryset=CoursePage.objects.prefetch_related(
-                        Prefetch(
-                            "topics",
-                            queryset=CoursesTopic.objects.only("name"),
-                        )
-                    ),
+                    queryset=CoursePage.objects.prefetch_related("topics"),
                 ),
                 Prefetch(
                     "collection_memberships__collection",
@@ -345,8 +341,14 @@ class CourseFilterSet(django_filters.FilterSet):
 
         if user_has_org_access(user, value):
             return queryset.filter(
-                courseruns__b2b_contract__organization_id=value,
-                courseruns__b2b_contract__active=True,
+                Q(
+                    courseruns__b2b_contract__organization_id=value,
+                    courseruns__b2b_contract__active=True,
+                )
+                | Q(
+                    courseruns__b2b_contracts__active=True,
+                    courseruns__b2b_contracts__organization_id=value,
+                )
             )
         return Course.objects.none()
 
@@ -364,8 +366,14 @@ class CourseFilterSet(django_filters.FilterSet):
             and user.b2b_contracts.filter(id=value).exists()
         ):
             return queryset.filter(
-                courseruns__b2b_contract__id=value,
-                courseruns__b2b_contract__active=True,
+                Q(
+                    courseruns__b2b_contract__id=value,
+                    courseruns__b2b_contract__active=True,
+                )
+                | Q(
+                    courseruns__b2b_contracts__active=True,
+                    courseruns__b2b_contracts__id=value,
+                )
             )
         return Course.objects.none()
 
@@ -435,7 +443,7 @@ class CourseViewSet(
 
     def get_queryset(self):
         """Get the queryset for the viewset."""
-        queryset = Course.objects.select_related("page")
+        queryset = Course.objects.select_related("page", "page__feature_image")
         # Use Prefetch for reverse GenericRelation (products on CourseRun)
         # 1. Get the ContentType object for the CourseRun model
         courserun_content_type = ContentType.objects.get_for_model(CourseRun)
@@ -454,29 +462,81 @@ class CourseViewSet(
             "enrollment_modes",
             to_attr="prefetched_enrollment_modes",
         )
+        # b2b_contracts is prefetched because get_first_unexpired_b2b_run and
+        # get_filtered_runs now match contracts in Python over the loaded runs
+        # rather than with a b2b_contracts__in filter - without it each run
+        # costs a query.
+        #
+        # Narrowed to organization_id because that and the pk are all those two
+        # methods read. ContractPage is a Wagtail Page, so the unnarrowed
+        # prefetch selects the whole multi-table row - ~50 columns including two
+        # RichTextFields - once per (run, contract) pair.
+        #
+        # active_objects, not objects: the M2M related manager is built from
+        # ContractPage._default_manager, which is ActiveContractManager because
+        # active_objects is ContractPage's only *local* manager (see
+        # CourseRunAdmin.formfield_for_foreignkey for the same reasoning). So
+        # this prefetch has always filtered to active, in-window contracts, and
+        # ContractPage.objects - Wagtail's inherited, unfiltered PageManager -
+        # would silently widen it.
+        #
+        # ``contract.id`` stays free under only(): it is the MTI parent's pk, so
+        # DeferredAttribute._check_parent_chain resolves it from the loaded
+        # page_ptr_id rather than reloading the row.
+        contracts_prefetch = Prefetch(
+            "b2b_contracts",
+            queryset=ContractPage.active_objects.only("organization_id"),
+        )
+        # The deprecated single-contract FK is annotated rather than
+        # select_related for the same reason: the only read of it is
+        # get_filtered_runs comparing organization_id, and the serializer's
+        # "b2b_contract" field renders the pk straight off b2b_contract_id. The
+        # alias matches CourseRun.b2b_contract_organization_id, so the
+        # annotation shadows that cached_property.
         course_runs_prefetch = Prefetch(
             "courseruns",
             queryset=CourseRun.objects.order_by("id")
-            .select_related("b2b_contract")
-            .prefetch_related(modes_prefetch, products_prefetch),
+            .annotate(b2b_contract_organization_id=F("b2b_contract__organization_id"))
+            .prefetch_related(contracts_prefetch, modes_prefetch, products_prefetch),
         )
+        # Topics are serialized per course along with their parent topics, whose
+        # sort key is CoursesTopic.Meta.ordering == ["parent__name", "name"] -
+        # hence walking up to the grandparent.
+        #
+        # Plain lookups, deliberately. Never give a ``Prefetch`` on
+        # ``CoursePage.topics`` a ``queryset=`` - any queryset, not just one
+        # carrying select_related.
+        #
+        # ``topics`` is a ParentalManyToManyField, and modelcluster's deferring
+        # manager (modelcluster/fields.py) implements ``_apply_rel_filters`` as
+        # nothing but a call to the passed queryset's ``_next_is_sticky``.
+        #
+        # ``_next_is_sticky`` returns ``self``; its own docstring in Django
+        # says it "should be immediately followed by a filter() that does
+        # create a clone". modelcluster never adds that filter, where Django's
+        # own ManyRelatedManager ends in ``.filter(**self.core_filters)`` and
+        # so clones. ``prefetch_one_level`` takes the ``lookup.queryset is not
+        # None`` branch, hands every page that same object, and assigns
+        # ``qs._result_cache = vals`` once per page - so the last page in the
+        # batch decides what every page carries. That is why the wrong topics
+        # tracked ``page_size``.
+        #
+        # Without ``queryset=`` the ``else`` branch calls
+        # ``manager.get_queryset()``, which builds a fresh queryset per page.
+        # Naming the parent chain keeps the query count flat in course count.
         queryset = queryset.prefetch_related(
-            "departments", "in_programs", course_runs_prefetch
+            "departments",
+            course_runs_prefetch,
+            # Prefetches "page__topics" on its way to the parent chain, so the
+            # shorter lookup does not need listing as well.
+            "page__topics__parent__parent",
+            "page__linked_instructors__linked_instructor_page",
         )
+        # Only booleans are ever read from these, so Exists() beats an aggregate:
+        # it needs no GROUP BY, which also keeps the paginator's COUNT cheap.
         queryset = queryset.annotate(
-            count_b2b_courseruns=Count("courseruns__b2b_contract__id")
-        )
-        queryset = queryset.annotate(count_courseruns=Count("courseruns"))
-        queryset = queryset.annotate(
-            verified_courserun_count=Count(
-                "courseruns__enrollment_modes",
-                filter=Q(
-                    courseruns__enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
-                ),
-            )
-        )
-        queryset = queryset.annotate(
-            has_live_certificate_page=live_certificate_page_exists()
+            has_verified_courserun=verified_courserun_exists(),
+            has_live_certificate_page=live_certificate_page_exists(),
         )
         queryset = queryset.prefetch_related(
             Prefetch(
@@ -487,16 +547,25 @@ class CourseViewSet(
                 ),
             )
         )
-        queryset = queryset.prefetch(
-            PrefetchOption(
-                "programs",
-                queryset=Program.objects.filter(self.get_program_filters())
-                .filter(
-                    live=True,
-                    page__live=True,
-                )
-                .only("id", "readable_id", "title", "display_mode"),
+        # One queryset for both prefetches: the financial assistance URL is
+        # picked by walking a course's programs, so a program this view filters
+        # out of "programs" must not be able to supply the URL either.
+        program_queryset = (
+            Program.objects.filter(self.get_program_filters())
+            .filter(
+                live=True,
+                page__live=True,
             )
+            .only("id", "readable_id", "title", "display_mode", "program_type")
+        )
+        queryset = queryset.prefetch(
+            # Resolved in the queryset so nothing queries during serialization.
+            # Applies to the detail route too, since ReadableIdLookupMixin.
+            # get_object filters this same queryset.
+            PrefetchOption(
+                "financial_assistance_form_url", program_queryset=program_queryset
+            ),
+            PrefetchOption("programs", queryset=program_queryset),
         )
 
         return queryset.order_by("title").distinct()
@@ -647,14 +716,22 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
 
     def filter_exclude_b2b(self, queryset, name, value):  # noqa: ARG002
         """Filter out B2B enrollments if exclude_b2b is True."""
+
+        # At this point, the only sure way to determine if an enrollment is a
+        # B2B one is if the run is marked as b2b_only. The enrollment APIs will
+        # need to be updated so we can track enrollments in public courses that
+        # are also B2B, which hasn't happened yet.
         if value:
-            return queryset.filter(run__b2b_contract__isnull=True)
+            return queryset.filter(run__b2b_only=False)
         return queryset
 
     def filter_org_id(self, queryset, name, value):  # noqa: ARG002
         """Filter enrollments by B2B organization ID."""
         if value:
-            return queryset.filter(run__b2b_contract__organization_id=value)
+            return queryset.filter(
+                Q(run__b2b_contract__organization_id=value)
+                | Q(run__b2b_contracts__organization_id=value)
+            )
         return queryset
 
 
@@ -685,6 +762,7 @@ class UserEnrollmentsApiViewSet(
         .prefetch(
             "certificate",
             "grades",
+            "run__course__financial_assistance_form_url",
             PrefetchOption(
                 "run__course__programs", queryset=Program.objects.filter(b2b_only=False)
             ),
@@ -730,9 +808,22 @@ class UserEnrollmentsApiViewSet(
         operation_id="user_enrollments_create_v2",
         description="Create a new user enrollment - API v2",
     )
-    def create(self, request, *args, **kwargs):
+    def create(self, request, *args, **kwargs):  # noqa: ARG002
         """Create a new enrollment."""
-        return super().create(request, *args, **kwargs)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        enrollment = serializer.save()
+        if enrollment is not None:
+            # serializer.save() hands back a plain instance, so the nested
+            # CourseSerializer would have to resolve its prefetched fields one
+            # query at a time. Read it back through this viewset's queryset
+            # instead: one query, and the response matches the list route.
+            serializer = self.get_serializer(self.queryset.get(pk=enrollment.pk))
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED,
+            headers=self.get_success_headers(serializer.data),
+        )
 
     @extend_schema(
         operation_id="user_enrollments_destroy_v2",
@@ -824,10 +915,7 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
             raise EnrollmentError from exc
         if len(enrollments) == 0:
             raise EnrollmentCreationFailedError
-        return Response(
-            CourseRunEnrollmentSerializer(enrollments[0]).data,
-            status=status.HTTP_201_CREATED,
-        )
+        return _created_enrollment_response(enrollments[0])
 
     # Everything checks out for a verified enrollment, so generate one.
     # This requires generating an order.
@@ -836,8 +924,23 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
         request, run, program_enrollment.program
     )
 
+    return _created_enrollment_response(enrollment)
+
+
+def _created_enrollment_response(enrollment):
+    """
+    Serialize a just-created enrollment the way a GET would.
+
+    create_run_enrollments and create_verified_program_course_run_enrollment
+    return plain instances, so the nested CourseSerializer would resolve its
+    prefetched fields lazily, one query at a time. Reading the row back through
+    UserEnrollmentsApiViewSet.queryset costs one query on a POST and keeps the
+    response identical in shape to the list and detail routes.
+    """
     return Response(
-        CourseRunEnrollmentSerializer(enrollment).data,
+        CourseRunEnrollmentSerializer(
+            UserEnrollmentsApiViewSet.queryset.get(pk=enrollment.pk)
+        ).data,
         status=status.HTTP_201_CREATED,
     )
 
@@ -989,10 +1092,11 @@ class CourseCertificateRetrieveViewSet(_BaseCertificateRetrieveViewSet):
 
     serializer_class = CourseRunCertificateSerializer
     queryset = CourseRunCertificate.objects.prefetch(
+        "course_run__course__financial_assistance_form_url",
         PrefetchOption(
             "course_run__course__programs",
             queryset=Program.objects.filter(b2b_only=False),
-        )
+        ),
     ).prefetch_related("user")
 
 
@@ -1049,7 +1153,10 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                     )
                     .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
                     .select_related("run__course__page", "run__b2b_contract")
-                    .prefetch("run__course__programs")
+                    .prefetch(
+                        "run__course__programs",
+                        "run__course__financial_assistance_form_url",
+                    )
                     .order_by("-id"),
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),

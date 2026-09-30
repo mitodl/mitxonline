@@ -8,10 +8,10 @@ from zoneinfo import ZoneInfo
 import faker
 import freezegun
 import pytest
+import reversion
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
 from django.test import RequestFactory
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
@@ -19,6 +19,7 @@ from opaque_keys.edx.keys import CourseKey
 from b2b import factories
 from b2b.api import (
     _apply_available_discount,
+    _determine_contract_for_user_product,
     _enroll_in_program_for_b2b,
     _get_source_runs_for_course,
     _handle_extra_enrollment_codes,
@@ -45,6 +46,7 @@ from b2b.constants import (
     B2B_RUN_TAG_FORMAT,
     CONTRACT_MEMBERSHIP_CODE,
     CONTRACT_MEMBERSHIP_MANAGED,
+    ONBOARDING_STATE_ORG_CREATED,
 )
 from b2b.exceptions import SourceCourseIncompleteError
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
@@ -55,7 +57,7 @@ from b2b.models import (
     OrganizationPage,
     UserOrganization,
 )
-from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED, UAI_COURSEWARE_ID_PREFIX
+from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
@@ -65,7 +67,11 @@ from courses.factories import (
 )
 from courses.models import CourseRunEnrollment, ProgramEnrollment
 from ecommerce.api_test import create_basket
-from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME, REDEMPTION_TYPE_UNLIMITED
+from ecommerce.constants import (
+    DISCOUNT_TYPE_FIXED_PRICE,
+    REDEMPTION_TYPE_ONE_TIME,
+    REDEMPTION_TYPE_UNLIMITED,
+)
 from ecommerce.factories import (
     BasketFactory,
     BasketItemFactory,
@@ -79,19 +85,25 @@ from ecommerce.models import (
     BasketDiscount,
     DiscountProduct,
     DiscountRedemption,
+    Line,
     OrderStatus,
 )
 from main.constants import (
     USER_MSG_TYPE_B2B_DISALLOWED,
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
     USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED,
+    USER_MSG_TYPE_B2B_ERROR_AMBIGUOUS_CONTRACT,
     USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT,
-    USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT,
+    USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH,
     USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE,
     USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
 )
 from main.utils import date_to_datetime
-from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.constants import (
+    COURSE_RUN_CLONE_STATUS_PENDING,
+    EDX_ENROLLMENT_VERIFIED_MODE,
+)
+from openedx.models import CourseRunClone
 from users.factories import UserFactory
 from variants.models import SupportedVariant
 
@@ -207,7 +219,8 @@ def test_b2b_basket_validation(user, run_contract, apply_code):
     if run_contract:
         contract = factories.ContractPageFactory.create()
 
-        product.purchasable_object.b2b_contract = contract
+        product.purchasable_object.b2b_contracts.add(contract)
+        product.purchasable_object.b2b_only = True
         product.purchasable_object.save()
         product.refresh_from_db()
 
@@ -379,7 +392,8 @@ def test_ensure_enrollment_codes_clears_extras():
         max_learners=10,
         membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
     product = ProductFactory.create(purchasable_object=run)
 
     created, updated, errors = ensure_enrollment_codes_exist(contract)
@@ -498,11 +512,11 @@ def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
             assert Basket.objects.filter(user=user).count() == assert_test
 
         if not product_in_contract:
-            assert result["result"] == USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT
+            assert result["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH
             return
 
         if not user_in_contract:
-            assert result["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT
+            assert result["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH
             return
 
         if not price_is_zero:
@@ -562,11 +576,12 @@ def test_enroll_in_program_for_b2b(program_in_contract, program_exists):
 
     user = UserFactory.create()
     course = CourseFactory.create()
-    run = CourseRunFactory.create(course=course, b2b_contract=contract)
+    run = CourseRunFactory.create(course=course, b2b_only=True)
+    run.b2b_contracts.add(contract)
 
     product = ProductFactory.create(purchasable_object=run)
 
-    _enroll_in_program_for_b2b(user, product, program_id)
+    _enroll_in_program_for_b2b(user, product, program_id, contract)
 
     if program_in_contract and program_exists:
         assert ProgramEnrollment.objects.filter(user=user, program=program).exists()
@@ -622,10 +637,11 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
             course=course,
             courseware_id=target_course_id,
             run_tag=CourseKey.from_string(target_course_id).run,
-            b2b_contract=contract,
+            b2b_only=True,
             language="en",
             is_primary_language=True,
         )
+        collision_run.b2b_contracts.add(contract)
 
         [(new_run, _)] = create_contract_run(contract, course)
 
@@ -648,7 +664,10 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
     assert created_product.object_id == created_run.id
     assert settings.OPENEDX_COURSE_BASE_URL in created_run.courseware_url
 
-    mocked_clone_run.assert_called()
+    mocked_clone_run.assert_called_once_with(created_run.id, source_run.courseware_id)
+    clone = CourseRunClone.objects.get(course_run=created_run)
+    assert clone.status == COURSE_RUN_CLONE_STATUS_PENDING
+    assert clone.source_courseware_id == source_run.courseware_id
 
 
 def test_create_contract_run_variants(mocker):
@@ -927,6 +946,18 @@ def test_b2b_reconcile_keycloak_orgs(mocker, update_an_org):
 
             return self.orgs
 
+        def list_all(self, page_size=None, **kwargs):  # noqa: ARG002
+            """
+            Return every fake org.
+
+            reconcile_keycloak_orgs pages rather than calling list, because
+            Keycloak's collection endpoints answer with 10 results when no max
+            is given and a drift reconciler that sees a first page is not a
+            reconciler.
+            """
+
+            return self.orgs
+
     org_model = MockedOrgModel()
     org_model.orgs = factories.OrganizationRepresentationFactory.create_batch(3)
 
@@ -979,6 +1010,13 @@ def test_b2b_reconcile_keycloak_orgs(mocker, update_an_org):
                 assert org_page.org_key != "changedKey"
 
     assert found_count == (3 if not update_an_org else 4)
+
+    # An adopted org needs an onboarding record too, so orgs that arrived this
+    # way show up in the same place as the ones the provisioning API made.
+    assert all(
+        org_page.onboarding.state == ONBOARDING_STATE_ORG_CREATED
+        for org_page in org_pages
+    )
 
 
 def test_reconcile_bad_keycloak_org(mocker):
@@ -1149,7 +1187,8 @@ def test_b2b_contract_removal_keeps_enrollments(mocked_b2b_org_attach):
         name="Contract Auto",
     )
 
-    courserun = CourseRunFactory.create(b2b_contract=contract_auto)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract_auto)
 
     process_add_org_membership(user, org)
 
@@ -1229,7 +1268,7 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
             existing_run.course,
             skip_edx=False,
             require_designated_source_run=False,
-            org_prefix=UAI_COURSEWARE_ID_PREFIX,
+            org_prefix=None,
         )
         assert result == (mock_run, mock_product)
     else:
@@ -1273,7 +1312,7 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
                 imported_course,
                 skip_edx=False,
                 require_designated_source_run=False,
-                org_prefix=UAI_COURSEWARE_ID_PREFIX,
+                org_prefix=None,
             )
             assert result == (mock_run, mock_product)
         else:
@@ -1351,7 +1390,7 @@ def test_import_and_create_contract_run_with_all_kwargs(mocker):
         imported_course,
         skip_edx=True,
         require_designated_source_run=True,
-        org_prefix=UAI_COURSEWARE_ID_PREFIX,
+        org_prefix=None,
     )
 
     assert result == (mock_run, mock_product)
@@ -1389,7 +1428,7 @@ def test_import_and_create_contract_run_with_string_departments(mocker):
         existing_run.course,
         skip_edx=False,
         require_designated_source_run=False,
-        org_prefix=UAI_COURSEWARE_ID_PREFIX,
+        org_prefix=None,
     )
     assert result == (mock_run, mock_product)
 
@@ -1399,7 +1438,8 @@ def test_get_runs_without_products():
 
     contract = ContractPageFactory.create()
 
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
 
     assert run in get_contract_runs_without_products(contract)
 
@@ -1409,7 +1449,9 @@ def test_get_contract_products_with_bad_pricing():
 
     contract = ContractPageFactory.create(enrollment_fixed_price=19)
 
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
+
     product = ProductFactory.create(price=76, purchasable_object=run)
 
     assert product in get_contract_products_with_bad_pricing(contract)
@@ -1420,7 +1462,8 @@ def test_ensure_contract_run_products():
 
     contract = ContractPageFactory.create()
 
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
 
     created_products = ensure_contract_run_products(contract)
 
@@ -1433,7 +1476,9 @@ def test_ensure_contract_run_pricing():
 
     contract = ContractPageFactory.create(enrollment_fixed_price=19)
 
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
+
     product = ProductFactory.create(price=76, purchasable_object=run)
 
     ensure_contract_run_pricing(contract)
@@ -1455,7 +1500,9 @@ def test_remove_extra_codes():
         membership_type=CONTRACT_MEMBERSHIP_CODE,
         max_learners=5,
     )
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
+
     product = ProductFactory.create(price=76, purchasable_object=run)
 
     ensure_enrollment_codes_exist(contract)
@@ -1577,6 +1624,34 @@ def test_create_contract_run_key():
         )
 
 
+@pytest.mark.parametrize(
+    ("org_key_prefix", "org_prefix", "expected_prefix"),
+    [
+        ("UAI_", None, "UAI_"),
+        ("", None, ""),
+        ("B2B_", None, "B2B_"),
+        ("UAI_", "", ""),
+        ("", "B2B_", "B2B_"),
+    ],
+)
+def test_create_contract_run_key_prefix(org_key_prefix, org_prefix, expected_prefix):
+    """None uses the organization's prefix, and a blank prefix means no prefix."""
+
+    contract = ContractPageFactory.create(organization__org_key_prefix=org_key_prefix)
+    course = CourseFactory.create()
+    source_run = CourseRunFactory.create(
+        course=course,
+        courseware_id=f"{course.readable_id}+SOURCE",
+        run_tag="SOURCE",
+    )
+
+    new_course_key = CourseKey.from_string(
+        create_contract_run_key(source_run, contract, org_prefix=org_prefix)
+    )
+
+    assert new_course_key.org == f"{expected_prefix}{contract.organization.org_key}"
+
+
 def test_apply_available_discount_seat_limit():
     """
     Test that the internal _apply_available_discount function works as expected.
@@ -1592,7 +1667,9 @@ def test_apply_available_discount_seat_limit():
         max_learners=2,
         membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
-    CourseRunFactory.create_batch(2, b2b_contract=contract)
+    contract_runs = CourseRunFactory.create_batch(2, b2b_only=True)
+    for contract_run in contract_runs:
+        contract_run.b2b_contracts.add(contract)
     user_orgs = factories.UserOrganizationFactory.create_batch(
         3, organization=contract.organization
     )
@@ -1635,19 +1712,20 @@ def test_apply_available_discount_seat_limit():
     request = RequestFactory()
     request.user = user_orgs[2].user
 
-    # Test the validate step - this gets called before the apply call and should
-    # fail. (So, in real life, trying to add this third user should not work.)
+    # Test the validate step
 
     user_orgs[2].user.b2b_contracts.add(contract)
     user_orgs[2].user.save()
 
     result = _validate_b2b_enrollment_prerequisites(user_orgs[2].user, products[0])
 
-    assert result == {"result": USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
+    # We've added the user to the contract - the seat limit is exceeded but because
+    # we manually did it above this should return successfully.
+    assert result == contract
 
     # Calling this directly should result in a new discount being created.
 
-    _apply_available_discount(request, products[0], basket)
+    _apply_available_discount(request, products[0], basket, contract)
 
     assert contract.get_discounts().count() == 5
 
@@ -1671,12 +1749,16 @@ def test_apply_available_discount_unlimited_seats(existing_discounts):
         max_learners=0,
         membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
-    CourseRunFactory.create_batch(2, b2b_contract=contract)
+    contract_runs = CourseRunFactory.create_batch(2, b2b_only=True)
+    for run in contract_runs:
+        run.b2b_contracts.add(contract)
     user_orgs = factories.UserOrganizationFactory.create_batch(
         3, organization=contract.organization
     )
 
     products = ensure_contract_run_products(contract)
+    assert products
+
     if existing_discounts:
         # Testing for existing discounts means we should create some orders where
         # the discount is used, to make sure we don't end up with extras.
@@ -1713,17 +1795,18 @@ def test_apply_available_discount_unlimited_seats(existing_discounts):
     request = RequestFactory()
     request.user = user_orgs[2].user
 
-    # Test the validate step - this gets called before the apply call and should
-    # fail. (So, in real life, trying to add this third user should not work.)
+    # Test the validate step
 
     user_orgs[2].user.b2b_contracts.add(contract)
     user_orgs[2].user.save()
 
     result = _validate_b2b_enrollment_prerequisites(user_orgs[2].user, products[0])
 
-    assert not result
+    # We've added the user to the contract - the seat limit is exceeded but because
+    # we manually did it above this should return successfully.
+    assert result == contract
 
-    _apply_available_discount(request, products[0], basket)
+    _apply_available_discount(request, products[0], basket, contract)
 
     assert contract.get_discounts().count() == (2 if existing_discounts else 1)
 
@@ -1794,41 +1877,51 @@ def test_create_contract_run_duplicate_language_source_raises(mocker, in_contrac
     """
     Test that you can't create two source runs with the same run tag and language.
 
-    This is enforced as a unique constraint so trying to do this should fail,
-    unless the runs are in different contracts (or one is in a contract and the
-    other isn't).
+    This is enforced in application code (see
+    ``CourseRun.validate_b2b_contract_group_uniqueness``) so trying to do this
+    should fail, unless the runs are in different contracts (or one is in a
+    contract and the other isn't).
     """
     contract = None if in_contract == "no" else ContractPageFactory.create()
     course = CourseFactory.create()
-    CourseRunFactory.create(
+    first_run = CourseRunFactory.create(
         course=course,
         run_tag="1T2026",
         language="en",
         is_source_run=True,
         is_primary_language=True,
         courseware_id=f"{course.readable_id}+1T2026-en",
-        b2b_contract=contract if in_contract in ["first", "both"] else None,
+    )
+    if in_contract in ["first", "both"]:
+        first_run.b2b_only = True
+        first_run.save()
+        first_run.b2b_contracts.add(contract)
+
+    second_run = CourseRunFactory.build(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en-copy",
     )
 
-    if in_contract in ["no", "both"]:
-        with pytest.raises(IntegrityError, match="unique_language_per_group"):
-            CourseRunFactory.create(
-                course=course,
-                run_tag="1T2026",
-                language="en",
-                is_source_run=True,
-                courseware_id=f"{course.readable_id}+1T2026-en-copy",
-                b2b_contract=contract,
-            )
+    if in_contract == "both":
+        second_run.b2b_only = True
+        second_run.save()
+
+        with pytest.raises(ValidationError):
+            second_run.b2b_contracts.add(contract)
+    elif in_contract == "no":
+        # Both runs are public, so re-validating the existing row surfaces the
+        # collision.
+        with pytest.raises(ValidationError):
+            second_run.save()
     else:
-        CourseRunFactory.create(
-            course=course,
-            run_tag="1T2026",
-            language="en",
-            is_source_run=True,
-            courseware_id=f"{course.readable_id}+1T2026-en-copy",
-            b2b_contract=contract if in_contract == "second" else None,
-        )
+        if in_contract == "second":
+            second_run.b2b_only = True
+            second_run.save()
+            second_run.b2b_contracts.add(contract)
+        second_run.save()
 
 
 def test_create_contract_run_single_language_legacy(mocker):
@@ -2220,7 +2313,8 @@ def test_enroll_prereqs_existing_enrollment(mocker, change_status):
     """
 
     contract = ContractPageFactory.create()
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_only=True)
+    run.b2b_contracts.add(contract)
     product = ProductFactory.create(purchasable_object=run)
 
     user = UserFactory.create()
@@ -2236,8 +2330,664 @@ def test_enroll_prereqs_existing_enrollment(mocker, change_status):
     result = _validate_b2b_enrollment_prerequisites(user, product)
 
     if change_status == ENROLL_CHANGE_STATUS_UNENROLLED:
-        assert not result
+        assert result == contract
     else:
         assert result
         assert "result" in result
         assert result["result"] == USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED
+
+
+@pytest.fixture
+def overlapping_contracts():
+    """
+    Build two contracts with some shared and some unique resources.
+
+    - run_a / program_a belong only to contract A
+    - run_b / program_b belong only to contract B
+    - run_ab / program_ab belong to both contracts
+    - run_none / program_none aren't in any contract
+    """
+
+    contract_a, contract_b = factories.ContractPageFactory.create_batch(
+        2, membership_type=CONTRACT_MEMBERSHIP_MANAGED, enrollment_fixed_price=0
+    )
+
+    runs = {
+        "a": CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract_a]),
+        "b": CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract_b]),
+        "ab": CourseRunFactory.create(
+            b2b_only=True, b2b_contracts=[contract_a, contract_b]
+        ),
+        "none": CourseRunFactory.create(),
+    }
+    with reversion.create_revision():
+        products = {
+            key: ProductFactory.create(purchasable_object=run, price=Decimal(0))
+            for key, run in runs.items()
+        }
+
+    programs = {key: ProgramFactory.create() for key in ("a", "b", "ab", "none")}
+    for key, contracts in (
+        ("a", [contract_a]),
+        ("b", [contract_b]),
+        ("ab", [contract_a, contract_b]),
+    ):
+        for contract in contracts:
+            ContractProgramItem.objects.create(
+                contract=contract, program=programs[key], sort_order=0
+            )
+
+    return {
+        "contracts": {"a": contract_a, "b": contract_b},
+        "runs": runs,
+        "products": products,
+        "programs": programs,
+    }
+
+
+def _make_contract_user(contracts, keys):
+    """Make a user that belongs to the specified contracts."""
+
+    user = UserFactory.create()
+    for key in keys:
+        user.b2b_contracts.add(contracts[key])
+    return user
+
+
+@pytest.mark.parametrize(
+    ("user_contracts", "run_key", "program_key", "expected"),
+    [
+        # Single overlap, no program
+        (["a"], "a", None, "a"),
+        (["b"], "ab", None, "b"),
+        # User is in both, run only in one
+        (["a", "b"], "a", None, "a"),
+        (["a", "b"], "b", None, "b"),
+        # Program in the same contract
+        (["a"], "a", "a", "a"),
+        (["a"], "a", "ab", "a"),
+        # Program disambiguates a run that's in both contracts
+        (["a", "b"], "ab", "a", "a"),
+        (["a", "b"], "ab", "b", "b"),
+        # Run disambiguates a program that's in both contracts
+        (["a", "b"], "b", "ab", "b"),
+    ],
+)
+def test_determine_contract_resolves_without_slug(
+    overlapping_contracts, user_contracts, run_key, program_key, expected
+):
+    """With no contract slug, the single overlapping contract should be returned."""
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, user_contracts)
+    product = overlapping_contracts["products"][run_key]
+    program = overlapping_contracts["programs"][program_key] if program_key else None
+
+    result = _determine_contract_for_user_product(user, product, program=program)
+
+    assert result == contracts[expected].id
+
+
+@pytest.mark.parametrize(
+    ("user_contracts", "run_key", "program_key", "failed_match"),
+    [
+        # User isn't in any contract
+        ([], "a", None, "item"),
+        # User is in a different contract than the run
+        (["b"], "a", None, "item"),
+        # Run isn't in a contract at all
+        (["a", "b"], "none", None, "item"),
+        # Run matches, program is in a contract the user isn't in
+        (["a"], "a", "b", "program"),
+        (["a"], "ab", "b", "program"),
+    ],
+)
+def test_determine_contract_no_match_without_slug(
+    overlapping_contracts, user_contracts, run_key, program_key, failed_match
+):
+    """If the user, run, and program don't share a contract, report which part failed."""
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, user_contracts)
+    product = overlapping_contracts["products"][run_key]
+    program = overlapping_contracts["programs"][program_key] if program_key else None
+
+    result = _determine_contract_for_user_product(user, product, program=program)
+
+    assert result == {
+        "result": USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH,
+        "failed_match": failed_match,
+    }
+
+
+@pytest.mark.parametrize("contract_slug", [None, "not-a-real-contract"])
+@pytest.mark.parametrize(
+    ("run_key", "program_key"),
+    [
+        # Run is in both contracts, no program to narrow it down
+        ("ab", None),
+        # Run and program are both in both contracts
+        ("ab", "ab"),
+        # Run and program each match one of the user's contracts, but not the
+        # same one - there's no single contract that covers everything
+        ("a", "b"),
+    ],
+)
+def test_determine_contract_ambiguous(
+    overlapping_contracts, run_key, program_key, contract_slug
+):
+    """If the right contract can't be narrowed down to one, the result is ambiguous."""
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, ["a", "b"])
+    product = overlapping_contracts["products"][run_key]
+    program = overlapping_contracts["programs"][program_key] if program_key else None
+
+    result = _determine_contract_for_user_product(
+        user, product, program=program, contract_slug=contract_slug
+    )
+
+    assert result == {"result": USER_MSG_TYPE_B2B_ERROR_AMBIGUOUS_CONTRACT}
+
+
+@pytest.mark.parametrize("slug_key", ["a", "b"])
+@pytest.mark.parametrize("program_key", [None, "ab"])
+def test_determine_contract_with_slug(overlapping_contracts, slug_key, program_key):
+    """An explicit contract slug should pick that contract out of several valid ones."""
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, ["a", "b"])
+    product = overlapping_contracts["products"]["ab"]
+    program = overlapping_contracts["programs"][program_key] if program_key else None
+
+    result = _determine_contract_for_user_product(
+        user, product, program=program, contract_slug=contracts[slug_key].slug
+    )
+
+    assert result == contracts[slug_key].id
+
+
+@pytest.mark.parametrize(
+    ("user_contracts", "run_key", "program_key"),
+    [
+        # User isn't in the specified contract
+        (["b"], "ab", None),
+        # Run isn't in the specified contract
+        (["a", "b"], "b", None),
+        # Program isn't in the specified contract
+        (["a", "b"], "ab", "b"),
+    ],
+)
+def test_determine_contract_with_slug_mismatch(
+    overlapping_contracts, user_contracts, run_key, program_key
+):
+    """If any part of the transaction isn't in the specified contract, it should fail."""
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, user_contracts)
+    product = overlapping_contracts["products"][run_key]
+    program = overlapping_contracts["programs"][program_key] if program_key else None
+
+    result = _determine_contract_for_user_product(
+        user, product, program=program, contract_slug=contracts["a"].slug
+    )
+
+    assert result == {"result": USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
+
+def test_determine_contract_unknown_slug_falls_back(overlapping_contracts):
+    """A slug that doesn't match a contract should fall back to finding the overlap."""
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, ["a", "b"])
+
+    result = _determine_contract_for_user_product(
+        user, overlapping_contracts["products"]["a"], contract_slug="not-a-contract"
+    )
+
+    assert result == contracts["a"].id
+
+
+@pytest.mark.parametrize("contract_slug", [None, "slug"])
+def test_determine_contract_program_not_in_contract(
+    overlapping_contracts, contract_slug
+):
+    """A program that isn't in any contract can't be used for a B2B enrollment."""
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, ["a", "b"])
+
+    result = _determine_contract_for_user_product(
+        user,
+        overlapping_contracts["products"]["a"],
+        program=overlapping_contracts["programs"]["none"],
+        contract_slug=contracts["a"].slug if contract_slug else None,
+    )
+
+    assert result == {"result": USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
+
+def test_determine_contract_no_purchasable_object(mocker):
+    """A product without a purchasable object is an error."""
+
+    product = mocker.Mock(purchasable_object=None)
+
+    with pytest.raises(ValueError, match="purchasable object"):
+        _determine_contract_for_user_product(UserFactory.create(), product)
+
+
+@pytest.mark.parametrize(
+    ("user_contracts", "program_key", "slug_key", "expected"),
+    [
+        (["a"], "a", None, "a"),
+        (["a", "b"], "b", None, "b"),
+        (["a", "b"], "ab", "a", "a"),
+        (["a", "b"], "ab", "b", "b"),
+        (["a", "b"], "ab", None, USER_MSG_TYPE_B2B_ERROR_AMBIGUOUS_CONTRACT),
+        (["b"], "a", None, USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH),
+        (["a", "b"], "a", "b", USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT),
+    ],
+)
+def test_determine_contract_program_product(
+    overlapping_contracts, user_contracts, program_key, slug_key, expected
+):
+    """A product for a program should resolve against the program's contracts."""
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, user_contracts)
+    with reversion.create_revision():
+        product = ProductFactory.create(
+            purchasable_object=overlapping_contracts["programs"][program_key]
+        )
+
+    result = _determine_contract_for_user_product(
+        user, product, contract_slug=contracts[slug_key].slug if slug_key else None
+    )
+
+    if expected in contracts:
+        assert result == contracts[expected].id
+    else:
+        assert result["result"] == expected
+
+
+def test_validate_b2b_prereqs_program_product(overlapping_contracts):
+    """An enrollable program in the user's contract should validate."""
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, ["a", "b"])
+    program = overlapping_contracts["programs"]["ab"]
+    program.live = True
+    program.start_date = now_in_utc() - timedelta(days=1)
+    program.enrollment_start = now_in_utc() - timedelta(days=1)
+    program.enrollment_end = now_in_utc() + timedelta(days=30)
+    program.save()
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=program)
+
+    result = _validate_b2b_enrollment_prerequisites(
+        user, product, contract_slug=contracts["b"].slug
+    )
+
+    assert result == contracts["b"]
+
+
+@pytest.mark.parametrize("run_in_users_contract", [True, False])
+def test_determine_contract_with_duplicate_slug(run_in_users_contract):
+    """
+    Contract slugs are only unique within an organization, so a slug can name
+    contracts in two organizations. The resolved contract must be the one the
+    user is actually in.
+    """
+
+    users_contract = factories.ContractPageFactory.create(slug="shared-slug")
+    other_contract = factories.ContractPageFactory.create(slug="shared-slug")
+    assert users_contract.organization != other_contract.organization
+
+    run_contracts = [other_contract]
+    if run_in_users_contract:
+        run_contracts.append(users_contract)
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=run_contracts)
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run)
+
+    user = UserFactory.create()
+    user.b2b_contracts.add(users_contract)
+
+    result = _determine_contract_for_user_product(
+        user, product, contract_slug="shared-slug"
+    )
+
+    if run_in_users_contract:
+        assert result == users_contract.id
+    else:
+        assert result == {"result": USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
+
+def test_validate_b2b_prereqs_duplicate_slug_other_org():
+    """
+    A user can't enroll through another organization's contract just because
+    it has the same slug as their own.
+    """
+
+    users_contract = factories.ContractPageFactory.create(slug="shared-slug")
+    other_contract = factories.ContractPageFactory.create(slug="shared-slug")
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[other_contract])
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run)
+
+    user = UserFactory.create()
+    user.b2b_contracts.add(users_contract)
+
+    result = _validate_b2b_enrollment_prerequisites(
+        user, product, contract_slug="shared-slug"
+    )
+
+    assert result == {"result": USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
+
+@pytest.mark.parametrize(
+    ("run_key", "program_key", "slug_key", "expected"),
+    [
+        ("a", None, None, "a"),
+        ("ab", "b", None, "b"),
+        ("ab", None, "a", "a"),
+        ("ab", "ab", "b", "b"),
+    ],
+)
+def test_validate_b2b_prereqs_returns_contract(
+    overlapping_contracts, run_key, program_key, slug_key, expected
+):
+    """When validation passes, the resolved contract object should be returned."""
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, ["a", "b"])
+    program = overlapping_contracts["programs"][program_key] if program_key else None
+
+    result = _validate_b2b_enrollment_prerequisites(
+        user,
+        overlapping_contracts["products"][run_key],
+        program=program,
+        contract_slug=contracts[slug_key].slug if slug_key else None,
+    )
+
+    assert isinstance(result, ContractPage)
+    assert result == contracts[expected]
+
+
+@pytest.mark.parametrize(
+    ("user_contracts", "run_key", "program_key", "expected"),
+    [
+        (["b"], "a", None, USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH),
+        (["a"], "a", "b", USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH),
+        (["a", "b"], "ab", None, USER_MSG_TYPE_B2B_ERROR_AMBIGUOUS_CONTRACT),
+        (["a", "b"], "a", "none", USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT),
+    ],
+)
+def test_validate_b2b_prereqs_contract_errors(
+    overlapping_contracts, user_contracts, run_key, program_key, expected
+):
+    """Contract resolution errors should be passed back out."""
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, user_contracts)
+    program = overlapping_contracts["programs"][program_key] if program_key else None
+
+    result = _validate_b2b_enrollment_prerequisites(
+        user, overlapping_contracts["products"][run_key], program=program
+    )
+
+    assert result["result"] == expected
+
+
+@pytest.mark.parametrize("inactive_by", ["flag", "date"])
+def test_validate_b2b_prereqs_inactive_contract(overlapping_contracts, inactive_by):
+    """A contract that resolves but isn't active can't be enrolled in."""
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, ["a", "b"])
+
+    if inactive_by == "flag":
+        contracts["a"].active = False
+    else:
+        contracts["a"].contract_end = now_in_utc() - timedelta(days=1)
+    contracts["a"].save()
+
+    result = _validate_b2b_enrollment_prerequisites(
+        user,
+        overlapping_contracts["products"]["ab"],
+        contract_slug=contracts["a"].slug,
+    )
+
+    assert result == {"result": USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
+
+def test_validate_b2b_prereqs_run_not_enrollable(overlapping_contracts):
+    """A run in the contract whose enrollment period has closed isn't enrollable."""
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, ["a"])
+    run = overlapping_contracts["runs"]["a"]
+    run.enrollment_end = now_in_utc() - timedelta(days=1)
+    run.save()
+
+    result = _validate_b2b_enrollment_prerequisites(
+        user, overlapping_contracts["products"]["a"]
+    )
+
+    assert result == {"result": USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
+
+
+def test_validate_b2b_prereqs_already_enrolled_other_contract(overlapping_contracts):
+    """
+    An existing verified enrollment in the run blocks a new enrollment, even if
+    it was made through the user's other contract.
+    """
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, ["a", "b"])
+    CourseRunEnrollmentFactory.create(
+        user=user,
+        run=overlapping_contracts["runs"]["ab"],
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        b2b_contract=contracts["a"],
+    )
+
+    result = _validate_b2b_enrollment_prerequisites(
+        user,
+        overlapping_contracts["products"]["ab"],
+        contract_slug=contracts["b"].slug,
+    )
+
+    assert result == {"result": USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED}
+
+
+@pytest.fixture
+def b2b_enrollment_mocks(mocker, settings):
+    """Mock out the external calls that a B2B enrollment makes."""
+
+    mocker.patch("openedx.api.enroll_in_edx_course_runs")
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch("hubspot_sync.tasks.sync_cart_add_event_with_hubspot.apply_async")
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "a token"  # noqa: S105
+    settings.OPENEDX_SERVICE_WORKER_USERNAME = "a username"
+
+
+def _attach_bulk_discount(product, amount=Decimal(0)):
+    """
+    Attach an unlimited fixed-price bulk discount to the product.
+
+    _apply_available_discount can only create a discount on the fly for runs
+    in a single contract, so runs in several contracts need one ahead of time.
+    """
+
+    discount = UnlimitedUseDiscountFactory.create(
+        is_bulk=True, discount_type=DISCOUNT_TYPE_FIXED_PRICE, amount=amount
+    )
+    DiscountProduct.objects.create(discount=discount, product=product)
+    return discount
+
+
+def _b2b_request(user):
+    """Make a request for the user."""
+
+    request = RequestFactory().get("/")
+    request.user = user
+    return request
+
+
+@pytest.mark.parametrize("slug_key", ["a", "b"])
+def test_create_b2b_enrollment_stores_contract(
+    b2b_enrollment_mocks, overlapping_contracts, slug_key
+):
+    """
+    Enrolling in a run that's in several contracts should record the chosen
+    contract on the order line and on the resulting enrollment.
+    """
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, ["a", "b"])
+    run = overlapping_contracts["runs"]["ab"]
+    product = overlapping_contracts["products"]["ab"]
+    _attach_bulk_discount(product)
+
+    result = create_b2b_enrollment(
+        _b2b_request(user), product, contract_slug=contracts[slug_key].slug
+    )
+
+    assert result["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+
+    enrollment = CourseRunEnrollment.objects.get(user=user, run=run)
+    assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    assert enrollment.b2b_contract == contracts[slug_key]
+
+    line = Line.objects.get(order__purchaser=user, purchased_object_id=run.id)
+    assert line.b2b_contract == contracts[slug_key]
+
+
+def test_create_b2b_enrollment_with_program_stores_contract(
+    b2b_enrollment_mocks, overlapping_contracts
+):
+    """
+    The program should narrow the contract down, and both the course run and
+    program enrollments should be linked to it.
+    """
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, ["a", "b"])
+    run = overlapping_contracts["runs"]["ab"]
+    product = overlapping_contracts["products"]["ab"]
+    program = overlapping_contracts["programs"]["b"]
+    _attach_bulk_discount(product)
+
+    result = create_b2b_enrollment(
+        _b2b_request(user), product, program_id=program.readable_id
+    )
+
+    assert result["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+    assert (
+        CourseRunEnrollment.objects.get(user=user, run=run).b2b_contract
+        == contracts["b"]
+    )
+    assert (
+        ProgramEnrollment.objects.get(user=user, program=program).b2b_contract
+        == contracts["b"]
+    )
+
+
+def test_create_b2b_enrollment_single_contract_run(
+    b2b_enrollment_mocks, overlapping_contracts
+):
+    """A run in one contract should be linked without a slug or pre-made discount."""
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, ["a", "b"])
+    run = overlapping_contracts["runs"]["a"]
+
+    result = create_b2b_enrollment(
+        _b2b_request(user), overlapping_contracts["products"]["a"]
+    )
+
+    assert result["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+    assert (
+        CourseRunEnrollment.objects.get(user=user, run=run).b2b_contract
+        == contracts["a"]
+    )
+
+
+def test_create_b2b_enrollment_requires_checkout_keeps_contract(
+    b2b_enrollment_mocks, overlapping_contracts
+):
+    """If the user has to pay, the basket item should hold the chosen contract."""
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, ["a", "b"])
+    run = overlapping_contracts["runs"]["ab"]
+    product = overlapping_contracts["products"]["ab"]
+    product.price = Decimal(100)
+    product.save()
+    _attach_bulk_discount(product, amount=Decimal(50))
+
+    result = create_b2b_enrollment(
+        _b2b_request(user), product, contract_slug=contracts["b"].slug
+    )
+
+    assert result["result"] == USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT
+    basket_item = Basket.objects.get(user=user).basket_items.get()
+    assert basket_item.product == product
+    assert basket_item.b2b_contract == contracts["b"]
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+@pytest.mark.parametrize(
+    ("user_contracts", "run_key", "program_key", "contract_slug_key", "expected"),
+    [
+        (["a", "b"], "ab", None, None, USER_MSG_TYPE_B2B_ERROR_AMBIGUOUS_CONTRACT),
+        (["b"], "a", None, None, USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH),
+        (["a"], "a", "b", None, USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH),
+        (["a"], "ab", None, "b", USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT),
+    ],
+)
+def test_create_b2b_enrollment_contract_errors(  # noqa: PLR0913
+    b2b_enrollment_mocks,
+    overlapping_contracts,
+    user_contracts,
+    run_key,
+    program_key,
+    contract_slug_key,
+    expected,
+):
+    """If the contract can't be resolved, nothing should be enrolled or put in the basket."""
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, user_contracts)
+    program = overlapping_contracts["programs"][program_key] if program_key else None
+
+    result = create_b2b_enrollment(
+        _b2b_request(user),
+        overlapping_contracts["products"][run_key],
+        program_id=program.readable_id if program else None,
+        contract_slug=contracts[contract_slug_key].slug if contract_slug_key else None,
+    )
+
+    assert result["result"] == expected
+    assert not Basket.objects.filter(user=user).exists()
+    assert not CourseRunEnrollment.all_objects.filter(user=user).exists()
+    assert not ProgramEnrollment.all_objects.filter(user=user).exists()
+
+
+def test_create_b2b_enrollment_multi_contract_run_without_discount(
+    b2b_enrollment_mocks, overlapping_contracts
+):
+    """A run in several contracts should be enrollable once a contract is chosen."""
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, ["a", "b"])
+
+    result = create_b2b_enrollment(
+        _b2b_request(user),
+        overlapping_contracts["products"]["ab"],
+        contract_slug=contracts["a"].slug,
+    )
+
+    assert result["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS

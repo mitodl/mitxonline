@@ -23,6 +23,10 @@ from b2b.api import (
     get_contract_runs_without_products,
 )
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
+from b2b.contracts import (
+    expected_enrollment_code_count,
+    expire_unused_enrollment_codes,
+)
 from b2b.models import ContractPage, DiscountContractAttachmentRedemption
 from courses.models import CourseRun
 from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME, REDEMPTION_TYPE_UNLIMITED
@@ -504,14 +508,12 @@ class Command(BaseCommand):
                     else contract.enrollment_fixed_price
                 )
 
-                if contract.max_learners:
-                    expected_codes_count = (
-                        contract.max_learners * contract.get_course_runs().count()
-                    )
-                    code_redemption_type = REDEMPTION_TYPE_ONE_TIME
-                else:
-                    expected_codes_count = contract.get_course_runs().count()
-                    code_redemption_type = REDEMPTION_TYPE_UNLIMITED
+                expected_codes_count = expected_enrollment_code_count(contract)
+                code_redemption_type = (
+                    REDEMPTION_TYPE_ONE_TIME
+                    if contract.max_learners
+                    else REDEMPTION_TYPE_UNLIMITED
+                )
 
                 total_code_count = contract.get_discounts().count()
 
@@ -579,24 +581,12 @@ class Command(BaseCommand):
         removed_codes = []
 
         for contract in contracts:
-            discounts = contract.get_unused_discounts()
-            contract_products = contract.get_products().all()
-
-            for discount in discounts:
-                code = [
-                    str(contract),
-                    discount.discount_code,
-                    "detached",
-                ]
-
-                if not dry_run:
-                    discount.products.filter(product__in=contract_products).delete()
-                if discount.products.count() == (1 if dry_run else 0):
-                    if not dry_run:
-                        discount.delete()
-                    code[2] = "deleted"
-
-                removed_codes.append(code)
+            removed_codes.extend(
+                [str(contract), code, "deleted" if deleted else "detached"]
+                for code, deleted in expire_unused_enrollment_codes(
+                    contract, dry_run=dry_run
+                )
+            )
 
         self.stdout.write(self.style.SUCCESS(f"{len(removed_codes)} codes removed."))
 

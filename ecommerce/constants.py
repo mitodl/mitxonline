@@ -6,6 +6,8 @@ from mitol.payment_gateway.constants import (
     MITOL_PAYMENT_GATEWAY_STRIPE,
 )
 
+from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
+
 REFERENCE_NUMBER_PREFIX = "mitxonline-"
 
 # Standard self-service refund window, per the terms of service: learners may
@@ -38,27 +40,46 @@ BULK_GENERATION_DISCOUNT_TYPES = list(
     zip(STANDARD_DISCOUNT_TYPES, STANDARD_DISCOUNT_TYPES)
 )
 
+# The courseware a paid-amount-off discount credits a prior purchase of. A run
+# purchase is credited to its course, so a run never appears here. These are
+# the same two tokens the course and program serializers publish as `type`,
+# which is what lets a client key both off one vocabulary.
+ALL_DISCOUNT_SOURCE_TYPES = [
+    CONTENT_TYPE_MODEL_COURSE,
+    CONTENT_TYPE_MODEL_PROGRAM,
+]
+DISCOUNT_SOURCE_TYPES = list(zip(ALL_DISCOUNT_SOURCE_TYPES, ALL_DISCOUNT_SOURCE_TYPES))
+
 REDEMPTION_TYPE_ONE_TIME = "one-time"
 REDEMPTION_TYPE_ONE_TIME_PER_USER = "one-time-per-user"
 REDEMPTION_TYPE_UNLIMITED = "unlimited"
 REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE = "program-child-purchase"
+# An internal discount reaches a basket only through application code that has
+# already decided the learner is entitled to it — the one such caller is
+# ecommerce.api.create_verified_program_course_run_enrollment. Every
+# learner-facing route refuses it (Discount._within_redemption_limits), and
+# pricing does not re-check eligibility: its product links say what it is for,
+# not where it applies.
+REDEMPTION_TYPE_INTERNAL = "internal"
 
 ALL_REDEMPTION_TYPES = [
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
     REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+    REDEMPTION_TYPE_INTERNAL,
 ]
 
 REDEMPTION_TYPES = list(zip(ALL_REDEMPTION_TYPES, ALL_REDEMPTION_TYPES))
 
 # program-child-purchase forces automatic=True and program-only product
-# links even when paired with a standard calculation, so the random draw
-# skips it too.
+# links even when paired with a standard calculation, and internal is never
+# learner-redeemable, so the random draw and bulk generation skip both.
 STANDARD_REDEMPTION_TYPES = [
     redemption_type
     for redemption_type in ALL_REDEMPTION_TYPES
-    if redemption_type != REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE
+    if redemption_type
+    not in (REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE, REDEMPTION_TYPE_INTERNAL)
 ]
 BULK_GENERATION_REDEMPTION_TYPES = list(
     zip(STANDARD_REDEMPTION_TYPES, STANDARD_REDEMPTION_TYPES)

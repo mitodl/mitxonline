@@ -21,12 +21,19 @@ By default, the command runs in dry-run mode (preview only). Use --commit to app
 5. Keep local enrollment records even if edX enrollment fails:
 ./manage.py enroll_learners --csv=learners.csv --run=course-v1:MITxT+14.310Fx+2T2026 --commit -k
 
+6. Skip the export compliance check for these enrollments:
+./manage.py enroll_learners --csv=learners.csv --run=course-v1:MITxT+14.310Fx+2T2026 --commit --skip-compliance-check
+
+7. Enroll without sending the enrollment confirmation email:
+./manage.py enroll_learners --csv=learners.csv --run=course-v1:MITxT+14.310Fx+2T2026 --commit --skip-enrollment-emails
+
 Note: creating an enrollment via this command runs the normal enrollment business
 logic (courses.api.create_run_enrollments), so it will also enroll the learner in
-edX and send them the standard enrollment confirmation email. This command only
-ever creates free "audit" enrollments (it never creates an Order/Product, so a
-paid "verified" enrollment isn't possible here) -- use the site's normal
-purchase flow, or `create_verified_enrollment`, for paid enrollments.
+edX and, unless --skip-enrollment-emails is given, send them the standard
+enrollment confirmation email. This command only ever creates free "audit"
+enrollments (it never creates an Order/Product, so a paid "verified"
+enrollment isn't possible here) -- use the site's normal purchase flow, or
+`create_verified_enrollment`, for paid enrollments.
 """
 
 import csv
@@ -77,6 +84,19 @@ class Command(BaseCommand):
             action="store_true",
             dest="keep_failed_enrollments",
             help="Keep local enrollment records even if edX enrollment fails",
+        )
+        parser.add_argument(
+            "--skip-compliance-check",
+            action="store_true",
+            dest="skip_compliance_check",
+            help="Skip the export compliance check for these enrollments. "
+            "Each bypassed enrollment attempt is logged.",
+        )
+        parser.add_argument(
+            "--skip-enrollment-emails",
+            action="store_true",
+            dest="skip_enrollment_emails",
+            help="Don't send the enrollment confirmation email to these learners.",
         )
         parser.add_argument(
             "--commit",
@@ -227,6 +247,8 @@ class Command(BaseCommand):
         users_str = options.get("users")
         courseware_id = options.get("run")
         keep_failed = options.get("keep_failed_enrollments")
+        skip_compliance_check = options.get("skip_compliance_check")
+        skip_enrollment_emails = options.get("skip_enrollment_emails")
         commit = options.get("commit")
 
         entries = self._resolve_entries(csv_path, users_str, courseware_id)
@@ -241,10 +263,19 @@ class Command(BaseCommand):
             self._dry_run(entries)
             return
 
+        if skip_compliance_check:
+            self.stderr.write(
+                self.style.WARNING(
+                    "Export compliance checks will be SKIPPED for these enrollments."
+                )
+            )
+
         summary = bulk_enroll_learners(
             entries,
             mode=EDX_ENROLLMENT_AUDIT_MODE,
             keep_failed_enrollments=keep_failed,
+            skip_compliance_check=skip_compliance_check,
+            skip_enrollment_emails=skip_enrollment_emails,
         )
 
         # Print details

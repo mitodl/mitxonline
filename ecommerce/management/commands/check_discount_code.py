@@ -79,7 +79,6 @@ class Command(BaseCommand):
         ]
 
         bulk = "Yes" if code.is_bulk else "No"
-        program = "Yes" if code.is_program_discount else "No"
 
         can_redeem = "No"
 
@@ -105,7 +104,6 @@ class Command(BaseCommand):
         self.stdout.write(f"Activation date: {code.activation_date}")
         self.stdout.write(f"Expiration date: {code.expiration_date}")
         self.stdout.write(f"Bulk discount? {bulk}")
-        self.stdout.write(f"For program enrollments? {program}")
         self.stdout.write(f"Can be redeemed? {can_redeem}")
         self.stdout.write("\n")
 

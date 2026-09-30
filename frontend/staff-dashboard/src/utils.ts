@@ -24,3 +24,6 @@ export const formatDiscount = (discount: IDiscount) => {
 export const formatIncome = (income: string, currency: string) => {
     return parseFloat(income).toLocaleString("en-US", {style: "currency", currency: currency})
 }
+
+// A page on MITx Online itself (not its API), e.g. the Wagtail admin.
+export const mitxOnlineUrl = (path: string) => (new URL(DATASOURCES_CONFIG.mitxOnline)).origin + path;

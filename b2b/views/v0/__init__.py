@@ -14,7 +14,7 @@ from drf_spectacular.utils import (
 from mitol.common.utils.datetime import now_in_utc
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_api_key.permissions import HasAPIKey
@@ -30,6 +30,8 @@ from b2b.serializers.v0 import (
     B2BEnrollRequestSerializer,
     ContractPageSerializer,
     CreateB2BEnrollmentSerializer,
+    DataConsentSerializer,
+    DataConsentValidationErrorSerializer,
     OrganizationPageSerializer,
 )
 from courses.models import CourseRun
@@ -38,7 +40,6 @@ from ecommerce.constants import REDEMPTION_TYPE_UNLIMITED
 from ecommerce.models import Discount, Product
 from main.authentication import CsrfExemptSessionAuthentication
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
-from main.permissions import IsAdminOrReadOnly
 
 log = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ class OrganizationPageViewSet(viewsets.ReadOnlyModelViewSet):
         )
     )
     serializer_class = OrganizationPageSerializer
-    permission_classes = [IsAdminOrReadOnly | HasAPIKey]
+    permission_classes = [IsAdminUser | HasAPIKey]
     lookup_field = "slug"
     lookup_url_kwarg = "organization_slug"
 
@@ -73,7 +74,7 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
     """
 
     serializer_class = ContractPageSerializer
-    permission_classes = [IsAdminOrReadOnly | HasAPIKey]
+    permission_classes = [IsAdminUser | HasAPIKey]
     lookup_field = "slug"
     lookup_url_kwarg = "contract_slug"
 
@@ -159,9 +160,11 @@ class Enroll(APIView):
         """Create an enrollment for the given course run."""
 
         course_run_content_type = ContentType.objects.get_for_model(CourseRun)
-        courserun = CourseRun.objects.filter(
-            courseware_id=readable_id, b2b_contract__isnull=False
-        ).get()
+        courserun = (
+            CourseRun.objects.annotate(b2b_contract_count=Count("b2b_contracts"))
+            .filter(courseware_id=readable_id, b2b_contract_count__gt=0)
+            .get()
+        )
         product = Product.objects.filter(
             content_type=course_run_content_type, object_id=courserun.id
         ).get()
@@ -170,13 +173,16 @@ class Enroll(APIView):
         request_serializer = B2BEnrollRequestSerializer(data=request.data)
         request_serializer.is_valid(raise_exception=True)
         program_id = request_serializer.validated_data.get("program_id")
+        contract_slug = request_serializer.validated_data.get("contract_slug")
 
-        response = create_b2b_enrollment(request, product, program_id=program_id)
+        response = create_b2b_enrollment(
+            request, product, program_id=program_id, contract_slug=contract_slug
+        )
 
         return Response(
             CreateB2BEnrollmentSerializer(response).data,
             status=status.HTTP_201_CREATED
-            if response["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+            if response and response["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
             else status.HTTP_400_BAD_REQUEST,
         )
 
@@ -372,3 +378,37 @@ class AttachContractApi(APIView):
         user.save()
 
         return contracts_attached, contract_full
+
+
+class DataConsentAPI(APIView):
+    """View for recording data consent for a user on a contract."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=DataConsentSerializer,
+        responses={
+            204: None,
+            400: DataConsentValidationErrorSerializer,
+            403: None,
+        },
+    )
+    def post(self, request, contract_id: int):
+
+        user = request.user
+        # user_b2b_contracts gives back UserB2BContract rows, scoped to the user from the request
+        b2b_contract_membership = user.user_b2b_contracts.filter(
+            contract_page_id=contract_id
+        ).first()
+        if not b2b_contract_membership:
+            # Users shouldn't be able to provide data consent for contracts they're not in
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        request_serializer = DataConsentSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        consent_value = request_serializer.validated_data["consented"]
+        b2b_contract_membership.consented_to_data_sharing = consent_value
+        b2b_contract_membership.consent_modified_at = now_in_utc()
+        b2b_contract_membership.save()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)

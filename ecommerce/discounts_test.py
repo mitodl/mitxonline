@@ -11,10 +11,12 @@ from ecommerce.discounts import (
 )
 from ecommerce.factories import (
     DiscountFactory,
+    InternalDiscountFactory,
     PaidAmountOffDiscountFactory,
     ProductFactory,
     UnlimitedUseDiscountFactory,
 )
+from ecommerce.models import DiscountProduct
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -121,6 +123,42 @@ def test_discounted_price(
 
     assert manually_discounted_prices == expected_price
     assert test_discounted_price == manually_discounted_prices
+
+
+def test_product_specific_discount_does_not_apply_to_other_products():
+    """A discount restricted to one product must not reduce the price of other products."""
+    eligible_product = ProductFactory.create(price=Decimal("100.00"))
+    other_product = ProductFactory.create(price=Decimal("80.00"))
+
+    discount = UnlimitedUseDiscountFactory.create(
+        discount_type="dollars-off",
+        amount=20,
+    )
+    DiscountProduct.objects.create(discount=discount, product=eligible_product)
+
+    discount_cls = DiscountType.for_discount(discount)
+
+    # Discount applies to the eligible product
+    assert discount_cls.get_product_price(eligible_product) == Decimal("80.00")
+
+    # Discount must NOT apply to the other product
+    assert discount_cls.get_product_price(other_product) == other_product.price
+
+
+def test_internal_discount_prices_products_outside_its_links():
+    """
+    An internal discount's link names the program it belongs to; the code that
+    attached it decided eligibility, so the link does not scope pricing.
+    """
+    program_product = ProductFactory.create()
+    course_run_product = ProductFactory.create()
+
+    discount = InternalDiscountFactory.create()
+    DiscountProduct.objects.create(discount=discount, product=program_product)
+
+    discount_cls = DiscountType.for_discount(discount)
+
+    assert discount_cls.get_product_price(course_run_product) == Decimal("0.00")
 
 
 def test_discounted_price_uses_best_price_across_multiple_discounts():

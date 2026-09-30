@@ -2,6 +2,12 @@
 
 ORG_INDEX_SLUG = "organizations"
 
+# org_key_prefix + org_key is the org segment of every contract run's course
+# key, org_key is also the Keycloak alias and a URL path segment. This is the
+# ASCII subset of what opaque-keys allows in a course key org.
+ORG_KEY_PATTERN = r"^[A-Za-z0-9_.\-]+$"
+ORG_KEY_PATTERN_MESSAGE = "Use only letters, digits, underscores, hyphens and periods."
+
 CONTRACT_MEMBERSHIP_MANAGED = "managed"
 CONTRACT_MEMBERSHIP_MANAGED_NAME = "Managed"
 CONTRACT_MEMBERSHIP_CODE = "code"
@@ -41,6 +47,109 @@ ORG_KEY_MAX_LENGTH = 30
 RETIREMENT_ORG_KEY = "RETIRED"
 RETIREMENT_ORG_NAME = "Retired Runs"
 RETIREMENT_CONTRACT_NAME = "Retired Runs Holding Contract"
+
+# Onboarding states for a B2B organization, in order. `blocked` is reachable
+# from anywhere, with the reason in OrganizationOnboarding.notes.
+#
+# The state is descriptive, not enforcing: it records what has been observed to
+# be true so an operator can answer "what is left for this customer" without
+# reading four systems. Nothing in the provisioning API gates on it.
+ONBOARDING_STATE_REQUESTED = "requested"
+ONBOARDING_STATE_ORG_CREATED = "org_created"
+ONBOARDING_STATE_IDP_CONFIGURED = "idp_configured"
+ONBOARDING_STATE_IDP_VALIDATED = "idp_validated"
+ONBOARDING_STATE_CONTRACT_READY = "contract_ready"
+ONBOARDING_STATE_LIVE = "live"
+ONBOARDING_STATE_BLOCKED = "blocked"
+
+ONBOARDING_STATE_CHOICES = [
+    (ONBOARDING_STATE_REQUESTED, "Requested"),
+    (ONBOARDING_STATE_ORG_CREATED, "Organization created"),
+    (ONBOARDING_STATE_IDP_CONFIGURED, "Identity provider configured"),
+    (ONBOARDING_STATE_IDP_VALIDATED, "Identity provider validated"),
+    (ONBOARDING_STATE_CONTRACT_READY, "Contract ready"),
+    (ONBOARDING_STATE_LIVE, "Live"),
+    (ONBOARDING_STATE_BLOCKED, "Blocked"),
+]
+
+# How far a contract's setup has got, as the staff contract API reports it.
+# in_progress while an edX clone for a contract run is pending or running, or
+# the contract has fewer enrollment codes than it needs; failed when any clone
+# has failed. MITx Online's own rows are written before a write request
+# returns, so they never hold a contract in progress.
+CONTRACT_SETUP_STATUS_IN_PROGRESS = "in_progress"
+CONTRACT_SETUP_STATUS_COMPLETE = "complete"
+CONTRACT_SETUP_STATUS_FAILED = "failed"
+
+CONTRACT_SETUP_STATUS_CHOICES = [
+    (CONTRACT_SETUP_STATUS_IN_PROGRESS, "In progress"),
+    (CONTRACT_SETUP_STATUS_COMPLETE, "Complete"),
+    (CONTRACT_SETUP_STATUS_FAILED, "Failed"),
+]
+
+IDP_PROTOCOL_SAML = "saml"
+IDP_PROTOCOL_OIDC = "oidc"
+IDP_PROTOCOL_CHOICES = [
+    (IDP_PROTOCOL_SAML, "SAML"),
+    (IDP_PROTOCOL_OIDC, "OIDC"),
+]
+
+IDP_STATE_DRAFT = "draft"
+IDP_STATE_TESTING = "testing"
+IDP_STATE_ACTIVE = "active"
+IDP_STATE_DISABLED = "disabled"
+
+IDP_LIFECYCLE_CHOICES = [
+    (IDP_STATE_DRAFT, "Draft"),
+    (IDP_STATE_TESTING, "Testing"),
+    (IDP_STATE_ACTIVE, "Active"),
+    (IDP_STATE_DISABLED, "Disabled"),
+]
+
+# The lifecycle state is written to Keycloak's own `enabled`/`hideOnLogin` as
+# well as our row, so the two cannot drift. `hideOnLogin` stays true
+# throughout, matching what the Pulumi resources set today: partner IdPs are
+# reached by organization/domain routing or an explicit kc_idp_hint, never by a
+# button on the shared login page. `testing` and `active` therefore carry the
+# same Keycloak flags -- they differ in whether the organization has an
+# email-domain redirect pointing at the IdP, which is org-level config.
+IDP_STATE_KEYCLOAK_FLAGS = {
+    IDP_STATE_DRAFT: {"enabled": False, "hideOnLogin": True},
+    IDP_STATE_TESTING: {"enabled": True, "hideOnLogin": True},
+    IDP_STATE_ACTIVE: {"enabled": True, "hideOnLogin": True},
+    IDP_STATE_DISABLED: {"enabled": False, "hideOnLogin": True},
+}
+
+# An IdP goes live only after somebody has actually logged in through it, so
+# there is no draft -> active edge. An IdP that has already been through
+# testing can be re-enabled directly.
+IDP_ALLOWED_TRANSITIONS = {
+    IDP_STATE_DRAFT: [IDP_STATE_TESTING],
+    IDP_STATE_TESTING: [IDP_STATE_DRAFT, IDP_STATE_ACTIVE, IDP_STATE_DISABLED],
+    IDP_STATE_ACTIVE: [IDP_STATE_TESTING, IDP_STATE_DISABLED],
+    IDP_STATE_DISABLED: [IDP_STATE_TESTING, IDP_STATE_ACTIVE],
+}
+
+PROVISIONING_ACTION_ORG_CREATED = "organization_created"
+PROVISIONING_ACTION_ORG_UPDATED = "organization_updated"
+PROVISIONING_ACTION_ONBOARDING_CHANGED = "onboarding_changed"
+PROVISIONING_ACTION_IDP_CREATED = "identity_provider_created"
+PROVISIONING_ACTION_IDP_TRANSITIONED = "identity_provider_transitioned"
+PROVISIONING_ACTION_IDP_METADATA_REFRESHED = "identity_provider_metadata_refreshed"
+PROVISIONING_ACTION_IDP_DELETED = "identity_provider_deleted"
+
+PROVISIONING_ACTION_CHOICES = [
+    (PROVISIONING_ACTION_ORG_CREATED, "Organization created"),
+    (PROVISIONING_ACTION_ORG_UPDATED, "Organization updated"),
+    (PROVISIONING_ACTION_ONBOARDING_CHANGED, "Onboarding state changed"),
+    (PROVISIONING_ACTION_IDP_CREATED, "Identity provider created"),
+    (PROVISIONING_ACTION_IDP_TRANSITIONED, "Identity provider state changed"),
+    (
+        PROVISIONING_ACTION_IDP_METADATA_REFRESHED,
+        "Identity provider metadata refreshed",
+    ),
+    (PROVISIONING_ACTION_IDP_DELETED, "Identity provider deleted"),
+]
 
 MAILGUN_LOGS_API_URL = "https://api.mailgun.net/v1/analytics/logs"
 MAILGUN_LOGS_PAGE_LIMIT = 100

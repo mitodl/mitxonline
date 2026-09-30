@@ -1,10 +1,5 @@
-import {
-    List,
-    TagField,
-    DateField,
-    Table,
-    useTable,
-} from "@pankod/refine-antd";
+import { List, TagField, DateField, useTable } from "@refinedev/antd";
+import { Table } from "antd";
 
 export const PostList: React.FC = () => {
     const { tableProps } = useTable();
