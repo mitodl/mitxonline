@@ -1,6 +1,19 @@
 Release Notes
 =============
 
+Version 1.169.6
+---------------
+
+- Update postcss, @babel/core and webpack-dev-server for security fixes (#4030)
+- Update actions/setup-python digest to ece7cb0 (#4033)
+- Update actions/checkout digest to d23441a (#4032)
+- Update actions/cache digest to caa2961 (#4031)
+- Add a command to backfill Keycloak orgs for unlinked organizations (#4057)
+- Add the B2B provisioning API reference doc (#3922)
+- Change refund status on enrollment refunds (#4026)
+- Fix incorrect course topics caused by a ParentalManyToMany prefetch (#4050)
+- Add a B2B organizations section to the staff dashboard (staff UI 4/4) (#3997)
+
 Version 1.169.4
 ---------------
 
