@@ -3079,6 +3079,107 @@ def test_get_courses_ordering_is_unchanged_by_prefetching(user_drf_client, param
 
 
 @pytest.mark.django_db
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize("page_size", [2, 5, 20])
+def test_courses_list_topics_belong_to_their_own_course(
+    page_size, django_assert_max_num_queries
+):
+    """
+    Each course must carry its own topics, at every page size.
+
+    ``CoursePage.topics`` is a ParentalManyToManyField. Prefetching it with an
+    explicit ``queryset=`` sends modelcluster's deferring manager down a path
+    that identifies the page by a join-table column it names literally, and
+    once that join is aliased the rows land on the wrong pages - every course
+    on the page gets one course's topics, or none, depending on how many rows
+    come back. Production served an identical seven-topic list for 89 of 100
+    courses at ``page_size=100`` and an empty list for the same courses at
+    ``page_size=5``.
+
+    ``test_get_courses_ordering_is_unchanged_by_prefetching`` already compares
+    ``topics`` against a bare queryset, but every course the shared fixture
+    builds has no topics, so both sides were ``[]`` and it passed throughout.
+    This builds courses whose topics actually differ.
+    """
+    parent = CoursesTopic.objects.create(name="Bench Parent")
+    courses = []
+    for index in range(6):
+        page = CoursePageFactory.create()
+        page.topics.set(
+            [
+                CoursesTopic.objects.create(name=f"Topic {index}-{slot}", parent=parent)
+                for slot in range(index % 3)
+            ]
+        )
+        page.save()
+        courses.append(page.course)
+
+    # The shapes get_topics_from_page branches on: a topic with no parent to
+    # walk up to, and one whose own parent has a parent, so the walk uses both
+    # levels the prefetch names. limit_choices_to keeps parentless topics out
+    # of the page chooser, but nothing stops the rows existing.
+    orphan = CoursesTopic.objects.create(name="Orphan", parent=None)
+    grandchild = CoursesTopic.objects.create(
+        name="Grandchild",
+        parent=CoursesTopic.objects.create(name="Middle", parent=parent),
+    )
+    for topic in (orphan, grandchild):
+        page = CoursePageFactory.create()
+        page.topics.set([topic])
+        page.save()
+        courses.append(page.course)
+
+    # A course with no topics at all must stay empty rather than picking up a
+    # neighbour's - that is the half of the bug that an emptiness check misses.
+    bare_page = CoursePageFactory.create()
+    courses.append(bare_page.course)
+
+    client = APIClient()
+    # skip_nplusone_check: zeal fires on courses.CoursesTopic.parent from
+    # inside prefetch_one_level while Django is executing the multi-level
+    # prefetch itself - not from the serializer. Verified by removing the
+    # marker: it raises at every page size. The queryset cannot carry a
+    # select_related through the ParentalManyToMany without reintroducing the
+    # bug, so the per-request query budget asserted below is the real guard.
+    #
+    # Walk every page, not just the first. Each page is its own prefetch
+    # batch, which is the unit the bug operates on, and titles are unseeded
+    # FuzzyText - sampling only page 1 would check whichever two courses
+    # happened to sort first and would fail outright whenever both of them
+    # were topic-less.
+    rows = {}
+    page = 1
+    while True:
+        with django_assert_max_num_queries(COURSES_LIST_QUERY_BUDGET):
+            response = client.get(
+                reverse("v2:courses_api-list"),
+                {"page_size": page_size, "live": True, "page": page},
+            )
+        assert response.status_code == status.HTTP_200_OK
+        body = response.json()
+        rows.update({row["id"]: row["topics"] for row in body["results"]})
+        if not body.get("next"):
+            break
+        page += 1
+
+    for course in courses:
+        # Same oracle as test_get_courses_ordering_is_unchanged_by_prefetching:
+        # re-serialize outside the viewset's prefetches. The parent chain is
+        # prefetched here only to keep the oracle's own reads batched; it is
+        # not the path under test.
+        expected_page = CoursePage.objects.prefetch_related(
+            "topics__parent__parent"
+        ).get(course_id=course.id)
+        assert rows[course.id] == get_topics_from_page(expected_page)
+
+    # Every row agreeing with every other row is the smearing failure, and the
+    # per-course assertion above cannot tell that apart from a correct response
+    # in which the courses happen to match. Pin the variety across all pages.
+    returned = [tuple(t["name"] for t in topics) for topics in rows.values()]
+    assert len(set(returned)) > 1
+
+
+@pytest.mark.django_db
 def test_courses_list_omits_finaid_form_of_a_non_live_program():
     """
     A non-live program's financial assistance form must not reach the catalog.

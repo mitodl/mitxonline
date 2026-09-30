@@ -250,14 +250,17 @@ class ProgramViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
                         "elective_flag",
                     ),
                 ),
+                # A plain lookup, not a Prefetch with a queryset: see
+                # CourseViewSet.get_queryset. Giving a Prefetch on
+                # CoursePage.topics any queryset - here it was .only("name") -
+                # hands every page one shared QuerySet object, so the last page
+                # in the batch decides what every page carries. Nothing reads
+                # these topics today (ProgramSerializer.get_topics queries them
+                # itself), but the prefetch must not be the broken shape if
+                # something starts to.
                 Prefetch(
                     "all_requirements__course__page",
-                    queryset=CoursePage.objects.prefetch_related(
-                        Prefetch(
-                            "topics",
-                            queryset=CoursesTopic.objects.only("name"),
-                        )
-                    ),
+                    queryset=CoursePage.objects.prefetch_related("topics"),
                 ),
                 Prefetch(
                     "collection_memberships__collection",
@@ -498,15 +501,35 @@ class CourseViewSet(
         )
         # Topics are serialized per course along with their parent topics, whose
         # sort key is CoursesTopic.Meta.ordering == ["parent__name", "name"] -
-        # hence select_related down to the grandparent.
-        topics_prefetch = Prefetch(
-            "page__topics",
-            queryset=CoursesTopic.objects.select_related("parent", "parent__parent"),
-        )
+        # hence walking up to the grandparent.
+        #
+        # Plain lookups, deliberately. Never give a ``Prefetch`` on
+        # ``CoursePage.topics`` a ``queryset=`` - any queryset, not just one
+        # carrying select_related.
+        #
+        # ``topics`` is a ParentalManyToManyField, and modelcluster's deferring
+        # manager (modelcluster/fields.py) implements ``_apply_rel_filters`` as
+        # nothing but a call to the passed queryset's ``_next_is_sticky``.
+        #
+        # ``_next_is_sticky`` returns ``self``; its own docstring in Django
+        # says it "should be immediately followed by a filter() that does
+        # create a clone". modelcluster never adds that filter, where Django's
+        # own ManyRelatedManager ends in ``.filter(**self.core_filters)`` and
+        # so clones. ``prefetch_one_level`` takes the ``lookup.queryset is not
+        # None`` branch, hands every page that same object, and assigns
+        # ``qs._result_cache = vals`` once per page - so the last page in the
+        # batch decides what every page carries. That is why the wrong topics
+        # tracked ``page_size``.
+        #
+        # Without ``queryset=`` the ``else`` branch calls
+        # ``manager.get_queryset()``, which builds a fresh queryset per page.
+        # Naming the parent chain keeps the query count flat in course count.
         queryset = queryset.prefetch_related(
             "departments",
             course_runs_prefetch,
-            topics_prefetch,
+            # Prefetches "page__topics" on its way to the parent chain, so the
+            # shorter lookup does not need listing as well.
+            "page__topics__parent__parent",
             "page__linked_instructors__linked_instructor_page",
         )
         # Only booleans are ever read from these, so Exists() beats an aggregate:
