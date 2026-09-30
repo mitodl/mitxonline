@@ -17,10 +17,12 @@ See docs/source/b2b/provisioning_api.md.
 """
 
 import logging
+from http import HTTPStatus
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from mitol.common.utils import now_in_utc
+from requests import HTTPError
 
 from b2b.constants import (
     IDP_ALLOWED_TRANSITIONS,
@@ -404,6 +406,13 @@ def link_organization_to_keycloak(organization, *, connection=None, actor=None):
 
     If the local write fails after a create, the Keycloak organization is left
     in place and the next call adopts it by alias.
+
+    Existing members are marked keep_until_seen before the link is saved.
+    reconcile_user_orgs removes a user from any linked org missing from their
+    token, and a freshly linked org is in nobody's token until they are added
+    to it in Keycloak and their session refreshes. The members are then pushed
+    into Keycloak; one who can't be (no global_id, or an HTTP error) keeps
+    access through the flag and is logged.
     """
 
     if organization.sso_organization_id:
@@ -450,6 +459,7 @@ def link_organization_to_keycloak(organization, *, connection=None, actor=None):
             raise AliasCollisionError(msg)
 
     with transaction.atomic():
+        organization.organization_users.update(keep_until_seen=True)
         organization.sso_organization_id = sso_organization_id
         organization.save()
         OrganizationOnboarding.objects.get_or_create(
@@ -470,7 +480,52 @@ def link_organization_to_keycloak(organization, *, connection=None, actor=None):
             },
         )
 
+    sync_organization_members_to_keycloak(organization, connection=connection)
+
     return created
+
+
+def sync_organization_members_to_keycloak(organization, *, connection):
+    """
+    Add the organization's MITx Online members to its Keycloak organization.
+
+    Args:
+    - organization (OrganizationPage): a linked organization
+    - connection (KeycloakConnection): the Keycloak connection to use
+    Returns:
+    - list[User]: the members who could not be added
+    """
+
+    failed = []
+    for user_org in organization.organization_users.select_related("user"):
+        user = user_org.user
+        if not user.global_id:
+            log.warning(
+                "Cannot add %s to Keycloak organization %s: no global_id",
+                user,
+                organization.org_key,
+            )
+            failed.append(user)
+            continue
+        try:
+            connection.organizations.associate(
+                "members", organization.sso_organization_id, user.global_id
+            )
+        except HTTPError as exc:
+            # An adopted realm org may already have this member.
+            if (
+                exc.response is not None
+                and exc.response.status_code == HTTPStatus.CONFLICT
+            ):
+                continue
+            log.exception(
+                "Could not add %s to Keycloak organization %s",
+                user,
+                organization.org_key,
+            )
+            failed.append(user)
+
+    return failed
 
 
 def update_organization(  # noqa: PLR0913

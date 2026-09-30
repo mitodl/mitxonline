@@ -4,7 +4,8 @@ Push MITx Online organizations that have no Keycloak organization into Keycloak.
 Organizations that predate the provisioning API have no sso_organization_id,
 so attach_user() no-ops for them and they cannot be managed through the staff
 dashboard. This links each one to an existing realm organization with the same
-alias, or creates one. Safe to re-run: linked organizations are skipped.
+alias, or creates one, and adds its existing members to it. Safe to re-run:
+linked organizations are skipped.
 """
 
 import logging
@@ -65,8 +66,11 @@ class Command(BaseCommand):
             realm_id = realm_ids.get(organization.org_key.lower())
 
             if options["dry_run"]:
+                members = organization.organization_users.count()
                 if realm_id is None:
-                    self.stdout.write(f"Would create: {organization.org_key}")
+                    self.stdout.write(
+                        f"Would create: {organization.org_key} ({members} members)"
+                    )
                 elif realm_id in linked_ids:
                     # link_organization_to_keycloak refuses this one.
                     self.stderr.write(
@@ -75,7 +79,9 @@ class Command(BaseCommand):
                     )
                     failed.append(organization.org_key)
                 else:
-                    self.stdout.write(f"Would adopt: {organization.org_key}")
+                    self.stdout.write(
+                        f"Would adopt: {organization.org_key} ({members} members)"
+                    )
                 continue
 
             try:

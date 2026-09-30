@@ -7,6 +7,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.management import CommandError, call_command
 from django.db.models import ProtectedError
 
+from b2b.api import reconcile_user_orgs
 from b2b.constants import (
     IDP_ALLOWED_TRANSITIONS,
     IDP_LIFECYCLE_CHOICES,
@@ -33,7 +34,11 @@ from b2b.exceptions import (
     OrganizationNotProvisionedError,
     OrphanedKeycloakOrganizationError,
 )
-from b2b.factories import OrganizationIndexPageFactory, OrganizationPageFactory
+from b2b.factories import (
+    OrganizationIndexPageFactory,
+    OrganizationPageFactory,
+    UserOrganizationFactory,
+)
 from b2b.keycloak_admin_dataclasses import (
     IdentityProviderRepresentation,
     OrganizationDomainRepresentation,
@@ -44,6 +49,7 @@ from b2b.models import (
     OrganizationOnboarding,
     OrganizationPage,
     OrganizationProvisioningAudit,
+    UserOrganization,
 )
 from b2b.provisioning import (
     create_identity_provider,
@@ -55,6 +61,7 @@ from b2b.provisioning import (
     transition_identity_provider,
     update_organization,
 )
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 FAKE = faker.Faker()
@@ -1042,6 +1049,61 @@ def test_link_organization_refuses_a_linked_organization(connection):
         link_organization_to_keycloak(organization, connection=connection)
 
     connection.organizations.create.assert_not_called()
+
+
+def test_link_organization_adds_existing_members_to_keycloak(connection):
+    """Members of the legacy org become members of its Keycloak org."""
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    members = UserOrganizationFactory.create_batch(
+        2, organization=organization, keep_until_seen=False
+    )
+
+    link_organization_to_keycloak(organization, connection=connection)
+
+    organization.refresh_from_db()
+    associated = {
+        call.args for call in connection.organizations.associate.call_args_list
+    }
+    assert associated == {
+        ("members", organization.sso_organization_id, member.user.global_id)
+        for member in members
+    }
+
+
+def test_link_organization_keeps_members_until_seen(connection):
+    """A member missing from their token keeps the org after the link."""
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    member = UserOrganizationFactory.create(
+        organization=organization, keep_until_seen=False
+    )
+
+    link_organization_to_keycloak(organization, connection=connection)
+    reconcile_user_orgs(member.user, [])
+
+    assert UserOrganization.objects.filter(
+        user=member.user, organization=organization, keep_until_seen=True
+    ).exists()
+
+
+def test_link_organization_tolerates_member_sync_failures(connection):
+    """An existing Keycloak member or an unlinkable user doesn't fail the link."""
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    UserOrganizationFactory.create(organization=organization)
+    UserOrganizationFactory.create(
+        organization=organization, user=UserFactory.create(global_id=None)
+    )
+    conflict = requests.HTTPError(response=requests.Response())
+    conflict.response.status_code = 409
+    connection.organizations.associate.side_effect = conflict
+
+    assert link_organization_to_keycloak(organization, connection=connection)
+
+    organization.refresh_from_db()
+    assert organization.sso_organization_id is not None
+    connection.organizations.associate.assert_called_once()
 
 
 def test_backfill_command_dry_run_writes_nothing(mocker, connection):
