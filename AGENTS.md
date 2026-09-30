@@ -11,7 +11,6 @@ MITx Online is a Django-based web platform for managing MIT online courses and p
 - Database: PostgreSQL 15
 - Cache/Queue: Redis, Celery
 - Authentication: OAuth2, Keycloak (optional)
-- Build System: Pants 2.17
 - Container: Docker Compose
 
 ## Build, Test, and Lint Commands
@@ -89,8 +88,8 @@ yarn dev-server        # Development server with HMR
 ### Documentation
 
 ```bash
-# Build Sphinx docs (requires Pants)
-pants docs ::
+# Build Sphinx docs
+uv run --only-group docs sphinx-build docs/source dist/sphinx
 
 # Output is in dist/sphinx/index.html
 ```
