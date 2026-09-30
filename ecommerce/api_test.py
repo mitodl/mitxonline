@@ -27,6 +27,7 @@ from reversion.models import Version
 from stripe import convert_to_stripe_object
 from zeal import zeal_context
 
+from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
@@ -611,6 +612,7 @@ def test_downgrade_learner_from_order_downgrades_active_enrollment(mocker, user)
     _, kwargs = create_run_enrollments_mock.call_args
     assert kwargs["runs"] == [enrollment.run]
     assert kwargs["mode"] == EDX_ENROLLMENT_AUDIT_MODE
+    assert kwargs["change_status"] == ENROLL_CHANGE_STATUS_REFUNDED
 
 
 def test_downgrade_learner_from_order_skips_unenrolled_learner(mocker, user):

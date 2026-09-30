@@ -913,6 +913,11 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
             program_setup.program_enrollment.enrollment_mode
             == EDX_ENROLLMENT_AUDIT_MODE
         )
+        assert (
+            program_setup.program_enrollment.change_status
+            == ENROLL_CHANGE_STATUS_REFUNDED
+        )
+        assert program_setup.program_enrollment.active is True
 
     def test_downgrades_auto_upgraded_run_enrollment(self, mocker, program_setup):
         """
@@ -935,6 +940,8 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         assert downgraded_runs == [run_enrollment]
         run_enrollment.refresh_from_db()
         assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        assert run_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
+        assert run_enrollment.active is True
 
     def test_downgrades_zero_value_verified_run_enrollment(self, mocker, program_setup):
         """
@@ -962,6 +969,8 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         assert downgraded_runs == [run_enrollment]
         run_enrollment.refresh_from_db()
         assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        assert run_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
+        assert run_enrollment.active is True
 
     def test_preserves_independently_purchased_run_enrollment(
         self, mocker, program_setup
@@ -988,6 +997,7 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         assert downgraded_runs == []
         run_enrollment.refresh_from_db()
         assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        assert run_enrollment.change_status is None
 
     def test_preserves_b2b_run_enrollment(self, mocker, program_setup):
         """A verified enrollment in a B2B-contracted run is left alone."""
@@ -1009,6 +1019,7 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         assert downgraded_runs == []
         run_enrollment.refresh_from_db()
         assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        assert run_enrollment.change_status is None
 
     def test_leaves_inactive_program_enrollment_alone(self, mocker, program_setup):
         """
@@ -1031,6 +1042,10 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
             program_setup.program_enrollment.enrollment_mode
             == EDX_ENROLLMENT_VERIFIED_MODE
         )
+        assert (
+            program_setup.program_enrollment.change_status
+            == ENROLL_CHANGE_STATUS_UNENROLLED
+        )
 
     def test_leaves_inactive_run_enrollment_alone(self, mocker, program_setup):
         """
@@ -1052,6 +1067,7 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         assert downgraded_runs == []
         run_enrollment.refresh_from_db()
         assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        assert run_enrollment.change_status is None
 
     def test_mixed_runs_downgrades_only_the_unpaid_ones(
         self,
@@ -1112,6 +1128,9 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         assert paid_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
         assert free_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
         assert zero_value_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        assert paid_enrollment.change_status is None
+        assert free_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
+        assert zero_value_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
 
 
 def test_create_run_enrollments_verifies_exports_for_verified_mode(
