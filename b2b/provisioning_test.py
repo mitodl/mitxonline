@@ -1060,6 +1060,29 @@ def test_backfill_command_dry_run_writes_nothing(mocker, connection):
     assert organization.sso_organization_id is None
 
 
+def test_backfill_command_dry_run_flags_a_realm_org_linked_elsewhere(
+    mocker, connection, capsys
+):
+    """--dry-run reports the collision the real run would raise."""
+
+    mocker.patch(
+        "b2b.management.commands.backfill_keycloak_orgs.KeycloakConnection",
+        return_value=connection,
+    )
+    taken = OrganizationPageFactory.create()
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    connection.organizations.list_all.return_value = [
+        OrganizationRepresentation(
+            id=str(taken.sso_organization_id), alias=organization.org_key
+        )
+    ]
+
+    with pytest.raises(CommandError, match=organization.org_key):
+        call_command("backfill_keycloak_orgs", "--dry-run")
+
+    assert "Would fail" in capsys.readouterr().err
+
+
 def test_backfill_command_reports_failures_and_keeps_going(mocker, connection):
     """One org's Keycloak error does not stop the rest, but the run exits nonzero."""
 

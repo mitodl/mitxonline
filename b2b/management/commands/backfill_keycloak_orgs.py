@@ -40,10 +40,16 @@ class Command(BaseCommand):
             organizations = organizations.filter(org_key__in=options["org_keys"])
 
         connection = KeycloakConnection()
-        realm_aliases = {
-            org.alias.lower()
+        realm_ids = {
+            org.alias.lower(): str(org.id)
             for org in connection.organizations.list_all()
             if org.alias is not None
+        }
+        linked_ids = {
+            str(sso_id)
+            for sso_id in OrganizationPage.objects.filter(
+                sso_organization_id__isnull=False
+            ).values_list("sso_organization_id", flat=True)
         }
 
         unmatched = set(options["org_keys"]) - set(
@@ -56,12 +62,20 @@ class Command(BaseCommand):
 
         failed = []
         for organization in organizations.order_by("org_key"):
-            action = (
-                "adopt" if organization.org_key.lower() in realm_aliases else "create"
-            )
+            realm_id = realm_ids.get(organization.org_key.lower())
 
             if options["dry_run"]:
-                self.stdout.write(f"Would {action}: {organization.org_key}")
+                if realm_id is None:
+                    self.stdout.write(f"Would create: {organization.org_key}")
+                elif realm_id in linked_ids:
+                    # link_organization_to_keycloak refuses this one.
+                    self.stderr.write(
+                        f"Would fail {organization.org_key}: the realm organization "
+                        "is already linked to another organization here"
+                    )
+                    failed.append(organization.org_key)
+                else:
+                    self.stdout.write(f"Would adopt: {organization.org_key}")
                 continue
 
             try:
