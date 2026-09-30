@@ -55,18 +55,10 @@ Refer to the [uv documentation](https://docs.astral.sh/uv/reference/cli/) for pa
 
 # Generating documentation
 
-Detailed documentation for the project is available in the `docs/` folder. The files within are reStructuredText and can be built into an HTML version using Sphinx. The project uses Pants to manage this build process.
-
-You will need `scie-pants` to build the docs. You can get this by:
-
-- Running the included `get-pants.sh` script
-- Installing using the [instructions in the official docs](https://www.pantsbuild.org/stable/docs/getting-started/installing-pants)
-- Installing via your package manager (`brew` fo macOS, etc.)
-
-Once you have it installed, you can build the docs:
+Detailed documentation for the project is available in the `docs/` folder. The files within are reStructuredText and can be built into an HTML version using Sphinx. Sphinx and its extensions are in the `docs` dependency group, so you can build the docs without installing the rest of the project:
 
 ```bash
-pants docs ::
+uv run --only-group docs sphinx-build docs/source dist/sphinx
 ```
 
 The HTML version of the docs starts at `dist/sphinx/index.html`.
