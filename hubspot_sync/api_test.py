@@ -1156,6 +1156,133 @@ def test_sync_cart_add_deal_with_hubspot_normalizes_stage_after_override(
     )
 
 
+@pytest.mark.parametrize(
+    ("existing_deal_id", "existing_line_item_id"),
+    [
+        (None, None),
+        ("existing-deal-id", None),
+        ("existing-deal-id", "existing-line-item-id"),
+    ],
+)
+def test_sync_cart_add_deal_with_hubspot_reuses_deal_line_item(
+    mocker, hubspot_order, existing_deal_id, existing_line_item_id
+):
+    """Cart-add should update the deal's line item for the product instead of adding another."""
+    mock_client = mocker.Mock()
+    mock_client.crm.objects.basic_api.create.return_value = SimpleNamespace(id="obj-id")
+    mock_client.crm.objects.basic_api.update.return_value = SimpleNamespace(
+        id="existing-deal-id"
+    )
+
+    mocker.patch(
+        "hubspot_sync.api._build_target_deal_message",
+        return_value=SimplePublicObjectInput(
+            properties={
+                "dealname": "MITXONLINE-ORDER-1",
+                "dealstage": "checkout_pending",
+                "unique_app_id": "test-app-id",
+            }
+        ),
+    )
+    mocker.patch(
+        "hubspot_sync.api._build_target_line_item_message",
+        return_value=SimplePublicObjectInput(
+            properties={"name": "line-item", "hs_product_id": "target-product-id"}
+        ),
+    )
+    mocker.patch(
+        "hubspot_sync.api._find_target_deal_id_by_dealname",
+        return_value=existing_deal_id,
+    )
+    mocker.patch(
+        "hubspot_sync.api._find_target_deal_id_by_unique_app_id", return_value=None
+    )
+    mocker.patch(
+        "hubspot_sync.api._ensure_target_hubspot_product_for_line", return_value=None
+    )
+    mocker.patch("hubspot_sync.api._normalize_deal_properties_for_target_account")
+    mocker.patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
+    mock_find_line_item = mocker.patch(
+        "hubspot_sync.api._find_target_deal_line_item_id_by_product",
+        return_value=existing_line_item_id,
+    )
+
+    api._sync_cart_add_deal_with_hubspot(hubspot_order, "contact-id", mock_client)  # noqa: SLF001
+
+    if existing_deal_id:
+        mock_find_line_item.assert_called_once_with(
+            mock_client, existing_deal_id, "target-product-id"
+        )
+    else:
+        # A brand new deal can't have line items yet, so there is nothing to look up
+        mock_find_line_item.assert_not_called()
+
+    basic_api = mock_client.crm.objects.basic_api
+    line_item_creates = [
+        call
+        for call in basic_api.create.call_args_list
+        if call.kwargs["object_type"] == "line_items"
+    ]
+    line_item_updates = [
+        call
+        for call in basic_api.update.call_args_list
+        if call.kwargs["object_type"] == "line_items"
+    ]
+    line_item_associations = [
+        call
+        for call in mock_client.crm.associations.v4.basic_api.create_default.call_args_list
+        if call.kwargs["from_object_type"] == "line_items"
+    ]
+
+    if existing_line_item_id:
+        assert line_item_creates == []
+        assert line_item_associations == []
+        assert len(line_item_updates) == 1
+        assert line_item_updates[0].kwargs["object_id"] == existing_line_item_id
+    else:
+        assert line_item_updates == []
+        assert len(line_item_creates) == 1
+        assert len(line_item_associations) == 1
+
+
+@pytest.mark.parametrize(
+    ("hs_product_id", "expected_id"),
+    [
+        ("product-b", "line-item-b"),
+        ("product-c", None),
+    ],
+)
+def test_find_target_deal_line_item_id_by_product(mocker, hs_product_id, expected_id):
+    """The deal's line item should be matched by product, ignoring any local ids."""
+    mocker.patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
+    mock_client = mocker.Mock()
+    mock_client.crm.associations.v4.basic_api.get_page.return_value = SimpleNamespace(
+        results=[
+            SimpleNamespace(to_object_id="line-item-a"),
+            SimpleNamespace(to_object_id="line-item-b"),
+        ]
+    )
+    line_item_products = {"line-item-a": "product-a", "line-item-b": "product-b"}
+    mock_client.crm.objects.basic_api.get_by_id.side_effect = (
+        lambda object_type, object_id, properties: SimpleNamespace(  # noqa: ARG005
+            id=object_id,
+            properties={"hs_product_id": line_item_products[object_id]},
+        )
+    )
+
+    assert (
+        api._find_target_deal_line_item_id_by_product(  # noqa: SLF001
+            mock_client, "deal-id", hs_product_id
+        )
+        == expected_id
+    )
+    mock_client.crm.associations.v4.basic_api.get_page.assert_called_once_with(
+        object_type="deals",
+        object_id="deal-id",
+        to_object_type="line_items",
+    )
+
+
 def test_normalize_deal_properties_for_target_account_pipeline_stage_mismatch(mocker):
     """Dealstage should be normalized to one allowed by the selected pipeline."""
     mock_client = mocker.Mock()

@@ -2487,6 +2487,35 @@ def _find_target_line_item_id_by_unique_app_id(
         return None
 
 
+def _find_target_deal_line_item_id_by_product(
+    hubspot_client: HubspotApi, deal_id: str, hs_product_id: str
+) -> str | None:
+    """
+    Find the line item on a target-account deal that points at the given product.
+
+    Cart-add creates a fresh local Order/Line each time, so the line item's
+    unique_app_id can't be used to find an earlier line item on the same deal.
+    Matching by the deal's associated line items and their product avoids
+    depending on any local record id.
+    """
+    wait_for_hubspot_rate_limit()
+    associations = hubspot_client.crm.associations.v4.basic_api.get_page(
+        object_type=HubspotObjectType.DEALS.value,
+        object_id=deal_id,
+        to_object_type=HubspotObjectType.LINES.value,
+    )
+    for association in associations.results:
+        wait_for_hubspot_rate_limit()
+        line_item = hubspot_client.crm.objects.basic_api.get_by_id(
+            object_type=HubspotObjectType.LINES.value,
+            object_id=association.to_object_id,
+            properties=["hs_product_id"],
+        )
+        if str(line_item.properties.get("hs_product_id")) == str(hs_product_id):
+            return line_item.id
+    return None
+
+
 def _ensure_target_line_item_for_line(
     line: Line, hubspot_client: HubspotApi
 ) -> str | None:
@@ -2690,19 +2719,37 @@ def _sync_cart_add_deal_with_hubspot(
     for line in order.lines.all():
         line_item_input = _build_target_line_item_message(line, hubspot_client)
 
-        wait_for_hubspot_rate_limit()
-        line_item = hubspot_client.crm.objects.basic_api.create(
-            object_type=HubspotObjectType.LINES.value,
-            simple_public_object_input_for_create=line_item_input,
+        # Reuse the deal's existing line item for this product so repeated
+        # cart-adds don't stack duplicate line items onto the same deal.
+        hs_product_id = line_item_input.properties.get("hs_product_id")
+        existing_line_item_id = (
+            _find_target_deal_line_item_id_by_product(
+                hubspot_client, deal.id, hs_product_id
+            )
+            if existing_deal_id and hs_product_id
+            else None
         )
 
         wait_for_hubspot_rate_limit()
-        hubspot_client.crm.associations.v4.basic_api.create_default(
-            from_object_type=HubspotObjectType.LINES.value,
-            from_object_id=line_item.id,
-            to_object_type=HubspotObjectType.DEALS.value,
-            to_object_id=deal.id,
-        )
+        if existing_line_item_id:
+            hubspot_client.crm.objects.basic_api.update(
+                object_type=HubspotObjectType.LINES.value,
+                object_id=existing_line_item_id,
+                simple_public_object_input=line_item_input,
+            )
+        else:
+            line_item = hubspot_client.crm.objects.basic_api.create(
+                object_type=HubspotObjectType.LINES.value,
+                simple_public_object_input_for_create=line_item_input,
+            )
+
+            wait_for_hubspot_rate_limit()
+            hubspot_client.crm.associations.v4.basic_api.create_default(
+                from_object_type=HubspotObjectType.LINES.value,
+                from_object_id=line_item.id,
+                to_object_type=HubspotObjectType.DEALS.value,
+                to_object_id=deal.id,
+            )
 
     return deal
 
