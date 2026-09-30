@@ -1081,3 +1081,38 @@ def test_backfill_command_reports_failures_and_keeps_going(mocker, connection):
     working.refresh_from_db()
     assert failing.sso_organization_id is None
     assert working.sso_organization_id is not None
+
+
+def test_link_organization_refuses_a_realm_org_linked_elsewhere(connection):
+    """Adopting an ID another page holds would break the unique constraint."""
+
+    taken = OrganizationPageFactory.create()
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    connection.organizations.list_all.return_value = [
+        OrganizationRepresentation(
+            id=str(taken.sso_organization_id), alias=organization.org_key
+        )
+    ]
+
+    with pytest.raises(AliasCollisionError):
+        link_organization_to_keycloak(organization, connection=connection)
+
+
+def test_backfill_command_continues_past_a_local_failure(mocker, connection):
+    """A non-HTTP failure on one org is reported and the rest still run."""
+
+    mocker.patch(
+        "b2b.management.commands.backfill_keycloak_orgs.KeycloakConnection",
+        return_value=connection,
+    )
+    OrganizationPageFactory.create(sso_organization_id=None, org_key="AAA")
+    OrganizationPageFactory.create(sso_organization_id=None, org_key="BBB")
+    link = mocker.patch(
+        "b2b.management.commands.backfill_keycloak_orgs.link_organization_to_keycloak",
+        side_effect=[ValueError("bad page"), True],
+    )
+
+    with pytest.raises(CommandError, match="AAA"):
+        call_command("backfill_keycloak_orgs")
+
+    assert link.call_count == 2

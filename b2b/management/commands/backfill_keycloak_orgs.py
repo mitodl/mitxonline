@@ -9,10 +9,8 @@ alias, or creates one. Safe to re-run: linked organizations are skipped.
 
 import logging
 
-import requests
 from django.core.management import BaseCommand, CommandError
 
-from b2b.exceptions import OrphanedKeycloakOrganizationError
 from b2b.models import OrganizationPage
 from b2b.provisioning import KeycloakConnection, link_organization_to_keycloak
 
@@ -48,6 +46,14 @@ class Command(BaseCommand):
             if org.alias is not None
         }
 
+        unmatched = set(options["org_keys"]) - set(
+            organizations.values_list("org_key", flat=True)
+        )
+        if unmatched:
+            self.stderr.write(
+                "No unlinked organization for: " + ", ".join(sorted(unmatched))
+            )
+
         failed = []
         for organization in organizations.order_by("org_key"):
             action = (
@@ -59,17 +65,19 @@ class Command(BaseCommand):
                 continue
 
             try:
-                link_organization_to_keycloak(organization, connection=connection)
-            except (
-                requests.RequestException,
-                OrphanedKeycloakOrganizationError,
-            ) as exc:
+                created = link_organization_to_keycloak(
+                    organization, connection=connection
+                )
+            except Exception as exc:
+                # One org's failure (Keycloak, an alias collision, an invalid
+                # legacy page) must not stop the rest of the batch.
                 log.exception("Could not link %s", organization.org_key)
                 failed.append(organization.org_key)
                 self.stderr.write(f"Failed {organization.org_key}: {exc}")
             else:
+                outcome = "Created" if created else "Adopted"
                 self.stdout.write(
-                    self.style.SUCCESS(f"{action.title()}d: {organization.org_key}")
+                    self.style.SUCCESS(f"{outcome}: {organization.org_key}")
                 )
 
         if failed:

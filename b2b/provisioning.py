@@ -396,9 +396,14 @@ def link_organization_to_keycloak(organization, *, connection=None, actor=None):
     - bool: True if a Keycloak organization was created, False if one was adopted
     Raises:
     - ValueError: the organization already has a Keycloak organization
+    - AliasCollisionError: the realm organization with this alias is already
+      linked to another organization here
     - OrphanedKeycloakOrganizationError: Keycloak accepted the create but the ID
       could not be resolved
     - requests.HTTPError: Keycloak rejected the create
+
+    If the local write fails after a create, the Keycloak organization is left
+    in place and the next call adopts it by alias.
     """
 
     if organization.sso_organization_id:
@@ -435,6 +440,14 @@ def link_organization_to_keycloak(organization, *, connection=None, actor=None):
             raise OrphanedKeycloakOrganizationError(msg)
     else:
         sso_organization_id = keycloak_org.id
+        if OrganizationPage.objects.filter(
+            sso_organization_id=sso_organization_id
+        ).exists():
+            msg = (
+                f"The Keycloak organization with alias '{keycloak_org.alias}' is "
+                "already linked to another organization here."
+            )
+            raise AliasCollisionError(msg)
 
     with transaction.atomic():
         organization.sso_organization_id = sso_organization_id
