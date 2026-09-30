@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.169.7
+---------------
+
+- Avoid recreating duplicate line items in hubspot (#4041)
+- Add "Manufacturing" to industry focus variant choices (#4060)
+
 Version 1.169.6
 ---------------
 
