@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 1.169.5
+---------------
+
+- Change refund status on enrollment refunds (#4026)
+- Fix incorrect course topics caused by a ParentalManyToMany prefetch (#4050)
+- Add a B2B organizations section to the staff dashboard (staff UI 4/4) (#3997)
+
 Version 1.169.4
 ---------------
 
