@@ -70,7 +70,14 @@ COURSE_VARIANT_INDUSTRY = [
         "F",
         "Finance",
     ),
-    ("HC", "Healthcare"),
+    (
+        "HC",
+        "Healthcare",
+    ),
+    (
+        "M",
+        "Manufacturing",
+    ),
 ]
 
 COURSE_VARIANT_LENGTH = [

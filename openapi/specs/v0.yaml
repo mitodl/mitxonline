@@ -4290,6 +4290,7 @@ paths:
           - E
           - F
           - HC
+          - M
         description: |-
           Variant: Describes the industry the run is adapted for.
 
@@ -4297,6 +4298,7 @@ paths:
           * `E` - Energy
           * `F` - Finance
           * `HC` - Healthcare
+          * `M` - Manufacturing
       - in: query
         name: courseruns__variant_length
         schema:
@@ -5487,6 +5489,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -6915,6 +6918,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -7117,6 +7121,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -7296,6 +7301,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -11389,6 +11395,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -12283,6 +12290,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -12483,6 +12491,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -12657,6 +12666,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -13208,6 +13218,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -13383,6 +13394,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -14112,16 +14124,19 @@ components:
       - E
       - F
       - HC
+      - M
       type: string
       description: |-
         * `` - Original
         * `E` - Energy
         * `F` - Finance
         * `HC` - Healthcare
+        * `M` - Manufacturing
       x-enum-descriptions:
       - Energy
       - Finance
       - Healthcare
+      - Manufacturing
     VariantLengthEnum:
       enum:
       - S
