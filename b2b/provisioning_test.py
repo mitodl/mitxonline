@@ -2,7 +2,9 @@
 
 import faker
 import pytest
+import requests
 from django.core.exceptions import ImproperlyConfigured
+from django.core.management import CommandError, call_command
 from django.db.models import ProtectedError
 
 from b2b.constants import (
@@ -47,6 +49,7 @@ from b2b.provisioning import (
     create_identity_provider,
     create_organization,
     delete_identity_provider,
+    link_organization_to_keycloak,
     refresh_identity_provider_metadata,
     set_onboarding_state,
     transition_identity_provider,
@@ -987,3 +990,94 @@ def test_audit_survives_the_organization_being_deleted(staff_user):
     (audit,) = OrganizationProvisioningAudit.objects.filter(org_key=org_key)
     assert audit.organization is None
     assert audit.acting_user == staff_user
+
+
+def test_link_organization_creates_a_keycloak_org_with_the_org_key_alias(
+    connection, staff_user
+):
+    """An unlinked org gets a realm org whose alias is its org_key."""
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+
+    created = link_organization_to_keycloak(
+        organization, connection=connection, actor=staff_user
+    )
+
+    assert created is True
+    assert connection.organizations.create.call_args.args[0]["alias"] == (
+        organization.org_key
+    )
+    organization.refresh_from_db()
+    assert str(organization.sso_organization_id) == str(
+        connection.organizations.create.return_value
+    )
+    assert organization.onboarding.state == ONBOARDING_STATE_ORG_CREATED
+    audit = OrganizationProvisioningAudit.objects.get(organization=organization)
+    assert audit.data_after["keycloak_organization"] == "created"
+
+
+def test_link_organization_adopts_a_realm_org_with_the_same_alias(connection):
+    """A realm org with the alias is linked, not duplicated."""
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    known_id = str(FAKE.uuid4())
+    connection.organizations.list_all.return_value = [
+        OrganizationRepresentation(id=known_id, alias=organization.org_key.lower())
+    ]
+
+    created = link_organization_to_keycloak(organization, connection=connection)
+
+    assert created is False
+    connection.organizations.create.assert_not_called()
+    organization.refresh_from_db()
+    assert str(organization.sso_organization_id) == known_id
+
+
+def test_link_organization_refuses_a_linked_organization(connection):
+    """Re-linking would orphan the existing Keycloak organization."""
+
+    organization = OrganizationPageFactory.create()
+
+    with pytest.raises(ValueError, match="already linked"):
+        link_organization_to_keycloak(organization, connection=connection)
+
+    connection.organizations.create.assert_not_called()
+
+
+def test_backfill_command_dry_run_writes_nothing(mocker, connection):
+    """--dry-run reports and leaves both systems alone."""
+
+    mocker.patch(
+        "b2b.management.commands.backfill_keycloak_orgs.KeycloakConnection",
+        return_value=connection,
+    )
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+
+    call_command("backfill_keycloak_orgs", "--dry-run")
+
+    connection.organizations.create.assert_not_called()
+    organization.refresh_from_db()
+    assert organization.sso_organization_id is None
+
+
+def test_backfill_command_reports_failures_and_keeps_going(mocker, connection):
+    """One org's Keycloak error does not stop the rest, but the run exits nonzero."""
+
+    mocker.patch(
+        "b2b.management.commands.backfill_keycloak_orgs.KeycloakConnection",
+        return_value=connection,
+    )
+    failing = OrganizationPageFactory.create(sso_organization_id=None, org_key="AAA")
+    working = OrganizationPageFactory.create(sso_organization_id=None, org_key="BBB")
+    connection.organizations.create.side_effect = [
+        requests.HTTPError("boom"),
+        str(FAKE.uuid4()),
+    ]
+
+    with pytest.raises(CommandError, match="AAA"):
+        call_command("backfill_keycloak_orgs")
+
+    failing.refresh_from_db()
+    working.refresh_from_db()
+    assert failing.sso_organization_id is None
+    assert working.sso_organization_id is not None
