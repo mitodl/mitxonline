@@ -379,6 +379,100 @@ def create_organization(  # noqa: PLR0913
     return organization
 
 
+def link_organization_to_keycloak(organization, *, connection=None, actor=None):
+    """
+    Give an organization that predates the provisioning API a Keycloak org.
+
+    An existing realm organization with the same alias is adopted rather than
+    duplicated, because aliases are realm-wide and reconcile_keycloak_orgs
+    would otherwise find two candidates for one org_key. Otherwise one is
+    created with the org_key as its alias, matching create_organization.
+
+    Args:
+    - organization (OrganizationPage): an organization with no sso_organization_id
+    - connection (KeycloakConnection): an existing connection, if any
+    - actor (User): who asked for this, for the audit trail
+    Returns:
+    - bool: True if a Keycloak organization was created, False if one was adopted
+    Raises:
+    - ValueError: the organization already has a Keycloak organization
+    - AliasCollisionError: the realm organization with this alias is already
+      linked to another organization here
+    - OrphanedKeycloakOrganizationError: Keycloak accepted the create but the ID
+      could not be resolved
+    - requests.HTTPError: Keycloak rejected the create
+
+    If the local write fails after a create, the Keycloak organization is left
+    in place and the next call adopts it by alias.
+    """
+
+    if organization.sso_organization_id:
+        msg = f"Organization '{organization.org_key}' is already linked to Keycloak."
+        raise ValueError(msg)
+
+    connection = connection or KeycloakConnection()
+
+    keycloak_org = _find_organization_by_alias(connection, organization.org_key)
+    created = keycloak_org is None
+
+    if created:
+        sso_organization_id = connection.organizations.create(
+            {
+                "name": organization.name,
+                "alias": organization.org_key,
+                "enabled": True,
+                "description": organization.description,
+            }
+        )
+        if not sso_organization_id:
+            keycloak_org = _find_organization_by_alias(connection, organization.org_key)
+            sso_organization_id = keycloak_org.id if keycloak_org else None
+        if not sso_organization_id:
+            log.error(
+                "Created a Keycloak organization with alias %s but could not "
+                "resolve its ID",
+                organization.org_key,
+            )
+            msg = (
+                f"Keycloak accepted the organization '{organization.org_key}' but "
+                "did not report its ID."
+            )
+            raise OrphanedKeycloakOrganizationError(msg)
+    else:
+        sso_organization_id = keycloak_org.id
+        if OrganizationPage.objects.filter(
+            sso_organization_id=sso_organization_id
+        ).exists():
+            msg = (
+                f"The Keycloak organization with alias '{keycloak_org.alias}' is "
+                "already linked to another organization here."
+            )
+            raise AliasCollisionError(msg)
+
+    with transaction.atomic():
+        organization.sso_organization_id = sso_organization_id
+        organization.save()
+        OrganizationOnboarding.objects.get_or_create(
+            organization=organization,
+            defaults={
+                "state": ONBOARDING_STATE_ORG_CREATED,
+                "state_changed_at": now_in_utc(),
+            },
+        )
+        _audit(
+            organization,
+            PROVISIONING_ACTION_ORG_UPDATED,
+            actor=actor,
+            data_before={"sso_organization_id": None},
+            data_after={
+                "sso_organization_id": str(sso_organization_id),
+                "keycloak_organization": "created" if created else "adopted",
+            },
+        )
+
+    return created
+
+
 def update_organization(  # noqa: PLR0913
     organization,
     *,
