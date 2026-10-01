@@ -256,6 +256,25 @@ def test_add_course_without_source_run_is_a_400(admin_drf_client):
     assert "source run" in response.json()["detail"]
 
 
+def test_add_course_with_no_shared_variant_is_a_400(admin_drf_client):
+    """A course offering none of the contract's variant sets is a 400, not a 500."""
+
+    contract = ContractPageFactory.create()
+    course = CourseRunFactory.create(
+        is_source_run=True, language="fr", is_primary_language=True
+    ).course
+    course.possible_variant_sets.update(language="fr")
+
+    response = admin_drf_client.post(
+        _contract_url(contract, "courseware"),
+        {"courseware_id": course.readable_id},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "source run" in response.json()["detail"]
+
+
 def test_retry_setup_requeues_failed_clones(admin_drf_client, mocked_tasks):
     """A failed clone shows as failed, and retrying queues it again."""
 
