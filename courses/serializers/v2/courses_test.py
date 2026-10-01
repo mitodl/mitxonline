@@ -270,9 +270,9 @@ class TestCourseRunEnrollmentSerializerV2:
         org = OrganizationPageFactory.create()
         contract = ContractPageFactory.create(organization=org)
 
-        enrollment = CourseRunEnrollmentFactory.create()
-        enrollment.run.b2b_contract = contract
-        enrollment.run.save()
+        enrollment = CourseRunEnrollmentFactory.create(
+            run__b2b_contracts=[contract], b2b_contract=contract
+        )
 
         serialized_data = CourseRunEnrollmentSerializer(
             enrollment, context=mock_context
@@ -311,10 +311,9 @@ class TestUserEnrollmentFiltering:
 
         org = OrganizationPageFactory.create(title="Test B2B Org")
         contract = ContractPageFactory.create(organization=org)
-        b2b_enrollment = CourseRunEnrollmentFactory.create()
-        b2b_enrollment.run.b2b_contract = contract
-        b2b_enrollment.run.b2b_only = True
-        b2b_enrollment.run.save()
+        b2b_enrollment = CourseRunEnrollmentFactory.create(
+            run__b2b_contracts=[contract], run__b2b_only=True
+        )
 
         queryset = CourseRunEnrollment.objects.filter(
             id__in=[regular_enrollment.id, b2b_enrollment.id]
@@ -348,13 +347,9 @@ class TestUserEnrollmentFiltering:
         contract1 = ContractPageFactory.create(organization=org1)
         contract2 = ContractPageFactory.create(organization=org2)
 
-        enrollment1 = CourseRunEnrollmentFactory.create()
-        enrollment1.run.b2b_contract = contract1
-        enrollment1.run.save()
+        enrollment1 = CourseRunEnrollmentFactory.create(run__b2b_contracts=[contract1])
 
-        enrollment2 = CourseRunEnrollmentFactory.create()
-        enrollment2.run.b2b_contract = contract2
-        enrollment2.run.save()
+        enrollment2 = CourseRunEnrollmentFactory.create(run__b2b_contracts=[contract2])
 
         queryset = CourseRunEnrollment.objects.all()
         filter_data = QueryDict(f"org_id={org1.id}")
@@ -382,7 +377,6 @@ def test_course_serializer_canonical_run_per_tag(mock_context):
         language="en",
         is_primary_language=True,
         courseware_id="course-v1:T+C+1T2026-en",
-        b2b_contract=None,
     )
     CourseRunFactory.create(
         course=course,
@@ -390,7 +384,6 @@ def test_course_serializer_canonical_run_per_tag(mock_context):
         language="zh",
         is_primary_language=False,
         courseware_id="course-v1:T+C+1T2026-zh",
-        b2b_contract=None,
     )
     serializer = CourseWithCourseRunsSerializer(course, context=mock_context)
     assert len(serializer.data["courseruns"]) == 1
@@ -406,7 +399,6 @@ def test_course_serializer_canonical_run_fallback_to_oldest(mock_context):
         language="en",
         is_primary_language=False,
         courseware_id="course-v1:T+C+1T2026-en",
-        b2b_contract=None,
     )
     CourseRunFactory.create(
         course=course,
@@ -414,8 +406,43 @@ def test_course_serializer_canonical_run_fallback_to_oldest(mock_context):
         language="zh",
         is_primary_language=False,
         courseware_id="course-v1:T+C+1T2026-zh",
-        b2b_contract=None,
     )
     serializer = CourseWithCourseRunsSerializer(course, context=mock_context)
     assert len(serializer.data["courseruns"]) == 1
     assert serializer.data["courseruns"][0]["courseware_id"] == run_first.courseware_id
+
+
+@pytest.mark.parametrize(
+    ("context_key", "expected_key"),
+    [
+        (None, "first"),
+        ("contract_id", "second"),
+        ("org_id", "second"),
+    ],
+)
+def test_course_run_serializer_b2b_contract(mock_context, context_key, expected_key):
+    """
+    The b2b_contract field returns the contract the request was scoped to, or
+    the lowest-ID contract otherwise.
+    """
+    contracts = {
+        "first": ContractPageFactory.create(),
+        "second": ContractPageFactory.create(),
+    }
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=list(contracts.values()))
+
+    context = {**mock_context}
+    if context_key == "contract_id":
+        context["contract_id"] = str(contracts["second"].id)
+    elif context_key == "org_id":
+        context["org_id"] = str(contracts["second"].organization_id)
+
+    data = CourseRunSerializer(run, context=context).data
+
+    assert data["b2b_contract"] == contracts[expected_key].id
+    assert (
+        CourseRunSerializer(CourseRunFactory.create(), context=context).data[
+            "b2b_contract"
+        ]
+        is None
+    )

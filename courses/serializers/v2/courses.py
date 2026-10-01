@@ -248,6 +248,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
 
     products = serializers.SerializerMethodField(method_name="get_products")
     approved_flexible_price_exists = serializers.SerializerMethodField()
+    b2b_contract = serializers.SerializerMethodField()
 
     class Meta:
         model = models.CourseRun
@@ -270,6 +271,35 @@ class CourseRunSerializer(BaseCourseRunSerializer):
     @extend_schema_field(bool)
     def get_approved_flexible_price_exists(self, instance):
         return get_approved_flexible_price_exists(instance, self.context)
+
+    @extend_schema_field(serializers.IntegerField(allow_null=True))
+    def get_b2b_contract(self, instance):
+        """
+        Return the ID of the B2B contract this run is being displayed for.
+
+        A run can belong to several contracts. If the request was scoped to a
+        contract or an organization, the matching contract is returned;
+        otherwise, the lowest-ID contract is used.
+        """
+        contracts = sorted(instance.b2b_contracts.all(), key=lambda c: c.id)
+        if not contracts:
+            return None
+
+        contract_id = self.context.get("contract_id")
+        org_id = self.context.get("org_id")
+
+        # These come from query params, so compare as strings.
+        for contract in contracts:
+            if contract_id is not None and str(contract.id) == str(contract_id):
+                return contract.id
+            if (
+                contract_id is None
+                and org_id is not None
+                and str(contract.organization_id) == str(org_id)
+            ):
+                return contract.id
+
+        return contracts[0].id
 
     @extend_schema_field(BaseProductSerializer(many=True))
     def get_products(self, obj):
@@ -354,11 +384,11 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSeri
         user = self.context["user"]
         run_id = validated_data["run_id"]
         try:
-            run = models.CourseRun.objects.select_related("b2b_contract").get(id=run_id)
+            run = models.CourseRun.objects.get(id=run_id)
         except models.CourseRun.DoesNotExist:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})  # noqa: B904
 
-        if run.b2b_contract is not None:
+        if run.has_b2b_contracts:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
 
         # The enrollment window governs getting into a run. An existing active
@@ -392,16 +422,14 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSeri
     @extend_schema_field(serializers.IntegerField(allow_null=True))
     def get_b2b_organization_id(self, enrollment):
         """Get the B2B organization ID if this enrollment is associated with a B2B contract."""
-        if enrollment.run.b2b_contract:
-            return enrollment.run.b2b_contract.organization.id
+        if enrollment.b2b_contract:
+            return enrollment.b2b_contract.organization_id
         return None
 
     @extend_schema_field(serializers.IntegerField(allow_null=True))
     def get_b2b_contract_id(self, enrollment):
         """Get the B2B contract ID if this enrollment is associated with a B2B contract."""
-        if enrollment.run.b2b_contract:
-            return enrollment.run.b2b_contract.id
-        return None
+        return enrollment.b2b_contract_id
 
     class Meta(BaseCourseRunEnrollmentWithFlexiblePriceSerializer.Meta):
         fields = [

@@ -68,6 +68,7 @@ from ecommerce.models import (
     OrderStatus,
     Product,
     UserDiscount,
+    b2b_order_exists,
 )
 from ecommerce.serializers import BulkDiscountSerializer
 from ecommerce.serializers.v0 import (
@@ -1054,6 +1055,8 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
             )
             # Read by Order.refund_status for every fulfilled row.
             .annotate(funds_fulfilled_redemption=funds_fulfilled_redemption_exists())
+            # Read by Order.refund_status and the serializer for every row.
+            .annotate(is_b2b_order=b2b_order_exists())
             .order_by("-created_on")
             .all()
         )

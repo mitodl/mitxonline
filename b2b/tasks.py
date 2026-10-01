@@ -94,7 +94,7 @@ def create_program_contract_runs(
                 continue
 
             # Check if run already exists
-            if CourseRun.objects.filter(course=course, b2b_contract=contract).exists():
+            if CourseRun.objects.filter(course=course, b2b_contracts=contract).exists():
                 skipped_count += 1
                 log.debug(
                     "Contract run already exists for course %s in contract %s",

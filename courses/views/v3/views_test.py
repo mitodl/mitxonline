@@ -118,9 +118,9 @@ def test_user_enrollments_detail(
             }
             for grade in enrollment.grades
         ],
-        "b2b_contract_id": enrollment.run.b2b_contract_id,
-        "b2b_organization_id": enrollment.run.b2b_contract.organization_id
-        if enrollment.run.b2b_contract
+        "b2b_contract_id": enrollment.b2b_contract_id,
+        "b2b_organization_id": enrollment.b2b_contract.organization_id
+        if enrollment.b2b_contract
         else None,
         "enrollment_mode": enrollment.enrollment_mode,
         "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
@@ -193,9 +193,9 @@ def test_user_enrollments_list(
                 }
                 for grade in enrollment.grades
             ],
-            "b2b_contract_id": enrollment.run.b2b_contract_id,
-            "b2b_organization_id": enrollment.run.b2b_contract.organization_id
-            if enrollment.run.b2b_contract
+            "b2b_contract_id": enrollment.b2b_contract_id,
+            "b2b_organization_id": enrollment.b2b_contract.organization_id
+            if enrollment.b2b_contract
             else None,
             "enrollment_mode": enrollment.enrollment_mode,
             "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
@@ -278,9 +278,9 @@ def test_user_enrollments_list_filter_org_id(
                     }
                     for grade in enrollment.grades
                 ],
-                "b2b_contract_id": enrollment.run.b2b_contract_id,
-                "b2b_organization_id": enrollment.run.b2b_contract.organization_id
-                if enrollment.run.b2b_contract
+                "b2b_contract_id": enrollment.b2b_contract_id,
+                "b2b_organization_id": enrollment.b2b_contract.organization_id
+                if enrollment.b2b_contract
                 else None,
                 "enrollment_mode": enrollment.enrollment_mode,
                 "certificate": maybe_serialize_course_cert(
@@ -449,9 +449,9 @@ def test_user_enrollments_list_filter_exclude_b2b(
                 }
                 for grade in enrollment.grades
             ],
-            "b2b_contract_id": enrollment.run.b2b_contract_id,
-            "b2b_organization_id": enrollment.run.b2b_contract.organization_id
-            if enrollment.run.b2b_contract
+            "b2b_contract_id": enrollment.b2b_contract_id,
+            "b2b_organization_id": enrollment.b2b_contract.organization_id
+            if enrollment.b2b_contract
             else None,
             "enrollment_mode": enrollment.enrollment_mode,
             "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),

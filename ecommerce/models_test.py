@@ -1428,7 +1428,7 @@ def test_refund_status_ineligible_for_unfulfilled_orders(state):
 def test_refund_status_ineligible_for_b2b_orders():
     """B2B contract orders are handled off the self-service path."""
     order = OrderFactory.create(state=OrderStatus.FULFILLED)
-    run = CourseRunFactory.create(b2b_contract=ContractPageFactory.create())
+    run = CourseRunFactory.create(b2b_contracts=[ContractPageFactory.create()])
     with reversion.create_revision():
         product = ProductFactory.create(purchasable_object=run)
     LineFactory.create(
