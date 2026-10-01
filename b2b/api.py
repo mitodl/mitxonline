@@ -555,7 +555,7 @@ def _get_source_runs_for_course(  # noqa: PLR0913
                 course,
                 fallback,
             )
-            return fallback
+            return CourseRun.all_objects.filter(pk=fallback.pk)
         msg = f"No source run found for {course}."
         raise SourceCourseIncompleteError(msg)
 

@@ -670,6 +670,25 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
     assert clone.source_courseware_id == source_run.courseware_id
 
 
+def test_create_contract_run_falls_back_to_newest_non_b2b_run(mocker):
+    """Without a designated source run, the newest non-B2B run is cloned."""
+
+    contract = factories.ContractPageFactory.create()
+    course = CourseFactory.create()
+    mocked_clone_run = mocker.patch("openedx.tasks.clone_courserun.delay")
+    older_run, newest_run = CourseRunFactory.create_batch(
+        2, course=course, is_source_run=False, language="en"
+    )
+
+    [(created_run, _)] = create_contract_run(
+        contract, course, require_designated_source_run=False
+    )
+
+    assert created_run.b2b_contract == contract
+    assert older_run.id < newest_run.id
+    mocked_clone_run.assert_called_once_with(created_run.id, newest_run.courseware_id)
+
+
 def test_create_contract_run_variants(mocker):
     """
     Test creating runs for a contract when there are variant runs.
