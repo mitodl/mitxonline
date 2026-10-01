@@ -446,6 +446,18 @@ def _variant_set_snapshot(contract: ContractPage, variant: SupportedVariant) -> 
     }
 
 
+def _lock_contract_variant_sets(contract: ContractPage) -> None:
+    """
+    Serialize changes to a contract's variant sets.
+
+    Nothing in the database stops two sets with the same language, length and
+    industry, so the duplicate check is only safe under this lock. of=("self",)
+    locks the contract's row and not the Wagtail page rows it joins.
+    """
+
+    ContractPage.objects.select_for_update(of=("self",)).get(pk=contract.pk)
+
+
 def _variant_fields(variant) -> tuple[str, str, str]:
     return (variant.language, variant.variant_length, variant.variant_industry)
 
@@ -535,6 +547,7 @@ def add_contract_variant_set(  # noqa: PLR0913
     same language, length and industry, active or not.
     """
 
+    _lock_contract_variant_sets(contract)
     existing = contract.variant_options.filter(
         language=language,
         variant_length=variant_length,
@@ -596,6 +609,8 @@ def update_contract_variant_set(
         )
         raise ContractVariantError(msg)
 
+    _lock_contract_variant_sets(contract)
+    variant.refresh_from_db()
     before = _variant_set_snapshot(contract, variant)
     if active is not None:
         variant.active = active

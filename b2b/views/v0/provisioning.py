@@ -838,7 +838,8 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
 
         Turning a set off stops new runs being created for it and drops its
         runs from the contract's course list. Its existing runs and their
-        enrollments are left alone. The default set can't be turned off.
+        enrollments are left alone. The default set can't be turned off or
+        made B2B-only.
         """
 
         contract = self.get_object()

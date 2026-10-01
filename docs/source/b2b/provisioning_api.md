@@ -245,13 +245,13 @@ language, length and industry, whether each has a source run for it, and the
 contract's run for it if there is one. A course with a source run and no
 contract run gets one the next time its courseware is added to the contract.
 `POST` adds a set (`language`, `variant_length`, `variant_industry`,
-`b2b_only`). It never adds a default, since every contract already has one,
-and a set the contract already has, active or not, is a 400. Adding a set
-creates no runs. `PATCH` takes `active` and `b2b_only`. An inactive set gets no
-new runs and its runs drop out of the contract's course list, but they stay in
-the contract and their enrollments are untouched, so turning it back on
-restores them. The default set can't be turned off. Variant set changes are
-recorded in the organization's change history.
+`b2b_only`). It never adds a default, since every contract already has one, and
+a set the contract already has, active or not, is a 400. Adding a set creates
+no runs. `PATCH` takes `active` and `b2b_only`. An inactive set gets no new
+runs and its runs drop out of the contract's course list, but they stay in the
+contract and their enrollments are untouched, so turning it back on restores
+them. The default set can't be turned off or made B2B-only. Variant set changes
+are recorded in the organization's change history.
 
 The codes routes list a contract's enrollment codes, expire the unused ones,
 and assign codes to people by email the same way the manager dashboard's bulk
