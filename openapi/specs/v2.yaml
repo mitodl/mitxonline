@@ -1448,11 +1448,13 @@ components:
         b2b_contract:
           type: integer
           nullable: true
+          readOnly: true
         b2b_only:
           type: boolean
           description: Indicates if the course run is B2B only
       required:
       - approved_flexible_price_exists
+      - b2b_contract
       - course_id
       - course_number
       - courseware_id
@@ -3002,6 +3004,7 @@ components:
         b2b_contract:
           type: integer
           nullable: true
+          readOnly: true
         b2b_only:
           type: boolean
           description: Indicates if the course run is B2B only
@@ -3011,6 +3014,7 @@ components:
           readOnly: true
       required:
       - approved_flexible_price_exists
+      - b2b_contract
       - course
       - course_id
       - course_number
@@ -3169,9 +3173,6 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
-        b2b_contract:
-          type: integer
-          nullable: true
         b2b_only:
           type: boolean
           description: Indicates if the course run is B2B only

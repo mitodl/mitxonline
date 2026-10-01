@@ -8,6 +8,7 @@ from django.contrib import admin, messages
 from django.contrib.admin.decorators import display
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.db import models
+from django.db.models import Prefetch
 from django.forms import TextInput
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
@@ -109,7 +110,6 @@ class CourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
         "language",
         "variant_length",
         "variant_industry",
-        "b2b_contract",
         "live",
         "start_date",
         "end_date",
@@ -125,7 +125,6 @@ class CourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
         "language",
         "variant_length",
         "variant_industry",
-        "b2b_contract",
         "live",
         "start_date",
         "end_date",
@@ -443,7 +442,7 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         "is_source_run",
         "language",
         "course",
-        "b2b_contract",
+        "b2b_contracts",
     ]
     raw_id_fields = ("course",)
     fieldsets = [
@@ -492,7 +491,6 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
             {
                 "fields": [
                     "b2b_only",
-                    "b2b_contract",
                 ],
             },
         ),
@@ -526,7 +524,9 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
     def get_queryset(self, request):  # noqa: ARG002
         """Use the all_objects manager so we can see source runs."""
 
-        return self.model.all_objects
+        # Imported here to avoid a circular dependency at module load time,
+        # matching ProgramContractPageInline above.
+        from b2b.models import ContractPage  # noqa: PLC0415
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """
@@ -551,8 +551,6 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
                 "organization__name", "name"
             )
 
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
     @admin.display(description="Primary?", ordering="is_primary_language")
     def primary(self, obj):
         """Return the primary language run flag."""
@@ -563,10 +561,10 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         """Return the source run flag."""
         return obj.is_source_run
 
-    @admin.display(description="Contract", ordering="b2b_contract")
+    @admin.display(description="Contract")
     def contract(self, obj):
-        """Return the B2B contract title."""
-        return obj.b2b_contract.name if obj.b2b_contract else ""
+        """Return the B2B contract names."""
+        return ", ".join(contract.name for contract in obj.all_b2b_contracts)
 
 
 class ProgramEnrollmentAuditInline(admin.TabularInline):

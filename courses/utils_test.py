@@ -10,6 +10,7 @@ import pytest
 from mitol.common.utils import now_in_utc
 from requests.exceptions import HTTPError
 
+from b2b.factories import ContractPageFactory
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
@@ -282,9 +283,12 @@ def test_get_dated_courseruns():
     assert instructor_paced_course_run in dated_courseruns
 
 
+@pytest.mark.django_db
 def test_is_contract_order_true_for_course_run_with_contract():
     """Test that is_contract_order returns True when a line has a contract course run."""
-    contract_course_run = CourseRun(b2b_contract_id=1)
+    contract_course_run = CourseRunFactory.create(
+        b2b_contracts=[ContractPageFactory.create()]
+    )
     line = SimpleNamespace(
         product=SimpleNamespace(purchasable_object=contract_course_run)
     )
@@ -293,9 +297,10 @@ def test_is_contract_order_true_for_course_run_with_contract():
     assert is_contract_order(order) is True
 
 
+@pytest.mark.django_db
 def test_is_contract_order_false_for_course_run_without_contract():
     """Test that is_contract_order returns False when course runs have no contract."""
-    non_contract_course_run = CourseRun(b2b_contract=None)
+    non_contract_course_run = CourseRunFactory.create()
     line = SimpleNamespace(
         product=SimpleNamespace(purchasable_object=non_contract_course_run)
     )
@@ -306,7 +311,7 @@ def test_is_contract_order_false_for_course_run_without_contract():
 
 def test_is_contract_order_false_for_non_course_run_product():
     """Test that is_contract_order ignores non-CourseRun purchasable objects."""
-    non_course_run = SimpleNamespace(b2b_contract=object())
+    non_course_run = SimpleNamespace(has_b2b_contracts=True)
     line = SimpleNamespace(product=SimpleNamespace(purchasable_object=non_course_run))
     order = SimpleNamespace(lines=SimpleNamespace(all=lambda: [line]))
 

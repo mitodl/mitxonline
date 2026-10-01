@@ -139,7 +139,8 @@ def validate_course_run_b2b_contracts(
 
     ``run.b2b_contracts.add(...)`` and ``contract.course_runs.add(...)`` bypass
     ``CourseRun.save()``/``clean()``, so this is where the rules that used to be
-    database UniqueConstraints on ``b2b_contract`` get enforced for M2M writes.
+    database UniqueConstraints on the old ``b2b_contract`` FK get enforced for
+    M2M writes.
     See ``CourseRun.validate_b2b_contract_group_uniqueness``.
     """
     if action != "pre_add":
