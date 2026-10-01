@@ -14,3 +14,9 @@ ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS = (
     "mitxonline-12321-program-specific-pathway-schools"
 )
 EXPORT_COMPLIANCE_CHECK_ENABLED = "enable_export_compliance"
+
+# Gates the in-progress credential metadata authoring work in the CMS (new
+# fields, AI-assisted generation, preview) so each piece can ship incrementally
+# without exposing a half-finished workflow to content authors. Does not gate
+# the credential fields that already exist and function.
+ENABLE_CREDENTIAL_METADATA_AUTHORING = "mitxonline-credential-metadata-authoring"
