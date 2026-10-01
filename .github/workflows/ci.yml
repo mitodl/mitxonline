@@ -27,7 +27,7 @@ jobs:
         run: sudo apt-get update -y
 
       - name: Apt install
-        run: cat Aptfile | sudo xargs apt-get install
+        run: xargs sudo apt-get install < Aptfile
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
@@ -126,7 +126,7 @@ jobs:
         run: sudo apt-get update -y
 
       - name: Apt install
-        run: cat Aptfile | sudo xargs apt-get install
+        run: xargs sudo apt-get install < Aptfile
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
