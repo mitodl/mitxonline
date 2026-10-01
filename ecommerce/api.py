@@ -1933,7 +1933,11 @@ def process_stripe_refund_updated(event: stripe.Event):  # noqa: PLR0911
     """
 
     if event.type not in STRIPE_EVENTS_REFUND:
-        msg = f"Event passed to process_stripe_refund_updated is type {event.type} - not a refund event"
+        msg = (
+            "Event "
+            f"{event.id} passed to process_stripe_refund_updated is type "
+            f"{event.type} - expected one of {STRIPE_EVENTS_REFUND}"
+        )
         raise ValueError(msg)
 
     refund = event.data.object.to_dict(for_json=True)
@@ -2015,22 +2019,13 @@ def process_stripe_refund_updated(event: stripe.Event):  # noqa: PLR0911
                 order.total_price_paid,
             )
 
-        try:
-            record_order_refund(
-                order,
-                api_response_data=refund,
-                amount=refund_amount,
-                reason=refund.get("reason") or "",
-                unenroll=True,
-            )
-        except Exception:
-            log.exception(
-                "process_stripe_refund_updated: failed to record refund %s (event %s) for order %s",
-                refund_id,
-                event.id,
-                order.reference_number,
-            )
-            raise
+        record_order_refund(
+            order,
+            api_response_data=refund,
+            amount=refund_amount,
+            reason=refund.get("reason") or "",
+            unenroll=True,
+        )
 
     log.info(
         "process_stripe_refund_updated: refunded order %s for refund %s (event %s)",
