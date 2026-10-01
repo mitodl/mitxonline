@@ -6,6 +6,7 @@ from http import HTTPStatus
 from urllib.parse import urljoin
 
 from django.conf import settings
+from django.contrib.postgres.expressions import ArraySubquery
 from django.db.models import Exists, OuterRef, Q
 from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError
@@ -42,6 +43,48 @@ def verified_courserun_exists(manager=None):
             enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
         )
     )
+
+
+def active_contract_id_annotations(outer_ref="pk"):
+    """
+    Build the ``b2b_contract_ids`` / ``b2b_contract_org_ids`` annotations for a
+    CourseRun queryset.
+
+    These replace a ``Prefetch("b2b_contracts", ...)``. ContractPage is a
+    Wagtail Page and a ClusterableModel, so prefetching it instantiates one of
+    the most expensive model classes in the project once per (run, contract)
+    pair - and the only things the Python match sites in ``Course.
+    get_filtered_runs`` and ``Course.get_first_unexpired_b2b_run`` read off a
+    contract are its pk and its organization_id. An ``ARRAY(subquery)`` hands
+    those over as plain integer lists, with no model instances and no
+    per-instance related-manager construction.
+
+    ``active_objects``, not ``objects``: the M2M related manager this replaces
+    was built from ``ContractPage._default_manager``, which is
+    ``ActiveContractManager`` because ``active_objects`` is ContractPage's only
+    *local* manager. So the prefetch has always been filtered to active,
+    in-window contracts, and ``ContractPage.objects`` - Wagtail's inherited,
+    unfiltered PageManager - would silently widen it.
+
+    Both annotations shadow the same-named ``cached_property`` fallbacks on
+    CourseRun, which is what callers that do not annotate fall back to.
+
+    Args:
+        outer_ref: the field on the outer CourseRun queryset to correlate on.
+            ``"pk"`` when annotating CourseRun itself; callers annotating a
+            model that reaches a run through a relation pass that path.
+    """
+    from b2b.models import ContractPage  # noqa: PLC0415
+
+    active_contracts = ContractPage.active_objects.filter(
+        course_runs=OuterRef(outer_ref)
+    )
+    return {
+        "b2b_contract_ids": ArraySubquery(active_contracts.values("pk")),
+        "b2b_contract_org_ids": ArraySubquery(
+            active_contracts.values("organization_id")
+        ),
+    }
 
 
 def live_certificate_page_exists():

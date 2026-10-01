@@ -97,9 +97,12 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
     @extend_schema_field(serializers.IntegerField(allow_null=True))
     def get_b2b_organization_id(self, enrollment):
         """Get the B2B organization ID if this enrollment is associated with a B2B contract."""
-        if enrollment.run.b2b_contract:
-            return enrollment.run.b2b_contract.organization_id
-        return None
+        # UserEnrollmentsApiViewSet annotates this so no ContractPage is
+        # hydrated; CourseRun.b2b_contract_organization_id is the lazy fallback
+        # for callers that build this serializer without the annotation.
+        if hasattr(enrollment, "b2b_contract_organization_id"):
+            return enrollment.b2b_contract_organization_id
+        return enrollment.run.b2b_contract_organization_id
 
     @extend_schema_field(serializers.IntegerField(allow_null=True))
     def get_b2b_contract_id(self, enrollment):
