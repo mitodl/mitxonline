@@ -1938,26 +1938,41 @@ def sync_deal_with_hubspot_targeted(  # noqa: C901
                 contact_id,
             )
 
-    # Ensure each line item exists by checking unique_app_id to avoid duplicates
     for line in order.lines.all():
-        line_item_id = _ensure_target_line_item_for_line(line, hubspot_client)
-        if line_item_id:
-            # Ensure the line item is associated with the deal
-            try:
-                wait_for_hubspot_rate_limit()
-                hubspot_client.crm.associations.v4.basic_api.create_default(
-                    from_object_type=HubspotObjectType.LINES.value,
-                    from_object_id=line_item_id,
-                    to_object_type=HubspotObjectType.DEALS.value,
-                    to_object_id=result.id,
-                )
-            except Exception:  # noqa: BLE001
-                # Association might already exist, which is fine
-                log.debug(
-                    "Association may already exist for line %s and deal %s",
-                    line_item_id,
-                    result.id,
-                )
+        # Look up a line item with the proper product on the deal.
+        # If it exists, update it; if not, create it.
+        line_item_input = _build_target_line_item_message(line, hubspot_client)
+
+        # Reuse the deal's existing line item for this product so repeated
+        hs_product_id = line_item_input.properties.get("hs_product_id")
+        existing_line_item_id = (
+            _find_target_deal_line_item_id_by_product(
+                hubspot_client, result.id, hs_product_id
+            )
+            if existing_deal_id and hs_product_id
+            else None
+        )
+
+        wait_for_hubspot_rate_limit()
+        if existing_line_item_id:
+            hubspot_client.crm.objects.basic_api.update(
+                object_type=HubspotObjectType.LINES.value,
+                object_id=existing_line_item_id,
+                simple_public_object_input=line_item_input,
+            )
+        else:
+            line_item = hubspot_client.crm.objects.basic_api.create(
+                object_type=HubspotObjectType.LINES.value,
+                simple_public_object_input_for_create=line_item_input,
+            )
+
+            wait_for_hubspot_rate_limit()
+            hubspot_client.crm.associations.v4.basic_api.create_default(
+                from_object_type=HubspotObjectType.LINES.value,
+                from_object_id=line_item.id,
+                to_object_type=HubspotObjectType.DEALS.value,
+                to_object_id=result.id,
+            )
 
     # Update the local HubspotObject mapping to maintain ID tracking
     content_type = ContentType.objects.get_for_model(Order)
