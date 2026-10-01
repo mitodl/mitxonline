@@ -792,12 +792,21 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
         request_serializer = CreateContractVariantSetSerializer(data=request.data)
         request_serializer.is_valid(raise_exception=True)
 
+        # The 400 bodies are fixed text, never the exception's, as for courseware.
         try:
             variant = add_contract_variant_set(
                 contract, **request_serializer.validated_data, actor=request.user
             )
-        except ContractVariantError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except ContractVariantError:
+            return Response(
+                {
+                    "detail": (
+                        "The contract already has this variant set. If it's "
+                        "inactive, turn it back on instead."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         return self._variant_set_response(contract, variant, status.HTTP_201_CREATED)
 
@@ -845,8 +854,16 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
                 **request_serializer.validated_data,
                 actor=request.user,
             )
-        except ContractVariantError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except ContractVariantError:
+            return Response(
+                {
+                    "detail": (
+                        "The contract's default variant set can't be turned off "
+                        "or made B2B-only."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         return self._variant_set_response(contract, variant, status.HTTP_200_OK)
 

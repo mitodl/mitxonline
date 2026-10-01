@@ -513,6 +513,7 @@ def test_update_default_variant_set_rejected(admin_drf_client):
     )
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "default variant set" in response.json()["detail"]
     assert contract.default_variant_options.active is True
 
 
