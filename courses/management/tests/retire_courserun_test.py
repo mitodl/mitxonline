@@ -374,15 +374,14 @@ class TestContractHandling:
         """A retired B2B run is parked, never orphaned."""
 
         contract = ContractPageFactory.create()
-        course_run = CourseRunFactory.create(live=True, b2b_contract=contract)
+        course_run = CourseRunFactory.create(live=True, b2b_contracts=[contract])
 
         _run_command(course_run, tmp_path, commit=True)
 
         course_run.refresh_from_db()
         holding = get_or_create_retirement_contract()
-        assert course_run.b2b_contract_id == holding.id
-        # Never nulled - a null contract FK would make this a public-catalog run.
-        assert course_run.b2b_contract_id is not None
+        # Moved out of the original contract, but never left without one.
+        assert course_run.contract_group_ids == {holding.id}
         assert holding.active is False
         assert holding.live is False
 
@@ -390,26 +389,26 @@ class TestContractHandling:
         """The holding contract is created once and reused."""
 
         contract = ContractPageFactory.create()
-        first = CourseRunFactory.create(live=True, b2b_contract=contract)
-        second = CourseRunFactory.create(live=True, b2b_contract=contract)
+        first = CourseRunFactory.create(live=True, b2b_contracts=[contract])
+        second = CourseRunFactory.create(live=True, b2b_contracts=[contract])
 
         _run_command(first, tmp_path, commit=True)
         _run_command(second, tmp_path, commit=True)
 
         first.refresh_from_db()
         second.refresh_from_db()
-        assert first.b2b_contract_id == second.b2b_contract_id
+        assert first.contract_group_ids == second.contract_group_ids
 
     def test_keep_contract(self, tmp_path, mock_edx):  # noqa: ARG002
         """Keep contract."""
 
         contract = ContractPageFactory.create()
-        course_run = CourseRunFactory.create(live=True, b2b_contract=contract)
+        course_run = CourseRunFactory.create(live=True, b2b_contracts=[contract])
 
         _run_command(course_run, tmp_path, commit=True, keep_contract=True)
 
         course_run.refresh_from_db()
-        assert course_run.b2b_contract_id == contract.id
+        assert course_run.contract_group_ids == {contract.id}
 
     def test_non_b2b_run_needs_no_contract(self, run, tmp_path, mock_edx):  # noqa: ARG002
         """A non-B2B run retires fine with no contract step."""
@@ -417,28 +416,28 @@ class TestContractHandling:
         _run_command(run, tmp_path, commit=True)
 
         run.refresh_from_db()
-        assert run.b2b_contract_id is None
+        assert run.contract_group_ids == set()
         assert run.live is False
 
     def test_keep_products_refused_when_parking_the_run(self, tmp_path, mock_edx):  # noqa: ARG002
         """--keep-products can't be combined with the contract move."""
 
         contract = ContractPageFactory.create()
-        course_run = CourseRunFactory.create(live=True, b2b_contract=contract)
+        course_run = CourseRunFactory.create(live=True, b2b_contracts=[contract])
         ProductFactory.create(purchasable_object=course_run, is_active=True)
 
         with pytest.raises(CommandError, match="--keep-products cannot be combined"):
             _run_command(course_run, tmp_path, commit=True, keep_products=True)
 
         course_run.refresh_from_db()
-        assert course_run.b2b_contract_id == contract.id
+        assert course_run.contract_group_ids == {contract.id}
         assert course_run.live is True
 
     def test_keep_products_allowed_with_keep_contract(self, tmp_path, mock_edx):  # noqa: ARG002
         """--keep-contract makes --keep-products safe again."""
 
         contract = ContractPageFactory.create()
-        course_run = CourseRunFactory.create(live=True, b2b_contract=contract)
+        course_run = CourseRunFactory.create(live=True, b2b_contracts=[contract])
         ProductFactory.create(purchasable_object=course_run, is_active=True)
 
         _run_command(
@@ -451,7 +450,7 @@ class TestContractHandling:
 
         course_run.refresh_from_db()
         assert course_run.live is False
-        assert course_run.b2b_contract_id == contract.id
+        assert course_run.contract_group_ids == {contract.id}
         assert all(p.is_active for p in get_run_products(course_run))
 
 
@@ -477,11 +476,11 @@ class TestCollisionCheck:
 
         holding = get_or_create_retirement_contract()
         parked = CourseRunFactory.create(
-            b2b_contract=holding, language="de_DE", run_tag="1T9C2026"
+            b2b_contracts=[holding], language="de_DE", run_tag="1T9C2026"
         )
         incoming = CourseRunFactory.create(
             course=parked.course,
-            b2b_contract=source_contract,
+            b2b_contracts=[source_contract],
             language="de_DE",
             run_tag="1T9C2026",
         )
@@ -494,14 +493,14 @@ class TestCollisionCheck:
 
         holding = get_or_create_retirement_contract()
         parked = CourseRunFactory.create(
-            b2b_contract=holding,
+            b2b_contracts=[holding],
             language="",
             is_primary_language=True,
             run_tag="1T9C2026",
         )
         incoming = CourseRunFactory.create(
             course=parked.course,
-            b2b_contract=source_contract,
+            b2b_contracts=[source_contract],
             language="",
             is_primary_language=True,
             run_tag="1T9C2026",
@@ -515,11 +514,11 @@ class TestCollisionCheck:
 
         holding = get_or_create_retirement_contract()
         parked = CourseRunFactory.create(
-            b2b_contract=holding, language="de_DE", run_tag="1T9C2026"
+            b2b_contracts=[holding], language="de_DE", run_tag="1T9C2026"
         )
         incoming = CourseRunFactory.create(
             course=parked.course,
-            b2b_contract=source_contract,
+            b2b_contracts=[source_contract],
             language="de_DE",
             run_tag="1T9C2027",
         )
@@ -530,7 +529,7 @@ class TestCollisionCheck:
         """Re-parking a run that's already in the holding contract is fine."""
 
         holding = get_or_create_retirement_contract()
-        parked = CourseRunFactory.create(b2b_contract=holding, run_tag="1T9C2026")
+        parked = CourseRunFactory.create(b2b_contracts=[holding], run_tag="1T9C2026")
 
         assert move_run_to_retirement_contract(parked).id == holding.id
 

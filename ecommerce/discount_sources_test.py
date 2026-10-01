@@ -261,7 +261,7 @@ def test_grandchild_courses_do_not_qualify(user, program, program_product):
 
 
 def test_b2b_run_sources_do_not_qualify(user, program, program_product):
-    run = CourseRunFactory.create(b2b_contract=ContractPageFactory.create())
+    run = CourseRunFactory.create(b2b_contracts=[ContractPageFactory.create()])
     program.add_requirement(run.course)
     make_purchase(user, run, Decimal("100.00"))
 

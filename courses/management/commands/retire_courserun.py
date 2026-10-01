@@ -38,6 +38,7 @@ from b2b.api import (
     RetirementContractCollisionError,
     move_run_to_retirement_contract,
 )
+from b2b.models import ContractPage
 from courses.management.utils import bulk_unenroll_learners
 from courses.models import CourseRun
 from courses.retirement import (
@@ -168,7 +169,7 @@ class Command(BaseCommand):
             f"Enrollment:   {run.enrollment_start} / {run.enrollment_end}"
         )
         self.stdout.write(
-            f"B2B contract: {run.b2b_contract or '- (not a contract run)'}"
+            f"B2B contract: {self._describe_contracts(run) or '- (not a contract run)'}"
         )
 
         self.stdout.write("")
@@ -236,13 +237,21 @@ class Command(BaseCommand):
 
         return target.resolve()
 
+    def _describe_contracts(self, run):
+        """Return the names of all the contracts the run is attached to."""
+
+        return ", ".join(
+            str(contract)
+            for contract in ContractPage.objects.filter(course_runs=run).order_by("id")
+        )
+
     def _handle_contract(self, run, *, keep_contract):
         """Move the run to the holding contract, if it's a contract run."""
 
-        if keep_contract or not run.b2b_contract_id:
+        if keep_contract or not run.has_b2b_contracts:
             return
 
-        previous = str(run.b2b_contract)
+        previous = self._describe_contracts(run)
 
         try:
             contract = move_run_to_retirement_contract(run)
@@ -330,7 +339,7 @@ class Command(BaseCommand):
         # inert, because ContractPage.get_products() filters on is_active.
         if (
             options["keep_products"]
-            and run.b2b_contract_id
+            and run.has_b2b_contracts
             and not options["keep_contract"]
         ):
             msg = (
