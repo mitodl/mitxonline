@@ -64,8 +64,8 @@ matches are reported and skipped."""
             )
 
         enrollments = CourseRunEnrollment.objects.filter(
-            run__b2b_contract__isnull=False
-        ).select_related("user", "run", "run__course", "run__b2b_contract")
+            b2b_contract__isnull=False
+        ).select_related("user", "run", "run__course", "b2b_contract")
 
         if specific_user:
             enrollments = enrollments.filter(
@@ -90,7 +90,7 @@ matches are reported and skipped."""
 
         for enrollment in enrollments:
             user = enrollment.user
-            contract = enrollment.run.b2b_contract
+            contract = enrollment.b2b_contract
             course = enrollment.run.course
 
             # Programs attached to this contract that also contain this course.

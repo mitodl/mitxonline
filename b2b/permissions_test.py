@@ -6,8 +6,13 @@ import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory
 
-from b2b.factories import OrganizationPageFactory, UserOrganizationFactory
+from b2b.factories import (
+    ContractPageFactory,
+    OrganizationPageFactory,
+    UserOrganizationFactory,
+)
 from b2b.permissions import IsOrganizationManager
+from courses.factories import CourseRunFactory
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -179,25 +184,26 @@ class TestIsOrganizationManagerHasObjectPermission:
         obj.b2b_contract.organization_id = other_org.id
         assert permission.has_object_permission(request, view, obj) is False
 
-    def test_manager_with_run_b2b_contract_attr_matching(
-        self, rf, permission, organization
-    ):
+    @pytest.mark.parametrize("matching", [True, False])
+    def test_manager_with_course_run(self, rf, permission, organization, matching):
+        """Course runs are checked against all of their contracts."""
         user_org = UserOrganizationFactory.create(
             organization=organization, is_manager=True
         )
         request = rf.get("/")
         request.user = user_org.user
         view = make_view(organization.id)
-        obj = MagicMock(spec=["run"])
-        obj.run = MagicMock(spec=["b2b_contract"])
-        obj.run.b2b_contract = MagicMock()
-        obj.run.b2b_contract.organization_id = organization.id
-        assert permission.has_object_permission(request, view, obj) is True
+        run = CourseRunFactory.create()
+        run.b2b_contracts.add(ContractPageFactory.create())
+        if matching:
+            run.b2b_contracts.add(ContractPageFactory.create(organization=organization))
+        assert permission.has_object_permission(request, view, run) is matching
 
-    def test_manager_with_run_b2b_contract_attr_mismatched(
-        self, rf, permission, organization
+    @pytest.mark.parametrize("matching", [True, False])
+    def test_manager_with_run_b2b_contracts(
+        self, rf, permission, organization, matching
     ):
-        other_org = OrganizationPageFactory.create()
+        """Objects with a run are checked against the run's contracts."""
         user_org = UserOrganizationFactory.create(
             organization=organization, is_manager=True
         )
@@ -205,7 +211,12 @@ class TestIsOrganizationManagerHasObjectPermission:
         request.user = user_org.user
         view = make_view(organization.id)
         obj = MagicMock(spec=["run"])
-        obj.run = MagicMock(spec=["b2b_contract"])
-        obj.run.b2b_contract = MagicMock()
-        obj.run.b2b_contract.organization_id = other_org.id
-        assert permission.has_object_permission(request, view, obj) is False
+        obj.run = CourseRunFactory.create()
+        obj.run.b2b_contracts.add(
+            ContractPageFactory.create(
+                organization=organization
+                if matching
+                else OrganizationPageFactory.create()
+            )
+        )
+        assert permission.has_object_permission(request, view, obj) is matching

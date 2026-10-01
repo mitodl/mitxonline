@@ -6,6 +6,7 @@ from prefetch import PrefetchOption
 from rest_framework import viewsets
 from rest_framework_api_key.permissions import HasAPIKey
 
+from b2b.models import ContractPage
 from courses.models import (
     Course,
     CourseRun,
@@ -63,10 +64,15 @@ class IngestibleCourseViewSet(viewsets.ReadOnlyModelViewSet):
         # to_attr-only prefetch that cache stays empty and every serialized
         # course issues its own query. IngestibleCourseWithCourseRunsSerializer
         # already falls back to instance.courseruns, so nothing else changes.
+        # Narrowed to organization_id - see CourseViewSet for why.
+        contracts_prefetch = Prefetch(
+            "b2b_contracts",
+            queryset=ContractPage.active_objects.only("organization_id"),
+        )
         course_runs_prefetch = Prefetch(
             "courseruns",
             queryset=CourseRun.all_objects.order_by("id").prefetch_related(
-                modes_prefetch, products_prefetch
+                modes_prefetch, products_prefetch, contracts_prefetch
             ),
         )
         dated_runs_prefetch = Prefetch(
