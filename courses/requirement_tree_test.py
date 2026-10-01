@@ -53,18 +53,9 @@ def _min_of(title, value, *children):
             _min_of("Electives", "2", _course(2), _course(3), _course(4), _course(5)),
             _min_of("Advanced Electives", "1", _course(4), _course(5)),
         ],
-        # groups below the top level, each counting as one item
-        [
-            _min_of(
-                "Choose a group",
-                "1",
-                _all_of("Group A", _course(1), _course(2)),
-                _all_of("Group B", _course(3)),
-            )
-        ],
         [_min_of("Optional", "0")],
     ],
-    ids=["two_level", "dedp", "nested_all_of", "min_zero"],
+    ids=["two_level", "dedp", "min_zero"],
 )
 def test_validate_requirement_tree_valid(tree):
     """Trees in the shapes programs use today have no errors"""
@@ -75,20 +66,16 @@ def test_validate_requirement_tree_valid(tree):
     ("tree", "display_mode", "message"),
     [
         ([_course(1)], None, "Top-level requirements must be groups"),
+        ([_all_of("", _course(1))], None, "A top-level group has no Title."),
         (
-            [_all_of("Required", _all_of("", _course(1)))],
+            [_min_of("Electives", "1", _all_of("Group", _course(1)))],
             None,
-            'A group in "Required" has no Title.',
-        ),
-        (
-            [_min_of("Electives", "1", _min_of("One of", "1", _course(1)))],
-            None,
-            '"One of" is a "Minimum # of" group inside another group',
+            '"Group" is a group inside another group',
         ),
         ([_min_of("Electives", None, _course(1))], None, "whole number, 0 or more"),
         ([_min_of("Electives", "-1", _course(1))], None, "whole number, 0 or more"),
         (
-            [_min_of("Electives", "2", _all_of("Group", _course(1), _course(2)))],
+            [_min_of("Electives", "2", _course(1))],
             None,
             "Value of 2 but only 1 item(s)",
         ),
@@ -101,7 +88,7 @@ def test_validate_requirement_tree_valid(tree):
     ids=[
         "top_level_course",
         "untitled_group",
-        "nested_min_number_of",
+        "nested_group",
         "value_missing",
         "value_negative",
         "value_above_child_count",
