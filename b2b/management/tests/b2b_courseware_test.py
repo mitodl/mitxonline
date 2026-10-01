@@ -49,7 +49,7 @@ def _add_run_languages(run):
             language=lang,
             is_primary_language=False,
             is_source_run=run.is_source_run,
-            b2b_contract=run.b2b_contract,
+            b2b_contracts=list(run.b2b_contracts.all()),
             start_date=run.start_date,
             end_date=run.end_date,
             enrollment_start=run.enrollment_start,
@@ -222,7 +222,7 @@ def test_add_courserun():
     """Test adding an extant courserun to a contract."""
 
     contract = ContractPageFactory.create()
-    run = CourseRunFactory.create(b2b_contract=None)
+    run = CourseRunFactory.create()
     command = b2b_courseware.Command()
 
     command.handle(
@@ -237,7 +237,7 @@ def test_add_courserun():
     )
 
     run.refresh_from_db()
-    assert run.b2b_contract == contract
+    assert run.contract_group_ids == {contract.id}
 
 
 def test_add_courserun_existing_contract():
@@ -245,7 +245,7 @@ def test_add_courserun_existing_contract():
 
     contract = ContractPageFactory.create()
     existing_contract = ContractPageFactory.create()
-    run = CourseRunFactory.create(b2b_contract=existing_contract)
+    run = CourseRunFactory.create(b2b_contracts=[existing_contract])
     run.b2b_contracts.add(existing_contract)
     command = b2b_courseware.Command()
 
@@ -261,7 +261,7 @@ def test_add_courserun_existing_contract():
     )
 
     run.refresh_from_db()
-    assert run.b2b_contract == existing_contract
+    assert run.contract_group_ids == {existing_contract.id}
     assert not run.b2b_contracts.filter(id=contract.id).exists()
 
 
@@ -587,7 +587,7 @@ def test_remove_course_prints_summary(capsys):
     """Removing a course should print a removal summary, like removing a program does."""
 
     contract = ContractPageFactory.create()
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_contracts=[contract])
     command = b2b_courseware.Command()
 
     command.handle(
