@@ -90,7 +90,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-prek = ["prek==0.5.4"]
+prek = ["prek==0.5.3"]
 dev = [
     { include-group = "prek" },
     "anys>=0.3.1,<0.4",
@@ -126,7 +126,6 @@ exclude-newer = "7d"
 required-version = ">=0.9.17"
 
 [tool.uv.exclude-newer-package]
-prek = "0d"
 ol-concourse = "0d"
 django-aqueduct = "0d"
 edx-sysadmin = "0d"
