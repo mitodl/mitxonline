@@ -2877,14 +2877,17 @@ class ProgramRequirement(MP_Node):
     elective_courses.add_child(course=course3)
     elective_courses.add_child(course=course4)
 
-    # 3rd elective option is at least one of these courses
-    mut_exclusive_courses = elective_courses.add_child(
-        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
-        operator_value=1
+    # the 3rd elective option is both of these courses, counting as one
+    paired_courses = elective_courses.add_child(
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Paired Courses"
     )
-    mut_exclusive_courses.add_child(course=course5)
-    mut_exclusive_courses.add_child(course=course6)
+    paired_courses.add_child(course=course5)
+    paired_courses.add_child(course=course6)
 
+    A MIN_NUMBER_OF operator counts each satisfied child once.
+    courses.requirement_tree.validate_requirement_tree allows one only directly
+    under the root.
     """
 
     # extended alphabet from the default to the recommended one for postgres
