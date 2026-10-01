@@ -40,12 +40,16 @@ docker compose run --rm web pytest courses/api_test.py
 
 **Linting and formatting:**
 ```bash
-# Prefer pre-commit where possible; Ruff runs via the configured hooks
-pre-commit run ruff-format --all-files
-pre-commit run ruff --all-files
+# Install the locked tooling and replace any existing pre-commit git hook
+uv sync
+uv run prek install -f
+
+# Prefer prek where possible; Ruff runs via the configured hooks
+uv run prek run ruff-format --all-files
+uv run prek run ruff --all-files
 
 # Run all configured checks
-pre-commit run --all-files
+uv run prek run --all-files
 ```
 
 **Run development server:**
@@ -265,7 +269,7 @@ docker compose build web celery  # Rebuild images after changes
 ### Code Style
 
 **Python:**
-- Prefer `pre-commit run` for formatting and linting; Ruff runs via the configured `ruff-format` and `ruff` hooks
+- Prefer `uv run prek run` for formatting and linting; Ruff runs via the configured `ruff-format` and `ruff` hooks
 - Type hints encouraged but not required
 - Docstrings for public APIs
 

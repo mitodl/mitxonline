@@ -55,7 +55,9 @@ from ecommerce.constants import (
     STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
     STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
     STRIPE_EVENTS_CHECKOUT_SESSION,
+    STRIPE_EVENTS_REFUND,
     STRIPE_OBJECT_CHECKOUT_SESSION,
+    STRIPE_OBJECT_REFUND,
     STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
     STRIPE_OVERALL_CHECKOUT_STATUS_ERROR,
     STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
@@ -66,7 +68,9 @@ from ecommerce.constants import (
     STRIPE_PAYMENT_INTENT_STATUS_SUCCEEDED,
     STRIPE_PAYMENT_STATUS_UNPAID,
     STRIPE_PAYMENT_STATUSES_GOOD,
+    STRIPE_REFUND_STATUS_SUCCEEDED,
     STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+    TRANSACTION_TYPE_PAYMENT,
     ZERO_PAYMENT_DATA,
 )
 from ecommerce.discount_sources import (
@@ -95,6 +99,7 @@ from ecommerce.models import (
     PendingOrder,
     Product,
     StripeEventLog,
+    Transaction,
     UserDiscount,
 )
 from ecommerce.tasks import perform_downgrade_from_order
@@ -709,15 +714,7 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
         refund_gateway_request,
     )
 
-    if response.state in REFUND_SUCCESS_STATES:
-        # Record refund transaction with PaymentGateway's refund response
-        order_flow = order.get_object_flow()
-        order_flow.refund(
-            api_response_data=response.response_data,
-            amount=transaction_dict["req_amount"],
-            reason=refund_reason,
-        )
-    else:
+    if response.state not in REFUND_SUCCESS_STATES:
         log.error(
             "There was an error with the Refund API request %s",
             response.message,
@@ -726,11 +723,54 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
         # success so we manually rollback the transaction in this case.
         raise Exception(f"Payment gateway returned an error: {response.message}")  # noqa: EM102, TRY002
 
+    # Record refund transaction with PaymentGateway's refund response
+    record_order_refund(
+        order,
+        api_response_data=response.response_data,
+        amount=transaction_dict["req_amount"],
+        reason=refund_reason,
+        unenroll=unenroll,
+    )
+
+    return True, message
+
+
+def record_order_refund(
+    order: Order,
+    *,
+    api_response_data: dict,
+    amount,
+    reason: str = "",
+    unenroll: bool = False,
+):
+    """
+    Record a refund that the payment processor has already completed.
+
+    This moves the order into the refunded state, logs the refund transaction,
+    and (optionally) queues the enrollment downgrade. It does not talk to the
+    payment gateway - use refund_order if the refund still needs to be issued.
+
+    Args:
+    - order (Order): the fulfilled order that was refunded
+    - api_response_data (dict): the processor's refund data; must have an "id"
+    - amount (Decimal|str|float): the amount refunded
+    - reason (str): the reason for the refund
+    - unenroll (bool): downgrade the learner's enrollments for the order
+    Returns:
+    - Transaction: the refund transaction
+    """
+
+    refund_transaction = order.get_object_flow().refund(
+        api_response_data=api_response_data,
+        amount=amount,
+        reason=reason,
+    )
+
     # If unenroll requested, perform unenrollment after successful refund
     if unenroll:
         perform_downgrade_from_order.delay(order.id)
 
-    return True, message
+    return refund_transaction
 
 
 def downgrade_learner_from_order(order_id):
@@ -1835,6 +1875,164 @@ def process_stripe_checkout_expired(event):
     StripeEventLog.objects.filter(event_id=event.id).update(related_order=order)
 
     order.get_object_flow().cancel(api_response_data=event.to_dict(for_json=True))
+
+    order.refresh_from_db()
+    return order
+
+
+def find_order_for_stripe_payment_intent(payment_intent_id: str) -> Order | None:
+    """
+    Find the order that was paid for with the given Stripe PaymentIntent.
+
+    The PaymentIntent ID isn't stored separately, so this looks through the
+    payment transaction data. Depending on how the order got fulfilled, the
+    transaction data is either the checkout.session.completed Event (so the ID
+    is in data.object.payment_intent) or a CheckoutSession (so the ID is in
+    payment_intent, or payment_intent.id if the PaymentIntent was expanded).
+
+    Args:
+    - payment_intent_id (str): the Stripe PaymentIntent ID
+    Returns:
+    - Order, or None if no order has a transaction for the PaymentIntent
+    """
+
+    payment_transaction = (
+        Transaction.objects.filter(
+            transaction_type=TRANSACTION_TYPE_PAYMENT,
+            order__gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+        )
+        .filter(
+            Q(data__data__object__payment_intent=payment_intent_id)
+            | Q(data__payment_intent=payment_intent_id)
+            | Q(data__payment_intent__id=payment_intent_id)
+        )
+        .select_related("order")
+        .order_by("-created_on")
+        .first()
+    )
+
+    return payment_transaction.order if payment_transaction else None
+
+
+def process_stripe_refund_updated(event: stripe.Event):  # noqa: PLR0911
+    """
+    Process a refund.updated or charge.refund.updated event.
+
+    Refunds for Stripe orders are issued in Stripe, so this records them in
+    MITx Online once they've succeeded: the order is moved to the refunded
+    state, the refund is logged as a transaction, and the learner's enrollments
+    are downgraded. Stripe may send both event types for the same refund, so
+    the order is locked and skipped if it's already been refunded.
+
+    Args:
+    - event (stripe.Event): the refund event
+    Returns:
+    - Order: the order, if it was refunded
+    - True: if there was nothing to do
+    - False: if the refund couldn't be recorded
+    """
+
+    if event.type not in STRIPE_EVENTS_REFUND:
+        msg = (
+            "Event "
+            f"{event.id} passed to process_stripe_refund_updated is type "
+            f"{event.type} - expected one of {STRIPE_EVENTS_REFUND}"
+        )
+        raise ValueError(msg)
+
+    refund = event.data.object.to_dict(for_json=True)
+    refund_id = refund.get("id")
+
+    if refund.get("object") != STRIPE_OBJECT_REFUND:
+        log.error(
+            "process_stripe_refund_updated: event %s has a %s object, not a refund",
+            event.id,
+            refund.get("object"),
+        )
+        return False
+
+    if refund.get("status") != STRIPE_REFUND_STATUS_SUCCEEDED:
+        log.info(
+            "process_stripe_refund_updated: refund %s (event %s) is %s, not %s - skipping",
+            refund_id,
+            event.id,
+            refund.get("status"),
+            STRIPE_REFUND_STATUS_SUCCEEDED,
+        )
+        return True
+
+    payment_intent_id = refund.get("payment_intent")
+
+    if not payment_intent_id:
+        log.error(
+            "process_stripe_refund_updated: refund %s (event %s) has no PaymentIntent",
+            refund_id,
+            event.id,
+        )
+        return False
+
+    order = find_order_for_stripe_payment_intent(payment_intent_id)
+
+    if not order:
+        log.error(
+            "process_stripe_refund_updated: refund %s (event %s) is for PaymentIntent %s, which doesn't match any order",
+            refund_id,
+            event.id,
+            payment_intent_id,
+        )
+        return False
+
+    StripeEventLog.objects.filter(event_id=event.id).update(related_order=order)
+
+    with transaction.atomic():
+        order = Order.objects.select_for_update().get(pk=order.id)
+
+        if order.state == OrderStatus.REFUNDED:
+            log.info(
+                "process_stripe_refund_updated: order %s is already refunded - skipping refund %s (event %s)",
+                order.reference_number,
+                refund_id,
+                event.id,
+            )
+            return True
+
+        if order.state != OrderStatus.FULFILLED:
+            log.error(
+                "process_stripe_refund_updated: can't refund order %s for refund %s (event %s): order is %s, not %s",
+                order.reference_number,
+                refund_id,
+                event.id,
+                order.state,
+                OrderStatus.FULFILLED,
+            )
+            return False
+
+        # Stripe amounts are in cents.
+        refund_amount = Decimal(refund.get("amount") or 0) / 100
+
+        if refund_amount != order.total_price_paid:
+            log.warning(
+                "process_stripe_refund_updated: refund %s for order %s is for %s but the order total is %s",
+                refund_id,
+                order.reference_number,
+                refund_amount,
+                order.total_price_paid,
+            )
+
+        record_order_refund(
+            order,
+            api_response_data=refund,
+            amount=refund_amount,
+            reason=refund.get("reason") or "",
+            unenroll=True,
+        )
+
+    log.info(
+        "process_stripe_refund_updated: refunded order %s for refund %s (event %s)",
+        order.reference_number,
+        refund_id,
+        event.id,
+    )
 
     order.refresh_from_db()
     return order
