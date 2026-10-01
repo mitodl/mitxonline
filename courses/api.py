@@ -1442,16 +1442,17 @@ def override_user_grade(
 
 def _has_earned_program_cert(user, program):
     """
-    Checks if a user has earned all the course certificates required
-    for a given program.
+    Return True if the user has satisfied the program's requirement tree.
+
+    A course counts when the user, actively enrolled in one of its runs, holds an
+    unrevoked certificate for that run or a passing grade in a run that does not
+    offer the verified mode. A required program counts through the user's
+    unrevoked certificate in it when it has a paid enrollment mode, and otherwise
+    when the user satisfies its own tree.
 
     Args:
         user (User): a Django user.
         program (programs.models.Program): program where the user is enrolled.
-
-    Returns:
-        bool: True if a user has earned all the course certificates required
-              for a given program else False
     """
 
     user_courseruns = (
