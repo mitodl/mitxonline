@@ -62,8 +62,17 @@ class BaseProgramRequirementTreeSerializer(serializers.ListSerializer):
 
         def _get_existing(data):
             node_id = data.get("id", None)
+            # Scoped to the program and the node type: a submitted id from
+            # another program's tree, or one whose type changed, is treated as
+            # a new node rather than moving or rewriting that node. Rewriting
+            # would let a track that enrollments chose become a course or
+            # group while their track FK still points at it.
             return (
-                models.ProgramRequirement.objects.filter(id=node_id).first()
+                models.ProgramRequirement.objects.filter(
+                    id=node_id,
+                    program_id=instance.program_id,
+                    node_type=data["data"]["node_type"],
+                ).first()
                 if node_id
                 else None
             )

@@ -31,6 +31,7 @@ from courses.factories import (
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
+    create_program_with_tracks,
     program_with_empty_requirements,  # noqa: F401
     program_with_requirements,  # noqa: F401
     program_with_tracks,  # noqa: F401
@@ -538,6 +539,7 @@ def test_audit(user, is_program):
         expected["edx_enrollment_retry_count"] = enrollment.edx_enrollment_retry_count
     else:
         expected["program"] = enrollment.program.id
+        expected["track"] = None
     assert (
         enrollment.get_audit_class().objects.get(enrollment=enrollment).data_after
         == expected
@@ -2215,3 +2217,37 @@ def test_program_requirement_track_node_constraint(
         parent.add_child(
             node_type=ProgramRequirementNodeType.TRACK, title="Stray Track", **extra
         )
+
+
+@pytest.mark.parametrize("wrong_node", ["group", "other_program_track"])
+def test_program_enrollment_clean_rejects_wrong_track(
+    program_with_tracks,  # noqa: F811
+    wrong_node,
+):
+    """clean() rejects a node that is not a track, and a track of another program"""
+    enrollment = ProgramEnrollmentFactory.create(program=program_with_tracks.program)
+    enrollment.track = (
+        program_with_tracks.tracks_node
+        if wrong_node == "group"
+        else create_program_with_tracks().track_nodes[0]
+    )
+
+    with pytest.raises(ValidationError) as exc:
+        enrollment.full_clean()
+
+    assert "track" in exc.value.message_dict
+
+
+def test_program_requirement_track_delete_clears_enrollment_track(
+    program_with_tracks,  # noqa: F811
+):
+    """Deleting a track node leaves enrollments that chose it with no track"""
+    track = program_with_tracks.track_nodes[0]
+    enrollment = ProgramEnrollmentFactory.create(
+        program=program_with_tracks.program, track=track
+    )
+
+    track.delete()
+
+    enrollment.refresh_from_db()
+    assert enrollment.track is None

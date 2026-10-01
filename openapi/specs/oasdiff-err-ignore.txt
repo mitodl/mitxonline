@@ -357,3 +357,20 @@ PUT /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ added the new `M`
 PUT /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ added the new `M` enum value to the `redeemed_by/b2b_organizations/items/contracts/items/variant_options/items/variant_industry/oneOf[#/components/schemas/VariantIndustryEnum]/` response property for the response status `200`
 PUT /api/v1/enrollments/{id}/ added the new `M` enum value to the `run/allOf[#/components/schemas/V1CourseRunWithCourse]/variant_industry/oneOf[#/components/schemas/VariantIndustryEnum]/` response property for the response status `200`
 GET /api/v2/courses/ removed the enum value `M` from the `query` request parameter `courseruns__variant_industry`
+# mitodl/hq#13656: requirement-tree node_type gained `track`. It appears only in
+# the req_tree of a program whose requirements staff have given tracks, and
+# Learn's track support is separate work under the same issue. Additive enum
+# growth, not a contract break.
+GET /api/v1/program_enrollments/ added the new `track` enum value to the `items/program/req_tree/items/data/node_type` response property for the response status `200`
+DELETE /api/v1/program_enrollments/{id}/ added the new `track` enum value to the `program/req_tree/items/data/node_type` response property for the response status `200`
+GET /api/v1/program_enrollments/{id}/ added the new `track` enum value to the `program/req_tree/items/data/node_type` response property for the response status `200`
+GET /api/v1/programs/ added the new `track` enum value to the `results/items/req_tree/items/data/node_type` response property for the response status `200`
+GET /api/v1/programs/{id}/ added the new `track` enum value to the `req_tree/items/data/node_type` response property for the response status `200`
+GET /api/v2/pages/?fields=*&type=cms.programpage added the new `track` enum value to the `items/items/program_details/req_tree/items/data/node_type` response property for the response status `200`
+GET /api/v2/pages/{id}/ added the new `track` enum value to the `oneOf[#/components/schemas/ProgramPageItem]/program_details/req_tree/items/data/node_type` response property for the response status `200`
+GET /api/v2/program_certificates/{uuid}/ added the new `track` enum value to the `program/req_tree/items/data/node_type` response property for the response status `200`
+GET /api/v2/program_enrollments/ added the new `track` enum value to the `items/program/req_tree/items/data/node_type` response property for the response status `200`
+DELETE /api/v2/program_enrollments/{id}/ added the new `track` enum value to the `items/program/req_tree/items/data/node_type` response property for the response status `200`
+GET /api/v2/program_enrollments/{id}/ added the new `track` enum value to the `program/req_tree/items/data/node_type` response property for the response status `200`
+GET /api/v2/programs/ added the new `track` enum value to the `results/items/req_tree/items/data/node_type` response property for the response status `200`
+GET /api/v2/programs/{id}/ added the new `track` enum value to the `req_tree/items/data/node_type` response property for the response status `200`

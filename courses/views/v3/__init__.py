@@ -49,6 +49,7 @@ from courses.serializers.v3.courses import (
 from courses.serializers.v3.programs import (
     ProgramEnrollmentCreateSerializer,
     ProgramEnrollmentSerializer,
+    ProgramEnrollmentTrackSerializer,
 )
 from courses.throttles import EnrollmentEligibilityThrottle
 from courses.utils import get_enrollable_courseruns_qs
@@ -183,6 +184,21 @@ class UserEnrollmentsApiViewSet(
         ],
         responses={204: None},
     ),
+    partial_update=extend_schema(
+        operation_id="v3_program_enrollments_partial_update",
+        description="Set or clear the learner's chosen track for this program.",
+        parameters=[
+            OpenApiParameter(
+                name="program_id",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                description="Program ID",
+                required=True,
+            )
+        ],
+        request=ProgramEnrollmentTrackSerializer,
+        responses={200: ProgramEnrollmentSerializer},
+    ),
 )
 class UserProgramEnrollmentsViewSet(
     mixins.CreateModelMixin,
@@ -203,6 +219,7 @@ class UserProgramEnrollmentsViewSet(
         ProgramEnrollment.objects.prefetch_related(
             "program",
         )
+        .select_related("track")
         .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
         .prefetch("certificate")
         .order_by("-id")
@@ -217,6 +234,8 @@ class UserProgramEnrollmentsViewSet(
         """Return appropriate serializer class based on action."""
         if self.action == "create":
             return ProgramEnrollmentCreateSerializer
+        if self.action == "partial_update":
+            return ProgramEnrollmentTrackSerializer
         return ProgramEnrollmentSerializer
 
     def create(self, request, *args, **kwargs):  # noqa: ARG002
@@ -262,6 +281,25 @@ class UserProgramEnrollmentsViewSet(
             raise EnrollmentError
         response_serializer = ProgramEnrollmentSerializer(enrollments[0])
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+    def partial_update(self, request, *args, **kwargs):  # noqa: ARG002
+        """
+        Set or clear the learner's chosen track for this program.
+
+        Body: {"track": <track node id> | null}; a body without "track" changes
+        nothing. Returns the updated enrollment. 404 when the user has no
+        active enrollment in the program. There is no PUT.
+        """
+        enrollment = self.get_object()
+        serializer = self.get_serializer(enrollment, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        if "track" in serializer.validated_data:
+            enrollment.track = serializer.validated_data["track"]
+            # Only the track: a full-row save would write back the mode and
+            # active flag this request read, over a concurrent upgrade or
+            # unenrollment.
+            enrollment.save_and_log(request.user, update_fields=["track", "updated_on"])
+        return Response(ProgramEnrollmentSerializer(enrollment).data)
 
     def destroy(self, request, *args, **kwargs):  # noqa: ARG002
         """

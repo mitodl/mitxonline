@@ -620,6 +620,7 @@ class ProgramEnrollmentAdmin(AuditableModelAdmin):
     raw_id_fields = (
         "user",
         "program",
+        "track",
     )
     readonly_fields = ("created_on", "updated_on")
     inlines = [ProgramEnrollmentAuditInline]

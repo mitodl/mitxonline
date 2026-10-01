@@ -5386,6 +5386,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/V3UserProgramEnrollment'
           description: ''
+    patch:
+      operationId: v3_program_enrollments_partial_update
+      description: Set or clear the learner's chosen track for this program.
+      parameters:
+      - in: path
+        name: program_id
+        schema:
+          type: integer
+        description: Program ID
+        required: true
+      tags:
+      - program_enrollments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedV3ProgramEnrollmentTrackRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedV3ProgramEnrollmentTrackRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedV3ProgramEnrollmentTrackRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V3UserProgramEnrollment'
+          description: ''
     delete:
       operationId: v3_program_enrollments_destroy
       description: |-
@@ -9479,15 +9509,18 @@ components:
       - operator
       - course
       - program
+      - track
       type: string
       description: |-
         * `operator` - operator
         * `course` - course
         * `program` - program
+        * `track` - track
       x-enum-descriptions:
       - operator
       - course
       - program
+      - track
     NullEnum:
       enum:
       - null
@@ -10870,6 +10903,13 @@ components:
           nullable: true
           description: If set, this discount code will not be redeemable after this
             date.
+    PatchedV3ProgramEnrollmentTrackRequest:
+      type: object
+      description: Sets or clears the learner's chosen track on a program enrollment.
+      properties:
+        track:
+          type: integer
+          nullable: true
     PaymentTypeEnum:
       enum:
       - marketing
@@ -13428,6 +13468,9 @@ components:
           type: boolean
           nullable: true
           default: false
+        description:
+          type: string
+          default: ''
       required:
       - node_type
     V2Course:
@@ -14578,6 +14621,9 @@ components:
           type: boolean
           nullable: true
           default: false
+        description:
+          type: string
+          default: ''
       required:
       - node_type
     V2UserProgramEnrollmentDetail:
@@ -14650,6 +14696,18 @@ components:
           writeOnly: true
       required:
       - program_id
+    V3ProgramTrack:
+      type: object
+      description: A track node of a program's requirement tree.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          nullable: true
+      required:
+      - id
     V3SimpleProgram:
       type: object
       description: Program Model Serializer v2
@@ -14700,9 +14758,15 @@ components:
         enrollment_mode:
           type: string
           maxLength: 20
+        track:
+          allOf:
+          - $ref: '#/components/schemas/V3ProgramTrack'
+          readOnly: true
+          nullable: true
       required:
       - certificate
       - program
+      - track
     VariantIndustryEnum:
       enum:
       - E

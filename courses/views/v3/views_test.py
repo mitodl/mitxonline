@@ -26,6 +26,8 @@ from courses.factories import (
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
+    create_program_with_tracks,
+    program_with_tracks,  # noqa: F401
 )
 from courses.models import (
     CourseRunEnrollment,
@@ -485,6 +487,7 @@ def test_program_enrollments(
                 program_enrollment.program, user
             ),
             "enrollment_mode": program_enrollment.enrollment_mode,
+            "track": None,
         }
         for program_enrollment in program_enrollments
     ]
@@ -993,3 +996,113 @@ class TestEnrollmentEligibility:
             user_drf_client.post(endpoints["run"](run)).status_code
             == status.HTTP_429_TOO_MANY_REQUESTS
         )
+
+
+def _program_enrollment_url(program):
+    return reverse(
+        "v3:user_program_enrollments_api-detail", kwargs={"program_id": program.id}
+    )
+
+
+def test_program_enrollments_include_track(
+    user_drf_client, user, django_assert_max_num_queries
+):
+    """The list carries each enrollment's chosen track with no query per enrollment"""
+    enrollments = [
+        ProgramEnrollmentFactory.create(
+            user=user, program=tracked.program, track=tracked.track_nodes[0]
+        )
+        for tracked in (create_program_with_tracks(), create_program_with_tracks())
+    ]
+
+    with django_assert_max_num_queries(4):
+        resp = user_drf_client.get(reverse("v3:user_program_enrollments_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert [enrollment["track"] for enrollment in resp.json()] == [
+        {"id": enrollment.track.id, "title": enrollment.track.title}
+        for enrollment in reversed(enrollments)
+    ]
+
+
+def test_update_program_enrollment_track(
+    user_drf_client,
+    user,
+    program_with_tracks,  # noqa: F811
+):
+    """PATCH sets, changes and clears the enrollment's track"""
+    enrollment = ProgramEnrollmentFactory.create(
+        user=user, program=program_with_tracks.program
+    )
+    url = _program_enrollment_url(enrollment.program)
+
+    for track in [*program_with_tracks.track_nodes, None]:
+        resp = user_drf_client.patch(
+            url, {"track": track.id if track else None}, format="json"
+        )
+
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.json()["track"] == (
+            {"id": track.id, "title": track.title} if track else None
+        )
+        enrollment.refresh_from_db()
+        assert enrollment.track == track
+
+
+def test_update_program_enrollment_track_without_field(
+    user_drf_client,
+    user,
+    program_with_tracks,  # noqa: F811
+):
+    """A PATCH that omits track leaves the chosen track alone"""
+    track = program_with_tracks.track_nodes[0]
+    enrollment = ProgramEnrollmentFactory.create(
+        user=user, program=program_with_tracks.program, track=track
+    )
+
+    resp = user_drf_client.patch(_program_enrollment_url(enrollment.program), {})
+
+    assert resp.status_code == status.HTTP_200_OK
+    enrollment.refresh_from_db()
+    assert enrollment.track == track
+
+
+@pytest.mark.parametrize("wrong_node", ["group", "other_program_track"])
+def test_update_program_enrollment_track_rejects_wrong_node(
+    user_drf_client,
+    user,
+    program_with_tracks,  # noqa: F811
+    wrong_node,
+):
+    """PATCH rejects a node that is not a track, and a track of another program"""
+    enrollment = ProgramEnrollmentFactory.create(
+        user=user, program=program_with_tracks.program
+    )
+    node = (
+        program_with_tracks.tracks_node
+        if wrong_node == "group"
+        else create_program_with_tracks().track_nodes[0]
+    )
+
+    resp = user_drf_client.patch(
+        _program_enrollment_url(enrollment.program), {"track": node.id}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert "track" in resp.json()["errors"]
+    enrollment.refresh_from_db()
+    assert enrollment.track is None
+
+
+def test_update_program_enrollment_track_without_enrollment(
+    user_drf_client,
+    program_with_tracks,  # noqa: F811
+):
+    """PATCH is a 404 when the user has no active enrollment in the program"""
+    resp = user_drf_client.patch(
+        _program_enrollment_url(program_with_tracks.program),
+        {"track": program_with_tracks.track_nodes[0].id},
+        format="json",
+    )
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND

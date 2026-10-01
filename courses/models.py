@@ -2637,12 +2637,31 @@ class ProgramEnrollment(EnrollmentModel):
         null=True,
         blank=True,
     )
+    # The chosen track only selects which view of the program the learner sees;
+    # certificates and the nightly upgrade never read it, so deleting the track
+    # node just clears the choice.
+    track = models.ForeignKey(
+        "courses.ProgramRequirement",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="The track the learner chose, a track node of this program",
+    )
 
     objects = ActiveProgramEnrollmentManager()
     all_objects = ProgramEnrollmentManager()
 
     class Meta:
         unique_together = ("user", "program")
+
+    def clean(self):
+        """Require track, when set, to be a track node of this program"""
+        super().clean()
+        if self.track is not None and not (
+            self.track.is_track and self.track.program_id == self.program_id
+        ):
+            raise ValidationError({"track": "Must be a track of this program."})
 
     @property
     def is_ended(self):
