@@ -13047,7 +13047,6 @@ components:
         certificate_page_revision:
           type: integer
           readOnly: true
-          nullable: true
       required:
       - certificate_page
       - certificate_page_revision
@@ -13669,7 +13668,6 @@ components:
         certificate_page_revision:
           type: integer
           readOnly: true
-          nullable: true
       required:
       - certificate_page
       - certificate_page_revision
