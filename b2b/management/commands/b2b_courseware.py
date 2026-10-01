@@ -170,9 +170,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
 
         # Parse out the variants specified.
         filter_variants = (
-            list(contract.variant_options.filter(active=True))
-            if len(variants) == 0
-            else []
+            list(contract.active_variant_options()) if len(variants) == 0 else []
         )
 
         for variant in variants:

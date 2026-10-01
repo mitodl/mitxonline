@@ -346,3 +346,46 @@ def test_deactivated_variant_set():
         .filter(course=other_course)
         .values_list("language", flat=True)
     ) == ["en"]
+
+
+def test_inactive_default_variant_set_still_filters():
+    """
+    A default set turned off in the admin still limits new runs to it, rather
+    than leaving an empty filter that means every variant the course has.
+    """
+
+    contract = ContractPageFactory.create()
+    default = contract.default_variant_options
+    default.active = False
+    default.save()
+
+    add_courseware_to_contract(contract, _bilingual_source_course())
+
+    assert list(contract.get_course_runs().values_list("language", flat=True)) == ["en"]
+
+
+def test_variant_coverage_reports_newest_contract_run():
+    """With two contract runs for one course and variant, the newer is listed."""
+
+    contract = ContractPageFactory.create()
+    course = _source_run().course
+    add_courseware_to_contract(contract, course)
+    add_courseware_to_contract(contract, course, no_reruns=False)
+    newest = contract.get_course_runs().order_by("-id").first()
+
+    [entry] = get_contract_variant_coverage(contract)
+
+    assert entry["courses"][0]["contract_run"] == newest
+
+
+def test_unchanged_variant_set_update_is_not_audited():
+    """A PATCH that changes nothing leaves no entry in the change history."""
+
+    contract = ContractPageFactory.create()
+    variant = add_contract_variant_set(contract, language="fr")
+
+    update_contract_variant_set(contract, variant, active=True, b2b_only=False)
+
+    assert not OrganizationProvisioningAudit.objects.filter(
+        action=PROVISIONING_ACTION_CONTRACT_VARIANT_UPDATED
+    ).exists()

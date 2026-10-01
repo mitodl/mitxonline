@@ -9,6 +9,7 @@ and the staff contract API do them the same way.
 import logging
 from dataclasses import dataclass
 
+from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.db.models import Q
 from mitol.common.utils import now_in_utc
@@ -139,7 +140,7 @@ def add_courseware_to_contract(  # noqa: PLR0913
     """
 
     if filter_variants is None:
-        filter_variants = list(contract.variant_options.filter(active=True))
+        filter_variants = list(contract.active_variant_options())
 
     if courseware.is_program:
         runs_added, no_source = contract.add_program_courses(
@@ -473,22 +474,23 @@ def get_contract_variant_coverage(contract: ContractPage) -> list[dict]:
         .distinct()
         .order_by("readable_id")
     )
-    course_variants = {
-        course.id: {
-            _variant_fields(variant)
-            for variant in course.possible_variant_sets.filter(active=True)
-        }
-        for course in courses
-    }
+    course_variants = {course.id: set() for course in courses}
+    for variant in SupportedVariant.objects.filter(
+        content_type=ContentType.objects.get_for_model(Course),
+        object_id__in=course_variants,
+        active=True,
+    ):
+        course_variants[variant.object_id].add(_variant_fields(variant))
     source_runs = {
         (run.course_id, *_variant_fields(run))
         for run in CourseRun.all_objects.filter(course__in=courses).filter(
             Q(is_source_run=True) | Q(run_tag="SOURCE")
         )
     }
+    # Ascending, so the newest run for a course and variant is the one kept.
     contract_runs = {
         (run.course_id, *_variant_fields(run)): run
-        for run in CourseRun.all_objects.filter(b2b_contracts=contract).order_by("-id")
+        for run in CourseRun.all_objects.filter(b2b_contracts=contract).order_by("id")
     }
 
     coverage = []
@@ -581,6 +583,8 @@ def update_contract_variant_set(
     closed and enrollments in them are untouched, so turning the set back on
     restores it. Closing runs is what removing courseware is for.
 
+    A change that changes nothing is not saved or audited.
+
     Raises ContractVariantError for a change to the default set: deactivating
     it would leave the contract's learners an empty course list, and the
     database refuses a b2b_only default.
@@ -597,6 +601,9 @@ def update_contract_variant_set(
         variant.active = active
     if b2b_only is not None:
         variant.b2b_only = b2b_only
+    after = _variant_set_snapshot(contract, variant)
+    if after == before:
+        return variant
     variant.save()
 
     _audit(
@@ -604,7 +611,7 @@ def update_contract_variant_set(
         PROVISIONING_ACTION_CONTRACT_VARIANT_UPDATED,
         actor=actor,
         data_before=before,
-        data_after=_variant_set_snapshot(contract, variant),
+        data_after=after,
     )
 
     return variant

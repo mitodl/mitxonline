@@ -480,7 +480,7 @@ def test_add_variant_set_rejected(admin_drf_client, payload):
 
 
 def test_update_variant_set(admin_drf_client):
-    """A non-default set can be turned off and back on."""
+    """A non-default set can be turned off and back on, and made B2B-only."""
 
     contract = ContractPageFactory.create()
     variant = admin_drf_client.post(
@@ -488,10 +488,13 @@ def test_update_variant_set(admin_drf_client):
     ).json()
     url = _variant_url(contract, contract.variant_options.get(id=variant["id"]))
 
-    response = admin_drf_client.patch(url, {"active": False}, format="json")
+    response = admin_drf_client.patch(
+        url, {"active": False, "b2b_only": True}, format="json"
+    )
 
     assert response.status_code == status.HTTP_200_OK
     assert response.json()["active"] is False
+    assert response.json()["b2b_only"] is True
     assert (
         admin_drf_client.patch(url, {"active": True}, format="json").json()["active"]
         is True
