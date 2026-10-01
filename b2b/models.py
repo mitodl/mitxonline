@@ -616,7 +616,12 @@ class ContractPage(Page, ClusterableModel):
         return [sv.variant_object for sv in sv_qset.all()]
 
     def get_all_variant_runs(self):
-        """Get runs matching the configured variants for the contract."""
+        """
+        Get runs matching the contract's active variant sets.
+
+        The default set is always included. A deactivated set's runs drop out
+        of the list, but stay in the contract.
+        """
 
         run_qs = self.get_course_runs()
 
@@ -631,7 +636,9 @@ class ContractPage(Page, ClusterableModel):
 
         run_qs_filter = self.default_variant_options.to_q_filter()
 
-        for variant_set in self.variant_options.filter(default_variant=False).all():
+        for variant_set in self.variant_options.filter(
+            default_variant=False, active=True
+        ).all():
             run_qs_filter = run_qs_filter | variant_set.to_q_filter()
 
         return run_qs.filter(run_qs_filter).all()

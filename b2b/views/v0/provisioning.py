@@ -32,16 +32,20 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.constants import ONBOARDING_STATE_CHOICES
 from b2b.contracts import (
+    add_contract_variant_set,
     add_courseware_to_contract,
     create_contract,
     expire_unused_enrollment_codes,
     get_contract_setup_status,
+    get_contract_variant_coverage,
     queue_enrollment_code_check_if_required,
     remove_courseware_from_contract,
     retry_contract_setup,
+    update_contract_variant_set,
 )
 from b2b.exceptions import (
     AliasCollisionError,
+    ContractVariantError,
     InvalidLifecycleTransitionError,
     OrganizationNameCollisionError,
     OrganizationNotProvisionedError,
@@ -73,8 +77,10 @@ from b2b.serializers.v0.manager import (
 from b2b.serializers.v0.provisioning import (
     ContractCoursewareSerializer,
     ContractSetupStatusSerializer,
+    ContractVariantSetSerializer,
     CoursewareAdditionSerializer,
     CreateContractSerializer,
+    CreateContractVariantSetSerializer,
     CreateIdentityProviderSerializer,
     CreateOrganizationSerializer,
     ExpiredEnrollmentCodeSerializer,
@@ -89,6 +95,7 @@ from b2b.serializers.v0.provisioning import (
     RemovedContractRunSerializer,
     SetOnboardingStateSerializer,
     UpdateContractSerializer,
+    UpdateContractVariantSetSerializer,
     UpdateOrganizationSerializer,
 )
 from b2b.views.v0.manager import (
@@ -738,6 +745,110 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
         return Response(
             ContractSetupStatusSerializer(get_contract_setup_status(contract)).data
         )
+
+    def _variant_set_response(self, contract, variant, response_status):
+        """Return one variant set with the courses it matches."""
+
+        coverage = next(
+            entry
+            for entry in get_contract_variant_coverage(contract)
+            if entry["variant"].id == variant.id
+        )
+        return Response(
+            ContractVariantSetSerializer(coverage).data, status=response_status
+        )
+
+    @extend_schema(responses={200: ContractVariantSetSerializer(many=True)})
+    @action(detail=True, methods=["get"], pagination_class=None)
+    def variants(self, request, pk=None, **kwargs):  # noqa: ARG002
+        """
+        List the contract's variant sets, default first.
+
+        Each set lists the contract's courses that support it, whether each has
+        a source run for it, and the contract's run for it if there is one.
+        """
+
+        return Response(
+            ContractVariantSetSerializer(
+                get_contract_variant_coverage(self.get_object()), many=True
+            ).data
+        )
+
+    @extend_schema(
+        request=CreateContractVariantSetSerializer,
+        responses={201: ContractVariantSetSerializer, 400: DetailSerializer},
+    )
+    @variants.mapping.post
+    def add_variant(self, request, pk=None, **kwargs):  # noqa: ARG002
+        """
+        Add a variant set to the contract.
+
+        Creates no runs. Adding the courseware to the contract again creates
+        runs for the new set.
+        """
+
+        contract = self.get_object()
+
+        request_serializer = CreateContractVariantSetSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+
+        try:
+            variant = add_contract_variant_set(
+                contract, **request_serializer.validated_data, actor=request.user
+            )
+        except ContractVariantError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return self._variant_set_response(contract, variant, status.HTTP_201_CREATED)
+
+    @extend_schema(
+        request=UpdateContractVariantSetSerializer,
+        responses={
+            200: ContractVariantSetSerializer,
+            400: DetailSerializer,
+            404: DetailSerializer,
+        },
+        parameters=[
+            OpenApiParameter(
+                "variant_id",
+                OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                description="The variant set's ID.",
+            )
+        ],
+    )
+    @action(
+        detail=True,
+        methods=["patch"],
+        url_path=r"variants/(?P<variant_id>[0-9]+)",
+        url_name="variant-detail",
+    )
+    def update_variant(self, request, pk=None, variant_id=None, **kwargs):  # noqa: ARG002
+        """
+        Turn a variant set on or off, or change its b2b_only flag.
+
+        Turning a set off stops new runs being created for it and drops its
+        runs from the contract's course list. Its existing runs and their
+        enrollments are left alone. The default set can't be turned off.
+        """
+
+        contract = self.get_object()
+        variant = get_object_or_404(contract.variant_options, id=variant_id)
+
+        request_serializer = UpdateContractVariantSetSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+
+        try:
+            update_contract_variant_set(
+                contract,
+                variant,
+                **request_serializer.validated_data,
+                actor=request.user,
+            )
+        except ContractVariantError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return self._variant_set_response(contract, variant, status.HTTP_200_OK)
 
     @extend_schema(responses={200: ManagerEnrollmentCodeSerializer(many=True)})
     @action(detail=True, methods=["get"])

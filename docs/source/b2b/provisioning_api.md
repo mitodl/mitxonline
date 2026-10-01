@@ -216,6 +216,9 @@ POST   .../contracts/{id}/retry-setup/
 GET    .../contracts/{id}/codes/
 POST   .../contracts/{id}/codes/expire/
 POST   .../contracts/{id}/codes/assign/
+GET    .../contracts/{id}/variants/
+POST   .../contracts/{id}/variants/
+PATCH  .../contracts/{id}/variants/{variant_id}/
 ```
 
 These replace running `b2b_contract`, `b2b_courseware`, `b2b_codes` and
@@ -235,6 +238,20 @@ run that already belongs to another contract is skipped and stays where it is.
 
 `courseware/remove/` closes the removed runs to new enrollments. A run that
 already has enrolled learners stays linked to the contract so they keep access.
+
+`variants/` lists the contract's variant sets, default first. Each set lists
+the contract's courses (from its runs and its programs) that support the same
+language, length and industry, whether each has a source run for it, and the
+contract's run for it if there is one. A course with a source run and no
+contract run gets one the next time its courseware is added to the contract.
+`POST` adds a set (`language`, `variant_length`, `variant_industry`,
+`b2b_only`). It never adds a default, since every contract already has one,
+and a set the contract already has, active or not, is a 400. Adding a set
+creates no runs. `PATCH` takes `active` and `b2b_only`. An inactive set gets no
+new runs and its runs drop out of the contract's course list, but they stay in
+the contract and their enrollments are untouched, so turning it back on
+restores them. The default set can't be turned off. Variant set changes are
+recorded in the organization's change history.
 
 The codes routes list a contract's enrollment codes, expire the unused ones,
 and assign codes to people by email the same way the manager dashboard's bulk

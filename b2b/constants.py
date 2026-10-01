@@ -137,6 +137,8 @@ PROVISIONING_ACTION_IDP_CREATED = "identity_provider_created"
 PROVISIONING_ACTION_IDP_TRANSITIONED = "identity_provider_transitioned"
 PROVISIONING_ACTION_IDP_METADATA_REFRESHED = "identity_provider_metadata_refreshed"
 PROVISIONING_ACTION_IDP_DELETED = "identity_provider_deleted"
+PROVISIONING_ACTION_CONTRACT_VARIANT_ADDED = "contract_variant_added"
+PROVISIONING_ACTION_CONTRACT_VARIANT_UPDATED = "contract_variant_updated"
 
 PROVISIONING_ACTION_CHOICES = [
     (PROVISIONING_ACTION_ORG_CREATED, "Organization created"),
@@ -149,6 +151,8 @@ PROVISIONING_ACTION_CHOICES = [
         "Identity provider metadata refreshed",
     ),
     (PROVISIONING_ACTION_IDP_DELETED, "Identity provider deleted"),
+    (PROVISIONING_ACTION_CONTRACT_VARIANT_ADDED, "Contract variant set added"),
+    (PROVISIONING_ACTION_CONTRACT_VARIANT_UPDATED, "Contract variant set changed"),
 ]
 
 MAILGUN_LOGS_API_URL = "https://api.mailgun.net/v1/analytics/logs"
