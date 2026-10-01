@@ -17,29 +17,23 @@ def _group_name(title, parent_title):
     return "A top-level group"
 
 
-def _min_number_of_errors(name, data, children, *, top_level) -> list[str]:
-    errors = []
-    if not top_level:
-        errors.append(
-            f'{name} is a "Minimum # of" group inside another group; '
-            '"Minimum # of" groups can only be at the top level.'
-        )
+def _min_number_of_errors(name, data, children) -> list[str]:
     try:
         value = int(str(data.get("operator_value")).strip())
     except ValueError:
         value = None
     if value is None or value < 0:
-        errors.append(
+        return [
             f'{name} needs a "Minimum # of" Value that is a whole number, 0 or more.'
-        )
+        ]
     # The evaluator counts each satisfied child once, so a larger value can
     # never be met.
-    elif value > len(children):
-        errors.append(
+    if value > len(children):
+        return [
             f'{name} has a "Minimum # of" Value of {value} but only '
             f"{len(children)} item(s) to choose from."
-        )
-    return errors
+        ]
+    return []
 
 
 def validate_requirement_tree(
@@ -47,6 +41,14 @@ def validate_requirement_tree(
 ) -> list[str]:
     """
     Check a requirement tree against the rules every saved tree must follow.
+
+    The tree is flat: top-level groups holding only courses and programs. That
+    is the only shape Learn renders. Its product page shows each top-level
+    group's direct courses and programs and drops a nested group
+    (https://github.com/mitodl/mit-learn/blob/b6d0e97e0d619ff30eb3479e9395574ce2254dfc/frontends/main/src/app-pages/ProductPages/util.ts#L34-L78),
+    and its dashboard progress skips one
+    (https://github.com/mitodl/mit-learn/blob/b6d0e97e0d619ff30eb3479e9395574ce2254dfc/frontends/main/src/app-pages/DashboardPage/CoursewareDisplay/model/dashboardViewModel.ts#L222-L232).
+    The evaluator handles nesting, so this rule loosens when Learn does.
 
     Args:
         tree: the root's children, each ``{"id", "data": {...}, "children": [...]}``
@@ -76,12 +78,15 @@ def validate_requirement_tree(
         title = (data.get("title") or "").strip()
         name = _group_name(title, parent_title)
         children = node.get("children") or []
+        if not top_level:
+            errors.append(
+                f"{name} is a group inside another group; groups can contain "
+                "only courses and programs."
+            )
         if not title:
             errors.append(f"{name} has no Title.")
         if data.get("operator") == ProgramRequirement.Operator.MIN_NUMBER_OF:
-            errors.extend(
-                _min_number_of_errors(name, data, children, top_level=top_level)
-            )
+            errors.extend(_min_number_of_errors(name, data, children))
         for child in children:
             _visit(child, top_level=False, parent_title=title or parent_title)
 
