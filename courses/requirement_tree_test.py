@@ -18,15 +18,15 @@ def _program(program_id):
     }
 
 
-def _all_of(title, *children):
+def _all_of(title, *children, **data):
     return {
         "id": None,
-        "data": {"node_type": "operator", "operator": "all_of", "title": title},
+        "data": {"node_type": "operator", "operator": "all_of", "title": title, **data},
         "children": list(children),
     }
 
 
-def _min_of(title, value, *children):
+def _min_of(title, value, *children, **data):
     return {
         "id": None,
         "data": {
@@ -35,9 +35,22 @@ def _min_of(title, value, *children):
             "operator_value": value,
             "title": title,
             "elective_flag": True,
+            **data,
         },
         "children": list(children),
     }
+
+
+def _track(title, *children):
+    return {
+        "id": None,
+        "data": {"node_type": "track", "title": title},
+        "children": list(children),
+    }
+
+
+def _valid_track(title="A Track"):
+    return _track(title, _all_of("Required", _course(7), _course(8)))
 
 
 @pytest.mark.parametrize(
@@ -55,11 +68,25 @@ def _min_of(title, value, *children):
             _min_of("Advanced Electives", "1", _course(4), _course(5)),
         ],
         [_min_of("Optional", "0")],
+        # tracks: core, then one of two tracks, one with its own elective group
+        [
+            _all_of("Core", _course(1)),
+            _min_of(
+                "Tracks",
+                "1",
+                _valid_track("General Track"),
+                _track(
+                    "Methods Track",
+                    _all_of("Required", _course(2)),
+                    _min_of("Electives", "1", _course(3), _course(4)),
+                ),
+            ),
+        ],
     ],
-    ids=["two_level", "dedp", "min_zero"],
+    ids=["two_level", "dedp", "min_zero", "tracks"],
 )
 def test_validate_requirement_tree_valid(tree):
-    """Trees in the shapes programs use today have no errors"""
+    """Trees in the shapes programs use have no errors"""
     assert validate_requirement_tree(tree, display_mode=None) == []
 
 
@@ -101,6 +128,59 @@ def test_validate_requirement_tree_valid(tree):
             PROGRAM_DISPLAY_MODE_COURSE,
             "cannot require other programs",
         ),
+        (
+            [_valid_track()],
+            None,
+            'Track "A Track" must be inside a top-level "Minimum # of" group.',
+        ),
+        (
+            [_all_of("Tracks", _valid_track(), elective_flag=True)],
+            None,
+            '"Tracks" holds tracks, so it must be a "Minimum # of" group.',
+        ),
+        (
+            [_min_of("Tracks", "2", _valid_track("A"), _valid_track("B"))],
+            None,
+            '"Tracks" holds tracks, so its "Minimum # of" Value must be 1',
+        ),
+        (
+            [_min_of("Tracks", "1", _valid_track(), _course(1))],
+            None,
+            '"Tracks" holds tracks, so every item in it must be a track.',
+        ),
+        (
+            [_min_of("Tracks", "1", _valid_track(), elective_flag=False)],
+            None,
+            '"Tracks" holds tracks, so it must be an elective group.',
+        ),
+        (
+            [
+                _min_of("Tracks", "1", _valid_track("A")),
+                _min_of("More Tracks", "1", _valid_track("B")),
+            ],
+            None,
+            "only one group of tracks",
+        ),
+        (
+            [_min_of("Tracks", "1", _track("Idle Track", _all_of("Required")))],
+            None,
+            'Track "Idle Track" requires nothing',
+        ),
+        (
+            [_min_of("Tracks", "1", _track("Flat Track", _course(1)))],
+            None,
+            "A track can only hold groups, not individual courses or programs.",
+        ),
+        (
+            [_min_of("Tracks", "1", _track("", _all_of("Required", _course(1))))],
+            None,
+            'A track in "Tracks" has no Title.',
+        ),
+        (
+            [_min_of("Tracks", "1", _valid_track())],
+            PROGRAM_DISPLAY_MODE_COURSE,
+            "A program displayed as a course cannot have tracks.",
+        ),
     ],
     ids=[
         "top_level_course",
@@ -112,6 +192,16 @@ def test_validate_requirement_tree_valid(tree):
         "value_negative",
         "value_above_child_count",
         "course_mode_program_node",
+        "track_at_top_level",
+        "container_not_min_number_of",
+        "container_value_not_one",
+        "container_mixed_items",
+        "container_not_elective",
+        "two_containers",
+        "track_requires_nothing",
+        "track_with_course",
+        "untitled_track",
+        "course_mode_tracks",
     ],
 )
 def test_validate_requirement_tree_invalid(tree, display_mode, message):

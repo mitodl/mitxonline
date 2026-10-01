@@ -68,7 +68,7 @@ class BaseProgramRequirementTreeSerializer(serializers.ListSerializer):
                 else None
             )
 
-        # we'll recursively walk the tree, in practice this is at most 3 deep under instance (OPERATOR -> OPERATOR -> COURSE)
+        # we'll recursively walk the tree, in practice this is at most 4 deep under instance (OPERATOR -> TRACK -> OPERATOR -> COURSE)
         def _update(parent, children_data):
             last_updated_child = None
 

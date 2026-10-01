@@ -197,6 +197,7 @@ def test_program_requirement_tree_serializer_save():
                 "required_program": None,
                 "title": "",
                 "elective_flag": False,
+                "description": "",
             },
             "id": ANY,
             "children": [
@@ -210,6 +211,7 @@ def test_program_requirement_tree_serializer_save():
                         "required_program": None,
                         "title": "Required Courses",
                         "elective_flag": False,
+                        "description": "",
                     },
                     "id": ANY,
                     "children": [
@@ -223,6 +225,7 @@ def test_program_requirement_tree_serializer_save():
                                 "required_program": None,
                                 "title": None,
                                 "elective_flag": False,
+                                "description": "",
                             },
                             "id": ANY,
                         }
@@ -238,6 +241,7 @@ def test_program_requirement_tree_serializer_save():
                         "required_program": None,
                         "title": "Elective Courses",
                         "elective_flag": False,
+                        "description": "",
                     },
                     "id": ANY,
                     "children": [
@@ -251,6 +255,7 @@ def test_program_requirement_tree_serializer_save():
                                 "required_program": None,
                                 "title": None,
                                 "elective_flag": False,
+                                "description": "",
                             },
                             "id": ANY,
                         }
@@ -387,6 +392,7 @@ def test_learner_record_serializer(
                                 "program": program.id,
                                 "title": "",
                                 "elective_flag": False,
+                                "description": "",
                             },
                             "id": program.get_requirements_root()
                             .get_children()
@@ -406,6 +412,7 @@ def test_learner_record_serializer(
                                 "program": program.id,
                                 "title": "",
                                 "elective_flag": False,
+                                "description": "",
                             },
                             "id": program.get_requirements_root()
                             .get_children()
@@ -425,6 +432,7 @@ def test_learner_record_serializer(
                                 "program": program.id,
                                 "title": "",
                                 "elective_flag": False,
+                                "description": "",
                             },
                             "id": program.get_requirements_root()
                             .get_children()
@@ -444,6 +452,7 @@ def test_learner_record_serializer(
                         "program": program.id,
                         "title": "Required Courses",
                         "elective_flag": False,
+                        "description": "",
                     },
                     "id": program.get_requirements_root().get_children().first().id,
                 },
@@ -457,6 +466,7 @@ def test_learner_record_serializer(
                         "program": program.id,
                         "title": "Elective Courses",
                         "elective_flag": True,
+                        "description": "",
                     },
                     "id": program.get_requirements_root().get_children().last().id,
                 },
@@ -470,6 +480,7 @@ def test_learner_record_serializer(
                 "program": program.id,
                 "title": "",
                 "elective_flag": False,
+                "description": "",
             },
             "id": program.requirements_root.id,
         }
@@ -762,3 +773,44 @@ def test_learner_record_shows_all_schools_when_flag_off(settings):
         "DEDP School",
         "SCM School",
     ]
+
+
+def _node(node_type, children=(), **data):
+    return {"data": {"node_type": node_type, **data}, "children": list(children)}
+
+
+def test_program_requirement_tree_serializer_saves_track():
+    """A track node saves and reads back with its description and its groups"""
+    program = ProgramFactory.create()
+    course = CourseFactory.create()
+    group = _node(
+        "operator",
+        [_node("course", course=course.id)],
+        title="Required",
+        operator="all_of",
+    )
+    track = _node(
+        "track", [group], title="General Track", description="For generalists."
+    )
+    container = _node(
+        "operator",
+        [track],
+        title="Tracks",
+        operator="min_number_of",
+        operator_value="1",
+        elective_flag=True,
+    )
+
+    serializer = ProgramRequirementTreeSerializer(
+        instance=program.requirements_root,
+        data=[container],
+        context={"program": program},
+    )
+    assert serializer.is_valid(), serializer.errors
+    serializer.save()
+
+    saved = ProgramRequirementTreeSerializer(instance=program.requirements_root).data
+    saved_track = saved[0]["children"][0]["children"][0]
+    assert saved_track["data"]["node_type"] == "track"
+    assert saved_track["data"]["description"] == "For generalists."
+    assert saved_track["children"][0]["children"][0]["data"]["course"] == course.id

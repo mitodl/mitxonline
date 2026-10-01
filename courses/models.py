@@ -2851,17 +2851,21 @@ class ProgramRequirementNodeType(models.TextChoices):
     OPERATOR = "operator", "Operator"
     COURSE = "course", "Course"
     PROGRAM = "program", "Program"
+    TRACK = "track", "Track"
 
 
 class ProgramRequirement(MP_Node):
     """
     A representation of program requirements.
 
-    There are 3 types of nodes that exist in a requirement tree:
+    The types of nodes that exist in a requirement tree:
 
     Root nodes - these represent a program
-    Operator nodes - these represent a logical operation over a set of courses
+    Operator nodes - these represent a logical operation over a set of requirements
     Course nodes - these represent a reference to a course
+    Program nodes - these represent a reference to another program
+    Track nodes - a named, described alternative; the program requires any one
+        whole track, and a track is satisfied when all of its operator nodes are
 
     Usage:
 
@@ -2885,6 +2889,10 @@ class ProgramRequirement(MP_Node):
     the requirement-tree serializer accept only the shapes
     courses.requirement_tree.validate_requirement_tree allows. The evaluator
     itself handles any nesting.
+
+    Tracks sit at depth 3, under one MIN_NUMBER_OF operator at depth 2 whose
+    children are all tracks (the tracks container), and hold operator nodes of
+    their own.
     """
 
     # extended alphabet from the default to the recommended one for postgres
@@ -2931,6 +2939,7 @@ class ProgramRequirement(MP_Node):
     )
 
     title = models.TextField(null=True, blank=True, default="")  # noqa: DJ001
+    description = models.TextField(blank=True, default="")
     elective_flag = models.BooleanField(null=True, blank=True, default=False)
 
     @property
@@ -2983,6 +2992,11 @@ class ProgramRequirement(MP_Node):
         """True if the node is the root"""
         return self.node_type == ProgramRequirementNodeType.PROGRAM_ROOT
 
+    @property
+    def is_track(self):
+        """True if the node is a track"""
+        return self.node_type == ProgramRequirementNodeType.TRACK
+
     def add_child(self, **kwargs):
         """Children must always have the same program"""
         kwargs["program"] = self.program
@@ -3002,6 +3016,8 @@ class ProgramRequirement(MP_Node):
             attrs["course"] = self.course
         elif self.is_program:
             attrs["required_program"] = self.required_program
+        elif self.is_track:
+            attrs["title"] = self.title
 
         return " ".join(f"{key}={value}" for key, value in attrs.items())
 
@@ -3045,6 +3061,16 @@ class ProgramRequirement(MP_Node):
                         course__isnull=True,
                         required_program__isnull=False,
                         depth__gt=1,
+                    )
+                    # track nodes: depth 3, inside the depth-2 tracks container;
+                    # validate_requirement_tree checks the parent and children
+                    | Q(
+                        node_type=ProgramRequirementNodeType.TRACK.value,
+                        operator__isnull=True,
+                        operator_value__isnull=True,
+                        course__isnull=True,
+                        required_program__isnull=True,
+                        depth=3,
                     )
                 ),
             ),
