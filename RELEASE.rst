@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 1.169.8
+---------------
+
+- Add a hookimpl for Stripe refund events (#4051)
+- Run hooks with prek and autofix.ci (#4063)
+- Update actions/setup-node action to v6.5.0 (#4035)
+- Updates to Refunds of Program Entitlements (#4053)
+- Add verifiable_credential_description, feature flag, and FieldPanel (#4027)
+
 Version 1.169.7
 ---------------
 
