@@ -6945,6 +6945,9 @@ components:
         b2b_contract:
           type: integer
           nullable: true
+        b2b_only:
+          type: boolean
+          description: Indicates if the course run is B2B only
       required:
       - approved_flexible_price_exists
       - course_id
@@ -13245,6 +13248,9 @@ components:
         b2b_contract:
           type: integer
           nullable: true
+        b2b_only:
+          type: boolean
+          description: Indicates if the course run is B2B only
         course:
           allOf:
           - $ref: '#/components/schemas/V2Course'
@@ -13410,6 +13416,9 @@ components:
         b2b_contract:
           type: integer
           nullable: true
+        b2b_only:
+          type: boolean
+          description: Indicates if the course run is B2B only
       required:
       - courseware_id
       - run_tag

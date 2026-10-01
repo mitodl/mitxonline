@@ -419,3 +419,9 @@ def test_course_serializer_canonical_run_fallback_to_oldest(mock_context):
     serializer = CourseWithCourseRunsSerializer(course, context=mock_context)
     assert len(serializer.data["courseruns"]) == 1
     assert serializer.data["courseruns"][0]["courseware_id"] == run_first.courseware_id
+
+
+def test_course_run_serializer_b2b_only():
+    """b2b_only is serialized, so MIT Learn's ETL can keep contract-only runs out of its catalog."""
+    run = CourseRunFactory.create(b2b_only=True)
+    assert CourseRunSerializer(run).data["b2b_only"] is True
