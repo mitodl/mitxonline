@@ -2857,10 +2857,10 @@ class ProgramRequirement(MP_Node):
     elective_courses.add_child(course=course4)
     elective_courses.add_child(course=course5)
 
-    A MIN_NUMBER_OF operator counts each satisfied child once. The evaluator
-    also handles operators nested inside operators, but
-    courses.requirement_tree.validate_requirement_tree rejects them because
-    Learn does not render them.
+    A MIN_NUMBER_OF operator counts each satisfied child once. The admin form and
+    the requirement-tree serializer accept only the shapes
+    courses.requirement_tree.validate_requirement_tree allows. The evaluator
+    itself handles any nesting.
     """
 
     # extended alphabet from the default to the recommended one for postgres

@@ -17,6 +17,34 @@ def _group_name(title, parent_title):
     return "A top-level group"
 
 
+# The shapes Learn renders, as the child node types each node type may hold.
+# Its product page shows each top-level group's direct courses and programs and
+# drops a nested group
+# (https://github.com/mitodl/mit-learn/blob/b6d0e97e0d619ff30eb3479e9395574ce2254dfc/frontends/main/src/app-pages/ProductPages/util.ts#L34-L78),
+# and its dashboard progress skips one
+# (https://github.com/mitodl/mit-learn/blob/b6d0e97e0d619ff30eb3479e9395574ce2254dfc/frontends/main/src/app-pages/DashboardPage/CoursewareDisplay/model/dashboardViewModel.ts#L222-L232).
+# The evaluator handles any nesting, so this widens when Learn does.
+_ALLOWED_CHILDREN = {
+    ProgramRequirementNodeType.PROGRAM_ROOT: {ProgramRequirementNodeType.OPERATOR},
+    ProgramRequirementNodeType.OPERATOR: {
+        ProgramRequirementNodeType.COURSE,
+        ProgramRequirementNodeType.PROGRAM,
+    },
+}
+
+
+def _placement_error(parent_type, title, parent_title) -> str:
+    """The message for a node that _ALLOWED_CHILDREN does not allow under its parent."""
+    if parent_type == ProgramRequirementNodeType.PROGRAM_ROOT:
+        return (
+            "Top-level requirements must be groups, not individual courses or programs."
+        )
+    return (
+        f"{_group_name(title, parent_title)} is inside a group; groups can "
+        "contain only courses and programs."
+    )
+
+
 def _operator_value_errors(name, data, children) -> list[str]:
     try:
         value = int(str(data.get("operator_value")).strip())
@@ -42,13 +70,10 @@ def validate_requirement_tree(
     """
     Check a requirement tree against the rules every saved tree must follow.
 
-    The tree is flat: top-level groups holding only courses and programs. That
-    is the only shape Learn renders. Its product page shows each top-level
-    group's direct courses and programs and drops a nested group
-    (https://github.com/mitodl/mit-learn/blob/b6d0e97e0d619ff30eb3479e9395574ce2254dfc/frontends/main/src/app-pages/ProductPages/util.ts#L34-L78),
-    and its dashboard progress skips one
-    (https://github.com/mitodl/mit-learn/blob/b6d0e97e0d619ff30eb3479e9395574ce2254dfc/frontends/main/src/app-pages/DashboardPage/CoursewareDisplay/model/dashboardViewModel.ts#L222-L232).
-    The evaluator handles nesting, so this rule loosens when Learn does.
+    Each node must be a child type that ``_ALLOWED_CHILDREN`` allows under its
+    parent. The other rules hold at any depth: every group has a title; a
+    "Minimum # of" group's value is a whole number no larger than its number of
+    children; a program displayed as a course requires no programs.
 
     Args:
         tree: the root's children, each ``{"id", "data": {...}, "children": [...]}``
@@ -61,10 +86,13 @@ def validate_requirement_tree(
     """
     errors = []
 
-    def _visit(node, *, top_level, parent_title):
+    def _visit(node, *, parent_type, parent_title):
         data = node.get("data", {})
         node_type = data.get("node_type")
+        title = (data.get("title") or "").strip()
 
+        if node_type not in _ALLOWED_CHILDREN[parent_type]:
+            errors.append(_placement_error(parent_type, title, parent_title))
         if (
             node_type == ProgramRequirementNodeType.PROGRAM
             and display_mode == PROGRAM_DISPLAY_MODE_COURSE
@@ -75,27 +103,19 @@ def validate_requirement_tree(
         if node_type != ProgramRequirementNodeType.OPERATOR:
             return
 
-        title = (data.get("title") or "").strip()
         name = _group_name(title, parent_title)
         children = node.get("children") or []
-        if not top_level:
-            errors.append(
-                f"{name} is a group inside another group; groups can contain "
-                "only courses and programs."
-            )
         if not title:
             errors.append(f"{name} has no Title.")
         if data.get("operator") == ProgramRequirement.Operator.MIN_NUMBER_OF:
             errors.extend(_operator_value_errors(name, data, children))
         for child in children:
-            _visit(child, top_level=False, parent_title=title or parent_title)
+            _visit(child, parent_type=node_type, parent_title=title or parent_title)
 
     for node in tree:
-        if node.get("data", {}).get("node_type") != ProgramRequirementNodeType.OPERATOR:
-            errors.append(
-                "Top-level requirements must be groups, not individual courses or programs."
-            )
-        _visit(node, top_level=True, parent_title=None)
+        _visit(
+            node, parent_type=ProgramRequirementNodeType.PROGRAM_ROOT, parent_title=None
+        )
 
     return errors
 
