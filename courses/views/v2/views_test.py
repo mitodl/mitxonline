@@ -871,10 +871,10 @@ def test_filter_with_org_id_combined_with_other_filters(
 def test_filter_without_org_id_authenticated_user(user_drf_client):
     course_with_contract = CourseFactory(title="Contract Course")
     contract = ContractPageFactory(active=True)
-    CourseRunFactory(course=course_with_contract, b2b_contract=contract)
+    CourseRunFactory(course=course_with_contract, b2b_contracts=[contract])
 
     course_no_contract = CourseFactory(title="No Contract Course")
-    CourseRunFactory(course=course_no_contract, b2b_contract=None)
+    CourseRunFactory(course=course_no_contract)
 
     url = reverse("v2:courses_api-list")
     response = user_drf_client.get(url)
@@ -1091,7 +1091,7 @@ def test_next_run_id_with_org_filter(  # noqa: PLR0915
 
     # create a run for the other org, same course, and starting before b2b_run
     second_eligible_b2b_run = CourseRunFactory.create(
-        b2b_contract=third_contract_first_org,
+        b2b_contracts=[third_contract_first_org],
         b2b_only=True,
         start_date=one_month_prior - timedelta(days=5),
         enrollment_start=one_month_prior - timedelta(days=5),
@@ -1192,7 +1192,7 @@ def test_user_enrollments_create_b2b_run_invalid_v2(user_drf_client, user):
     """v2 enrollments API should reject creating enrollments for B2B course runs."""
     contract = ContractPageFactory.create()
     course = CourseFactory.create()
-    run = CourseRunFactory.create(course=course, b2b_contract=contract)
+    run = CourseRunFactory.create(course=course, b2b_contracts=[contract])
 
     resp = user_drf_client.post(
         reverse("v2:user-enrollments-api-list"), data={"run_id": run.id}
@@ -1697,7 +1697,7 @@ def test_filter_courses_with_contract_id_authenticated_user(make_contract_ready_
 
     other_contract = ContractPageFactory(organization=org, active=True)
     unrelated_course_runs = [
-        CourseRunFactory(course=course, b2b_contract=other_contract)
+        CourseRunFactory(course=course, b2b_contracts=[other_contract])
         for course in courses
     ]
 
@@ -2621,7 +2621,9 @@ def test_get_courses_b2b_runs(with_b2b, single, user_drf_client):
 
     contract = ContractPageFactory.create() if with_b2b else None
 
-    test_course_run = CourseRunFactory.create(b2b_only=with_b2b, b2b_contract=contract)
+    test_course_run = CourseRunFactory.create(
+        b2b_only=with_b2b, b2b_contracts=[contract] if contract else []
+    )
 
     url = reverse("v2:courses_api-list")
     response_raw = user_drf_client.get(
@@ -2703,8 +2705,8 @@ def test_get_courses_with_specified_contract_programs(user, user_drf_client):
     other_contract = ContractPageFactory.create()
 
     programs = ProgramFactory.create_batch(2)
-    course_run = CourseRunFactory.create(b2b_contract=contract)
-    CourseRunFactory.create(b2b_contract=other_contract, course=course_run.course)
+    course_run = CourseRunFactory.create(b2b_contracts=[contract])
+    CourseRunFactory.create(b2b_contracts=[other_contract], course=course_run.course)
 
     for program in programs:
         program.add_requirement(course_run.course)
@@ -3255,10 +3257,6 @@ def test_courses_list_count_query_is_pk_only(user_drf_client):
 def b2b_contracted_course(contract_ready_course, mock_course_run_clone):
     """
     A course with a run under an active contract, and a user who can see it.
-
-    Attaches the contract both ways - the deprecated ``b2b_contract`` FK and
-    the ``b2b_contracts`` M2M - because the org/contract filters and
-    ``Course.get_filtered_runs`` each consult both.
     """
     org = OrganizationPageFactory(name="Contract Org")
     contract = ContractPageFactory(organization=org, active=True)
@@ -3269,8 +3267,6 @@ def b2b_contracted_course(contract_ready_course, mock_course_run_clone):
 
     (course, _) = contract_ready_course
     create_contract_run(contract, course)
-    for run in course.courseruns.filter(b2b_contract=contract):
-        run.b2b_contracts.add(contract)
 
     client = APIClient()
     client.force_authenticate(user=user)
@@ -3285,7 +3281,7 @@ def test_courses_list_does_not_select_contract_page_columns(
     The b2b contract prefetches must not hydrate whole Wagtail pages.
 
     ``ContractPage`` is a Wagtail Page, so an unnarrowed ``b2b_contracts``
-    prefetch (or a ``select_related("b2b_contract")``) selects the full
+    prefetch selects the full
     multi-table row - ~50 columns including two RichTextFields - once per
     (run, contract) pair. Only the pk and ``organization_id`` are ever read,
     and deserializing the rest was ~900ms of a 1.4s production request.
@@ -3311,10 +3307,9 @@ def test_courses_list_does_not_select_contract_page_columns(
 
 def test_courses_list_b2b_runs_match_unprefetched_queryset(b2b_contracted_course):
     """
-    Annotated, prefetched and lazy paths must agree.
+    Prefetched and lazy paths must agree.
 
-    The viewset annotates ``b2b_contract_organization_id`` and narrows the
-    ``b2b_contracts`` prefetch; a bare ``Course.objects.get()`` has neither, so
+    The viewset narrows the ``b2b_contracts`` prefetch; a bare ``Course.objects.get()`` has neither, so
     comparing the two exercises every fallback in ``get_filtered_runs``.
     """
     client, course, org, contract = b2b_contracted_course
@@ -3365,10 +3360,9 @@ def test_course_queryset_courseruns_prefetch_avoids_contract_pages():
     """
     Inspect the queryset directly, without a request.
 
-    ``select_related("b2b_contract")`` and a bare ``"b2b_contracts"`` lookup
-    both reintroduce the full Wagtail page fetch, and neither shows up as an
-    extra query - only as a slower one - so the query-count budget cannot
-    catch a regression here.
+    A bare ``"b2b_contracts"`` lookup reintroduces the full Wagtail page
+    fetch, and that doesn't show up as an extra query - only as a slower
+    one - so the query-count budget cannot catch a regression here.
     """
     view = CourseViewSet()
     view.validated_params = CourseViewSet.validated_params
@@ -3380,7 +3374,6 @@ def test_course_queryset_courseruns_prefetch_avoids_contract_pages():
     runs_qs = prefetch.queryset
 
     assert not runs_qs.query.select_related, runs_qs.query.select_related
-    assert "b2b_contract_organization_id" in runs_qs.query.annotations
 
     contracts = next(
         lookup

@@ -21,7 +21,9 @@ pytestmark = [pytest.mark.django_db]
 def _create_run_with_product_and_discount(contract, *, with_enrollment=False):
     """Helper to create a B2B run, product, discount, and optional enrollment."""
 
-    run = CourseRunFactory.create(b2b_contract=contract, live=True, enrollment_end=None)
+    run = CourseRunFactory.create(
+        b2b_contracts=[contract], live=True, enrollment_end=None
+    )
     product = ProductFactory.create(purchasable_object=run, is_active=True)
     discount = DiscountFactory.create()
     DiscountProduct.objects.create(discount=discount, product=product)
@@ -60,7 +62,7 @@ def test_b2b_courseware_remove_run_without_enrollments_unlinks_and_deactivates(m
     )
 
     # Sanity checks
-    assert run.b2b_contract == contract
+    assert run.contract_group_ids == {contract.id}
     assert product.is_active is True
     assert DiscountProduct.objects.filter(product=product).exists()
     assert Discount.objects.filter(id=discount.id).exists()
@@ -73,7 +75,7 @@ def test_b2b_courseware_remove_run_without_enrollments_unlinks_and_deactivates(m
     # Run should be deactivated and unlinked
     assert run.live is False
     assert run.enrollment_end is not None
-    assert run.b2b_contract is None
+    assert run.contract_group_ids == set()
 
     # Product should be deactivated
     assert product.is_active is False
@@ -99,7 +101,7 @@ def test_b2b_courseware_remove_run_with_enrollments_keeps_contract_and_deactivat
     )
 
     # Sanity checks
-    assert run.b2b_contract == contract
+    assert run.contract_group_ids == {contract.id}
     assert product.is_active is True
     assert DiscountProduct.objects.filter(product=product).exists()
     assert Discount.objects.filter(id=discount.id).exists()
@@ -112,7 +114,7 @@ def test_b2b_courseware_remove_run_with_enrollments_keeps_contract_and_deactivat
     # Run should be deactivated but still linked to the contract
     assert run.live is False
     assert run.enrollment_end is not None
-    assert run.b2b_contract == contract
+    assert run.contract_group_ids == {contract.id}
 
     # Product should be deactivated
     assert product.is_active is False

@@ -112,7 +112,7 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
         run_id = validated_data["run_id"]
         run = models.CourseRun.objects.filter(id=run_id).first()
 
-        if run is None or run.b2b_contract_id is not None:
+        if run is None or run.has_b2b_contracts:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
 
         try:

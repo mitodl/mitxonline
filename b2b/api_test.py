@@ -162,7 +162,7 @@ def test_create_single_course_run(mocker, contract_ready_course, has_start, has_
     assert run.run_tag == B2B_RUN_TAG_FORMAT.format(
         run_idx=1, year=now_time.year, contract_id=contract.id
     )
-    assert run.b2b_contract == contract
+    assert run.contract_group_ids == {contract.id}
 
     if has_start:
         assertable_start = date_to_datetime(contract.contract_start, settings.TIME_ZONE)
@@ -802,7 +802,7 @@ def test_create_contract_run_variants(mocker):
         course.courseruns.filter(courseware_id__startswith=target_course_id).count()
         == 5
     )
-    run_check_qs = course.courseruns.filter(b2b_contract=contract)
+    run_check_qs = course.courseruns.filter(b2b_contracts=contract)
 
     found_count = 0
     for language, variant_industry, variant_length in [
@@ -837,9 +837,9 @@ def test_create_contract_run_variants(mocker):
     create_contract_run(contract, course, no_reruns=False)
     mocked_clone_run.assert_called()
 
-    assert course.courseruns.filter(b2b_contract=contract).count() == 10
+    assert course.courseruns.filter(b2b_contracts=contract).count() == 10
     run_check_qs = course.courseruns.filter(
-        b2b_contract=contract, courseware_id__startswith=target_course_id
+        b2b_contracts=contract, courseware_id__startswith=target_course_id
     )
 
     found_count = 0
@@ -1994,7 +1994,7 @@ def test_create_contract_run_single_language_legacy(mocker):
     results = create_contract_run(contract, course, require_designated_source_run=True)
     assert len(results) == 1
     run, product = results[0]
-    assert run.b2b_contract == contract
+    assert run.contract_group_ids == {contract.id}
     assert product.object_id == run.id
 
 

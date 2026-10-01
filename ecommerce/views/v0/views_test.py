@@ -2113,7 +2113,7 @@ def test_refund_request_no_consent(user, user_drf_client):
 def test_refund_request_b2b_order(user, user_drf_client):
     """B2B contract orders are excluded from self-service refund requests."""
     contract = ContractPageFactory.create()
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_contracts=[contract])
     with reversion.create_revision():
         product = ProductFactory.create(purchasable_object=courserun)
     product_version = Version.objects.get_for_object(product).last()

@@ -482,7 +482,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         # Get the course run and verify it belongs to this contract
         course_run = get_object_or_404(
-            CourseRun, courseware_id=course_run_id, b2b_contract=contract
+            CourseRun, courseware_id=course_run_id, b2b_contracts=contract
         )
 
         # Get enrollments for this course run
