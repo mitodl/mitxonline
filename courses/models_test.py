@@ -33,6 +33,7 @@ from courses.factories import (
     ProgramFactory,
     program_with_empty_requirements,  # noqa: F401
     program_with_requirements,  # noqa: F401
+    program_with_tracks,  # noqa: F401
 )
 from courses.models import (
     Course,
@@ -678,6 +679,7 @@ def test_program_requirements(program_with_requirements):  # noqa: F811
         "title": "",
         "program": program_with_requirements.program.id,
         "elective_flag": False,
+        "description": "",
     }
 
     assert program_with_requirements.root_node.dump_bulk() == [
@@ -2191,3 +2193,42 @@ def test_has_dated_courseruns_matches_get_dated_courseruns():
     fresh = Course.objects.get(pk=course.pk)
     assert get_dated_courseruns(fresh.courseruns).exists() is True
     assert fresh.has_dated_courseruns is True
+
+
+@pytest.mark.parametrize(
+    ("parent_attr", "extra"),
+    [
+        ("root_node", {}),
+        ("tracks_node", {"operator": ProgramRequirement.Operator.ALL_OF}),
+    ],
+    ids=["wrong_depth", "operator_set"],
+)
+def test_program_requirement_track_node_constraint(
+    program_with_tracks,  # noqa: F811
+    parent_attr,
+    extra,
+):
+    """The node constraint rejects a track outside depth 3 or with operator fields"""
+    parent = getattr(program_with_tracks, parent_attr)
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        parent.add_child(
+            node_type=ProgramRequirementNodeType.TRACK, title="Stray Track", **extra
+        )
+
+
+def test_program_courses_lists_a_course_in_two_groups_once_as_required(
+    program_with_tracks,  # noqa: F811
+):
+    """A course in a track and a later required group is listed once, as required"""
+    shared = program_with_tracks.track_courses[0][0]
+    program_with_tracks.root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="More Core",
+    ).add_child(node_type=ProgramRequirementNodeType.COURSE, course=shared)
+    program = Program.objects.get(pk=program_with_tracks.program.pk)
+
+    assert [course for course, _ in program.courses].count(shared) == 1
+    assert shared in program.required_courses
+    assert shared not in program.elective_courses

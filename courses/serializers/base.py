@@ -47,7 +47,12 @@ class BaseProgramRequirementTreeSerializer(serializers.ListSerializer):
             if self.instance is not None
             else self.context["program"]
         )
-        errors = validate_requirement_tree(attrs, display_mode=program.display_mode)
+        # The submitted tree, not attrs: validated attrs carry course_id and
+        # required_program_id, not the course and required_program keys the
+        # validator reads.
+        errors = validate_requirement_tree(
+            self.initial_data, display_mode=program.display_mode
+        )
         if errors:
             raise serializers.ValidationError(errors)
         return attrs
@@ -68,7 +73,7 @@ class BaseProgramRequirementTreeSerializer(serializers.ListSerializer):
                 else None
             )
 
-        # we'll recursively walk the tree, in practice this is at most 3 deep under instance (OPERATOR -> OPERATOR -> COURSE)
+        # we'll recursively walk the tree, in practice this is at most 4 deep under instance (OPERATOR -> TRACK -> OPERATOR -> COURSE)
         def _update(parent, children_data):
             last_updated_child = None
 

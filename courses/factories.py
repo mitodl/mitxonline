@@ -560,3 +560,54 @@ class ProgramCollectionFactory(wagtail_factories.PageFactory):
         for program in extracted:
             self.programs.add(program)
         self.save()
+
+
+@pytest.fixture
+def program_with_tracks():
+    """A program with a core group and two tracks, each one group of two courses"""
+    program = ProgramFactory.create()
+    core_courses = CourseFactory.create_batch(2)
+    root_node = program.requirements_root
+
+    core_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Core Courses",
+    )
+    for course in core_courses:
+        core_node.add_child(node_type=ProgramRequirementNodeType.COURSE, course=course)
+
+    tracks_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=1,
+        title="Tracks",
+        elective_flag=True,
+    )
+    track_nodes = []
+    track_courses = []
+    for title in ("General Track", "Methods Track"):
+        track_node = tracks_node.add_child(
+            node_type=ProgramRequirementNodeType.TRACK, title=title
+        )
+        group_node = track_node.add_child(
+            node_type=ProgramRequirementNodeType.OPERATOR,
+            operator=ProgramRequirement.Operator.ALL_OF,
+            title="Required",
+        )
+        courses = CourseFactory.create_batch(2)
+        for course in courses:
+            group_node.add_child(
+                node_type=ProgramRequirementNodeType.COURSE, course=course
+            )
+        track_nodes.append(track_node)
+        track_courses.append(courses)
+
+    return SimpleNamespace(
+        program=program,
+        root_node=root_node,
+        core_courses=core_courses,
+        tracks_node=tracks_node,
+        track_nodes=track_nodes,
+        track_courses=track_courses,
+    )
