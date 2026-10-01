@@ -244,8 +244,6 @@ def b2b_courses(fake, course_catalog_data):
     for run in fake.random_sample(runs, length=ceil(len(runs) * 0.5)):
         contract = fake.random_element(elements=contracts)
 
-        run.b2b_contract = contract
-        run.save()
         run.b2b_contracts.add(contract)
 
         course_runs.append(run)

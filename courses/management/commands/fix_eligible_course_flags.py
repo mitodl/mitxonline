@@ -72,12 +72,16 @@ class Command(BaseCommand):
             .all()
             .annotate(
                 regular_courserun_count=Count(
-                    "courseruns", filter=Q(courseruns__b2b_contract__isnull=True)
+                    "courseruns",
+                    filter=Q(courseruns__b2b_contracts__isnull=True),
+                    distinct=True,
                 ),
             )
             .annotate(
                 b2b_courserun_count=Count(
-                    "courseruns", filter=Q(courseruns__b2b_contract__isnull=False)
+                    "courseruns",
+                    filter=Q(courseruns__b2b_contracts__isnull=False),
+                    distinct=True,
                 ),
             )
         )

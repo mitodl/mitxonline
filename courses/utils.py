@@ -175,7 +175,7 @@ def get_unenrollable_courses(queryset):
     courseruns_qs = CourseRun.objects.unenrollable()
     # Deliberately does not prefetch "courseruns" here. Callers (notably
     # CourseViewSet) build a richer Prefetch for that relation, and re-declaring
-    # it would silently replace theirs, dropping select_related("b2b_contract")
+    # it would silently replace theirs, dropping the prefetched b2b_contracts
     # and the prefetched_enrollment_modes / prefetched_products caches.
     # Course.get_filtered_runs applies the is_enrollable predicate in Python, so
     # narrowing the prefetch was redundant anyway.
@@ -338,7 +338,7 @@ def is_contract_order(order):
     for line in order.lines.all():
         if hasattr(line.product, "purchasable_object"):
             course_run = line.product.purchasable_object
-            if isinstance(course_run, CourseRun) and course_run.b2b_contract_id:
+            if isinstance(course_run, CourseRun) and course_run.has_b2b_contracts:
                 return True
     return False
 
