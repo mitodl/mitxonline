@@ -70,7 +70,7 @@ def test_validate_requirement_tree_valid(tree):
         (
             [_min_of("Electives", "1", _all_of("Group", _course(1)))],
             None,
-            '"Group" is a group inside another group',
+            '"Group" is inside a group',
         ),
         ([_min_of("Electives", None, _course(1))], None, "whole number, 0 or more"),
         ([_min_of("Electives", "-1", _course(1))], None, "whole number, 0 or more"),
