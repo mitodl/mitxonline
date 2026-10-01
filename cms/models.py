@@ -20,6 +20,7 @@ from django.http import Http404, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.functional import cached_property
+from django.utils.safestring import mark_safe
 from django.utils.text import slugify
 from mitol.common.utils.datetime import now_in_utc
 from mitol.olposthog.features import is_enabled
@@ -324,6 +325,35 @@ class CourseProgramChildPage(Page):
         raise Http404
 
 
+class FeatureFlaggedFieldPanel(FieldPanel):
+    """A FieldPanel that is only rendered while its feature flag is enabled.
+
+    Lets a field ship (and accumulate a migration) ahead of the functionality
+    that consumes it, without exposing a field that does nothing to CMS authors.
+    """
+
+    def __init__(self, field_name, feature_flag, **kwargs):
+        super().__init__(field_name, **kwargs)
+        self.feature_flag = feature_flag
+
+    def clone_kwargs(self):
+        """Carry the flag across clones.
+
+        Wagtail clones panels when binding them to a model/instance, so without
+        this the flag is lost and the panel reverts to always rendering.
+        """
+        kwargs = super().clone_kwargs()
+        kwargs["feature_flag"] = self.feature_flag
+        return kwargs
+
+    class BoundPanel(FieldPanel.BoundPanel):
+        """Bound panel that also consults the feature flag."""
+
+        def is_shown(self):
+            """Hide the panel entirely while the feature flag is disabled."""
+            return is_enabled(self.panel.feature_flag) and super().is_shown()
+
+
 class CertificatePage(CourseProgramChildPage):
     """
     CMS page representing a Certificate.
@@ -383,7 +413,7 @@ class CertificatePage(CourseProgramChildPage):
     verifiable_credential_description = models.TextField(  # noqa: DJ001
         null=True,
         blank=True,
-        help_text="For verifiable credentials issued for this certificate, this is the description field. It is a template shared across every learner who earns this credential, so it should not include a specific learner's name.",
+        help_text="1-2 sentences describing the course or program. This language serves as a template applied to the credential for every learner who completes the course and earns a certificate, so it should not include a specific learner's name.",
     )
 
     should_provision_verifiable_credential = models.BooleanField(
@@ -396,8 +426,26 @@ class CertificatePage(CourseProgramChildPage):
         FieldPanel("CEUs"),
         FieldPanel("overrides"),
         FieldPanel("signatories"),
-        FieldPanel("verifiable_credential_criteria", widget=Textarea),
-        FieldPanel("verifiable_credential_description", widget=Textarea),
+        # Set on the panel, not the field: panel help text carries markup and
+        # isn't migration-tracked, so this copy can be revised without one.
+        FieldPanel(
+            "verifiable_credential_criteria",
+            widget=Textarea,
+            help_text=mark_safe(
+                "Describe what the learner did in order to earn the credential. "
+                "This should be a bulleted list, in plain text or markdown, with "
+                "each item beginning with an action verb -- for example: "
+                "<strong>Described</strong> how machine learning models are "
+                "trained, or <strong>Distinguished</strong> between symbolic and "
+                "modern machine learning. If it is not supplied, no verifiable "
+                "credential will be provisioned for those certificates."
+            ),
+        ),
+        FeatureFlaggedFieldPanel(
+            "verifiable_credential_description",
+            feature_flag=features.ENABLE_CREDENTIAL_METADATA_AUTHORING,
+            widget=Textarea,
+        ),
         FieldPanel("should_provision_verifiable_credential"),
     ]
     api_fields = [

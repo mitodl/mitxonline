@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
             name="verifiable_credential_description",
             field=models.TextField(
                 blank=True,
-                help_text="For verifiable credentials issued for this certificate, this is the description field. It is a template shared across every learner who earns this credential, so it should not include a specific learner's name.",
+                help_text="1-2 sentences describing the course or program. This language serves as a template applied to the credential for every learner who completes the course and earns a certificate, so it should not include a specific learner's name.",
                 null=True,
             ),
         ),
