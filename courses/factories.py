@@ -562,9 +562,8 @@ class ProgramCollectionFactory(wagtail_factories.PageFactory):
         self.save()
 
 
-@pytest.fixture
-def program_with_tracks():
-    """A program with a core group and two tracks, each one group of two courses"""
+def create_program_with_tracks():
+    """Create a program with a core group and two tracks, each a group of two courses"""
     program = ProgramFactory.create()
     core_courses = CourseFactory.create_batch(2)
     root_node = program.requirements_root
@@ -611,3 +610,9 @@ def program_with_tracks():
         track_nodes=track_nodes,
         track_courses=track_courses,
     )
+
+
+@pytest.fixture
+def program_with_tracks():
+    """A program with a core group and two tracks, each one group of two courses"""
+    return create_program_with_tracks()
