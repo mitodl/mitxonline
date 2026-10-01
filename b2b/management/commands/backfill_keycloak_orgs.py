@@ -85,7 +85,7 @@ class Command(BaseCommand):
                 continue
 
             try:
-                created = link_organization_to_keycloak(
+                created, failed_members = link_organization_to_keycloak(
                     organization, connection=connection
                 )
             except Exception as exc:
@@ -95,11 +95,19 @@ class Command(BaseCommand):
                 failed.append(organization.org_key)
                 self.stderr.write(f"Failed {organization.org_key}: {exc}")
             else:
-                outcome = "Created" if created else "Adopted"
-                self.stdout.write(
-                    self.style.SUCCESS(f"{outcome}: {organization.org_key}")
-                )
+                self._report_link(organization, created, failed_members)
 
         if failed:
             msg = f"{len(failed)} organization(s) failed: {', '.join(failed)}"
             raise CommandError(msg)
+
+    def _report_link(self, organization, created, failed_members):
+        outcome = "Created" if created else "Adopted"
+        self.stdout.write(self.style.SUCCESS(f"{outcome}: {organization.org_key}"))
+        if failed_members:
+            # They keep access through keep_until_seen; see the log.
+            self.stderr.write(
+                f"{len(failed_members)} member(s) of {organization.org_key} "
+                "could not be added to Keycloak: "
+                + ", ".join(str(user.id) for user in failed_members)
+            )

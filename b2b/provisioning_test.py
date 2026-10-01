@@ -3,6 +3,7 @@
 import faker
 import pytest
 import requests
+from authlib.integrations.base_client.errors import InvalidTokenError
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import CommandError, call_command
 from django.db.models import ProtectedError
@@ -1006,11 +1007,12 @@ def test_link_organization_creates_a_keycloak_org_with_the_org_key_alias(
 
     organization = OrganizationPageFactory.create(sso_organization_id=None)
 
-    created = link_organization_to_keycloak(
+    created, failed_members = link_organization_to_keycloak(
         organization, connection=connection, actor=staff_user
     )
 
     assert created is True
+    assert failed_members == []
     assert connection.organizations.create.call_args.args[0]["alias"] == (
         organization.org_key
     )
@@ -1032,7 +1034,7 @@ def test_link_organization_adopts_a_realm_org_with_the_same_alias(connection):
         OrganizationRepresentation(id=known_id, alias=organization.org_key.lower())
     ]
 
-    created = link_organization_to_keycloak(organization, connection=connection)
+    created, _ = link_organization_to_keycloak(organization, connection=connection)
 
     assert created is False
     connection.organizations.create.assert_not_called()
@@ -1087,23 +1089,74 @@ def test_link_organization_keeps_members_until_seen(connection):
     ).exists()
 
 
-def test_link_organization_tolerates_member_sync_failures(connection):
-    """An existing Keycloak member or an unlinkable user doesn't fail the link."""
+def _http_error(status_code):
+    response = requests.Response()
+    response.status_code = status_code
+    return requests.HTTPError(response=response)
+
+
+def test_link_organization_treats_an_existing_keycloak_member_as_added(connection):
+    """An adopted realm org may already have the member (409)."""
 
     organization = OrganizationPageFactory.create(sso_organization_id=None)
     UserOrganizationFactory.create(organization=organization)
-    UserOrganizationFactory.create(
-        organization=organization, user=UserFactory.create(global_id=None)
+    connection.organizations.associate.side_effect = _http_error(409)
+
+    _, failed_members = link_organization_to_keycloak(
+        organization, connection=connection
     )
-    conflict = requests.HTTPError(response=requests.Response())
-    conflict.response.status_code = 409
-    connection.organizations.associate.side_effect = conflict
 
-    assert link_organization_to_keycloak(organization, connection=connection)
+    assert failed_members == []
 
+
+def test_link_organization_reports_a_member_without_a_global_id(connection):
+    """A member Keycloak can't know about keeps access through the flag."""
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    member = UserOrganizationFactory.create(
+        organization=organization,
+        user=UserFactory.create(global_id=None),
+        keep_until_seen=False,
+    )
+
+    _, failed_members = link_organization_to_keycloak(
+        organization, connection=connection
+    )
+
+    assert failed_members == [member.user]
+    connection.organizations.associate.assert_not_called()
+    member.refresh_from_db()
+    assert member.keep_until_seen is True
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        _http_error(500),
+        requests.ConnectionError("dropped"),
+        InvalidTokenError(),
+    ],
+)
+def test_link_organization_survives_member_sync_errors(connection, error):
+    """A sync failure after the link commits is reported, not raised."""
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    members = UserOrganizationFactory.create_batch(
+        2, organization=organization, keep_until_seen=False
+    )
+    connection.organizations.associate.side_effect = [error, True]
+
+    _, failed_members = link_organization_to_keycloak(
+        organization, connection=connection
+    )
+
+    assert len(failed_members) == 1
+    assert connection.organizations.associate.call_count == 2
     organization.refresh_from_db()
     assert organization.sso_organization_id is not None
-    connection.organizations.associate.assert_called_once()
+    assert all(
+        UserOrganization.objects.get(pk=member.pk).keep_until_seen for member in members
+    )
 
 
 def test_backfill_command_dry_run_writes_nothing(mocker, connection):
@@ -1143,6 +1196,42 @@ def test_backfill_command_dry_run_flags_a_realm_org_linked_elsewhere(
         call_command("backfill_keycloak_orgs", "--dry-run")
 
     assert "Would fail" in capsys.readouterr().err
+
+
+def test_backfill_command_dry_run_reports_member_counts(mocker, connection, capsys):
+    """--dry-run shows how many members each org would take into Keycloak."""
+
+    mocker.patch(
+        "b2b.management.commands.backfill_keycloak_orgs.KeycloakConnection",
+        return_value=connection,
+    )
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    UserOrganizationFactory.create_batch(3, organization=organization)
+
+    call_command("backfill_keycloak_orgs", "--dry-run")
+
+    assert f"Would create: {organization.org_key} (3 members)" in (
+        capsys.readouterr().out
+    )
+
+
+def test_backfill_command_reports_members_it_could_not_sync(mocker, connection, capsys):
+    """Members left out of Keycloak are listed, and the org still counts as linked."""
+
+    mocker.patch(
+        "b2b.management.commands.backfill_keycloak_orgs.KeycloakConnection",
+        return_value=connection,
+    )
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    member = UserOrganizationFactory.create(
+        organization=organization, user=UserFactory.create(global_id=None)
+    )
+
+    call_command("backfill_keycloak_orgs")
+
+    err = capsys.readouterr().err
+    assert f"1 member(s) of {organization.org_key}" in err
+    assert str(member.user.id) in err
 
 
 def test_backfill_command_reports_failures_and_keeps_going(mocker, connection):
@@ -1194,7 +1283,7 @@ def test_backfill_command_continues_past_a_local_failure(mocker, connection):
     OrganizationPageFactory.create(sso_organization_id=None, org_key="BBB")
     link = mocker.patch(
         "b2b.management.commands.backfill_keycloak_orgs.link_organization_to_keycloak",
-        side_effect=[ValueError("bad page"), True],
+        side_effect=[ValueError("bad page"), (True, [])],
     )
 
     with pytest.raises(CommandError, match="AAA"):

@@ -19,10 +19,11 @@ See docs/source/b2b/provisioning_api.md.
 import logging
 from http import HTTPStatus
 
+from authlib.integrations.base_client.errors import OAuthError
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from mitol.common.utils import now_in_utc
-from requests import HTTPError
+from requests import HTTPError, RequestException
 
 from b2b.constants import (
     IDP_ALLOWED_TRANSITIONS,
@@ -395,7 +396,8 @@ def link_organization_to_keycloak(organization, *, connection=None, actor=None):
     - connection (KeycloakConnection): an existing connection, if any
     - actor (User): who asked for this, for the audit trail
     Returns:
-    - bool: True if a Keycloak organization was created, False if one was adopted
+    - tuple(bool, list[User]): True if a Keycloak organization was created,
+      False if one was adopted; and the members who could not be added to it
     Raises:
     - ValueError: the organization already has a Keycloak organization
     - AliasCollisionError: the realm organization with this alias is already
@@ -480,9 +482,11 @@ def link_organization_to_keycloak(organization, *, connection=None, actor=None):
             },
         )
 
-    sync_organization_members_to_keycloak(organization, connection=connection)
+    failed_members = sync_organization_members_to_keycloak(
+        organization, connection=connection
+    )
 
-    return created
+    return created, failed_members
 
 
 def sync_organization_members_to_keycloak(organization, *, connection):
@@ -511,10 +515,11 @@ def sync_organization_members_to_keycloak(organization, *, connection):
             connection.organizations.associate(
                 "members", organization.sso_organization_id, user.global_id
             )
-        except HTTPError as exc:
+        except (RequestException, OAuthError) as exc:
             # An adopted realm org may already have this member.
             if (
-                exc.response is not None
+                isinstance(exc, HTTPError)
+                and exc.response is not None
                 and exc.response.status_code == HTTPStatus.CONFLICT
             ):
                 continue
