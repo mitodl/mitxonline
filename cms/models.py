@@ -426,27 +426,35 @@ class CertificatePage(CourseProgramChildPage):
         FieldPanel("CEUs"),
         FieldPanel("overrides"),
         FieldPanel("signatories"),
-        # Set on the panel, not the field: panel help text carries markup and
-        # isn't migration-tracked, so this copy can be revised without one.
-        FieldPanel(
-            "verifiable_credential_criteria",
-            widget=Textarea,
-            help_text=mark_safe(
-                "Describe what the learner did in order to earn the credential. "
-                "This should be a bulleted list, in plain text or markdown, with "
-                "each item beginning with an action verb -- for example: "
-                "<strong>Described</strong> how machine learning models are "
-                "trained, or <strong>Distinguished</strong> between symbolic and "
-                "modern machine learning. If it is not supplied, no verifiable "
-                "credential will be provisioned for those certificates."
-            ),
+        MultiFieldPanel(
+            [
+                FieldPanel("should_provision_verifiable_credential"),
+                FeatureFlaggedFieldPanel(
+                    "verifiable_credential_description",
+                    feature_flag=features.ENABLE_CREDENTIAL_METADATA_AUTHORING,
+                    widget=Textarea,
+                ),
+                # Set on the panel, not the field: panel help text carries
+                # markup and isn't migration-tracked, so this copy can be
+                # revised without one.
+                FieldPanel(
+                    "verifiable_credential_criteria",
+                    widget=Textarea,
+                    help_text=mark_safe(
+                        "Describe what the learner did in order to earn the "
+                        "credential. This should be a bulleted list, in plain "
+                        "text or markdown, with each item beginning with an "
+                        "action verb -- for example: <strong>Described</strong> "
+                        "how machine learning models are trained, or "
+                        "<strong>Distinguished</strong> between symbolic and "
+                        "modern machine learning. If it is not supplied, no "
+                        "verifiable credential will be provisioned for those "
+                        "certificates."
+                    ),
+                ),
+            ],
+            heading="Verifiable Credential",
         ),
-        FeatureFlaggedFieldPanel(
-            "verifiable_credential_description",
-            feature_flag=features.ENABLE_CREDENTIAL_METADATA_AUTHORING,
-            widget=Textarea,
-        ),
-        FieldPanel("should_provision_verifiable_credential"),
     ]
     api_fields = [
         APIField("product_name"),
