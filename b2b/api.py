@@ -299,13 +299,22 @@ def move_run_to_retirement_contract(run: CourseRun) -> ContractPage:
 
     contract = get_or_create_retirement_contract()
 
-    if run.b2b_contracts.filter(pk=contract.pk).exists():
+    # The holding contract is inactive, so the (active-only) related manager
+    # can't be used to look at the run's current contracts.
+    current_contract_ids = set(
+        CourseRun.b2b_contracts.through.objects.filter(courserun_id=run.pk).values_list(
+            "contractpage_id", flat=True
+        )
+    )
+
+    if current_contract_ids == {contract.pk}:
         return contract
 
     check_retirement_contract_collision(run, contract)
 
-    run.b2b_contract = contract
-    run.save()
+    other_contract_ids = current_contract_ids - {contract.pk}
+    if other_contract_ids:
+        run.b2b_contracts.remove(*other_contract_ids)
     run.b2b_contracts.add(contract)
 
     log.info("Moved course run %s to %s", run.courseware_id, contract)
@@ -704,9 +713,7 @@ def create_contract_run(  # noqa: PLR0913
                 variant_industry=clone_course_run.variant_industry,
                 variant_length=clone_course_run.variant_length,
             )
-            .filter(
-                Q(b2b_contract=contract) | Q(b2b_contracts__in=[contract]),
-            )
+            .filter(b2b_contracts=contract)
             .exists()
             and no_reruns
         ):
@@ -729,7 +736,6 @@ def create_contract_run(  # noqa: PLR0913
             certificate_available_date=start_date,
             is_self_paced=True,
             live=True,
-            b2b_contract=contract,
             b2b_only=True,
             language=clone_course_run.language,
             is_primary_language=clone_course_run.is_primary_language,

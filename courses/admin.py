@@ -8,6 +8,7 @@ from django.contrib import admin, messages
 from django.contrib.admin.decorators import display
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.db import models
+from django.db.models import Prefetch
 from django.forms import TextInput
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
@@ -109,7 +110,6 @@ class CourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
         "language",
         "variant_length",
         "variant_industry",
-        "b2b_contract",
         "live",
         "start_date",
         "end_date",
@@ -125,7 +125,6 @@ class CourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
         "language",
         "variant_length",
         "variant_industry",
-        "b2b_contract",
         "live",
         "start_date",
         "end_date",
@@ -443,7 +442,7 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         "is_source_run",
         "language",
         "course",
-        "b2b_contract",
+        "b2b_contracts",
     ]
     raw_id_fields = ("course",)
     fieldsets = [
@@ -492,7 +491,6 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
             {
                 "fields": [
                     "b2b_only",
-                    "b2b_contract",
                 ],
             },
         ),
@@ -526,38 +524,19 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
     def get_queryset(self, request):  # noqa: ARG002
         """Use the all_objects manager so we can see source runs."""
 
-        return self.model.all_objects
+        # Imported here to avoid a circular dependency at module load time,
+        # matching ProgramContractPageInline above.
+        from b2b.models import ContractPage  # noqa: PLC0415
 
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        """
-        Show inactive contracts in the b2b_contract dropdown.
-
-        By default the admin builds this field from
-        ``ContractPage._default_manager``. ContractPage declares
-        ``active_objects`` as its only local manager, and Django orders local
-        managers ahead of ones inherited from the concrete parent, so
-        ``_default_manager`` is ``ActiveContractManager`` and filters
-        ``active=True``.
-
-        That means a run attached to an inactive contract - a retired run parked
-        in the holding contract, or any run on an expired contract - renders with
-        an empty dropdown, because its current value isn't among the choices.
-        Since the field is ``null=True, blank=True``, saving that form is valid
-        and silently sets ``b2b_contract`` to NULL, which turns a B2B run into a
-        public-catalog run (``CourseRunQuerySet.exclude_b2b`` treats a null
-        contract as "not B2B").
-        """
-
-        if db_field.name == "b2b_contract":
-            # Imported here to avoid a circular dependency at module load time,
-            # matching ProgramContractPageInline above.
-            from b2b.models import ContractPage  # noqa: PLC0415
-
-            kwargs["queryset"] = ContractPage.objects.order_by(
-                "organization__name", "name"
+        # ContractPage.objects, not the default (active-only) manager, so runs
+        # parked in inactive contracts still show their contract.
+        return self.model.all_objects.prefetch_related(
+            Prefetch(
+                "b2b_contracts",
+                queryset=ContractPage.objects.order_by("id"),
+                to_attr="all_b2b_contracts",
             )
-
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+        )
 
     @admin.display(description="Primary?", ordering="is_primary_language")
     def primary(self, obj):
@@ -569,10 +548,10 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         """Return the source run flag."""
         return obj.is_source_run
 
-    @admin.display(description="Contract", ordering="b2b_contract")
+    @admin.display(description="Contract")
     def contract(self, obj):
-        """Return the B2B contract title."""
-        return obj.b2b_contract.name if obj.b2b_contract else ""
+        """Return the B2B contract names."""
+        return ", ".join(contract.name for contract in obj.all_b2b_contracts)
 
 
 class ProgramEnrollmentAuditInline(admin.TabularInline):

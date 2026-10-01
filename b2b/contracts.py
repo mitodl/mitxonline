@@ -172,8 +172,6 @@ def add_courseware_to_contract(  # noqa: PLR0913
                 )
             )
 
-        courseware.b2b_contract = contract
-        courseware.save()
         courseware.b2b_contracts.add(contract)
         return CoursewareAddition(runs_added=1)
 
@@ -210,8 +208,6 @@ def _remove_run_from_contract(contract: ContractPage, run: CourseRun) -> bool:
         run.enrollment_end = now
 
     if unlinked:
-        if run.b2b_contract == contract:
-            run.b2b_contract = None
         run.b2b_contracts.remove(contract)
 
     run.save()
