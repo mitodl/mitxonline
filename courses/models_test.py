@@ -818,7 +818,6 @@ def test_program_requirement_properties_use_prefetched_all_requirements(
         course_pairs = program.courses
         required_course_list = program.required_courses
         elective_course_list = program.elective_courses
-        minimum_elective_requirement = program.minimum_elective_courses_requirement
 
     assert len(context) == 0
     assert [course.id for course, _ in course_pairs] == [
@@ -839,7 +838,6 @@ def test_program_requirement_properties_use_prefetched_all_requirements(
             + program_with_requirements.mut_exclusive_courses
         )
     ]
-    assert minimum_elective_requirement == 2
 
 
 def test_program_requirements_is_operator():
@@ -1258,42 +1256,6 @@ def test_related_programs():
     assert len(programs[3].related_programs) == 1
 
     assert related_program == second_related_program
-
-
-def test_program_minimum_elective_courses_requirement():
-    """Tests to make sure the related programs functionality in the model works."""
-    minimum_elective_required = 5
-    program = ProgramFactory.create()
-    root_node = program.requirements_root
-
-    root_node.add_child(
-        node_type=ProgramRequirementNodeType.OPERATOR,
-        operator=ProgramRequirement.Operator.ALL_OF,
-        title="Required Courses",
-    )
-    root_node.add_child(
-        node_type=ProgramRequirementNodeType.OPERATOR,
-        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
-        operator_value=minimum_elective_required,
-        title="Elective Courses",
-        elective_flag=True,
-    )
-
-    assert program.minimum_elective_courses_requirement == minimum_elective_required
-
-
-def test_program_minimum_elective_courses_requirement_no_elective_node():
-    """Tests to make sure the related programs functionality in the model works."""
-    program = ProgramFactory.create()
-    root_node = program.requirements_root
-
-    root_node.add_child(
-        node_type=ProgramRequirementNodeType.OPERATOR,
-        operator=ProgramRequirement.Operator.ALL_OF,
-        title="Required Courses",
-    )
-
-    assert program.minimum_elective_courses_requirement is None
 
 
 def test_courserun_qs_b2b_flags():

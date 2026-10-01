@@ -1612,8 +1612,6 @@
     "courses/models_test.py::test_program_certificates_disabled_defaults_false": 0.23108479499205714,
     "courses/models_test.py::test_program_elective_programs_property": 0.7316362559940899,
     "courses/models_test.py::test_program_first_unexpired_run": 0.6213074250044883,
-    "courses/models_test.py::test_program_minimum_elective_courses_requirement": 0.29609524700208567,
-    "courses/models_test.py::test_program_minimum_elective_courses_requirement_no_elective_node": 0.3123162990086712,
     "courses/models_test.py::test_program_num_courses": 0.6084413410062552,
     "courses/models_test.py::test_program_required_programs_property": 0.8021463719996973,
     "courses/models_test.py::test_program_requirement_node_types": 0.42314739099674625,

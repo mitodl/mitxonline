@@ -521,22 +521,14 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         elective_courses = []
         required_title = "Required Courses"
         elective_title = "Elective Courses"
-        minimum_elective_requirement = None
 
-        # First, check all operators for titles and minimum elective requirements
+        # First, take the section titles from the operators
         for op in path_to_operator.values():
             # Store titles from actual operator nodes
             if not op.elective_flag and required_title == "Required Courses":
                 required_title = op.title or required_title
             elif op.elective_flag and elective_title == "Elective Courses":
                 elective_title = op.title or elective_title
-                if (
-                    op.is_min_number_of_operator
-                    and minimum_elective_requirement is None
-                ):
-                    minimum_elective_requirement = (
-                        int(op.operator_value) if op.operator_value else None
-                    )
 
         for req in course_reqs:
             if not req.course:
@@ -568,7 +560,6 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             "elective_courses": elective_courses,
             "required_title": required_title,
             "elective_title": elective_title,
-            "minimum_elective_requirement": minimum_elective_requirement,
         }
 
     def _find_parent_operator(self, req, path_to_operator):
@@ -596,7 +587,6 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             "elective_courses": [],
             "required_title": "Required Courses",
             "elective_title": "Elective Courses",
-            "minimum_elective_requirement": None,
         }
 
     def get_courses_with_requirements_data(self, requirements=None) -> dict:
@@ -631,7 +621,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
 
         Returns:
         - dict: Contains 'courses', 'required_courses', 'elective_courses',
-                'required_title', 'elective_title', and 'minimum_elective_requirement'
+                'required_title', and 'elective_title'
         """
         prefetched_requirements = getattr(self, "_prefetched_objects_cache", {}).get(
             "all_requirements"
@@ -758,17 +748,6 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         courses (e.g. the one that has elective_flag = True).
         """
         return self._courses_with_requirements_data["elective_title"]
-
-    @cached_property
-    def minimum_elective_courses_requirement(self):
-        """
-        Returns the (int) value defined for the minimum number of elective courses required to be completed by the Program
-
-        Returns:
-            int: Minimum number of elective courses required to be completed by the Program.
-                Returns None, if no value is defined or elective node is absent.
-        """
-        return self._courses_with_requirements_data["minimum_elective_requirement"]
 
     @property
     def is_program(self):
