@@ -17,6 +17,7 @@ from courses.factories import (
     CourseRunGradeFactory,
 )
 from courses.models import (
+    CourseRunAccessRole,
     CourseRunCertificate,
     CourseRunEnrollment,
 )
@@ -317,6 +318,51 @@ class TestEdxEnrollmentWebhook:
             HTTP_AUTHORIZATION=f"Bearer {oauth_token.token}",
         )
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+
+    @pytest.mark.parametrize("role", ["instructor", "staff"])
+    def test_course_staff_role_is_recorded(self, api_client, oauth_token, role):
+        """A course staff role in the payload is recorded against the run"""
+        user = UserFactory.create()
+        course_run = CourseRunFactory.create()
+
+        response = self._post_webhook(
+            api_client,
+            {
+                "email": user.email,
+                "course_id": course_run.courseware_id,
+                "role": role,
+            },
+            token=oauth_token.token,
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert CourseRunAccessRole.objects.filter(
+            user=user, run=course_run, role=role
+        ).exists()
+
+    @pytest.mark.parametrize("role", ["data_researcher", "beta", ""])
+    def test_non_staff_role_is_not_recorded(self, api_client, oauth_token, role):
+        """
+        Roles that do not grant courseware access before a run starts are not
+        recorded, so they cannot switch the dashboard's early-access on.
+        """
+        user = UserFactory.create()
+        course_run = CourseRunFactory.create()
+
+        response = self._post_webhook(
+            api_client,
+            {
+                "email": user.email,
+                "course_id": course_run.courseware_id,
+                "role": role,
+            },
+            token=oauth_token.token,
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert not CourseRunAccessRole.objects.filter(
+            user=user, run=course_run
+        ).exists()
 
 
 class TestEdxCertificateWebhook:

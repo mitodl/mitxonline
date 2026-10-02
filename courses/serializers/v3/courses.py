@@ -20,6 +20,7 @@ from courses.serializers.v1.base import (
 )
 from courses.serializers.v3.certificates import CourseRunCertificateSerializer
 from main import features
+from openedx.constants import OPENEDX_COURSE_STAFF_ROLES
 
 log = logging.getLogger(__name__)
 
@@ -93,6 +94,28 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
 
     b2b_organization_id = serializers.SerializerMethodField(read_only=True)
     b2b_contract_id = serializers.SerializerMethodField(read_only=True)
+    has_course_staff_role = serializers.SerializerMethodField(read_only=True)
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_has_course_staff_role(self, enrollment):
+        """
+        Whether the user holds an Open edX course staff role on this run.
+
+        Open edX lets these users open the courseware before the run starts, so
+        the dashboard needs the same fact to decide whether to offer the link.
+
+        Prefers the annotation the list view adds, which keeps the dashboard's
+        enrollment list at one subquery rather than a query per card. The
+        fallback covers the unannotated paths, such as create.
+        """
+        annotated = getattr(enrollment, "has_course_staff_role", None)
+        if annotated is not None:
+            return annotated
+        return models.CourseRunAccessRole.objects.filter(
+            user_id=enrollment.user_id,
+            run_id=enrollment.run_id,
+            role__in=OPENEDX_COURSE_STAFF_ROLES,
+        ).exists()
 
     @extend_schema_field(serializers.IntegerField(allow_null=True))
     def get_b2b_organization_id(self, enrollment):
@@ -146,6 +169,7 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
             "b2b_organization_id",
             "b2b_contract_id",
             "certificate",
+            "has_course_staff_role",
         ]
 
 
