@@ -55,6 +55,7 @@ class TestCourseRunEnrollmentSerializerV3:
             "grades",
             "b2b_organization_id",
             "b2b_contract_id",
+            "has_course_staff_role",
         }
 
         assert set(serialized_data.keys()) == expected_fields

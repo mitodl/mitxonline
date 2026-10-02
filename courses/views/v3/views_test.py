@@ -26,15 +26,19 @@ from courses.factories import (
     ProgramFactory,
 )
 from courses.models import (
+    CourseRunAccessRole,
     PaidProgram,
     ProgramEnrollment,
 )
+from courses.serializers.v3.courses import CourseRunEnrollmentSerializer
 from courses.serializers.v3.programs import SimpleProgramSerializer
 from courses.test_utils import maybe_serialize_course_cert, maybe_serialize_program_cert
+from courses.views.v3 import UserEnrollmentsApiViewSet
 from ecommerce.factories import OrderFactory
 from ecommerce.models import OrderStatus
 from main.test_utils import drf_datetime
 from openedx.exceptions import EdxApiCourseOutlineError
+from users.factories import UserFactory
 
 pytestmark = [
     pytest.mark.django_db,
@@ -124,6 +128,7 @@ def test_user_enrollments_detail(
         else None,
         "enrollment_mode": enrollment.enrollment_mode,
         "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+        "has_course_staff_role": False,
     }
 
 
@@ -199,6 +204,7 @@ def test_user_enrollments_list(
             else None,
             "enrollment_mode": enrollment.enrollment_mode,
             "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+            "has_course_staff_role": False,
         }
         for enrollment in user_with_enrollments_and_certificates.run_enrollments
         for upgrade_product in [
@@ -376,6 +382,7 @@ def test_user_enrollments_list_filter_exclude_b2b(
             "b2b_organization_id": None,
             "enrollment_mode": enrollment.enrollment_mode,
             "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+            "has_course_staff_role": False,
         }
         for enrollment in user_with_enrollments_and_certificates.run_enrollments
         for upgrade_product in [
@@ -455,6 +462,7 @@ def test_user_enrollments_list_filter_exclude_b2b(
             else None,
             "enrollment_mode": enrollment.enrollment_mode,
             "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+            "has_course_staff_role": False,
         }
         for enrollment in user_with_enrollments_and_certificates.run_enrollments
         for upgrade_product in [
@@ -474,6 +482,59 @@ def test_user_enrollments_list_query_count_guard(
     with django_assert_max_num_queries(20):
         resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
     assert resp.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.parametrize(
+    ("role", "expected"),
+    [
+        ("staff", True),
+        ("instructor", True),
+        ("data_researcher", False),
+    ],
+)
+def test_user_enrollments_list_has_course_staff_role(
+    user_drf_client, user, role, expected
+):
+    """
+    The list endpoint reports whether the user is course staff on each run, so
+    the dashboard can offer the courseware link before the run starts. Only the
+    roles Open edX itself lets in early count.
+    """
+    enrollment = CourseRunEnrollmentFactory.create(user=user)
+    CourseRunAccessRole.objects.create(user=user, run=enrollment.run, role=role)
+
+    resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    [result] = [row for row in resp.json() if row["id"] == enrollment.id]
+    assert result["has_course_staff_role"] is expected
+
+
+def test_user_enrollments_list_course_staff_role_is_per_run(user_drf_client, user):
+    """A role on one run does not mark the user's other enrollments"""
+    staffed, other = CourseRunEnrollmentFactory.create_batch(2, user=user)
+    CourseRunAccessRole.objects.create(user=user, run=staffed.run, role="staff")
+
+    resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    flags = {row["id"]: row["has_course_staff_role"] for row in resp.json()}
+    assert flags[staffed.id] is True
+    assert flags[other.id] is False
+
+
+def test_user_enrollments_list_course_staff_role_is_per_user(user_drf_client, user):
+    """Another user's role on the same run does not mark this user's enrollment"""
+    enrollment = CourseRunEnrollmentFactory.create(user=user)
+    CourseRunAccessRole.objects.create(
+        user=UserFactory.create(), run=enrollment.run, role="staff"
+    )
+
+    resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    [result] = [row for row in resp.json() if row["id"] == enrollment.id]
+    assert result["has_course_staff_role"] is False
 
 
 def test_program_enrollments(
@@ -557,6 +618,31 @@ def test_user_enrollments_future_course_cert(user_drf_client, user):
     assert list_resp.status_code == status.HTTP_200_OK
     enrollment_data = next(e for e in list_resp.json() if e["id"] == enrollment.id)
     assert enrollment_data["certificate"] is None
+
+
+def test_perform_create_annotates_the_new_enrollment(user, rf):
+    """
+    The created enrollment is re-read through the annotated queryset.
+
+    Nothing annotates the instance `save()` returns, so without this the create
+    response would report `has_course_staff_role` as False for a user who does
+    hold the role - someone re-enrolling after unenrolling, or whose role
+    arrived while an earlier enrollment attempt failed - while a later GET on
+    the same enrollment reported True.
+    """
+    enrollment = CourseRunEnrollmentFactory.create(user=user)
+    CourseRunAccessRole.objects.create(user=user, run=enrollment.run, role="staff")
+
+    view = UserEnrollmentsApiViewSet()
+    request = rf.post(reverse("v3:user_enrollments_api-list"))
+    request.user = user
+    view.request = request
+
+    serializer = CourseRunEnrollmentSerializer(context={"user": user})
+    serializer.save = lambda **_kwargs: enrollment
+    view.perform_create(serializer)
+
+    assert serializer.instance.has_course_staff_role is True
 
 
 def test_create_program_enrollment(user_drf_client, user):

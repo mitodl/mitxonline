@@ -6710,12 +6710,16 @@ components:
           type: integer
           nullable: true
           readOnly: true
+        has_course_staff_role:
+          type: boolean
+          readOnly: true
       required:
       - b2b_contract_id
       - b2b_organization_id
       - certificate
       - enrollment_mode
       - grades
+      - has_course_staff_role
       - id
       - run
     CourseRunEnrollmentV3Request:

@@ -17,6 +17,7 @@ from courses.factories import (
     CourseRunGradeFactory,
 )
 from courses.models import (
+    CourseRunAccessRole,
     CourseRunCertificate,
     CourseRunEnrollment,
 )
@@ -217,6 +218,13 @@ class TestEdxEnrollmentWebhook:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "Failed to create enrollment" in response.data["error"]
 
+        # The role is recorded before the enrollment precisely so it survives
+        # this. They are independent facts, and Open edX has already granted
+        # the role whether or not we manage to mirror the enrollment.
+        assert CourseRunAccessRole.objects.filter(
+            user=user, run=course_run, role="instructor"
+        ).exists()
+
     def test_already_enrolled_user(self, api_client, oauth_token):
         """Test that webhook succeeds for an already-enrolled user (idempotent)"""
         user = UserFactory.create()
@@ -317,6 +325,51 @@ class TestEdxEnrollmentWebhook:
             HTTP_AUTHORIZATION=f"Bearer {oauth_token.token}",
         )
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+
+    @pytest.mark.parametrize("role", ["instructor", "staff"])
+    def test_course_staff_role_is_recorded(self, api_client, oauth_token, role):
+        """A course staff role in the payload is recorded against the run"""
+        user = UserFactory.create()
+        course_run = CourseRunFactory.create()
+
+        response = self._post_webhook(
+            api_client,
+            {
+                "email": user.email,
+                "course_id": course_run.courseware_id,
+                "role": role,
+            },
+            token=oauth_token.token,
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert CourseRunAccessRole.objects.filter(
+            user=user, run=course_run, role=role
+        ).exists()
+
+    @pytest.mark.parametrize("role", ["data_researcher", "beta", ""])
+    def test_non_staff_role_is_not_recorded(self, api_client, oauth_token, role):
+        """
+        Roles that do not grant courseware access before a run starts are not
+        recorded, so they cannot switch the dashboard's early-access on.
+        """
+        user = UserFactory.create()
+        course_run = CourseRunFactory.create()
+
+        response = self._post_webhook(
+            api_client,
+            {
+                "email": user.email,
+                "course_id": course_run.courseware_id,
+                "role": role,
+            },
+            token=oauth_token.token,
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert not CourseRunAccessRole.objects.filter(
+            user=user, run=course_run
+        ).exists()
 
 
 class TestEdxCertificateWebhook:
