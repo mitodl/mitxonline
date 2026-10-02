@@ -670,6 +670,25 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
     assert clone.source_courseware_id == source_run.courseware_id
 
 
+def test_create_contract_run_falls_back_to_newest_non_b2b_run(mocker):
+    """Without a designated source run, the newest non-B2B run is cloned."""
+
+    contract = factories.ContractPageFactory.create()
+    course = CourseFactory.create()
+    mocked_clone_run = mocker.patch("openedx.tasks.clone_courserun.delay")
+    older_run, newest_run = CourseRunFactory.create_batch(
+        2, course=course, is_source_run=False, language="en"
+    )
+
+    [(created_run, _)] = create_contract_run(
+        contract, course, require_designated_source_run=False
+    )
+
+    assert created_run.b2b_contract == contract
+    assert older_run.id < newest_run.id
+    mocked_clone_run.assert_called_once_with(created_run.id, newest_run.courseware_id)
+
+
 def test_create_contract_run_variants(mocker):
     """
     Test creating runs for a contract when there are variant runs.
@@ -2150,6 +2169,30 @@ def test_get_source_course_runs_with_variants_lang_filter(filter_type):
         assert returned_run.id == main_source_course.id
     else:
         assert returned_run.id == variant_2.id
+
+
+@pytest.mark.parametrize("filter_type", ["filter_variants", "only_lang"])
+def test_get_source_course_runs_no_matching_variants(filter_type):
+    """No variant surviving the filters means no source run, not an IndexError."""
+
+    course = CourseFactory.create()
+    CourseRunFactory.create(
+        course=course,
+        is_source_run=True,
+        language="en",
+        is_primary_language=True,
+        variant_industry="",
+        variant_length="",
+    )
+    if filter_type == "filter_variants":
+        contract = factories.ContractPageFactory.create()
+        contract.variant_options.update(language="hi")
+        kwargs = {"filter_variants": list(contract.variant_options.all())}
+    else:
+        kwargs = {"only_lang": "hi"}
+
+    with pytest.raises(SourceCourseIncompleteError, match="No source run found"):
+        _get_source_runs_for_course(course, **kwargs)
 
 
 def test_get_user_b2b_organizations_no_orgs():
