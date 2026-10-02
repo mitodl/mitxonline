@@ -218,6 +218,13 @@ class TestEdxEnrollmentWebhook:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "Failed to create enrollment" in response.data["error"]
 
+        # The role is recorded before the enrollment precisely so it survives
+        # this. They are independent facts, and Open edX has already granted
+        # the role whether or not we manage to mirror the enrollment.
+        assert CourseRunAccessRole.objects.filter(
+            user=user, run=course_run, role="instructor"
+        ).exists()
+
     def test_already_enrolled_user(self, api_client, oauth_token):
         """Test that webhook succeeds for an already-enrolled user (idempotent)"""
         user = UserFactory.create()

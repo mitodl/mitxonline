@@ -105,12 +105,8 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
 
         Read from the annotation the viewset's queryset adds, never queried
         here: this runs once per enrollment, so a lookup would be an N+1 across
-        the dashboard.
-
-        Defaults to False on a path that did not annotate, which in practice is
-        only create. Course staff never reach it - Open edX enrols them the
-        moment the role is granted, so they are already enrolled by the time
-        the dashboard loads and the list view annotates them properly.
+        the dashboard. The viewset annotates every path that serializes an
+        enrollment, including create - see `perform_create`.
         """
         return bool(getattr(enrollment, "has_course_staff_role", False))
 
