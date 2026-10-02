@@ -9,6 +9,7 @@ from urllib.parse import parse_qsl
 
 import factory
 import pytest
+import requests
 import responses
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ImproperlyConfigured
@@ -39,6 +40,7 @@ from openedx.api import (
     existing_edx_enrollment,
     generate_unique_username,
     get_edx_api_client,
+    get_edx_api_course_list_client,
     get_edx_course_outline,
     get_edx_retirement_service_client,
     get_valid_edx_api_auth,
@@ -1072,6 +1074,108 @@ def test_get_edx_retirement_service_client(mocker, settings):
     client = get_edx_retirement_service_client()
     assert client.credentials["access_token"] == "an_access_token"  # noqa: S105
     assert client.base_url == settings.OPENEDX_API_BASE_URL
+
+
+@pytest.mark.parametrize("has_client_credentials", [True, False])
+def test_get_edx_api_course_list_client(mocker, settings, has_client_credentials):
+    """
+    get_edx_api_course_list_client uses a client-credentials JWT when the courses
+    service worker is configured, and the static service worker token otherwise
+    """
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "static_token"  # noqa: S105
+    settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID = (
+        "courses_client_id" if has_client_credentials else None
+    )
+    settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET = (
+        "courses_client_secret" if has_client_credentials else None
+    )
+    mock_resp = mocker.Mock()
+    mock_resp.json.return_value = {"access_token": "a_jwt"}
+    mock_resp.raise_for_status.side_effect = None
+    mock_post = mocker.patch("openedx.api.requests.post", return_value=mock_resp)
+
+    course_list = get_edx_api_course_list_client()
+
+    auth_header = course_list._requester.headers["Authorization"]  # noqa: SLF001
+    if has_client_credentials:
+        assert auth_header == "jwt a_jwt"
+        assert mock_post.call_args.kwargs["data"] == {
+            "grant_type": "client_credentials",
+            "client_id": "courses_client_id",
+            "client_secret": "courses_client_secret",
+            "token_type": "jwt",
+        }
+        assert mock_post.call_args.kwargs["timeout"] == settings.EDX_API_CLIENT_TIMEOUT
+    else:
+        assert auth_header == "Bearer static_token"
+        mock_post.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("failure", "expected_level"),
+    [
+        ("http_400", logging.ERROR),
+        ("http_503", logging.WARNING),
+        ("connection_error", logging.WARNING),
+        ("timeout", logging.WARNING),
+        ("missing_access_token", logging.WARNING),
+        ("invalid_json", logging.WARNING),
+    ],
+)
+def test_get_edx_api_course_list_client_falls_back_to_static_token(
+    mocker, settings, caplog, failure, expected_level
+):
+    """
+    If the client-credentials JWT can't be obtained, the course list client uses
+    the static service worker token instead of failing. A 4xx from the token
+    endpoint means the app is set up wrong, so it's logged as an error; other
+    failures are logged as warnings. Neither log includes the client secret.
+    """
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "static_token"  # noqa: S105
+    settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID = "authorization_code_app"
+    settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET = "a_client_secret"  # noqa: S105
+    mock_resp = mocker.Mock()
+    mock_resp.json.return_value = {"access_token": "a_jwt"}
+    mock_post = mocker.patch("openedx.api.requests.post", return_value=mock_resp)
+    if failure.startswith("http_"):
+        mock_resp.raise_for_status.side_effect = HTTPError(
+            response=mocker.Mock(status_code=int(failure.removeprefix("http_")))
+        )
+    elif failure == "connection_error":
+        mock_post.side_effect = requests.ConnectionError
+    elif failure == "timeout":
+        mock_post.side_effect = requests.Timeout
+    elif failure == "missing_access_token":
+        mock_resp.json.return_value = {}
+    else:
+        mock_resp.json.side_effect = ValueError
+
+    with caplog.at_level(logging.WARNING, logger="openedx.api"):
+        course_list = get_edx_api_course_list_client()
+
+    auth_header = course_list._requester.headers["Authorization"]  # noqa: SLF001
+    assert auth_header == "Bearer static_token"
+    (record,) = caplog.records
+    assert record.levelno == expected_level
+    assert record.exc_info is None
+    assert "a_client_secret" not in caplog.text
+
+
+def test_get_edx_api_course_list_client_static_token_only(mocker, settings):
+    """With use_jwt=False the course list client uses the static token without requesting a JWT"""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "static_token"  # noqa: S105
+    settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID = "courses_client_id"
+    settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET = "courses_client_secret"  # noqa: S105
+    mock_post = mocker.patch("openedx.api.requests.post")
+
+    course_list = get_edx_api_course_list_client(use_jwt=False)
+
+    auth_header = course_list._requester.headers["Authorization"]  # noqa: SLF001
+    assert auth_header == "Bearer static_token"
+    mock_post.assert_not_called()
 
 
 @pytest.mark.parametrize("has_edx_username", [True, False])
