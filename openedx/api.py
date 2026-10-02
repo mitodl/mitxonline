@@ -14,6 +14,7 @@ from django.db import transaction
 from django.shortcuts import reverse
 from edx_api.client import EdxApi
 from edx_api.course_detail.models import CourseMode
+from edx_api.course_list import CourseList
 from edx_api.course_runs.exceptions import CourseRunAPIError
 from edx_api.course_runs.models import CourseRun, CourseRunList
 from mitol.common.utils import (
@@ -1065,7 +1066,11 @@ def get_edx_api_jwt_client(
         "client_secret": client_secret,
         "token_type": "jwt",
     }
-    resp = requests.post(edx_url(OPENEDX_OAUTH2_ACCESS_TOKEN_PATH), data=data)  # noqa: S113
+    resp = requests.post(
+        edx_url(OPENEDX_OAUTH2_ACCESS_TOKEN_PATH),
+        data=data,
+        timeout=settings.EDX_API_CLIENT_TIMEOUT,
+    )
     resp.raise_for_status()
     access_token = resp.json()["access_token"]
 
@@ -1163,9 +1168,37 @@ def get_edx_api_course_list_client():
     """
     Gets an edx api client instance for use with the course list api
 
+    Uses a client-credentials JWT for the courses service worker, so edX can
+    tell this is a service call rather than a user's. Falls back to the static
+    service worker token if that JWT can't be obtained, e.g. when the courses
+    service worker settings fall back to an app that doesn't allow the
+    client-credentials grant.
+
     Returns:
         CourseList: edx api course list client instance
     """
+    if (
+        settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID
+        and settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET
+    ):
+        try:
+            edx_client = get_edx_api_jwt_client(
+                settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID,
+                settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET,
+            )
+        except (requests.RequestException, KeyError, ValueError):
+            log.warning(
+                "Could not get a client-credentials JWT for the course list API, "
+                "using the static service worker token instead",
+                exc_info=True,
+            )
+        else:
+            # edX only accepts a JWT under the "JWT" scheme, but the client's
+            # course_list property always sends "Bearer".
+            return CourseList(
+                edx_client.get_requester(token_type="jwt"),  # noqa: S106
+                edx_client.base_url,
+            )
     edx_client = get_edx_api_service_client()
     return edx_client.course_list
 
