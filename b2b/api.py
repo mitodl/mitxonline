@@ -912,6 +912,9 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     if not basket:
         return False
 
+    if not active_contracts:
+        active_contracts = []
+
     free_contracts, nonfree_contracts = get_free_and_nonfree_contracts(active_contracts)
 
     # Find free contracts the user is NOT associated with
