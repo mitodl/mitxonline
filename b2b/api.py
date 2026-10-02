@@ -1531,9 +1531,31 @@ def _validate_b2b_enrollment_prerequisites(  # noqa: PLR0911
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
 
-    if not purchasable_object.enrollable_for_contract(contract):
+    audit_exists = (
+        isinstance(
+            purchasable_object,
+            (
+                CourseRun,
+                Program,
+            ),
+        )
+        and purchasable_object.enrollments.filter(
+            user=user,
+            active=True,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        )
+        .exclude(
+            change_status__in=ALL_ENROLL_CHANGE_STATUSES,
+        )
+        .exists()
+    )
+
+    if (audit_exists and not purchasable_object.is_upgradable) or (
+        not audit_exists and not purchasable_object.enrollable_for_contract(contract)
+    ):
+        # Active audit enrollment - check for upgrdability
         log.error(
-            "B2B enroll: attempted to use %s but %s is not enrollable for B2B contract %s",
+            "B2B enroll: attempted to use %s but %s is not enrollable/upgradable for B2B contract %s",
             product,
             purchasable_object,
             contract,
@@ -1541,7 +1563,13 @@ def _validate_b2b_enrollment_prerequisites(  # noqa: PLR0911
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
 
     if (
-        isinstance(purchasable_object, CourseRun)
+        isinstance(
+            purchasable_object,
+            (
+                CourseRun,
+                Program,
+            ),
+        )
         and purchasable_object.enrollments.filter(
             user=user,
             active=True,
@@ -1553,10 +1581,10 @@ def _validate_b2b_enrollment_prerequisites(  # noqa: PLR0911
         .exists()
     ):
         log.error(
-            "B2B enroll: attempted to use %s but %s already enrolled in %s",
+            "B2B enroll: attempted to use %s but %s already has verified enrollment in %s",
             product,
             user,
-            CourseRun.courseware_id,
+            purchasable_object.courseware_id,
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED}
 
