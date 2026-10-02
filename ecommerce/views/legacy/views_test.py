@@ -560,6 +560,7 @@ def test_start_checkout_with_discounts_and_b2b(
         product = ProductFactory.create(price=999)
 
     product.purchasable_object.b2b_contracts.add(contract)
+    product.purchasable_object.b2b_only = True
     product.purchasable_object.save()
     product.refresh_from_db()
 
