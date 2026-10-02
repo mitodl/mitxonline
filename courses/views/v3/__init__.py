@@ -62,7 +62,7 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
     )
     exclude_b2b = django_filters.BooleanFilter(
         method="filter_exclude_b2b",
-        label="Exclude B2B enrollments (enrollments linked to course runs with B2B contracts)",
+        label="Exclude B2B enrollments (enrollments made through a B2B contract)",
     )
 
     class Meta:
@@ -72,13 +72,13 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
     def filter_exclude_b2b(self, queryset, name, value):  # noqa: ARG002
         """Filter out B2B enrollments if exclude_b2b is True."""
         if value:
-            return queryset.filter(run__b2b_contracts__isnull=True)
+            return queryset.filter(b2b_contract__isnull=True)
         return queryset
 
     def filter_org_id(self, queryset, name, value):  # noqa: ARG002
         """Filter enrollments by B2B organization ID."""
         if value:
-            return queryset.filter(run__b2b_contracts__organization_id=value)
+            return queryset.filter(b2b_contract__organization_id=value)
         return queryset
 
 
@@ -86,7 +86,7 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
     list=extend_schema(
         operation_id="user_enrollments_list_v3",
         description="List user enrollments with B2B organization and contract information - API v3. "
-        "Use ?exclude_b2b=true to filter out enrollments linked to course runs with B2B contracts. "
+        "Use ?exclude_b2b=true to filter out enrollments made through a B2B contract. "
         "Use ?org_id=<id> to filter enrollments by specific B2B organization.",
     ),
     create=extend_schema(
@@ -112,7 +112,7 @@ class UserEnrollmentsApiViewSet(
         CourseRunEnrollment.objects.select_related(
             # these possibly get joined anyway via filer, so select over prefetch
             "run",
-            "run__b2b_contract",
+            "b2b_contract",
         )
         .prefetch_related(
             "run__b2b_contracts",

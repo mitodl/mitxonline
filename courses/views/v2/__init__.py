@@ -707,7 +707,7 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
     )
     exclude_b2b = django_filters.BooleanFilter(
         method="filter_exclude_b2b",
-        label="Exclude B2B enrollments (enrollments linked to course runs with B2B contracts)",
+        label="Exclude B2B enrollments (enrollments made through a B2B contract)",
     )
 
     class Meta:
@@ -716,22 +716,14 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
 
     def filter_exclude_b2b(self, queryset, name, value):  # noqa: ARG002
         """Filter out B2B enrollments if exclude_b2b is True."""
-
-        # At this point, the only sure way to determine if an enrollment is a
-        # B2B one is if the run is marked as b2b_only. The enrollment APIs will
-        # need to be updated so we can track enrollments in public courses that
-        # are also B2B, which hasn't happened yet.
         if value:
-            return queryset.filter(run__b2b_only=False)
+            return queryset.filter(b2b_contract__isnull=True)
         return queryset
 
     def filter_org_id(self, queryset, name, value):  # noqa: ARG002
         """Filter enrollments by B2B organization ID."""
         if value:
-            return queryset.filter(
-                Q(run__b2b_contract__organization_id=value)
-                | Q(run__b2b_contracts__organization_id=value)
-            )
+            return queryset.filter(b2b_contract__organization_id=value)
         return queryset
 
 
@@ -752,7 +744,7 @@ class UserEnrollmentsApiViewSet(
         CourseRunEnrollment.objects.select_related(
             "user",
             "run",
-            "run__b2b_contract",
+            "b2b_contract",
         )
         .prefetch_related(
             "run__b2b_contract__organization",
@@ -784,7 +776,7 @@ class UserEnrollmentsApiViewSet(
     @extend_schema(
         operation_id="user_enrollments_list_v2",
         description="List user enrollments with B2B organization and contract information - API v2. "
-        "Use ?exclude_b2b=true to filter out enrollments linked to course runs with B2B contracts. "
+        "Use ?exclude_b2b=true to filter out enrollments made through a B2B contract. "
         "Use ?org_id=<id> to filter enrollments by specific B2B organization.",
     )
     def list(self, request, *args, **kwargs):
@@ -1152,7 +1144,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                         user=request.user, run__course__in=courses
                     )
                     .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
-                    .select_related("run__course__page", "run__b2b_contract")
+                    .select_related("run__course__page", "b2b_contract")
                     .prefetch(
                         "run__course__programs",
                         "run__course__financial_assistance_form_url",
