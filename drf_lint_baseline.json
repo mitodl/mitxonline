@@ -64,7 +64,7 @@
   "courses/serializers/v3/courses.py:116:11:ORM006",
   "courses/serializers/v3/courses.py:117:19:ORM006",
   "courses/serializers/v3/courses.py:123:15:ORM006",
-  "courses/serializers/v3/courses.py:133:14:ORM001",
+  "courses/serializers/v3/courses.py:129:14:ORM001",
   "courses/serializers/v3/courses.py:57:12:ORM002",
   "courses/serializers/v3/courses.py:62:18:ORM004",
   "courses/serializers/v3/courses.py:69:18:ORM004",
