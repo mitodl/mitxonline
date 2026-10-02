@@ -6,25 +6,52 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0109_add_manufacturing_variant'),
+        ("courses", "0109_add_manufacturing_variant"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='CourseRunAccessRole',
+            name="CourseRunAccessRole",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_on', models.DateTimeField(auto_now_add=True)),
-                ('updated_on', models.DateTimeField(auto_now=True)),
-                ('role', models.CharField(help_text="The Open edX course access role name, e.g. 'staff' or 'instructor'.", max_length=64)),
-                ('run', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='access_roles', to='courses.courserun')),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='course_run_access_roles', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("created_on", models.DateTimeField(auto_now_add=True)),
+                ("updated_on", models.DateTimeField(auto_now=True)),
+                (
+                    "role",
+                    models.CharField(
+                        help_text="The Open edX course access role name, e.g. 'staff' or 'instructor'.",
+                        max_length=64,
+                    ),
+                ),
+                (
+                    "run",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="access_roles",
+                        to="courses.courserun",
+                    ),
+                ),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="course_run_access_roles",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'unique_together': {('user', 'run', 'role')},
+                "unique_together": {("user", "run", "role")},
             },
         ),
     ]
