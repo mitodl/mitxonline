@@ -44,7 +44,10 @@ dependencies = [
     "mitol-django-hubspot-api==2026.4.29",
     "mitol-django-mail==2026.4.29",
     "mitol-django-openedx==2026.4.29",
-    "mitol-django-payment-gateway==2026.8.5",
+    # TEMPORARY: pointed at mitodl/ol-django#567 via [tool.uv.sources] to test the
+    # CyberSource 0.0.79 bump and the urllib3 compat patch moving into the library.
+    # Restore a released pin (>= the version that ships #567) before merging.
+    "mitol-django-payment-gateway",
     "mitol-django-scim==2026.4.29",
     "mitol-django-observability>=2026.8.19",
     "opentelemetry-instrumentation-celery>=0.52b0",
@@ -173,6 +176,8 @@ mitol-drf-lint = "0d"
 
 [tool.uv.sources]
 urllib3-future = { path = "shims/urllib3-future" }
+# TEMPORARY: see the dependency comment above.
+mitol-django-payment-gateway = { git = "https://github.com/mitodl/ol-django", subdirectory = "src/payment_gateway", branch = "renovate/cybersource-rest-client-python-0.x" }
 
 [tool.uv.build-backend]
 module-root = ""

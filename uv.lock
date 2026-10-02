@@ -7,51 +7,51 @@ exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for 
 exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
-django-aqueduct = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-edx-sysadmin = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-edx-username-changer = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-apigateway = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-authentication = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-common = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-digitalcredentials = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-geoip = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 mitol-django-google-sheets = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-google-sheets-deferrals = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-google-sheets-refunds = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-hubspot-api = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-mail = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-oauth-toolkit-extensions = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-observability = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-olposthog = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-openedx = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-payment-gateway = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-scim = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-transcoding = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-drf-lint = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-concourse = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-ai-static-translations = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-auto-select-language = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-uai-content-customization = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 ol-openedx-canvas-integration = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-chat = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-concourse = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-olposthog = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-oauth-toolkit-extensions = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-social-auth = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-payment-gateway = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-ai-static-translations = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-google-sheets-refunds = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 ol-openedx-chat-xblock = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-checkout-external = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-course-export = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-course-outline-api = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-course-structure-api = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-course-sync = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-course-translations = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 ol-openedx-events-handler = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 ol-openedx-feedback = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-git-auto-export = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 ol-openedx-logging = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-lti-utilities = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-otel-monitoring = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 ol-openedx-rapid-response-reports = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-sentry = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-uai-content-customization = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-social-auth = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-observability = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-authentication = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-lti-utilities = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-checkout-external = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-geoip = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-git-auto-export = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-chat = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-hubspot-api = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 openedx-companion-auth = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-course-sync = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-digitalcredentials = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-common = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-sentry = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 rapid-response-xblock = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-mail = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-google-sheets-deferrals = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-course-translations = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-course-outline-api = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-transcoding = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+edx-username-changer = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-auto-select-language = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-apigateway = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-course-structure-api = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-drf-lint = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+django-aqueduct = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-otel-monitoring = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+edx-sysadmin = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-course-export = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-openedx = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-scim = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 
 [[package]]
 name = "amqp"
@@ -609,7 +609,7 @@ wheels = [
 
 [[package]]
 name = "cybersource-rest-client-python"
-version = "0.0.74"
+version = "0.0.79"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -618,12 +618,11 @@ dependencies = [
     { name = "jwcrypto" },
     { name = "pgpy" },
     { name = "pycryptodome" },
-    { name = "pyjwt" },
     { name = "setuptools" },
     { name = "six" },
     { name = "urllib3-future" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/90/e3/b7f9b6384ee9621a0c690dd3693e0c003b77350e613c7aada2de1ea970f3/cybersource_rest_client_python-0.0.74.tar.gz", hash = "sha256:9c64247e8eedd8151f40f60a018a9d0ca1c53498b892b94e9cbb6b6175a99107", size = 1503549, upload-time = "2026-02-11T08:37:58.447Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7f/d7/1c6c5bd378f7bce1d35ac4a336ebc4a49180ce163d3f535af7dc1c27c6dd/cybersource_rest_client_python-0.0.79.tar.gz", hash = "sha256:a6a63062b5dc3c9a79d201a8465d5ebc9fe08a35150bf8fe03077062bb95d013", size = 1894661, upload-time = "2026-09-15T05:20:53.13Z" }
 
 [[package]]
 name = "datamodel-code-generator"
@@ -1969,7 +1968,7 @@ wheels = [
 [[package]]
 name = "mitol-django-common"
 version = "2026.6.16.4"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/mitodl/ol-django?subdirectory=src%2Fcommon&branch=renovate%2Fcybersource-rest-client-python-0.x#def1e6a0d3cbb1390cf4d78383520bdeddd97a71" }
 dependencies = [
     { name = "django" },
     { name = "django-redis" },
@@ -1978,10 +1977,6 @@ dependencies = [
     { name = "pytz" },
     { name = "requests" },
     { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/5a/c8/bfddaffd14e2f0233e0be31ea83a82865579f9eb1ecc9514cf14edd5d574/mitol_django_common-2026.6.16.4.tar.gz", hash = "sha256:f06dee7575c4c1cfefef016459ed8c673482511b9b0f8387fc2e056844ca6a8c", size = 24357, upload-time = "2026-06-16T19:21:07.244Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/00/d2/db0dd231888821180997dd1a0c35fcd3d7999567596d27604bcb939d0ee6/mitol_django_common-2026.6.16.4-py3-none-any.whl", hash = "sha256:3506d91de35e91bc17e65eee73fe68cfa0b73254edb66d9a59d6e9cee870580b", size = 35258, upload-time = "2026-06-16T19:21:06.429Z" },
 ]
 
 [[package]]
@@ -2124,18 +2119,14 @@ wheels = [
 
 [[package]]
 name = "mitol-django-payment-gateway"
-version = "2026.8.5"
-source = { registry = "https://pypi.org/simple" }
+version = "2026.9.1"
+source = { git = "https://github.com/mitodl/ol-django?subdirectory=src%2Fpayment_gateway&branch=renovate%2Fcybersource-rest-client-python-0.x#def1e6a0d3cbb1390cf4d78383520bdeddd97a71" }
 dependencies = [
     { name = "cybersource-rest-client-python" },
     { name = "django" },
     { name = "django-stubs" },
     { name = "mitol-django-common" },
     { name = "stripe" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/85/94/822ce662bb0aa011f930a5b2c7983f4b955327f539a6e6e1fedcd7ee57b6/mitol_django_payment_gateway-2026.8.5.tar.gz", hash = "sha256:64e15d10299cc57146ef3d4542739437d9eb1ee08e91fbf56009a449a7c14f86", size = 20071, upload-time = "2026-08-05T16:18:57.819Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/48/2b/1e509ced5855a00f6e745e4a964617800fb9ff12d267c3947b1bd4a1ebac/mitol_django_payment_gateway-2026.8.5-py3-none-any.whl", hash = "sha256:03c06448e6744143027af400c7e1b1c12806287aa9bebd7addd6f5bd8a876804", size = 27427, upload-time = "2026-08-05T16:18:56.799Z" },
 ]
 
 [[package]]
@@ -2335,7 +2326,7 @@ requires-dist = [
     { name = "mitol-django-observability", specifier = ">=2026.8.19" },
     { name = "mitol-django-olposthog", specifier = ">=2026.3.6,<2027" },
     { name = "mitol-django-openedx", specifier = "==2026.4.29" },
-    { name = "mitol-django-payment-gateway", specifier = "==2026.8.5" },
+    { name = "mitol-django-payment-gateway", git = "https://github.com/mitodl/ol-django?subdirectory=src%2Fpayment_gateway&branch=renovate%2Fcybersource-rest-client-python-0.x" },
     { name = "mitol-django-scim", specifier = "==2026.4.29" },
     { name = "opentelemetry-instrumentation-celery", specifier = ">=0.52b0" },
     { name = "opentelemetry-instrumentation-django", specifier = ">=0.52b0" },

@@ -20,8 +20,8 @@
 # kwargs only urllib3-future accepts. The real urllib3 swallows them into
 # connection_pool_kw and then raises on the first request, when it builds the pool key:
 #     TypeError: PoolKey.__new__() got an unexpected keyword argument 'key_keepalive_delay'
-# main/cybersource_compat.py filters those kwargs back out; keep it in place alongside
-# this stub.
+# mitol.payment_gateway.cybersource_compat filters those kwargs back out, applied from
+# PaymentGatewayApp.ready(); this stub is the half that app cannot supply for us.
 #
 # If a dependency ever requires a *version* of urllib3-future, resolution will fail
 # here rather than silently swapping urllib3 back out - revisit this shim at that point.
