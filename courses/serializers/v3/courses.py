@@ -20,7 +20,6 @@ from courses.serializers.v1.base import (
 )
 from courses.serializers.v3.certificates import CourseRunCertificateSerializer
 from main import features
-from openedx.constants import OPENEDX_COURSE_STAFF_ROLES
 
 log = logging.getLogger(__name__)
 
@@ -104,18 +103,16 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
         Open edX lets these users open the courseware before the run starts, so
         the dashboard needs the same fact to decide whether to offer the link.
 
-        Prefers the annotation the list view adds, which keeps the dashboard's
-        enrollment list at one subquery rather than a query per card. The
-        fallback covers the unannotated paths, such as create.
+        Read from the annotation the viewset's queryset adds, never queried
+        here: this runs once per enrollment, so a lookup would be an N+1 across
+        the dashboard.
+
+        Defaults to False on a path that did not annotate, which in practice is
+        only create. Course staff never reach it - Open edX enrols them the
+        moment the role is granted, so they are already enrolled by the time
+        the dashboard loads and the list view annotates them properly.
         """
-        annotated = getattr(enrollment, "has_course_staff_role", None)
-        if annotated is not None:
-            return annotated
-        return models.CourseRunAccessRole.objects.filter(
-            user_id=enrollment.user_id,
-            run_id=enrollment.run_id,
-            role__in=OPENEDX_COURSE_STAFF_ROLES,
-        ).exists()
+        return bool(getattr(enrollment, "has_course_staff_role", False))
 
     @extend_schema_field(serializers.IntegerField(allow_null=True))
     def get_b2b_organization_id(self, enrollment):
