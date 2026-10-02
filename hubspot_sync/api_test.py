@@ -624,12 +624,8 @@ def test_sync_deal_with_hubspot_targeted_updates_when_found_by_unique_app_id(
     mock_ensure_contact.assert_called_once_with(
         hubspot_order.purchaser, mock_client_instance, skip_certificates=False
     )
-    # The deal already existed, so line items should be looked up on it
     mock_upsert_line_item.assert_called_once_with(
-        hubspot_order.lines.first(),
-        existing_deal_id,
-        mock_client_instance,
-        deal_existed=True,
+        hubspot_order.lines.first(), existing_deal_id, mock_client_instance
     )
 
     # Verify the deal-contact association was created
@@ -1201,13 +1197,11 @@ def test_sync_cart_add_deal_with_hubspot_reuses_deal_line_item(
 
     api._sync_cart_add_deal_with_hubspot(hubspot_order, "contact-id", mock_client)  # noqa: SLF001
 
-    if existing_deal_id:
-        mock_find_line_item.assert_called_once_with(
-            mock_client, existing_deal_id, "target-product-id"
-        )
-    else:
-        # A brand new deal can't have line items yet, so there is nothing to look up
-        mock_find_line_item.assert_not_called()
+    # The deal's line items are always checked, using the newly created
+    # deal's id ("obj-id") when no existing deal was found
+    mock_find_line_item.assert_called_once_with(
+        mock_client, existing_deal_id or "obj-id", "target-product-id"
+    )
 
     basic_api = mock_client.crm.objects.basic_api
     line_item_creates = [
