@@ -8,7 +8,7 @@ import re
 import django_filters
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models import Prefetch, Q
+from django.db.models import Exists, OuterRef, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
@@ -31,6 +31,7 @@ from courses.constants import COURSE_KEY_PATTERN, ENROLL_CHANGE_STATUS_UNENROLLE
 from courses.exceptions import EnrollmentError
 from courses.models import (
     Course,
+    CourseRunAccessRole,
     CourseRunEnrollment,
     Program,
     ProgramEnrollment,
@@ -48,6 +49,7 @@ from courses.utils import get_enrollable_courseruns_qs
 from ecommerce.models import Product
 from main import features
 from openedx.api import get_edx_course_outline
+from openedx.constants import OPENEDX_COURSE_STAFF_ROLES
 from openedx.exceptions import EdxApiCourseOutlineError
 
 log = logging.getLogger(__name__)
@@ -134,7 +136,21 @@ class UserEnrollmentsApiViewSet(
 
     def get_queryset(self):
         """Get the queryset for user enrollments."""
-        return super().get_queryset().filter(user=self.request.user)
+        return (
+            super()
+            .get_queryset()
+            .filter(user=self.request.user)
+            # One subquery for the whole page instead of a lookup per card.
+            .annotate(
+                has_course_staff_role=Exists(
+                    CourseRunAccessRole.objects.filter(
+                        user_id=OuterRef("user_id"),
+                        run_id=OuterRef("run_id"),
+                        role__in=OPENEDX_COURSE_STAFF_ROLES,
+                    )
+                )
+            )
+        )
 
     def get_serializer_context(self):
         """Get the serializer context."""
