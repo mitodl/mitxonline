@@ -1,21 +1,17 @@
 """
-Checks programs for a valid requirements tree. A valid tree is one that:
-a) exists
-b) has all the courses in the program accounted for as either an elective
-   or a required course
+Reports programs whose saved requirement tree is missing or breaks a rule that
+courses.requirement_tree.validate_requirement_tree enforces on save, which is
+how a tree saved before a rule existed is found.
 
 This won't fix the issue for you - do that via Django Admin - but it will tell
 you if there are any.
 """
 
-import io
-import logging
-
 from django.core.management import BaseCommand
 from django.db.models import Q
 
-from courses.api import check_program_for_orphans
-from courses.models import Program
+from courses.models import Program, ProgramRequirement
+from courses.requirement_tree import validate_requirement_tree
 
 
 class Command(BaseCommand):
@@ -26,10 +22,11 @@ class Command(BaseCommand):
     help = "Checks program(s) for valid requirements trees"
 
     def add_arguments(self, parser) -> None:
+        """Add --program (repeatable) and --live"""
         parser.add_argument(
             "--program",
             action="append",
-            help="Program to check.",
+            help="Program to check, by id or readable_id.",
             nargs="*",
         )
 
@@ -37,62 +34,44 @@ class Command(BaseCommand):
             "--live", action="store_true", help="Check only live programs."
         )
 
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG002
-        if kwargs["program"] is not None and len(kwargs["program"]) > 0:
-            numeric_ids = []
-            readable_ids = []
-
-            [
-                readable_ids.append(id[0])
-                if not id[0].isnumeric()
-                else numeric_ids.append(id[0])
-                for id in kwargs["program"]  # noqa: A001
-            ]
-
+    def handle(self, *args, **kwargs):  # noqa: ARG002
+        """Report every selected program whose tree is missing or breaks a rule"""
+        if kwargs["program"]:
+            program_ids = [pid for group in kwargs["program"] for pid in group]
             programs_qset = Program.objects.filter(
-                Q(id__in=numeric_ids) | Q(readable_id__in=readable_ids)
+                Q(id__in=[pid for pid in program_ids if pid.isnumeric()])
+                | Q(readable_id__in=[pid for pid in program_ids if not pid.isnumeric()])
             )
         else:
-            programs_qset = Program.objects
+            programs_qset = Program.objects.all()
 
         if kwargs["live"]:
             programs_qset = programs_qset.filter(live=True)
 
-        logger = logging.getLogger("courses.api")
-
-        log_capture = io.StringIO()
-        handler = logging.StreamHandler(log_capture)
-
-        logger.addHandler(handler)
-
-        for program in programs_qset.all():
-            orphans = check_program_for_orphans(program)
-
-            if len(orphans) > 0:
-                if "no requirements tree" in log_capture.getvalue():
-                    self.stdout.write(
-                        self.style.ERROR(
-                            f"Program {program.readable_id} has no requirements tree!"
-                        )
-                    )
-
+        invalid = 0
+        for program in programs_qset.order_by("readable_id"):
+            root = program.get_requirements_root()
+            if root is None:
+                invalid += 1
                 self.stdout.write(
-                    self.style.WARNING(
-                        f"Program {program.readable_id} has {len(orphans)} orphaned course{'s' if len(orphans) > 1 else ''}:"
+                    self.style.ERROR(
+                        f"Program {program.readable_id} has no requirements tree"
                     )
                 )
-
-                [
-                    self.stdout.write(
-                        self.style.WARNING(f"{orphan.title} - {orphan.readable_id}")
-                    )
-                    for orphan in orphans
-                ]
-            else:
+                continue
+            tree = ProgramRequirement.dump_bulk(parent=root, keep_ids=True)[0].get(
+                "children", []
+            )
+            errors = validate_requirement_tree(tree, display_mode=program.display_mode)
+            if errors:
+                invalid += 1
+            for error in errors:
                 self.stdout.write(
-                    self.style.SUCCESS(
-                        f"Program {program.readable_id} has a complete requirements tree"
-                    )
+                    self.style.WARNING(f"Program {program.readable_id}: {error}")
                 )
 
-            self.stdout.write("\n")
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Checked {programs_qset.count()} program(s); {invalid} with problems"
+            )
+        )

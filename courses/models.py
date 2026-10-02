@@ -2876,15 +2876,12 @@ class ProgramRequirement(MP_Node):
     )
     elective_courses.add_child(course=course3)
     elective_courses.add_child(course=course4)
+    elective_courses.add_child(course=course5)
 
-    # 3rd elective option is at least one of these courses
-    mut_exclusive_courses = elective_courses.add_child(
-        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
-        operator_value=1
-    )
-    mut_exclusive_courses.add_child(course=course5)
-    mut_exclusive_courses.add_child(course=course6)
-
+    A MIN_NUMBER_OF operator counts each satisfied child once. The admin form and
+    the requirement-tree serializer accept only the shapes
+    courses.requirement_tree.validate_requirement_tree allows. The evaluator
+    itself handles any nesting.
     """
 
     # extended alphabet from the default to the recommended one for postgres
