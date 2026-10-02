@@ -20,17 +20,22 @@ from drf_spectacular.utils import (
     inline_serializer,
 )
 from rest_framework import mixins, serializers, status, viewsets
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from b2b.models import ContractPage
 from compliance.exceptions import ExportComplianceCheckError
-from courses.api import create_program_enrollments, deactivate_run_enrollment
+from courses.api import (
+    check_enrollment_eligibility,
+    create_program_enrollments,
+    deactivate_run_enrollment,
+)
 from courses.constants import COURSE_KEY_PATTERN, ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.exceptions import EnrollmentError
 from courses.models import (
     Course,
+    CourseRun,
     CourseRunEnrollment,
     Program,
     ProgramEnrollment,
@@ -39,11 +44,13 @@ from courses.serializers.v3.courses import (
     CourseOutlineResponseSerializer,
     CourseRunEnrollmentSerializer,
     CourseVariantRunsResponseSerializer,
+    EnrollmentEligibilitySerializer,
 )
 from courses.serializers.v3.programs import (
     ProgramEnrollmentCreateSerializer,
     ProgramEnrollmentSerializer,
 )
+from courses.throttles import EnrollmentEligibilityThrottle
 from courses.utils import get_enrollable_courseruns_qs
 from ecommerce.models import Product
 from main import features
@@ -492,3 +499,57 @@ def get_course_variant_runs(request):
     )
 
     return Response(CourseVariantRunsResponseSerializer(output, many=True).data)
+
+
+ENROLLMENT_ELIGIBILITY_DESCRIPTION = (
+    "Report whether the authenticated user may enroll, without enrolling them. "
+    "Only covers export compliance - it says nothing about whether the run or "
+    "program is open for enrollment, live, or already enrolled in.\n\n"
+    "A POST because a cache miss triggers a live CyberSource export compliance "
+    "check and records its result. Rate limited per user, so ask at the point "
+    "of intent rather than pre-flighting a whole catalogue page."
+)
+
+ENROLLMENT_ELIGIBILITY_RESPONSES = {
+    200: EnrollmentEligibilitySerializer,
+    404: inline_serializer(
+        name="EnrollmentEligibilityNotFoundSerializer",
+        fields={"detail": serializers.CharField()},
+    ),
+    429: inline_serializer(
+        name="EnrollmentEligibilityThrottledSerializer",
+        fields={"detail": serializers.CharField()},
+    ),
+}
+
+
+@extend_schema(
+    operation_id="course_runs_enrollment_eligible",
+    description=ENROLLMENT_ELIGIBILITY_DESCRIPTION,
+    request=None,
+    responses=ENROLLMENT_ELIGIBILITY_RESPONSES,
+)
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+@throttle_classes([EnrollmentEligibilityThrottle])
+def course_run_enrollment_eligible(request, run_id):
+    """Report whether the user may enroll in this course run."""
+    run = get_object_or_404(CourseRun, pk=run_id)
+    eligibility = check_enrollment_eligibility(request.user, run)
+    return Response(EnrollmentEligibilitySerializer(eligibility).data)
+
+
+@extend_schema(
+    operation_id="programs_enrollment_eligible",
+    description=ENROLLMENT_ELIGIBILITY_DESCRIPTION,
+    request=None,
+    responses=ENROLLMENT_ELIGIBILITY_RESPONSES,
+)
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+@throttle_classes([EnrollmentEligibilityThrottle])
+def program_enrollment_eligible(request, program_id):
+    """Report whether the user may enroll in this program."""
+    program = get_object_or_404(Program, pk=program_id)
+    eligibility = check_enrollment_eligibility(request.user, program)
+    return Response(EnrollmentEligibilitySerializer(eligibility).data)

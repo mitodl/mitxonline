@@ -1153,6 +1153,15 @@ OAUTH2_PROVIDER = {
 
 SCIM_SERVICE_PROVIDER["USER_ADAPTER"] = "users.adapters.LearnUserAdapter"  # noqa: F405
 
+ENROLLMENT_ELIGIBILITY_THROTTLE_RATE = get_string(
+    name="ENROLLMENT_ELIGIBILITY_THROTTLE_RATE",
+    default="2/min",
+    description=(
+        "DRF throttle rate for the enrollment eligibility endpoints. A cache "
+        "miss there costs a live CyberSource export compliance call."
+    ),
+)
+
 # DRF configuration
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -1165,6 +1174,9 @@ REST_FRAMEWORK = {
     "DEFAULT_VERSIONING": "rest_framework.versioning.NamespaceVersioning",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "ALLOWED_VERSIONS": ["v0", "v1", "v2"],
+    "DEFAULT_THROTTLE_RATES": {
+        "enrollment_eligibility": ENROLLMENT_ELIGIBILITY_THROTTLE_RATE,
+    },
     "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",)
     if not DEBUG
     else (
