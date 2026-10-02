@@ -1813,7 +1813,8 @@ def test_sync_course_runs(settings, mocker, mocked_api_response, expect_success)
         assert course_run2.is_self_paced == mocked_api_response[1].is_self_paced()
     else:
         assert success_count == 0
-        assert failure_count == 1
+        # An API error fails the whole batch, so both runs count as failures
+        assert failure_count == (2 if isinstance(mocked_api_response, Exception) else 1)
 
 
 @patch("courses.signals.transaction.on_commit", side_effect=lambda callback: callback())
@@ -1857,6 +1858,236 @@ def test_sync_course_runs_skips_unchanged(
     success_count, failure_count = sync_course_runs([course_run])
     assert (success_count, failure_count) == (0, 0)
     assert mock_purge_delay.call_count == 0
+
+
+def _course_list_http_error(status_code, retry_after=None, wait_in_body=None):
+    """
+    Build the HTTPError the edX course list client raises for a failed request.
+    edX reports a throttle's wait in the body's developer_message, not the
+    Retry-After header.
+    """
+    headers = {"Retry-After": retry_after} if retry_after else {}
+    response = Mock(status_code=status_code, headers=headers)
+    if wait_in_body is None:
+        response.json.side_effect = ValueError
+    else:
+        response.json.return_value = {
+            "developer_message": f"Request was throttled. Expected available in {wait_in_body} seconds."
+        }
+    return HTTPError(response=response)
+
+
+def _course_detail(courseware_id, name="Synced title"):
+    """Build a CourseDetail the edX course list API would return for a run"""
+    return CourseDetail(
+        {
+            "id": courseware_id,
+            "start": "2015-09-15T05:00:00Z",
+            "end": "2015-12-31T05:00:00Z",
+            "enrollment_start": None,
+            "enrollment_end": None,
+            "name": name,
+        }
+    )
+
+
+def _fake_get_courses(*results):
+    """
+    Build a side_effect for CourseList.get_courses that returns each result in
+    turn. The real method is a generator, so an error is raised while the
+    results are iterated, not when it's called.
+    """
+    results = iter(results)
+
+    def get_courses(course_keys, **kwargs):
+        result = next(results)
+        if isinstance(result, Exception):
+            raise result
+        yield from result
+
+    return get_courses
+
+
+@pytest.mark.parametrize(
+    ("retry_after", "wait_in_body", "expected_wait"),
+    [
+        ("7", None, 7),
+        (None, 12, 12),
+        (None, 3600, 60),
+        (None, None, 60),
+        ("3600", None, 60),
+        ("²", None, 60),
+        ("soon", None, 60),
+    ],
+)
+def test_sync_course_runs_retries_rate_limited_batch(
+    settings, mocker, retry_after, wait_in_body, expected_wait
+):
+    """
+    A batch that edX rate-limits (429) is retried after waiting as long as edX
+    asks, capped at one throttle window, or a full window when edX doesn't say,
+    and then syncs.
+    """
+    settings.OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES = 3
+    settings.OPENEDX_COURSE_LIST_THROTTLE_WAIT_SECONDS = 60
+    mock_sleep = mocker.patch("time.sleep")
+    course_run = CourseRunFactory.create(courseware_id="course-v1:MITx+6.00.1x+3T2015")
+    mock_client = mocker.patch(
+        "courses.api.get_edx_api_course_list_client"
+    ).return_value
+    mock_client.get_courses.side_effect = _fake_get_courses(
+        _course_list_http_error(429, retry_after, wait_in_body),
+        [_course_detail(course_run.courseware_id)],
+    )
+
+    assert sync_course_runs([course_run]) == (1, 0)
+
+    mock_sleep.assert_called_once_with(expected_wait)
+    assert mock_client.get_courses.call_count == 2
+    first_call, retry_call = mock_client.get_courses.call_args_list
+    assert first_call.kwargs["course_keys"] == [course_run.courseware_id]
+    assert retry_call.kwargs["course_keys"] == first_call.kwargs["course_keys"]
+    course_run.refresh_from_db()
+    assert course_run.title == "Synced title"
+
+
+def test_sync_course_runs_without_retries(settings, mocker):
+    """
+    With retries turned off, each batch is still requested once and a
+    rate-limited batch counts as a failure
+    """
+    settings.OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES = 0
+    mock_sleep = mocker.patch("time.sleep")
+    course_run = CourseRunFactory.create(courseware_id="course-v1:MITx+6.00.1x+3T2015")
+    mock_client = mocker.patch(
+        "courses.api.get_edx_api_course_list_client"
+    ).return_value
+    mock_client.get_courses.side_effect = _fake_get_courses(
+        _course_list_http_error(429)
+    )
+
+    assert sync_course_runs([course_run]) == (0, 1)
+
+    assert mock_client.get_courses.call_count == 1
+    mock_sleep.assert_not_called()
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+def test_sync_course_runs_falls_back_to_static_token_on_auth_error(
+    settings, mocker, caplog, status_code
+):
+    """
+    If edX rejects the client-credentials JWT, e.g. because its app is owned by a
+    non-staff user, the sync switches to the static service worker token, logs
+    an error, and uses that token for this and every later batch
+    """
+    mocker.patch("courses.api.COURSE_LIST_BATCH_SIZE", 1)
+    runs = [
+        CourseRunFactory.create(courseware_id="course-v1:MITx+FIRST+1T2026"),
+        CourseRunFactory.create(courseware_id="course-v1:MITx+SECOND+1T2026"),
+    ]
+    jwt_client, static_client = Mock(), Mock()
+    jwt_client.get_courses.side_effect = _fake_get_courses(
+        _course_list_http_error(status_code)
+    )
+    static_client.get_courses.side_effect = _fake_get_courses(
+        *[[_course_detail(run.courseware_id)] for run in runs]
+    )
+    mocker.patch(
+        "courses.api.get_edx_api_course_list_client",
+        side_effect=lambda *, use_jwt=True: jwt_client if use_jwt else static_client,
+    )
+
+    with caplog.at_level(logging.ERROR, logger="courses.api"):
+        assert sync_course_runs(runs) == (2, 0)
+
+    assert jwt_client.get_courses.call_count == 1
+    assert [
+        c.kwargs["course_keys"] for c in static_client.get_courses.call_args_list
+    ] == [[run.courseware_id] for run in runs]
+    assert any("static service worker token" in r.getMessage() for r in caplog.records)
+
+
+def test_sync_course_runs_static_token_also_rejected(settings, mocker):
+    """
+    If the static token is rejected too, the batch counts as failed and the
+    sync doesn't keep switching tokens
+    """
+    course_run = CourseRunFactory.create(courseware_id="course-v1:MITx+6.00.1x+3T2015")
+    jwt_client, static_client = Mock(), Mock()
+    jwt_client.get_courses.side_effect = _fake_get_courses(_course_list_http_error(403))
+    static_client.get_courses.side_effect = _fake_get_courses(
+        _course_list_http_error(403)
+    )
+    mock_get_client = mocker.patch(
+        "courses.api.get_edx_api_course_list_client",
+        side_effect=lambda *, use_jwt=True: jwt_client if use_jwt else static_client,
+    )
+
+    assert sync_course_runs([course_run]) == (0, 1)
+
+    assert mock_get_client.call_count == 2
+    assert static_client.get_courses.call_count == 1
+
+
+@pytest.mark.parametrize(
+    "first_batch_error",
+    [
+        _course_list_http_error(429),
+        _course_list_http_error(500),
+        ConnectionError(),
+        KeyError("start"),
+    ],
+)
+def test_sync_course_runs_continues_after_failed_batch(
+    settings, mocker, caplog, first_batch_error
+):
+    """
+    When one batch of course keys fails, even after retrying a 429, every run in
+    it counts as a failure, all of its keys are logged once with a traceback,
+    and the batches after it are still fetched and synced.
+    """
+    settings.OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES = 2
+    mock_sleep = mocker.patch("time.sleep")
+    first_batch = CourseRunFactory.build_batch(100)
+    for index, run in enumerate(first_batch):
+        run.courseware_id = f"course-v1:MITx+FIRST.{index}+1T2026"
+    second_batch_run = CourseRunFactory.create(
+        courseware_id="course-v1:MITx+SECOND.0+1T2026"
+    )
+    course_detail = _course_detail(second_batch_run.courseware_id)
+
+    def get_courses(course_keys, **kwargs):
+        # Like edx-api-client: one request per 100 keys, yielded lazily
+        for start in range(0, len(course_keys), 100):
+            if second_batch_run.courseware_id not in course_keys[start : start + 100]:
+                raise first_batch_error
+            yield course_detail
+
+    mock_client = mocker.patch(
+        "courses.api.get_edx_api_course_list_client"
+    ).return_value
+    mock_client.get_courses.side_effect = get_courses
+
+    with caplog.at_level(logging.WARNING, logger="courses.api"):
+        assert sync_course_runs([*first_batch, second_batch_run]) == (1, 100)
+
+    batch_error_logs = [r for r in caplog.records if r.levelno == logging.ERROR]
+    assert len(batch_error_logs) == 1
+    assert batch_error_logs[0].exc_info is not None
+    assert all(
+        run.courseware_id in batch_error_logs[0].getMessage() for run in first_batch
+    )
+    # The failed batch's keys were already logged, so they aren't reported
+    # again as courses edX sent no data for
+    assert not any("No data received" in r.getMessage() for r in caplog.records)
+
+    second_batch_run.refresh_from_db()
+    assert second_batch_run.title == "Synced title"
+    is_rate_limited = getattr(first_batch_error, "response", None) is not None and (
+        first_batch_error.response.status_code == 429
+    )
+    assert mock_sleep.call_count == (2 if is_rate_limited else 0)
 
 
 @pytest.mark.parametrize(
@@ -3689,7 +3920,8 @@ def test_sync_course_runs_bulk(settings, mocker, mocked_api_response, expect_suc
         assert course_run2.is_self_paced == mocked_api_response[1].is_self_paced()
     else:
         assert success_count == 0
-        assert failure_count == 1
+        # An API error fails the whole batch, so both runs count as failures
+        assert failure_count == (2 if isinstance(mocked_api_response, Exception) else 1)
 
 
 def test_deactivate_run_enrollment_removes_paid_course_run(mocker):
