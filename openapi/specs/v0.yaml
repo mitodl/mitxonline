@@ -1540,6 +1540,146 @@ paths:
               schema:
                 $ref: '#/components/schemas/ContractSetupStatus'
           description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/contracts/{id}/variants/:
+    get:
+      operationId: b2b_provisioning_organizations_contracts_variants_list
+      description: |-
+        List the contract's variant sets, default first.
+
+        Each set lists the contract's courses that support it, whether each has
+        a source run for it, and the contract's run for it if there is one.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Contract.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ContractVariantSet'
+          description: ''
+    post:
+      operationId: b2b_provisioning_organizations_contracts_variants_create
+      description: |-
+        Add a variant set to the contract.
+
+        Creates no runs. Adding the courseware to the contract again creates
+        runs for the new set.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Contract.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateContractVariantSetRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateContractVariantSetRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateContractVariantSetRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractVariantSet'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/contracts/{id}/variants/{variant_id}/:
+    patch:
+      operationId: b2b_provisioning_organizations_contracts_variants_partial_update
+      description: |-
+        Turn a variant set on or off, or change its b2b_only flag.
+
+        Turning a set off stops new runs being created for it and drops its
+        runs from the contract's course list. Its existing runs and their
+        enrollments are left alone. The default set can't be turned off or
+        made B2B-only.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Contract.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      - in: path
+        name: variant_id
+        schema:
+          type: integer
+        description: The variant set's ID.
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateContractVariantSetRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateContractVariantSetRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateContractVariantSetRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractVariantSet'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
   /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/identity-providers/:
     get:
       operationId: b2b_provisioning_organizations_identity_providers_list
@@ -5199,6 +5339,8 @@ components:
       - identity_provider_transitioned
       - identity_provider_metadata_refreshed
       - identity_provider_deleted
+      - contract_variant_added
+      - contract_variant_updated
       type: string
       description: |-
         * `organization_created` - Organization created
@@ -5208,6 +5350,8 @@ components:
         * `identity_provider_transitioned` - Identity provider state changed
         * `identity_provider_metadata_refreshed` - Identity provider metadata refreshed
         * `identity_provider_deleted` - Identity provider deleted
+        * `contract_variant_added` - Contract variant set added
+        * `contract_variant_updated` - Contract variant set changed
       x-enum-descriptions:
       - Organization created
       - Organization updated
@@ -5216,6 +5360,8 @@ components:
       - Identity provider state changed
       - Identity provider metadata refreshed
       - Identity provider deleted
+      - Contract variant set added
+      - Contract variant set changed
     AssignRevokeCodeRequestRequest:
       type: object
       description: Serializer for the assign_code request body.
@@ -6140,6 +6286,64 @@ components:
       - In progress
       - Complete
       - Failed
+    ContractVariantCourse:
+      type: object
+      description: One of the contract's courses that a variant set matches.
+      properties:
+        course_id:
+          type: integer
+        readable_id:
+          type: string
+        title:
+          type: string
+        has_source_run:
+          type: boolean
+          description: Whether the course has a source run for this variant to clone.
+        contract_run:
+          type: string
+          nullable: true
+          description: The contract's run for this variant, if it has one.
+      required:
+      - course_id
+      - has_source_run
+      - readable_id
+      - title
+    ContractVariantSet:
+      type: object
+      description: |-
+        One of a contract's variant sets, with the contract's courses it matches.
+
+        A listed course with a source run and no contract run gets a run for this
+        set when its courseware is next added to the contract, if the set is
+        active.
+      properties:
+        id:
+          type: integer
+        language:
+          type: string
+        variant_length:
+          type: string
+        variant_industry:
+          type: string
+        default_variant:
+          type: boolean
+        active:
+          type: boolean
+        b2b_only:
+          type: boolean
+        courses:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContractVariantCourse'
+      required:
+      - active
+      - b2b_only
+      - courses
+      - default_variant
+      - id
+      - language
+      - variant_industry
+      - variant_length
     Country:
       type: object
       description: Serializer for pycountry countries, with states for US/CA
@@ -7659,6 +7863,87 @@ components:
       required:
       - membership_type
       - name
+    CreateContractVariantSetRequest:
+      type: object
+      description: |-
+        Request body for adding a variant set to a contract.
+
+        The set is never the default: every contract already has one.
+      properties:
+        language:
+          allOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          description: |-
+            ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr'). Leave blank for unspecified.
+
+            * `af_ZA` - af_ZA
+            * `ar` - ar
+            * `az` - az
+            * `bo` - bo
+            * `da` - da
+            * `de` - de
+            * `de_DE` - de_DE
+            * `el` - el
+            * `es_419` - es_419
+            * `es_ES` - es_ES
+            * `en` - en
+            * `fa` - fa
+            * `fr` - fr
+            * `fr_CA` - fr_CA
+            * `he` - he
+            * `hi` - hi
+            * `hu` - hu
+            * `id` - id
+            * `it_IT` - it_IT
+            * `ja` - ja
+            * `ka` - ka
+            * `kk` - kk
+            * `ko` - ko
+            * `lv` - lv
+            * `nl` - nl
+            * `pl` - pl
+            * `pt_BR` - pt_BR
+            * `pt_PT` - pt_PT
+            * `ro` - ro
+            * `ru` - ru
+            * `sq` - sq
+            * `sv` - sv
+            * `sw` - sw
+            * `te` - te
+            * `th` - th
+            * `tr_TR` - tr_TR
+            * `uk` - uk
+            * `uz` - uz
+            * `vi` - vi
+            * `zh_CN` - zh_CN
+            * `zh_HANS` - zh_HANS
+            * `zh_HK` - zh_HK
+        variant_length:
+          description: |-
+            Variant: Describes the length of the run (short/long).
+
+            * `` - Full
+            * `S` - Short
+          oneOf:
+          - $ref: '#/components/schemas/VariantLengthEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        variant_industry:
+          description: |-
+            Variant: Describes the industry the run is adapted for.
+
+            * `` - Original
+            * `E` - Energy
+            * `F` - Finance
+            * `HC` - Healthcare
+            * `M` - Manufacturing
+          oneOf:
+          - $ref: '#/components/schemas/VariantIndustryEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        b2b_only:
+          type: boolean
+          title: Set if this variant only applies within a B2B context.
+      required:
+      - language
     CreateIdentityProviderRequest:
       type: object
       description: Request body for provisioning an identity provider.
@@ -10218,6 +10503,14 @@ components:
         active:
           type: boolean
           description: Whether this contract is active or not. Date rules still apply.
+    PatchedUpdateContractVariantSetRequest:
+      type: object
+      description: Request body for changing a contract's variant set.
+      properties:
+        active:
+          type: boolean
+        b2b_only:
+          type: boolean
     PatchedUpdateCourseRunEnrollmentRequest:
       type: object
       properties:
