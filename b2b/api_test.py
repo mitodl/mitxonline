@@ -101,6 +101,7 @@ from main.constants import (
 from main.utils import date_to_datetime
 from openedx.constants import (
     COURSE_RUN_CLONE_STATUS_PENDING,
+    EDX_ENROLLMENT_AUDIT_MODE,
     EDX_ENROLLMENT_VERIFIED_MODE,
 )
 from openedx.models import CourseRunClone
@@ -2775,6 +2776,51 @@ def test_validate_b2b_prereqs_run_not_enrollable(overlapping_contracts):
     )
 
     assert result == {"result": USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
+
+
+def test_validate_b2b_prereqs_run_not_upgradable(overlapping_contracts):
+    """A run in the contract that the user has an audit enrollment for and has an upgrade deadline in the past can't be upgraded."""
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, ["a"])
+    run = overlapping_contracts["runs"]["a"]
+    run.upgrade_deadline = now_in_utc() - timedelta(days=1)
+    run.save()
+    CourseRunEnrollmentFactory.create(
+        run=run,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        b2b_contract=contracts["a"],
+    )
+
+    result = _validate_b2b_enrollment_prerequisites(
+        user, overlapping_contracts["products"]["a"]
+    )
+
+    assert result == {"result": USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
+
+
+def test_validate_b2b_prereqs_run_upgradable(overlapping_contracts):
+    """A run in the contract that the user has an audit enrollment for and is upgradable (but not necessarily enrollable) can be upgraded."""
+
+    contracts = overlapping_contracts["contracts"]
+    user = _make_contract_user(contracts, ["a"])
+    run = overlapping_contracts["runs"]["a"]
+    run.upgrade_deadline = now_in_utc() + timedelta(days=1)
+    run.enrollment_end = now_in_utc() - timedelta(days=1)
+    run.save()
+    CourseRunEnrollmentFactory.create(
+        run=run,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        b2b_contract=contracts["a"],
+    )
+
+    result = _validate_b2b_enrollment_prerequisites(
+        user, overlapping_contracts["products"]["a"]
+    )
+
+    assert result == contracts["a"]
 
 
 def test_validate_b2b_prereqs_already_enrolled_other_contract(overlapping_contracts):
