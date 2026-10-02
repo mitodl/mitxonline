@@ -152,6 +152,22 @@ class UserEnrollmentsApiViewSet(
             )
         )
 
+    def perform_create(self, serializer):
+        """
+        Re-read the new enrollment through the annotated queryset.
+
+        The create response is serialized from whatever `save()` returns, and
+        nothing annotated that instance, so `has_course_staff_role` would come
+        back False for a user who does hold the role - someone re-enrolling
+        after unenrolling, or whose role arrived while an earlier enrollment
+        attempt failed. One query on a write path, rather than a lookup inside
+        the serializer that would run per row on every list.
+        """
+        enrollment = serializer.save()
+        serializer.instance = (
+            self.get_queryset().filter(pk=enrollment.pk).first() or enrollment
+        )
+
     def get_serializer_context(self):
         """Get the serializer context."""
         return {"user": self.request.user}
