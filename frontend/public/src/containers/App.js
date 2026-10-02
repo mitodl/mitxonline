@@ -16,6 +16,7 @@ import {
 import { addUserNotification } from "../actions"
 
 import Header from "../components/Header"
+import DelayedNotificationContainer from "../components/DelayedNotificationContainer"
 import PrivateRoute from "../components/PrivateRoute"
 
 import LoginPages from "./pages/login/LoginPages"
@@ -116,16 +117,24 @@ export class App extends React.Component<Props, void> {
       return <div className="app" />
     }
 
+    const showHeader =
+      !this.isEcomServiceMode() &&
+      !this.isCheckoutRelatedPage() &&
+      !this.isLearnerRecordsPage()
+
     return (
       <div className="app" aria-flowto="notifications-container">
-        {!this.isEcomServiceMode() &&
-          !this.isCheckoutRelatedPage() &&
-          !this.isLearnerRecordsPage() && (
+        {showHeader ? (
           <Header
             currentUser={currentUser}
             cartItemsCount={cartItemsCount}
             location={location}
           />
+        ) : (
+          // Notifications normally render inside the header. Without it,
+          // messages set by a redirect (e.g. a declined payment returning to
+          // the cart) would be read from the cookie and never shown.
+          <DelayedNotificationContainer />
         )}
         <div id="main" className="main-page-content">
           <Switch>
