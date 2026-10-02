@@ -12,6 +12,7 @@ import {
   USER_MSG_TYPE_ENROLLED,
   USER_MSG_TYPE_PAYMENT_DECLINED,
   USER_MSG_TYPE_PAYMENT_CANCELLED,
+  USER_MSG_TYPE_PAYMENT_ERROR,
   USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
   USER_MSG_TYPE_PAYMENT_ACCEPTED,
   USER_MSG_TYPE_PAYMENT_ACCEPTED_NO_VALUE,
@@ -80,6 +81,10 @@ export function parseStoredUserMessage(
   case USER_MSG_TYPE_PAYMENT_DECLINED:
     alertType = ALERT_TYPE_DANGER
     msgText = "Payment was declined, please try again."
+    break
+  case USER_MSG_TYPE_PAYMENT_ERROR:
+    alertType = ALERT_TYPE_DANGER
+    msgText = "There was an error processing your payment, please try again."
     break
   case USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN:
     alertType = ALERT_TYPE_DANGER
