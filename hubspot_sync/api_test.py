@@ -595,9 +595,8 @@ def test_sync_deal_with_hubspot_targeted_updates_when_found_by_unique_app_id(
     mock_ensure_contact = mocker.patch(
         "hubspot_sync.api._ensure_hubspot_contact_for_user", return_value="contact-123"
     )
-    mock_ensure_line_item = mocker.patch(
-        "hubspot_sync.api._ensure_target_line_item_for_line",
-        return_value="line-item-123",
+    mock_upsert_line_item = mocker.patch(
+        "hubspot_sync.api._upsert_target_deal_line_item"
     )
     mocker.patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
 
@@ -625,27 +624,20 @@ def test_sync_deal_with_hubspot_targeted_updates_when_found_by_unique_app_id(
     mock_ensure_contact.assert_called_once_with(
         hubspot_order.purchaser, mock_client_instance, skip_certificates=False
     )
-    mock_ensure_line_item.assert_called_once_with(
-        hubspot_order.lines.first(), mock_client_instance
+    # The deal already existed, so line items should be looked up on it
+    mock_upsert_line_item.assert_called_once_with(
+        hubspot_order.lines.first(),
+        existing_deal_id,
+        mock_client_instance,
+        deal_existed=True,
     )
 
-    # Verify associations were created (deal-contact and line-deal)
-    expected_association_calls = [
-        mocker.call(
-            from_object_type=api.HubspotObjectType.DEALS.value,
-            from_object_id=result.id,
-            to_object_type=api.HubspotObjectType.CONTACTS.value,
-            to_object_id="contact-123",
-        ),
-        mocker.call(
-            from_object_type=api.HubspotObjectType.LINES.value,
-            from_object_id="line-item-123",
-            to_object_type=api.HubspotObjectType.DEALS.value,
-            to_object_id=result.id,
-        ),
-    ]
-    mock_client_instance.crm.associations.v4.basic_api.create_default.assert_has_calls(
-        expected_association_calls, any_order=True
+    # Verify the deal-contact association was created
+    mock_client_instance.crm.associations.v4.basic_api.create_default.assert_called_once_with(
+        from_object_type=api.HubspotObjectType.DEALS.value,
+        from_object_id=result.id,
+        to_object_type=api.HubspotObjectType.CONTACTS.value,
+        to_object_id="contact-123",
     )
 
 
