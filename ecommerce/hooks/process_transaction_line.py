@@ -57,22 +57,24 @@ def _link_b2b_course_run_contracts(line) -> str | None:
         )
         return
 
-    enrollment_qs = CourseRunEnrollment.objects.filter(
+    enrollment = CourseRunEnrollment.objects.filter(
         run=purchased_run,
         user=line.order.purchaser,
         enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-    )
+    ).first()
 
-    if enrollment_qs.count() != 1:
+    if enrollment is None:
         log.error(
-            "_link_b2b_course_run_contracts: Purchaser %s has an improper number of enrollments (%s) for %s in order %s",
+            "_link_b2b_course_run_contracts: Purchaser %s has no verified enrollment for %s in order %s",
             line.order.purchaser,
-            enrollment_qs.count(),
             purchased_run,
             line.order.reference_number,
         )
+        return
 
-    enrollment_qs.update(b2b_contract=line.b2b_contract)
+    if enrollment.b2b_contract_id != line.b2b_contract_id:
+        enrollment.b2b_contract_id = line.b2b_contract_id
+        enrollment.save_and_log(None)
 
 
 def _create_program_enrollment(line) -> str | None:
