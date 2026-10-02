@@ -2187,6 +2187,33 @@ def test_create_from_basket_copies_b2b_contract_to_lines(user):
     )
 
 
+@pytest.mark.parametrize("contract_on_first_attempt", [False, True])
+def test_reused_pending_order_line_takes_the_basket_contract(
+    user, contract_on_first_attempt
+):
+    """A reused pending order's line should get the contract of the current basket item."""
+
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run)
+
+    basket = BasketFactory.create(user=user)
+    item = BasketItem.objects.create(
+        basket=basket,
+        product=product,
+        b2b_contract=contract if contract_on_first_attempt else None,
+    )
+    first_order = PendingOrder.create_from_basket(basket)
+
+    item.b2b_contract = None if contract_on_first_attempt else contract
+    item.save()
+    order = PendingOrder.create_from_basket(basket)
+
+    assert order.id == first_order.id
+    assert order.lines.get().b2b_contract == item.b2b_contract
+
+
 @pytest.mark.parametrize("line_has_contract", [True, False])
 def test_link_b2b_course_run_contracts(user, line_has_contract):
     """
