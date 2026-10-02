@@ -1939,9 +1939,7 @@ def sync_deal_with_hubspot_targeted(
             )
 
     for line in order.lines.all():
-        _upsert_target_deal_line_item(
-            line, result.id, hubspot_client, deal_existed=bool(existing_deal_id)
-        )
+        _upsert_target_deal_line_item(line, result.id, hubspot_client)
 
     # Update the local HubspotObject mapping to maintain ID tracking
     content_type = ContentType.objects.get_for_model(Order)
@@ -2741,9 +2739,7 @@ def _sync_cart_add_deal_with_hubspot(
     )
 
     for line in order.lines.all():
-        _upsert_target_deal_line_item(
-            line, deal.id, hubspot_client, deal_existed=bool(existing_deal_id)
-        )
+        _upsert_target_deal_line_item(line, deal.id, hubspot_client)
 
     return deal
 
