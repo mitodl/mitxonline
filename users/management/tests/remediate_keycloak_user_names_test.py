@@ -431,3 +431,194 @@ def test_report_is_written_with_resume_offset_when_a_patch_fails(mocker, tmp_pat
     report = json.loads(report_path.read_text())
     assert [row["user_id"] for row in report["patched"]] == [patched_user.id]
     assert report["resume_offset"] == 0
+
+
+@pytest.mark.django_db
+def test_fill_only_fills_empty_full_name_without_touching_split_name(mocker):
+    """--fill-only writes only fullName for a user whose Keycloak fullName is
+    empty, even when firstName/lastName also differ from legal_address
+    """
+    user = UserFactory.create(name="Joe Smith", scim_external_id="kc-1")
+    user.legal_address.first_name = "Joe"
+    user.legal_address.last_name = "Smith"
+    user.legal_address.save()
+
+    kc_user = UserRepresentation(
+        id="kc-1",
+        firstName="Joseph",
+        lastName="Smyth",
+        attributes={"someOtherAttr": ["keep-me"]},
+    )
+    client = _mock_client(mocker, [[kc_user]])
+    client.retrieve.return_value = UserRepresentation(
+        id="kc-1",
+        firstName="Joseph",
+        lastName="Smyth",
+        attributes={"someOtherAttr": ["keep-me"], "fullName": ["Joe Smith"]},
+    )
+    remediate_keycloak_user_names.bootstrap_client.return_value = client
+
+    COMMAND.handle(apply=True, limit=None, fill_only=True, report_path=None)
+
+    client.save.assert_called_once_with(
+        "users/kc-1",
+        {"attributes": {"someOtherAttr": ["keep-me"], "fullName": ["Joe Smith"]}},
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("kc_first", "kc_last", "kc_full_name"),
+    [
+        ("Joe", "Smith", "Joseph Smith"),  # fullName present but different
+        ("Joseph", "Smyth", "Joe Smith"),  # only the split name differs
+    ],
+)
+def test_fill_only_skips_users_it_would_overwrite(
+    mocker, tmp_path, kc_first, kc_last, kc_full_name
+):
+    """--fill-only never overwrites a value Keycloak already holds; those
+    users are counted as skipped, not patched or listed
+    """
+    user = UserFactory.create(name="Joe Smith", scim_external_id="kc-1")
+    user.legal_address.first_name = "Joe"
+    user.legal_address.last_name = "Smith"
+    user.legal_address.save()
+
+    kc_user = UserRepresentation(
+        id="kc-1",
+        firstName=kc_first,
+        lastName=kc_last,
+        attributes={"fullName": [kc_full_name]},
+    )
+    client = _mock_client(mocker, [[kc_user]])
+    remediate_keycloak_user_names.bootstrap_client.return_value = client
+
+    report = _run(tmp_path, apply=True, limit=None, fill_only=True)
+
+    client.save.assert_not_called()
+    assert report["patched"] == []
+    assert report["would_patch"] == []
+    assert report["skipped_by_fill_only_count"] == 1
+
+
+@pytest.mark.django_db
+def test_fill_only_dry_run_lists_only_fillable_users(mocker, tmp_path):
+    """In a --fill-only dry run, would_patch holds only users with an empty
+    Keycloak fullName
+    """
+    fillable = UserFactory.create(name="Ann Lee", scim_external_id="kc-fill")
+    differs = UserFactory.create(name="Bo Chan", scim_external_id="kc-differs")
+    for user in (fillable, differs):
+        user.legal_address.first_name = ""
+        user.legal_address.last_name = ""
+        user.legal_address.save()
+
+    client = _mock_client(
+        mocker,
+        [
+            [
+                UserRepresentation(id="kc-fill"),
+                UserRepresentation(
+                    id="kc-differs", attributes={"fullName": ["Robert Chan"]}
+                ),
+            ]
+        ],
+    )
+    remediate_keycloak_user_names.bootstrap_client.return_value = client
+
+    report = _run(tmp_path, apply=False, limit=None, fill_only=True)
+
+    assert [row["user_id"] for row in report["would_patch"]] == [fillable.id]
+    assert report["skipped_by_fill_only_count"] == 1
+
+
+@pytest.mark.django_db
+def test_fill_only_treats_whitespace_full_name_as_empty(mocker):
+    """A whitespace-only Keycloak fullName is blank, not a value anyone chose,
+    so --fill-only fills it
+    """
+    user = UserFactory.create(name="Ann Lee", scim_external_id="kc-1")
+    user.legal_address.first_name = ""
+    user.legal_address.last_name = ""
+    user.legal_address.save()
+
+    client = _mock_client(
+        mocker, [[UserRepresentation(id="kc-1", attributes={"fullName": ["  "]})]]
+    )
+    client.retrieve.return_value = UserRepresentation(
+        id="kc-1", attributes={"fullName": ["Ann Lee"]}
+    )
+    remediate_keycloak_user_names.bootstrap_client.return_value = client
+
+    COMMAND.handle(apply=True, limit=None, fill_only=True, report_path=None)
+
+    client.save.assert_called_once_with(
+        "users/kc-1", {"attributes": {"fullName": ["Ann Lee"]}}
+    )
+
+
+@pytest.mark.django_db
+def test_fill_only_skips_user_with_no_mitxonline_name(mocker, tmp_path):
+    """A user with a legal_address split but an empty User.name has nothing to
+    fill fullName with, so --fill-only skips them instead of sending an empty PUT
+    """
+    user = UserFactory.create(name="", scim_external_id="kc-1")
+    user.legal_address.first_name = "Joe"
+    user.legal_address.last_name = "Smith"
+    user.legal_address.save()
+
+    client = _mock_client(mocker, [[UserRepresentation(id="kc-1")]])
+    remediate_keycloak_user_names.bootstrap_client.return_value = client
+
+    report = _run(tmp_path, apply=True, limit=None, fill_only=True)
+
+    client.save.assert_not_called()
+    assert report["skipped_by_fill_only_count"] == 1
+
+
+@pytest.mark.django_db
+def test_run_aborts_when_an_untouched_field_changes(mocker, tmp_path):
+    """If Keycloak changes a root field the PUT didn't include (here
+    firstName, blanked by a fullName-only PUT), the run stops before the next
+    user's PUT, and the report still carries the resume_offset
+    """
+    for scim_id, name in (("kc-1", "Ann Lee"), ("kc-2", "Bo Chan")):
+        user = UserFactory.create(name=name, scim_external_id=scim_id)
+        user.legal_address.first_name = ""
+        user.legal_address.last_name = ""
+        user.legal_address.save()
+
+    client = _mock_client(
+        mocker,
+        [
+            [
+                UserRepresentation(id="kc-1", firstName="Ann", lastName="Lee"),
+                UserRepresentation(id="kc-2", firstName="Bo", lastName="Chan"),
+            ]
+        ],
+    )
+    client.retrieve.return_value = UserRepresentation(
+        id="kc-1", firstName="", lastName="Lee", attributes={"fullName": ["Ann Lee"]}
+    )
+    remediate_keycloak_user_names.bootstrap_client.return_value = client
+
+    report_path = tmp_path / "report.json"
+    with pytest.raises(remediate_keycloak_user_names.UntouchedFieldChangedError):
+        COMMAND.handle(
+            apply=True, limit=None, fill_only=True, report_path=str(report_path)
+        )
+
+    assert client.save.call_count == 1
+    assert json.loads(report_path.read_text())["resume_offset"] == 0
+
+
+@pytest.mark.django_db
+def test_normal_mode_report_has_no_fill_only_count(mocker, tmp_path):
+    """Without --fill-only, the report keeps its existing shape"""
+    client = _mock_client(mocker, [[UserRepresentation(id="kc-orphan")]])
+    remediate_keycloak_user_names.bootstrap_client.return_value = client
+
+    report = _run(tmp_path, apply=False, limit=None)
+
+    assert "skipped_by_fill_only_count" not in report
