@@ -19,6 +19,7 @@ from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
 from modelcluster.fields import ParentalKey
 from requests.exceptions import HTTPError
+from wagtail.admin.forms import WagtailAdminPageForm
 from wagtail.admin.panels import FieldPanel, HelpPanel, InlinePanel, MultiFieldPanel
 from wagtail.fields import RichTextField
 from wagtail.models import ClusterableModel, Orderable, Page
@@ -120,8 +121,20 @@ class StaffDashboardOrganizationPanel(HelpPanel):
             )
 
 
+class OrganizationPageForm(WagtailAdminPageForm):
+    """Passes the editing user to OrganizationPage.save() for the audit trail."""
+
+    def save(self, commit=True):  # noqa: FBT002
+        # The editor saves an unpublished page straight from the form, with
+        # no user and no revision yet to take one from.
+        self.instance._wagtail_editor = self.for_user  # noqa: SLF001
+        return super().save(commit=commit)
+
+
 class OrganizationPage(Page):
     """Stores information about an organization we have a relationship with."""
+
+    base_form_class = OrganizationPageForm
 
     parent_page_types = ["b2b.OrganizationIndexPage"]
     subpage_types = ["b2b.ContractPage"]
@@ -212,23 +225,35 @@ class OrganizationPage(Page):
             update_fields is None or "sso_organization_id" in update_fields
         )
 
-        stored = None
-        if audit_sso_link and writes_sso_link and self.pk:
-            stored = (
-                OrganizationPage.objects.filter(pk=self.pk)
-                .values("sso_organization_id", "live_revision_id")
-                .first()
-            )
-
         with transaction.atomic():
+            stored = None
+            if audit_sso_link and writes_sso_link and self.pk:
+                stored = (
+                    OrganizationPage.objects.filter(pk=self.pk)
+                    .values("sso_organization_id", "live_revision_id")
+                    .first()
+                )
+
             Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
-            if stored and stored["sso_organization_id"] != self.sso_organization_id:
+
+            if stored:
                 self._audit_sso_link_change(stored, user)
 
     def _audit_sso_link_change(self, stored, user):
         """Record a change to sso_organization_id made outside the provisioning API."""
 
-        actor = user
+        # Compared as text: a caller may assign the ID as a str, and a save
+        # that skips full_clean() leaves it one.
+        before = (
+            str(stored["sso_organization_id"])
+            if stored["sso_organization_id"]
+            else None
+        )
+        after = str(self.sso_organization_id) if self.sso_organization_id else None
+        if before == after:
+            return
+
+        actor = user or getattr(self, "_wagtail_editor", None)
         if (
             actor is None
             and self.live_revision_id
@@ -243,18 +268,8 @@ class OrganizationPage(Page):
             org_key=self.org_key,
             action=PROVISIONING_ACTION_ORG_UPDATED,
             acting_user=actor,
-            data_before={
-                "sso_organization_id": (
-                    str(stored["sso_organization_id"])
-                    if stored["sso_organization_id"]
-                    else None
-                )
-            },
-            data_after={
-                "sso_organization_id": (
-                    str(self.sso_organization_id) if self.sso_organization_id else None
-                )
-            },
+            data_before={"sso_organization_id": before},
+            data_after={"sso_organization_id": after},
         )
 
     def get_learners(self):

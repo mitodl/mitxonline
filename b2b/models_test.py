@@ -116,7 +116,8 @@ def test_organization_page_sso_change_is_audited():
 def test_organization_page_sso_change_published_in_wagtail_is_audited():
     """
     Publishing a revision saves the page with no user, so the revision's
-    author is recorded. This is the path the Wagtail editor takes.
+    author is recorded. This is the path the Wagtail editor takes for a live
+    page.
     """
     org = OrganizationPageFactory.create(sso_organization_id=None)
     editor = UserFactory.create(is_staff=True)
@@ -128,6 +129,50 @@ def test_organization_page_sso_change_published_in_wagtail_is_audited():
     audit = OrganizationProvisioningAudit.objects.get(organization=org)
     assert audit.acting_user == editor
     assert audit.data_before == {"sso_organization_id": None}
+    assert audit.data_after == {"sso_organization_id": str(new_id)}
+
+
+def test_organization_page_draft_sso_change_is_not_audited():
+    """A draft of a live page writes a revision, not the stored link."""
+    org = OrganizationPageFactory.create(sso_organization_id=None)
+
+    org.sso_organization_id = uuid4()
+    org.save_revision(user=UserFactory.create(is_staff=True))
+
+    assert not OrganizationProvisioningAudit.objects.filter(organization=org).exists()
+
+
+def test_organization_page_same_sso_id_as_text_is_not_audited():
+    """The same ID assigned as a str, saved without cleaning, is not a change."""
+    sso_id = uuid4()
+    org = OrganizationPageFactory.create(sso_organization_id=sso_id)
+
+    org.sso_organization_id = str(sso_id)
+    org.save(clean=False)
+
+    assert not OrganizationProvisioningAudit.objects.filter(organization=org).exists()
+
+
+def test_organization_page_form_records_the_editor_for_an_unpublished_page():
+    """
+    The Wagtail editor saves an unpublished page straight from the form, with
+    no user and before any revision exists, so the form supplies the editor.
+    """
+    org = OrganizationPageFactory.create(sso_organization_id=None, live=False)
+    editor = UserFactory.create(is_staff=True, is_superuser=True)
+    new_id = uuid4()
+
+    form_class = org.get_edit_handler().get_form_class()
+    form = form_class(
+        data={"sso_organization_id": str(new_id), "slug": org.slug},
+        instance=org,
+        for_user=editor,
+    )
+    assert form.is_valid(), form.errors
+    form.save()
+
+    audit = OrganizationProvisioningAudit.objects.get(organization=org)
+    assert audit.acting_user == editor
     assert audit.data_after == {"sso_organization_id": str(new_id)}
 
 
