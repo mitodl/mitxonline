@@ -7,9 +7,12 @@ import faker
 import pytest
 
 from b2b.api import ensure_enrollment_codes_exist
-from b2b.constants import CONTRACT_MEMBERSHIP_CODE
+from b2b.constants import CONTRACT_MEMBERSHIP_CODE, PROVISIONING_ACTION_ORG_UPDATED
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
-from b2b.models import DiscountContractAttachmentRedemption
+from b2b.models import (
+    DiscountContractAttachmentRedemption,
+    OrganizationProvisioningAudit,
+)
 from courses.factories import (
     CourseRunFactory,
     ProgramFactory,
@@ -81,6 +84,61 @@ def test_organization_page_slug_preserved_on_name_change():
     assert org.slug == original_slug
     # But the title should reflect the new name
     assert org.title == "MIT - Universal AI"
+
+
+def test_organization_page_save_without_sso_change_is_not_audited():
+    """Creating an organization, or saving one unchanged, writes no audit row."""
+    org = OrganizationPageFactory.create(sso_organization_id=uuid4())
+    org.name = "Renamed"
+    org.save()
+
+    assert not OrganizationProvisioningAudit.objects.filter(organization=org).exists()
+
+
+def test_organization_page_sso_change_is_audited():
+    """A changed sso_organization_id is recorded with the user passed to save."""
+    old_id = uuid4()
+    new_id = uuid4()
+    org = OrganizationPageFactory.create(sso_organization_id=old_id)
+    user = UserFactory.create(is_staff=True)
+
+    org.sso_organization_id = new_id
+    org.save(user=user)
+
+    audit = OrganizationProvisioningAudit.objects.get(organization=org)
+    assert audit.action == PROVISIONING_ACTION_ORG_UPDATED
+    assert audit.acting_user == user
+    assert audit.org_key == org.org_key
+    assert audit.data_before == {"sso_organization_id": str(old_id)}
+    assert audit.data_after == {"sso_organization_id": str(new_id)}
+
+
+def test_organization_page_sso_change_published_in_wagtail_is_audited():
+    """
+    Publishing a revision saves the page with no user, so the revision's
+    author is recorded. This is the path the Wagtail editor takes.
+    """
+    org = OrganizationPageFactory.create(sso_organization_id=None)
+    editor = UserFactory.create(is_staff=True)
+    new_id = uuid4()
+
+    org.sso_organization_id = new_id
+    org.save_revision(user=editor).publish()
+
+    audit = OrganizationProvisioningAudit.objects.get(organization=org)
+    assert audit.acting_user == editor
+    assert audit.data_before == {"sso_organization_id": None}
+    assert audit.data_after == {"sso_organization_id": str(new_id)}
+
+
+def test_organization_page_sso_audit_can_be_skipped():
+    """A caller that writes its own audit record can turn this one off."""
+    org = OrganizationPageFactory.create(sso_organization_id=None)
+
+    org.sso_organization_id = uuid4()
+    org.save(audit_sso_link=False)
+
+    assert not OrganizationProvisioningAudit.objects.filter(organization=org).exists()
 
 
 def test_organization_page_slug_generated_on_create():

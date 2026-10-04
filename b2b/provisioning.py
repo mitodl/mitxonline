@@ -451,7 +451,7 @@ def link_organization_to_keycloak(organization, *, connection=None, actor=None):
 
     with transaction.atomic():
         organization.sso_organization_id = sso_organization_id
-        organization.save()
+        organization.save(audit_sso_link=False)
         OrganizationOnboarding.objects.get_or_create(
             organization=organization,
             defaults={

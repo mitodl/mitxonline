@@ -9,7 +9,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
-from django.db import models
+from django.db import models, transaction
 from django.http import Http404
 from django.urls import reverse
 from django.utils.functional import cached_property
@@ -35,6 +35,7 @@ from b2b.constants import (
     ONBOARDING_STATE_REQUESTED,
     ORG_INDEX_SLUG,
     PROVISIONING_ACTION_CHOICES,
+    PROVISIONING_ACTION_ORG_UPDATED,
 )
 from courses.models import Program
 from main.models import AuditModel, ValidateOnSaveMixin
@@ -160,7 +161,8 @@ class OrganizationPage(Page):
     )
 
     # The staff dashboard has no logo upload, and sso_organization_id stays
-    # editable here to link organizations created before the dashboard.
+    # editable here to link organizations created before the dashboard. save()
+    # audits a change to it.
     content_panels = [
         StaffDashboardOrganizationPanel(),
         FieldPanel("name", read_only=True),
@@ -178,14 +180,82 @@ class OrganizationPage(Page):
 
         return slugify(f"org-{name}")
 
-    def save(self, clean=True, user=None, log_action=False, **kwargs):  # noqa: FBT002
-        """Save the page, and update the slug and title appropriately."""
+    def save(
+        self,
+        clean=True,  # noqa: FBT002
+        user=None,
+        log_action=False,  # noqa: FBT002
+        *,
+        audit_sso_link=True,
+        **kwargs,
+    ):
+        """
+        Save the page, and update the slug and title appropriately.
+
+        A change to sso_organization_id on an existing organization is
+        written to the provisioning audit trail here rather than in a Wagtail
+        hook, because the Wagtail admin has several ways to write the row
+        (saving an unpublished page, publishing from the editor, publishing an
+        older revision, bulk publish) and only some of them run hooks.
+        Callers that write their own audit record pass audit_sso_link=False.
+        """
 
         self.title = str(self.name)
 
         if not self.slug:
             self.slug = self.slug_for_name(self.name)
-        Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
+
+        # save_revision() saves only the revision fields, with the edited
+        # value in memory and not yet written.
+        update_fields = kwargs.get("update_fields")
+        writes_sso_link = (
+            update_fields is None or "sso_organization_id" in update_fields
+        )
+
+        stored = None
+        if audit_sso_link and writes_sso_link and self.pk:
+            stored = (
+                OrganizationPage.objects.filter(pk=self.pk)
+                .values("sso_organization_id", "live_revision_id")
+                .first()
+            )
+
+        with transaction.atomic():
+            Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
+            if stored and stored["sso_organization_id"] != self.sso_organization_id:
+                self._audit_sso_link_change(stored, user)
+
+    def _audit_sso_link_change(self, stored, user):
+        """Record a change to sso_organization_id made outside the provisioning API."""
+
+        actor = user
+        if (
+            actor is None
+            and self.live_revision_id
+            and self.live_revision_id != stored["live_revision_id"]
+        ):
+            # Publishing a revision saves the page without a user. The
+            # revision's author is who made the change.
+            actor = self.live_revision.user
+
+        OrganizationProvisioningAudit.objects.create(
+            organization=self,
+            org_key=self.org_key,
+            action=PROVISIONING_ACTION_ORG_UPDATED,
+            acting_user=actor,
+            data_before={
+                "sso_organization_id": (
+                    str(stored["sso_organization_id"])
+                    if stored["sso_organization_id"]
+                    else None
+                )
+            },
+            data_after={
+                "sso_organization_id": (
+                    str(self.sso_organization_id) if self.sso_organization_id else None
+                )
+            },
+        )
 
     def get_learners(self):
         """Get the learners associated with this organization."""
