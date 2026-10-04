@@ -1128,14 +1128,18 @@ def update_identity_provider(  # noqa: PLR0913
 
     with transaction.atomic():
         identity_provider.save()
-        _audit(
-            identity_provider.organization,
-            PROVISIONING_ACTION_IDP_UPDATED,
-            actor=actor,
-            identity_provider_alias=identity_provider.alias,
-            data_before=data_before,
-            data_after=data_after,
-        )
+        # A body that repeats the current values changes nothing. The writes
+        # above still run, so re-sending a PATCH stays the recovery for a
+        # half-applied one, but an empty record would only pad the history.
+        if data_before or data_after:
+            _audit(
+                identity_provider.organization,
+                PROVISIONING_ACTION_IDP_UPDATED,
+                actor=actor,
+                identity_provider_alias=identity_provider.alias,
+                data_before=data_before,
+                data_after=data_after,
+            )
 
     return identity_provider
 

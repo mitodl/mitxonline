@@ -690,6 +690,37 @@ def test_update_identity_provider_audits_the_change(connection, staff_user):
     assert audit.data_after["config"]["clientId"] == "mitxonline-2"
 
 
+def test_update_identity_provider_does_not_audit_an_edit_that_changes_nothing(
+    connection, staff_user
+):
+    """
+    A body that repeats the current values writes no change record.
+
+    Keycloak is still written, because re-sending a PATCH is how a
+    half-applied one is recovered.
+    """
+
+    identity_provider = _oidc_identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu",
+        enabled=True,
+        config={"clientId": "mitxonline", "clientSecret": "**********"},
+    )
+
+    update_identity_provider(
+        identity_provider,
+        display_name=identity_provider.display_name,
+        client_id="mitxonline",
+        connection=connection,
+        actor=staff_user,
+    )
+
+    connection.identity_providers.update.assert_called_once()
+    assert not OrganizationProvisioningAudit.objects.filter(
+        action=PROVISIONING_ACTION_IDP_UPDATED
+    ).exists()
+
+
 def test_update_identity_provider_audits_a_rotation_without_the_secret(
     connection, staff_user
 ):
