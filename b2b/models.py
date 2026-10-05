@@ -228,8 +228,11 @@ class OrganizationPage(Page):
         with transaction.atomic():
             stored = None
             if audit_sso_link and writes_sso_link and self.pk:
+                # Locked, so two overlapping saves each record the link they
+                # overwrote.
                 stored = (
-                    OrganizationPage.objects.filter(pk=self.pk)
+                    OrganizationPage.objects.select_for_update(of=("self",))
+                    .filter(pk=self.pk)
                     .values("sso_organization_id", "live_revision_id")
                     .first()
                 )
@@ -242,14 +245,12 @@ class OrganizationPage(Page):
     def _audit_sso_link_change(self, stored, user):
         """Record a change to sso_organization_id made outside the provisioning API."""
 
-        # Compared as text: a caller may assign the ID as a str, and a save
-        # that skips full_clean() leaves it one.
-        before = (
-            str(stored["sso_organization_id"])
-            if stored["sso_organization_id"]
-            else None
+        # A caller may assign the ID as a str in any form uuid.UUID accepts,
+        # and a save that skips full_clean() leaves it one.
+        before = stored["sso_organization_id"]
+        after = self._meta.get_field("sso_organization_id").to_python(
+            self.sso_organization_id or None
         )
-        after = str(self.sso_organization_id) if self.sso_organization_id else None
         if before == after:
             return
 
@@ -268,8 +269,8 @@ class OrganizationPage(Page):
             org_key=self.org_key,
             action=PROVISIONING_ACTION_ORG_UPDATED,
             acting_user=actor,
-            data_before={"sso_organization_id": before},
-            data_after={"sso_organization_id": after},
+            data_before={"sso_organization_id": str(before) if before else None},
+            data_after={"sso_organization_id": str(after) if after else None},
         )
 
     def get_learners(self):

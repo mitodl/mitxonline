@@ -142,15 +142,32 @@ def test_organization_page_draft_sso_change_is_not_audited():
     assert not OrganizationProvisioningAudit.objects.filter(organization=org).exists()
 
 
-def test_organization_page_same_sso_id_as_text_is_not_audited():
+@pytest.mark.parametrize(
+    "as_text",
+    [str, lambda sso_id: str(sso_id).upper(), lambda sso_id: sso_id.hex],
+    ids=["canonical", "uppercase", "unhyphenated"],
+)
+def test_organization_page_same_sso_id_as_text_is_not_audited(as_text):
     """The same ID assigned as a str, saved without cleaning, is not a change."""
     sso_id = uuid4()
     org = OrganizationPageFactory.create(sso_organization_id=sso_id)
 
-    org.sso_organization_id = str(sso_id)
+    org.sso_organization_id = as_text(sso_id)
     org.save(clean=False)
 
     assert not OrganizationProvisioningAudit.objects.filter(organization=org).exists()
+
+
+def test_organization_page_sso_change_as_text_is_recorded_in_canonical_form():
+    """A new ID assigned as an unhyphenated str is recorded the way it is stored."""
+    new_id = uuid4()
+    org = OrganizationPageFactory.create(sso_organization_id=None)
+
+    org.sso_organization_id = new_id.hex.upper()
+    org.save(clean=False)
+
+    audit = OrganizationProvisioningAudit.objects.get(organization=org)
+    assert audit.data_after == {"sso_organization_id": str(new_id)}
 
 
 def test_organization_page_form_records_the_editor_for_an_unpublished_page():
