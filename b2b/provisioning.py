@@ -992,6 +992,43 @@ def _replace_metadata_config(
         )
 
 
+def _updated_identity_provider_config(  # noqa: PLR0913
+    config,
+    identity_provider,
+    *,
+    metadata_artifact,
+    metadata_url,
+    client_id,
+    client_secret,
+):
+    """
+    Return an IdP's Keycloak config with an update's changes applied.
+
+    Args:
+    - config (dict): the IdP's current Keycloak config, left as it is
+    - identity_provider (OrganizationIdentityProvider): the IdP being updated
+    - metadata_artifact (dict): what Keycloak parsed out of a new document, or None
+    - metadata_url (str): the new metadata URL, if the source is a URL
+    - client_id (str): the new OIDC client ID, or None
+    - client_secret (str): the new OIDC client secret, or None
+    Returns:
+    - dict: the config to write
+    """
+
+    config = dict(config)
+
+    if metadata_artifact is not None:
+        _replace_metadata_config(
+            config, identity_provider, metadata_artifact, metadata_url
+        )
+    if client_id is not None:
+        config["clientId"] = client_id
+    if client_secret is not None:
+        config["clientSecret"] = client_secret
+
+    return config
+
+
 def _identity_provider_update_diff(  # noqa: PLR0913
     identity_provider,
     *,
@@ -1114,17 +1151,15 @@ def update_identity_provider(  # noqa: PLR0913
 
         keycloak_idp = connection.identity_providers.get(identity_provider.alias)
         payload = keycloak_idp.model_dump(by_alias=True, exclude_none=True)
-        config = dict(payload.get("config") or {})
-        config_before = dict(config)
-
-        if metadata_artifact is not None:
-            _replace_metadata_config(
-                config, identity_provider, metadata_artifact, metadata_url
-            )
-        if client_id is not None:
-            config["clientId"] = client_id
-        if client_secret is not None:
-            config["clientSecret"] = client_secret
+        config_before = dict(payload.get("config") or {})
+        config = _updated_identity_provider_config(
+            config_before,
+            identity_provider,
+            metadata_artifact=metadata_artifact,
+            metadata_url=metadata_url,
+            client_id=client_id,
+            client_secret=client_secret,
+        )
         if display_name is not None:
             payload["displayName"] = display_name
 
