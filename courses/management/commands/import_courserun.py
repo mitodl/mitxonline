@@ -34,9 +34,9 @@ from courses.models import Program
 from openedx.api import get_edx_api_course_detail_client
 
 try:
-    from b2b.models import ContractPage
+    from b2b.management.utils import get_contract_by_id_or_slug
 except ImportError:
-    ContractPage = None
+    get_contract_by_id_or_slug = None
 
 INDUSTRY_OPTS = [opt[0] for opt in COURSE_VARIANT_INDUSTRY]
 LENGTH_OPTS = [opt[0] for opt in COURSE_VARIANT_LENGTH]
@@ -203,21 +203,10 @@ class Command(BaseCommand):
         Returns:
             ContractPage or None: The resolved contract or None if not found/not available
         """
-        if not ContractPage or not contract_identifier:
+        if not get_contract_by_id_or_slug or not contract_identifier:
             return None
 
-        if contract_identifier.isdigit():
-            try:
-                return ContractPage.objects.get(id=int(contract_identifier))
-            except ContractPage.DoesNotExist:
-                pass
-
-        try:
-            return ContractPage.objects.get(slug=contract_identifier)
-        except ContractPage.DoesNotExist:
-            pass
-
-        return None
+        return get_contract_by_id_or_slug(contract_identifier)
 
     def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: C901, PLR0911, PLR0915, ARG002
         if kwargs.get("publish_cms_page") and kwargs.get("draft_cms_page"):

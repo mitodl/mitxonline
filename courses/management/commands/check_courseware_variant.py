@@ -9,7 +9,7 @@ from django.core.management import BaseCommand
 from django.core.management.base import CommandParser
 from django.db.models import Count, Q
 
-from b2b.models import ContractPage
+from b2b.management.utils import get_contract_by_id_or_slug
 from courses.api import resolve_courseware_object_from_id
 from courses.models import Course
 from variants.models import SupportedVariant
@@ -95,10 +95,7 @@ by the course, which may include variant options that the contract does not incl
             return
 
         if contract:
-            if contract.isdecimal():
-                contract_obj = ContractPage.objects.filter(id=contract).first()
-            else:
-                contract_obj = ContractPage.objects.filter(slug=contract).first()
+            contract_obj = get_contract_by_id_or_slug(contract)
 
             if not contract_obj:
                 self.stderr.write(
