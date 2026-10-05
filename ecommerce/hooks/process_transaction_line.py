@@ -50,8 +50,9 @@ def _link_b2b_course_run_contracts(line) -> str | None:
 
     if not line.b2b_contract:
         log.debug(
-            "_link_b2b_course_run_contracts: Line %s is not a B2B line, skipping",
+            "_link_b2b_course_run_contracts: Line %s is not a B2B line (%s), skipping",
             line,
+            line.b2b_contract,
         )
         return
 
