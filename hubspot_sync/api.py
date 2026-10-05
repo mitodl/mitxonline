@@ -2550,7 +2550,13 @@ def _ensure_target_line_item_for_line(
             hubspot_client, unique_app_id
         )
         if existing_line_item_id:
-            # Update the local HubspotObject mapping for existing line item
+            # Update the line item with latest data (enrollment_mode can change over time)
+            wait_for_hubspot_rate_limit()
+            hubspot_client.crm.objects.basic_api.update(
+                object_type=HubspotObjectType.LINES.value,
+                object_id=existing_line_item_id,
+                simple_public_object_input=line_item_input,
+            )
             content_type = ContentType.objects.get_for_model(Line)
             HubspotObject.objects.update_or_create(
                 object_id=line.id,

@@ -1469,6 +1469,47 @@ def test_ensure_target_hubspot_product_for_line_creates_when_missing(
     mock_client.crm.objects.basic_api.create.assert_called_once()
 
 
+def test_ensure_target_line_item_for_line_creates_when_missing(mocker, hubspot_order):
+    """A new HubSpot line item should be created when none exists yet."""
+    line = hubspot_order.lines.first()
+    mock_client = mocker.Mock()
+    mock_client.crm.objects.basic_api.create.return_value = SimpleNamespace(
+        id="new-line-item-123"
+    )
+
+    mocker.patch("hubspot_sync.api._build_target_line_item_message")
+    mocker.patch(
+        "hubspot_sync.api._find_target_line_item_id_by_unique_app_id", return_value=None
+    )
+    mocker.patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
+
+    result = api._ensure_target_line_item_for_line(line, mock_client)  # noqa: SLF001
+
+    assert result == "new-line-item-123"
+    mock_client.crm.objects.basic_api.create.assert_called_once()
+    mock_client.crm.objects.basic_api.update.assert_not_called()
+
+
+def test_ensure_target_line_item_for_line_updates_existing(mocker, hubspot_order):
+    """An existing HubSpot line item should be updated with current enrollment data."""
+    line = hubspot_order.lines.first()
+    mock_client = mocker.Mock()
+    existing_id = "existing-line-item-456"
+
+    mocker.patch("hubspot_sync.api._build_target_line_item_message")
+    mocker.patch(
+        "hubspot_sync.api._find_target_line_item_id_by_unique_app_id",
+        return_value=existing_id,
+    )
+    mocker.patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
+
+    result = api._ensure_target_line_item_for_line(line, mock_client)  # noqa: SLF001
+
+    assert result == existing_id
+    mock_client.crm.objects.basic_api.update.assert_called_once()
+    mock_client.crm.objects.basic_api.create.assert_not_called()
+
+
 def test_get_course_run_certificate_hubspot_property_removes_semicolons():
     """Test that _get_course_run_certificate_hubspot_property removes semicolons from course run names."""
     # Create course runs with semicolons in their titles
