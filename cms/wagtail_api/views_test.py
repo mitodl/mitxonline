@@ -240,6 +240,40 @@ def test_listing_response_includes_live_in_meta(user_drf_client):
     assert "last_published_at" in items[0]["meta"]
 
 
+# --- show_course_outline field tests ---
+
+
+def test_course_page_detail_exposes_show_course_outline_default(user_drf_client):
+    """CoursePage detail returns show_course_outline, on by default."""
+    page = CoursePageFactory.create()
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    assert resp.json()["show_course_outline"] is True
+
+
+def test_course_page_detail_exposes_show_course_outline_when_off(user_drf_client):
+    """A CMS user turning the outline off is visible to anonymous API consumers."""
+    page = CoursePageFactory.create(show_course_outline=False)
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    assert resp.json()["show_course_outline"] is False
+
+
+def test_course_page_listing_exposes_show_course_outline(anon_client):
+    """The listing route Learn's product page uses carries show_course_outline."""
+    CoursePageFactory.create(include_in_learn_catalog=True, show_course_outline=False)
+    resp = anon_client.get(
+        reverse("wagtailapi:pages:listing"),
+        {"type": "cms.coursepage", "fields": "*"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["items"][0]["show_course_outline"] is False
+
+
 # --- hubspot_form_id field tests ---
 
 

@@ -6470,6 +6470,11 @@ components:
           nullable: true
           description: If true, allow the AI chatbots to ingest the course's content
             files.
+        show_course_outline:
+          type: boolean
+          description: If true, Learn should show the course outline (modules) on
+            the product page. Turn this off for courses whose module titles aren't
+            written for a pre-purchase audience.
         how_youll_learn:
           type: array
           items:
@@ -6500,6 +6505,7 @@ components:
       - min_weeks
       - prerequisites
       - price
+      - show_course_outline
       - testimonials
       - title
       - topic_list

@@ -1607,6 +1607,14 @@ class CoursePage(ProductPage):
         null=True,
         help_text="If true, allow the AI chatbots to ingest the course's content files.",
     )
+    show_course_outline = models.BooleanField(
+        default=True,
+        help_text=(
+            "If true, Learn should show the course outline (modules) on the "
+            "product page. Turn this off for courses whose module titles aren't "
+            "written for a pre-purchase audience."
+        ),
+    )
 
     template = "product_page.html"
     search_fields = Page.search_fields + [  # noqa: RUF005
@@ -1623,6 +1631,7 @@ class CoursePage(ProductPage):
         *ProductPage.content_panels,
         FieldPanel("include_in_learn_catalog"),
         FieldPanel("ingest_content_files_for_ai"),
+        FieldPanel("show_course_outline"),
     ]
     api_fields = [
         *ProductPage.api_fields,
@@ -1630,6 +1639,7 @@ class CoursePage(ProductPage):
         APIField("topic_list"),
         APIField("include_in_learn_catalog"),
         APIField("ingest_content_files_for_ai"),
+        APIField("show_course_outline"),
     ]
 
     @cached_property
