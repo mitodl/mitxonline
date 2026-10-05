@@ -30,6 +30,8 @@ _ALLOWED_CHILDREN = {
         ProgramRequirementNodeType.COURSE,
         ProgramRequirementNodeType.PROGRAM,
     },
+    ProgramRequirementNodeType.COURSE: set(),
+    ProgramRequirementNodeType.PROGRAM: set(),
 }
 
 
@@ -39,10 +41,12 @@ def _placement_error(parent_type, title, parent_title) -> str:
         return (
             "Top-level requirements must be groups, not individual courses or programs."
         )
-    return (
-        f"{_group_name(title, parent_title)} is inside a group; groups can "
-        "contain only courses and programs."
-    )
+    if parent_type == ProgramRequirementNodeType.OPERATOR:
+        return (
+            f"{_group_name(title, parent_title)} is inside a group; groups can "
+            "contain only courses and programs."
+        )
+    return "Courses and programs cannot contain other requirements."
 
 
 def _operator_value_errors(name, data, children) -> list[str]:
@@ -118,7 +122,7 @@ def validate_requirement_tree(
         node_type = data.get("node_type")
         title = (data.get("title") or "").strip()
 
-        if node_type not in _ALLOWED_CHILDREN[parent_type]:
+        if node_type not in _ALLOWED_CHILDREN.get(parent_type, set()):
             errors.append(_placement_error(parent_type, title, parent_title))
         if node_type == ProgramRequirementNodeType.PROGRAM:
             errors.extend(
@@ -129,17 +133,15 @@ def validate_requirement_tree(
                     programs_requiring_this=programs_requiring_this,
                 )
             )
-        if node_type != ProgramRequirementNodeType.OPERATOR:
-            return
-
-        name = _group_name(title, parent_title)
         children = node.get("children") or []
-        if not title:
-            errors.append(f"{name} has no Title.")
-        if data.get("operator") not in ProgramRequirement.Operator.values:
-            errors.append(f'{name} needs an operator: "All of" or "Minimum # of".')
-        if data.get("operator") == ProgramRequirement.Operator.MIN_NUMBER_OF:
-            errors.extend(_operator_value_errors(name, data, children))
+        if node_type == ProgramRequirementNodeType.OPERATOR:
+            name = _group_name(title, parent_title)
+            if not title:
+                errors.append(f"{name} has no Title.")
+            if data.get("operator") not in ProgramRequirement.Operator.values:
+                errors.append(f'{name} needs an operator: "All of" or "Minimum # of".')
+            if data.get("operator") == ProgramRequirement.Operator.MIN_NUMBER_OF:
+                errors.extend(_operator_value_errors(name, data, children))
         for child in children:
             _visit(child, parent_type=node_type, parent_title=title or parent_title)
 

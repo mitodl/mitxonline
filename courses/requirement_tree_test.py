@@ -84,6 +84,11 @@ def test_validate_requirement_tree_valid(tree):
             None,
             '"Group" is inside a group',
         ),
+        (
+            [_all_of("Required", {**_course(1), "children": [_course(2)]})],
+            None,
+            "Courses and programs cannot contain other requirements.",
+        ),
         ([_min_of("Electives", None, _course(1))], None, "whole number, 0 or more"),
         ([_min_of("Electives", "-1", _course(1))], None, "whole number, 0 or more"),
         (
@@ -102,6 +107,7 @@ def test_validate_requirement_tree_valid(tree):
         "untitled_group",
         "no_operator",
         "nested_group",
+        "course_with_children",
         "value_missing",
         "value_negative",
         "value_above_child_count",
