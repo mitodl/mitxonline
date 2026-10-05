@@ -1803,7 +1803,7 @@ def _organization_update(connection, mocker):
         lambda: update_organization(
             organization, name="Renamed", connection=connection
         ),
-        connection.organizations.update,
+        [connection.organizations.update],
         unchanged,
     )
 
@@ -1822,7 +1822,7 @@ def _identity_provider_update(connection, mocker):
         lambda: update_identity_provider(
             identity_provider, display_name="Renamed", connection=connection
         ),
-        connection.identity_providers.update,
+        [connection.identity_providers.update],
         unchanged,
     )
 
@@ -1840,6 +1840,13 @@ def _mapper_replacement(connection, mocker):
             config={"attribute.friendly.name": "E-Mail", "user.attribute": "email"},
         )
     ]
+    updated_on = identity_provider.updated_on
+
+    def unchanged():
+        # Replacing mappers changes no column of ours, so the save itself is
+        # the only local write there is to see.
+        identity_provider.refresh_from_db()
+        return identity_provider.updated_on == updated_on
 
     return (
         lambda: update_identity_provider(
@@ -1847,8 +1854,12 @@ def _mapper_replacement(connection, mocker):
             attribute_map={"email": "E-Mail Address"},
             connection=connection,
         ),
-        connection.client.delete,
-        lambda: True,
+        [
+            connection.identity_providers.update,
+            connection.client.delete,
+            connection.client.create_returning_id,
+        ],
+        unchanged,
     )
 
 
@@ -1870,7 +1881,7 @@ def _metadata_refresh(connection, mocker):
         lambda: refresh_identity_provider_metadata(
             identity_provider, connection=connection
         ),
-        connection.identity_providers.update,
+        [connection.identity_providers.update],
         unchanged,
     )
 
@@ -1889,7 +1900,7 @@ def _transition(connection, mocker):
         lambda: transition_identity_provider(
             identity_provider, IDP_STATE_TESTING, connection=connection
         ),
-        connection.identity_providers.update,
+        [connection.identity_providers.update],
         unchanged,
     )
 
@@ -1899,7 +1910,7 @@ def _deletion(connection, mocker):
 
     return (
         lambda: delete_identity_provider(identity_provider, connection=connection),
-        connection.organizations.disassociate,
+        [connection.organizations.disassociate, connection.identity_providers.delete],
         OrganizationIdentityProvider.objects.filter(alias="exampleu").exists,
     )
 
@@ -1926,7 +1937,7 @@ def test_a_failed_local_write_never_reaches_keycloak(connection, mocker, setup):
     nor the audit trail knows about.
     """
 
-    change, keycloak_write, unchanged = setup(connection, mocker)
+    change, keycloak_writes, unchanged = setup(connection, mocker)
     mocker.patch(
         "b2b.provisioning.OrganizationProvisioningAudit.objects.create",
         side_effect=ValueError("no"),
@@ -1935,7 +1946,8 @@ def test_a_failed_local_write_never_reaches_keycloak(connection, mocker, setup):
     with pytest.raises(ValueError, match="no"):
         change()
 
-    keycloak_write.assert_not_called()
+    for keycloak_write in keycloak_writes:
+        keycloak_write.assert_not_called()
     assert unchanged()
 
 
@@ -1943,10 +1955,15 @@ def test_a_failed_local_write_never_reaches_keycloak(connection, mocker, setup):
 def test_a_failed_keycloak_write_rolls_back_our_row_and_its_audit(
     connection, mocker, setup
 ):
-    """A change Keycloak refused is neither applied nor recorded here."""
+    """
+    A change Keycloak refused is neither applied nor recorded here.
 
-    change, keycloak_write, unchanged = setup(connection, mocker)
-    keycloak_write.side_effect = RuntimeError("keycloak said no")
+    The last write is the one that fails, so every earlier one has already
+    been accepted by the time our side has to roll back.
+    """
+
+    change, keycloak_writes, unchanged = setup(connection, mocker)
+    keycloak_writes[-1].side_effect = RuntimeError("keycloak said no")
 
     with pytest.raises(RuntimeError, match="keycloak said no"):
         change()
