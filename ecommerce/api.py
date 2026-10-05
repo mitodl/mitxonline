@@ -151,8 +151,8 @@ def _validate_basket_steps_for_b2b(basket, request):
     """
     Validate the basket for B2B.
 
-    If the basket contains items that aren't B2B-only but are in contracts, we
-    need to see if
+    Only run the B2B validation if necessary - the basket either contains a
+    B2B-only item, or a discount code has been applied for a B2B contract.
     """
 
     from b2b.api import validate_basket_for_b2b_purchase  # noqa: PLC0415
@@ -251,7 +251,7 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
 
     b2b_validation_result = _validate_basket_steps_for_b2b(basket, request)
 
-    if b2b_validation_result and "error" in b2b_validation_result:
+    if b2b_validation_result:
         return b2b_validation_result
 
     if not basket.basket_items.count():
