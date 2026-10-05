@@ -254,7 +254,7 @@ def test_course_page_detail_exposes_show_course_outline_default(user_drf_client)
 
 
 def test_course_page_detail_exposes_show_course_outline_when_off(user_drf_client):
-    """A CMS user turning the outline off is visible to anonymous API consumers."""
+    """CoursePage detail reflects a CMS user turning the outline off."""
     page = CoursePageFactory.create(show_course_outline=False)
     resp = user_drf_client.get(
         reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
@@ -264,14 +264,17 @@ def test_course_page_detail_exposes_show_course_outline_when_off(user_drf_client
 
 
 def test_course_page_listing_exposes_show_course_outline(anon_client):
-    """The listing route Learn's product page uses carries show_course_outline."""
-    CoursePageFactory.create(include_in_learn_catalog=True, show_course_outline=False)
+    """The anonymous listing route Learn's product page uses carries the flag."""
+    page = CoursePageFactory.create(
+        include_in_learn_catalog=True, show_course_outline=False
+    )
     resp = anon_client.get(
         reverse("wagtailapi:pages:listing"),
         {"type": "cms.coursepage", "fields": "*"},
     )
     assert resp.status_code == 200
-    assert resp.json()["items"][0]["show_course_outline"] is False
+    items = {item["id"]: item for item in resp.json()["items"]}
+    assert items[page.id]["show_course_outline"] is False
 
 
 # --- hubspot_form_id field tests ---
