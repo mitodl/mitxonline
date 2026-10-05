@@ -4,7 +4,6 @@ import logging
 
 import pluggy
 
-from b2b.api import process_add_org_membership
 from courses.models import (
     CourseRun,
     CourseRunEnrollment,
@@ -48,6 +47,8 @@ def _create_courserun_enrollment(line) -> str | None:
 
 def _link_b2b_course_run_contracts(line) -> str | None:
     """If the purchased line was a B2B run, make the resulting enrollment a B2B enrollment"""
+
+    from b2b.api import process_add_org_membership  # noqa: PLC0415
 
     purchased_run = line.purchased_object
     line_user = line.order.purchaser
