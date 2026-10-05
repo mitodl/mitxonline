@@ -3,6 +3,7 @@
 import logging
 
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.types import OpenApiTypes
@@ -19,7 +20,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_api_key.permissions import HasAPIKey
 
-from b2b.api import create_b2b_enrollment, process_add_org_membership
+from b2b.api import (
+    create_b2b_enrollment,
+    lock_contract_for_code_assignment,
+    process_add_org_membership,
+)
 from b2b.models import (
     ContractPage,
     ContractProgramItem,
@@ -367,12 +372,19 @@ class AttachContractApi(APIView):
                 user, contract.organization, keep_until_seen=True
             )
             user.b2b_contracts.add(contract)
-            DiscountContractAttachmentRedemption.objects.update_or_create(
-                discount=code,
-                contract=contract,
-                user=None,
-                defaults={"user": user, "redeemed_on": now_in_utc()},
-            )
+            # A code assignment in flight for this contract may be about to
+            # commit a row for this code. Without the lock the lookup here
+            # misses it and inserts a second row for the same code. This is
+            # its own transaction, after the writes above, so the lock is the
+            # first thing it takes on the contract.
+            with transaction.atomic():
+                lock_contract_for_code_assignment(contract)
+                DiscountContractAttachmentRedemption.objects.update_or_create(
+                    discount=code,
+                    contract=contract,
+                    user=None,
+                    defaults={"user": user, "redeemed_on": now_in_utc()},
+                )
             contracts_attached = True
 
         user.save()
