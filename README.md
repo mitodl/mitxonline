@@ -55,7 +55,7 @@ Refer to the [uv documentation](https://docs.astral.sh/uv/reference/cli/) for pa
 
 # Generating documentation
 
-Detailed documentation for the project is available in the `docs/` folder. The files within are reStructuredText and can be built into an HTML version using Sphinx. Sphinx and its extensions are in the `docs` dependency group, so you can build the docs without installing the rest of the project:
+Detailed documentation for the project is available in the `docs/` folder. The files within are reStructuredText or Markdown (via MyST) and can be built into an HTML version using Sphinx. Sphinx and its extensions are in the `docs` dependency group, so you can build the docs without installing the rest of the project:
 
 ```bash
 uv run --only-group docs sphinx-build docs/source dist/sphinx
