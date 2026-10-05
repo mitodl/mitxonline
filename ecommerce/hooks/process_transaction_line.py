@@ -80,12 +80,12 @@ def _link_b2b_course_run_contracts(line) -> str | None:
         enrollment.save_and_log(None)
 
     if not line_user.user_b2b_contracts.filter(
-        contract_page=purchased_run.b2b_contract
+        contract_page=line.b2b_contract
     ).exists():
         process_add_org_membership(
-            line_user, purchased_run.b2b_contract.organization, keep_until_seen=True
+            line_user, line.b2b_contract.organization, keep_until_seen=True
         )
-        line_user.b2b_contracts.add(purchased_run.b2b_contract)
+        line_user.b2b_contracts.add(line.b2b_contract)
         line_user.save()
 
 
