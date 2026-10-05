@@ -19,7 +19,6 @@ from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
 from modelcluster.fields import ParentalKey
 from requests.exceptions import HTTPError
-from wagtail.admin.forms import WagtailAdminPageForm
 from wagtail.admin.panels import FieldPanel, HelpPanel, InlinePanel, MultiFieldPanel
 from wagtail.fields import RichTextField
 from wagtail.models import ClusterableModel, Orderable, Page
@@ -121,20 +120,8 @@ class StaffDashboardOrganizationPanel(HelpPanel):
             )
 
 
-class OrganizationPageForm(WagtailAdminPageForm):
-    """Passes the editing user to OrganizationPage.save() for the audit trail."""
-
-    def save(self, commit=True):  # noqa: FBT002
-        # The editor saves an unpublished page straight from the form, with
-        # no user and no revision yet to take one from.
-        self.instance._wagtail_editor = self.for_user  # noqa: SLF001
-        return super().save(commit=commit)
-
-
 class OrganizationPage(Page):
     """Stores information about an organization we have a relationship with."""
-
-    base_form_class = OrganizationPageForm
 
     parent_page_types = ["b2b.OrganizationIndexPage"]
     subpage_types = ["b2b.ContractPage"]
@@ -173,16 +160,26 @@ class OrganizationPage(Page):
         help_text="The UUID for the organization in the SSO provider.",
     )
 
-    # The staff dashboard has no logo upload, and sso_organization_id stays
-    # editable here to link organizations created before the dashboard. save()
-    # audits a change to it.
+    # Written only by the provisioning API and the Keycloak reconciler. A
+    # Wagtail revision holds whatever these were when it was saved, so
+    # with_content_json() takes them from the stored row instead.
+    PROVISIONED_FIELDS = (
+        "name",
+        "org_key",
+        "org_key_prefix",
+        "description",
+        "sso_organization_id",
+    )
+
+    # The staff dashboard has no logo upload, so the logo is the one field
+    # still edited here.
     content_panels = [
         StaffDashboardOrganizationPanel(),
         FieldPanel("name", read_only=True),
         FieldPanel("description", read_only=True),
         FieldPanel("org_key", read_only=True),
+        FieldPanel("sso_organization_id", read_only=True),
         FieldPanel("logo"),
-        FieldPanel("sso_organization_id"),
     ]
 
     # Use default promote_panels from Page to allow manual slug editing
@@ -206,10 +203,8 @@ class OrganizationPage(Page):
         Save the page, and update the slug and title appropriately.
 
         A change to sso_organization_id on an existing organization is
-        written to the provisioning audit trail here rather than in a Wagtail
-        hook, because the Wagtail admin has several ways to write the row
-        (saving an unpublished page, publishing from the editor, publishing an
-        older revision, bulk publish) and only some of them run hooks.
+        written to the provisioning audit trail here, so one made outside the
+        provisioning API (a management command, a shell) is still recorded.
         Callers that write their own audit record pass audit_sso_link=False.
         """
 
@@ -233,7 +228,7 @@ class OrganizationPage(Page):
                 stored = (
                     OrganizationPage.objects.select_for_update(of=("self",))
                     .filter(pk=self.pk)
-                    .values("sso_organization_id", "live_revision_id")
+                    .values("sso_organization_id")
                     .first()
                 )
 
@@ -241,6 +236,28 @@ class OrganizationPage(Page):
 
             if stored:
                 self._audit_sso_link_change(stored, user)
+
+    def with_content_json(self, content):
+        """
+        Build the page a revision describes, keeping the provisioned fields.
+
+        Wagtail calls this to load the editor and to publish. Without it,
+        publishing a revision saved before an API write puts the old name,
+        description and Keycloak link back.
+        """
+
+        page = super().with_content_json(content)
+        # Read from the database, not from self: when the editor publishes,
+        # self is the instance it loaded before the form was filled in.
+        stored = (
+            OrganizationPage.objects.filter(pk=self.pk)
+            .values(*self.PROVISIONED_FIELDS)
+            .get()
+        )
+        for field, value in stored.items():
+            setattr(page, field, value)
+        page.title = stored["name"]
+        return page
 
     def _audit_sso_link_change(self, stored, user):
         """Record a change to sso_organization_id made outside the provisioning API."""
@@ -254,21 +271,11 @@ class OrganizationPage(Page):
         if before == after:
             return
 
-        actor = user or getattr(self, "_wagtail_editor", None)
-        if (
-            actor is None
-            and self.live_revision_id
-            and self.live_revision_id != stored["live_revision_id"]
-        ):
-            # Publishing a revision saves the page without a user. The
-            # revision's author is who made the change.
-            actor = self.live_revision.user
-
         OrganizationProvisioningAudit.objects.create(
             organization=self,
             org_key=self.org_key,
             action=PROVISIONING_ACTION_ORG_UPDATED,
-            acting_user=actor,
+            acting_user=user,
             data_before={"sso_organization_id": str(before) if before else None},
             data_after={"sso_organization_id": str(after) if after else None},
         )

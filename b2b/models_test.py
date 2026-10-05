@@ -113,23 +113,58 @@ def test_organization_page_sso_change_is_audited():
     assert audit.data_after == {"sso_organization_id": str(new_id)}
 
 
-def test_organization_page_sso_change_published_in_wagtail_is_audited():
+def test_organization_page_publish_keeps_provisioned_fields():
     """
-    Publishing a revision saves the page with no user, so the revision's
-    author is recorded. This is the path the Wagtail editor takes for a live
-    page.
+    A revision saved before an API write holds the old values. Publishing it
+    (a logo upload in the editor, a bulk publish) must not put them back.
     """
-    org = OrganizationPageFactory.create(sso_organization_id=None)
-    editor = UserFactory.create(is_staff=True)
+    org = OrganizationPageFactory.create(
+        name="Old name", description="Old description", sso_organization_id=None
+    )
+    stale = org.save_revision(user=UserFactory.create(is_staff=True))
+
     new_id = uuid4()
-
+    org.name = "New name"
+    org.description = "New description"
     org.sso_organization_id = new_id
-    org.save_revision(user=editor).publish()
+    org.save(audit_sso_link=False)
 
-    audit = OrganizationProvisioningAudit.objects.get(organization=org)
-    assert audit.acting_user == editor
-    assert audit.data_before == {"sso_organization_id": None}
-    assert audit.data_after == {"sso_organization_id": str(new_id)}
+    stale.publish()
+
+    org.refresh_from_db()
+    assert org.name == "New name"
+    assert org.title == "New name"
+    assert org.description == "New description"
+    assert org.sso_organization_id == new_id
+    assert not OrganizationProvisioningAudit.objects.filter(organization=org).exists()
+
+
+def test_organization_page_editor_loads_provisioned_fields_from_the_row():
+    """The Wagtail editor shows the stored values, not the latest revision's."""
+    org = OrganizationPageFactory.create(name="Old name", sso_organization_id=None)
+    org.save_revision()
+
+    new_id = uuid4()
+    org.name = "New name"
+    org.sso_organization_id = new_id
+    org.save(audit_sso_link=False)
+
+    in_editor = org.get_latest_revision_as_object()
+    assert in_editor.name == "New name"
+    assert in_editor.sso_organization_id == new_id
+
+
+def test_organization_page_revision_cannot_change_the_sso_link():
+    """A revision carrying a different link does not change the stored one."""
+    old_id = uuid4()
+    org = OrganizationPageFactory.create(sso_organization_id=old_id)
+
+    org.sso_organization_id = uuid4()
+    org.save_revision(user=UserFactory.create(is_staff=True)).publish()
+
+    org.refresh_from_db()
+    assert org.sso_organization_id == old_id
+    assert not OrganizationProvisioningAudit.objects.filter(organization=org).exists()
 
 
 def test_organization_page_draft_sso_change_is_not_audited():
@@ -170,27 +205,16 @@ def test_organization_page_sso_change_as_text_is_recorded_in_canonical_form():
     assert audit.data_after == {"sso_organization_id": str(new_id)}
 
 
-def test_organization_page_form_records_the_editor_for_an_unpublished_page():
-    """
-    The Wagtail editor saves an unpublished page straight from the form, with
-    no user and before any revision exists, so the form supplies the editor.
-    """
-    org = OrganizationPageFactory.create(sso_organization_id=None, live=False)
+def test_organization_page_wagtail_form_edits_only_the_logo():
+    """The provisioned fields are read-only panels, so the form has no such fields."""
+    org = OrganizationPageFactory.create()
     editor = UserFactory.create(is_staff=True, is_superuser=True)
-    new_id = uuid4()
 
     form_class = org.get_edit_handler().get_form_class()
-    form = form_class(
-        data={"sso_organization_id": str(new_id), "slug": org.slug},
-        instance=org,
-        for_user=editor,
-    )
-    assert form.is_valid(), form.errors
-    form.save()
+    form = form_class(instance=org, for_user=editor)
 
-    audit = OrganizationProvisioningAudit.objects.get(organization=org)
-    assert audit.acting_user == editor
-    assert audit.data_after == {"sso_organization_id": str(new_id)}
+    assert "logo" in form.fields
+    assert not set(org.PROVISIONED_FIELDS) & set(form.fields)
 
 
 def test_organization_page_sso_audit_can_be_skipped():

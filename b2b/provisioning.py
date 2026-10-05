@@ -943,10 +943,9 @@ def delete_identity_provider(identity_provider, *, connection=None, actor=None):
     """
 
     # Creation requires a provisioned organization, so this looks unreachable -
-    # but sso_organization_id is an editable panel on OrganizationPage
-    # (content_panels) and is nullable, so staff can blank it in the Wagtail
-    # admin after the IdP exists. Without the guard the unlink 502s and the IdP
-    # can never be deleted, with a message blaming Keycloak.
+    # but sso_organization_id is nullable and can be blanked outside the API
+    # after the IdP exists. Without the guard the unlink 502s and the IdP can
+    # never be deleted, with a message blaming Keycloak.
     _require_provisioned(identity_provider.organization)
 
     connection = connection or KeycloakConnection()
