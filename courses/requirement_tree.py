@@ -1,7 +1,7 @@
 """Validation and evaluation of a program's requirement tree."""
 
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 
 from mitol.common.utils.queryset import is_prefetched
 
@@ -64,27 +64,54 @@ def _operator_value_errors(name, data, children) -> list[str]:
     return []
 
 
+def _program_node_errors(
+    required_program, *, display_mode, program_id, programs_requiring_this
+) -> list[str]:
+    errors = []
+    if display_mode == PROGRAM_DISPLAY_MODE_COURSE:
+        errors.append("A program displayed as a course cannot require other programs.")
+    if program_id is not None and required_program == program_id:
+        errors.append("A program cannot require itself.")
+    elif required_program in programs_requiring_this:
+        errors.append(
+            f'"{programs_requiring_this[required_program]}" already requires this '
+            "program, so this program cannot require it."
+        )
+    return errors
+
+
 def validate_requirement_tree(
-    tree: list[dict], *, display_mode: str | None
+    tree: list[dict],
+    *,
+    display_mode: str | None,
+    program_id: int | None = None,
+    programs_requiring_this: Mapping[int, str] | None = None,
 ) -> list[str]:
     """
     Check a requirement tree against the rules every saved tree must follow.
 
     Each node must be a child type that ``_ALLOWED_CHILDREN`` allows under its
-    parent. The other rules hold at any depth: every group has a title; a
-    "Minimum # of" group's value is a whole number no larger than its number of
-    children; a program displayed as a course requires no programs.
+    parent. The other rules hold at any depth: every group has a title and an
+    operator; a "Minimum # of" group's value is a whole number no larger than
+    its number of children; a program displayed as a course requires no
+    programs; and a program requires neither itself nor a program that already
+    requires it, which would make evaluating either tree recurse forever.
 
     Args:
         tree: the root's children, each ``{"id", "data": {...}, "children": [...]}``
             as ProgramAdminForm submits them and ``dump_bulk`` produces them.
             Leaf nodes may omit ``children``.
         display_mode: the program's ``display_mode``.
+        program_id: the id of the program whose tree this is; None for a
+            program not yet saved.
+        programs_requiring_this: title by id of every program that already
+            requires this one, as ``programs_requiring`` returns them.
 
     Returns:
         list[str]: one message per problem found; empty when the tree is valid.
     """
     errors = []
+    programs_requiring_this = programs_requiring_this or {}
 
     def _visit(node, *, parent_type, parent_title):
         data = node.get("data", {})
@@ -93,12 +120,14 @@ def validate_requirement_tree(
 
         if node_type not in _ALLOWED_CHILDREN[parent_type]:
             errors.append(_placement_error(parent_type, title, parent_title))
-        if (
-            node_type == ProgramRequirementNodeType.PROGRAM
-            and display_mode == PROGRAM_DISPLAY_MODE_COURSE
-        ):
-            errors.append(
-                "A program displayed as a course cannot require other programs."
+        if node_type == ProgramRequirementNodeType.PROGRAM:
+            errors.extend(
+                _program_node_errors(
+                    data.get("required_program"),
+                    display_mode=display_mode,
+                    program_id=program_id,
+                    programs_requiring_this=programs_requiring_this,
+                )
             )
         if node_type != ProgramRequirementNodeType.OPERATOR:
             return
@@ -107,6 +136,8 @@ def validate_requirement_tree(
         children = node.get("children") or []
         if not title:
             errors.append(f"{name} has no Title.")
+        if data.get("operator") not in ProgramRequirement.Operator.values:
+            errors.append(f'{name} needs an operator: "All of" or "Minimum # of".')
         if data.get("operator") == ProgramRequirement.Operator.MIN_NUMBER_OF:
             errors.extend(_operator_value_errors(name, data, children))
         for child in children:
@@ -118,6 +149,29 @@ def validate_requirement_tree(
         )
 
     return errors
+
+
+def programs_requiring(program_id: int) -> dict[int, str]:
+    """
+    Return the title, by id, of every program whose saved tree requires the
+    given program, directly or through other required programs.
+
+    Costs one query per level of required programs, plus one for the titles.
+    """
+    found = set()
+    frontier = {program_id}
+    while frontier:
+        frontier = (
+            set(
+                ProgramRequirement.objects.filter(
+                    node_type=ProgramRequirementNodeType.PROGRAM,
+                    required_program_id__in=frontier,
+                ).values_list("program_id", flat=True)
+            )
+            - found
+        )
+        found |= frontier
+    return dict(Program.objects.filter(id__in=found).values_list("id", "title"))
 
 
 def _requirement_nodes(program: Program) -> list[ProgramRequirement]:

@@ -9,7 +9,7 @@ from courses.models import (
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
-from courses.requirement_tree import validate_requirement_tree
+from courses.requirement_tree import programs_requiring, validate_requirement_tree
 from courses.serializers.v1.programs import ProgramRequirementTreeSerializer
 from courses.widgets import ProgramRequirementsInput
 
@@ -111,9 +111,14 @@ class ProgramAdminForm(ModelForm):
         """Reject a requirements tree that breaks validate_requirement_tree's rules."""
         cleaned_data = super().clean()
         if "requirements" in cleaned_data:
+            program_id = self.instance.pk
             errors = validate_requirement_tree(
                 cleaned_data["requirements"],
                 display_mode=cleaned_data.get("display_mode"),
+                program_id=program_id,
+                programs_requiring_this=(
+                    programs_requiring(program_id) if program_id else {}
+                ),
             )
             if errors:
                 raise ValidationError(errors)

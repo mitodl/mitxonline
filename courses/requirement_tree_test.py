@@ -3,7 +3,8 @@
 import pytest
 
 from courses.constants import PROGRAM_DISPLAY_MODE_COURSE
-from courses.requirement_tree import validate_requirement_tree
+from courses.factories import ProgramFactory
+from courses.requirement_tree import programs_requiring, validate_requirement_tree
 
 
 def _course(course_id):
@@ -68,6 +69,17 @@ def test_validate_requirement_tree_valid(tree):
         ([_course(1)], None, "Top-level requirements must be groups"),
         ([_all_of("", _course(1))], None, "A top-level group has no Title."),
         (
+            [
+                {
+                    "id": None,
+                    "data": {"node_type": "operator", "title": "Group"},
+                    "children": [_course(1)],
+                }
+            ],
+            None,
+            '"Group" needs an operator',
+        ),
+        (
             [_min_of("Electives", "1", _all_of("Group", _course(1)))],
             None,
             '"Group" is inside a group',
@@ -88,6 +100,7 @@ def test_validate_requirement_tree_valid(tree):
     ids=[
         "top_level_course",
         "untitled_group",
+        "no_operator",
         "nested_group",
         "value_missing",
         "value_negative",
@@ -101,3 +114,43 @@ def test_validate_requirement_tree_invalid(tree, display_mode, message):
 
     assert len(errors) == 1
     assert message in errors[0]
+
+
+@pytest.mark.parametrize(
+    ("required_program", "message"),
+    [
+        (1, "A program cannot require itself."),
+        (
+            2,
+            '"Parent" already requires this program, so this program cannot '
+            "require it.",
+        ),
+    ],
+    ids=["itself", "program_requiring_it"],
+)
+def test_validate_requirement_tree_rejects_program_cycles(required_program, message):
+    """A program cannot require itself or a program that already requires it"""
+    errors = validate_requirement_tree(
+        [_all_of("Required", _program(required_program))],
+        display_mode=None,
+        program_id=1,
+        programs_requiring_this={2: "Parent"},
+    )
+
+    assert errors == [message]
+
+
+@pytest.mark.django_db
+def test_programs_requiring_follows_required_programs():
+    """Programs requiring the program directly or through another are returned"""
+    program = ProgramFactory.create()
+    parent = ProgramFactory.create()
+    parent.add_program_requirement(program)
+    grandparent = ProgramFactory.create()
+    grandparent.add_program_requirement(parent)
+    ProgramFactory.create().add_program_requirement(ProgramFactory.create())
+
+    assert programs_requiring(program.id) == {
+        parent.id: parent.title,
+        grandparent.id: grandparent.title,
+    }
