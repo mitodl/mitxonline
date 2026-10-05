@@ -32,6 +32,7 @@ IDENTITY_PROVIDER_IMPORT_CONFIG_ENDPOINT = "identity-provider/import-config"
 # Keycloak's collection endpoints default to returning 10 items when `max` is
 # not supplied, so anything that needs the whole collection has to page.
 KEYCLOAK_LIST_PAGE_SIZE = 100
+KEYCLOAK_ADMIN_REQUEST_TIMEOUT_SECONDS = 60
 
 
 class KeycloakAdminClient:
@@ -87,7 +88,7 @@ class KeycloakAdminClient:
 
         openid_configuration = requests.get(
             realm_discovery,
-            timeout=60,
+            timeout=KEYCLOAK_ADMIN_REQUEST_TIMEOUT_SECONDS,
             verify=not self.skip_verify,
         )
         openid_configuration.raise_for_status()
@@ -99,6 +100,9 @@ class KeycloakAdminClient:
             token_endpoint=self.openid_configuration["token_endpoint"],
             scope=settings.KEYCLOAK_ADMIN_CLIENT_SCOPES,
             verify=not self.skip_verify,
+            # requests waits forever by default, and the provisioning functions
+            # hold a row lock across these calls. Covers token fetches too.
+            default_timeout=KEYCLOAK_ADMIN_REQUEST_TIMEOUT_SECONDS,
             # Without this, authlib has no way to renew an expired token (a
             # client_credentials token carries no refresh_token) and raises
             # InvalidTokenError on the next request, which breaks anything that
