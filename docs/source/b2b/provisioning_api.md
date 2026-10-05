@@ -274,6 +274,12 @@ reports what's still pending or has failed. `retry-setup` queues the failed
 parts again. Adding the same courseware twice doesn't create a second run. A
 run that already belongs to another contract is skipped and stays where it is.
 
+Adding a program creates runs for each of its courses. A course with no source
+run to clone (none at all, or none for the contract's variant sets) is skipped,
+and the response's `courses_without_source_run` counts those courses. The rest
+of the program is still added. Adding a single course with no usable source run
+is a 400.
+
 `courseware/remove/` closes the removed runs to new enrollments. A run that
 already has enrolled learners stays linked to the contract so they keep access.
 

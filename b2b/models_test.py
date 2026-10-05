@@ -67,6 +67,34 @@ def test_add_program_courses_to_contract(mocker):
     assert contract.get_course_runs().count() == 4
 
 
+def test_add_program_courses_skips_courses_without_a_usable_source_run(mocker):
+    """Courses with no source run for the contract's variants are counted, not fatal."""
+
+    mocker.patch("openedx.tasks.clone_courserun.delay")
+
+    program = ProgramFactory.create()
+    contract = ContractPageFactory.create()
+    usable = CourseRunFactory.create(
+        is_source_run=True, language="en", is_primary_language=True
+    ).course
+    no_source = CourseRunFactory.create(is_source_run=False, language="en").course
+    french = CourseRunFactory.create(
+        is_source_run=True, language="fr", is_primary_language=True
+    ).course
+    french.possible_variant_sets.update(language="fr")
+
+    for course in (no_source, french, usable):
+        program.add_requirement(course)
+
+    created, no_source_count = contract.add_program_courses(
+        program, filter_variants=list(contract.variant_options.all())
+    )
+
+    assert (created, no_source_count) == (1, 2)
+    assert contract.programs.count() == 1
+    assert [run.course for run in contract.get_course_runs()] == [usable]
+
+
 def test_organization_page_slug_preserved_on_name_change():
     """Test that the slug is not regenerated when only the name changes."""
     org = OrganizationPageFactory.create(name="MIT")
