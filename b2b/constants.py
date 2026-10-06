@@ -42,7 +42,7 @@ ORG_KEY_MAX_LENGTH = 30
 # The holding org/contract that retired course runs get moved into. Runs parked
 # here are hidden from every catalog path because the contract is inactive and
 # has no members, but the CourseRun row survives - which matters, because
-# create_contract_run_key() derives its run index from existing courseware IDs,
+# create_contract_run_key() derives its run index from the existing run rows,
 # so deleting a retired run risks minting a duplicate courseware ID later.
 RETIREMENT_ORG_KEY = "RETIRED"
 RETIREMENT_ORG_NAME = "Retired Runs"
