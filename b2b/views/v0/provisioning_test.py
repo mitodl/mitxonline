@@ -969,6 +969,7 @@ def test_identity_provider_detail_includes_its_saml_attribute_maps(
             "firstName",
             **{"attribute.name": "urn:oid:2.5.4.42"},
         ),
+        _mapper(IDP_PROTOCOL_SAML, "lastName"),
         IdentityProviderMapperRepresentation(
             id=str(FAKE.uuid4()),
             name="hardcoded-role",
