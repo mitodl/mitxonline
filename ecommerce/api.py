@@ -147,6 +147,47 @@ def get_checkout_cancel_url(gateway_type):
     )
 
 
+def _validate_basket_steps_for_b2b(basket, request):
+    """
+    Validate the basket for B2B.
+
+    Only run the B2B validation if necessary - the basket either contains a
+    B2B-only item, or a discount code has been applied for a B2B contract.
+    """
+
+    from b2b.api import validate_basket_for_b2b_purchase  # noqa: PLC0415
+
+    item_qs = basket.basket_items.prefetch_related(
+        "product", "product__purchasable_object"
+    ).all()
+    b2b_only_items = [
+        item for item in item_qs if item.product.purchasable_object.b2b_only
+    ]
+    basket_item_contracts = [item.b2b_contract for item in item_qs if item.b2b_contract]
+
+    if len(b2b_only_items) == 0 and len(basket_item_contracts) == 0:
+        # No item in the cart is b2b-only
+        # No basket lines have contracts attached to them
+        # This is not a B2B-related purchase, so skip further validation
+        return {}
+
+    active_contracts = get_active_contracts_from_basket_items(basket)
+
+    if not is_discount_supplied_for_b2b_purchase(request, active_contracts):
+        return {
+            "invalid_discounts": True,
+            "error": USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
+        }
+
+    if not validate_basket_for_b2b_purchase(request, active_contracts):
+        return {
+            "invalid_discounts": True,
+            "error": USER_MSG_TYPE_B2B_INVALID_BASKET,
+        }
+
+    return {}
+
+
 def generate_checkout_payload(  # noqa: PLR0911, C901
     request, *, skip_discount_check=False, skip_receipt=False, gateway_type=None
 ):
@@ -167,8 +208,6 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
     - skip_receipt: skip sending order receipt email (default False)
     - gateway_type: specify specific gateway type (default None)
     """
-
-    from b2b.api import validate_basket_for_b2b_purchase  # noqa: PLC0415
 
     basket = establish_basket(request)
 
@@ -210,19 +249,10 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
             "error": USER_MSG_TYPE_DISCOUNT_INVALID,
         }
 
-    active_contracts = get_active_contracts_from_basket_items(basket)
+    b2b_validation_result = _validate_basket_steps_for_b2b(basket, request)
 
-    if not is_discount_supplied_for_b2b_purchase(request, active_contracts):
-        return {
-            "invalid_discounts": True,
-            "error": USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
-        }
-
-    if not validate_basket_for_b2b_purchase(request, active_contracts):
-        return {
-            "invalid_discounts": True,
-            "error": USER_MSG_TYPE_B2B_INVALID_BASKET,
-        }
+    if b2b_validation_result:
+        return b2b_validation_result
 
     if not basket.basket_items.count():
         return {
