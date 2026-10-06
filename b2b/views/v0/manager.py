@@ -5,6 +5,7 @@ import uuid
 from dataclasses import dataclass
 from decimal import Decimal
 
+from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
@@ -85,21 +86,38 @@ def clear_assignment_email_deliverability_fields(assignment):
     return assignment
 
 
-def assign_codes_and_send_emails(
+def lock_contract_for_code_assignment(contract: ContractPage) -> None:
+    """
+    Serialize code assignment for a contract until the transaction ends.
+
+    Assigning checks which codes are free and then inserts assignment rows.
+    Locking the candidate discounts would not close that gap, because a
+    concurrent assignment inserts a redemption row and never updates the
+    discount, so Postgres has nothing to re-check. Holding the contract row
+    instead makes the second request wait and then read the first one's rows.
+    Only the contract's own table is locked, not the Wagtail page row.
+    """
+
+    ContractPage.objects.select_for_update(of=("self",)).get(pk=contract.pk)
+
+
+def create_code_assignments(
     assignments: list[CodeAssignment], assigning_user
-) -> bool:
-    # If we're passed an empty list, short circuit and return true
-    # This can happen in bulk_assign if all users in the payload have already
-    # been assigned or redeemed a code for the contract
-    if not assignments:
-        return True
+) -> list[DiscountContractAttachmentRedemption] | None:
+    """
+    Write assignment rows for the given codes.
+
+    Callers hold lock_contract_for_code_assignment for the check that the
+    codes are free through this write, and call queue_code_assignment_emails
+    once that transaction has committed, so the email task never runs ahead
+    of the rows it reads.
+
+    Returns the created rows, or None if they could not be written.
+    """
 
     assignment_records = []
     for assignment in assignments:
         # For bulk_create, we have to set the auto timestamps manually.
-        # We're unlikely to have integrity errors here at the moment - while the APIs do some precondition checking
-        # There aren't any meaningful database constraints that would bite us.
-        # We may need to reevaluate that as the feature set around these records grows.
         now = now_in_utc()
         assignment_record = DiscountContractAttachmentRedemption(
             discount=assignment.discount,
@@ -116,17 +134,29 @@ def assign_codes_and_send_emails(
         assignment.discount.prefetched_redemptions = [assignment_record]
         assignment_records.append(assignment_record)
 
+    if not assignment_records:
+        return assignment_records
+
     try:
-        DiscountContractAttachmentRedemption.objects.bulk_create(assignment_records)
+        # A savepoint, so a failed insert does not abort the caller's transaction.
+        with transaction.atomic():
+            DiscountContractAttachmentRedemption.objects.bulk_create(assignment_records)
     except Exception:
         log.exception("Error creating code assignments")
-        return False
+        return None
 
-    queue_send_enrollment_code_assignment_email.delay(
-        [record.id for record in assignment_records]
-    )
+    return assignment_records
 
-    return True
+
+def queue_code_assignment_emails(
+    assignment_records: list[DiscountContractAttachmentRedemption],
+) -> None:
+    """Queue the invite email for each newly created assignment row."""
+
+    if assignment_records:
+        queue_send_enrollment_code_assignment_email.delay(
+            [record.id for record in assignment_records]
+        )
 
 
 def _create_discount_codes_for_contract(
@@ -165,6 +195,24 @@ def bulk_assign_enrollment_codes(
     Returns (assignments, errors), or None if the assignments could not be
     written.
     """
+
+    with transaction.atomic():
+        lock_contract_for_code_assignment(contract)
+        assignments, errors = _match_free_codes(contract, email_assignees)
+        assignment_records = create_code_assignments(assignments, assigning_user)
+
+    if assignment_records is None:
+        return None
+
+    queue_code_assignment_emails(assignment_records)
+
+    return assignments, errors
+
+
+def _match_free_codes(
+    contract: ContractPage, email_assignees: list[dict]
+) -> tuple[list[CodeAssignment], list[dict]]:
+    """Pair each assignee with a free code. Run under the contract lock."""
 
     # Emails that have already been assigned a code or have redeemed one for
     # this contract should not receive another assignment.
@@ -235,9 +283,6 @@ def bulk_assign_enrollment_codes(
             errors.append(
                 {"email": email, "name": name, "detail": "No available code."}
             )
-
-    if not assign_codes_and_send_emails(assignments, assigning_user):
-        return None
 
     return assignments, errors
 
@@ -616,22 +661,26 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 status=http_status.HTTP_404_NOT_FOUND,
             )
 
-        if discount.contract_redemptions.exists():
-            return Response(
-                {"detail": "Code has already been assigned or redeemed."},
-                status=http_status.HTTP_409_CONFLICT,
-            )
-
         assignment = CodeAssignment(
             code=code, contract=contract, discount=discount, email=email, name=name
         )
 
-        success = assign_codes_and_send_emails([assignment], request.user)
-        if not success:
+        with transaction.atomic():
+            lock_contract_for_code_assignment(contract)
+            if discount.contract_redemptions.exists():
+                return Response(
+                    {"detail": "Code has already been assigned or redeemed."},
+                    status=http_status.HTTP_409_CONFLICT,
+                )
+            assignment_records = create_code_assignments([assignment], request.user)
+
+        if assignment_records is None:
             return Response(
                 {"detail": "Error assigning codes."},
                 status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+        queue_code_assignment_emails(assignment_records)
 
         return Response(
             ManagerEnrollmentCodeSerializer(discount).data,
