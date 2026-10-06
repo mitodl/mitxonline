@@ -2219,7 +2219,7 @@ def test_reused_pending_order_line_takes_the_basket_contract(
 
 
 @pytest.mark.parametrize("line_has_contract", [True, False])
-def test_link_b2b_course_run_contracts(user, line_has_contract):
+def test_link_b2b_course_run_contracts(mocker, user, line_has_contract):
     """
     The verified enrollment for the purchased run should get the line's contract,
     with an audit row recording the change.
@@ -2228,6 +2228,10 @@ def test_link_b2b_course_run_contracts(user, line_has_contract):
     the same run, or the purchaser's enrollment in a different run of the same
     contract - should be left alone.
     """
+
+    mocked_process_add_org_membership = mocker.patch(
+        "b2b.api.process_add_org_membership"
+    )
 
     contract = ContractPageFactory.create()
     run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
@@ -2239,7 +2243,7 @@ def test_link_b2b_course_run_contracts(user, line_has_contract):
         user=user,
         run=run,
         enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-        b2b_contract=None if line_has_contract else contract,
+        b2b_contract=None,
     )
     other_run_enrollment = CourseRunEnrollmentFactory.create(
         user=user, run=other_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
@@ -2259,8 +2263,14 @@ def test_link_b2b_course_run_contracts(user, line_has_contract):
     other_user_enrollment.refresh_from_db()
 
     assert enrollment.b2b_contract == expected_contract
-    audit = CourseRunEnrollmentAudit.objects.get(enrollment=enrollment)
-    assert audit.data_after["b2b_contract"] == getattr(expected_contract, "id", None)
+
+    if line_has_contract:
+        audit = CourseRunEnrollmentAudit.objects.get(enrollment=enrollment)
+        assert audit.data_after["b2b_contract"] == getattr(
+            expected_contract, "id", None
+        )
+        mocked_process_add_org_membership.assert_called()
+
     assert other_run_enrollment.b2b_contract is None
     assert other_user_enrollment.b2b_contract is None
 
@@ -2331,6 +2341,7 @@ def test_fulfill_links_b2b_contract_to_enrollment(
     mocker.patch("openedx.api.enroll_in_edx_course_runs")
     mocker.patch("ecommerce.tasks.send_ecommerce_order_receipt.delay")
     mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
+    mocker.patch("b2b.api.process_add_org_membership")
 
     contract = ContractPageFactory.create()
     other_contract = ContractPageFactory.create()

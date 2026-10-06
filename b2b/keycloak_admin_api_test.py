@@ -12,6 +12,7 @@ import requests
 from b2b.exceptions import KeycloakAdminImproperlyConfiguredError
 from b2b.factories import RealmRepresentationFactory
 from b2b.keycloak_admin_api import (
+    KEYCLOAK_ADMIN_REQUEST_TIMEOUT_SECONDS,
     KeycloakAdminClient,
     KeycloakAdminModel,
     bootstrap_client,
@@ -447,6 +448,7 @@ def test_client_init_oauth_session_configuration(settings, mocker):
         token_endpoint=mocked_openid_config["token_endpoint"],
         scope=settings.KEYCLOAK_ADMIN_CLIENT_SCOPES,
         verify=not client.skip_verify,
+        default_timeout=KEYCLOAK_ADMIN_REQUEST_TIMEOUT_SECONDS,
         grant_type="client_credentials",
     )
 

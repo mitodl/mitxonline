@@ -30,7 +30,6 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework.status import HTTP_404_NOT_FOUND
 
-from b2b.api import process_add_org_membership
 from cms.api import create_default_courseware_page
 from compliance.api import verify_user_with_exports
 from compliance.exceptions import ExportComplianceCheckError, ExportComplianceError
@@ -280,15 +279,6 @@ def create_run_enrollments(  # noqa: C901, PLR0913
             if created:
                 enrollment.save_and_log(None)
 
-            # If the run is associated with a B2B contract, add the contract
-            # to the user's contract list and update their org memberships
-            if run.b2b_contract:
-                process_add_org_membership(
-                    user, run.b2b_contract.organization, keep_until_seen=True
-                )
-                user.b2b_contracts.add(run.b2b_contract)
-                user.save()
-
             if not created:
                 enrollment_mode_changed = mode != enrollment.enrollment_mode
                 enrollment.edx_enrolled = edx_request_success
@@ -425,8 +415,9 @@ def reconcile_verified_program_enrollments(
             raise EnrollmentError
     except ExportComplianceCheckError as exc:
         # Don't propagate the specifics of the compliance decision to the
-        # client - the underlying cause is logged where it's raised.
-        raise EnrollmentError from exc
+        # client - only an opaque support code, if the cause declares one.
+        # The underlying cause is logged where it's raised.
+        raise EnrollmentError.from_cause(exc) from exc
 
 
 def upgrade_audit_run_enrollments_for_program_purchase(user, program):

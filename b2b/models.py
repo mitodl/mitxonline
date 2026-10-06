@@ -465,6 +465,19 @@ class ContractPage(Page, ClusterableModel):
 
         return self.variant_options.filter(default_variant=True).first()
 
+    def active_variant_options(self):
+        """
+        Return the variant sets runs are created and listed for.
+
+        The default set always counts, even if it was turned off in the admin:
+        an empty list here means "every variant the course has" to
+        create_contract_run.
+        """
+
+        return self.variant_options.filter(
+            models.Q(active=True) | models.Q(default_variant=True)
+        )
+
     content_panels = [
         FieldPanel("name"),
         MultiFieldPanel(
@@ -615,7 +628,12 @@ class ContractPage(Page, ClusterableModel):
         return [sv.variant_object for sv in sv_qset.all()]
 
     def get_all_variant_runs(self):
-        """Get runs matching the configured variants for the contract."""
+        """
+        Get runs matching the contract's active variant sets.
+
+        The default set is always included. A deactivated set's runs drop out
+        of the list, but stay in the contract.
+        """
 
         run_qs = self.get_course_runs()
 
@@ -630,7 +648,7 @@ class ContractPage(Page, ClusterableModel):
 
         run_qs_filter = self.default_variant_options.to_q_filter()
 
-        for variant_set in self.variant_options.filter(default_variant=False).all():
+        for variant_set in self.active_variant_options().filter(default_variant=False):
             run_qs_filter = run_qs_filter | variant_set.to_q_filter()
 
         return run_qs.filter(run_qs_filter).all()
