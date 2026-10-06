@@ -268,6 +268,30 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         ).exists()
 
     @property
+    def is_upgradable(self):
+        """
+        Checks if the program can be upgraded.
+        Requires program to be live, a product to exist, and a verified
+        enrollment mode to be available.
+        """
+        if hasattr(self, "prefetched_products"):
+            has_product = bool(self.prefetched_products)
+        else:
+            has_product = self.products.exists()
+
+        if hasattr(self, "prefetched_enrollment_modes"):
+            has_verified_mode = any(
+                mode.mode_slug == EDX_ENROLLMENT_VERIFIED_MODE
+                for mode in self.prefetched_enrollment_modes
+            )
+        else:
+            has_verified_mode = self.enrollment_modes.filter(
+                mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+            ).exists()
+
+        return self.live is True and has_product and has_verified_mode
+
+    @property
     def related_programs_qs(self):
         """
         Returns a list of programs related to this one. Returns a QuerySet.
