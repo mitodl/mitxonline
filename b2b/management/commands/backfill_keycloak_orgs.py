@@ -4,7 +4,8 @@ Push MITx Online organizations that have no Keycloak organization into Keycloak.
 Organizations that predate the provisioning API have no sso_organization_id,
 so attach_user() no-ops for them and they cannot be managed through the staff
 dashboard. This links each one to an existing realm organization with the same
-alias, or creates one. Safe to re-run: linked organizations are skipped.
+alias, or creates one, and adds its existing members to it. Safe to re-run:
+linked organizations are skipped.
 """
 
 import logging
@@ -65,8 +66,11 @@ class Command(BaseCommand):
             realm_id = realm_ids.get(organization.org_key.lower())
 
             if options["dry_run"]:
+                members = organization.organization_users.count()
                 if realm_id is None:
-                    self.stdout.write(f"Would create: {organization.org_key}")
+                    self.stdout.write(
+                        f"Would create: {organization.org_key} ({members} members)"
+                    )
                 elif realm_id in linked_ids:
                     # link_organization_to_keycloak refuses this one.
                     self.stderr.write(
@@ -75,11 +79,13 @@ class Command(BaseCommand):
                     )
                     failed.append(organization.org_key)
                 else:
-                    self.stdout.write(f"Would adopt: {organization.org_key}")
+                    self.stdout.write(
+                        f"Would adopt: {organization.org_key} ({members} members)"
+                    )
                 continue
 
             try:
-                created = link_organization_to_keycloak(
+                created, failed_members = link_organization_to_keycloak(
                     organization, connection=connection
                 )
             except Exception as exc:
@@ -89,11 +95,19 @@ class Command(BaseCommand):
                 failed.append(organization.org_key)
                 self.stderr.write(f"Failed {organization.org_key}: {exc}")
             else:
-                outcome = "Created" if created else "Adopted"
-                self.stdout.write(
-                    self.style.SUCCESS(f"{outcome}: {organization.org_key}")
-                )
+                self._report_link(organization, created, failed_members)
 
         if failed:
             msg = f"{len(failed)} organization(s) failed: {', '.join(failed)}"
             raise CommandError(msg)
+
+    def _report_link(self, organization, created, failed_members):
+        outcome = "Created" if created else "Adopted"
+        self.stdout.write(self.style.SUCCESS(f"{outcome}: {organization.org_key}"))
+        if failed_members:
+            # They keep access through keep_until_seen; see the log.
+            self.stderr.write(
+                f"{len(failed_members)} member(s) of {organization.org_key} "
+                "could not be added to Keycloak: "
+                + ", ".join(str(user.id) for user in failed_members)
+            )

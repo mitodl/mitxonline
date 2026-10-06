@@ -27,6 +27,7 @@ from b2b.contracts import (
     expected_enrollment_code_count,
     expire_unused_enrollment_codes,
 )
+from b2b.management.utils import get_contract_by_id_or_slug
 from b2b.models import ContractPage, DiscountContractAttachmentRedemption
 from courses.models import CourseRun
 from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME, REDEMPTION_TYPE_UNLIMITED
@@ -85,21 +86,13 @@ class Command(BaseCommand):
         org_id = kwargs.pop("organization", False)
         if contract_id:
             self.stdout.write(f"Filtering by contract: {contract_id}")
-            if contract_id.isdecimal():
-                contracts = ContractPage.objects.filter(id=contract_id).all()
-            else:
-                contracts = ContractPage.objects.filter(slug=contract_id).all()
+            contract = get_contract_by_id_or_slug(contract_id)
 
-            if contracts.count() > 1:
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"WARNING: Identifier {contract_id} returned >1 contract!"
-                    )
-                )
-
-            if contracts.count() == 0:
+            if not contract:
                 msg = f"Identifier {contract_id} not found."
                 raise CommandError(msg)
+
+            contracts = ContractPage.objects.filter(id=contract.id)
         elif org_id:
             self.stdout.write(f"Filtering by organization: {org_id}")
             if org_id.isdecimal():

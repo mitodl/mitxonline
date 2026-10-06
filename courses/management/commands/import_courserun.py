@@ -33,11 +33,6 @@ from courses.constants import (
 from courses.models import Program
 from openedx.api import get_edx_api_course_detail_client
 
-try:
-    from b2b.models import ContractPage
-except ImportError:
-    ContractPage = None
-
 INDUSTRY_OPTS = [opt[0] for opt in COURSE_VARIANT_INDUSTRY]
 LENGTH_OPTS = [opt[0] for opt in COURSE_VARIANT_LENGTH]
 LANG_OPTS = [opt[0] for opt in COURSE_VARIANT_LANGUAGE]
@@ -50,7 +45,7 @@ class Command(BaseCommand):
     Creates a courseware object.
     """
 
-    help = "Creates a course run using details from edX. Supports setting catalog/AI flags, CMS page creation options, and B2B contract assignment."
+    help = "Creates a course run using details from edX. Supports setting catalog/AI flags and CMS page creation options."
 
     def add_arguments(self, parser) -> None:
         parser.add_argument(
@@ -151,12 +146,6 @@ class Command(BaseCommand):
         )
 
         parser.add_argument(
-            "--contract",
-            type=str,
-            help="Assign the resulting course run to the specified B2B contract (contract ID or slug).",
-        )
-
-        parser.add_argument(
             "--source-course",
             action="store_true",
             help="Designate the course run(s) to import as source course runs.",
@@ -193,33 +182,7 @@ class Command(BaseCommand):
             help="Customization option: course industry focus.",
         )
 
-    def _resolve_contract(self, contract_identifier):
-        """
-        Resolve a contract by ID or slug.
-
-        Args:
-            contract_identifier (str): Contract ID (numeric) or slug
-
-        Returns:
-            ContractPage or None: The resolved contract or None if not found/not available
-        """
-        if not ContractPage or not contract_identifier:
-            return None
-
-        if contract_identifier.isdigit():
-            try:
-                return ContractPage.objects.get(id=int(contract_identifier))
-            except ContractPage.DoesNotExist:
-                pass
-
-        try:
-            return ContractPage.objects.get(slug=contract_identifier)
-        except ContractPage.DoesNotExist:
-            pass
-
-        return None
-
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: C901, PLR0911, PLR0915, ARG002
+    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: C901, PLR0915, ARG002
         if kwargs.get("publish_cms_page") and kwargs.get("draft_cms_page"):
             self.stderr.write(
                 self.style.ERROR(
@@ -230,17 +193,6 @@ class Command(BaseCommand):
 
         edx_course_detail = get_edx_api_course_detail_client()
         edx_courses = []
-
-        contract = None
-        if kwargs.get("contract"):
-            contract = self._resolve_contract(kwargs.get("contract"))
-            if not contract:
-                self.stdout.write(
-                    self.style.ERROR(
-                        f"Contract '{kwargs.get('contract')}' not found or B2B module not available."
-                    )
-                )
-                return False
 
         price = None
         if kwargs.get("price"):

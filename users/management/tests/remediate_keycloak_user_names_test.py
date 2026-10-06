@@ -52,9 +52,48 @@ def test_mitxonline_users_lookup_query_count_is_flat(django_assert_max_num_queri
         user.legal_address.save()
 
     with django_assert_max_num_queries(3):
-        by_id = COMMAND._mitxonline_users_by_scim_id()  # noqa: SLF001
+        by_id = COMMAND._mitxonline_users_by_scim_id(  # noqa: SLF001
+            [f"kc-{i}" for i in range(5)]
+        )
         for user in by_id.values():
             LearnUserAdapter(user)._resolve_name()  # noqa: SLF001
+
+
+@pytest.mark.django_db
+def test_mitxonline_users_lookup_is_scoped_to_the_page():
+    """Only the users on the current Keycloak page are loaded, so memory is
+    bounded by the page size rather than by every SCIM-linked user
+    """
+    on_page = UserFactory.create(scim_external_id="kc-on-page")
+    UserFactory.create(scim_external_id="kc-elsewhere")
+
+    by_id = COMMAND._mitxonline_users_by_scim_id(["kc-on-page"])  # noqa: SLF001
+
+    assert list(by_id) == ["kc-on-page"]
+    assert by_id["kc-on-page"].id == on_page.id
+
+
+@pytest.mark.django_db
+def test_report_counts_up_to_date_users_without_listing_them(mocker, tmp_path):
+    """Up-to-date users appear only as a count in the report"""
+    user = UserFactory.create(name="Joe Smith", scim_external_id="kc-1")
+    user.legal_address.first_name = "Joe"
+    user.legal_address.last_name = "Smith"
+    user.legal_address.save()
+
+    kc_user = UserRepresentation(
+        id="kc-1",
+        firstName="Joe",
+        lastName="Smith",
+        attributes={"fullName": ["Joe Smith"]},
+    )
+    client = _mock_client(mocker, [[kc_user]])
+    remediate_keycloak_user_names.bootstrap_client.return_value = client
+
+    report = _run(tmp_path, apply=False, limit=None)
+
+    assert report["up_to_date_count"] == 1
+    assert "up_to_date" not in report
 
 
 @pytest.mark.django_db
@@ -297,3 +336,98 @@ def test_paginates_across_multiple_pages(mocker):
     COMMAND.handle(apply=False, limit=None, report_path=None)
 
     assert client.list.call_count == 3  # page1, page2, empty terminator
+
+
+@pytest.mark.django_db
+def test_offset_is_passed_through_to_the_first_page_fetch(mocker):
+    """--offset resumes pagination at that point, rather than from zero"""
+    kc_user = UserRepresentation(id="kc-1", firstName="", lastName="")
+    client = _mock_client(mocker, [[kc_user]])
+    remediate_keycloak_user_names.bootstrap_client.return_value = client
+
+    COMMAND.handle(apply=False, limit=None, report_path=None, offset=200)
+
+    first_call_kwargs = client.list.call_args_list[0].kwargs
+    assert first_call_kwargs["first"] == 200
+
+
+@pytest.mark.django_db
+def test_report_includes_resume_offset_on_a_completed_run(mocker, tmp_path):
+    """The report always carries resume_offset, even when nothing failed -
+    harmless to feed back into --offset, since it just replays the last page
+    """
+    user = UserFactory.create(name="Joe Smith", scim_external_id="kc-1")
+    user.legal_address.first_name = "Joe"
+    user.legal_address.last_name = "Smith"
+    user.legal_address.save()
+
+    kc_user = UserRepresentation(id="kc-1", firstName="", lastName="")
+    client = _mock_client(mocker, [[kc_user]])
+    remediate_keycloak_user_names.bootstrap_client.return_value = client
+
+    report = _run(tmp_path, apply=False, limit=None)
+
+    assert report["resume_offset"] == 0
+
+
+@pytest.mark.django_db
+def test_report_is_written_with_resume_offset_when_a_page_fetch_fails(mocker, tmp_path):
+    """A network failure partway through a run must not lose the report -
+    the error propagates (so the run is visibly non-zero-exit), but the
+    partial results and a resume_offset are still written to disk first
+    """
+    user = UserFactory.create(name="Joe Smith", scim_external_id="kc-page1")
+    user.legal_address.first_name = "Joe"
+    user.legal_address.last_name = "Smith"
+    user.legal_address.save()
+
+    page1 = [UserRepresentation(id="kc-page1", firstName="", lastName="")]
+    client = mocker.Mock()
+    client.list.side_effect = [page1, ConnectionError("boom")]
+    remediate_keycloak_user_names.bootstrap_client.return_value = client
+
+    report_path = tmp_path / "report.json"
+    with pytest.raises(ConnectionError):
+        COMMAND.handle(apply=False, limit=None, report_path=str(report_path))
+
+    report = json.loads(report_path.read_text())
+    assert [row["user_id"] for row in report["would_patch"]] == [user.id]
+    # page1 (offset 0) fully succeeded; the failure was fetching page2, which
+    # never got far enough to be attributed a page_offset of its own - 0 is
+    # conservative (a resumed run replays page1, which is idempotent) rather
+    # than risking a skipped page.
+    assert report["resume_offset"] == 0
+
+
+@pytest.mark.django_db
+def test_report_is_written_with_resume_offset_when_a_patch_fails(mocker, tmp_path):
+    """Same guarantee when the failure is mid-patch (--apply) rather than a
+    page fetch - already-patched users in the report aren't lost
+    """
+    patched_user = UserFactory.create(name="Joe Smith", scim_external_id="kc-0")
+    patched_user.legal_address.first_name = "Joe"
+    patched_user.legal_address.last_name = "Smith"
+    patched_user.legal_address.save()
+    failing_user = UserFactory.create(name="Jane Doe", scim_external_id="kc-1")
+    failing_user.legal_address.first_name = "Jane"
+    failing_user.legal_address.last_name = "Doe"
+    failing_user.legal_address.save()
+
+    kc_users = [
+        UserRepresentation(id="kc-0", firstName="", lastName=""),
+        UserRepresentation(id="kc-1", firstName="", lastName=""),
+    ]
+    client = _mock_client(mocker, [kc_users])
+    client.retrieve.return_value = UserRepresentation(
+        id="kc-0", firstName="Joe", lastName="Smith"
+    )
+    client.save.side_effect = [None, ConnectionError("boom")]
+    remediate_keycloak_user_names.bootstrap_client.return_value = client
+
+    report_path = tmp_path / "report.json"
+    with pytest.raises(ConnectionError):
+        COMMAND.handle(apply=True, limit=None, report_path=str(report_path))
+
+    report = json.loads(report_path.read_text())
+    assert [row["user_id"] for row in report["patched"]] == [patched_user.id]
+    assert report["resume_offset"] == 0

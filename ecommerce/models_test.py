@@ -24,7 +24,11 @@ from courses.factories import (
     ProgramEnrollmentFactory,
     ProgramFactory,
 )
-from courses.models import CourseRunEnrollment, ProgramEnrollment
+from courses.models import (
+    CourseRunEnrollment,
+    CourseRunEnrollmentAudit,
+    ProgramEnrollment,
+)
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
@@ -2187,10 +2191,38 @@ def test_create_from_basket_copies_b2b_contract_to_lines(user):
     )
 
 
+@pytest.mark.parametrize("contract_on_first_attempt", [False, True])
+def test_reused_pending_order_line_takes_the_basket_contract(
+    user, contract_on_first_attempt
+):
+    """A reused pending order's line should get the contract of the current basket item."""
+
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run)
+
+    basket = BasketFactory.create(user=user)
+    item = BasketItem.objects.create(
+        basket=basket,
+        product=product,
+        b2b_contract=contract if contract_on_first_attempt else None,
+    )
+    first_order = PendingOrder.create_from_basket(basket)
+
+    item.b2b_contract = None if contract_on_first_attempt else contract
+    item.save()
+    order = PendingOrder.create_from_basket(basket)
+
+    assert order.id == first_order.id
+    assert order.lines.get().b2b_contract == item.b2b_contract
+
+
 @pytest.mark.parametrize("line_has_contract", [True, False])
 def test_link_b2b_course_run_contracts(user, line_has_contract):
     """
-    The verified enrollment for the purchased run should get the line's contract.
+    The verified enrollment for the purchased run should get the line's contract,
+    with an audit row recording the change.
 
     Enrollments that don't belong to the purchase - another user's enrollment in
     the same run, or the purchaser's enrollment in a different run of the same
@@ -2202,8 +2234,12 @@ def test_link_b2b_course_run_contracts(user, line_has_contract):
     other_run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
     other_user = UserFactory.create()
 
+    expected_contract = contract if line_has_contract else None
     enrollment = CourseRunEnrollmentFactory.create(
-        user=user, run=run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        user=user,
+        run=run,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        b2b_contract=None if line_has_contract else contract,
     )
     other_run_enrollment = CourseRunEnrollmentFactory.create(
         user=user, run=other_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
@@ -2222,9 +2258,25 @@ def test_link_b2b_course_run_contracts(user, line_has_contract):
     other_run_enrollment.refresh_from_db()
     other_user_enrollment.refresh_from_db()
 
-    assert enrollment.b2b_contract == (contract if line_has_contract else None)
+    assert enrollment.b2b_contract == expected_contract
+    audit = CourseRunEnrollmentAudit.objects.get(enrollment=enrollment)
+    assert audit.data_after["b2b_contract"] == getattr(expected_contract, "id", None)
     assert other_run_enrollment.b2b_contract is None
     assert other_user_enrollment.b2b_contract is None
+
+
+def test_link_b2b_course_run_contracts_skips_unchanged_contract(user):
+    """A purchase that doesn't change the enrollment's contract shouldn't add an audit row."""
+
+    run = CourseRunFactory.create()
+    enrollment = CourseRunEnrollmentFactory.create(
+        user=user, run=run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    line = make_purchase(user, run, Decimal("0.00"))
+
+    _link_b2b_course_run_contracts(line)
+
+    assert not CourseRunEnrollmentAudit.objects.filter(enrollment=enrollment).exists()
 
 
 def test_link_b2b_course_run_contracts_ignores_audit_enrollment(user):
