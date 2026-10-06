@@ -4,6 +4,7 @@ from django.conf import settings
 from rest_framework import serializers
 
 from courses import models
+from courses.requirement_tree import validate_requirement_tree
 
 
 def get_thumbnail_url(page):
@@ -38,6 +39,18 @@ class BaseProgramRequirementTreeSerializer(serializers.ListSerializer):
     is expected to be a list of objects in the structure that ProgramRequirement.load_bulk()
     can consume.
     """
+
+    def validate(self, attrs):
+        """Reject a tree that breaks validate_requirement_tree's rules."""
+        program = (
+            self.instance.program
+            if self.instance is not None
+            else self.context["program"]
+        )
+        errors = validate_requirement_tree(attrs, display_mode=program.display_mode)
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
 
     def update(self, instance, validated_data):  # noqa: C901
         """

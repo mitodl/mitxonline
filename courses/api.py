@@ -30,7 +30,6 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework.status import HTTP_404_NOT_FOUND
 
-from b2b.api import process_add_org_membership
 from cms.api import create_default_courseware_page
 from compliance.api import verify_user_with_exports
 from compliance.exceptions import ExportComplianceCheckError, ExportComplianceError
@@ -60,6 +59,7 @@ from courses.models import (
     ProgramRequirement,
     VerifiableCredential,
 )
+from courses.requirement_tree import is_requirement_tree_satisfied
 from courses.serializers.base import get_thumbnail_url
 from courses.tasks import subscribe_edx_course_emails
 from courses.utils import (
@@ -278,15 +278,6 @@ def create_run_enrollments(  # noqa: C901, PLR0913
 
             if created:
                 enrollment.save_and_log(None)
-
-            # If the run is associated with a B2B contract, add the contract
-            # to the user's contract list and update their org memberships
-            if run.b2b_contract:
-                process_add_org_membership(
-                    user, run.b2b_contract.organization, keep_until_seen=True
-                )
-                user.b2b_contracts.add(run.b2b_contract)
-                user.save()
 
             if not created:
                 enrollment_mode_changed = mode != enrollment.enrollment_mode
@@ -1441,16 +1432,17 @@ def override_user_grade(
 
 def _has_earned_program_cert(user, program):
     """
-    Checks if a user has earned all the course certificates required
-    for a given program.
+    Return True if the user has satisfied the program's requirement tree.
+
+    A course counts when the user, actively enrolled in one of its runs, holds an
+    unrevoked certificate for that run or a passing grade in a run that does not
+    offer the verified mode. A required program counts through the user's
+    unrevoked certificate in it when it has a paid enrollment mode, and otherwise
+    when the user satisfies its own tree.
 
     Args:
         user (User): a Django user.
         program (programs.models.Program): program where the user is enrolled.
-
-    Returns:
-        bool: True if a user has earned all the course certificates required
-              for a given program else False
     """
 
     user_courseruns = (
@@ -1475,54 +1467,25 @@ def _has_earned_program_cert(user, program):
         courseruns__grades__user=user,
         courseruns__grades__passed=True,
     )
-    root = ProgramRequirement.get_root_nodes().get(program=program)
+    passed_course_ids = {
+        *cert_courses.values_list("id", flat=True),
+        *grade_courses.values_list("id", flat=True),
+    }
 
-    def _has_earned(node):
-        if node.is_root or node.is_all_of_operator:
-            # has passed all of the child requirements
-            log.debug("node is root or all of, stepping through children")
-            return all(_has_earned(child) for child in node.get_children())
-        elif node.is_min_number_of_operator:
-            # has passed a minimum of the child requirements
-            log.debug(
-                "node is min num, checking children for %s passes", node.operator_value
-            )
-            return len(list(filter(_has_earned, node.get_children()))) >= int(
-                node.operator_value
-            )
-        elif node.is_course:
-            # has passed the referenced course
-            log.debug(
-                "node is course, checking for cert/pass for %s", node.course.readable_id
-            )
-            return node.course in [*cert_courses, *grade_courses]
-        elif node.is_program:
-            # If the program has a verified mode (requires_payment=True), then
-            # check for a certificate. If not, then recurse; if the learner would
-            # have earned a certificate, we should count that.
-            if node.required_program.enrollment_modes.filter(
-                requires_payment=True
-            ).exists():
-                log.debug(
-                    "node is program w/ verified enrollment, checking for cert for %s",
-                    node.required_program.readable_id,
-                )
-                return ProgramCertificate.all_objects.filter(
-                    user=user, program=node.required_program, is_revoked=False
-                ).exists()
+    def _has_earned_required_program(required_program):
+        # A required program with a paid mode counts through its own
+        # certificate; otherwise it counts when the learner would have earned one.
+        if required_program.enrollment_modes.filter(requires_payment=True).exists():
+            return ProgramCertificate.all_objects.filter(
+                user=user, program=required_program, is_revoked=False
+            ).exists()
+        return _has_earned_program_cert(user, required_program)
 
-            log.debug(
-                "node is audit-only program, checking for pass for %s",
-                node.required_program.readable_id,
-            )
-
-            return _has_earned_program_cert(user, node.required_program)
-
-        log.debug("node is weird, returning false")
-
-        return False
-
-    return _has_earned(root)
+    return is_requirement_tree_satisfied(
+        program,
+        course_satisfied=passed_course_ids.__contains__,
+        program_satisfied=_has_earned_required_program,
+    )
 
 
 def generate_program_certificate(user, program, force_create=False):  # noqa: FBT002
@@ -2318,45 +2281,60 @@ def rerun_course_run(  # noqa: PLR0913
     return new_run
 
 
+def get_audit_program_enrollments_for_upgrade():
+    """
+    Return audit program enrollments with what
+    upgrade_program_enrollment_if_eligible reads already loaded: each program's
+    requirement nodes, and those of any program a node requires.
+
+    Returns:
+        QuerySet[ProgramEnrollment]
+    """
+    return (
+        ProgramEnrollment.objects.filter(enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE)
+        .select_related("program", "user")
+        .prefetch("certificate")
+        .prefetch_related(
+            Prefetch(
+                "program__all_requirements",
+                queryset=ProgramRequirement.objects.select_related(
+                    "required_program"
+                ).prefetch_related("required_program__all_requirements"),
+            )
+        )
+    )
+
+
 def upgrade_program_enrollment_if_eligible(program_enrollment):
     """
-    For a given program enrollment checks if learner is qualified for an upgrade
+    Upgrade a program enrollment to verified when the learner holds an active
+    verified enrollment in enough of the program's courses to satisfy its
+    requirement tree.
 
     Returns:
         (ProgramEnrollment, bool): A tuple containing a
         ProgramEnrollment paired
         with a boolean indicating whether the enrollment was upgraded.
     """
-    program = program_enrollment.program
-    user = program_enrollment.user
-
     if program_enrollment.certificate is not None:
         return program_enrollment, False
 
-    requirements_data = program.get_courses_with_requirements_data()
-    program_course_ids = [course.id for course, _ in requirements_data["courses"]]
-    verified_courses = Course.objects.filter(
-        id__in=program_course_ids,
-        courseruns__enrollments__user=user,
-        courseruns__enrollments__enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-        courseruns__enrollments__active=True,
-    ).distinct()
-    verified_course_ids = set(verified_courses.values_list("id", flat=True))
+    verified_course_ids = set(
+        CourseRunEnrollment.objects.filter(
+            user=program_enrollment.user,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        ).values_list("run__course_id", flat=True)
+    )
 
-    # make sure all core courses are verified
-    required_courses = requirements_data["required_courses"]
-    if not all(course.id in verified_course_ids for course in required_courses):
-        return program_enrollment, False
+    def _is_satisfied(program):
+        return is_requirement_tree_satisfied(
+            program,
+            course_satisfied=verified_course_ids.__contains__,
+            program_satisfied=_is_satisfied,
+        )
 
-    nim_elective_num = requirements_data["minimum_elective_requirement"]
-    elective_course_ids = [
-        course.id for course in requirements_data["elective_courses"]
-    ]
-    verified_elective_count = verified_courses.filter(
-        id__in=elective_course_ids
-    ).count()
-
-    if nim_elective_num is not None and verified_elective_count < nim_elective_num:
+    if not _is_satisfied(program_enrollment.program):
         return program_enrollment, False
 
     program_enrollment.enrollment_mode = EDX_ENROLLMENT_VERIFIED_MODE

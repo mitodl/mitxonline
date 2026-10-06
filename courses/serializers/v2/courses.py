@@ -393,16 +393,14 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSeri
     @extend_schema_field(serializers.IntegerField(allow_null=True))
     def get_b2b_organization_id(self, enrollment):
         """Get the B2B organization ID if this enrollment is associated with a B2B contract."""
-        if enrollment.run.b2b_contract:
-            return enrollment.run.b2b_contract.organization.id
+        if enrollment.b2b_contract:
+            return enrollment.b2b_contract.organization_id
         return None
 
     @extend_schema_field(serializers.IntegerField(allow_null=True))
     def get_b2b_contract_id(self, enrollment):
         """Get the B2B contract ID if this enrollment is associated with a B2B contract."""
-        if enrollment.run.b2b_contract:
-            return enrollment.run.b2b_contract.id
-        return None
+        return enrollment.b2b_contract_id
 
     class Meta(BaseCourseRunEnrollmentWithFlexiblePriceSerializer.Meta):
         fields = [

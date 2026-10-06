@@ -9,6 +9,7 @@ from courses.models import (
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
+from courses.requirement_tree import programs_requiring, validate_requirement_tree
 from courses.serializers.v1.programs import ProgramRequirementTreeSerializer
 from courses.widgets import ProgramRequirementsInput
 
@@ -106,155 +107,22 @@ class ProgramAdminForm(ModelForm):
 
         return [_serialize(node) for node in data]
 
-    def clean(self):  # noqa: C901
-        """
-        Verifies that a Program's elective and requirement operators.
-        Ensures that every operator has a Title defined.
-        Ensures that elective operators have a Value defined which
-        is less than or equal to the number of courses which can be
-        applied to the program certificate.
-
-        Raises:
-            ValidationError: operator_value does not exist.
-            ValidationError: operator_value does exist but is empty.
-            ValidationError: operator_value is not equal to or less than the number of courses
-                which can apply towards the program certificate.
-        """
-
-        def _validate_elective_value_presence(operator):
-            """
-            Verifies that a Program's elective operator contains
-            a defined Value field that is not negative.
-
-            Args:
-                operator (dict):
-                {
-                    'children': [],
-                    'id': None,
-                    'data': {
-                        'node_type': 'operator',
-                        'title': 'Only 1 of',
-                        'operator': 'min_number_of',
-                        'operator_value': '1',
-                        'elective_flag': False
-                    }
-                }
-            ValidationError: operator_value does not exist.
-            ValidationError: operator_value does exist but is empty.
-            ValidationError: operator_value is negative.
-            """
-            if (
-                operator["data"]["operator"]
-                == ProgramRequirement.Operator.MIN_NUMBER_OF.value
-            ):
-                # Ensure a Value exists and is defined for elective operators.
-                if "operator_value" not in operator["data"]:
-                    raise ValidationError(
-                        '"Minimum # of" operator must have Value equal to 1 or more.'  # noqa: EM101
-                    )
-                if operator["data"]["operator_value"] == "":
-                    raise ValidationError(
-                        '"Minimum # of" operator must have Value equal to 1 or more.'  # noqa: EM101
-                    )
-                # Ensure the value is not negative
-                try:
-                    value = int(operator["data"]["operator_value"])
-                    if value < 0:
-                        raise ValidationError(
-                            '"Minimum # of" operator must have Value equal to 0 or more.'  # noqa: EM101
-                        )
-                except (ValueError, TypeError):
-                    raise ValidationError(
-                        '"Minimum # of" operator must have a valid numeric Value equal to 0 or more.'  # noqa: EM101
-                    ) from None
-
-        def _validate_operator_title(operator):
-            """Ensure Title is defined for every operator.
-
-            Args:
-                operator (dict):
-                    {
-                        'children': [],
-                        'id': None,
-                        'data': {
-                            'node_type': 'operator',
-                            'title': 'Only 1 of',
-                            'operator': 'min_number_of',
-                            'operator_value': '1',
-                            'elective_flag': False
-                        }
-                    }
-
-            Raises:
-                ValidationError: Operator Title value is empty.
-            """
-            if operator["data"]["title"] == "":
-                raise ValidationError("Operator must have a Title.")  # noqa: EM101
-
-        def _validate_elective_value_and_child_courses(
-            elective_operator_value: int, number_of_applicable_courses_in_operator: int
-        ):
-            """Validate that the elective operations Value is equal to or less
-                    than the total number of course certificates which count
-                    towards satisfying the elective.
-
-            Args:
-                elective_operator_value (int): The Value field of the elective operator.
-                number_of_applicable_courses_in_operator (int): The calculated total number of course
-                    certificates which count towards satisfying the elective.
-
-            Raises:
-                ValidationError: The elective operator's Value is larger than the total number of course
-                    certificates which count towards satisfying the elective.
-            """
-            if elective_operator_value > number_of_applicable_courses_in_operator:
-                raise ValidationError(
-                    '"Minimum # of" operator must have Value equal to or less than the number of elective courses which can apply towards the program certificate.'  # noqa: EM101
-                )
-
-        if "requirements" in self.cleaned_data:
-            for operator in self.cleaned_data["requirements"]:
-                # Ensure Title is defined for every operator.
-                _validate_operator_title(operator)
-
-                if (
-                    operator["data"]["operator"]
-                    == ProgramRequirement.Operator.MIN_NUMBER_OF.value
-                ):
-                    _validate_elective_value_presence(operator)
-
-                    # Ensure the total number of courses that are allowed to apply towards the program
-                    # certificate is equal to or less than the Value field for the elective.
-                    total_child_courses = 0
-                    for child in operator["children"]:
-                        if child["data"]["node_type"] == "operator":
-                            _validate_operator_title(child)
-                            if (
-                                child["data"]["operator"]
-                                == ProgramRequirement.Operator.MIN_NUMBER_OF.value
-                            ):
-                                _validate_elective_value_presence(child)
-                                # Make sure the nested elective stipulation's value is equal to or less than the number
-                                # of child courses associated with it.  We can assume that all children of the nested
-                                # elective stipulation are courses and not operators.
-                                _validate_elective_value_and_child_courses(
-                                    int(child["data"]["operator_value"]),
-                                    len(child["children"]),
-                                )
-                                # The value of the nested elective stipulation defines the number of courses
-                                # within that nested stipulation which are allowed to apply towards a program's
-                                # elective requirement.
-                                total_child_courses += int(
-                                    child["data"]["operator_value"]
-                                )
-                        else:
-                            # Assume the child must be a course.
-                            total_child_courses += 1
-
-                    # Validate the main elective operator using child courses and nested stipulation values.
-                    _validate_elective_value_and_child_courses(
-                        int(operator["data"]["operator_value"]), total_child_courses
-                    )
+    def clean(self):
+        """Reject a requirements tree that breaks validate_requirement_tree's rules."""
+        cleaned_data = super().clean()
+        if "requirements" in cleaned_data:
+            program_id = self.instance.pk
+            errors = validate_requirement_tree(
+                cleaned_data["requirements"],
+                display_mode=cleaned_data.get("display_mode"),
+                program_id=program_id,
+                programs_requiring_this=(
+                    programs_requiring(program_id) if program_id else {}
+                ),
+            )
+            if errors:
+                raise ValidationError(errors)
+        return cleaned_data
 
     def save(self, commit=True):  # noqa: FBT002
         """Save requirements"""

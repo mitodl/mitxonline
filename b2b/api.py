@@ -866,17 +866,26 @@ def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> boo
 def get_active_contracts_from_basket_items(basket: Basket):
     """Get active contracts from basket items"""
     course_run_ct = ContentType.objects.get_for_model(CourseRun)
-
-    items = basket.basket_items.select_related("product__content_type").filter(
-        product__content_type=course_run_ct
-    )
-
+    program_ct = ContentType.objects.get_for_model(Program)
     contract_ids = []
-    for item in items:
+    items = basket.basket_items.select_related("product__content_type")
+
+    for item in items.filter(product__content_type=course_run_ct):
         purchasable = item.product.purchasable_object
         if hasattr(purchasable, "b2b_contracts") and purchasable.b2b_contracts.exists():
             item_contract_ids = purchasable.b2b_contracts.values_list("id", flat=True)
-            contract_ids.extend([contract_id for contract_id in item_contract_ids])  # noqa: C416
+            contract_ids.extend(list(item_contract_ids))
+
+    for item in items.filter(product__content_type=program_ct):
+        purchasable = item.product.purchasable_object
+        if (
+            hasattr(purchasable, "contract_memberships")
+            and purchasable.contract_memberships.exists()
+        ):
+            item_contract_ids = purchasable.contract_memberships.values_list(
+                "contract_id", flat=True
+            )
+            contract_ids.extend(list(item_contract_ids))
 
     if contract_ids:
         return list(ContractPage.objects.filter(id__in=contract_ids, active=True))
@@ -907,6 +916,9 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     basket = establish_basket(request)
     if not basket:
         return False
+
+    if not active_contracts:
+        active_contracts = []
 
     free_contracts, nonfree_contracts = get_free_and_nonfree_contracts(active_contracts)
 
@@ -1527,9 +1539,30 @@ def _validate_b2b_enrollment_prerequisites(  # noqa: PLR0911
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
 
-    if not purchasable_object.enrollable_for_contract(contract):
+    audit_exists = (
+        isinstance(
+            purchasable_object,
+            (
+                CourseRun,
+                Program,
+            ),
+        )
+        and purchasable_object.enrollments.filter(
+            user=user,
+            active=True,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        )
+        .exclude(
+            change_status__in=ALL_ENROLL_CHANGE_STATUSES,
+        )
+        .exists()
+    )
+
+    if (audit_exists and not purchasable_object.is_upgradable) or (
+        not audit_exists and not purchasable_object.enrollable_for_contract(contract)
+    ):
         log.error(
-            "B2B enroll: attempted to use %s but %s is not enrollable for B2B contract %s",
+            "B2B enroll: attempted to use %s but %s is not enrollable/upgradable for B2B contract %s",
             product,
             purchasable_object,
             contract,
@@ -1537,7 +1570,13 @@ def _validate_b2b_enrollment_prerequisites(  # noqa: PLR0911
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
 
     if (
-        isinstance(purchasable_object, CourseRun)
+        isinstance(
+            purchasable_object,
+            (
+                CourseRun,
+                Program,
+            ),
+        )
         and purchasable_object.enrollments.filter(
             user=user,
             active=True,
@@ -1549,10 +1588,10 @@ def _validate_b2b_enrollment_prerequisites(  # noqa: PLR0911
         .exists()
     ):
         log.error(
-            "B2B enroll: attempted to use %s but %s already enrolled in %s",
+            "B2B enroll: attempted to use %s but %s already has verified enrollment in %s",
             product,
             user,
-            CourseRun.courseware_id,
+            purchasable_object,
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED}
 
