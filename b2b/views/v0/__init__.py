@@ -387,10 +387,15 @@ class AttachContractApi(APIView):
             with transaction.atomic():
                 lock_contract_for_code_assignment(contract)
 
-                if code.contract_redemptions.filter(
-                    contract=contract, user=user
-                ).exists():
-                    # A repeat of this request got here first.
+                if (
+                    user.b2b_contracts.filter(pk=contract.pk).exists()
+                    and code.contract_redemptions.filter(
+                        contract=contract, user=user
+                    ).exists()
+                ):
+                    # A repeat of this request got here first. Someone in the
+                    # contract with no row for this code, or with a row but no
+                    # longer in the contract, is redeeming it for real.
                     continue
 
                 # The user's own rows don't count: one code can cover several
