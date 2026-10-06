@@ -270,8 +270,8 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     @property
     def is_upgradable(self):
         """
-        Checks if the course can be upgraded.
-        Requires the run to be live, a product to exist, and a verified
+        Checks if the program can be upgraded.
+        Requires program to be live, a product to exist, and a verified
         enrollment mode to be available.
         """
         if hasattr(self, "prefetched_products"):

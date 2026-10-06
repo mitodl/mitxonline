@@ -1553,7 +1553,6 @@ def _validate_b2b_enrollment_prerequisites(  # noqa: PLR0911
     if (audit_exists and not purchasable_object.is_upgradable) or (
         not audit_exists and not purchasable_object.enrollable_for_contract(contract)
     ):
-        # Active audit enrollment - check for upgrdability
         log.error(
             "B2B enroll: attempted to use %s but %s is not enrollable/upgradable for B2B contract %s",
             product,
@@ -1584,7 +1583,7 @@ def _validate_b2b_enrollment_prerequisites(  # noqa: PLR0911
             "B2B enroll: attempted to use %s but %s already has verified enrollment in %s",
             product,
             user,
-            purchasable_object.courseware_id,
+            purchasable_object,
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED}
 
