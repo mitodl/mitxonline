@@ -934,10 +934,11 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
             product_ids.update(contract.get_products().values_list("pk", flat=True))
 
     # Validate that at least one discount applies to these products, and is
-    # a code for one of these contracts
+    # a code for one of the basket's contracts. That can be a free contract
+    # the user is already in, which check_contracts leaves out.
     if product_ids:
         return basket.discounts.filter(
-            redeemed_discount__b2b_contract__in=check_contracts,
+            redeemed_discount__b2b_contract__in=active_contracts,
             redeemed_discount__products__product__in=product_ids,
         ).exists()
 

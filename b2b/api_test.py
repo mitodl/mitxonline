@@ -443,6 +443,38 @@ def test_ensure_enrollment_codes_clears_extras():
     assert contract.get_discounts().count() == 10
 
 
+def test_b2b_basket_validation_code_for_free_member_contract(user):
+    """
+    On a run shared with a priced contract, a code for the free contract the
+    user belongs to is enough.
+    """
+
+    free_contract = factories.ContractPageFactory.create(enrollment_fixed_price=0)
+    priced_contract = factories.ContractPageFactory.create(enrollment_fixed_price=50)
+    user.b2b_contracts.add(free_contract)
+    run = CourseRunFactory.create(
+        b2b_only=True, b2b_contracts=[free_contract, priced_contract]
+    )
+    product = ProductFactory.create(purchasable_object=run)
+    discount = UnlimitedUseDiscountFactory.create(b2b_contract=free_contract)
+    DiscountProduct.objects.create(discount=discount, product=product)
+
+    basket = create_basket(user, [product])
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=discount,
+        redeemed_basket=basket,
+    )
+
+    assert (
+        validate_basket_for_b2b_purchase(
+            basket, get_active_contracts_from_basket_items(basket)
+        )
+        is True
+    )
+
+
 def test_ensure_enrollment_codes_shared_run():
     """Contracts that share a course run should each get their own codes."""
 

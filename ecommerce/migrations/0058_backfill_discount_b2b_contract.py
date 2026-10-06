@@ -86,9 +86,12 @@ def backfill_discount_contracts(apps, schema_editor):
 
     contract_discounts = defaultdict(list)
     ambiguous = []
+    shared_with = set()
     for discount_id, run_ids in discount_runs.items():
+        candidates = set().union(*(run_contracts[run_id] for run_id in run_ids))
+        shared_with |= candidates if len(candidates) > 1 else set()
         contract_id = _pick_contract(
-            set().union(*(run_contracts[run_id] for run_id in run_ids)),
+            candidates,
             redeemed_for[discount_id],
             {
                 original_contract[run_id]
@@ -106,6 +109,14 @@ def backfill_discount_contracts(apps, schema_editor):
             Discount.objects.filter(
                 pk__in=discount_ids[start : start + UPDATE_BATCH_SIZE]
             ).update(b2b_contract_id=contract_id)
+
+    if shared_with:
+        log.warning(
+            "Contracts %s shared enrollment codes with another contract. Each "
+            "code now belongs to one of them, so run b2b_codes validate for "
+            "these contracts to create the codes the others are missing.",
+            sorted(shared_with),
+        )
 
     if ambiguous:
         log.warning(
