@@ -806,13 +806,18 @@ def get_identity_provider_attribute_maps(identity_provider, *, connection=None):
 
     for mapper in _attribute_importer_mappers(connection, identity_provider.alias):
         config = mapper.config or {}
-        user_attribute = config["user.attribute"]
+        user_attribute = config.get("user.attribute")
         if identity_provider.protocol == IDP_PROTOCOL_OIDC:
-            attribute_map[user_attribute] = config["claim"]
+            source, target = config.get("claim"), attribute_map
         elif config.get("attribute.friendly.name"):
-            attribute_map[user_attribute] = config["attribute.friendly.name"]
+            source, target = config["attribute.friendly.name"], attribute_map
         else:
-            attribute_name_map[user_attribute] = config["attribute.name"]
+            source, target = config.get("attribute.name"), attribute_name_map
+        # A mapper with no user attribute or no source imports nothing, so
+        # there is nothing to report. One edited into that state in the
+        # Keycloak console must not stop the rest from being read.
+        if user_attribute and source:
+            target[user_attribute] = source
 
     return attribute_map, attribute_name_map
 
