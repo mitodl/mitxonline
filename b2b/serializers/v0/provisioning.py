@@ -1,5 +1,6 @@
 """Serializers for the staff-only B2B provisioning API (v0)."""
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import RegexValidator
 from rest_framework import serializers
 
@@ -22,6 +23,7 @@ from b2b.models import (
     OrganizationProvisioningAudit,
 )
 from openedx.constants import COURSE_RUN_CLONE_STATUS_CHOICES
+from variants.models import SupportedVariant
 
 
 class OrganizationOnboardingSerializer(serializers.ModelSerializer):
@@ -534,6 +536,71 @@ class RemovedContractRunSerializer(serializers.Serializer):
     unlinked = serializers.BooleanField(
         help_text="False when the run stays linked because learners are enrolled."
     )
+
+
+class ContractVariantCourseSerializer(serializers.Serializer):
+    """One of the contract's courses that a variant set matches."""
+
+    course_id = serializers.IntegerField(source="course.id")
+    readable_id = serializers.CharField(source="course.readable_id")
+    title = serializers.CharField(source="course.title")
+    has_source_run = serializers.BooleanField(
+        help_text="Whether the course has a source run for this variant to clone."
+    )
+    contract_run = serializers.CharField(
+        source="contract_run.courseware_id",
+        allow_null=True,
+        default=None,
+        help_text="The contract's run for this variant, if it has one.",
+    )
+
+
+class ContractVariantSetSerializer(serializers.Serializer):
+    """
+    One of a contract's variant sets, with the contract's courses it matches.
+
+    A listed course with a source run and no contract run gets a run for this
+    set when its courseware is next added to the contract, if the set is
+    active.
+    """
+
+    id = serializers.IntegerField(source="variant.id")
+    language = serializers.CharField(source="variant.language")
+    variant_length = serializers.CharField(source="variant.variant_length")
+    variant_industry = serializers.CharField(source="variant.variant_industry")
+    default_variant = serializers.BooleanField(source="variant.default_variant")
+    active = serializers.BooleanField(source="variant.active")
+    b2b_only = serializers.BooleanField(source="variant.b2b_only")
+    courses = ContractVariantCourseSerializer(many=True)
+
+
+class CreateContractVariantSetSerializer(serializers.ModelSerializer):
+    """
+    Request body for adding a variant set to a contract.
+
+    The set is never the default: every contract already has one.
+    """
+
+    class Meta:
+        model = SupportedVariant
+        fields = ["language", "variant_length", "variant_industry", "b2b_only"]
+        extra_kwargs = {"language": {"required": True, "allow_blank": False}}
+
+    def validate_language(self, value):
+        """Apply the model's language check, which runs in save() otherwise."""
+
+        try:
+            SupportedVariant(language=value).clean_language()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages) from exc
+        return value
+
+
+class UpdateContractVariantSetSerializer(serializers.Serializer):
+    """Request body for changing a contract's variant set."""
+
+    active = serializers.BooleanField(required=False)
+    b2b_only = serializers.BooleanField(required=False)
 
 
 class ContractRunSetupSerializer(serializers.Serializer):

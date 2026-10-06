@@ -9,23 +9,33 @@ from b2b.constants import (
     CONTRACT_MEMBERSHIP_AUTO,
     CONTRACT_MEMBERSHIP_CODE,
     CONTRACT_MEMBERSHIP_MANAGED,
+    PROVISIONING_ACTION_CONTRACT_VARIANT_ADDED,
+    PROVISIONING_ACTION_CONTRACT_VARIANT_UPDATED,
 )
 from b2b.contracts import (
+    add_contract_variant_set,
     add_courseware_to_contract,
     create_contract,
     ensure_default_variant,
     expected_enrollment_code_count,
     expire_unused_enrollment_codes,
+    get_contract_variant_coverage,
     remove_courseware_from_contract,
+    update_contract_variant_set,
 )
+from b2b.exceptions import ContractVariantError
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
-from b2b.models import DiscountContractAttachmentRedemption
+from b2b.models import (
+    DiscountContractAttachmentRedemption,
+    OrganizationProvisioningAudit,
+)
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     ProgramFactory,
 )
 from users.factories import UserFactory
+from variants.factories import CourseSupportedVariantFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -202,3 +212,180 @@ def test_expire_unused_enrollment_codes(mocker, dry_run):
     assert all(deleted for _, deleted in expired)
     assert redeemed.discount_code not in [code for code, _ in expired]
     assert contract.get_discounts().distinct().count() == (3 if dry_run else 1)
+
+
+def _bilingual_source_course():
+    """Create a course that supports en and fr, with a source run for each."""
+
+    run = _source_run()
+    CourseSupportedVariantFactory.create(
+        variant_object=run.course, language="fr", variant_length="", variant_industry=""
+    )
+    CourseRunFactory.create(course=run.course, is_source_run=True, language="fr")
+    return run.course
+
+
+def test_variant_coverage():
+    """
+    Each set lists the contract's courses that support it, whether each has a
+    source run for it, and the contract's run for it.
+    """
+
+    contract = ContractPageFactory.create()
+    french = add_contract_variant_set(contract, language="fr")
+    german = add_contract_variant_set(contract, language="de")
+    course = _bilingual_source_course()
+    CourseSupportedVariantFactory.create(
+        variant_object=course, language="de", variant_length="", variant_industry=""
+    )
+    add_courseware_to_contract(contract, course)
+    # Not in the contract, so never listed.
+    _bilingual_source_course()
+
+    coverage = get_contract_variant_coverage(contract)
+
+    assert [entry["variant"] for entry in coverage] == [
+        contract.default_variant_options,
+        french,
+        german,
+    ]
+    for entry, language in zip(coverage[:2], ["en", "fr"]):
+        [listed] = entry["courses"]
+        assert listed["course"] == course
+        assert listed["has_source_run"] is True
+        assert listed["contract_run"].language == language
+    [listed] = coverage[2]["courses"]
+    assert listed["has_source_run"] is False
+    assert listed["contract_run"] is None
+
+
+def test_add_variant_set_is_audited():
+    """Adding a set records who added what, against the contract's organization."""
+
+    contract = ContractPageFactory.create()
+    actor = UserFactory.create()
+
+    variant = add_contract_variant_set(
+        contract, language="fr", variant_length="s", b2b_only=True, actor=actor
+    )
+
+    assert variant.default_variant is False
+    assert variant.b2b_only is True
+    audit = OrganizationProvisioningAudit.objects.get()
+    assert audit.organization == contract.organization
+    assert audit.action == PROVISIONING_ACTION_CONTRACT_VARIANT_ADDED
+    assert audit.acting_user == actor
+    assert audit.data_after["contract_id"] == contract.id
+    assert audit.data_after["variant_id"] == variant.id
+
+
+@pytest.mark.parametrize("active", [True, False])
+def test_add_duplicate_variant_set(active):
+    """A set the contract already has can't be added again, active or not."""
+
+    contract = ContractPageFactory.create()
+    existing = add_contract_variant_set(contract, language="fr")
+    if not active:
+        update_contract_variant_set(contract, existing, active=False)
+
+    with pytest.raises(ContractVariantError, match=str(existing.id)) as exc:
+        add_contract_variant_set(contract, language="fr")
+
+    assert ("inactive" in str(exc.value)) is not active
+
+
+@pytest.mark.parametrize(
+    "change", [{"active": False}, {"b2b_only": True}], ids=["deactivate", "b2b_only"]
+)
+def test_default_variant_set_cannot_be_changed(change):
+    """The default set always stays active and open outside B2B."""
+
+    contract = ContractPageFactory.create()
+
+    with pytest.raises(ContractVariantError):
+        update_contract_variant_set(
+            contract, contract.default_variant_options, **change
+        )
+
+    assert not OrganizationProvisioningAudit.objects.exists()
+
+
+def test_deactivated_variant_set():
+    """
+    An inactive set gets no new runs and its runs leave the contract's course
+    list, but stay in the contract.
+    """
+
+    contract = ContractPageFactory.create()
+    french = add_contract_variant_set(contract, language="fr")
+    course = _bilingual_source_course()
+    add_courseware_to_contract(contract, course)
+    actor = UserFactory.create()
+
+    update_contract_variant_set(contract, french, active=False, actor=actor)
+
+    assert set(contract.get_all_variant_runs().values_list("language", flat=True)) == {
+        "en"
+    }
+    assert set(contract.get_course_runs().values_list("language", flat=True)) == {
+        "en",
+        "fr",
+    }
+    audit = OrganizationProvisioningAudit.objects.get(
+        action=PROVISIONING_ACTION_CONTRACT_VARIANT_UPDATED
+    )
+    assert audit.acting_user == actor
+    assert audit.data_before["active"] is True
+    assert audit.data_after["active"] is False
+
+    other_course = _bilingual_source_course()
+    add_courseware_to_contract(contract, other_course)
+
+    assert list(
+        contract.get_course_runs()
+        .filter(course=other_course)
+        .values_list("language", flat=True)
+    ) == ["en"]
+
+
+def test_inactive_default_variant_set_still_filters():
+    """
+    A default set turned off in the admin still limits new runs to it, rather
+    than leaving an empty filter that means every variant the course has.
+    """
+
+    contract = ContractPageFactory.create()
+    default = contract.default_variant_options
+    default.active = False
+    default.save()
+
+    add_courseware_to_contract(contract, _bilingual_source_course())
+
+    assert list(contract.get_course_runs().values_list("language", flat=True)) == ["en"]
+
+
+def test_variant_coverage_reports_newest_contract_run():
+    """With two contract runs for one course and variant, the newer is listed."""
+
+    contract = ContractPageFactory.create()
+    course = _source_run().course
+    add_courseware_to_contract(contract, course)
+    add_courseware_to_contract(contract, course, no_reruns=False)
+    newest = contract.get_course_runs().order_by("-id").first()
+
+    [entry] = get_contract_variant_coverage(contract)
+
+    assert entry["courses"][0]["contract_run"] == newest
+
+
+def test_unchanged_variant_set_update_is_not_audited():
+    """A PATCH that changes nothing leaves no entry in the change history."""
+
+    contract = ContractPageFactory.create()
+    variant = add_contract_variant_set(contract, language="fr")
+
+    update_contract_variant_set(contract, variant, active=True, b2b_only=False)
+
+    assert not OrganizationProvisioningAudit.objects.filter(
+        action=PROVISIONING_ACTION_CONTRACT_VARIANT_UPDATED
+    ).exists()
