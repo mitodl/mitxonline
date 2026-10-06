@@ -237,7 +237,7 @@ def b2b_courses(fake, course_catalog_data):
     course_runs_by_org_id = defaultdict(list)
 
     for org in organizations:
-        org_contracts = ContractPageFactory.create_batch(3)
+        org_contracts = ContractPageFactory.create_batch(3, organization=org)
         contracts_by_org_id[org.id] = org_contracts
         contracts.extend(org_contracts)
 

@@ -33,9 +33,9 @@ class TestCourseRunEnrollmentSerializerV3:
         org = OrganizationPageFactory.create()
         contract = ContractPageFactory.create(organization=org)
 
-        enrollment = CourseRunEnrollmentFactory.create()
-        enrollment.run.b2b_contract = contract
-        enrollment.run.save()
+        enrollment = CourseRunEnrollmentFactory.create(
+            run__b2b_contracts=[contract], b2b_contract=contract
+        )
 
         serialized_data = CourseRunEnrollmentSerializer(enrollment).data
         assert serialized_data["b2b_organization_id"] == org.id

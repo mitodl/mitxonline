@@ -4423,16 +4423,14 @@ paths:
     get:
       operationId: user_enrollments_list_v2
       description: List user enrollments with B2B organization and contract information
-        - API v2. Use ?exclude_b2b=true to filter out enrollments linked to course
-        runs with B2B contracts. Use ?org_id=<id> to filter enrollments by specific
-        B2B organization.
+        - API v2. Use ?exclude_b2b=true to filter out enrollments made through a B2B
+        contract. Use ?org_id=<id> to filter enrollments by specific B2B organization.
       parameters:
       - in: query
         name: exclude_b2b
         schema:
           type: boolean
-        description: Exclude B2B enrollments (enrollments linked to course runs with
-          B2B contracts)
+        description: Exclude B2B enrollments (enrollments made through a B2B contract)
       - in: query
         name: org_id
         schema:
@@ -5016,16 +5014,14 @@ paths:
     get:
       operationId: user_enrollments_list_v3
       description: List user enrollments with B2B organization and contract information
-        - API v3. Use ?exclude_b2b=true to filter out enrollments linked to course
-        runs with B2B contracts. Use ?org_id=<id> to filter enrollments by specific
-        B2B organization.
+        - API v3. Use ?exclude_b2b=true to filter out enrollments made through a B2B
+        contract. Use ?org_id=<id> to filter enrollments by specific B2B organization.
       parameters:
       - in: query
         name: exclude_b2b
         schema:
           type: boolean
-        description: Exclude B2B enrollments (enrollments linked to course runs with
-          B2B contracts)
+        description: Exclude B2B enrollments (enrollments made through a B2B contract)
       - in: query
         name: org_id
         schema:
