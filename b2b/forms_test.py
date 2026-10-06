@@ -155,6 +155,61 @@ def test_contract_draft_toggle_keeps_the_stamp(admin_user, staff_user):
     assert contract.learner_records_opt_in_recorded_on == recorded_on
 
 
+def test_contract_draft_withdrawal_keeps_its_stamp(admin_user, staff_user, user):
+    """
+    A withdrawal saved as a draft differs from the live contract until it is
+    published. Someone else editing another field of that draft must not
+    take over the stamp, because its date starts the credential removal.
+    """
+
+    contract = ContractPageFactory.create()
+    _edit_form(contract, staff_user, learner_records_opt_in="on").save()
+    contract.refresh_from_db()
+
+    withdrawn = _edit_form(contract, admin_user).save(commit=False)
+    withdrawn.save_revision(user=admin_user)
+    contract.refresh_from_db()
+    # Read back from the revision, which stores the time to the millisecond.
+    draft = contract.get_latest_revision_as_object()
+    withdrawn_on = draft.learner_records_opt_in_recorded_on
+
+    edited = _edit_form(draft, user, welcome_message="Hello").save(commit=False)
+    edited.save_revision(user=user).publish()
+
+    contract.refresh_from_db()
+    assert contract.welcome_message == "Hello"
+    assert contract.learner_records_opt_in is False
+    assert contract.learner_records_opt_in_recorded_by == admin_user
+    assert contract.learner_records_opt_in_recorded_on == withdrawn_on
+
+
+def test_contract_alias_is_not_opted_in(admin_user, staff_user):
+    """
+    Wagtail copies every field to an alias, and again whenever the original
+    is published. An alias never carries the opt-in.
+    """
+
+    contract = ContractPageFactory.create()
+    alias = contract.create_alias(update_slug=f"{contract.slug}-alias")
+
+    opted_in = _edit_form(contract, staff_user, learner_records_opt_in="on").save(
+        commit=False
+    )
+    opted_in.save_revision(user=admin_user).publish()
+
+    contract.refresh_from_db()
+    alias.refresh_from_db()
+    assert contract.learner_records_opt_in is True
+    assert alias.learner_records_opt_in is False
+    assert alias.learner_records_opt_in_recorded_on is None
+    assert alias.learner_records_opt_in_recorded_by is None
+
+    late_alias = contract.create_alias(update_slug=f"{contract.slug}-alias-2")
+    late_alias.refresh_from_db()
+    assert late_alias.learner_records_opt_in is False
+    assert late_alias.learner_records_opt_in_recorded_by is None
+
+
 def test_contract_copy_is_not_opted_in(staff_user):
     """A copy is a new contract, so it doesn't inherit the opt-in."""
 
