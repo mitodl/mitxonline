@@ -1,6 +1,7 @@
 """Tests for the B2B Wagtail admin forms."""
 
 import pytest
+from django.urls import reverse
 from wagtail.test.utils.form_data import inline_formset, nested_form_data, rich_text
 
 from b2b.constants import CONTRACT_MEMBERSHIP_MANAGED
@@ -107,3 +108,18 @@ def test_contract_opt_in_stamp_survives_a_revision(admin_user):
     assert contract.learner_records_opt_in is True
     assert contract.learner_records_opt_in_recorded_by == admin_user
     assert contract.learner_records_opt_in_recorded_on is not None
+
+
+def test_contract_edit_page_shows_who_recorded_the_opt_in(admin_client, staff_user):
+    """The stamp is shown read-only beside the opt-in in the Wagtail editor."""
+
+    contract = ContractPageFactory.create()
+    _edit_form(contract, staff_user, learner_records_opt_in="on").save()
+
+    response = admin_client.get(reverse("wagtailadmin_pages:edit", args=[contract.id]))
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert 'name="learner_records_opt_in"' in content
+    assert 'name="learner_records_opt_in_recorded_by"' not in content
+    assert str(staff_user) in content
