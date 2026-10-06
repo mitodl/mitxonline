@@ -236,7 +236,7 @@ def test_create_program_contract_runs_skips_courses_without_a_usable_source_run(
     assert not contract_runs(contract, no_source).exists()
     assert not contract_runs(contract, other_variant).exists()
     assert contract_runs(contract, usable).count() == 1
-    assert mock_log_info.call_args_list[-1].args[-2:] == (1, 2)
+    assert mock_log_info.call_args_list[-1].args[-3:] == (1, 2, 0)
 
 
 def test_create_program_contract_runs_exception_releases_lock(mocker, mocked_lock):
