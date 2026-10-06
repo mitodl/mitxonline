@@ -1165,16 +1165,20 @@ def refresh_identity_provider_metadata(
     connection = connection or KeycloakConnection()
     source = identity_provider.metadata_source
 
+    metadata_url = source if not source.lstrip().startswith("<") else None
+
     config = parse_identity_provider_metadata(
         identity_provider.protocol,
-        metadata_url=source if not source.lstrip().startswith("<") else None,
-        metadata_xml=source if source.lstrip().startswith("<") else None,
+        metadata_url=metadata_url,
+        metadata_xml=source if metadata_url is None else None,
         connection=connection,
     )
 
     keycloak_idp = connection.identity_providers.get(identity_provider.alias)
     payload = keycloak_idp.model_dump(by_alias=True, exclude_none=True)
-    payload["config"] = {**(payload.get("config") or {}), **config}
+    keycloak_config = dict(payload.get("config") or {})
+    _replace_metadata_config(keycloak_config, identity_provider, config, metadata_url)
+    payload["config"] = keycloak_config
     connection.identity_providers.update(identity_provider.alias, payload)
 
     before = identity_provider.metadata_artifact or {}

@@ -153,8 +153,10 @@ users in with no email or name. OIDC takes `discovery_url`, `client_id` and
 Keycloak's `identity-provider/import-config` parses the metadata. The parsed
 config is stored on the `OrganizationIdentityProvider` as `metadata_artifact`,
 along with where it came from. Metadata is only fetched again when someone
-calls `refresh-metadata`. If the partner's endpoint is down, the refresh
-returns 502 and the stored config is left as it was. The OIDC client secret is
+calls `refresh-metadata`. A refresh replaces the parsed config, so a key the
+partner's metadata no longer defines (e.g. a withdrawn certificate or logout
+endpoint) is removed from Keycloak too. If the partner's endpoint is down, the
+refresh returns 502 and the stored config is left as it was. The OIDC client secret is
 sent to Keycloak but never stored in MITx Online.
 
 `parse-metadata` runs the same parse without creating anything, so staff can

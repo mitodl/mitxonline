@@ -612,6 +612,50 @@ def test_refresh_metadata_stores_what_came_back(connection, mocker):
     assert identity_provider.metadata_fetched_at is not None
 
 
+def test_refresh_metadata_drops_keys_the_new_metadata_omits(connection, mocker):
+    """
+    A key the refreshed document no longer defines stops being live in Keycloak.
+
+    The credentials and the lifecycle flags are not metadata and survive.
+    """
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    identity_provider.metadata_artifact = {
+        **PARSED_METADATA,
+        "signingCertificate": "old-certificate",
+    }
+    identity_provider.save()
+
+    refreshed = {"singleSignOnServiceUrl": "https://idp.example.edu/sso2"}
+    mocker.patch(
+        "b2b.provisioning.import_identity_provider_config", return_value=refreshed
+    )
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu",
+        enabled=True,
+        config={
+            **identity_provider.metadata_artifact,
+            "clientId": "mitxonline",
+        },
+    )
+
+    refresh_identity_provider_metadata(identity_provider, connection=connection)
+
+    _, payload = connection.identity_providers.update.call_args.args
+    assert "signingCertificate" not in payload["config"]
+    assert "idpEntityId" not in payload["config"]
+    assert (
+        payload["config"]["singleSignOnServiceUrl"]
+        == refreshed["singleSignOnServiceUrl"]
+    )
+    assert payload["config"]["clientId"] == "mitxonline"
+    assert payload["config"]["metadataDescriptorUrl"] == (
+        identity_provider.metadata_source
+    )
+    assert payload["config"]["useMetadataDescriptorUrl"] == "true"
+    assert payload["enabled"] is True
+
+
 def _oidc_identity_provider(organization, alias="exampleu"):
     return OrganizationIdentityProvider.objects.create(
         organization=organization,
