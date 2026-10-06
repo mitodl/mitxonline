@@ -564,7 +564,7 @@ def test_start_checkout_with_discounts_and_b2b(
     product.refresh_from_db()
 
     if apply_discount:
-        discount = UnlimitedUseDiscountFactory.create(amount=1)
+        discount = UnlimitedUseDiscountFactory.create(amount=1, b2b_contract=contract)
         discount_product = DiscountProduct.objects.create(
             discount=discount, product=product
         )

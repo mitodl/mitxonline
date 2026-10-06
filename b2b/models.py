@@ -674,7 +674,9 @@ class ContractPage(Page, ClusterableModel):
 
         from ecommerce.models import Discount  # noqa: PLC0415
 
-        return Discount.objects.filter(products__product__in=self.get_products())
+        return Discount.objects.filter(
+            b2b_contract=self, products__product__in=self.get_products()
+        )
 
     def get_discounts(self):
         """Get the discounts associated with the contract."""

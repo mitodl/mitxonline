@@ -933,10 +933,12 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
         for contract in check_contracts:
             product_ids.update(contract.get_products().values_list("pk", flat=True))
 
-    # Validate that at least one discount applies to these products
+    # Validate that at least one discount applies to these products, and is
+    # a code for one of these contracts
     if product_ids:
         return basket.discounts.filter(
-            redeemed_discount__products__product__in=product_ids
+            redeemed_discount__b2b_contract__in=check_contracts,
+            redeemed_discount__products__product__in=product_ids,
         ).exists()
 
     return True  # No products to validate means valid
@@ -1029,13 +1031,17 @@ def _get_discount_defaults(discount_amount: Decimal) -> dict:
 
 
 def _create_discount_with_product(
-    product: Product, discount_amount: Decimal, redemption_type: str
+    contract: ContractPage,
+    product: Product,
+    discount_amount: Decimal,
+    redemption_type: str,
 ) -> Discount:
-    """Create a discount and associate it with a product."""
+    """Create a discount for the contract and associate it with a product."""
     defaults = _get_discount_defaults(discount_amount)
     discount = Discount(
         discount_code=uuid4(),
         redemption_type=redemption_type,
+        b2b_contract=contract,
         **defaults,
     )
     discount.save()
@@ -1151,7 +1157,7 @@ def _handle_unlimited_seats(
 
     if len(product_discounts) == 0:
         discount = _create_discount_with_product(
-            product, discount_amount, REDEMPTION_TYPE_UNLIMITED
+            contract, product, discount_amount, REDEMPTION_TYPE_UNLIMITED
         )
         log.info(
             "Contract %s: Created unlimited discount %s for product %s",
@@ -1271,7 +1277,7 @@ def _handle_limited_seats(
 
     for _ in range(create_count):
         discount = _create_discount_with_product(
-            product, discount_amount, REDEMPTION_TYPE_ONE_TIME
+            contract, product, discount_amount, REDEMPTION_TYPE_ONE_TIME
         )
         created += 1
         log.info(
@@ -1333,7 +1339,7 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
             created, updated, errors = _handle_unlimited_seats(
                 contract,
                 product,
-                Discount.objects.filter(products__product=product).distinct(),
+                contract.get_discounts().filter(products__product=product).distinct(),
             )
         else:
             # Limited seats - multiple discounts per product
@@ -1613,7 +1619,11 @@ def _apply_available_discount(
     # so it matches what we send out to people.
     applicable_discounts_qs = (
         product.discounts.annotate(redemptions=Count("discount__order_redemptions"))
-        .filter(discount__is_bulk=True, discount__products__product=product)
+        .filter(
+            discount__is_bulk=True,
+            discount__products__product=product,
+            discount__b2b_contract=contract,
+        )
         .filter(
             Q(redemptions=0) | Q(discount__redemption_type=REDEMPTION_TYPE_UNLIMITED)
         )
@@ -1647,7 +1657,10 @@ def _apply_available_discount(
         log.error("B2B enroll: had to create a discount for %s", product)
 
         discount = _create_discount_with_product(
-            product, discount_amount if discount_amount else Decimal(0), redemption_type
+            contract,
+            product,
+            discount_amount if discount_amount else Decimal(0),
+            redemption_type,
         )
 
     basket_discount = BasketDiscount.objects.create(
