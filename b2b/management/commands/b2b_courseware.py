@@ -12,10 +12,9 @@ from opaque_keys import InvalidKeyError
 
 from b2b.api import import_and_create_contract_run
 from b2b.contracts import add_courseware_to_contract, remove_courseware_from_contract
-from b2b.models import ContractPage
+from b2b.management.utils import get_contract_by_id_or_slug
 from b2b.tasks import queue_enrollment_code_check
 from courses.api import resolve_courseware_object_from_id
-from courses.constants import UAI_COURSEWARE_ID_PREFIX
 
 log = logging.getLogger(__name__)
 
@@ -116,7 +115,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
         )
         add_subparser.add_argument(
             "--prefix",
-            help=f"Organization prefix for the resulting course run. (Defaults to the org setting, or {UAI_COURSEWARE_ID_PREFIX}.)",
+            help="Organization prefix for the resulting course run. (Defaults to the org setting.)",
             type=str,
         )
         add_subparser.add_argument(
@@ -355,10 +354,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
         additional_courseware_ids = kwargs.get("additional_courseware")
         subcommand = kwargs.pop("subcommand")
 
-        if contract_id.isdecimal():
-            contract = ContractPage.objects.filter(id=contract_id).first()
-        else:
-            contract = ContractPage.objects.filter(slug=contract_id).first()
+        contract = get_contract_by_id_or_slug(contract_id)
 
         if not contract:
             msg = f"Contract with ID/slug '{contract_id}' does not exist."

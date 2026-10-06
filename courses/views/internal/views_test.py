@@ -6,13 +6,17 @@ from faker import Faker
 from rest_framework.test import APIClient
 from rest_framework_api_key.models import APIKey
 
+from cms.factories import CoursePageFactory
+from cms.models import CoursePage
 from courses.constants import (
     COURSE_VARIANT_INDUSTRY,
     COURSE_VARIANT_LANGUAGE,
     COURSE_VARIANT_LENGTH,
 )
 from courses.factories import CourseRunFactory
+from courses.models import CoursesTopic
 from courses.permissions import IsEtlUser
+from courses.serializers.utils import get_topics_from_page
 from users.factories import UserFactory
 
 pytestmark = [
@@ -190,3 +194,53 @@ def test_get_ingestible_courses(b2b_courses, use_api_key):
 
     for variant_id in variant_runs:
         assert variant_id in returned_run_ids
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize("page_size", [2, 5, 20])
+def test_ingestible_courses_topics_belong_to_their_own_course(page_size):
+    """
+    Each course in the ETL feed must carry its own topics, at every page size.
+
+    Same defect as the v2 catalog - see
+    courses/views/v2/views_test.py::test_courses_list_topics_belong_to_their_own_course
+    for the mechanism. Both viewsets grew the offending prefetch in the same
+    commit, so both had to lose it.
+    """
+    parent = CoursesTopic.objects.create(name="ETL Parent")
+    pages = []
+    for index in range(4):
+        page = CoursePageFactory.create()
+        page.topics.set(
+            [
+                CoursesTopic.objects.create(
+                    name=f"ETL Topic {index}-{slot}", parent=parent
+                )
+                for slot in range(index % 3)
+            ]
+        )
+        page.save()
+        pages.append(page)
+
+    api_client = APIClient()
+    api_client.force_authenticate(UserFactory.create(is_etl=True))
+
+    rows = {}
+    page_number = 1
+    while True:
+        resp = api_client.get(
+            reverse("internal_ingestible_courses-list"),
+            {"page_size": page_size, "page": page_number},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        rows.update({row["id"]: row["topics"] for row in body["results"]})
+        if not body.get("next"):
+            break
+        page_number += 1
+
+    for page in pages:
+        expected = CoursePage.objects.prefetch_related("topics__parent__parent").get(
+            pk=page.pk
+        )
+        assert rows[page.course_id] == get_topics_from_page(expected)

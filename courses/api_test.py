@@ -7,7 +7,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
 from urllib.parse import quote
-from uuid import UUID
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 import factory
@@ -104,7 +104,13 @@ from courses.models import (
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
-from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
+from ecommerce.factories import (
+    DiscountFactory,
+    DiscountRedemptionFactory,
+    LineFactory,
+    OrderFactory,
+    ProductFactory,
+)
 from ecommerce.models import Basket, OrderStatus
 from main import features
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
@@ -890,13 +896,25 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         )
 
     @staticmethod
-    def _paid_course_run(user, run, *, total_price_paid):
-        """Create a fulfilled PaidCourseRun for run/user at the given amount."""
+    def _paid_course_run(user, run, *, total_price_paid, discount_code=None):
+        """
+        Create a fulfilled PaidCourseRun for run/user at the given amount.
+
+        If discount_code is given, the order redeems a Discount with that
+        code (used to simulate program-linked vs. unrelated $0 orders).
+        """
         order = OrderFactory.create(
             purchaser=user,
             state=OrderStatus.FULFILLED,
             total_price_paid=total_price_paid,
         )
+        if discount_code is not None:
+            discount = DiscountFactory.create(discount_code=discount_code)
+            DiscountRedemptionFactory.create(
+                redeemed_by=user,
+                redeemed_discount=discount,
+                redeemed_order=order,
+            )
         return PaidCourseRun.objects.create(user=user, course_run=run, order=order)
 
     def test_downgrades_verified_program_enrollment(self, mocker, program_setup):
@@ -913,6 +931,11 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
             program_setup.program_enrollment.enrollment_mode
             == EDX_ENROLLMENT_AUDIT_MODE
         )
+        assert (
+            program_setup.program_enrollment.change_status
+            == ENROLL_CHANGE_STATUS_REFUNDED
+        )
+        assert program_setup.program_enrollment.active is True
 
     def test_downgrades_auto_upgraded_run_enrollment(self, mocker, program_setup):
         """
@@ -935,11 +958,14 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         assert downgraded_runs == [run_enrollment]
         run_enrollment.refresh_from_db()
         assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        assert run_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
+        assert run_enrollment.active is True
 
     def test_downgrades_zero_value_verified_run_enrollment(self, mocker, program_setup):
         """
         A course-run enrollment backed by a PaidCourseRun whose order was
-        fulfilled at $0 (create_verified_program_course_run_enrollment's
+        fulfilled at $0 by redeeming *this program's* internal enrollment-code
+        discount (create_verified_program_course_run_enrollment's
         program-linked checkout) is still downgraded - a PaidCourseRun
         existing is not, by itself, proof of an independent purchase.
         """
@@ -950,7 +976,10 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
             active=True,
         )
         self._paid_course_run(
-            program_setup.user, program_setup.run, total_price_paid=Decimal("0.00")
+            program_setup.user,
+            program_setup.run,
+            total_price_paid=Decimal("0.00"),
+            discount_code=f"{program_setup.program.readable_id}-{uuid4()}",
         )
         mocker.patch("courses.api.enroll_in_edx_course_runs")
         mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
@@ -962,6 +991,8 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         assert downgraded_runs == [run_enrollment]
         run_enrollment.refresh_from_db()
         assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        assert run_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
+        assert run_enrollment.active is True
 
     def test_preserves_independently_purchased_run_enrollment(
         self, mocker, program_setup
@@ -978,6 +1009,39 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         )
         self._paid_course_run(
             program_setup.user, program_setup.run, total_price_paid=Decimal("100.00")
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        _, downgraded_runs = downgrade_program_enrollment_and_verified_runs(
+            program_setup.user, program_setup.program
+        )
+
+        assert downgraded_runs == []
+        run_enrollment.refresh_from_db()
+        assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        assert run_enrollment.change_status is None
+
+    def test_preserves_zero_value_run_enrollment_with_unrelated_discount(
+        self, mocker, program_setup
+    ):
+        """
+        A course-run enrollment backed by a PaidCourseRun whose order was
+        fulfilled at $0 by redeeming some other discount (not this program's
+        internal enrollment code) is left verified - it wasn't upgraded
+        because of this program purchase, so it shouldn't be downgraded
+        because of this program's refund.
+        """
+        run_enrollment = CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        self._paid_course_run(
+            program_setup.user,
+            program_setup.run,
+            total_price_paid=Decimal("0.00"),
+            discount_code="UNRELATED-FLEXIBLE-PRICING-DISCOUNT",
         )
         mocker.patch("courses.api.enroll_in_edx_course_runs")
 
@@ -1009,6 +1073,7 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         assert downgraded_runs == []
         run_enrollment.refresh_from_db()
         assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        assert run_enrollment.change_status is None
 
     def test_leaves_inactive_program_enrollment_alone(self, mocker, program_setup):
         """
@@ -1031,6 +1096,10 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
             program_setup.program_enrollment.enrollment_mode
             == EDX_ENROLLMENT_VERIFIED_MODE
         )
+        assert (
+            program_setup.program_enrollment.change_status
+            == ENROLL_CHANGE_STATUS_UNENROLLED
+        )
 
     def test_leaves_inactive_run_enrollment_alone(self, mocker, program_setup):
         """
@@ -1052,6 +1121,7 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         assert downgraded_runs == []
         run_enrollment.refresh_from_db()
         assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        assert run_enrollment.change_status is None
 
     def test_mixed_runs_downgrades_only_the_unpaid_ones(
         self,
@@ -1094,7 +1164,12 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
             active=True,
         )
         self._paid_course_run(user, paid_run, total_price_paid=Decimal("100.00"))
-        self._paid_course_run(user, zero_value_run, total_price_paid=Decimal("0.00"))
+        self._paid_course_run(
+            user,
+            zero_value_run,
+            total_price_paid=Decimal("0.00"),
+            discount_code=f"{program.readable_id}-{uuid4()}",
+        )
         mocker.patch("courses.api.enroll_in_edx_course_runs")
         mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
 
@@ -1112,6 +1187,9 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         assert paid_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
         assert free_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
         assert zero_value_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        assert paid_enrollment.change_status is None
+        assert free_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
+        assert zero_value_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
 
 
 def test_create_run_enrollments_verifies_exports_for_verified_mode(

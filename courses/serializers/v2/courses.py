@@ -255,6 +255,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
             "products",
             "approved_flexible_price_exists",
             "b2b_contract",
+            "b2b_only",
         ]
 
     def to_representation(self, instance):

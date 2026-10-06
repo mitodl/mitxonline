@@ -1,12 +1,14 @@
 import { AuthProvider } from "@refinedev/core";
 import axios from "axios";
 
+import { mitxOnlineUrl } from "utils";
+
 export const PROFILE_KEY = "mitx-online-staff-profile";
 
 // A full-page navigation to MITx Online's logout view.
 export const logOutOfMitxOnline = () => {
   localStorage.removeItem(PROFILE_KEY);
-  window.location.href = (new URL(DATASOURCES_CONFIG.mitxOnline)).origin + "/logout/";
+  window.location.href = mitxOnlineUrl("/logout/");
 };
 
 export function useAuthProvider(): AuthProvider {

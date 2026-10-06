@@ -290,7 +290,7 @@ class BaseOrderAdmin(TimestampedModelAdmin):
         "purchaser__username",
         "reference_number",
     ]
-    list_display = ["id", "state", "get_purchaser", "total_price_paid"]
+    list_display = ["id", "state", "gateway_type", "get_purchaser", "total_price_paid"]
     list_fields = ["state"]
     list_filter = ["state"]
     inlines = [OrderLineInline, OrderDiscountInline, OrderTransactionInline]
@@ -330,7 +330,14 @@ class FlowOrderAdmin(fsm.FlowAdminMixin, BaseOrderAdmin):
 class OrderAdmin(BaseOrderAdmin):
     """Admin for Order"""
 
-    list_display = ["id", "state", "purchaser", "total_price_paid", "reference_number"]
+    list_display = [
+        "id",
+        "state",
+        "gateway_type",
+        "purchaser",
+        "total_price_paid",
+        "reference_number",
+    ]
     model = Order
 
 

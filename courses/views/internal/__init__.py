@@ -9,7 +9,6 @@ from rest_framework_api_key.permissions import HasAPIKey
 from courses.models import (
     Course,
     CourseRun,
-    CoursesTopic,
     Program,
 )
 from courses.permissions import IsEtlUser
@@ -77,17 +76,21 @@ class IngestibleCourseViewSet(viewsets.ReadOnlyModelViewSet):
         )
         # Topics are serialized per course along with their parent topics, whose
         # sort key is CoursesTopic.Meta.ordering == ["parent__name", "name"] -
-        # hence select_related down to the grandparent.
-        topics_prefetch = Prefetch(
-            "page__topics",
-            queryset=CoursesTopic.objects.select_related("parent", "parent__parent"),
-        )
+        # hence walking up to the grandparent.
+        #
+        # Plain lookups for the same reason as CourseViewSet.get_queryset - a
+        # Prefetch with any queryset= on this ParentalManyToManyField hands
+        # every page one shared QuerySet object, so the last page in the batch
+        # decides what every page carries. See the comment there for the
+        # mechanism.
         queryset = queryset.prefetch_related(
             "departments",
             "in_programs",
             course_runs_prefetch,
             dated_runs_prefetch,
-            topics_prefetch,
+            # Prefetches "page__topics" on its way to the parent chain, so the
+            # shorter lookup does not need listing as well.
+            "page__topics__parent__parent",
             # CoursePageSerializer.get_instructors walks this for every course.
             "page__linked_instructors__linked_instructor_page",
             # Serialized by CourseSerializer.possible_variant_sets. Unfiltered,

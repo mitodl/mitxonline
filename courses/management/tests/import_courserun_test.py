@@ -6,7 +6,6 @@ from unittest.mock import Mock
 import pytest
 from django.core.management import call_command
 
-from b2b.factories import ContractPageFactory
 from courses.factories import (
     CourseFactory,
     DepartmentFactory,
@@ -110,46 +109,6 @@ class TestImportCourserunCommand:
             assert result is False
         else:
             assert result is None
-
-    def test_resolve_contract_by_id(self):
-        """Test resolving contract by numeric ID"""
-        contract = ContractPageFactory.create()
-        command = import_courserun.Command()
-
-        resolved = command._resolve_contract(str(contract.id))  # noqa: SLF001
-        assert resolved == contract
-
-    def test_resolve_contract_by_slug(self):
-        """Test resolving contract by slug"""
-        contract = ContractPageFactory.create()
-        command = import_courserun.Command()
-
-        resolved = command._resolve_contract(contract.slug)  # noqa: SLF001
-        assert resolved == contract
-
-    def test_resolve_contract_not_found(self):
-        """Test handling of non-existent contract"""
-        command = import_courserun.Command()
-
-        resolved = command._resolve_contract("nonexistent")  # noqa: SLF001
-        assert resolved is None
-
-    def test_resolve_contract_none_identifier(self):
-        """Test resolving contract with None identifier"""
-        command = import_courserun.Command()
-        resolved = command._resolve_contract(None)  # noqa: SLF001
-        assert resolved is None
-
-    def test_contract_validation_failure(self, mocker):
-        """Test handling of invalid contract"""
-        # Mock the API client to prevent it from being initialized
-        mocker.patch(
-            "courses.management.commands.import_courserun.get_edx_api_course_detail_client"
-        )
-
-        command = import_courserun.Command()
-        result = command.handle(contract="nonexistent-contract")
-        assert result is False
 
     def test_use_specific_course_flag_passed_to_api(
         self, mocker, mock_edx_api_client, mock_edx_course_detail

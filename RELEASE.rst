@@ -1,6 +1,40 @@
 Release Notes
 =============
 
+Version 1.169.8
+---------------
+
+- Add a hookimpl for Stripe refund events (#4051)
+- Run hooks with prek and autofix.ci (#4063)
+- Update actions/setup-node action to v6.5.0 (#4035)
+- Updates to Refunds of Program Entitlements (#4053)
+- Add verifiable_credential_description, feature flag, and FieldPanel (#4027)
+
+Version 1.169.7
+---------------
+
+- Avoid recreating duplicate line items in hubspot (#4041)
+- Add "Manufacturing" to industry focus variant choices (#4060)
+
+Version 1.169.6
+---------------
+
+- Update postcss, @babel/core and webpack-dev-server for security fixes (#4030)
+- Update actions/setup-python digest to ece7cb0 (#4033)
+- Update actions/checkout digest to d23441a (#4032)
+- Update actions/cache digest to caa2961 (#4031)
+- Add a command to backfill Keycloak orgs for unlinked organizations (#4057)
+- Add the B2B provisioning API reference doc (#3922)
+- Change refund status on enrollment refunds (#4026)
+- Fix incorrect course topics caused by a ParentalManyToMany prefetch (#4050)
+- Add a B2B organizations section to the staff dashboard (staff UI 4/4) (#3997)
+
+Version 1.169.4
+---------------
+
+- Enrolling users should skip repair user if it is already synced (#4045)
+- Return the user's data sharing consent on their B2B contracts (#4039)
+
 Version 1.169.3
 ---------------
 

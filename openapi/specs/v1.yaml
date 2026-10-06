@@ -4290,6 +4290,7 @@ paths:
           - E
           - F
           - HC
+          - M
         description: |-
           Variant: Describes the industry the run is adapted for.
 
@@ -4297,6 +4298,7 @@ paths:
           * `E` - Energy
           * `F` - Finance
           * `HC` - Healthcare
+          * `M` - Manufacturing
       - in: query
         name: courseruns__variant_length
         schema:
@@ -5487,6 +5489,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -6915,6 +6918,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -6941,6 +6945,9 @@ components:
         b2b_contract:
           type: integer
           nullable: true
+        b2b_only:
+          type: boolean
+          description: Indicates if the course run is B2B only
       required:
       - approved_flexible_price_exists
       - course_id
@@ -7117,6 +7124,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -7296,6 +7304,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -7700,9 +7709,11 @@ components:
         org_key:
           type: string
           minLength: 1
+          pattern: ^[A-Za-z0-9_.\-]+$
           maxLength: 30
         org_key_prefix:
           type: string
+          pattern: ^[A-Za-z0-9_.\-]+$
           maxLength: 30
         domains:
           type: array
@@ -10891,7 +10902,8 @@ components:
         org_key_prefix:
           type: string
           readOnly: true
-          description: The prefix to append to the org key (defaults to UAI_).
+          description: Prepended to the org key in courseware IDs, e.g. UAI_. Blank
+            means no prefix.
         description:
           type: string
           readOnly: true
@@ -11386,6 +11398,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -12280,6 +12293,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -12480,6 +12494,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -12654,6 +12669,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -13205,6 +13221,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -13231,6 +13248,9 @@ components:
         b2b_contract:
           type: integer
           nullable: true
+        b2b_only:
+          type: boolean
+          description: Indicates if the course run is B2B only
         course:
           allOf:
           - $ref: '#/components/schemas/V2Course'
@@ -13380,6 +13400,7 @@ components:
             * `E` - Energy
             * `F` - Finance
             * `HC` - Healthcare
+            * `M` - Manufacturing
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -13395,6 +13416,9 @@ components:
         b2b_contract:
           type: integer
           nullable: true
+        b2b_only:
+          type: boolean
+          description: Indicates if the course run is B2B only
       required:
       - courseware_id
       - run_tag
@@ -14109,16 +14133,19 @@ components:
       - E
       - F
       - HC
+      - M
       type: string
       description: |-
         * `` - Original
         * `E` - Energy
         * `F` - Finance
         * `HC` - Healthcare
+        * `M` - Manufacturing
       x-enum-descriptions:
       - Energy
       - Finance
       - Healthcare
+      - Manufacturing
     VariantLengthEnum:
       enum:
       - S

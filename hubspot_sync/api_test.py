@@ -595,9 +595,8 @@ def test_sync_deal_with_hubspot_targeted_updates_when_found_by_unique_app_id(
     mock_ensure_contact = mocker.patch(
         "hubspot_sync.api._ensure_hubspot_contact_for_user", return_value="contact-123"
     )
-    mock_ensure_line_item = mocker.patch(
-        "hubspot_sync.api._ensure_target_line_item_for_line",
-        return_value="line-item-123",
+    mock_upsert_line_item = mocker.patch(
+        "hubspot_sync.api._upsert_target_deal_line_item"
     )
     mocker.patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
 
@@ -625,27 +624,16 @@ def test_sync_deal_with_hubspot_targeted_updates_when_found_by_unique_app_id(
     mock_ensure_contact.assert_called_once_with(
         hubspot_order.purchaser, mock_client_instance, skip_certificates=False
     )
-    mock_ensure_line_item.assert_called_once_with(
-        hubspot_order.lines.first(), mock_client_instance
+    mock_upsert_line_item.assert_called_once_with(
+        hubspot_order.lines.first(), existing_deal_id, mock_client_instance
     )
 
-    # Verify associations were created (deal-contact and line-deal)
-    expected_association_calls = [
-        mocker.call(
-            from_object_type=api.HubspotObjectType.DEALS.value,
-            from_object_id=result.id,
-            to_object_type=api.HubspotObjectType.CONTACTS.value,
-            to_object_id="contact-123",
-        ),
-        mocker.call(
-            from_object_type=api.HubspotObjectType.LINES.value,
-            from_object_id="line-item-123",
-            to_object_type=api.HubspotObjectType.DEALS.value,
-            to_object_id=result.id,
-        ),
-    ]
-    mock_client_instance.crm.associations.v4.basic_api.create_default.assert_has_calls(
-        expected_association_calls, any_order=True
+    # Verify the deal-contact association was created
+    mock_client_instance.crm.associations.v4.basic_api.create_default.assert_called_once_with(
+        from_object_type=api.HubspotObjectType.DEALS.value,
+        from_object_id=result.id,
+        to_object_type=api.HubspotObjectType.CONTACTS.value,
+        to_object_id="contact-123",
     )
 
 
@@ -1156,6 +1144,131 @@ def test_sync_cart_add_deal_with_hubspot_normalizes_stage_after_override(
     )
 
 
+@pytest.mark.parametrize(
+    ("existing_deal_id", "existing_line_item_id"),
+    [
+        (None, None),
+        ("existing-deal-id", None),
+        ("existing-deal-id", "existing-line-item-id"),
+    ],
+)
+def test_sync_cart_add_deal_with_hubspot_reuses_deal_line_item(
+    mocker, hubspot_order, existing_deal_id, existing_line_item_id
+):
+    """Cart-add should update the deal's line item for the product instead of adding another."""
+    mock_client = mocker.Mock()
+    mock_client.crm.objects.basic_api.create.return_value = SimpleNamespace(id="obj-id")
+    mock_client.crm.objects.basic_api.update.return_value = SimpleNamespace(
+        id="existing-deal-id"
+    )
+
+    mocker.patch(
+        "hubspot_sync.api._build_target_deal_message",
+        return_value=SimplePublicObjectInput(
+            properties={
+                "dealname": "MITXONLINE-ORDER-1",
+                "dealstage": "checkout_pending",
+                "unique_app_id": "test-app-id",
+            }
+        ),
+    )
+    mocker.patch(
+        "hubspot_sync.api._build_target_line_item_message",
+        return_value=SimplePublicObjectInput(
+            properties={"name": "line-item", "hs_product_id": "target-product-id"}
+        ),
+    )
+    mocker.patch(
+        "hubspot_sync.api._find_target_deal_id_by_dealname",
+        return_value=existing_deal_id,
+    )
+    mocker.patch(
+        "hubspot_sync.api._find_target_deal_id_by_unique_app_id", return_value=None
+    )
+    mocker.patch(
+        "hubspot_sync.api._ensure_target_hubspot_product_for_line", return_value=None
+    )
+    mocker.patch("hubspot_sync.api._normalize_deal_properties_for_target_account")
+    mocker.patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
+    mock_find_line_item = mocker.patch(
+        "hubspot_sync.api._find_target_deal_line_item_id_by_product",
+        return_value=existing_line_item_id,
+    )
+
+    api._sync_cart_add_deal_with_hubspot(hubspot_order, "contact-id", mock_client)  # noqa: SLF001
+
+    # The deal's line items are always checked, using the newly created
+    # deal's id ("obj-id") when no existing deal was found
+    mock_find_line_item.assert_called_once_with(
+        mock_client, existing_deal_id or "obj-id", "target-product-id"
+    )
+
+    basic_api = mock_client.crm.objects.basic_api
+    line_item_creates = [
+        call
+        for call in basic_api.create.call_args_list
+        if call.kwargs["object_type"] == "line_items"
+    ]
+    line_item_updates = [
+        call
+        for call in basic_api.update.call_args_list
+        if call.kwargs["object_type"] == "line_items"
+    ]
+    line_item_associations = [
+        call
+        for call in mock_client.crm.associations.v4.basic_api.create_default.call_args_list
+        if call.kwargs["from_object_type"] == "line_items"
+    ]
+
+    if existing_line_item_id:
+        assert line_item_creates == []
+        assert line_item_associations == []
+        assert len(line_item_updates) == 1
+        assert line_item_updates[0].kwargs["object_id"] == existing_line_item_id
+    else:
+        assert line_item_updates == []
+        assert len(line_item_creates) == 1
+        assert len(line_item_associations) == 1
+
+
+@pytest.mark.parametrize(
+    ("hs_product_id", "expected_id"),
+    [
+        ("product-b", "line-item-b"),
+        ("product-c", None),
+    ],
+)
+def test_find_target_deal_line_item_id_by_product(mocker, hs_product_id, expected_id):
+    """The deal's line item should be matched by product, ignoring any local ids."""
+    mocker.patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
+    mock_client = mocker.Mock()
+    mock_client.crm.associations.v4.basic_api.get_page.return_value = SimpleNamespace(
+        results=[
+            SimpleNamespace(to_object_id="line-item-a"),
+            SimpleNamespace(to_object_id="line-item-b"),
+        ]
+    )
+    line_item_products = {"line-item-a": "product-a", "line-item-b": "product-b"}
+    mock_client.crm.objects.basic_api.get_by_id.side_effect = (
+        lambda object_type, object_id, properties: SimpleNamespace(  # noqa: ARG005
+            id=object_id,
+            properties={"hs_product_id": line_item_products[object_id]},
+        )
+    )
+
+    assert (
+        api._find_target_deal_line_item_id_by_product(  # noqa: SLF001
+            mock_client, "deal-id", hs_product_id
+        )
+        == expected_id
+    )
+    mock_client.crm.associations.v4.basic_api.get_page.assert_called_once_with(
+        object_type="deals",
+        object_id="deal-id",
+        to_object_type="line_items",
+    )
+
+
 def test_normalize_deal_properties_for_target_account_pipeline_stage_mismatch(mocker):
     """Dealstage should be normalized to one allowed by the selected pipeline."""
     mock_client = mocker.Mock()
@@ -1354,6 +1467,47 @@ def test_ensure_target_hubspot_product_for_line_creates_when_missing(
 
     assert result == "created-product-999"
     mock_client.crm.objects.basic_api.create.assert_called_once()
+
+
+def test_ensure_target_line_item_for_line_creates_when_missing(mocker, hubspot_order):
+    """A new HubSpot line item should be created when none exists yet."""
+    line = hubspot_order.lines.first()
+    mock_client = mocker.Mock()
+    mock_client.crm.objects.basic_api.create.return_value = SimpleNamespace(
+        id="new-line-item-123"
+    )
+
+    mocker.patch("hubspot_sync.api._build_target_line_item_message")
+    mocker.patch(
+        "hubspot_sync.api._find_target_line_item_id_by_unique_app_id", return_value=None
+    )
+    mocker.patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
+
+    result = api._ensure_target_line_item_for_line(line, mock_client)  # noqa: SLF001
+
+    assert result == "new-line-item-123"
+    mock_client.crm.objects.basic_api.create.assert_called_once()
+    mock_client.crm.objects.basic_api.update.assert_not_called()
+
+
+def test_ensure_target_line_item_for_line_updates_existing(mocker, hubspot_order):
+    """An existing HubSpot line item should be updated with current enrollment data."""
+    line = hubspot_order.lines.first()
+    mock_client = mocker.Mock()
+    existing_id = "existing-line-item-456"
+
+    mocker.patch("hubspot_sync.api._build_target_line_item_message")
+    mocker.patch(
+        "hubspot_sync.api._find_target_line_item_id_by_unique_app_id",
+        return_value=existing_id,
+    )
+    mocker.patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
+
+    result = api._ensure_target_line_item_for_line(line, mock_client)  # noqa: SLF001
+
+    assert result == existing_id
+    mock_client.crm.objects.basic_api.update.assert_called_once()
+    mock_client.crm.objects.basic_api.create.assert_not_called()
 
 
 def test_get_course_run_certificate_hubspot_property_removes_semicolons():

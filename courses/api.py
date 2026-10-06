@@ -38,6 +38,7 @@ from courses import mail_api
 from courses.constants import (
     COURSE_KEY_PATTERN,
     ENROLL_CHANGE_STATUS_DEFERRED,
+    ENROLL_CHANGE_STATUS_REFUNDED,
     ENROLL_CHANGE_STATUS_UNENROLLED,
     PROGRAM_TEXT_ID_PREFIX,
 )
@@ -522,14 +523,21 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
     - it's a B2B-provisioned run (has a b2b_contract or a b2b_contracts
       entry) - governed by its contract, not this payment, or
     - the learner has a separate PaidCourseRun for it backed by a fulfilled
-      order with total_price_paid > 0 - a genuine, independent purchase of
-      that specific run.
+      order that isn't attributable to this program purchase - either a
+      genuine, independent purchase of that specific run (total_price_paid
+      > 0), or a $0 order redeeming some other discount not tied to this
+      program.
 
     Otherwise the run is downgraded, whether its verified mode came from
     upgrade_audit_run_enrollments_for_program_purchase (no order at all) or
-    from a $0 order (see create_verified_program_course_run_enrollment,
-    which creates a real but zero-value order for a program-verified learner
-    enrolling directly in one of the program's runs).
+    from a $0 order redeeming this program's internal enrollment-code
+    discount (see create_verified_program_course_run_enrollment, which
+    creates a real but zero-value order for a program-verified learner
+    enrolling directly in one of the program's runs). That discount's code
+    is always generated as f"{program.readable_id}-{uuid}" (see
+    create_verified_program_discount), so a fulfilled $0 order is only
+    treated as program-linked when one of its redeemed discount codes
+    starts with the program's readable_id.
 
     Args:
         user (User): The user whose program enrollment is being downgraded
@@ -554,6 +562,13 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
             user, [program], enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
         )
         downgraded_program_enrollment = first_or_none(downgraded_program_enrollments)
+        if downgraded_program_enrollment is not None:
+            # create_program_enrollments has no change_status kwarg, so tag
+            # the refund onto the enrollment directly - active stays True,
+            # this is audit-trail/reporting only (e.g. HubSpot sync), not a
+            # deactivation.
+            downgraded_program_enrollment.change_status = ENROLL_CHANGE_STATUS_REFUNDED
+            downgraded_program_enrollment.save_and_log(None)
 
     verified_run_enrollments = CourseRunEnrollment.get_program_run_enrollments(
         user=user, program=program
@@ -564,12 +579,18 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
         run = run_enrollment.run
         if run.b2b_contract_id or run.b2b_contracts.exists():
             continue
-        if PaidCourseRun.objects.filter(
-            user=user,
-            course_run=run,
-            order__state=OrderStatus.FULFILLED,
-            order__total_price_paid__gt=0,
-        ).exists():
+        if (
+            PaidCourseRun.objects.filter(
+                user=user,
+                course_run=run,
+                order__state=OrderStatus.FULFILLED,
+            )
+            .exclude(
+                order__total_price_paid=0,
+                order__discounts__redeemed_discount__discount_code__startswith=program.readable_id,
+            )
+            .exists()
+        ):
             continue
         eligible_runs.append(run)
 
@@ -580,6 +601,7 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
         user,
         eligible_runs,
         mode=EDX_ENROLLMENT_AUDIT_MODE,
+        change_status=ENROLL_CHANGE_STATUS_REFUNDED,
         keep_failed_enrollments=True,
     )
     return downgraded_program_enrollment, downgraded_run_enrollments

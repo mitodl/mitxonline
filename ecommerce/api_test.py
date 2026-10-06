@@ -27,6 +27,7 @@ from reversion.models import Version
 from stripe import convert_to_stripe_object
 from zeal import zeal_context
 
+from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
@@ -50,6 +51,7 @@ from ecommerce.api import (
     downgrade_learner_from_order,
     establish_basket,
     establish_basket_for_request,
+    find_order_for_stripe_payment_intent,
     fulfill_completed_order,
     generate_checkout_payload,
     get_anonymous_basket_id,
@@ -58,6 +60,7 @@ from ecommerce.api import (
     process_cybersource_payment_response,
     process_stripe_checkout_completed,
     process_stripe_checkout_expired,
+    process_stripe_refund_updated,
     quote_user_price,
     refund_order,
     unenroll_learner_from_order,
@@ -70,6 +73,9 @@ from ecommerce.constants import (
     STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
     STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED,
     STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
+    STRIPE_EVENT_CHARGE_REFUND_UPDATED,
+    STRIPE_EVENT_CHECKOUT_SESSION_EXPIRED,
+    STRIPE_EVENT_REFUND_UPDATED,
     STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
     STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
     STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
@@ -109,6 +115,7 @@ from ecommerce.fixtures import (
     stripe_checkout_session,
     stripe_event,
     stripe_payment_intent,
+    stripe_refund,
 )
 from ecommerce.models import (
     Basket,
@@ -611,6 +618,7 @@ def test_downgrade_learner_from_order_downgrades_active_enrollment(mocker, user)
     _, kwargs = create_run_enrollments_mock.call_args
     assert kwargs["runs"] == [enrollment.run]
     assert kwargs["mode"] == EDX_ENROLLMENT_AUDIT_MODE
+    assert kwargs["change_status"] == ENROLL_CHANGE_STATUS_REFUNDED
 
 
 def test_downgrade_learner_from_order_skips_unenrolled_learner(mocker, user):
@@ -2433,3 +2441,253 @@ def test_revalidation_passes_a_resolvable_program_child_purchase_discount(
 
     assert basket.discounts.get().redeemed_discount == paid_amount_off_source.discount
     assert check_basket_discounts_for_validity(request) is True
+
+
+STRIPE_TEST_PAYMENT_INTENT_ID = "pi_1GszsK2eZvKYlo2CfhZyoZLp"
+
+
+def _stripe_payment_transaction_data(data_shape, payment_intent_id):
+    """
+    Return payment transaction data for a Stripe order.
+
+    - event: a checkout.session.completed Event (from the webhook)
+    - session: a CheckoutSession with an unexpanded PaymentIntent
+    - session_expanded: a CheckoutSession with the PaymentIntent expanded
+      (from the pending order check)
+    """
+
+    if data_shape == "event":
+        return {
+            "id": f"evt_{uuid.uuid4().hex}",
+            "object": "event",
+            "data": {
+                "object": {
+                    "id": "cs_test",
+                    "object": "checkout.session",
+                    "payment_intent": payment_intent_id,
+                }
+            },
+        }
+
+    if data_shape == "session":
+        return {
+            "id": f"cs_{uuid.uuid4().hex}",
+            "object": "checkout.session",
+            "payment_intent": payment_intent_id,
+        }
+
+    return {
+        "id": f"cs_{uuid.uuid4().hex}",
+        "object": "checkout.session",
+        "payment_intent": {"id": payment_intent_id, "object": "payment_intent"},
+    }
+
+
+def _create_stripe_order_with_payment(
+    *,
+    state=OrderStatus.FULFILLED,
+    data_shape="event",
+    payment_intent_id=STRIPE_TEST_PAYMENT_INTENT_ID,
+):
+    """Create a Stripe order with a payment transaction for the PaymentIntent."""
+
+    order = OrderFactory.create(
+        state=state,
+        gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+        total_price_paid=Decimal("10.00"),
+    )
+    data = _stripe_payment_transaction_data(data_shape, payment_intent_id)
+    TransactionFactory.create(
+        order=order,
+        transaction_id=data["id"],
+        transaction_type=TRANSACTION_TYPE_PAYMENT,
+        data=data,
+    )
+
+    return order
+
+
+def _configure_refund_event(
+    event_type=STRIPE_EVENT_REFUND_UPDATED,
+    *,
+    status="succeeded",
+    payment_intent_id=STRIPE_TEST_PAYMENT_INTENT_ID,
+    amount=1000,
+):
+    """Generate a Stripe refund event."""
+
+    refund = stripe_refund()
+    refund.status = status
+    refund.payment_intent = payment_intent_id
+    refund.amount = amount
+
+    event = stripe_event()
+    event.id = f"evt_{uuid.uuid4().hex}"
+    event.type = event_type
+    event.data.object = refund
+
+    return event
+
+
+@pytest.mark.parametrize("data_shape", ["event", "session", "session_expanded"])
+def test_find_order_for_stripe_payment_intent(data_shape):
+    """The order should be found no matter how the payment was recorded."""
+
+    order = _create_stripe_order_with_payment(data_shape=data_shape)
+    _create_stripe_order_with_payment(payment_intent_id="pi_someotherintent")
+
+    assert find_order_for_stripe_payment_intent(STRIPE_TEST_PAYMENT_INTENT_ID) == order
+
+
+def test_find_order_for_stripe_payment_intent_no_match():
+    """None should be returned if nothing matches the PaymentIntent."""
+
+    _create_stripe_order_with_payment(payment_intent_id="pi_someotherintent")
+
+    assert find_order_for_stripe_payment_intent(STRIPE_TEST_PAYMENT_INTENT_ID) is None
+
+
+@pytest.mark.parametrize(
+    "event_type", [STRIPE_EVENT_REFUND_UPDATED, STRIPE_EVENT_CHARGE_REFUND_UPDATED]
+)
+@pytest.mark.parametrize("amount", [1000, 500])
+def test_process_stripe_refund_updated(mocker, event_type, amount):
+    """A succeeded refund should refund the order and downgrade the learner."""
+
+    downgrade_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_downgrade_from_order.delay"
+    )
+    order = _create_stripe_order_with_payment()
+    event = _configure_refund_event(event_type, amount=amount)
+
+    result = process_stripe_refund_updated(event)
+
+    assert result == order
+    assert result.state == OrderStatus.REFUNDED
+
+    refund_transaction = order.transactions.get(
+        transaction_type=TRANSACTION_TYPE_REFUND
+    )
+    assert refund_transaction.transaction_id == event.data.object.id
+    assert refund_transaction.amount == Decimal(amount) / 100
+    assert refund_transaction.data == event.data.object.to_dict(for_json=True)
+
+    downgrade_task_mock.assert_called_once_with(order.id)
+
+
+def test_process_stripe_refund_updated_both_events(mocker):
+    """Stripe sends two events per refund; only one should refund the order."""
+
+    downgrade_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_downgrade_from_order.delay"
+    )
+    order = _create_stripe_order_with_payment()
+
+    assert (
+        process_stripe_refund_updated(
+            _configure_refund_event(STRIPE_EVENT_REFUND_UPDATED)
+        )
+        == order
+    )
+    assert (
+        process_stripe_refund_updated(
+            _configure_refund_event(STRIPE_EVENT_CHARGE_REFUND_UPDATED)
+        )
+        is True
+    )
+
+    assert (
+        order.transactions.filter(transaction_type=TRANSACTION_TYPE_REFUND).count() == 1
+    )
+    downgrade_task_mock.assert_called_once_with(order.id)
+
+
+@pytest.mark.parametrize("status", ["pending", "requires_action", "failed", "canceled"])
+def test_process_stripe_refund_updated_not_succeeded(mocker, status):
+    """Refunds that haven't succeeded should be skipped."""
+
+    downgrade_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_downgrade_from_order.delay"
+    )
+    order = _create_stripe_order_with_payment()
+
+    assert process_stripe_refund_updated(_configure_refund_event(status=status)) is True
+
+    order.refresh_from_db()
+    assert order.state == OrderStatus.FULFILLED
+    assert not order.transactions.filter(
+        transaction_type=TRANSACTION_TYPE_REFUND
+    ).exists()
+    downgrade_task_mock.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("order_state", "expected_result"),
+    [
+        (OrderStatus.REFUNDED, True),
+        (OrderStatus.PENDING, False),
+        (OrderStatus.CANCELED, False),
+        (OrderStatus.PARTIALLY_REFUNDED, False),
+    ],
+)
+def test_process_stripe_refund_updated_wrong_order_state(
+    mocker, order_state, expected_result
+):
+    """Orders that aren't fulfilled should be left alone."""
+
+    downgrade_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_downgrade_from_order.delay"
+    )
+    order = _create_stripe_order_with_payment(state=order_state)
+
+    assert process_stripe_refund_updated(_configure_refund_event()) is expected_result
+
+    order.refresh_from_db()
+    assert order.state == order_state
+    assert not order.transactions.filter(
+        transaction_type=TRANSACTION_TYPE_REFUND
+    ).exists()
+    downgrade_task_mock.assert_not_called()
+
+
+@pytest.mark.parametrize("payment_intent_id", [None, "pi_nomatchingorder"])
+def test_process_stripe_refund_updated_no_order(mocker, payment_intent_id):
+    """The refund should fail if there's no order for it."""
+
+    downgrade_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_downgrade_from_order.delay"
+    )
+    order = _create_stripe_order_with_payment()
+
+    assert (
+        process_stripe_refund_updated(
+            _configure_refund_event(payment_intent_id=payment_intent_id)
+        )
+        is False
+    )
+
+    order.refresh_from_db()
+    assert order.state == OrderStatus.FULFILLED
+    downgrade_task_mock.assert_not_called()
+
+
+def test_process_stripe_refund_updated_links_event_log(mocker):
+    """The logged event should be linked to the refunded order."""
+
+    mocker.patch("ecommerce.tasks.perform_downgrade_from_order.delay")
+    order = _create_stripe_order_with_payment()
+    event = _configure_refund_event()
+    log_stripe_event(event)
+
+    process_stripe_refund_updated(event)
+
+    assert StripeEventLog.objects.get(event_id=event.id).related_order == order
+
+
+def test_process_stripe_refund_updated_wrong_event_type():
+    """Non-refund events should be rejected."""
+
+    with pytest.raises(ValueError):  # noqa: PT011
+        process_stripe_refund_updated(
+            _configure_refund_event(STRIPE_EVENT_CHECKOUT_SESSION_EXPIRED)
+        )
