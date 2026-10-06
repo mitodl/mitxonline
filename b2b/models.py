@@ -783,15 +783,15 @@ class ContractPage(Page, ClusterableModel):
                 continue
             managed += len(created_runs)
 
-        if order is None:
-            last_item = self.contract_programs.order_by("-sort_order").first()
-            order = (last_item.sort_order + 1) if last_item else 0
-
-        existing_item = ContractProgramItem.objects.filter(
+        already_linked = ContractProgramItem.objects.filter(
             contract=self, program=program
-        ).first()
+        ).exists()
 
-        if not existing_item:
+        if not already_linked:
+            if order is None:
+                last_item = self.contract_programs.order_by("-sort_order").first()
+                order = (last_item.sort_order + 1) if last_item else 0
+
             item = ContractProgramItem(contract=self, program=program, sort_order=order)
             item.save(skip_run_creation=True)
 
