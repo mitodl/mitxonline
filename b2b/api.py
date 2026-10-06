@@ -384,6 +384,7 @@ def import_and_create_contract_run(  # noqa: PLR0913
     skip_edx: bool = False,
     require_designated_source_run: bool = False,
     org_prefix: str | None = None,
+    filter_variants: list | None = None,
 ):
     """
     Create a contract run for the given course, importing it from edX if necessary.
@@ -434,10 +435,18 @@ def import_and_create_contract_run(  # noqa: PLR0913
         ingest_content_files_for_ai (bool): Set the "ingest_content_files_for_ai" flag on the new page.
         skip_edx (bool): Don't try to create a course run in edX.
         require_designated_source_run (bool): Require a flagged source run.
+        filter_variants (list|None): Only create runs for these variant sets. An
+            empty list raises SourceCourseIncompleteError before anything is
+            imported; None means every variant the course supports.
     Returns:
         CourseRun: The created CourseRun object.
         Product: The created Product object.
     """
+
+    # create_contract_run rejects this too, but only after the import.
+    if filter_variants == []:
+        msg = f"No variant sets to create runs of {course_run_id} for."
+        raise SourceCourseIncompleteError(msg)
 
     run_qs = CourseRun.all_objects.filter(courseware_id=course_run_id)
 
@@ -473,6 +482,7 @@ def import_and_create_contract_run(  # noqa: PLR0913
         skip_edx=skip_edx,
         require_designated_source_run=require_designated_source_run,
         org_prefix=org_prefix,
+        filter_variants=filter_variants,
     )
 
 

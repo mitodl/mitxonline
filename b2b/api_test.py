@@ -1321,6 +1321,7 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
             skip_edx=False,
             require_designated_source_run=False,
             org_prefix=None,
+            filter_variants=None,
         )
         assert result == (mock_run, mock_product)
     else:
@@ -1365,6 +1366,7 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
                 skip_edx=False,
                 require_designated_source_run=False,
                 org_prefix=None,
+                filter_variants=None,
             )
             assert result == (mock_run, mock_product)
         else:
@@ -1443,6 +1445,7 @@ def test_import_and_create_contract_run_with_all_kwargs(mocker):
         skip_edx=True,
         require_designated_source_run=True,
         org_prefix=None,
+        filter_variants=None,
     )
 
     assert result == (mock_run, mock_product)
@@ -1481,6 +1484,7 @@ def test_import_and_create_contract_run_with_string_departments(mocker):
         skip_edx=False,
         require_designated_source_run=False,
         org_prefix=None,
+        filter_variants=None,
     )
     assert result == (mock_run, mock_product)
 
@@ -3476,3 +3480,40 @@ def test_upgrade_enrollments_keeps_existing_contract(mocked_edx_upgrade_push):
     enrollment.refresh_from_db()
     assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
     assert enrollment.b2b_contract == other_contract
+
+
+def test_import_and_create_contract_run_forwards_filter_variants(mocker):
+    """The variant filter reaches create_contract_run."""
+
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(is_source_run=True)
+    mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
+    filter_variants = list(contract.variant_options.all())
+
+    import_and_create_contract_run(
+        contract=contract,
+        course_run_id=run.courseware_id,
+        departments=[],
+        filter_variants=filter_variants,
+    )
+
+    assert (
+        mock_create_contract_run.call_args.kwargs["filter_variants"] == filter_variants
+    )
+
+
+def test_import_and_create_contract_run_empty_filter_imports_nothing(mocker):
+    """An empty variant filter fails before the run is imported from edX."""
+
+    contract = ContractPageFactory.create()
+    mock_import = mocker.patch("courses.api.import_courserun_from_edx")
+
+    with pytest.raises(SourceCourseIncompleteError):
+        import_and_create_contract_run(
+            contract=contract,
+            course_run_id="course-v1:MITx+6.00x+2T2023",
+            departments=[],
+            filter_variants=[],
+        )
+
+    mock_import.assert_not_called()
