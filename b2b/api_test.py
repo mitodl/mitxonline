@@ -30,6 +30,7 @@ from b2b.api import (
     ensure_contract_run_pricing,
     ensure_contract_run_products,
     ensure_enrollment_codes_exist,
+    find_unlinked_page_for_alias,
     get_active_contracts_from_basket_items,
     get_contract_products_with_bad_pricing,
     get_contract_runs_without_products,
@@ -3037,3 +3038,155 @@ def test_create_b2b_enrollment_multi_contract_run_without_discount(
     )
 
     assert result["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+
+
+def test_reconcile_links_an_unlinked_page_to_the_keycloak_org_with_its_alias():
+    """A legacy page shares its org_key with the realm alias; link it, don't duplicate."""
+
+    legacy = factories.OrganizationPageFactory.create(
+        org_key="UTK", sso_organization_id=None
+    )
+    org = factories.OrganizationRepresentationFactory.create(alias="utk")
+
+    page, created = reconcile_single_keycloak_org(org)
+    page.save()
+
+    assert not created
+    assert page.pk == legacy.pk
+    assert str(page.sso_organization_id) == org.id
+    assert page.org_key == "UTK"
+    assert OrganizationPage.objects.filter(org_key__iexact="utk").count() == 1
+
+
+@pytest.fixture
+def reconcile_realm(mocker):
+    """Run reconcile_keycloak_orgs against a mocked realm; returns the connection."""
+
+    if not OrganizationIndexPage.objects.exists():
+        factories.OrganizationIndexPageFactory.create()
+    org_model = mocker.patch("b2b.api.get_keycloak_model").return_value
+    connection = mocker.patch("b2b.api.KeycloakConnection").return_value
+
+    def _reconcile(*keycloak_orgs):
+        org_model.list_all.return_value = list(keycloak_orgs)
+        return reconcile_keycloak_orgs()
+
+    return _reconcile, connection
+
+
+def test_reconcile_keeps_the_members_of_a_page_it_links(reconcile_realm):
+    """Linking a page must not cost its members the org on their next request."""
+
+    reconcile, connection = reconcile_realm
+    legacy = factories.OrganizationPageFactory.create(
+        org_key="UTK", sso_organization_id=None
+    )
+    members = factories.UserOrganizationFactory.create_batch(
+        2, organization=legacy, keep_until_seen=False
+    )
+    org = factories.OrganizationRepresentationFactory.create(alias="utk")
+
+    assert reconcile(org) == (0, 1)
+
+    legacy.refresh_from_db()
+    assert str(legacy.sso_organization_id) == org.id
+    assert {
+        call.args for call in connection.organizations.associate.call_args_list
+    } == {
+        ("members", legacy.sso_organization_id, member.user.global_id)
+        for member in members
+    }
+
+    reconcile_user_orgs(members[0].user, [])
+    assert UserOrganization.objects.filter(
+        pk=members[0].pk, keep_until_seen=True
+    ).exists()
+
+
+def test_reconcile_leaves_the_members_of_a_linked_page_alone(reconcile_realm):
+    """Only the pass that links a page touches its members."""
+
+    reconcile, connection = reconcile_realm
+    linked = factories.OrganizationPageFactory.create()
+    member = factories.UserOrganizationFactory.create(
+        organization=linked, keep_until_seen=False
+    )
+    org = factories.OrganizationRepresentationFactory.create(
+        id=str(linked.sso_organization_id)
+    )
+
+    assert reconcile(org) == (0, 1)
+
+    connection.organizations.associate.assert_not_called()
+    member.refresh_from_db()
+    assert member.keep_until_seen is False
+
+
+def test_reconcile_does_not_flag_members_when_the_link_fails(reconcile_realm, mocker):
+    """The flag is set in the link's savepoint, so a failed save undoes it."""
+
+    reconcile, connection = reconcile_realm
+    legacy = factories.OrganizationPageFactory.create(
+        org_key="UTK", sso_organization_id=None
+    )
+    member = factories.UserOrganizationFactory.create(
+        organization=legacy, keep_until_seen=False
+    )
+    org = factories.OrganizationRepresentationFactory.create(alias="utk")
+    mocker.patch.object(
+        OrganizationPage, "save", side_effect=ValidationError("invalid page")
+    )
+
+    assert reconcile(org) == (0, 0)
+
+    connection.organizations.associate.assert_not_called()
+    member.refresh_from_db()
+    assert member.keep_until_seen is False
+
+
+def test_reconcile_does_not_link_by_alias_when_the_page_is_already_linked():
+    """An org_key held by a page with a different Keycloak UUID is left alone."""
+
+    existing = factories.OrganizationPageFactory.create(org_key="UTK")
+    org = factories.OrganizationRepresentationFactory.create(alias="UTK")
+
+    page, created = reconcile_single_keycloak_org(org)
+
+    assert created
+    assert page.pk is None
+    existing.refresh_from_db()
+    assert str(existing.sso_organization_id) != org.id
+
+
+def test_reconcile_refuses_to_guess_between_two_unlinked_pages():
+    """Two unlinked pages that differ only in case make the link ambiguous."""
+
+    factories.OrganizationPageFactory.create(org_key="UTK", sso_organization_id=None)
+    factories.OrganizationPageFactory.create(org_key="utk", sso_organization_id=None)
+    org = factories.OrganizationRepresentationFactory.create(alias="utk")
+
+    with pytest.raises(ValidationError, match="more than one unlinked"):
+        reconcile_single_keycloak_org(org)
+
+
+def test_reconcile_does_not_link_on_a_truncated_alias():
+    """An alias longer than an org_key must not match a page by its first 30 characters."""
+
+    unrelated = factories.OrganizationPageFactory.create(
+        org_key="acme-corp-division-of-research", sso_organization_id=None
+    )
+    org = factories.OrganizationRepresentationFactory.create(
+        alias="acme-corp-division-of-research-and-dev"
+    )
+
+    assert find_unlinked_page_for_alias(org.alias) is None
+    unrelated.refresh_from_db()
+    assert unrelated.sso_organization_id is None
+
+
+def test_find_unlinked_page_for_alias_ignores_a_missing_alias():
+    """Keycloak allows an organization with no alias; there is nothing to match."""
+
+    factories.OrganizationPageFactory.create(sso_organization_id=None)
+
+    assert find_unlinked_page_for_alias(None) is None
