@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ("b2b", "0033_organizationpage_description_plain_text"),
+        ("b2b", "0035_alter_organizationprovisioningaudit_action"),
     ]
 
     operations = [
