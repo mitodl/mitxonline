@@ -269,6 +269,13 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 )
                 continue
 
+            if added.courses_with_invalid_key:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Program '{courseware.readable_id}' has {added.courses_with_invalid_key} courses whose source run ID is not a valid course key; cannot create contract runs for these courses."
+                    )
+                )
+
             if added.skipped_reason:
                 self.stdout.write(self.style.WARNING(added.skipped_reason))
                 continue
