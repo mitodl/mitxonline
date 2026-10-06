@@ -360,10 +360,25 @@ def test_client_init_openid_configuration_request_failure(settings, mocker):
         KeycloakAdminClient()
 
 
-def test_client_init_base_url_processing(settings, mocker):
-    """Test that base URL is properly processed with admin path."""
-    base_url = "https://keycloak.example.com"
-    expected_admin_url = "https://keycloak.example.com/admin/realms/"
+@pytest.mark.parametrize(
+    ("base_url", "expected_admin_url"),
+    [
+        ("https://keycloak.example.com", "https://keycloak.example.com/admin/realms/"),
+        ("https://keycloak.example.com/", "https://keycloak.example.com/admin/realms/"),
+        (
+            "https://keycloak.example.com/auth",
+            "https://keycloak.example.com/auth/admin/realms/",
+        ),
+        (
+            "https://keycloak.example.com/auth/",
+            "https://keycloak.example.com/auth/admin/realms/",
+        ),
+    ],
+)
+def test_client_init_base_url_processing(
+    settings, mocker, base_url, expected_admin_url
+):
+    """The admin URL keeps any path in the base URL."""
 
     settings.KEYCLOAK_BASE_URL = base_url
     settings.KEYCLOAK_REALM_NAME = FAKE.word()
@@ -388,6 +403,9 @@ def test_client_init_base_url_processing(settings, mocker):
     client = KeycloakAdminClient()
 
     assert client.base_url == expected_admin_url
+    assert client.realmify_url("organizations") == (
+        f"{expected_admin_url}{settings.KEYCLOAK_REALM_NAME}/organizations"
+    )
 
 
 def test_client_init_oauth_session_configuration(settings, mocker):

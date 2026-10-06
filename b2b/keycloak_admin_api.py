@@ -64,7 +64,8 @@ class KeycloakAdminClient:
         if not self.base_url:
             msg = "KEYCLOAK_BASE_URL setting is not configured."
             raise KeycloakAdminImproperlyConfiguredError(msg)
-        self.base_url = urljoin(self.base_url, "/admin/realms/")
+        # Not urljoin: a leading slash there drops any path in the base URL.
+        self.base_url = f"{self.base_url.removesuffix('/')}/admin/realms/"
         self._realm = settings.KEYCLOAK_REALM_NAME
         if not self._realm:
             msg = "KEYCLOAK_REALM_NAME setting is not configured."
