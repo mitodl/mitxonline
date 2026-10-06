@@ -502,6 +502,7 @@ def _get_source_runs_for_course(  # noqa: PLR0913
         only_lang: If set, only add the specified additional language (plus the
             default)
         filter_variants: If provided, a list of SupportedVariant objects to filter by.
+            An empty list matches no variants; None means no filter.
         no_variants: If True, only return runs that match the default variant set.
     Returns:
         List of distinct source CourseRun objects, one per language (or one
@@ -537,7 +538,7 @@ def _get_source_runs_for_course(  # noqa: PLR0913
             for sv in course.possible_variant_sets.filter(active=True).all()
         ]
 
-        if filter_variants:
+        if filter_variants is not None:
             fvs = [
                 (fv.language, fv.variant_length, fv.variant_industry)
                 for fv in filter_variants
@@ -635,6 +636,8 @@ def create_contract_run(  # noqa: PLR0913
         queue_codes (bool): Queue enrollment code generation after saving.
         ignore_langs (bool): Only create a run for the primary language.
         only_lang (str|None): Only create a run for the primary language and the specified one.
+        filter_variants (list|None): Only create runs for these variant sets. An
+            empty list matches none; None means every variant the course supports.
     Returns:
         list[tuple[CourseRun, Product]]: One (CourseRun, Product) pair per
         source language run. Legacy single-language courses produce a one-element
