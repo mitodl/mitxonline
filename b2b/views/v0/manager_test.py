@@ -23,6 +23,7 @@ from b2b.models import (
     REDEMPTION_STATUS_ASSIGNED,
     REDEMPTION_STATUS_REDEEMED,
     REDEMPTION_STATUS_UNASSIGNED,
+    ContractPage,
     DiscountContractAttachmentRedemption,
     UserOrganization,
 )
@@ -2473,19 +2474,21 @@ def test_concurrent_bulk_assigns_get_different_codes(org_setup, mock_email_task)
     )
 
 
-def _assign_while_other_writer_waits(contract, discount, other_writer, manager_user):
+def _write_while_other_writer_waits(contract, write, other_writer):
     """
-    Assign a code under the contract lock while another writer is blocked.
+    Run `write` under the contract lock while another writer is blocked.
 
     The other writer runs in a thread and has to be waiting on a lock before
-    the assignment is written, so it can only have read the code as free.
+    `write` runs, so it can only have read the state from before it. Returns
+    what the other writer returned.
     """
 
     errors = []
+    results = []
 
     def run_other_writer():
         try:
-            other_writer()
+            results.append(other_writer())
         except Exception as exc:  # noqa: BLE001
             errors.append(exc)
         finally:
@@ -2497,24 +2500,35 @@ def _assign_while_other_writer_waits(contract, discount, other_writer, manager_u
             lock_contract_for_code_assignment(contract)
             thread.start()
             _wait_for_lock_waiter()
-            create_code_assignments(
-                [
-                    CodeAssignment(
-                        contract=contract,
-                        discount=discount,
-                        email="first@example.com",
-                        name="",
-                        code=discount.discount_code,
-                    )
-                ],
-                manager_user,
-            )
+            write()
     finally:
         # Joined even if the block above fails, so the writer can't outlive
         # the test and write into the next one's database.
         thread.join(timeout=10)
     assert not thread.is_alive()
     assert errors == []
+    return results[0]
+
+
+def _assign_while_other_writer_waits(contract, discount, other_writer, manager_user):
+    """Assign a code under the contract lock while another writer is blocked."""
+
+    return _write_while_other_writer_waits(
+        contract,
+        lambda: create_code_assignments(
+            [
+                CodeAssignment(
+                    contract=contract,
+                    discount=discount,
+                    email="first@example.com",
+                    name="",
+                    code=discount.discount_code,
+                )
+            ],
+            manager_user,
+        ),
+        other_writer,
+    )
 
 
 @pytest.mark.django_db(transaction=True)
@@ -2571,8 +2585,6 @@ def test_redeeming_a_code_waits_for_a_concurrent_assignment(
     manager_user, _, (contract_1, *_), *_ = org_setup
     mocker.patch("b2b.views.v0.process_add_org_membership")
     learner = UserFactory.create()
-    # Already a member, so the only write to wait on is the redemption itself.
-    learner.b2b_contracts.add(contract_1)
     code = contract_1.get_discounts().order_by("id").first()
 
     _assign_while_other_writer_waits(
@@ -2587,3 +2599,101 @@ def test_redeeming_a_code_waits_for_a_concurrent_assignment(
     redemption = DiscountContractAttachmentRedemption.objects.get(discount=code)
     assert redemption.user == learner
     assert redemption.assigned_email == "first@example.com"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_redeeming_a_single_use_code_loses_to_a_concurrent_redemption(
+    org_setup, mocker
+):
+    """
+    A learner whose redemption was validated before someone else redeemed the
+    same single-use code is not attached once that redemption commits.
+    """
+    _, _, (contract_1, *_), *_ = org_setup
+    mocker.patch("b2b.views.v0.process_add_org_membership")
+    first, second = UserFactory.create_batch(2)
+    code = contract_1.get_discounts().order_by("id").first()
+    assert code.redemption_type == REDEMPTION_TYPE_ONE_TIME
+
+    result = _write_while_other_writer_waits(
+        contract_1,
+        lambda: AttachContractApi()._attach_user_to_contracts(  # noqa: SLF001
+            first, [contract_1], code
+        ),
+        lambda: AttachContractApi()._attach_user_to_contracts(  # noqa: SLF001
+            second, [contract_1], code
+        ),
+    )
+
+    assert result == (False, False, True)
+    redemption = DiscountContractAttachmentRedemption.objects.get(discount=code)
+    assert redemption.user == first
+    assert not second.b2b_contracts.filter(pk=contract_1.pk).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_redeeming_a_code_loses_the_last_seat_to_a_concurrent_redemption(
+    org_setup, mocker
+):
+    """
+    Two learners redeeming different codes for a contract's last seat don't
+    both get it.
+    """
+    _, _, (contract_1, *_), *_ = org_setup
+    mocker.patch("b2b.views.v0.process_add_org_membership")
+    first, second = UserFactory.create_batch(2)
+    first_code, second_code = contract_1.get_discounts().order_by("id")[:2]
+    # Set without save(), which would also re-run the contract's code checks.
+    contract_1.max_learners = contract_1.get_learners().count() + 1
+    ContractPage.objects.filter(pk=contract_1.pk).update(
+        max_learners=contract_1.max_learners
+    )
+
+    result = _write_while_other_writer_waits(
+        contract_1,
+        lambda: AttachContractApi()._attach_user_to_contracts(  # noqa: SLF001
+            first, [contract_1], first_code
+        ),
+        lambda: AttachContractApi()._attach_user_to_contracts(  # noqa: SLF001
+            second, [contract_1], second_code
+        ),
+    )
+
+    assert result == (False, True, False)
+    assert first.b2b_contracts.filter(pk=contract_1.pk).exists()
+    assert not second.b2b_contracts.filter(pk=contract_1.pk).exists()
+    assert not second_code.contract_redemptions.exists()
+
+
+def test_redeeming_a_single_use_code_twice_by_one_user_adds_one_row(org_setup, mocker):
+    """A repeat of a learner's own redemption does not add a second row."""
+    _, _, (contract_1, *_), *_ = org_setup
+    mocker.patch("b2b.views.v0.process_add_org_membership")
+    learner = UserFactory.create()
+    code = contract_1.get_discounts().order_by("id").first()
+    view = AttachContractApi()
+
+    assert view._attach_user_to_contracts(  # noqa: SLF001
+        learner, [contract_1], code
+    ) == (True, False, False)
+    assert view._attach_user_to_contracts(  # noqa: SLF001
+        learner, [contract_1], code
+    ) == (False, False, False)
+
+    assert code.contract_redemptions.count() == 1
+
+
+def test_redeeming_a_single_use_code_attaches_each_of_its_contracts(org_setup, mocker):
+    """One user's redemption of a code covers every contract it is passed for."""
+    _, _, (contract_1, *_), _, (contract_3, *_) = org_setup
+    mocker.patch("b2b.views.v0.process_add_org_membership")
+    learner = UserFactory.create()
+    code = contract_1.get_discounts().order_by("id").first()
+
+    result = AttachContractApi()._attach_user_to_contracts(  # noqa: SLF001
+        learner, [contract_1, contract_3], code
+    )
+
+    assert result == (True, False, False)
+    assert set(learner.b2b_contracts.all()) == {contract_1, contract_3}
+    assert code.contract_redemptions.filter(user=learner).count() == 2

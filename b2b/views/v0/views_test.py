@@ -55,6 +55,32 @@ def test_b2b_contract_attachment_bad_code(user):
     assert user.b2b_contracts.count() == 0
 
 
+def test_b2b_contract_attachment_code_taken_during_request(mocker, user):
+    """A code someone else redeems after it was validated is a 404, not a 201."""
+
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_CODE, max_learners=1
+    )
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
+    ProductFactory.create(purchasable_object=courserun)
+    ensure_enrollment_codes_exist(contract)
+    code = contract.get_discounts().first()
+    mocker.patch(
+        "b2b.views.v0.AttachContractApi._attach_user_to_contracts",
+        return_value=(False, False, True),
+    )
+
+    client = APIClient()
+    client.force_login(user)
+    resp = client.post(
+        reverse("b2b:attach-user", kwargs={"enrollment_code": code.discount_code})
+    )
+
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Invalid or expired enrollment code."
+
+
 def test_b2b_contract_attachment_code_with_no_contracts(user):
     """Ensure a code not tied to any B2B contracts returns 404."""
     client = APIClient()
