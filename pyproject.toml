@@ -87,6 +87,7 @@ dependencies = [
     "pydantic>=2.13.4",
     "pynacl>=1.6.2",
     "datamodel-code-generator[http]>=0.72.4",
+    "pyjwt==2.14.0",
 ]
 
 [dependency-groups]
