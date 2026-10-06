@@ -55,6 +55,10 @@ from b2b.models import (
     UserB2BContract,
     UserOrganization,
 )
+from b2b.provisioning import (
+    KeycloakConnection,
+    sync_organization_members_to_keycloak,
+)
 from b2b.tasks import queue_contract_sheet_update_post_save, queue_enrollment_code_check
 from cms.api import get_home_page
 from courses.constants import ALL_ENROLL_CHANGE_STATUSES
@@ -870,17 +874,26 @@ def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> boo
 def get_active_contracts_from_basket_items(basket: Basket):
     """Get active contracts from basket items"""
     course_run_ct = ContentType.objects.get_for_model(CourseRun)
-
-    items = basket.basket_items.select_related("product__content_type").filter(
-        product__content_type=course_run_ct
-    )
-
+    program_ct = ContentType.objects.get_for_model(Program)
     contract_ids = []
-    for item in items:
+    items = basket.basket_items.select_related("product__content_type")
+
+    for item in items.filter(product__content_type=course_run_ct):
         purchasable = item.product.purchasable_object
         if hasattr(purchasable, "b2b_contracts") and purchasable.b2b_contracts.exists():
             item_contract_ids = purchasable.b2b_contracts.values_list("id", flat=True)
-            contract_ids.extend([contract_id for contract_id in item_contract_ids])  # noqa: C416
+            contract_ids.extend(list(item_contract_ids))
+
+    for item in items.filter(product__content_type=program_ct):
+        purchasable = item.product.purchasable_object
+        if (
+            hasattr(purchasable, "contract_memberships")
+            and purchasable.contract_memberships.exists()
+        ):
+            item_contract_ids = purchasable.contract_memberships.values_list(
+                "contract_id", flat=True
+            )
+            contract_ids.extend(list(item_contract_ids))
 
     if contract_ids:
         return list(ContractPage.objects.filter(id__in=contract_ids, active=True))
@@ -911,6 +924,9 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     basket = establish_basket(request)
     if not basket:
         return False
+
+    if not active_contracts:
+        active_contracts = []
 
     free_contracts, nonfree_contracts = get_free_and_nonfree_contracts(active_contracts)
 
@@ -1531,9 +1547,30 @@ def _validate_b2b_enrollment_prerequisites(  # noqa: PLR0911
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
 
-    if not purchasable_object.enrollable_for_contract(contract):
+    audit_exists = (
+        isinstance(
+            purchasable_object,
+            (
+                CourseRun,
+                Program,
+            ),
+        )
+        and purchasable_object.enrollments.filter(
+            user=user,
+            active=True,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        )
+        .exclude(
+            change_status__in=ALL_ENROLL_CHANGE_STATUSES,
+        )
+        .exists()
+    )
+
+    if (audit_exists and not purchasable_object.is_upgradable) or (
+        not audit_exists and not purchasable_object.enrollable_for_contract(contract)
+    ):
         log.error(
-            "B2B enroll: attempted to use %s but %s is not enrollable for B2B contract %s",
+            "B2B enroll: attempted to use %s but %s is not enrollable/upgradable for B2B contract %s",
             product,
             purchasable_object,
             contract,
@@ -1541,7 +1578,13 @@ def _validate_b2b_enrollment_prerequisites(  # noqa: PLR0911
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
 
     if (
-        isinstance(purchasable_object, CourseRun)
+        isinstance(
+            purchasable_object,
+            (
+                CourseRun,
+                Program,
+            ),
+        )
         and purchasable_object.enrollments.filter(
             user=user,
             active=True,
@@ -1553,10 +1596,10 @@ def _validate_b2b_enrollment_prerequisites(  # noqa: PLR0911
         .exists()
     ):
         log.error(
-            "B2B enroll: attempted to use %s but %s already enrolled in %s",
+            "B2B enroll: attempted to use %s but %s already has verified enrollment in %s",
             product,
             user,
-            CourseRun.courseware_id,
+            purchasable_object,
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED}
 
@@ -1936,15 +1979,58 @@ def reconcile_user_orgs(user, organizations):
     return (len(orgs_to_add), len(orgs_to_remove))
 
 
+def find_unlinked_page_for_alias(alias: str | None) -> OrganizationPage | None:
+    """
+    Find the OrganizationPage with no Keycloak UUID whose org_key is this alias.
+
+    Provisioning writes the org_key as the Keycloak alias verbatim, so a page
+    that predates provisioning and shares an org_key with a realm alias is the
+    same organization. The match ignores case, as the provisioning collision
+    checks do. A page that is already linked to some other Keycloak organization
+    is not a candidate.
+
+    Args:
+    - alias (str): the Keycloak organization alias
+    Returns:
+    - OrganizationPage or None: the page to link, if there is exactly one. None
+      too when the alias is missing or longer than an org_key can be.
+    Raises:
+    - ValidationError: more than one unlinked page matches, so linking would be a guess
+    """
+
+    # An alias longer than an org_key can never be one, and truncating it would
+    # match an unrelated page whose org_key is the alias's first 30 characters.
+    if alias is None or len(alias) > ORG_KEY_MAX_LENGTH:
+        return None
+
+    candidates = list(
+        OrganizationPage.objects.filter(
+            org_key__iexact=alias, sso_organization_id__isnull=True
+        )
+    )
+
+    if len(candidates) > 1:
+        msg = (
+            f"Keycloak alias '{alias}' matches more than one unlinked "
+            f"organization: {sorted(page.org_key for page in candidates)}."
+        )
+        raise ValidationError(msg)
+
+    return candidates[0] if candidates else None
+
+
 def reconcile_single_keycloak_org(keycloak_org: OrganizationRepresentation):
     """
     Reconcile a single Keycloak organization.
 
     This is the heavy lifting for reconcile_keycloak_orgs. When provided with a
     Keycloak organization, it creates or updates the corresponding
-    OrganizationPage record for the record.
+    OrganizationPage record for the record. A page that has no Keycloak UUID yet
+    but whose org_key is this organization's alias is linked to it rather than
+    duplicated (see find_unlinked_page_for_alias).
 
-    This won't save the OrganizationPage.
+    This won't save the OrganizationPage, so a page linked here still has no
+    Keycloak UUID in the database until the caller saves it.
 
     Args:
     - keycloak_org (OrganizationRepresentation): The Keycloak organization to reconcile.
@@ -1955,6 +2041,12 @@ def reconcile_single_keycloak_org(keycloak_org: OrganizationRepresentation):
     created_flag = False
 
     page = OrganizationPage.objects.filter(sso_organization_id=keycloak_org.id).first()
+
+    if not page:
+        page = find_unlinked_page_for_alias(keycloak_org.alias)
+        if page:
+            page.sso_organization_id = keycloak_org.id
+            log.info("Linked organization %s to Keycloak org %s", page, keycloak_org.id)
 
     if not page:
         page = OrganizationPage(
@@ -1982,7 +2074,11 @@ def reconcile_keycloak_orgs():
 
     Retrieves the organizations for the configured realm out of Keycloak, and
     create or update corresponding records in MITx Online. This does not manage
-    memberships, just base org info.
+    memberships, just base org info, except when it links a page that had no
+    Keycloak UUID (see reconcile_single_keycloak_org). reconcile_user_orgs
+    removes a user from any linked org missing from their token, and a freshly
+    linked org is in nobody's token, so that page's existing members are marked
+    keep_until_seen with the link and then added to the Keycloak organization.
 
     Since the provisioning API (capability C1) writes both systems together,
     this is a drift reconciler rather than the primary create path: it adopts
@@ -2011,6 +2107,17 @@ def reconcile_keycloak_orgs():
             with transaction.atomic():
                 page, created = reconcile_single_keycloak_org(org)
 
+                # The UUID is on the instance but not saved yet, so the row
+                # still says whether this pass is the one linking the page.
+                linked = (
+                    not created
+                    and OrganizationPage.objects.filter(
+                        pk=page.pk, sso_organization_id__isnull=True
+                    ).exists()
+                )
+                if linked:
+                    page.organization_users.update(keep_until_seen=True)
+
                 if created:
                     parent_org_page.add_child(instance=page)
                     page.save()
@@ -2035,6 +2142,22 @@ def reconcile_keycloak_orgs():
                 created_count += 1
             else:
                 updated_count += 1
+
+            if linked:
+                # After the savepoint, like link_organization_to_keycloak: a
+                # member Keycloak won't take keeps access through the flag.
+                failed_members = sync_organization_members_to_keycloak(
+                    page,
+                    connection=KeycloakConnection(client=org_model.admin_client),
+                )
+                if failed_members:
+                    log.warning(
+                        "Could not add %s member(s) of %s to its Keycloak "
+                        "organization: %s",
+                        len(failed_members),
+                        page.org_key,
+                        [user.id for user in failed_members],
+                    )
         except (ValidationError, IntegrityError):  # noqa: PERF203
             # IntegrityError because OrganizationOnboarding.organization is a
             # OneToOneField: a concurrent provisioning saga or a second

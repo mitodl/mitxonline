@@ -17,6 +17,7 @@ from b2b.constants import (
 )
 from b2b.contracts import create_contract
 from b2b.exceptions import SourceCourseIncompleteError
+from b2b.management.utils import get_contract_by_id_or_slug
 from b2b.models import (
     ContractPage,
     ContractProgramItem,
@@ -360,10 +361,7 @@ class Command(BaseCommand):
         contract_id = kwargs.pop("contract_id")
         output_path = kwargs.pop("output", None)
 
-        if str(contract_id).isdecimal():
-            contract = ContractPage.objects.filter(id=contract_id).first()
-        else:
-            contract = ContractPage.objects.filter(slug=contract_id).first()
+        contract = get_contract_by_id_or_slug(str(contract_id))
 
         if not contract:
             msg = f"Contract '{contract_id}' not found."
@@ -600,7 +598,7 @@ class Command(BaseCommand):
 
     def _import_contract(self, org, contract_data, slug):
         """Get or create the ContractPage from exported contract data."""
-        contract = ContractPage.objects.filter(slug=slug).first()
+        contract = ContractPage.objects.child_of(org).filter(slug=slug).first()
         if contract:
             self.stdout.write(f"  Contract exists: {slug}")
             return contract
@@ -840,7 +838,7 @@ class Command(BaseCommand):
         self.stdout.write("\nStep 5: Contract runs")
         # Reload so cached_property fields see the variant records we just created.
         contract.refresh_from_db()
-        filter_variants = list(contract.variant_options.all())
+        filter_variants = list(contract.active_variant_options())
         total_created = 0
         total_no_source = 0
 

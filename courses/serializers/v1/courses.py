@@ -200,8 +200,9 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSeri
             )
         except ExportComplianceCheckError as exc:
             # Don't propagate the specifics of the compliance decision to the
-            # client - the underlying cause is logged where it's raised.
-            raise EnrollmentError from exc
+            # client - only an opaque support code, if the cause declares one.
+            # The underlying cause is logged where it's raised.
+            raise EnrollmentError.from_cause(exc) from exc
 
         return successful_enrollments[0] if successful_enrollments else None
 
