@@ -567,6 +567,12 @@ class ContractPage(Page, ClusterableModel):
     # Declared first so it is the default manager; see ContractPageManager.
     objects = ContractPageManager()
     base_form_class = ContractPageForm
+    # A copy is a new contract, and the organization hasn't opted in under it.
+    exclude_fields_in_copy = [
+        "learner_records_opt_in",
+        "learner_records_opt_in_recorded_on",
+        "learner_records_opt_in_recorded_by",
+    ]
     active_objects = ActiveContractManager()
 
     # Written only by the contract API, which saves the row without a Wagtail
