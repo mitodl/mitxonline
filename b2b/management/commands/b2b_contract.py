@@ -863,7 +863,7 @@ class Command(BaseCommand):
             if invalid_key:
                 self.stdout.write(
                     self.style.WARNING(
-                        f"    {invalid_key} course(s) had an invalid source run key and were skipped"
+                        f"    {invalid_key} course(s) had no valid contract run key and were skipped"
                     )
                 )
 
@@ -871,7 +871,7 @@ class Command(BaseCommand):
             self.style.SUCCESS(
                 f"  Created {total_created} contract run(s), "
                 f"{total_no_source} course(s) without source runs skipped, "
-                f"{total_invalid_key} with an invalid source run key skipped"
+                f"{total_invalid_key} with no valid contract run key skipped"
             )
         )
 

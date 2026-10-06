@@ -172,6 +172,26 @@ def test_add_course_to_contract_with_no_variant_sets_creates_nothing():
     assert not contract.get_course_runs().exists()
 
 
+@pytest.mark.parametrize("has_default_variant", [True, False])
+def test_add_program_to_contract_with_no_variant_sets_creates_nothing(
+    has_default_variant,
+):
+    """Every course is skipped, including one with no default variant set."""
+
+    contract = ContractPageFactory.create()
+    contract.variant_options.all().delete()
+    program = ProgramFactory.create()
+    course = _source_run().course
+    if not has_default_variant:
+        course.possible_variant_sets.all().delete()
+    program.add_requirement(course)
+
+    added = add_courseware_to_contract(contract, program, skip_edx=True)
+
+    assert (added.runs_added, added.courses_without_source_run) == (0, 1)
+    assert not contract.get_course_runs().exists()
+
+
 def test_add_run_in_another_contract_is_skipped():
     """A run already in another contract stays there and is reported."""
 
