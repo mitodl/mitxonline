@@ -9,7 +9,9 @@ and the staff contract API do them the same way.
 import logging
 from dataclasses import dataclass
 
+from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
+from django.db.models import Q
 from mitol.common.utils import now_in_utc
 
 from b2b.api import create_contract_run
@@ -17,10 +19,14 @@ from b2b.constants import (
     CONTRACT_SETUP_STATUS_COMPLETE,
     CONTRACT_SETUP_STATUS_FAILED,
     CONTRACT_SETUP_STATUS_IN_PROGRESS,
+    PROVISIONING_ACTION_CONTRACT_VARIANT_ADDED,
+    PROVISIONING_ACTION_CONTRACT_VARIANT_UPDATED,
 )
+from b2b.exceptions import ContractVariantError
 from b2b.models import ContractPage, ContractProgramItem, OrganizationPage
+from b2b.provisioning import _audit
 from b2b.tasks import queue_enrollment_code_check
-from courses.models import CourseRun, CourseRunEnrollment
+from courses.models import Course, CourseRun, CourseRunEnrollment
 from courses.retirement import (
     deactivate_run_products,
     get_run_products,
@@ -128,13 +134,13 @@ def add_courseware_to_contract(  # noqa: PLR0913
       learners' courseware with it.
 
     Runs are created for the variant sets in filter_variants, which defaults to
-    every variant set on the contract. no_reruns defaults to True, unlike
+    the contract's active variant sets. no_reruns defaults to True, unlike
     create_contract_run, so repeating a call does not mint another run.
     org_prefix defaults to the organization's own prefix.
     """
 
     if filter_variants is None:
-        filter_variants = list(contract.variant_options.all())
+        filter_variants = list(contract.active_variant_options())
 
     if courseware.is_program:
         runs_added, no_source = contract.add_program_courses(
@@ -423,3 +429,204 @@ def expire_unused_enrollment_codes(
         expired.append((discount.discount_code, deleted))
 
     return expired
+
+
+def _variant_set_snapshot(contract: ContractPage, variant: SupportedVariant) -> dict:
+    """Return the audited fields of a contract's variant set."""
+
+    return {
+        "contract_id": contract.id,
+        "variant_id": variant.id,
+        "language": variant.language,
+        "variant_length": variant.variant_length,
+        "variant_industry": variant.variant_industry,
+        "default_variant": variant.default_variant,
+        "active": variant.active,
+        "b2b_only": variant.b2b_only,
+    }
+
+
+def _lock_contract_variant_sets(contract: ContractPage) -> None:
+    """
+    Serialize changes to a contract's variant sets.
+
+    Nothing in the database stops two sets with the same language, length and
+    industry, so the duplicate check is only safe under this lock. of=("self",)
+    locks the contract's row and not the Wagtail page rows it joins.
+    """
+
+    ContractPage.objects.select_for_update(of=("self",)).get(pk=contract.pk)
+
+
+def _variant_fields(variant) -> tuple[str, str, str]:
+    return (variant.language, variant.variant_length, variant.variant_industry)
+
+
+def get_contract_variant_coverage(contract: ContractPage) -> list[dict]:
+    """
+    Report what each of the contract's variant sets matches.
+
+    The contract's courses are those of its runs and of its programs. For each
+    variant set, a course is listed if one of its own active variant sets has
+    the same language, length and industry. That is the condition
+    add_courseware_to_contract uses to pick source runs, so a listed course
+    with a source run and no contract run is one that adding courseware again
+    would create a run for, as long as the set is active.
+
+    Returns a dict per variant set, default first: `variant` (the
+    SupportedVariant) and `courses`, each with `course`, `has_source_run` and
+    `contract_run` (the contract's run for this variant, or None).
+    """
+
+    courses = list(
+        Course.objects.filter(
+            Q(in_programs__program__contract_memberships__contract=contract)
+            | Q(courseruns__b2b_contracts=contract)
+        )
+        .distinct()
+        .order_by("readable_id")
+    )
+    course_variants = {course.id: set() for course in courses}
+    for variant in SupportedVariant.objects.filter(
+        content_type=ContentType.objects.get_for_model(Course),
+        object_id__in=course_variants,
+        active=True,
+    ):
+        course_variants[variant.object_id].add(_variant_fields(variant))
+    source_runs = {
+        (run.course_id, *_variant_fields(run))
+        for run in CourseRun.all_objects.filter(course__in=courses).filter(
+            Q(is_source_run=True) | Q(run_tag="SOURCE")
+        )
+    }
+    # Ascending, so the newest run for a course and variant is the one kept.
+    contract_runs = {
+        (run.course_id, *_variant_fields(run)): run
+        for run in CourseRun.all_objects.filter(b2b_contracts=contract).order_by("id")
+    }
+
+    coverage = []
+    for variant in contract.variant_options.order_by("-default_variant", "id"):
+        fields = _variant_fields(variant)
+        coverage.append(
+            {
+                "variant": variant,
+                "courses": [
+                    {
+                        "course": course,
+                        "has_source_run": (course.id, *fields) in source_runs,
+                        "contract_run": contract_runs.get((course.id, *fields)),
+                    }
+                    for course in courses
+                    if fields in course_variants[course.id]
+                ],
+            }
+        )
+
+    return coverage
+
+
+@transaction.atomic
+def add_contract_variant_set(  # noqa: PLR0913
+    contract: ContractPage,
+    *,
+    language: str,
+    variant_length: str = "",
+    variant_industry: str = "",
+    b2b_only: bool = False,
+    actor=None,
+) -> SupportedVariant:
+    """
+    Add a non-default variant set to a contract.
+
+    Every contract already has its default set (ensure_default_variant), so
+    this never adds one. Creates no runs: adding courseware to the contract
+    again does that.
+
+    Raises ContractVariantError if the contract already has a set with the
+    same language, length and industry, active or not.
+    """
+
+    _lock_contract_variant_sets(contract)
+    existing = contract.variant_options.filter(
+        language=language,
+        variant_length=variant_length,
+        variant_industry=variant_industry,
+    ).first()
+    if existing:
+        msg = (
+            f"The contract already has this variant set (id {existing.id}"
+            f"{'' if existing.active else ', inactive'})."
+        )
+        raise ContractVariantError(msg)
+
+    variant = SupportedVariant.objects.create(
+        variant_object=contract,
+        language=language,
+        variant_length=variant_length,
+        variant_industry=variant_industry,
+        b2b_only=b2b_only,
+        default_variant=False,
+    )
+
+    _audit(
+        contract.organization,
+        PROVISIONING_ACTION_CONTRACT_VARIANT_ADDED,
+        actor=actor,
+        data_after=_variant_set_snapshot(contract, variant),
+    )
+
+    return variant
+
+
+@transaction.atomic
+def update_contract_variant_set(
+    contract: ContractPage,
+    variant: SupportedVariant,
+    *,
+    active: bool | None = None,
+    b2b_only: bool | None = None,
+    actor=None,
+) -> SupportedVariant:
+    """
+    Turn a contract's variant set on or off, or change its b2b_only flag.
+
+    An inactive set gets no new runs and its runs are left out of the
+    contract's course list (get_all_variant_runs). Its existing runs are not
+    closed and enrollments in them are untouched, so turning the set back on
+    restores it. Closing runs is what removing courseware is for.
+
+    A change that changes nothing is not saved or audited.
+
+    Raises ContractVariantError for a change to the default set: deactivating
+    it would leave the contract's learners an empty course list, and the
+    database refuses a b2b_only default.
+    """
+
+    if variant.default_variant and (active is False or b2b_only is True):
+        msg = (
+            "The contract's default variant set can't be deactivated or made B2B-only."
+        )
+        raise ContractVariantError(msg)
+
+    _lock_contract_variant_sets(contract)
+    variant.refresh_from_db()
+    before = _variant_set_snapshot(contract, variant)
+    if active is not None:
+        variant.active = active
+    if b2b_only is not None:
+        variant.b2b_only = b2b_only
+    after = _variant_set_snapshot(contract, variant)
+    if after == before:
+        return variant
+    variant.save()
+
+    _audit(
+        contract.organization,
+        PROVISIONING_ACTION_CONTRACT_VARIANT_UPDATED,
+        actor=actor,
+        data_before=before,
+        data_after=after,
+    )
+
+    return variant

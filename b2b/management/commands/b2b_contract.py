@@ -838,7 +838,7 @@ class Command(BaseCommand):
         self.stdout.write("\nStep 5: Contract runs")
         # Reload so cached_property fields see the variant records we just created.
         contract.refresh_from_db()
-        filter_variants = list(contract.variant_options.all())
+        filter_variants = list(contract.active_variant_options())
         total_created = 0
         total_no_source = 0
 

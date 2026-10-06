@@ -14,7 +14,7 @@ from b2b.constants import (
     CONTRACT_SETUP_STATUS_FAILED,
     CONTRACT_SETUP_STATUS_IN_PROGRESS,
 )
-from b2b.contracts import add_courseware_to_contract
+from b2b.contracts import add_contract_variant_set, add_courseware_to_contract
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from courses.factories import CourseFactory, CourseRunFactory
 from openedx.constants import (
@@ -23,6 +23,7 @@ from openedx.constants import (
     COURSE_RUN_CLONE_STATUS_PENDING,
 )
 from openedx.models import CourseRunClone
+from variants.factories import CourseSupportedVariantFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -365,3 +366,186 @@ def test_expire_codes(admin_drf_client, code_contract):
     assert response.status_code == status.HTTP_200_OK
     assert [item["deleted"] for item in response.json()] == [True, True]
     assert not code_contract.get_discounts().exists()
+
+
+def _variant_url(contract, variant):
+    return reverse(
+        "b2b:b2b-provisioning-organization-contract-variant-detail",
+        kwargs={
+            "parent_lookup_organization__org_key": contract.organization.org_key,
+            "pk": contract.id,
+            "variant_id": variant.id,
+        },
+    )
+
+
+def test_variant_routes_require_staff(user_drf_client):
+    """The variant routes are staff-only like the rest of the contract routes."""
+
+    contract = ContractPageFactory.create()
+    url = _contract_url(contract, "variants")
+
+    assert user_drf_client.get(url).status_code == status.HTTP_403_FORBIDDEN
+    assert (
+        user_drf_client.post(url, {"language": "fr"}, format="json").status_code
+        == status.HTTP_403_FORBIDDEN
+    )
+    assert (
+        user_drf_client.patch(
+            _variant_url(contract, contract.default_variant_options),
+            {"active": True},
+            format="json",
+        ).status_code
+        == status.HTTP_403_FORBIDDEN
+    )
+
+
+def test_list_variant_sets(admin_drf_client):
+    """The default set comes first, with the contract's courses it matches."""
+
+    contract = ContractPageFactory.create()
+    course = _source_course()
+    add_courseware_to_contract(contract, course)
+    [contract_run] = contract.get_course_runs()
+    french = add_contract_variant_set(contract, language="fr")
+    CourseSupportedVariantFactory.create(
+        variant_object=course, language="fr", variant_length="", variant_industry=""
+    )
+
+    response = admin_drf_client.get(_contract_url(contract, "variants"))
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == [
+        {
+            "id": contract.default_variant_options.id,
+            "language": "en",
+            "variant_length": "",
+            "variant_industry": "",
+            "default_variant": True,
+            "active": True,
+            "b2b_only": False,
+            "courses": [
+                {
+                    "course_id": course.id,
+                    "readable_id": course.readable_id,
+                    "title": course.title,
+                    "has_source_run": True,
+                    "contract_run": contract_run.courseware_id,
+                }
+            ],
+        },
+        {
+            "id": french.id,
+            "language": "fr",
+            "variant_length": "",
+            "variant_industry": "",
+            "default_variant": False,
+            "active": True,
+            "b2b_only": False,
+            "courses": [
+                {
+                    "course_id": course.id,
+                    "readable_id": course.readable_id,
+                    "title": course.title,
+                    "has_source_run": False,
+                    "contract_run": None,
+                }
+            ],
+        },
+    ]
+
+
+def test_add_variant_set(admin_drf_client, admin_user):
+    """A new set is never the default, and the add is audited."""
+
+    contract = ContractPageFactory.create()
+
+    response = admin_drf_client.post(
+        _contract_url(contract, "variants"),
+        {"language": "fr", "variant_industry": "", "b2b_only": True},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    body = response.json()
+    assert body["language"] == "fr"
+    assert body["default_variant"] is False
+    assert body["b2b_only"] is True
+    assert body["courses"] == []
+    audit = contract.organization.provisioning_audits.get()
+    assert audit.acting_user == admin_user
+    assert audit.data_after["variant_id"] == body["id"]
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [{}, {"language": ""}, {"language": "xx-not-a-language"}, {"language": "fr"}],
+    ids=["missing", "blank", "invalid", "duplicate"],
+)
+def test_add_variant_set_rejected(admin_drf_client, payload):
+    """Bad and duplicate sets are a 400, not an IntegrityError or 500."""
+
+    contract = ContractPageFactory.create()
+    admin_drf_client.post(
+        _contract_url(contract, "variants"), {"language": "fr"}, format="json"
+    )
+
+    response = admin_drf_client.post(
+        _contract_url(contract, "variants"), payload, format="json"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert contract.variant_options.count() == 2
+
+
+def test_update_variant_set(admin_drf_client):
+    """A non-default set can be turned off and back on, and made B2B-only."""
+
+    contract = ContractPageFactory.create()
+    variant = admin_drf_client.post(
+        _contract_url(contract, "variants"), {"language": "fr"}, format="json"
+    ).json()
+    url = _variant_url(contract, contract.variant_options.get(id=variant["id"]))
+
+    response = admin_drf_client.patch(
+        url, {"active": False, "b2b_only": True}, format="json"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["active"] is False
+    assert response.json()["b2b_only"] is True
+    assert (
+        admin_drf_client.patch(url, {"active": True}, format="json").json()["active"]
+        is True
+    )
+
+
+def test_update_default_variant_set_rejected(admin_drf_client):
+    """The default set can't be turned off."""
+
+    contract = ContractPageFactory.create()
+
+    response = admin_drf_client.patch(
+        _variant_url(contract, contract.default_variant_options),
+        {"active": False},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "default variant set" in response.json()["detail"]
+    assert contract.default_variant_options.active is True
+
+
+def test_update_variant_set_of_another_contract(admin_drf_client):
+    """A variant set ID from another contract is a 404."""
+
+    contract = ContractPageFactory.create()
+    other = ContractPageFactory.create(organization=contract.organization)
+
+    response = admin_drf_client.patch(
+        _variant_url(contract, other.default_variant_options),
+        {"active": False},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
