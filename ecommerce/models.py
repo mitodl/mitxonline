@@ -1363,8 +1363,9 @@ class PendingOrder(Order):
             )
             if not created:
                 # get_or_create skips `defaults` on an existing line, so a reused
-                # pending order carries the price from the last attempt until
-                # re-priced.
+                # pending order carries the contract and price from the last
+                # attempt until they're refreshed from this basket.
+                line.record_b2b_contract(contract)
                 line.record_discounted_unit_price()
             total += line.discounted_price
 
@@ -1627,6 +1628,17 @@ class Line(TimestampedModel):
         This is a price, not a receipt: an unpaid order still carries a value.
         """
         return self.discounted_unit_price.quantize(Decimal("0.01"))
+
+    def record_b2b_contract(self, contract):
+        """
+        Record the contract this line is bought under and save it.
+
+        Skips the write when the contract is unchanged.
+        """
+        contract_id = contract.id if contract else None
+        if self.b2b_contract_id != contract_id:
+            self.b2b_contract_id = contract_id
+            self.save(update_fields=["b2b_contract", "updated_on"])
 
     def record_discounted_unit_price(self):
         """

@@ -268,6 +268,30 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         ).exists()
 
     @property
+    def is_upgradable(self):
+        """
+        Checks if the program can be upgraded.
+        Requires program to be live, a product to exist, and a verified
+        enrollment mode to be available.
+        """
+        if hasattr(self, "prefetched_products"):
+            has_product = bool(self.prefetched_products)
+        else:
+            has_product = self.products.exists()
+
+        if hasattr(self, "prefetched_enrollment_modes"):
+            has_verified_mode = any(
+                mode.mode_slug == EDX_ENROLLMENT_VERIFIED_MODE
+                for mode in self.prefetched_enrollment_modes
+            )
+        else:
+            has_verified_mode = self.enrollment_modes.filter(
+                mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+            ).exists()
+
+        return self.live is True and has_product and has_verified_mode
+
+    @property
     def related_programs_qs(self):
         """
         Returns a list of programs related to this one. Returns a QuerySet.
@@ -521,22 +545,14 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         elective_courses = []
         required_title = "Required Courses"
         elective_title = "Elective Courses"
-        minimum_elective_requirement = None
 
-        # First, check all operators for titles and minimum elective requirements
+        # First, take the section titles from the operators
         for op in path_to_operator.values():
             # Store titles from actual operator nodes
             if not op.elective_flag and required_title == "Required Courses":
                 required_title = op.title or required_title
             elif op.elective_flag and elective_title == "Elective Courses":
                 elective_title = op.title or elective_title
-                if (
-                    op.is_min_number_of_operator
-                    and minimum_elective_requirement is None
-                ):
-                    minimum_elective_requirement = (
-                        int(op.operator_value) if op.operator_value else None
-                    )
 
         for req in course_reqs:
             if not req.course:
@@ -568,7 +584,6 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             "elective_courses": elective_courses,
             "required_title": required_title,
             "elective_title": elective_title,
-            "minimum_elective_requirement": minimum_elective_requirement,
         }
 
     def _find_parent_operator(self, req, path_to_operator):
@@ -596,7 +611,6 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             "elective_courses": [],
             "required_title": "Required Courses",
             "elective_title": "Elective Courses",
-            "minimum_elective_requirement": None,
         }
 
     def get_courses_with_requirements_data(self, requirements=None) -> dict:
@@ -631,7 +645,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
 
         Returns:
         - dict: Contains 'courses', 'required_courses', 'elective_courses',
-                'required_title', 'elective_title', and 'minimum_elective_requirement'
+                'required_title', and 'elective_title'
         """
         prefetched_requirements = getattr(self, "_prefetched_objects_cache", {}).get(
             "all_requirements"
@@ -758,17 +772,6 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         courses (e.g. the one that has elective_flag = True).
         """
         return self._courses_with_requirements_data["elective_title"]
-
-    @cached_property
-    def minimum_elective_courses_requirement(self):
-        """
-        Returns the (int) value defined for the minimum number of elective courses required to be completed by the Program
-
-        Returns:
-            int: Minimum number of elective courses required to be completed by the Program.
-                Returns None, if no value is defined or elective node is absent.
-        """
-        return self._courses_with_requirements_data["minimum_elective_requirement"]
 
     @property
     def is_program(self):
@@ -2876,15 +2879,12 @@ class ProgramRequirement(MP_Node):
     )
     elective_courses.add_child(course=course3)
     elective_courses.add_child(course=course4)
+    elective_courses.add_child(course=course5)
 
-    # 3rd elective option is at least one of these courses
-    mut_exclusive_courses = elective_courses.add_child(
-        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
-        operator_value=1
-    )
-    mut_exclusive_courses.add_child(course=course5)
-    mut_exclusive_courses.add_child(course=course6)
-
+    A MIN_NUMBER_OF operator counts each satisfied child once. The admin form and
+    the requirement-tree serializer accept only the shapes
+    courses.requirement_tree.validate_requirement_tree allows. The evaluator
+    itself handles any nesting.
     """
 
     # extended alphabet from the default to the recommended one for postgres

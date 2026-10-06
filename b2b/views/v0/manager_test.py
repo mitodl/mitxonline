@@ -1,9 +1,12 @@
 """Tests for the B2B Manager views"""
 
+import threading
+import time
 import uuid
 
 import pytest
 import reversion
+from django.db import connection, transaction
 from django.urls import reverse
 from mitol.common.utils.datetime import now_in_utc
 from rest_framework import status
@@ -26,7 +29,13 @@ from b2b.serializers.v0 import (
     BaseContractPageSerializer,
 )
 from b2b.serializers.v0.manager import ManagerEnrollmentSerializer
-from b2b.views.v0.manager import CodeAssignment, assign_codes_and_send_emails
+from b2b.views.v0.manager import (
+    CodeAssignment,
+    bulk_assign_enrollment_codes,
+    create_code_assignments,
+    lock_contract_for_code_assignment,
+    queue_code_assignment_emails,
+)
 from courses.factories import CourseRunFactory
 from courses.models import CourseRunEnrollment
 from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME
@@ -999,9 +1008,7 @@ def test_assign_code_forbidden(org_setup, manager_drf_client):
 def test_assign_code_internal_error(org_setup, manager_drf_client, mocker):
     """assign_code returns 500 when the assignment DB operation fails."""
     mocker.patch("b2b.views.v0.manager.queue_send_enrollment_code_assignment_email")
-    mocker.patch(
-        "b2b.views.v0.manager.assign_codes_and_send_emails", return_value=False
-    )
+    mocker.patch("b2b.views.v0.manager.create_code_assignments", return_value=None)
     _, _, (contract_1, *_), *_ = org_setup
 
     discount = contract_1.get_discounts().order_by("id").first()
@@ -1717,9 +1724,7 @@ def test_bulk_assign_forbidden(org_setup, manager_drf_client):
 def test_bulk_assign_internal_error(org_setup, manager_drf_client, mocker):
     """bulk_assign returns 500 when the assignment DB operation fails."""
     mocker.patch("b2b.views.v0.manager.queue_send_enrollment_code_assignment_email")
-    mocker.patch(
-        "b2b.views.v0.manager.assign_codes_and_send_emails", return_value=False
-    )
+    mocker.patch("b2b.views.v0.manager.create_code_assignments", return_value=None)
     _, _, (contract_1, *_), *_ = org_setup
 
     bulk_assign_url = reverse(
@@ -2217,7 +2222,7 @@ def test_manager_org_list_invalid_sso_uuid_returns_empty_not_500():
 
 
 # ---------------------------------------------------------------------------
-# assign_codes_and_send_emails unit tests
+# create_code_assignments / queue_code_assignment_emails unit tests
 # ---------------------------------------------------------------------------
 
 
@@ -2228,8 +2233,8 @@ def mock_email_task(mocker):
     )
 
 
-def test_assign_codes_and_send_emails_creates_records(org_setup, mock_email_task):
-    """Happy path: DB records are created and the email task is queued."""
+def test_create_code_assignments_creates_records(org_setup, mock_email_task):
+    """Happy path: DB records are created, and no email is queued yet."""
     manager_user, _, (contract_1, *_), *_ = org_setup
 
     discount = contract_1.get_discounts().order_by("id").first()
@@ -2241,21 +2246,20 @@ def test_assign_codes_and_send_emails_creates_records(org_setup, mock_email_task
         code=discount.discount_code,
     )
 
-    result = assign_codes_and_send_emails([assignment], manager_user)
+    result = create_code_assignments([assignment], manager_user)
 
-    assert result is True
     record = DiscountContractAttachmentRedemption.objects.get(
         discount=discount, assigned_email="learner@example.com"
     )
+    assert result == [record]
+    mock_email_task.delay.assert_not_called()
     assert record.assigned_name == "Test Learner"
     assert record.assigned_by == manager_user
     assert record.contract == contract_1
     assert record.email_status == EMAIL_STATUS_PENDING
 
 
-def test_assign_codes_and_send_emails_queues_email_with_record_ids(
-    org_setup, mock_email_task
-):
+def test_queue_code_assignment_emails_with_record_ids(org_setup, mock_email_task):
     """The email task is called with the IDs of the newly created records."""
     manager_user, _, (contract_1, *_), *_ = org_setup
 
@@ -2271,7 +2275,7 @@ def test_assign_codes_and_send_emails_queues_email_with_record_ids(
         for i, d in enumerate(discounts)
     ]
 
-    assign_codes_and_send_emails(assignments, manager_user)
+    queue_code_assignment_emails(create_code_assignments(assignments, manager_user))
 
     created_ids = list(
         DiscountContractAttachmentRedemption.objects.filter(
@@ -2282,7 +2286,7 @@ def test_assign_codes_and_send_emails_queues_email_with_record_ids(
     mock_email_task.delay.assert_called_once_with(created_ids)
 
 
-def test_assign_codes_and_send_emails_sets_prefetched_redemptions(
+def test_create_code_assignments_sets_prefetched_redemptions(
     org_setup, mock_email_task
 ):
     """discount.prefetched_redemptions is populated so serializers skip the DB query."""
@@ -2297,17 +2301,17 @@ def test_assign_codes_and_send_emails_sets_prefetched_redemptions(
         code=discount.discount_code,
     )
 
-    assign_codes_and_send_emails([assignment], manager_user)
+    create_code_assignments([assignment], manager_user)
 
     assert hasattr(discount, "prefetched_redemptions")
     assert len(discount.prefetched_redemptions) == 1
     assert discount.prefetched_redemptions[0].assigned_email == "learner@example.com"
 
 
-def test_assign_codes_and_send_emails_bulk_create_failure(
+def test_create_code_assignments_bulk_create_failure(
     org_setup, mock_email_task, mocker
 ):
-    """assign_codes_and_send_emails returns False and skips email when bulk_create raises."""
+    """create_code_assignments returns None when bulk_create raises."""
     manager_user, _, (contract_1, *_), *_ = org_setup
     discount = contract_1.get_discounts().order_by("id").first()
     assignment = CodeAssignment(
@@ -2324,30 +2328,28 @@ def test_assign_codes_and_send_emails_bulk_create_failure(
         side_effect=Exception("DB error"),
     )
 
-    result = assign_codes_and_send_emails([assignment], manager_user)
+    result = create_code_assignments([assignment], manager_user)
 
-    assert result is False
-    mock_email_task.delay.assert_not_called()
-
-    assert result is False
+    assert result is None
     mock_email_task.delay.assert_not_called()
     assert not DiscountContractAttachmentRedemption.objects.filter(
         discount=discount, assigned_email="learner@example.com"
     ).exists()
 
 
-def test_assign_codes_and_send_emails_empty_list(org_setup, mock_email_task):
+def test_code_assignments_empty_list(org_setup, mock_email_task):
     """An empty assignments list creates no records and dispatches no task."""
     manager_user, *_ = org_setup
 
-    result = assign_codes_and_send_emails([], manager_user)
+    result = create_code_assignments([], manager_user)
+    queue_code_assignment_emails(result)
 
-    assert result is True
+    assert result == []
     assert not DiscountContractAttachmentRedemption.objects.exists()
     mock_email_task.delay.assert_not_called()
 
 
-def test_assign_codes_and_send_emails_timestamps_are_set(org_setup, mock_email_task):
+def test_create_code_assignments_timestamps_are_set(org_setup, mock_email_task):
     """created_on, updated_on, and last_reminder_sent_on are populated."""
     manager_user, _, (contract_1, *_), *_ = org_setup
 
@@ -2360,7 +2362,7 @@ def test_assign_codes_and_send_emails_timestamps_are_set(org_setup, mock_email_t
         code=discount.discount_code,
     )
 
-    assign_codes_and_send_emails([assignment], manager_user)
+    create_code_assignments([assignment], manager_user)
 
     record = DiscountContractAttachmentRedemption.objects.get(
         discount=discount, assigned_email="learner@example.com"
@@ -2369,3 +2371,102 @@ def test_assign_codes_and_send_emails_timestamps_are_set(org_setup, mock_email_t
     assert record.updated_on is not None
     # Since email sending happens in a task, this value should remain unset between creation and that task executing
     assert record.last_reminder_sent_on is None
+
+
+def test_create_code_assignments_failure_keeps_transaction_usable(
+    org_setup, mock_email_task, mocker
+):
+    """A failed insert rolls back to its savepoint, so the caller can keep querying."""
+    manager_user, _, (contract_1, *_), *_ = org_setup
+    discount = contract_1.get_discounts().order_by("id").first()
+    assignment = CodeAssignment(
+        contract=contract_1,
+        discount=discount,
+        email="learner@example.com",
+        name="Test Learner",
+        code=discount.discount_code,
+    )
+    mocker.patch.object(
+        DiscountContractAttachmentRedemption.objects,
+        "bulk_create",
+        side_effect=Exception("DB error"),
+    )
+
+    with transaction.atomic():
+        lock_contract_for_code_assignment(contract_1)
+        assert create_code_assignments([assignment], manager_user) is None
+        assert not discount.contract_redemptions.exists()
+
+
+def _wait_for_lock_waiter(timeout_seconds=10):
+    """
+    Block until another backend is waiting on a lock.
+
+    Runs inside the lock holder's transaction, where pg_stat_activity is a
+    snapshot taken on first read, so the snapshot is cleared on every poll.
+    """
+
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_stat_clear_snapshot()")
+            cursor.execute(
+                "SELECT count(*) FROM pg_stat_activity "
+                "WHERE wait_event_type = 'Lock' AND pid <> pg_backend_pid() "
+                "AND datname = current_database()"
+            )
+            if cursor.fetchone()[0]:
+                return
+        time.sleep(0.05)
+    pytest.fail("The second assignment never waited on the contract lock")
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_bulk_assigns_get_different_codes(org_setup, mock_email_task):
+    """
+    A bulk assign waits for a concurrent assignment on the same contract, then
+    skips the code that assignment took instead of handing it out again.
+    """
+    manager_user, _, (contract_1, *_), *_ = org_setup
+    first_free = (
+        contract_1.get_discounts()
+        .filter(contract_redemptions__isnull=True)
+        .order_by("id")
+        .first()
+    )
+    result = {}
+
+    def second_assign():
+        try:
+            result["value"] = bulk_assign_enrollment_codes(
+                contract_1, [{"email": "second@example.com"}], manager_user
+            )
+        finally:
+            connection.close()
+
+    with transaction.atomic():
+        lock_contract_for_code_assignment(contract_1)
+        thread = threading.Thread(target=second_assign)
+        thread.start()
+        _wait_for_lock_waiter()
+        create_code_assignments(
+            [
+                CodeAssignment(
+                    contract=contract_1,
+                    discount=first_free,
+                    email="first@example.com",
+                    name="",
+                    code=first_free.discount_code,
+                )
+            ],
+            manager_user,
+        )
+    thread.join(timeout=10)
+
+    assignments, errors = result["value"]
+    assert errors == []
+    assert [a.discount.id for a in assignments] != [first_free.id]
+    assert (
+        DiscountContractAttachmentRedemption.objects.filter(discount=first_free).count()
+        == 1
+    )

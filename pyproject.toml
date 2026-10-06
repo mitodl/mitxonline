@@ -118,10 +118,16 @@ dev = [
     "granian[reload]>=2.5.4,<3",
     "pytest-split>=0.9,<1",
 ]
+docs = [
+    "insipid-sphinx-theme>=0.4.4,<0.5",
+    "myst-parser>=5.0.0,<6",
+    "sphinx>=9.0.4,<10",
+    "sphinxcontrib-mermaid>=2.1.1,<3",
+]
 
 [tool.uv]
 package = false
-default-groups = "all"
+default-groups = ["dev"]
 exclude-newer = "7d"
 required-version = ">=0.9.17"
 
@@ -341,6 +347,9 @@ filterwarnings = [
     "ignore:Failed to load HostKeys"
 ]
 env = [
+  "AWS_ACCESS_KEY_ID=",
+  "AWS_SECRET_ACCESS_KEY=",
+  "AWS_STORAGE_BUCKET_NAME=",
   "CELERY_TASK_ALWAYS_EAGER=True",
   "DEBUG=False",
   "DJANGO_SETTINGS_MODULE=main.settings",

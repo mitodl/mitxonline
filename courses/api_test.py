@@ -18,7 +18,6 @@ import reversion
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import connection
-from django.db.models import Prefetch
 from django.test import RequestFactory, override_settings
 from django.test.utils import CaptureQueriesContext
 from edx_api.course_detail import CourseDetail, CourseMode, CourseModes
@@ -51,6 +50,7 @@ from courses.api import (
     generate_missing_program_certificates,
     generate_openedx_course_url,
     generate_program_certificate,
+    get_audit_program_enrollments_for_upgrade,
     get_certificate_grade_eligible_runs,
     get_eligible_program_certificate_candidates,
     get_verifiable_credentials_payload,
@@ -4854,8 +4854,7 @@ def test_upgrade_program_enrollment_if_eligible_upgrades_when_requirements_met(
             active=True,
         )
 
-    min_electives = program.minimum_elective_courses_requirement or 0
-    for course in program.elective_courses[:min_electives]:
+    for course in program_with_requirements.elective_courses[:2]:
         run = CourseRunFactory.create(course=course)
         CourseRunEnrollmentFactory.create(
             user=user,
@@ -4871,56 +4870,155 @@ def test_upgrade_program_enrollment_if_eligible_upgrades_when_requirements_met(
     assert program_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
 
 
+def _verify_courses(user, courses):
+    """Give the user an active verified run enrollment in each course."""
+    for course in courses:
+        CourseRunEnrollmentFactory.create(
+            user=user,
+            run=CourseRunFactory.create(course=course),
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+
+
+@pytest.mark.parametrize("with_required_program", [False, True])
 def test_upgrade_program_enrollment_if_eligible_query_count(
     user,
     program_with_requirements,  # noqa: F811
+    with_required_program,
 ):
-    """The upgrade path should use a stable number of queries for an eligible enrollment."""
+    """The upgrade path uses a fixed number of queries, however the tree is nested."""
     program = program_with_requirements.program
     program_enrollment = ProgramEnrollmentFactory.create(
         user=user,
         program=program,
         enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
     )
+    _verify_courses(user, program_with_requirements.required_courses)
+    _verify_courses(user, program_with_requirements.elective_courses[:2])
 
-    for course in program.required_courses:
-        run = CourseRunFactory.create(course=course)
-        CourseRunEnrollmentFactory.create(
-            user=user,
-            run=run,
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            active=True,
-        )
+    if with_required_program:
+        required_program = ProgramFactory.create()
+        required_program_course = CourseFactory.create()
+        required_program.add_requirement(required_program_course)
+        program.add_program_requirement(required_program)
+        _verify_courses(user, [required_program_course])
 
-    min_electives = program.minimum_elective_courses_requirement or 0
-    for course in program.elective_courses[:min_electives]:
-        run = CourseRunFactory.create(course=course)
-        CourseRunEnrollmentFactory.create(
-            user=user,
-            run=run,
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            active=True,
-        )
-
-    program_enrollment = (
-        ProgramEnrollment.objects.select_related("program", "user")
-        .prefetch("certificate")
-        .prefetch_related(
-            Prefetch(
-                "program__all_requirements",
-                queryset=ProgramRequirement.objects.select_related("course"),
-            )
-        )
-        .get(pk=program_enrollment.pk)
+    program_enrollment = get_audit_program_enrollments_for_upgrade().get(
+        pk=program_enrollment.pk
     )
 
     with CaptureQueriesContext(connection) as context:
         _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
 
-    program_enrollment.refresh_from_db()
-    assert len(context) == 14
+    assert len(context) == 13
     assert upgraded is True
-    assert program_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+
+
+@pytest.mark.parametrize("verify_whole_group", [False, True])
+def test_upgrade_program_enrollment_if_eligible_requires_whole_nested_group(
+    user, verify_whole_group
+):
+    """
+    A course inside a nested all-of group under the elective operator does not
+    count on its own; the whole group has to be verified.
+    """
+    program = ProgramFactory.create()
+    core_course = CourseFactory.create()
+    program.add_requirement(core_course)
+    groups_node = program.requirements_root.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=1,
+        title="Choose a group",
+        elective_flag=True,
+    )
+    group_courses = []
+    for title in ("Group A", "Group B"):
+        group_node = groups_node.add_child(
+            node_type=ProgramRequirementNodeType.OPERATOR,
+            operator=ProgramRequirement.Operator.ALL_OF,
+            title=title,
+        )
+        courses = CourseFactory.create_batch(2)
+        for course in courses:
+            group_node.add_child(
+                node_type=ProgramRequirementNodeType.COURSE, course=course
+            )
+        group_courses.append(courses)
+    program_enrollment = ProgramEnrollmentFactory.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+    _verify_courses(user, [core_course])
+    _verify_courses(
+        user, group_courses[0] if verify_whole_group else group_courses[0][:1]
+    )
+
+    _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
+
+    assert upgraded is verify_whole_group
+
+
+@pytest.mark.parametrize("required_program_satisfied", [False, True])
+def test_upgrade_program_enrollment_if_eligible_requires_required_program(
+    user, required_program_satisfied
+):
+    """A required program node counts only when its own tree is satisfied."""
+    required_program = ProgramFactory.create()
+    required_program_course = CourseFactory.create()
+    required_program.add_requirement(required_program_course)
+    program = ProgramFactory.create()
+    program_course = CourseFactory.create()
+    program.add_requirement(program_course)
+    program.add_program_requirement(required_program)
+    program_enrollment = ProgramEnrollmentFactory.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+    _verify_courses(user, [program_course])
+    if required_program_satisfied:
+        _verify_courses(user, [required_program_course])
+
+    _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
+
+    assert upgraded is required_program_satisfied
+
+
+@pytest.mark.parametrize("verified_per_group", [1, 2])
+def test_upgrade_program_enrollment_if_eligible_checks_each_elective_group(
+    user, verified_per_group
+):
+    """
+    Each elective group has to reach its own minimum; verified courses in one
+    group do not count towards another.
+    """
+    program = ProgramFactory.create()
+    required_courses = CourseFactory.create_batch(2)
+    for course in required_courses:
+        program.add_requirement(course)
+    elective_groups = []
+    for _ in range(2):
+        group_node = program.requirements_root.add_child(
+            node_type=ProgramRequirementNodeType.OPERATOR,
+            operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+            operator_value=2,
+            elective_flag=True,
+        )
+        courses = CourseFactory.create_batch(3)
+        for course in courses:
+            group_node.add_child(
+                node_type=ProgramRequirementNodeType.COURSE, course=course
+            )
+        elective_groups.append(courses)
+    program_enrollment = ProgramEnrollmentFactory.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+    _verify_courses(user, required_courses)
+    for courses in elective_groups:
+        _verify_courses(user, courses[:verified_per_group])
+
+    _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
+
+    assert upgraded is (verified_per_group == 2)
 
 
 def test_upgrade_program_enrollment_if_eligible_returns_false_when_electives_missing(

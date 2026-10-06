@@ -1,6 +1,31 @@
 Release Notes
 =============
 
+Version 1.169.9
+---------------
+
+- Push SCIM user updates to Open edX asynchronously (#3925)
+- Remove duplicates hopefully (#4072)
+- Update astral-sh/setup-uv action to v8.3.2 (#4085)
+- Update actions/checkout action to v6.1.0 (#4034)
+- Remove import_courserun's non-functional --contract flag (#4091)
+- fix(scim): let remediate_keycloak_user_names run against production (#3992)
+- Keep existing members when linking an organization to Keycloak (#4064)
+- Reject ambiguous contract slugs in B2B management commands (#4070)
+- Keep a B2B enrollment's contract when checkout reuses a pending order (#4082)
+- Update Keycloak admin data classes (#4078)
+- chore: remove the interim pre-commit.ci ci: block (#4075)
+- Serialize b2b_only on v2 course runs (#4069)
+
+Version 1.169.8
+---------------
+
+- Add a hookimpl for Stripe refund events (#4051)
+- Run hooks with prek and autofix.ci (#4063)
+- Update actions/setup-node action to v6.5.0 (#4035)
+- Updates to Refunds of Program Entitlements (#4053)
+- Add verifiable_credential_description, feature flag, and FieldPanel (#4027)
+
 Version 1.169.7
 ---------------
 

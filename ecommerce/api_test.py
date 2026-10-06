@@ -27,6 +27,8 @@ from reversion.models import Version
 from stripe import convert_to_stripe_object
 from zeal import zeal_context
 
+from b2b.constants import CONTRACT_MEMBERSHIP_CODE
+from b2b.factories import ContractPageFactory
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.factories import (
     CourseRunEnrollmentFactory,
@@ -287,16 +289,24 @@ def create_basket(user, products):
     return basket
 
 
+def authed_request(user):
+    """Return a RequestFactory with the user attached."""
+
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = user
+    request.session = {}
+
+    return request
+
+
 def create_pending_order(user):
     """
     Call generate_checkout_payload to create a PendingOrder with a realistic
     CyberSource payload.
     """
-    rf = RequestFactory()
-    request = rf.get("/")
-    request.user = user
-    request.session = {}
-    return generate_checkout_payload(request)
+
+    return generate_checkout_payload(authed_request(user))
 
 
 @pytest.mark.parametrize(
@@ -2691,3 +2701,86 @@ def test_process_stripe_refund_updated_wrong_event_type():
         process_stripe_refund_updated(
             _configure_refund_event(STRIPE_EVENT_CHECKOUT_SESSION_EXPIRED)
         )
+
+
+@pytest.mark.parametrize(
+    "item_b2b_only",
+    [
+        "b2b_only",
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "user_in_contract",
+    [
+        "user_in_contract",
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "b2b_line",
+    [
+        "b2b_line",
+        False,
+    ],
+)
+def test_generate_checkout_payload_b2b_optional_run(
+    bootstrapped_verified_program, item_b2b_only, user_in_contract, b2b_line
+):
+    """
+    Test that we get proper validation if the basket contains B2B-adjacent items.
+
+    The purchasable item can be either B2B-only or not. If it's B2B-only,
+    we need to make sure the basket is OK for B2B purchasing.
+
+    The line items can be attached to a contract. If they are, the basket
+    needs to be checked for the appropriate discount. (The B2B process will
+    add these, so this is checking that someone isn't trying to get around
+    that.)
+
+    If no lines have contracts, and no items are B2B only, then it's not B2B
+    so even if the items _have_ contracts, these will be public enrollments
+    so no further checking.
+
+    This does not apply any discounts so it can check to make sure things
+    fail as expected.
+    """
+
+    from b2b.models import ContractProgramItem  # noqa: PLC0415
+
+    (prog, *_, run, run_prod) = bootstrapped_verified_program
+
+    # Set these to $0 to avoid payment processing
+    with reversion.create_revision():
+        run_prod.price = 0
+        run_prod.save()
+
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_CODE, max_learners=1
+    )
+
+    user = UserFactory.create()
+    if user_in_contract:
+        user.b2b_contracts.add(contract)
+
+    run.b2b_contracts.add(contract)
+    cpi = ContractProgramItem(contract=contract, program=prog, sort_order=0)
+    cpi.save(skip_run_creation=True)
+
+    if item_b2b_only:
+        run.b2b_only = True
+        run.save()
+
+    basket = create_basket(user, [run_prod])
+
+    if b2b_line:
+        basket.basket_items.update(b2b_contract=contract)
+
+    request = authed_request(user)
+
+    result = generate_checkout_payload(request)
+
+    if (b2b_line or item_b2b_only) and not user_in_contract:
+        assert "error" in result
+    else:
+        assert "error" not in result

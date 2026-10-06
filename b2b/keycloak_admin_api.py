@@ -99,6 +99,11 @@ class KeycloakAdminClient:
             token_endpoint=self.openid_configuration["token_endpoint"],
             scope=settings.KEYCLOAK_ADMIN_CLIENT_SCOPES,
             verify=not self.skip_verify,
+            # Without this, authlib has no way to renew an expired token (a
+            # client_credentials token carries no refresh_token) and raises
+            # InvalidTokenError on the next request, which breaks anything that
+            # outlives one token, e.g. paging through every realm user.
+            grant_type="client_credentials",
         )
         self.token = self.oauth_session.fetch_token(
             self.openid_configuration["token_endpoint"],

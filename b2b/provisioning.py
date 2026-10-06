@@ -17,10 +17,13 @@ See docs/source/b2b/provisioning_api.md.
 """
 
 import logging
+from http import HTTPStatus
 
+from authlib.integrations.base_client.errors import OAuthError
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from mitol.common.utils import now_in_utc
+from requests import HTTPError, RequestException
 
 from b2b.constants import (
     IDP_ALLOWED_TRANSITIONS,
@@ -33,6 +36,7 @@ from b2b.constants import (
     PROVISIONING_ACTION_IDP_DELETED,
     PROVISIONING_ACTION_IDP_METADATA_REFRESHED,
     PROVISIONING_ACTION_IDP_TRANSITIONED,
+    PROVISIONING_ACTION_IDP_UPDATED,
     PROVISIONING_ACTION_ONBOARDING_CHANGED,
     PROVISIONING_ACTION_ORG_CREATED,
     PROVISIONING_ACTION_ORG_UPDATED,
@@ -51,6 +55,7 @@ from b2b.keycloak_admin_api import (
     get_keycloak_model,
     import_identity_provider_config,
 )
+from b2b.keycloak_admin_dataclasses import IdentityProviderMapperRepresentation
 from b2b.models import (
     OrganizationIdentityProvider,
     OrganizationIndexPage,
@@ -393,7 +398,8 @@ def link_organization_to_keycloak(organization, *, connection=None, actor=None):
     - connection (KeycloakConnection): an existing connection, if any
     - actor (User): who asked for this, for the audit trail
     Returns:
-    - bool: True if a Keycloak organization was created, False if one was adopted
+    - tuple(bool, list[User]): True if a Keycloak organization was created,
+      False if one was adopted; and the members who could not be added to it
     Raises:
     - ValueError: the organization already has a Keycloak organization
     - AliasCollisionError: the realm organization with this alias is already
@@ -404,6 +410,13 @@ def link_organization_to_keycloak(organization, *, connection=None, actor=None):
 
     If the local write fails after a create, the Keycloak organization is left
     in place and the next call adopts it by alias.
+
+    Existing members are marked keep_until_seen before the link is saved.
+    reconcile_user_orgs removes a user from any linked org missing from their
+    token, and a freshly linked org is in nobody's token until they are added
+    to it in Keycloak and their session refreshes. The members are then pushed
+    into Keycloak; one who can't be (no global_id, or an HTTP error) keeps
+    access through the flag and is logged.
     """
 
     if organization.sso_organization_id:
@@ -450,6 +463,7 @@ def link_organization_to_keycloak(organization, *, connection=None, actor=None):
             raise AliasCollisionError(msg)
 
     with transaction.atomic():
+        organization.organization_users.update(keep_until_seen=True)
         organization.sso_organization_id = sso_organization_id
         organization.save()
         OrganizationOnboarding.objects.get_or_create(
@@ -470,7 +484,55 @@ def link_organization_to_keycloak(organization, *, connection=None, actor=None):
             },
         )
 
-    return created
+    failed_members = sync_organization_members_to_keycloak(
+        organization, connection=connection
+    )
+
+    return created, failed_members
+
+
+def sync_organization_members_to_keycloak(organization, *, connection):
+    """
+    Add the organization's MITx Online members to its Keycloak organization.
+
+    Args:
+    - organization (OrganizationPage): a linked organization
+    - connection (KeycloakConnection): the Keycloak connection to use
+    Returns:
+    - list[User]: the members who could not be added
+    """
+
+    failed = []
+    for user_org in organization.organization_users.select_related("user"):
+        user = user_org.user
+        if not user.global_id:
+            log.warning(
+                "Cannot add %s to Keycloak organization %s: no global_id",
+                user,
+                organization.org_key,
+            )
+            failed.append(user)
+            continue
+        try:
+            connection.organizations.associate(
+                "members", organization.sso_organization_id, user.global_id
+            )
+        except (RequestException, OAuthError) as exc:
+            # An adopted realm org may already have this member.
+            if (
+                isinstance(exc, HTTPError)
+                and exc.response is not None
+                and exc.response.status_code == HTTPStatus.CONFLICT
+            ):
+                continue
+            log.exception(
+                "Could not add %s to Keycloak organization %s",
+                user,
+                organization.org_key,
+            )
+            failed.append(user)
+
+    return failed
 
 
 def update_organization(  # noqa: PLR0913
@@ -674,6 +736,54 @@ def _create_attribute_mappers(
         )
 
 
+def _replace_attribute_mappers(
+    connection, alias, protocol, attribute_map, attribute_name_map
+):
+    """
+    Replace the IdP's attribute-importer mappers with the supplied set.
+
+    The two maps together are the whole mapper set, the way `domains` is the
+    whole domain list on an organization update: what is on the IdP now goes,
+    and what is supplied takes its place. A merge would have to guess which
+    mapper an operator meant to change - Keycloak keys them by a generated id,
+    and the only name we give them is `{alias}-{attribute}-mapper`.
+
+    Only the attribute importers are replaced. A mapper of another type - a
+    username template, a hardcoded role - was added out of band and has nothing
+    to do with the maps being supplied, so an attribute edit does not destroy
+    it.
+
+    Args:
+    - connection (KeycloakConnection): the Keycloak connection to use
+    - alias (str): the IdP alias
+    - protocol (str): "saml" or "oidc"
+    - attribute_map (dict): user attribute -> SAML friendly name / OIDC claim
+    - attribute_name_map (dict): user attribute -> SAML attribute name
+    Returns:
+    - list[dict]: the mappers that were removed, for the audit record. They
+      are gone from Keycloak once this returns, so this is the only place the
+      set an operator replaced can still be read.
+    """
+
+    endpoint = f"identity-provider/instances/{alias}/mappers"
+    existing = connection.client.list(endpoint, IdentityProviderMapperRepresentation)
+
+    removed = [
+        mapper
+        for mapper in existing
+        if mapper.identity_provider_mapper in IDP_ATTRIBUTE_MAPPERS.values()
+    ]
+
+    for mapper in removed:
+        connection.client.delete(f"{endpoint}/{mapper.id}")
+
+    _create_attribute_mappers(
+        connection, alias, protocol, attribute_map, attribute_name_map
+    )
+
+    return [{"name": mapper.name, "config": mapper.config} for mapper in removed]
+
+
 def create_identity_provider(  # noqa: PLR0913
     organization,
     *,
@@ -815,6 +925,225 @@ def create_identity_provider(  # noqa: PLR0913
     return identity_provider
 
 
+def _replace_metadata_config(
+    config, identity_provider, metadata_artifact, metadata_url
+):
+    """
+    Swap the metadata-derived keys in an IdP's Keycloak config for new ones.
+
+    Drops what the old document put there before applying the new one.
+    Overlaying would leave any key the new document does not define - an old
+    SAML signing certificate, an OIDC logout endpoint the partner removed -
+    live in Keycloak while our artifact says it is gone. The stored artifact is
+    exactly the set of keys metadata owns, so the credentials and the lifecycle
+    flags are untouched.
+
+    Args:
+    - config (dict): the IdP's current Keycloak config, modified in place
+    - identity_provider (OrganizationIdentityProvider): the IdP being updated
+    - metadata_artifact (dict): what Keycloak parsed out of the new document
+    - metadata_url (str): the new metadata URL, if the source is a URL
+    """
+
+    for stale_key in identity_provider.metadata_artifact or {}:
+        config.pop(stale_key, None)
+
+    config.update(metadata_artifact)
+
+    if identity_provider.protocol == IDP_PROTOCOL_SAML:
+        # Whichever source is not in use has to be turned off explicitly. An
+        # IdP created from a URL keeps re-reading that URL otherwise, so an
+        # operator who replaces it with uploaded XML gets a 200 and a realm
+        # still following the descriptor they just replaced.
+        config.update(
+            {
+                "metadataDescriptorUrl": metadata_url or "",
+                "useMetadataDescriptorUrl": "true" if metadata_url else "false",
+            }
+        )
+
+
+def _identity_provider_update_diff(  # noqa: PLR0913
+    identity_provider,
+    *,
+    config_before,
+    config_after,
+    display_name,
+    metadata_source,
+    rotated_secret,
+):
+    """
+    Build the before/after pair recording what an IdP update changed.
+
+    The client secret is the one thing that is recorded without its value:
+    that a rotation happened is what an auditor needs, and the audit table is
+    readable by anyone who can read the change history.
+
+    Args:
+    - identity_provider (OrganizationIdentityProvider): the IdP being updated
+    - config_before (dict): its Keycloak config as read
+    - config_after (dict): its Keycloak config as written
+    - display_name (str): the new display name, or None
+    - metadata_source (str): the new metadata source, or None
+    - rotated_secret (bool): whether a new client secret was sent
+    Returns:
+    - tuple[dict, dict]: what the audit record holds as before and after
+    """
+
+    changed_keys = sorted(
+        key
+        for key in config_before.keys() | config_after.keys()
+        if key != "clientSecret" and config_before.get(key) != config_after.get(key)
+    )
+
+    data_before = {}
+    data_after = {}
+
+    if changed_keys:
+        data_before["config"] = {key: config_before.get(key) for key in changed_keys}
+        data_after["config"] = {key: config_after.get(key) for key in changed_keys}
+    if rotated_secret:
+        data_after["client_secret_rotated"] = True
+    if display_name is not None and display_name != identity_provider.display_name:
+        data_before["display_name"] = identity_provider.display_name
+        data_after["display_name"] = display_name
+    if metadata_source:
+        data_before["metadata_source"] = identity_provider.metadata_source
+        data_after["metadata_source"] = metadata_source
+
+    return data_before, data_after
+
+
+def update_identity_provider(  # noqa: PLR0913
+    identity_provider,
+    *,
+    display_name=None,
+    metadata_url=None,
+    metadata_xml=None,
+    client_id=None,
+    client_secret=None,
+    attribute_map=None,
+    attribute_name_map=None,
+    connection=None,
+    actor=None,
+):
+    """
+    Update an identity provider in place.
+
+    The alternative is delete and recreate, and Keycloak's IdP delete runs
+    `preRemove` on the provider, which deletes every user's federated identity
+    link to it. Those users then have to go back through first-broker-login.
+    Rotating a client secret or fixing one mapper must not cost that, which is
+    why this exists.
+
+    Keycloak's IdP PUT replaces rather than merges, so this reads the current
+    representation and writes it back with the changes applied - including the
+    lifecycle flags, which keeps the transition machinery the only thing that
+    moves them. A client secret that is not being changed comes back from
+    Keycloak masked and is written back masked; Keycloak restores the stored
+    value when it sees the sentinel (IdentityProviderResource.updateIdpFromRep,
+    Keycloak main). The alias cannot change here and Keycloak rejects it too.
+
+    There is no compensation. The IdP write, the mapper replacement and our
+    save happen in that order, and a failure part way through leaves Keycloak
+    ahead of our row - on a SAML IdP, possibly with fewer mappers than it
+    started with. Every step is idempotent for the same request body, so the
+    recovery is to send the same PATCH again; unlike a create, there is nothing
+    half-made to delete.
+
+    Args:
+    - identity_provider (OrganizationIdentityProvider): the IdP to update
+    - display_name (str): new display name, if changing
+    - metadata_url (str): new metadata or OIDC discovery URL, if changing
+    - metadata_xml (str): new SAML metadata document, if changing
+    - client_id (str): new OIDC client ID, if changing
+    - client_secret (str): new OIDC client secret, if rotating
+    - attribute_map (dict): user attribute -> SAML friendly name / OIDC claim
+    - attribute_name_map (dict): user attribute -> SAML attribute name
+    - connection (KeycloakConnection): an existing connection, if any
+    Returns:
+    - OrganizationIdentityProvider: the updated record
+    """
+
+    connection = connection or KeycloakConnection()
+
+    metadata_source = metadata_url or metadata_xml
+    metadata_artifact = None
+
+    if metadata_source:
+        metadata_artifact = parse_identity_provider_metadata(
+            identity_provider.protocol,
+            metadata_url=metadata_url,
+            metadata_xml=metadata_xml,
+            connection=connection,
+        )
+
+    keycloak_idp = connection.identity_providers.get(identity_provider.alias)
+    payload = keycloak_idp.model_dump(by_alias=True, exclude_none=True)
+    config = dict(payload.get("config") or {})
+    config_before = dict(config)
+
+    if metadata_artifact is not None:
+        _replace_metadata_config(
+            config, identity_provider, metadata_artifact, metadata_url
+        )
+    if client_id is not None:
+        config["clientId"] = client_id
+    if client_secret is not None:
+        config["clientSecret"] = client_secret
+    if display_name is not None:
+        payload["displayName"] = display_name
+
+    payload["config"] = config
+    connection.identity_providers.update(identity_provider.alias, payload)
+
+    data_before, data_after = _identity_provider_update_diff(
+        identity_provider,
+        config_before=config_before,
+        config_after=config,
+        display_name=display_name,
+        metadata_source=metadata_source,
+        rotated_secret=client_secret is not None,
+    )
+
+    if attribute_map is not None or attribute_name_map is not None:
+        data_before["attribute_mappers"] = _replace_attribute_mappers(
+            connection,
+            identity_provider.alias,
+            identity_provider.protocol,
+            attribute_map,
+            attribute_name_map,
+        )
+        data_after["attribute_map"] = attribute_map or {}
+        data_after["attribute_name_map"] = attribute_name_map or {}
+
+    if display_name is not None:
+        identity_provider.display_name = display_name
+    if metadata_artifact is not None:
+        # The artifact stays what Keycloak parsed and nothing else: this field
+        # is served back over the API, and an OIDC update carries a secret.
+        identity_provider.metadata_source = metadata_source
+        identity_provider.metadata_artifact = metadata_artifact
+        identity_provider.metadata_fetched_at = now_in_utc()
+
+    with transaction.atomic():
+        identity_provider.save()
+        # A body that repeats the current values changes nothing. The writes
+        # above still run, so re-sending a PATCH stays the recovery for a
+        # half-applied one, but an empty record would only pad the history.
+        if data_before or data_after:
+            _audit(
+                identity_provider.organization,
+                PROVISIONING_ACTION_IDP_UPDATED,
+                actor=actor,
+                identity_provider_alias=identity_provider.alias,
+                data_before=data_before,
+                data_after=data_after,
+            )
+
+    return identity_provider
+
+
 def refresh_identity_provider_metadata(
     identity_provider, *, connection=None, actor=None
 ):
@@ -836,16 +1165,20 @@ def refresh_identity_provider_metadata(
     connection = connection or KeycloakConnection()
     source = identity_provider.metadata_source
 
+    metadata_url = source if not source.lstrip().startswith("<") else None
+
     config = parse_identity_provider_metadata(
         identity_provider.protocol,
-        metadata_url=source if not source.lstrip().startswith("<") else None,
-        metadata_xml=source if source.lstrip().startswith("<") else None,
+        metadata_url=metadata_url,
+        metadata_xml=source if metadata_url is None else None,
         connection=connection,
     )
 
     keycloak_idp = connection.identity_providers.get(identity_provider.alias)
     payload = keycloak_idp.model_dump(by_alias=True, exclude_none=True)
-    payload["config"] = {**(payload.get("config") or {}), **config}
+    keycloak_config = dict(payload.get("config") or {})
+    _replace_metadata_config(keycloak_config, identity_provider, config, metadata_url)
+    payload["config"] = keycloak_config
     connection.identity_providers.update(identity_provider.alias, payload)
 
     before = identity_provider.metadata_artifact or {}

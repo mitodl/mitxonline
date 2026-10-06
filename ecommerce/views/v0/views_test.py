@@ -1574,7 +1574,7 @@ def test_start_checkout_with_b2b_products(
     """Test that start_checkout works when there's B2B items in the basket."""
 
     contract = ContractPageFactory.create(membership_type=contract_type)
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_contracts=[contract], b2b_only=True)
     with reversion.create_revision():
         product = ProductFactory.create(purchasable_object=courserun)
 

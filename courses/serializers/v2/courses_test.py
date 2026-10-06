@@ -270,9 +270,9 @@ class TestCourseRunEnrollmentSerializerV2:
         org = OrganizationPageFactory.create()
         contract = ContractPageFactory.create(organization=org)
 
-        enrollment = CourseRunEnrollmentFactory.create()
-        enrollment.run.b2b_contract = contract
-        enrollment.run.save()
+        enrollment = CourseRunEnrollmentFactory.create(
+            run__b2b_contracts=[contract], b2b_contract=contract
+        )
 
         serialized_data = CourseRunEnrollmentSerializer(
             enrollment, context=mock_context
@@ -306,15 +306,13 @@ class TestUserEnrollmentFiltering:
     """Test B2B filtering for user enrollments."""
 
     def test_exclude_b2b_filter_logic(self):
-        """Test that the exclude_b2b filter correctly filters out B2B enrollments."""
-        regular_enrollment = CourseRunEnrollmentFactory.create()
-
-        org = OrganizationPageFactory.create(title="Test B2B Org")
-        contract = ContractPageFactory.create(organization=org)
-        b2b_enrollment = CourseRunEnrollmentFactory.create()
-        b2b_enrollment.run.b2b_contract = contract
-        b2b_enrollment.run.b2b_only = True
-        b2b_enrollment.run.save()
+        """exclude_b2b filters out enrollments made through a contract, not every enrollment in a contract run."""
+        contract = ContractPageFactory.create()
+        run = CourseRunFactory.create(b2b_contracts=[contract])
+        regular_enrollment = CourseRunEnrollmentFactory.create(run=run)
+        b2b_enrollment = CourseRunEnrollmentFactory.create(
+            run=run, b2b_contract=contract
+        )
 
         queryset = CourseRunEnrollment.objects.filter(
             id__in=[regular_enrollment.id, b2b_enrollment.id]
@@ -348,13 +346,15 @@ class TestUserEnrollmentFiltering:
         contract1 = ContractPageFactory.create(organization=org1)
         contract2 = ContractPageFactory.create(organization=org2)
 
-        enrollment1 = CourseRunEnrollmentFactory.create()
-        enrollment1.run.b2b_contract = contract1
-        enrollment1.run.save()
+        enrollment1 = CourseRunEnrollmentFactory.create(
+            run__b2b_contracts=[contract1], b2b_contract=contract1
+        )
+        # A personal enrollment in the same contract run doesn't belong to org1.
+        CourseRunEnrollmentFactory.create(run=enrollment1.run)
 
-        enrollment2 = CourseRunEnrollmentFactory.create()
-        enrollment2.run.b2b_contract = contract2
-        enrollment2.run.save()
+        enrollment2 = CourseRunEnrollmentFactory.create(
+            run__b2b_contracts=[contract2], b2b_contract=contract2
+        )
 
         queryset = CourseRunEnrollment.objects.all()
         filter_data = QueryDict(f"org_id={org1.id}")
@@ -419,3 +419,9 @@ def test_course_serializer_canonical_run_fallback_to_oldest(mock_context):
     serializer = CourseWithCourseRunsSerializer(course, context=mock_context)
     assert len(serializer.data["courseruns"]) == 1
     assert serializer.data["courseruns"][0]["courseware_id"] == run_first.courseware_id
+
+
+def test_course_run_serializer_b2b_only():
+    """b2b_only is serialized, so MIT Learn's ETL can keep contract-only runs out of its catalog."""
+    run = CourseRunFactory.create(b2b_only=True)
+    assert CourseRunSerializer(run).data["b2b_only"] is True
