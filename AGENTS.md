@@ -342,11 +342,11 @@ docker compose exec web python manage.py collectstatic       # Collect static fi
 
 Generate and view API schema:
 ```bash
-# Generate schema
-docker compose exec web python manage.py spectacular --file schema.yml
+# Regenerate openapi/specs/v0.yaml ... v3.yaml
+docker compose exec web python manage.py generate_openapi_spec
 
 # View in browser
-# Navigate to http://mitxonline.odl.local:8013/api/schema/swagger-ui/
+# Navigate to http://mitxonline.odl.local:8013/api/v0/schema/swagger-ui/ (one per version: v0-v3)
 ```
 
 Schema checked in tests: `scripts/test/openapi_spec_check.sh` ensures schema is up-to-date.

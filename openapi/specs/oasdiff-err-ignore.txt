@@ -359,16 +359,19 @@ PUT /api/v1/enrollments/{id}/ added the new `M` enum value to the `run/allOf[#/c
 GET /api/v2/courses/ removed the enum value `M` from the `query` request parameter `courseruns__variant_industry`
 
 # ============================================================================
-# ONE-TIME: OpenAPI spec repartitioning (PR #3824).
+# ONE-TIME: OpenAPI spec repartitioning (mitodl/hq#9979).
 #
 # Until now REST_FRAMEWORK used the non-existent key "DEFAULT_VERSIONING",
 # so NamespaceVersioning was never active and every per-version spec file
 # contained every path in the project. Partitioning them therefore reports
 # each path as "removed" from the files it no longer belongs to. Every entry
 # below is api-path-removed-without-deprecation and no endpoint actually
-# changed - each one still exists, just in its own version's spec.
+# changed - each one still exists, just in its own version's spec, except
+# /api/records/* and POST /enrollments/, which exclude_paths_hook in
+# openapi/hooks.py keeps out of every spec.
 #
-# DELETE THIS ENTIRE BLOCK in a follow-up PR immediately after #3824 merges.
+# DELETE THIS ENTIRE BLOCK in a follow-up PR immediately after the
+# repartitioning merges.
 # Once main's specs are partitioned this noise disappears, and leaving these
 # lines in place would permanently mask genuine removals of the same paths.
 # ============================================================================
