@@ -63,6 +63,7 @@ from b2b.provisioning import (
     refresh_identity_provider_metadata,
     set_onboarding_state,
     transition_identity_provider,
+    update_identity_provider,
     update_organization,
 )
 from b2b.serializers.v0.manager import (
@@ -89,6 +90,7 @@ from b2b.serializers.v0.provisioning import (
     RemovedContractRunSerializer,
     SetOnboardingStateSerializer,
     UpdateContractSerializer,
+    UpdateIdentityProviderSerializer,
     UpdateOrganizationSerializer,
 )
 from b2b.views.v0.manager import (
@@ -425,9 +427,48 @@ class IdentityProviderProvisioningViewSet(
             status=status.HTTP_201_CREATED,
         )
 
+    @extend_schema(
+        request=UpdateIdentityProviderSerializer,
+        responses={
+            200: OrganizationIdentityProviderSerializer,
+            400: DetailSerializer,
+            502: DetailSerializer,
+        },
+    )
+    def partial_update(self, request, alias=None, **kwargs):  # noqa: ARG002
+        """
+        Update an identity provider in place.
+
+        Without this, rotating a partner's OIDC client secret or fixing a
+        mapper means deleting the IdP and creating it again, and Keycloak's
+        delete takes every user's federated identity link with it.
+        """
+
+        identity_provider = self.get_object()
+
+        request_serializer = UpdateIdentityProviderSerializer(
+            data=request.data,
+            context={"protocol": identity_provider.protocol},
+        )
+        request_serializer.is_valid(raise_exception=True)
+
+        identity_provider = update_identity_provider(
+            identity_provider,
+            actor=request.user,
+            **request_serializer.validated_data,
+        )
+
+        return Response(self.get_serializer(identity_provider).data)
+
     @extend_schema(responses={204: None, 502: DetailSerializer})
     def destroy(self, request, alias=None, **kwargs):  # noqa: ARG002
-        """Unlink and delete an identity provider."""
+        """
+        Unlink and delete an identity provider.
+
+        Destructive beyond this API: Keycloak deletes every user's federated
+        identity link to the provider along with it, so everyone who has signed
+        in through it re-links on their next login. Prefer PATCH.
+        """
 
         delete_identity_provider(self.get_object(), actor=request.user)
 

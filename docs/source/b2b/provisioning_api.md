@@ -110,8 +110,8 @@ start at `org_created`, and so do organizations the reconciler adopts.
 
 Every change made through the provisioning functions writes an
 `OrganizationProvisioningAudit` row in the same transaction: organization
-create and update, onboarding changes, and IdP create, transition, metadata
-refresh and delete. Each row records who made the change and the data before
+create and update, onboarding changes, and IdP create, update, transition,
+metadata refresh and delete. Each row records who made the change and the data before
 and after it. `GET .../events/` returns them newest first.
 
 Partner SSO changes used to go through PR review in Pulumi. We decided on
@@ -125,6 +125,7 @@ written to it. Contract changes aren't audited here.
 GET    /api/v0/b2b/provisioning/organizations/{org_key}/identity-providers/
 POST   /api/v0/b2b/provisioning/organizations/{org_key}/identity-providers/
 GET    /api/v0/b2b/provisioning/organizations/{org_key}/identity-providers/{alias}/
+PATCH  /api/v0/b2b/provisioning/organizations/{org_key}/identity-providers/{alias}/
 DELETE /api/v0/b2b/provisioning/organizations/{org_key}/identity-providers/{alias}/
 POST   /api/v0/b2b/provisioning/organizations/{org_key}/identity-providers/{alias}/refresh-metadata/
 POST   /api/v0/b2b/provisioning/organizations/{org_key}/identity-providers/{alias}/transition/
@@ -152,8 +153,10 @@ users in with no email or name. OIDC takes `discovery_url`, `client_id` and
 Keycloak's `identity-provider/import-config` parses the metadata. The parsed
 config is stored on the `OrganizationIdentityProvider` as `metadata_artifact`,
 along with where it came from. Metadata is only fetched again when someone
-calls `refresh-metadata`. If the partner's endpoint is down, the refresh
-returns 502 and the stored config is left as it was. The OIDC client secret is
+calls `refresh-metadata`. A refresh replaces the parsed config, so a key the
+partner's metadata no longer defines (e.g. a withdrawn certificate or logout
+endpoint) is removed from Keycloak too. If the partner's endpoint is down, the
+refresh returns 502 and the stored config is left as it was. The OIDC client secret is
 sent to Keycloak but never stored in MITx Online.
 
 `parse-metadata` runs the same parse without creating anything, so staff can
@@ -167,6 +170,41 @@ send to the partner.
 
 An IdP alias is chosen by staff, not derived from `org_key`, because one
 organization can have more than one IdP.
+
+### Editing an identity provider
+
+`DELETE` on an IdP is destructive beyond this API. Keycloak's IdP delete also
+deletes every user's federated identity link to that alias, so everyone who
+has signed in through the IdP has to re-link on their next login. `PATCH`
+exists so that rotating an OIDC client secret, pointing at new metadata or
+fixing a mapper doesn't cost that.
+
+`PATCH` takes any of these, and only the fields sent are changed:
+
+| Field | Protocol | Notes |
+| --- | --- | --- |
+| `display_name` | both | The only field that may be sent blank |
+| `metadata_url`, `metadata_xml` | SAML | At most one. The metadata is parsed again and replaces the stored config |
+| `discovery_url` | OIDC | Parsed again, the same as SAML metadata |
+| `client_id`, `client_secret` | OIDC | The secret goes to Keycloak and is never stored or audited |
+| `attribute_map`, `attribute_name_map` | see below | Replace the IdP's attribute mappers |
+
+The attribute maps replace the whole set of attribute mappers, they don't
+merge into it. For SAML, send both maps together (an empty object for the one
+with no entries), because sending one alone would delete the other's mappers.
+A user attribute can be in only one of the two, and the pair can't leave a
+SAML IdP with no mappers. OIDC takes `attribute_map` only, and an empty
+object clears its mappers. Mappers of other types added in the Keycloak
+console are left alone.
+
+`alias` and `protocol` can't be changed. Sending either is a 400, and so is a
+field that belongs to the other protocol or a body with no fields. The
+lifecycle state doesn't change here, only through `transition/`.
+
+The update writes the IdP to Keycloak, then replaces the mappers, then saves
+the MITx Online record, with no compensation. If a step fails, Keycloak is
+ahead of MITx Online, and on SAML it may have fewer mappers than it started
+with. Send the same `PATCH` again to finish it.
 
 ### Lifecycle
 
@@ -249,6 +287,7 @@ here requires staff, including reads.
 | Organization name gives a page slug that's already taken | 409 |
 | Acting on an organization with no Keycloak organization | 409 |
 | `org_key` sent on `PATCH` | 400 |
+| `alias` or `protocol` sent on an IdP `PATCH` | 400 |
 | Lifecycle transition not in the table above | 400 |
 | Database write and compensating Keycloak delete both failed | 500 |
 | A Keycloak admin API call failed | 502 |
@@ -278,5 +317,5 @@ changes an existing `org_key`.
 - Domain verification, before C2.
 - Where C2's partner invite token is stored. `OrganizationOnboarding` is the
   likely place, but it has no token field yet.
-- A contracts section in the staff dashboard, an IdP edit route, and a
-  test-login flow.
+- A contracts section in the staff dashboard, an IdP edit form over the
+  `PATCH` route, and a test-login flow.
