@@ -149,6 +149,7 @@
             font-size: 12px;
             font-weight: 600;
             padding: 4px 10px;
+            min-width: 56px;
             cursor: pointer;
 
             & + button {
@@ -256,6 +257,7 @@
 
         input {
             width: 100%;
+            box-sizing: border-box;
             padding: 6px 10px;
             border: 1px solid var(--border-color);
             border-radius: 5px;
@@ -314,13 +316,6 @@
         }
     }
 
-    .req-subgroups {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        margin-top: 4px;
-    }
-
     .req-add-row {
         display: flex;
         gap: 8px;
@@ -328,7 +323,7 @@
     }
 
     .req-add-btn,
-    .req-add-nested-btn {
+    .req-add-track-btn {
         border: 1.5px dashed var(--border-color);
         background: transparent;
         color: var(--body-quiet-color);
@@ -354,21 +349,119 @@
         color: var(--req-elective-color, #a1662f);
     }
 
-    .req-add-nested-btn {
+    .req-add-track-btn {
         align-self: flex-start;
         font-size: 11.5px;
         padding: 5px 10px;
+
+        &:hover {
+            border-color: var(--req-track-color, #3b6e8f);
+            color: var(--req-track-color, #3b6e8f);
+        }
+    }
+
+    .req-tracks {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 4px;
+    }
+
+    .req-track {
+        background: var(--darkened-bg);
+        border: 1px solid var(--border-color);
+        border-left: 4px solid var(--req-track-color, #3b6e8f);
+        border-radius: 6px;
+        padding: 10px 12px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+
+        &__head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        &__pill {
+            font-size: 10.5px;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            padding: 3px 8px;
+            border-radius: 99px;
+            white-space: nowrap;
+            background: color-mix(
+                in srgb,
+                var(--req-track-color, #3b6e8f) 18%,
+                transparent
+            );
+            color: var(--req-track-color, #3b6e8f);
+        }
+
+        &__title {
+            flex: 1;
+            min-width: 0;
+            font-size: 14px;
+            font-weight: 700;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            padding: 3px 6px;
+            background: transparent;
+            color: var(--body-fg);
+
+            &:hover,
+            &:focus {
+                outline: none;
+                border-color: var(--border-color);
+                background: var(--body-bg);
+            }
+        }
+
+        &__description {
+            width: 100%;
+            box-sizing: border-box;
+            resize: vertical;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 6px 8px;
+            background: var(--body-bg);
+            color: var(--body-fg);
+            font-size: 12.5px;
+            font-family: inherit;
+
+            &:focus {
+                outline: none;
+                border-color: var(--req-track-color, #3b6e8f);
+            }
+        }
+
+        &__groups {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .req-group--nested {
+            background: var(--body-bg);
+        }
+
+        .req-add-row {
+            margin-top: 0;
+        }
     }
 }
 
-// The elective accent has no equivalent in Django admin's own token set, so
-// it gets its own light/dark values instead of hardcoding one hex for both.
+// The elective and track accents have no equivalent in Django admin's own
+// token set, so they get their own light/dark values instead of hardcoding
+// one hex for both.
 html[data-theme="dark"] .program-requirements-field {
     --req-elective-color: #d99a5c;
+    --req-track-color: #7fb3d5;
 }
 
 @media (prefers-color-scheme: dark) {
     html[data-theme="auto"] .program-requirements-field {
         --req-elective-color: #d99a5c;
+        --req-track-color: #7fb3d5;
     }
 }
