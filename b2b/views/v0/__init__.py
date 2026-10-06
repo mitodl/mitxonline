@@ -386,6 +386,9 @@ class AttachContractApi(APIView):
             # that already holds one of those can deadlock asking for the lock.
             with transaction.atomic():
                 lock_contract_for_code_assignment(contract)
+                # The seat limit may have been changed while this waited for
+                # the lock; the contract passed in was loaded before it.
+                contract.refresh_from_db(fields=["max_learners"])
 
                 if (
                     user.b2b_contracts.filter(pk=contract.pk).exists()
