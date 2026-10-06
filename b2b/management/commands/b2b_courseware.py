@@ -191,6 +191,12 @@ Specifying a program will only unlink the program from the contract, unless "--r
             filter_val = filter_val.first()
             if filter_val:
                 filter_variants.append(filter_val)
+            else:
+                self.stderr.write(
+                    self.style.WARNING(
+                        f"The contract has no variant set matching '{variant}'; no runs will be created for it."
+                    )
+                )
 
         if can_import:
             # Get the courseware IDs we got passed in that weren't matched to

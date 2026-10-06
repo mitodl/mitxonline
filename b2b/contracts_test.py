@@ -23,7 +23,7 @@ from b2b.contracts import (
     remove_courseware_from_contract,
     update_contract_variant_set,
 )
-from b2b.exceptions import ContractVariantError
+from b2b.exceptions import ContractVariantError, SourceCourseIncompleteError
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.models import (
     DiscountContractAttachmentRedemption,
@@ -116,6 +116,19 @@ def test_add_program():
     assert added.runs_added == 2
     assert added.courses_without_source_run == 0
     assert list(contract.programs) == [program]
+
+
+def test_add_course_to_contract_with_no_variant_sets_creates_nothing():
+    """No variant sets on the contract means no runs, not a run for every variant."""
+
+    contract = ContractPageFactory.create()
+    contract.variant_options.all().delete()
+    course = _source_run().course
+
+    with pytest.raises(SourceCourseIncompleteError):
+        add_courseware_to_contract(contract, course, skip_edx=True)
+
+    assert not contract.get_course_runs().exists()
 
 
 def test_add_run_in_another_contract_is_skipped():

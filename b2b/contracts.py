@@ -134,7 +134,8 @@ def add_courseware_to_contract(  # noqa: PLR0913
       learners' courseware with it.
 
     Runs are created for the variant sets in filter_variants, which defaults to
-    the contract's active variant sets. no_reruns defaults to True, unlike
+    the contract's active variant sets. A contract with no active variant sets
+    gets no runs. no_reruns defaults to True, unlike
     create_contract_run, so repeating a call does not mint another run.
     org_prefix defaults to the organization's own prefix.
     """
