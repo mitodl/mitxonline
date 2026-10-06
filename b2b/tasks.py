@@ -102,11 +102,13 @@ def create_program_contract_runs(
 
         log.info(
             "Completed contract run creation for program %s in contract %s: "
-            "%d created, %d courses without a usable source run",
+            "%d created, %d courses without a usable source run, "
+            "%d courses with an invalid source run key",
             program.readable_id,
             contract.slug,
             added.runs_added,
             added.courses_without_source_run,
+            added.courses_with_invalid_key,
         )
 
     finally:

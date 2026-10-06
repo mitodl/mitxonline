@@ -651,6 +651,11 @@ def create_contract_run(  # noqa: PLR0913
         filter_variants=filter_variants,
     )
 
+    # Raises InvalidKeyError before the loop creates anything, so a course with
+    # one bad source run ID doesn't end up with runs for only some variants.
+    for source_run in source_runs:
+        CourseKey.from_string(source_run.readable_id)
+
     content_type = ContentType.objects.filter(
         app_label="courses", model="courserun"
     ).get()

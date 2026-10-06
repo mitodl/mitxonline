@@ -276,10 +276,11 @@ run that already belongs to another contract is skipped and stays where it is.
 
 Adding a program creates runs for each of its courses. A course with no source
 run to clone (none at all, or none for the contract's variant sets) is skipped,
-and the response's `courses_without_source_run` counts those courses. The rest
-of the program is still added. Adding a single course with no usable source run
-is a 400. A contract with no variant sets has no usable source run for any
-course.
+and the response's `courses_without_source_run` counts those courses. A course
+whose source run ID isn't a valid course key is skipped the same way and
+counted in `courses_with_invalid_key`. The rest of the program is still added.
+Adding a single course with no usable source run or with an invalid key is a
+400. A contract with no variant sets has no usable source run for any course.
 
 `courseware/remove/` closes the removed runs to new enrollments. A run that
 already has enrolled learners stays linked to the contract so they keep access.

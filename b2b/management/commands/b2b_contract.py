@@ -840,10 +840,11 @@ class Command(BaseCommand):
         filter_variants = list(contract.active_variant_options())
         total_created = 0
         total_no_source = 0
+        total_invalid_key = 0
 
         for program, sort_order in programs_with_order:
             self.stdout.write(f"  Program: {program.readable_id}")
-            created, no_source = contract.add_program_courses(
+            created, no_source, invalid_key = contract.add_program_courses(
                 program,
                 order=sort_order,
                 skip_edx=True,
@@ -852,17 +853,25 @@ class Command(BaseCommand):
             )
             total_created += created
             total_no_source += no_source
+            total_invalid_key += invalid_key
             if no_source:
                 self.stdout.write(
                     self.style.WARNING(
                         f"    {no_source} course(s) had no source run and were skipped"
                     )
                 )
+            if invalid_key:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"    {invalid_key} course(s) had an invalid source run key and were skipped"
+                    )
+                )
 
         self.stdout.write(
             self.style.SUCCESS(
                 f"  Created {total_created} contract run(s), "
-                f"{total_no_source} course(s) without source runs skipped"
+                f"{total_no_source} course(s) without source runs skipped, "
+                f"{total_invalid_key} with an invalid source run key skipped"
             )
         )
 

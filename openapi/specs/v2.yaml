@@ -7847,9 +7847,12 @@ components:
           type: integer
         courses_without_source_run:
           type: integer
+        courses_with_invalid_key:
+          type: integer
         skipped_reason:
           type: string
       required:
+      - courses_with_invalid_key
       - courses_without_source_run
       - runs_added
       - skipped_reason

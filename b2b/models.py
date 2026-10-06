@@ -18,6 +18,7 @@ from django.utils.text import slugify
 from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
 from modelcluster.fields import ParentalKey
+from opaque_keys import InvalidKeyError
 from requests.exceptions import HTTPError
 from wagtail.admin.panels import FieldPanel, HelpPanel, InlinePanel, MultiFieldPanel
 from wagtail.fields import RichTextField
@@ -733,9 +734,10 @@ class ContractPage(Page, ClusterableModel):
         This defaults to not allowing re-runs to happen.
 
         A course with no source run for the requested variants is skipped and
-        counted, and the rest of the program is still added. The check for a
-        source run happens before anything is created for a course, so a
-        skipped course leaves nothing behind.
+        counted, and so is one whose source run ID is not a valid course key.
+        The rest of the program is still added. Both checks happen before
+        anything is created for a course, so a skipped course leaves nothing
+        behind.
 
         Args:
         - program (courses.Program): the program to add
@@ -744,9 +746,11 @@ class ContractPage(Page, ClusterableModel):
           organization's own prefix
 
         Returns:
-        - tuple: Tuple with two integers:
+        - tuple: Tuple with three integers:
             - number of course runs created
             - number of courses skipped for having no usable source run
+            - number of courses skipped for a source run ID that is not a
+              valid course key
         """
 
         from b2b.api import create_contract_run  # noqa: PLC0415
@@ -757,6 +761,7 @@ class ContractPage(Page, ClusterableModel):
 
         managed = 0
         no_source = 0
+        invalid_key = 0
 
         for course in program.courses_qset.all():
             try:
@@ -781,6 +786,17 @@ class ContractPage(Page, ClusterableModel):
                 )
                 no_source += 1
                 continue
+            except InvalidKeyError:
+                log.warning(
+                    "Could not build a contract run key for course %s in program "
+                    "%s, skipping it for contract %s",
+                    course.readable_id,
+                    program.readable_id,
+                    self.id,
+                    exc_info=True,
+                )
+                invalid_key += 1
+                continue
             managed += len(created_runs)
 
         already_linked = ContractProgramItem.objects.filter(
@@ -795,7 +811,7 @@ class ContractPage(Page, ClusterableModel):
             item = ContractProgramItem(contract=self, program=program, sort_order=order)
             item.save(skip_run_creation=True)
 
-        return (managed, no_source)
+        return (managed, no_source, invalid_key)
 
     @property
     @admin.display(description="Title")
