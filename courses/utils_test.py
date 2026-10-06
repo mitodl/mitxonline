@@ -10,6 +10,7 @@ import pytest
 from mitol.common.utils import now_in_utc
 from requests.exceptions import HTTPError
 
+from cms.models import ProgramPage
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
@@ -77,13 +78,12 @@ def test_get_program_certificate_by_enrollment_program_does_not_exist(user):
 def test_get_program_certificate_by_enrollment_program_page_does_not_exist(
     user,
     program_with_requirements,  # noqa: F811
+    mocker,
 ):
     """
     Test that get_program_certificate_by_enrollment returns None if program page does not exist
     """
     program = program_with_requirements.program
-
-    program.page.delete()
 
     course = program_with_requirements.program.courses[0][0]
     course_run = CourseRunFactory.create(course=course)
@@ -92,6 +92,13 @@ def test_get_program_certificate_by_enrollment_program_page_does_not_exist(
     program_enrollment = ProgramEnrollmentFactory.create(user=user, program=program)
 
     program_certificate = ProgramCertificateFactory.create(program=program, user=user)
+
+    # A certificate can no longer be created without a live program page (it
+    # needs one to derive certificate_page_revision from), so simulate a
+    # missing page by overriding the cached_property directly on this
+    # instance rather than deleting the page out from under an existing
+    # certificate.
+    mocker.patch.object(program, "program_page", None)
 
     assert (
         get_program_certificate_by_enrollment(course_enrollment, program)
@@ -107,14 +114,12 @@ def test_get_program_certificate_by_enrollment_program_page_does_not_exist(
 def test_get_program_certificate_by_enrollment_program_certificate_page_does_not_exist(
     user,
     program_with_requirements,  # noqa: F811
+    mocker,
 ):
     """
     Test that get_program_certificate_by_enrollment returns None if program certificate page does not exist
     """
     program = program_with_requirements.program
-
-    program.page.certificate_page.delete()
-    program.page.delete()
 
     course = program_with_requirements.program.courses[0][0]
     course_run = CourseRunFactory.create(course=course)
@@ -123,6 +128,12 @@ def test_get_program_certificate_by_enrollment_program_certificate_page_does_not
     program_enrollment = ProgramEnrollmentFactory.create(user=user, program=program)
 
     program_certificate = ProgramCertificateFactory.create(program=program, user=user)
+
+    # A certificate can no longer be created without a live certificate page,
+    # so simulate a missing one by patching the (plain, uncached) property
+    # instead of deleting the page an existing certificate's revision points
+    # to - that would cascade-delete the certificate along with it.
+    mocker.patch.object(ProgramPage, "certificate_page", new=None)
 
     assert (
         get_program_certificate_by_enrollment(course_enrollment) != program_certificate
