@@ -426,27 +426,35 @@ class CertificatePage(CourseProgramChildPage):
         FieldPanel("CEUs"),
         FieldPanel("overrides"),
         FieldPanel("signatories"),
-        # Set on the panel, not the field: panel help text carries markup and
-        # isn't migration-tracked, so this copy can be revised without one.
-        FieldPanel(
-            "verifiable_credential_criteria",
-            widget=Textarea,
-            help_text=mark_safe(
-                "Describe what the learner did in order to earn the credential. "
-                "This should be a bulleted list, in plain text or markdown, with "
-                "each item beginning with an action verb -- for example: "
-                "<strong>Described</strong> how machine learning models are "
-                "trained, or <strong>Distinguished</strong> between symbolic and "
-                "modern machine learning. If it is not supplied, no verifiable "
-                "credential will be provisioned for those certificates."
-            ),
+        MultiFieldPanel(
+            [
+                FieldPanel("should_provision_verifiable_credential"),
+                FeatureFlaggedFieldPanel(
+                    "verifiable_credential_description",
+                    feature_flag=features.ENABLE_CREDENTIAL_METADATA_AUTHORING,
+                    widget=Textarea,
+                ),
+                # Set on the panel, not the field: panel help text carries
+                # markup and isn't migration-tracked, so this copy can be
+                # revised without one.
+                FieldPanel(
+                    "verifiable_credential_criteria",
+                    widget=Textarea,
+                    help_text=mark_safe(
+                        "Describe what the learner did in order to earn the "
+                        "credential. This should be a bulleted list, in plain "
+                        "text or markdown, with each item beginning with an "
+                        "action verb -- for example: <strong>Described</strong> "
+                        "how machine learning models are trained, or "
+                        "<strong>Distinguished</strong> between symbolic and "
+                        "modern machine learning. If it is not supplied, no "
+                        "verifiable credential will be provisioned for those "
+                        "certificates."
+                    ),
+                ),
+            ],
+            heading="Verifiable Credential",
         ),
-        FeatureFlaggedFieldPanel(
-            "verifiable_credential_description",
-            feature_flag=features.ENABLE_CREDENTIAL_METADATA_AUTHORING,
-            widget=Textarea,
-        ),
-        FieldPanel("should_provision_verifiable_credential"),
     ]
     api_fields = [
         APIField("product_name"),
@@ -1607,6 +1615,14 @@ class CoursePage(ProductPage):
         null=True,
         help_text="If true, allow the AI chatbots to ingest the course's content files.",
     )
+    show_course_outline = models.BooleanField(
+        default=True,
+        help_text=(
+            "If true, Learn should show the course outline (modules) on the "
+            "product page. Turn this off for courses whose module titles aren't "
+            "written for a pre-purchase audience."
+        ),
+    )
 
     template = "product_page.html"
     search_fields = Page.search_fields + [  # noqa: RUF005
@@ -1623,6 +1639,7 @@ class CoursePage(ProductPage):
         *ProductPage.content_panels,
         FieldPanel("include_in_learn_catalog"),
         FieldPanel("ingest_content_files_for_ai"),
+        FieldPanel("show_course_outline"),
     ]
     api_fields = [
         *ProductPage.api_fields,
@@ -1630,6 +1647,7 @@ class CoursePage(ProductPage):
         APIField("topic_list"),
         APIField("include_in_learn_catalog"),
         APIField("ingest_content_files_for_ai"),
+        APIField("show_course_outline"),
     ]
 
     @cached_property

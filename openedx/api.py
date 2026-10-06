@@ -630,6 +630,12 @@ def update_edx_user_profile(user):
         )
         return
 
+    # Safety net, mirroring get_edx_api_client: make sure the user actually has an
+    # OpenEdxApiAuth record before we read it.
+    if create_edx_auth_token(user) is None:
+        log.info("Skipping user profile update for %s, could not create edX auth", user)
+        return
+
     auth = get_valid_edx_api_auth(user)
     req_session = requests.Session()
     resp = req_session.patch(
@@ -667,6 +673,12 @@ def update_edx_user_email(user):
     Args:
         user(user.models.User): the user to update the record for
     """
+    if not user.openedx_user_exists:
+        log.info(
+            "Skipping user email update for %s, user has no Open edX account", user
+        )
+        return
+
     with requests.Session() as req_session:
         django_session = auth_api.create_user_session(user)
         session_cookie = requests.cookies.create_cookie(

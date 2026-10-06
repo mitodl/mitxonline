@@ -1160,10 +1160,12 @@ def test_user_enrollments_b2b_organization_filter(user_drf_client, user):
     regular_run = CourseRunFactory.create(course=regular_course)
 
     b2b_course = CourseFactory.create()
-    b2b_run = CourseRunFactory.create(course=b2b_course, b2b_contract=contract)
+    b2b_run = CourseRunFactory.create(course=b2b_course, b2b_contracts=[contract])
 
     CourseRunEnrollmentFactory.create(user=user, run=regular_run)
-    b2b_enrollment = CourseRunEnrollmentFactory.create(user=user, run=b2b_run)
+    b2b_enrollment = CourseRunEnrollmentFactory.create(
+        user=user, run=b2b_run, b2b_contract=contract
+    )
 
     resp = user_drf_client.get(reverse("v2:user-enrollments-api-list"))
     assert resp.status_code == status.HTTP_200_OK
@@ -1882,10 +1884,10 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                     ),
                     **(
                         {
-                            "b2b_contract_id": run_enrollment.run.b2b_contract.id,
-                            "b2b_organization_id": run_enrollment.run.b2b_contract.organization_id,
+                            "b2b_contract_id": run_enrollment.b2b_contract.id,
+                            "b2b_organization_id": run_enrollment.b2b_contract.organization_id,
                         }
-                        if run_enrollment.run.b2b_contract
+                        if run_enrollment.b2b_contract
                         else {
                             "b2b_contract_id": None,
                             "b2b_organization_id": None,
