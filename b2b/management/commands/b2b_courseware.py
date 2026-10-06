@@ -218,14 +218,23 @@ Specifying a program will only unlink the program from the contract, unless "--r
 
                 self.stdout.write(f"Attempting to import {importable_id} from edX...")
 
-                imported_runs = import_and_create_contract_run(
-                    contract=contract,
-                    course_run_id=importable_id,
-                    departments=can_import.split(sep=","),
-                    create_cms_page=True,
-                    create_depts=True,
-                    org_prefix=org_prefix,
-                )
+                try:
+                    imported_runs = import_and_create_contract_run(
+                        contract=contract,
+                        course_run_id=importable_id,
+                        departments=can_import.split(sep=","),
+                        create_cms_page=True,
+                        create_depts=True,
+                        org_prefix=org_prefix,
+                        filter_variants=filter_variants,
+                    )
+                except SourceCourseIncompleteError as exc:
+                    self.stderr.write(
+                        self.style.ERROR(
+                            f"No usable source run for {importable_id}: {exc}"
+                        )
+                    )
+                    continue
 
                 if not imported_runs:
                     self.stdout.write(
