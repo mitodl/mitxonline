@@ -575,6 +575,13 @@ class ContractPage(Page, ClusterableModel):
 
         self.title = str(self.name)
 
+        if self.alias_of_id:
+            # Wagtail ignores exclude_fields_in_copy for an alias, and copies
+            # every field to it again each time the original is published.
+            self.learner_records_opt_in = False
+            self.learner_records_opt_in_recorded_on = None
+            self.learner_records_opt_in_recorded_by = None
+
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
 
     def get_learners(self):
