@@ -782,6 +782,41 @@ def _attribute_importer_mappers(connection, alias):
     ]
 
 
+def get_identity_provider_attribute_maps(identity_provider, *, connection=None):
+    """
+    Return the IdP's attribute mappers as the two maps an update takes.
+
+    The maps replace the whole mapper set on an update, so a caller editing one
+    mapping has to start from what Keycloak holds now. Keycloak is the only
+    place the mappers are stored.
+
+    A SAML mapper carrying both a FriendlyName and a Name is reported by its
+    FriendlyName. Nothing here or in ol-infrastructure creates one.
+
+    Args:
+    - identity_provider (OrganizationIdentityProvider): the IdP to read
+    - connection (KeycloakConnection): the Keycloak connection to use
+    Returns:
+    - tuple of (attribute_map, attribute_name_map)
+    """
+
+    connection = connection or KeycloakConnection()
+    attribute_map = {}
+    attribute_name_map = {}
+
+    for mapper in _attribute_importer_mappers(connection, identity_provider.alias):
+        config = mapper.config or {}
+        user_attribute = config["user.attribute"]
+        if identity_provider.protocol == IDP_PROTOCOL_OIDC:
+            attribute_map[user_attribute] = config["claim"]
+        elif config.get("attribute.friendly.name"):
+            attribute_map[user_attribute] = config["attribute.friendly.name"]
+        else:
+            attribute_name_map[user_attribute] = config["attribute.name"]
+
+    return attribute_map, attribute_name_map
+
+
 def _replace_attribute_mappers(  # noqa: PLR0913
     connection, alias, protocol, existing, attribute_map, attribute_name_map
 ):
