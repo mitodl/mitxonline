@@ -671,14 +671,16 @@ MIT_LEARN_BASE_URL = get_string(
 )
 
 # MIT Learn's API is served from a separate host, not a path under the web app,
-# so MIT_LEARN_BASE_URL cannot be reused for it. The API hostnames are the web
-# hostnames with an "api." prefix, which is why this derives from the same map.
+# so MIT_LEARN_BASE_URL cannot be reused for it.
+#
+# Unlike the MIT_LEARN_*_URL settings above, which only build links, this one is
+# called. It defaults to empty so that a deployment which has not configured it
+# makes no outbound request at all, rather than silently reaching an instance it
+# did not choose. Same convention as VERIFIABLE_CREDENTIAL_SIGNER_URL.
 MIT_LEARN_API_BASE_URL = get_string(
     name="MIT_LEARN_API_BASE_URL",
-    default=(
-        f"https://api.{ENV_TO_LEARN_HOSTNAME_MAP.get(ENVIRONMENT, 'learn.mit.edu')}"
-    ),
-    description="Base URL of the MIT Learn API for this environment",
+    default="",
+    description="Base URL of the MIT Learn API; lookups are disabled when unset",
 )
 
 MIT_LEARN_DASHBOARD_URL = get_string(
