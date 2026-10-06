@@ -342,8 +342,10 @@ def create_contract_run_key(
         .first()
     )
     if last_run_tag:
-        run_idx, _ = CourseKey.from_string(last_run_tag.courseware_id).run.split("T")
-        run_idx = int(run_idx) + 1
+        # Read from run_tag, not the courseware ID: create_contract_run appends
+        # the language and variant tags to the ID's run, and those can contain
+        # a "T" of their own (e.g. pt_PT).
+        run_idx = int(last_run_tag.run_tag.removesuffix(mostly_run_tag)) + 1
 
     new_run_tag = B2B_RUN_TAG_FORMAT.format(
         year=now_in_utc().year, contract_id=contract.id, run_idx=run_idx

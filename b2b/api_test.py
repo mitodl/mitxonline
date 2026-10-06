@@ -1625,6 +1625,39 @@ def test_create_contract_run_key():
         )
 
 
+@pytest.mark.parametrize("language", ["pt_PT", "it_IT", "tr_TR"])
+def test_create_contract_run_key_language_with_t(language):
+    """
+    The run index increments past a contract run whose language code has a "T".
+
+    create_contract_run appends the language to the courseware ID's run, so the
+    ID of an existing run looks like 1T5C2026_pt_PT.
+    """
+
+    contract = ContractPageFactory.create()
+    course = CourseFactory.create()
+    source_run = CourseRunFactory.create(
+        course=course,
+        courseware_id=f"{course.readable_id}+SOURCE",
+        run_tag="SOURCE",
+        language=language,
+    )
+
+    first_key = CourseKey.from_string(create_contract_run_key(source_run, contract))
+    CourseRunFactory.create(
+        course=course,
+        courseware_id=f"{first_key}_{language}",
+        run_tag=first_key.run,
+        language=language,
+    )
+
+    second_key = CourseKey.from_string(create_contract_run_key(source_run, contract))
+
+    assert second_key.run == B2B_RUN_TAG_FORMAT.format(
+        run_idx=2, contract_id=contract.id, year=now_in_utc().year
+    )
+
+
 @pytest.mark.parametrize(
     ("org_key_prefix", "org_prefix", "expected_prefix"),
     [
