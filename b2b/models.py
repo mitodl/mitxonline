@@ -373,6 +373,12 @@ class ContractPage(Page, ClusterableModel):
 
     parent_page_types = ["b2b.OrganizationPage"]
     base_form_class = ContractPageForm
+    # A copy is a new contract, and the organization hasn't opted in under it.
+    exclude_fields_in_copy = [
+        "learner_records_opt_in",
+        "learner_records_opt_in_recorded_on",
+        "learner_records_opt_in_recorded_by",
+    ]
     active_objects = ActiveContractManager()
 
     name = models.CharField(max_length=255, help_text="The name of the contract.")

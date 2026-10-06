@@ -110,6 +110,66 @@ def test_contract_opt_in_stamp_survives_a_revision(admin_user):
     assert contract.learner_records_opt_in_recorded_on is not None
 
 
+def test_contract_revert_does_not_restore_the_old_stamp(admin_user, staff_user):
+    """
+    Reverting binds the form to the old revision. Going back to a revision
+    that was opted in is a new opt-in by whoever reverted, not the original.
+    """
+
+    contract = ContractPageFactory.create()
+    opted_in = _edit_form(contract, staff_user, learner_records_opt_in="on").save(
+        commit=False
+    )
+    revision = opted_in.save_revision(user=staff_user)
+    revision.publish()
+    contract.refresh_from_db()
+    _edit_form(contract, staff_user).save()
+
+    _edit_form(revision.as_object(), admin_user, learner_records_opt_in="on").save()
+
+    contract.refresh_from_db()
+    assert contract.learner_records_opt_in is True
+    assert contract.learner_records_opt_in_recorded_by == admin_user
+
+
+def test_contract_draft_toggle_keeps_the_stamp(admin_user, staff_user):
+    """
+    Unticking and re-ticking in drafts never changes the stored opt-in, so
+    publishing the result leaves the original stamp in place.
+    """
+
+    contract = ContractPageFactory.create()
+    _edit_form(contract, staff_user, learner_records_opt_in="on").save()
+    contract.refresh_from_db()
+    recorded_on = contract.learner_records_opt_in_recorded_on
+
+    draft = _edit_form(contract, admin_user).save(commit=False)
+    draft = _edit_form(draft, admin_user, learner_records_opt_in="on").save(
+        commit=False
+    )
+    draft.save_revision(user=admin_user).publish()
+
+    contract.refresh_from_db()
+    assert contract.learner_records_opt_in is True
+    assert contract.learner_records_opt_in_recorded_by == staff_user
+    assert contract.learner_records_opt_in_recorded_on == recorded_on
+
+
+def test_contract_copy_is_not_opted_in(staff_user):
+    """A copy is a new contract, so it doesn't inherit the opt-in."""
+
+    contract = ContractPageFactory.create()
+    _edit_form(contract, staff_user, learner_records_opt_in="on").save()
+    contract.refresh_from_db()
+
+    copy = contract.copy(update_attrs={"slug": f"{contract.slug}-copy"})
+
+    copy.refresh_from_db()
+    assert copy.learner_records_opt_in is False
+    assert copy.learner_records_opt_in_recorded_on is None
+    assert copy.learner_records_opt_in_recorded_by is None
+
+
 def test_contract_edit_page_shows_who_recorded_the_opt_in(admin_client, staff_user):
     """The stamp is shown read-only beside the opt-in in the Wagtail editor."""
 
@@ -122,4 +182,5 @@ def test_contract_edit_page_shows_who_recorded_the_opt_in(admin_client, staff_us
     content = response.content.decode()
     assert 'name="learner_records_opt_in"' in content
     assert 'name="learner_records_opt_in_recorded_by"' not in content
+    assert 'name="learner_records_opt_in_recorded_on"' not in content
     assert str(staff_user) in content
