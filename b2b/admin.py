@@ -328,6 +328,9 @@ class ContractPageAdmin(ReadOnlyModelAdmin):
         "contract_end",
         "max_learners",
         "enrollment_fixed_price",
+        "learner_records_opt_in",
+        "learner_records_opt_in_recorded_on",
+        "learner_records_opt_in_recorded_by",
     ]
     inlines = [
         ContractPageCourseRunInline,
