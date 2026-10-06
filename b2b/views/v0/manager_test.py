@@ -41,7 +41,7 @@ from b2b.views.v0.manager import (
 )
 from courses.factories import CourseRunFactory
 from courses.models import CourseRunEnrollment
-from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME
+from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME, REDEMPTION_TYPE_UNLIMITED
 from ecommerce.factories import ProductFactory
 from main.test_utils import assert_drf_json_equal
 from users.factories import UserFactory
@@ -2721,3 +2721,22 @@ def test_redeeming_a_code_succeeds_when_keycloak_is_unreachable(org_setup, mocke
         user=learner, organization=contract_1.organization, keep_until_seen=True
     ).exists()
     assert code.contract_redemptions.filter(user=learner).count() == 1
+
+
+def test_redeeming_an_unlimited_code_again_after_removal_reattaches(org_setup, mocker):
+    """A learner removed from a contract can rejoin it with the same unlimited code."""
+    _, _, _, (contract_2, *_), *_ = org_setup
+    mocker.patch("b2b.models.OrganizationPage.attach_user", return_value=True)
+    learner = UserFactory.create()
+    code = contract_2.get_discounts().order_by("id").first()
+    assert code.redemption_type == REDEMPTION_TYPE_UNLIMITED
+    view = AttachContractApi()
+
+    view._attach_user_to_contracts(learner, [contract_2], code)  # noqa: SLF001
+    learner.b2b_contracts.remove(contract_2)
+    result = view._attach_user_to_contracts(  # noqa: SLF001
+        learner, [contract_2], code
+    )
+
+    assert result == (True, False, False)
+    assert learner.b2b_contracts.filter(pk=contract_2.pk).exists()
