@@ -5,6 +5,7 @@ import time
 import uuid
 
 import pytest
+import requests
 import reversion
 from django.core.management import call_command
 from django.db import connection, transaction
@@ -2610,7 +2611,7 @@ def test_redeeming_a_single_use_code_loses_to_a_concurrent_redemption(
     same single-use code is not attached once that redemption commits.
     """
     _, _, (contract_1, *_), *_ = org_setup
-    mocker.patch("b2b.views.v0.process_add_org_membership")
+    mocker.patch("b2b.models.OrganizationPage.attach_user", return_value=True)
     first, second = UserFactory.create_batch(2)
     code = contract_1.get_discounts().order_by("id").first()
     assert code.redemption_type == REDEMPTION_TYPE_ONE_TIME
@@ -2629,6 +2630,8 @@ def test_redeeming_a_single_use_code_loses_to_a_concurrent_redemption(
     redemption = DiscountContractAttachmentRedemption.objects.get(discount=code)
     assert redemption.user == first
     assert not second.b2b_contracts.filter(pk=contract_1.pk).exists()
+    assert UserOrganization.objects.filter(user=first).exists()
+    assert not UserOrganization.objects.filter(user=second).exists()
 
 
 @pytest.mark.django_db(transaction=True)
@@ -2697,3 +2700,24 @@ def test_redeeming_a_single_use_code_attaches_each_of_its_contracts(org_setup, m
     assert result == (True, False, False)
     assert set(learner.b2b_contracts.all()) == {contract_1, contract_3}
     assert code.contract_redemptions.filter(user=learner).count() == 2
+
+
+def test_redeeming_a_code_succeeds_when_keycloak_is_unreachable(org_setup, mocker):
+    """Keycloak being down after the redemption commits doesn't fail the request."""
+    _, _, (contract_1, *_), *_ = org_setup
+    mocker.patch(
+        "b2b.models.OrganizationPage.attach_user",
+        side_effect=requests.exceptions.ConnectionError("unreachable"),
+    )
+    learner = UserFactory.create()
+    code = contract_1.get_discounts().order_by("id").first()
+
+    result = AttachContractApi()._attach_user_to_contracts(  # noqa: SLF001
+        learner, [contract_1], code
+    )
+
+    assert result == (True, False, False)
+    assert UserOrganization.objects.filter(
+        user=learner, organization=contract_1.organization, keep_until_seen=True
+    ).exists()
+    assert code.contract_redemptions.filter(user=learner).count() == 1
