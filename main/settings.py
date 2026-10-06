@@ -282,7 +282,6 @@ INSTALLED_APPS = (
     # "mitol.digitalcredentials.apps.DigitalCredentialsApp",
     "mitol.hubspot_api",
     "mitol.mail.apps.MailApp",
-    "mitol.authentication.apps.TransitionalAuthenticationApp",
     "mitol.payment_gateway.apps.PaymentGatewayApp",
     "mitol.olposthog.apps.OlPosthog",
     "mitol.scim.apps.ScimApp",
@@ -1173,14 +1172,9 @@ REST_FRAMEWORK = {
     ),
 }
 
-# Relative URL to be used by Djoser for the link in the password reset email
-# (see: http://djoser.readthedocs.io/en/stable/settings.html#password-reset-confirm-url)
-PASSWORD_RESET_CONFIRM_URL = "password_reset/confirm/{uid}/{token}/"  # noqa: S105
-
 # ol-django configuration
 
 import_settings_modules(
-    "mitol.authentication.settings.djoser_settings",
     "mitol.payment_gateway.settings",
     "mitol.olposthog.settings.olposthog",
 )
@@ -1209,10 +1203,6 @@ MITOL_MAIL_ENABLE_EMAIL_DEBUGGER = get_bool(  # NOTE: this will override the leg
     description="Enable the mitol-mail email debugger",
     dev_only=True,
 )
-
-# mitol-django-authentication
-MITOL_AUTHENTICATION_FROM_EMAIL = MIT_LEARN_FROM_EMAIL
-MITOL_AUTHENTICATION_REPLY_TO_EMAIL = MITX_ONLINE_REPLY_TO_ADDRESS
 
 OPENEDX_OAUTH_PROVIDER = get_string(
     name="OPENEDX_OAUTH_PROVIDER",
