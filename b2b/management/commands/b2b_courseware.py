@@ -12,6 +12,7 @@ from opaque_keys import InvalidKeyError
 
 from b2b.api import import_and_create_contract_run
 from b2b.contracts import add_courseware_to_contract, remove_courseware_from_contract
+from b2b.exceptions import SourceCourseIncompleteError
 from b2b.management.utils import get_contract_by_id_or_slug
 from b2b.tasks import queue_enrollment_code_check
 from courses.api import resolve_courseware_object_from_id
@@ -268,11 +269,16 @@ Specifying a program will only unlink the program from the contract, unless "--r
                     )
                 )
                 continue
+            except SourceCourseIncompleteError as exc:
+                self.stderr.write(
+                    self.style.ERROR(f"No usable source run for {courseware}: {exc}")
+                )
+                continue
 
             if added.courses_with_invalid_key:
                 self.stdout.write(
                     self.style.WARNING(
-                        f"Program '{courseware.readable_id}' has {added.courses_with_invalid_key} courses whose source run ID is not a valid course key; cannot create contract runs for these courses."
+                        f"Program '{courseware.readable_id}' has {added.courses_with_invalid_key} courses that a contract run key could not be built for; cannot create contract runs for these courses. Check the source run IDs, the organization key and the prefix."
                     )
                 )
 

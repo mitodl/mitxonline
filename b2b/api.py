@@ -502,7 +502,9 @@ def _get_source_runs_for_course(  # noqa: PLR0913
         only_lang: If set, only add the specified additional language (plus the
             default)
         filter_variants: If provided, a list of SupportedVariant objects to filter by.
-            An empty list matches no variants; None means no filter.
+            An empty list matches no variants; None means no filter. The
+            legacy and ignore_langs paths don't apply it, so create_contract_run
+            rejects an empty list before calling this.
         no_variants: If True, only return runs that match the default variant set.
     Returns:
         List of distinct source CourseRun objects, one per language (or one
@@ -643,6 +645,12 @@ def create_contract_run(  # noqa: PLR0913
         source language run. Legacy single-language courses produce a one-element
         list.
     """
+    # _get_source_runs_for_course doesn't apply filter_variants to a course with
+    # no default variant set, with ignore_langs, or in its fallback.
+    if filter_variants == []:
+        msg = f"No variant sets to create runs of {course} for."
+        raise SourceCourseIncompleteError(msg)
+
     source_runs = _get_source_runs_for_course(
         course,
         require_designated=require_designated_source_run,

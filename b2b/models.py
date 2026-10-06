@@ -734,7 +734,8 @@ class ContractPage(Page, ClusterableModel):
         This defaults to not allowing re-runs to happen.
 
         A course with no source run for the requested variants is skipped and
-        counted, and so is one whose source run ID is not a valid course key.
+        counted, and so is one that a contract run key can't be built for (a
+        source run ID, organization key or prefix that isn't key-safe).
         The rest of the program is still added. Both checks happen before
         anything is created for a course, so a skipped course leaves nothing
         behind.
@@ -749,8 +750,8 @@ class ContractPage(Page, ClusterableModel):
         - tuple: Tuple with three integers:
             - number of course runs created
             - number of courses skipped for having no usable source run
-            - number of courses skipped for a source run ID that is not a
-              valid course key
+            - number of courses skipped because a contract run key could not
+              be built
         """
 
         from b2b.api import create_contract_run  # noqa: PLC0415
