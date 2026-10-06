@@ -670,6 +670,17 @@ MIT_LEARN_BASE_URL = get_string(
     description="Base URL of the MIT Learn instance for this environment",
 )
 
+# MIT Learn's API is served from a separate host, not a path under the web app,
+# so MIT_LEARN_BASE_URL cannot be reused for it. The API hostnames are the web
+# hostnames with an "api." prefix, which is why this derives from the same map.
+MIT_LEARN_API_BASE_URL = get_string(
+    name="MIT_LEARN_API_BASE_URL",
+    default=(
+        f"https://api.{ENV_TO_LEARN_HOSTNAME_MAP.get(ENVIRONMENT, 'learn.mit.edu')}"
+    ),
+    description="Base URL of the MIT Learn API for this environment",
+)
+
 MIT_LEARN_DASHBOARD_URL = get_string(
     name="MIT_LEARN_DASHBOARD_URL",
     default=f"{MIT_LEARN_BASE_URL}/dashboard",
