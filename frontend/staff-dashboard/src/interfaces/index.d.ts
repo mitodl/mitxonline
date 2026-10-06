@@ -187,6 +187,12 @@ export interface IOrganizationIdentityProvider {
     service_provider: IServiceProviderDetails;
 }
 
+// The detail route also reads the attribute mappers back from Keycloak.
+export interface IOrganizationIdentityProviderDetail extends IOrganizationIdentityProvider {
+    attribute_map: Record<string, string>;
+    attribute_name_map: Record<string, string>;
+}
+
 export interface IProvisionedOrganization {
     id: number;
     name: string;
