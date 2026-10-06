@@ -5,18 +5,15 @@ Tasks for the courses app
 
 import logging
 
-from django.db.models import Prefetch, Q
+from django.db.models import Q
 from mitol.common.utils.datetime import now_in_utc
 
 from courses.models import (
     CourseRun,
     CourseRunEnrollment,
     LearnerProgramRecordShare,
-    ProgramEnrollment,
-    ProgramRequirement,
 )
 from main.celery import app
-from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE
 
 log = logging.getLogger(__name__)
 
@@ -100,18 +97,11 @@ def generate_program_certificates(batch_size=500):
 @app.task
 def upgrade_eligible_program_enrollments():
     """Upgrade eligible learners for all audit-mode program enrollments."""
-    from courses.api import upgrade_program_enrollment_if_eligible
-
-    enrollments = (
-        ProgramEnrollment.objects.filter(enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE)
-        .select_related("program", "user")
-        .prefetch("certificate")
-        .prefetch_related(
-            Prefetch(
-                "program__all_requirements",
-                queryset=ProgramRequirement.objects.select_related("course"),
-            )
-        )
+    from courses.api import (
+        get_audit_program_enrollments_for_upgrade,
+        upgrade_program_enrollment_if_eligible,
     )
+
+    enrollments = get_audit_program_enrollments_for_upgrade()
     for enrollment in enrollments:
         upgrade_program_enrollment_if_eligible(enrollment)

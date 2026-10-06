@@ -9,6 +9,7 @@ from mitol.common.utils import now_in_utc
 from rest_framework.exceptions import ValidationError
 
 from cms.serializers import ProgramPageSerializer
+from courses.constants import PROGRAM_DISPLAY_MODE_COURSE
 from courses.factories import (
     CourseFactory,
     CourseRunCertificateFactory,
@@ -151,7 +152,7 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
 def test_program_requirement_tree_serializer_save():
     """Verify that the ProgramRequirementTreeSerializer validates data"""
     program = ProgramFactory.create()
-    course1, _course2, _course3 = CourseFactory.create_batch(3)
+    course1, course2, _course3 = CourseFactory.create_batch(3)
     root = program.requirements_root
 
     serializer = ProgramRequirementTreeSerializer(
@@ -174,7 +175,9 @@ def test_program_requirement_tree_serializer_save():
                     "operator": "min_number_of",
                     "operator_value": "1",
                 },
-                "children": [],
+                "children": [
+                    {"id": None, "data": {"node_type": "course", "course": course2.id}}
+                ],
             },
         ],
         context={"program": program},
@@ -237,10 +240,57 @@ def test_program_requirement_tree_serializer_save():
                         "elective_flag": False,
                     },
                     "id": ANY,
+                    "children": [
+                        {
+                            "data": {
+                                "node_type": "course",
+                                "operator": None,
+                                "operator_value": None,
+                                "program": program.id,
+                                "course": course2.id,
+                                "required_program": None,
+                                "title": None,
+                                "elective_flag": False,
+                            },
+                            "id": ANY,
+                        }
+                    ],
                 },
             ],
         }
     ]
+
+
+def test_program_requirement_tree_serializer_rejects_invalid_tree():
+    """The tree serializer validates against the program's display mode"""
+    program = ProgramFactory.create(display_mode=PROGRAM_DISPLAY_MODE_COURSE)
+    required_program = ProgramFactory.create()
+
+    serializer = ProgramRequirementTreeSerializer(
+        instance=program.requirements_root,
+        data=[
+            {
+                "data": {
+                    "node_type": "operator",
+                    "title": "Required Courses",
+                    "operator": "all_of",
+                },
+                "children": [
+                    {
+                        "id": None,
+                        "data": {
+                            "node_type": "program",
+                            "required_program": required_program.id,
+                        },
+                    }
+                ],
+            }
+        ],
+        context={"program": program},
+    )
+
+    assert serializer.is_valid() is False
+    assert "cannot require other programs" in str(serializer.errors)
 
 
 def test_program_requirement_deletion():

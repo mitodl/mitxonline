@@ -5,7 +5,6 @@ MITx Online Commands
    :maxdepth: 2
    :caption: Contents:
 
-   check_program_requirements
    configure_instance
    configure_tiers
    create_courseware
