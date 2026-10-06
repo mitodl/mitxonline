@@ -474,6 +474,24 @@ def test_user_enrollments_list_has_course_staff_role(
     assert result["has_course_staff_role"] is expected
 
 
+def test_user_enrollments_detail_has_course_staff_role(user_drf_client, user):
+    """
+    Retrieve reports the role too.
+
+    It shares `get_queryset` with list today, so this is a guard against a
+    future `get_object`/`retrieve` override that skips the annotation.
+    """
+    enrollment = CourseRunEnrollmentFactory.create(user=user)
+    CourseRunAccessRole.objects.create(user=user, run=enrollment.run, role="staff")
+
+    resp = user_drf_client.get(
+        reverse("v3:user_enrollments_api-detail", kwargs={"pk": enrollment.id})
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["has_course_staff_role"] is True
+
+
 def test_user_enrollments_list_course_staff_role_is_per_run(user_drf_client, user):
     """A role on one run does not mark the user's other enrollments"""
     staffed, other = CourseRunEnrollmentFactory.create_batch(2, user=user)

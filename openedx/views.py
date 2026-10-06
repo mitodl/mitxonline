@@ -114,6 +114,18 @@ def edx_enrollment_webhook(request):
             course_id,
             role_created,
         )
+    elif role:
+        # The success log below prints the role either way, which would read as
+        # if it had been handled. Say so when it has not: a role arriving that
+        # we do not record means the plugin's allowed-role setting and
+        # OPENEDX_COURSE_STAFF_ROLES have drifted, or the casing differs.
+        log.warning(
+            "Webhook: Role %s for user %s in course run %s is not in "
+            "OPENEDX_COURSE_STAFF_ROLES, so it was not recorded.",
+            role,
+            email,
+            course_id,
+        )
 
     # --- Create local enrollment ---
     try:

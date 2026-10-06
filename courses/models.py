@@ -2586,13 +2586,17 @@ class CourseRunAccessRole(TimestampedModel):
     Open edX is the system of record. Rows here are mirrored from its
     COURSE_ACCESS_ROLE_ADDED event by the enrollment webhook, so that MITx
     Online can answer "is this user on the course team?" locally instead of
-    calling Open edX once per enrollment when the dashboard loads.
+    calling Open edX once per enrollment when the dashboard loads. The
+    plugin's `sync_course_access_roles` management command posts to the same
+    webhook to backfill roles granted before we started recording them; it
+    skips org-wide roles, which have no single run to attach to.
 
-    Two limits worth knowing. Only the roles the ol_openedx_events_handler
-    plugin is configured to report arrive here, so this is not a complete
-    picture of a run's course team - see OPENEDX_COURSE_STAFF_ROLES. And
-    nothing removes a row yet, because Open edX's role-removal event is not
-    forwarded, so a revoked role stays recorded until it is deleted by hand.
+    Two limits worth knowing. A row only lands here if the role passes both
+    the plugin's ENROLLMENT_COURSE_ACCESS_ROLES setting and our own
+    OPENEDX_COURSE_STAFF_ROLES, so this is not a complete picture of a run's
+    course team. And nothing removes a row, because Open edX's
+    COURSE_ACCESS_ROLE_REMOVED event is not forwarded, so a revoked role stays
+    recorded until it is deleted by hand.
     """
 
     user = models.ForeignKey(

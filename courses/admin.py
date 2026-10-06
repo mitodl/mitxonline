@@ -1352,17 +1352,9 @@ class CourseRunAccessRoleAdmin(TimestampedModelAdmin):
         "run__courseware_id",
         "run__title",
     ]
-    list_display = ("id", "get_user_email", "get_run_courseware_id", "role")
+    list_display = ("id", "user__email", "run__courseware_id", "role")
     list_filter = ["role"]
     raw_id_fields = ("user", "run")
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("user", "run")
-
-    @display(description="User", ordering="user__email")
-    def get_user_email(self, obj):
-        return obj.user.email
-
-    @display(description="Course Run", ordering="run__courseware_id")
-    def get_run_courseware_id(self, obj):
-        return obj.run.courseware_id
