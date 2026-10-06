@@ -2740,3 +2740,21 @@ def test_redeeming_an_unlimited_code_again_after_removal_reattaches(org_setup, m
 
     assert result == (True, False, False)
     assert learner.b2b_contracts.filter(pk=contract_2.pk).exists()
+
+
+def test_redeeming_a_code_uses_the_seat_limit_as_of_the_lock(org_setup, mocker):
+    """A seat limit lowered after the contract was loaded still refuses the learner."""
+    _, _, (contract_1, *_), *_ = org_setup
+    mocker.patch("b2b.models.OrganizationPage.attach_user", return_value=True)
+    member, learner = UserFactory.create_batch(2)
+    member.b2b_contracts.add(contract_1)
+    code = contract_1.get_discounts().order_by("id").first()
+    ContractPage.objects.filter(pk=contract_1.pk).update(max_learners=1)
+    assert contract_1.max_learners > 1
+
+    result = AttachContractApi()._attach_user_to_contracts(  # noqa: SLF001
+        learner, [contract_1], code
+    )
+
+    assert result == (False, True, False)
+    assert not learner.b2b_contracts.filter(pk=contract_1.pk).exists()
