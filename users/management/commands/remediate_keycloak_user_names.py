@@ -39,11 +39,24 @@ User = get_user_model()
 
 PAGE_SIZE = 100
 
+#: Root fields echoed back on every PUT, as (wire name, UserRepresentation
+#: attribute). Keycloak treats a PUT that carries ``attributes`` as the whole
+#: profile: a managed root field left out of the body is cleared, not kept.
+#: Measured on 26.7.4 with the default user profile, a PUT of only
+#: ``attributes`` nulled email, firstName and lastName, and a PUT of
+#: firstName/lastName plus ``attributes`` nulled email.
+ECHOED_ROOT_FIELDS = (
+    ("username", "username"),
+    ("email", "email"),
+    ("firstName", "first_name"),
+    ("lastName", "last_name"),
+)
+
 
 class UntouchedFieldChangedError(RuntimeError):
-    """Keycloak altered a root field the PUT did not include.
+    """Keycloak altered a root field the PUT was not meant to change.
 
-    Raised rather than reported per row: if omitted fields are being cleared,
+    Raised rather than reported per row: if untouched fields are being altered,
     every further PUT does the same damage, so the run stops before the next
     one and the resume_offset in the report says where to pick up.
     """
@@ -293,9 +306,14 @@ class Command(BaseCommand):
         :returns: whether the re-fetched user carries every value written.
         :rtype: bool
         :raises UntouchedFieldChangedError: if email, or firstName/lastName
-            when ``split_name`` is None, changed although the PUT omitted them.
+            when ``split_name`` is None, read back different from what was
+            listed before the PUT.
         """
-        patch = {}
+        patch = {
+            wire_name: value
+            for wire_name, attr in ECHOED_ROOT_FIELDS
+            if (value := getattr(keycloak_user, attr)) is not None
+        }
         if split_name:
             # client.save() PUTs this dict as raw JSON straight to
             # Keycloak's admin REST API - it never goes through
@@ -311,8 +329,9 @@ class Command(BaseCommand):
         client.save(f"users/{keycloak_user.id}", patch)
         # verify - don't just trust a 2xx
         refetched = client.retrieve(f"users/{keycloak_user.id}", UserRepresentation)
-        # A PUT that omits a root field must leave it alone; check rather than
-        # assume, since a fill-only run sends ~360k of these.
+        # The PUT echoes these back unchanged (see ECHOED_ROOT_FIELDS), so they
+        # must read back unchanged. Check rather than assume, since a fill-only
+        # run sends ~360k of these.
         untouched = {"email": (keycloak_user.email, refetched.email)}
         if split_name:
             names_verified = (refetched.first_name or "") == split_name[0] and (
@@ -330,7 +349,7 @@ class Command(BaseCommand):
         if changed:
             msg = (
                 f"Keycloak changed {', '.join(changed)} on user "
-                f"{keycloak_user.id} although the PUT omitted them"
+                f"{keycloak_user.id} although the PUT did not change them"
             )
             raise UntouchedFieldChangedError(msg)
         full_name_verified = (

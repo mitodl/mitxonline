@@ -222,7 +222,8 @@ def test_no_legal_address_split_only_patches_full_name(mocker):
     COMMAND.handle(apply=True, limit=None, report_path=None)
 
     client.save.assert_called_once_with(
-        "users/kc-1", {"attributes": {"fullName": ["Madonna"]}}
+        "users/kc-1",
+        {"firstName": "Madonna", "attributes": {"fullName": ["Madonna"]}},
     )
 
 
@@ -445,24 +446,31 @@ def test_fill_only_fills_empty_full_name_without_touching_split_name(mocker):
 
     kc_user = UserRepresentation(
         id="kc-1",
+        username="jsmyth",
+        email="jsmyth@example.com",
         firstName="Joseph",
         lastName="Smyth",
         attributes={"someOtherAttr": ["keep-me"]},
     )
     client = _mock_client(mocker, [[kc_user]])
-    client.retrieve.return_value = UserRepresentation(
-        id="kc-1",
-        firstName="Joseph",
-        lastName="Smyth",
-        attributes={"someOtherAttr": ["keep-me"], "fullName": ["Joe Smith"]},
+    client.retrieve.return_value = kc_user.model_copy(
+        update={"attributes": {"someOtherAttr": ["keep-me"], "fullName": ["Joe Smith"]}}
     )
     remediate_keycloak_user_names.bootstrap_client.return_value = client
 
     COMMAND.handle(apply=True, limit=None, fill_only=True, report_path=None)
 
+    # Keycloak clears a managed root field that a PUT carrying attributes
+    # leaves out, so all four are echoed back with the values it already holds.
     client.save.assert_called_once_with(
         "users/kc-1",
-        {"attributes": {"someOtherAttr": ["keep-me"], "fullName": ["Joe Smith"]}},
+        {
+            "username": "jsmyth",
+            "email": "jsmyth@example.com",
+            "firstName": "Joseph",
+            "lastName": "Smyth",
+            "attributes": {"someOtherAttr": ["keep-me"], "fullName": ["Joe Smith"]},
+        },
     )
 
 
@@ -578,10 +586,51 @@ def test_fill_only_skips_user_with_no_mitxonline_name(mocker, tmp_path):
 
 
 @pytest.mark.django_db
+def test_apply_echoes_email_and_username_when_patching_split_name(mocker):
+    """Normal mode sends attributes too, so it has to echo email and username
+    or Keycloak clears the email of every user it patches
+    """
+    user = UserFactory.create(name="Joe Smith", scim_external_id="kc-1")
+    user.legal_address.first_name = "Joe"
+    user.legal_address.last_name = "Smith"
+    user.legal_address.save()
+
+    kc_user = UserRepresentation(
+        id="kc-1",
+        username="jsmith",
+        email="jsmith@example.com",
+        firstName="",
+        lastName="",
+    )
+    client = _mock_client(mocker, [[kc_user]])
+    client.retrieve.return_value = kc_user.model_copy(
+        update={
+            "first_name": "Joe",
+            "last_name": "Smith",
+            "attributes": {"fullName": ["Joe Smith"]},
+        }
+    )
+    remediate_keycloak_user_names.bootstrap_client.return_value = client
+
+    COMMAND.handle(apply=True, limit=None, report_path=None)
+
+    client.save.assert_called_once_with(
+        "users/kc-1",
+        {
+            "username": "jsmith",
+            "email": "jsmith@example.com",
+            "firstName": "Joe",
+            "lastName": "Smith",
+            "attributes": {"fullName": ["Joe Smith"]},
+        },
+    )
+
+
+@pytest.mark.django_db
 def test_run_aborts_when_an_untouched_field_changes(mocker, tmp_path):
-    """If Keycloak changes a root field the PUT didn't include (here
-    firstName, blanked by a fullName-only PUT), the run stops before the next
-    user's PUT, and the report still carries the resume_offset
+    """If a root field the PUT was not meant to change reads back different
+    (here firstName, blanked), the run stops before the next user's PUT, and
+    the report still carries the resume_offset
     """
     for scim_id, name in (("kc-1", "Ann Lee"), ("kc-2", "Bo Chan")):
         user = UserFactory.create(name=name, scim_external_id=scim_id)
