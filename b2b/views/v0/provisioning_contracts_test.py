@@ -188,6 +188,48 @@ def test_patch_contract(
     assert mocked_tasks.code_check.called is queues_code_check
 
 
+def test_contract_description_keeps_only_rich_text_markup(admin_drf_client):
+    """A description is stored with nothing Wagtail's editor would not store."""
+
+    contract = ContractPageFactory.create()
+
+    response = admin_drf_client.patch(
+        _contract_url(contract),
+        {
+            "description": (
+                '<p data-block-key="a1" onclick="x()">Pilot <b>cohort</b></p>'
+                "<script>alert(1)</script>"
+                '<a href="javascript:alert(1)">bad</a>'
+                '<a href="https://example.edu">good</a>'
+                "<img src=x onerror=alert(1)>"
+            )
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    contract.refresh_from_db()
+    assert contract.description == (
+        '<p data-block-key="a1">Pilot <b>cohort</b></p>'
+        "alert(1)"
+        "<a>bad</a>"
+        '<a href="https://example.edu">good</a>'
+    )
+
+    created = admin_drf_client.post(
+        _contracts_url(contract.organization.org_key),
+        {
+            "name": "Scripted",
+            "membership_type": CONTRACT_MEMBERSHIP_MANAGED,
+            "description": "<script>alert(1)</script>Plain & simple",
+        },
+        format="json",
+    )
+
+    assert created.status_code == status.HTTP_201_CREATED
+    assert created.json()["description"] == "alert(1)Plain &amp; simple"
+
+
 @pytest.mark.zeal_allow("wagtailcore.Page", "get()")
 def test_add_courseware_and_follow_setup(admin_drf_client, mocked_tasks):
     """
