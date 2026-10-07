@@ -105,8 +105,14 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
 
         Read from the annotation the viewset's queryset adds, never queried
         here: this runs once per enrollment, so a lookup would be an N+1 across
-        the dashboard. The viewset annotates every path that serializes an
-        enrollment, including create - see `perform_create`.
+        the dashboard.
+
+        That covers list and retrieve, which is every route the dashboard uses.
+        It falls back to False anywhere the queryset was not involved - a
+        serializer used directly, or the v3 create route, which is unreachable
+        for a separate reason (`run_id` is read in `create()` but never
+        declared as a field) and is not called: the frontend enrols through
+        /api/v1/enrollments/.
         """
         return bool(getattr(enrollment, "has_course_staff_role", False))
 

@@ -30,10 +30,8 @@ from courses.models import (
     PaidProgram,
     ProgramEnrollment,
 )
-from courses.serializers.v3.courses import CourseRunEnrollmentSerializer
 from courses.serializers.v3.programs import SimpleProgramSerializer
 from courses.test_utils import maybe_serialize_course_cert, maybe_serialize_program_cert
-from courses.views.v3 import UserEnrollmentsApiViewSet
 from ecommerce.factories import OrderFactory
 from ecommerce.models import OrderStatus
 from main.test_utils import drf_datetime
@@ -600,31 +598,6 @@ def test_user_enrollments_future_course_cert(user_drf_client, user):
     assert list_resp.status_code == status.HTTP_200_OK
     enrollment_data = next(e for e in list_resp.json() if e["id"] == enrollment.id)
     assert enrollment_data["certificate"] is None
-
-
-def test_perform_create_annotates_the_new_enrollment(user, rf):
-    """
-    The created enrollment is re-read through the annotated queryset.
-
-    Nothing annotates the instance `save()` returns, so without this the create
-    response would report `has_course_staff_role` as False for a user who does
-    hold the role - someone re-enrolling after unenrolling, or whose role
-    arrived while an earlier enrollment attempt failed - while a later GET on
-    the same enrollment reported True.
-    """
-    enrollment = CourseRunEnrollmentFactory.create(user=user)
-    CourseRunAccessRole.objects.create(user=user, run=enrollment.run, role="staff")
-
-    view = UserEnrollmentsApiViewSet()
-    request = rf.post(reverse("v3:user_enrollments_api-list"))
-    request.user = user
-    view.request = request
-
-    serializer = CourseRunEnrollmentSerializer(context={"user": user})
-    serializer.save = lambda **_kwargs: enrollment
-    view.perform_create(serializer)
-
-    assert serializer.instance.has_course_staff_role is True
 
 
 def test_create_program_enrollment(user_drf_client, user):
