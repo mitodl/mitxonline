@@ -270,7 +270,11 @@ These replace running `b2b_contract`, `b2b_courseware`, `b2b_codes` and
 
 `POST` takes `name`, `membership_type` (required), `description`,
 `welcome_message`, `contract_start`, `contract_end`, `max_learners` and
-`enrollment_fixed_price`. `PATCH` takes the same fields plus `active`.
+`enrollment_fixed_price`. `PATCH` takes the same fields plus `active`. A
+contract that is inactive, ended or not yet started can still be read and
+edited here, and switched back on. It stays out of `user.b2b_contracts`,
+`run.b2b_contracts` and `organization.contracts`, which only return contracts
+valid for use (`ContractPageManager`).
 
 `courseware/` takes a program, course or course run readable ID. The contract
 runs and their products exist once the call returns. The edX course clones and
