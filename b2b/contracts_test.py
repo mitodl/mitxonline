@@ -295,6 +295,7 @@ def test_sync_contract_variants_covers_program_courses():
     course = _bilingual_source_course()
     program.add_requirement(course)
     add_courseware_to_contract(contract, program, skip_edx=True)
+    [original_run] = contract.get_course_runs()
     late_course = _bilingual_source_course()
     program.add_requirement(late_course)
     add_contract_variant_set(contract, language="fr")
@@ -304,7 +305,55 @@ def test_sync_contract_variants_covers_program_courses():
     assert sorted(
         (run.course_id, run.language) for run in synced["runs_created"]
     ) == sorted([(course.id, "fr"), (late_course.id, "en"), (late_course.id, "fr")])
+    assert original_run not in synced["runs_created"]
+    assert original_run in contract.get_course_runs()
+
+    assert sync_contract_variants(contract, skip_edx=True)["runs_created"] == []
     assert contract.get_course_runs().count() == 4
+
+
+def test_sync_contract_variants_skips_removed_course():
+    """
+    A removed course whose run stays linked for its learners gets no run for a
+    set added afterwards.
+    """
+
+    contract = ContractPageFactory.create()
+    course = _bilingual_source_course()
+    add_courseware_to_contract(contract, course, skip_edx=True)
+    [run] = contract.get_course_runs()
+    CourseRunEnrollmentFactory.create(run=run)
+    remove_courseware_from_contract(contract, course)
+    add_contract_variant_set(contract, language="fr")
+
+    synced = sync_contract_variants(contract, skip_edx=True)
+
+    assert synced == {"runs_created": [], "missing_source_runs": [], "failed": []}
+    assert list(contract.get_course_runs()) == [run]
+
+
+def test_sync_contract_variants_needs_a_default_course_variant():
+    """
+    A course with no default variant set is reported and gets no run, since
+    create_contract_run would ignore the set asked for.
+    """
+
+    contract = ContractPageFactory.create()
+    course = _bilingual_source_course()
+    add_courseware_to_contract(contract, course, skip_edx=True)
+    french = add_contract_variant_set(contract, language="fr")
+    course.possible_variant_sets.filter(default_variant=True).update(
+        default_variant=False
+    )
+
+    synced = sync_contract_variants(contract, skip_edx=True)
+
+    assert synced == {
+        "runs_created": [],
+        "missing_source_runs": [],
+        "failed": [{"course": course, "variant": french}],
+    }
+    assert contract.get_course_runs().count() == 1
 
 
 @pytest.mark.parametrize(

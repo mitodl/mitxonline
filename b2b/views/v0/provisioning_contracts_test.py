@@ -499,6 +499,7 @@ def test_sync_variants(admin_drf_client, mocked_tasks):
             {
                 "courseware_id": french_run.courseware_id,
                 "course_id": course.id,
+                "readable_id": course.readable_id,
                 "language": "fr",
                 "variant_length": "",
                 "variant_industry": "",
@@ -526,6 +527,24 @@ def test_sync_variants(admin_drf_client, mocked_tasks):
 
     assert response.json()["runs_created"] == []
     assert contract.get_course_runs().count() == 2
+    mocked_tasks.code_check.assert_not_called()
+
+
+def test_sync_variants_without_codes(admin_drf_client, mocked_tasks):
+    """A contract that doesn't use codes gets its runs and no code check."""
+
+    contract = ContractPageFactory.create(membership_type=CONTRACT_MEMBERSHIP_MANAGED)
+    course = _source_course()
+    CourseSupportedVariantFactory.create(
+        variant_object=course, language="fr", variant_length="", variant_industry=""
+    )
+    CourseRunFactory.create(course=course, is_source_run=True, language="fr")
+    add_courseware_to_contract(contract, course)
+    add_contract_variant_set(contract, language="fr")
+
+    response = admin_drf_client.post(_contract_url(contract, "sync-variants"))
+
+    assert len(response.json()["runs_created"]) == 1
     mocked_tasks.code_check.assert_not_called()
 
 

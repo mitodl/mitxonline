@@ -600,6 +600,7 @@ class ContractVariantSyncRunSerializer(serializers.Serializer):
 
     courseware_id = serializers.CharField()
     course_id = serializers.IntegerField()
+    readable_id = serializers.CharField(source="course.readable_id")
     language = serializers.CharField()
     variant_length = serializers.CharField(allow_blank=True)
     variant_industry = serializers.CharField(allow_blank=True)
