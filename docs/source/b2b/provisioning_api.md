@@ -6,10 +6,13 @@ members access to courseware. It lives under `/api/v0/b2b/provisioning/` and is
 staff-only.
 
 Most people will use it through the staff dashboard's B2B Organizations
-section, which covers organizations, onboarding state, IdPs and the change
-history. Contracts don't have a staff UI yet and are still edited in Wagtail,
-as child pages of the organization, or through the contract routes below. This
-page is the reference for engineers working on the API or the UI, and for
+section, which covers organizations, onboarding state, IdPs, the change
+history and contracts. A contract's page there creates and edits the contract,
+adds and removes courseware, shows how far the edX clones and enrollment codes
+have got, and assigns and expires codes. Three things on a contract still need
+Wagtail or the API: `welcome_message_extra` and the Google Sheet target, which
+the contract routes don't carry, and variant sets, which have routes and no UI
+yet. This page is the reference for engineers working on the API or the UI, and for
 anyone who needs to know what a button in the dashboard actually does.
 
 The design came from the B2B onboarding RFC,
@@ -334,5 +337,8 @@ changes an existing `org_key`.
 - Domain verification, before C2.
 - Where C2's partner invite token is stored. `OrganizationOnboarding` is the
   likely place, but it has no token field yet.
-- A contracts section in the staff dashboard, an IdP edit form over the
-  `PATCH` route, and a test-login flow.
+- An IdP edit form over the `PATCH` route, and a test-login flow.
+- The contract fields the staff dashboard can't reach
+  (`welcome_message_extra`, `google_sheet_target`, `google_sheet_target_tab`)
+  and a variant set editor. The Wagtail contract page can't go read-only
+  until the dashboard covers them.
