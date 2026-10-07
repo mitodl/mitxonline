@@ -300,7 +300,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
             ):
                 return contract.id
 
-        return contracts[0].id
+        return None
 
     @extend_schema_field(BaseProductSerializer(many=True))
     def get_products(self, obj):
@@ -389,7 +389,7 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSeri
         except models.CourseRun.DoesNotExist:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})  # noqa: B904
 
-        if run.has_b2b_contracts:
+        if run.b2b_only:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
 
         # The enrollment window governs getting into a run. An existing active
