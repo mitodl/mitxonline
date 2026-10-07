@@ -9632,6 +9632,12 @@ components:
           allOf:
           - $ref: '#/components/schemas/IdentityProviderServiceProvider'
           readOnly: true
+        login_url:
+          type: string
+          readOnly: true
+          nullable: true
+          description: A link that signs a user in through this IdP. Null when the
+            login client isn't configured.
         created_on:
           type: string
           format: date-time
@@ -9647,6 +9653,7 @@ components:
       - id
       - internal_id
       - lifecycle_state
+      - login_url
       - metadata_artifact
       - metadata_fetched_at
       - metadata_source

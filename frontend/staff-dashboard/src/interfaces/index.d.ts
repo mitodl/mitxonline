@@ -185,6 +185,7 @@ export interface IOrganizationIdentityProvider {
     created_on: string;
     updated_on: string;
     service_provider: IServiceProviderDetails;
+    login_url: string | null;
 }
 
 export interface IProvisionedOrganization {

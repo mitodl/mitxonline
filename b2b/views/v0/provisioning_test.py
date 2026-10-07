@@ -1,5 +1,7 @@
 """Tests for the staff-only B2B provisioning API's HTTP surface."""
 
+from urllib.parse import parse_qs, urlsplit
+
 import faker
 import pytest
 from django.urls import reverse
@@ -951,6 +953,56 @@ def test_identity_provider_includes_the_service_provider_details(
         "redirect_uri": f"{realm_url}/broker/exampleu/endpoint",
         "metadata_url": f"{realm_url}/broker/exampleu/endpoint/descriptor",
     }
+
+
+def test_identity_provider_includes_a_login_url_with_its_alias_as_the_hint(
+    staff_drf_client, settings
+):
+    """The gateway drops kc_idp_hint, so the link goes to Keycloak directly."""
+
+    settings.KEYCLOAK_BASE_URL = "https://sso.example.mit.edu"
+    settings.KEYCLOAK_REALM_NAME = "olapps"
+    settings.B2B_IDP_LOGIN_CLIENT_ID = "learn-client"
+    settings.B2B_IDP_LOGIN_REDIRECT_URI = "https://api.learn.example.mit.edu/login"
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+
+    response = staff_drf_client.get(
+        _identity_provider_url(organization.org_key, "exampleu")
+    )
+
+    login_url = urlsplit(response.json()["login_url"])
+    assert login_url._replace(query="").geturl() == (
+        "https://sso.example.mit.edu/realms/olapps/protocol/openid-connect/auth"
+    )
+    assert parse_qs(login_url.query) == {
+        "response_type": ["code"],
+        "client_id": ["learn-client"],
+        "redirect_uri": ["https://api.learn.example.mit.edu/login"],
+        "scope": ["openid"],
+        "kc_idp_hint": ["exampleu"],
+    }
+
+
+@pytest.mark.parametrize(
+    "unset", ["B2B_IDP_LOGIN_CLIENT_ID", "B2B_IDP_LOGIN_REDIRECT_URI"]
+)
+def test_identity_provider_has_no_login_url_without_a_login_client(
+    staff_drf_client, settings, unset
+):
+    """A link missing its client or redirect URI would fail at Keycloak."""
+
+    settings.B2B_IDP_LOGIN_CLIENT_ID = "learn-client"
+    settings.B2B_IDP_LOGIN_REDIRECT_URI = "https://api.learn.example.mit.edu/login"
+    setattr(settings, unset, None)
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+
+    response = staff_drf_client.get(
+        _identity_provider_url(organization.org_key, "exampleu")
+    )
+
+    assert response.json()["login_url"] is None
 
 
 def test_set_onboarding_state_records_who_did_it(staff_drf_client, staff_user):
