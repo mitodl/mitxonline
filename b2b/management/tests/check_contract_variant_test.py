@@ -44,3 +44,25 @@ def test_reports_each_course_per_variant_set(mocker):
     assert lines.count(f"{course.readable_id}: NO RUN") == 1
     assert lines.count(f"{course.readable_id}: NO RUN, NO SOURCE RUN") == 1
     assert lines.count(f"{course.readable_id}: NOT IN THE COURSE VARIANTS") == 1
+
+
+@pytest.mark.parametrize("fix_default", [True, False])
+def test_contract_with_no_default_variant_set(fix_default):
+    """Without a default set nothing is reported, unless --fix-default adds one."""
+
+    contract = ContractPageFactory.create()
+    contract.variant_options.all().delete()
+    args = ["--fix-default"] if fix_default else []
+    out = StringIO()
+
+    call_command(
+        "check_contract_variant",
+        str(contract.id),
+        *args,
+        stdout=out,
+        stderr=StringIO(),
+        no_color=True,
+    )
+
+    assert contract.variant_options.filter(default_variant=True).exists() is fix_default
+    assert ("Language = " in out.getvalue()) is fix_default
