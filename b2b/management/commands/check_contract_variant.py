@@ -5,7 +5,7 @@ Check B2B contract variants for validity.
 from django.core.management import BaseCommand
 from django.core.management.base import CommandParser
 
-from b2b.contracts import ensure_default_variant
+from b2b.contracts import ensure_default_variant, get_contract_variant_coverage
 from b2b.management.utils import get_contract_by_id_or_slug
 
 
@@ -57,30 +57,38 @@ class Command(BaseCommand):
                 self.stdout.write(
                     "'fix-default' flag set, creating a default variant set for the contract."
                 )
-                default_variant = ensure_default_variant(contract_obj)
+                ensure_default_variant(contract_obj)
             else:
                 return
 
         other_options = contract_obj.variant_options.filter(default_variant=False)
 
         self.stdout.write(
-            f"{len(other_options)} supported variants + default for contract {contract_obj.slug}"
+            f"{other_options.count()} supported variants + default for contract {contract_obj.slug}"
         )
 
-        runs_qs = contract_obj.get_all_variant_runs()
-
-        for variant in [default_variant, *other_options.all()]:
-            variant_runs = runs_qs.filter(variant.to_q_filter()).all()
-
-            runs = []
-
-            for variant_run in variant_runs:
-                source_flag = "(Source)" if variant_run.is_source_run else ""
-                runs.append(f"{variant_run.courseware_id}{source_flag}")
-
-            runs = " ".join(runs) if len(runs) > 0 else self.style.WARNING("NO RUNS")
+        for entry in get_contract_variant_coverage(contract_obj):
+            variant = entry["variant"]
+            inactive = "" if variant.active else " (inactive)"
 
             self.stdout.write(
-                f"Language = {variant.language} Industry = {variant.variant_industry} Length = {variant.variant_length}"
+                f"Language = {variant.language} Industry = {variant.variant_industry} Length = {variant.variant_length}{inactive}"
             )
-            self.stdout.write(f"\t{runs}")
+
+            if not entry["courses"]:
+                self.stdout.write(f"\t{self.style.WARNING('NO COURSES')}")
+
+            for listed in entry["courses"]:
+                if listed["contract_run"]:
+                    run_status = listed["contract_run"].courseware_id
+                elif listed["has_source_run"]:
+                    run_status = self.style.WARNING("NO RUN")
+                else:
+                    run_status = self.style.WARNING("NO RUN, NO SOURCE RUN")
+
+                self.stdout.write(f"\t{listed['course'].readable_id}: {run_status}")
+
+            for course in entry["unsupported_courses"]:
+                self.stdout.write(
+                    f"\t{course.readable_id}: {self.style.WARNING('NOT IN THE COURSE VARIANTS')}"
+                )

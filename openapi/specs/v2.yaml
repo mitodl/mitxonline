@@ -6325,10 +6325,17 @@ components:
             $ref: '#/components/schemas/ContractRunSetup'
         enrollment_codes:
           $ref: '#/components/schemas/ContractEnrollmentCodeSetup'
+        variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContractVariantSet'
+          description: Which of the contract's courses have a run for each of its
+            variant sets. A missing run does not change the status.
       required:
       - enrollment_codes
       - runs
       - status
+      - variants
     ContractSetupStatusEnum:
       enum:
       - in_progress
@@ -6372,7 +6379,8 @@ components:
 
         A listed course with a source run and no contract run gets a run for this
         set when its courseware is next added to the contract, if the set is
-        active.
+        active. A course in unsupported_courses has no active variant set of its
+        own with this language, length and industry, so it gets no run for it.
       properties:
         id:
           type: integer
@@ -6392,6 +6400,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ContractVariantCourse'
+        unsupported_courses:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContractVariantUnsupportedCourse'
       required:
       - active
       - b2b_only
@@ -6399,8 +6411,23 @@ components:
       - default_variant
       - id
       - language
+      - unsupported_courses
       - variant_industry
       - variant_length
+    ContractVariantUnsupportedCourse:
+      type: object
+      description: One of the contract's courses that a variant set does not match.
+      properties:
+        course_id:
+          type: integer
+        readable_id:
+          type: string
+        title:
+          type: string
+      required:
+      - course_id
+      - readable_id
+      - title
     Country:
       type: object
       description: Serializer for pycountry countries, with states for US/CA

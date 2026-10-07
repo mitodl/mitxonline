@@ -90,7 +90,7 @@ Contracts also contain a list of variants, which are the _requested_ variants fo
 - The interface for the contract variants is in the Django Admin. (We will add a Wagtail interface for variants but that hasn't been completed yet.)
 - The "B2B Only" flag is ignored, as contracts are always B2B-only.
 
-Contracts also have a management command for checking the variant setup - `check_contract_variant` - and it works in much the same way as the courseware version.
+Contracts also have a management command for checking the variant setup - `check_contract_variant` - and it works in much the same way as the courseware version. For each of the contract's variant sets it lists the contract's courses with the contract run for that set, or the reason there isn't one: no run yet, no source run to clone, or the course doesn't have the variant set. The staff API's `setup-status` and `variants/` routes return the same report.
 
 :::{note}
 The `check_courseware_variant` command also has a `--contract` flag - this will show you what B2B variants are configured for the course and what the matching course runs _may_ be. (It pulls contract runs, matched up against the _course_ variants, and displays them grouped together with the course's B2B variants.)
