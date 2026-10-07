@@ -306,6 +306,9 @@ holds the whole page as it was when it was saved, so `ContractPage` takes the
 fields these routes write (`ContractPage.PROVISIONED_FIELDS`) from the stored
 row whenever Wagtail loads or publishes one. Publishing an old revision
 therefore can't put back a contract's old name, dates, seat cap or price.
+The same goes for which programs a contract has: a publish keeps the stored
+program links and takes only their order from the revision, so a program
+added or removed on the Wagtail page is not saved.
 
 `description` is Wagtail rich text. On the way in it is reduced to the markup
 Wagtail's editor stores (paragraphs, headings, bold, italic, lists, links);
