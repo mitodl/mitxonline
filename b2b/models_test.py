@@ -9,7 +9,7 @@ import pytest
 from b2b.api import ensure_enrollment_codes_exist
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
-from b2b.models import DiscountContractAttachmentRedemption
+from b2b.models import ContractProgramItem, DiscountContractAttachmentRedemption
 from courses.factories import (
     CourseRunFactory,
     ProgramFactory,
@@ -321,3 +321,59 @@ def test_contract_wagtail_editor_only_edits_what_the_api_does_not(admin_client):
     form = response.context["form"]
     assert not set(contract.PROVISIONED_FIELDS) & set(form.fields)
     assert {"welcome_message_extra", "google_sheet_target"} <= set(form.fields)
+
+
+def test_publishing_a_contract_revision_keeps_program_links_and_takes_its_order(
+    mocker,
+):
+    """A Wagtail publish reorders a contract's programs and can't add or drop one."""
+
+    queued = mocker.patch("b2b.tasks.create_program_contract_runs.delay")
+    contract = ContractPageFactory.create()
+    first, second, third = ProgramFactory.create_batch(3)
+    ContractProgramItem(contract=contract, program=first, sort_order=0).save(
+        skip_run_creation=True
+    )
+    stale = contract.save_revision()
+
+    # Linked by the contract API after the revision was saved.
+    ContractProgramItem(contract=contract, program=second, sort_order=1).save(
+        skip_run_creation=True
+    )
+
+    def linked_programs():
+        return list(
+            ContractProgramItem.objects.filter(contract=contract)
+            .order_by("sort_order")
+            .values_list("program_id", flat=True)
+        )
+
+    stale.publish()
+    assert linked_programs() == [first.id, second.id]
+
+    # Wagtail's editor starts from the latest revision and sees both.
+    edited = contract.get_latest_revision_as_object()
+    items = {item.program_id: item for item in edited.contract_programs.all()}
+    assert set(items) == {first.id, second.id}
+
+    items[first.id].sort_order = 1
+    items[second.id].sort_order = 0
+    edited.contract_programs = [
+        items[second.id],
+        items[first.id],
+        ContractProgramItem(program=third, sort_order=2),
+    ]
+    edited.save_revision().publish()
+
+    assert linked_programs() == [second.id, first.id]
+    queued.assert_not_called()
+
+    # A revision that leaves a program out doesn't unlink it. It goes after the
+    # programs the revision does have.
+    edited = contract.get_latest_revision_as_object()
+    edited.contract_programs = [
+        item for item in edited.contract_programs.all() if item.program_id == first.id
+    ]
+    edited.save_revision().publish()
+
+    assert linked_programs() == [first.id, second.id]

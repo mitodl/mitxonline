@@ -92,7 +92,7 @@ Organizations and contracts are created and edited in the staff dashboard, and o
 
 - Organizations are best made in Keycloak, and then imported into MITx Online. There is a Celery task that will import organizations on a regular basis, or you can run the import manually. This will allow user management to be centralized within Keycloak. If you _must_ create an organization that exists outside of Keycloak, it's important that the Organization ID field remain blank.
 - Do not modify the Organization ID within an Organization record. Doing so will break the sync between the org and the Keycloak org, and you'll end up with a duplicate organization when the Keycloak one is synced back into the system.
-- Contracts are created and edited in the staff dashboard, on the organization's page under B2B Organizations, which also adds courseware and lists, assigns and expires enrollment codes. In Wagtail a contract's page edits the extra welcome message, the Google Sheet target and tab, and its list of programs; its other fields are read-only there, and a contract can't be created or copied there. See [the provisioning API](provisioning_api.md).
+- Contracts are created and edited in the staff dashboard, on the organization's page under B2B Organizations, which also adds courseware and lists, assigns and expires enrollment codes. In Wagtail a contract's page edits the extra welcome message, the Google Sheet target and tab, and the order of its programs (adding or removing one there is not saved); its other fields are read-only there, and a contract can't be created or copied there. See [the provisioning API](provisioning_api.md).
 
 ### In Django Admin
 

@@ -392,7 +392,8 @@ class ContractPage(Page, ClusterableModel):
 
     # Written only by the contract API, which saves the row without a Wagtail
     # revision. A revision holds whatever these were when it was saved, so
-    # with_content_json() takes them from the stored row instead.
+    # with_content_json() takes them from the stored row instead. It does the
+    # same for which programs the contract has.
     PROVISIONED_FIELDS = (
         "name",
         "membership_type",
@@ -547,7 +548,11 @@ class ContractPage(Page, ClusterableModel):
         InlinePanel(
             "contract_programs",
             heading="Programs",
-            help_text="Add and order programs in this contract",
+            help_text=(
+                "Order the programs in this contract. Add and remove programs "
+                "in the staff dashboard: a program added or removed here is "
+                "not saved."
+            ),
         ),
     ]
 
@@ -596,6 +601,25 @@ class ContractPage(Page, ClusterableModel):
         for field, value in stored.items():
             setattr(page, field, value)
         page.title = stored["name"]
+
+        # Which programs are in the contract is the API's to say, and a
+        # revision saved before a program was linked would delete the link
+        # when published. Wagtail still orders them, so keep the stored links
+        # in the revision's order, with any it doesn't have after the rest.
+        revision_position = {
+            item.program_id: position
+            for position, item in enumerate(page.contract_programs.all())
+        }
+        programs = sorted(
+            ContractProgramItem.objects.filter(contract_id=self.pk),
+            key=lambda item: (
+                revision_position.get(item.program_id, len(revision_position)),
+                item.sort_order or 0,
+            ),
+        )
+        for sort_order, item in enumerate(programs):
+            item.sort_order = sort_order
+        page.contract_programs = programs
         return page
 
     def get_learners(self):
