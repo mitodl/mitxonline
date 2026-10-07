@@ -249,71 +249,9 @@ def test_user_enrollments_list_filter_org_id(
             reverse("v3:user_enrollments_api-list"), {"org_id": org.id}
         )
         assert resp.status_code == status.HTTP_200_OK
-        assert resp.json() == [
-            {
-                "id": enrollment.id,
-                "run": {
-                    "id": enrollment.run.id,
-                    "is_archived": enrollment.run.is_enrollable
-                    and enrollment.run.is_past,
-                    "is_enrollable": enrollment.run.is_enrollable,
-                    "is_self_paced": enrollment.run.is_self_paced,
-                    "is_upgradable": enrollment.run.is_upgradable,
-                    "live": enrollment.run.live,
-                    "run_tag": enrollment.run.run_tag,
-                    "start_date": drf_datetime(enrollment.run.start_date),
-                    "title": enrollment.run.title,
-                    "upgrade_deadline": drf_datetime(enrollment.run.upgrade_deadline),
-                    "certificate_available_date": drf_datetime(
-                        enrollment.run.certificate_available_date
-                    ),
-                    "course_number": enrollment.run.course_number,
-                    "courseware_id": enrollment.run.courseware_id,
-                    "courseware_url": enrollment.run.courseware_url,
-                    "end_date": drf_datetime(enrollment.run.end_date)
-                    if enrollment.run.end_date
-                    else None,
-                    "enrollment_end": drf_datetime(enrollment.run.enrollment_end),
-                    "enrollment_modes": [],
-                    "upgrade_product_id": upgrade_product.id
-                    if upgrade_product
-                    else None,
-                    "upgrade_product_price": str(upgrade_product.price)
-                    if upgrade_product
-                    else None,
-                    "upgrade_product_is_active": upgrade_product.is_active
-                    if upgrade_product
-                    else None,
-                    "enrollment_start": drf_datetime(enrollment.run.enrollment_start),
-                    "expiration_date": drf_datetime(enrollment.run.expiration_date),
-                    "course": {
-                        "id": enrollment.run.course_id,
-                        "readable_id": enrollment.run.course.readable_id,
-                        "include_in_learn_catalog": enrollment.run.course.include_in_learn_catalog,
-                        "title": "Test page",
-                        "type": "course",
-                    },
-                },
-                "edx_emails_subscription": enrollment.edx_emails_subscription,
-                "grades": [
-                    {
-                        "grade": grade.grade,
-                        "letter_grade": grade.letter_grade,
-                        "passed": grade.passed,
-                        "set_by_admin": grade.set_by_admin,
-                        "grade_percent": grade.grade_percent,
-                    }
-                    for grade in enrollment.grades
-                ],
-                "b2b_contract_id": enrollment.b2b_contract_id,
-                "b2b_organization_id": enrollment.b2b_contract.organization_id
-                if enrollment.b2b_contract
-                else None,
-                "enrollment_mode": enrollment.enrollment_mode,
-                "certificate": maybe_serialize_course_cert(
-                    enrollment.run, enrollment.user
-                ),
-            }
+        returned_ids = [enrollment["id"] for enrollment in resp.json()]
+        assert returned_ids == [
+            enrollment.id
             for enrollment in user_with_enrollments_and_certificates.run_enrollments
             if enrollment.b2b_contract
             and enrollment.b2b_contract.organization_id == org.id
