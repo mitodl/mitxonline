@@ -6,7 +6,6 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
-from mitol.common.utils.datetime import now_in_utc
 
 from courses.models import (
     CourseRunCertificate,
@@ -18,7 +17,7 @@ from courses.models import (
 )
 from ecommerce.models import Order, OrderStatus
 from openedx.api import enroll_in_edx_course_runs, get_edx_api_service_client
-from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENTS_PAID_MODES
+from openedx.constants import EDX_ENROLLMENTS_PAID_MODES
 from users.api import fetch_user
 
 User = get_user_model()
@@ -32,15 +31,10 @@ class Command(BaseCommand):
     """
     Transfer course-related records between two users.
 
-    Moves, for the source user:
-    - Verified (paid) course run enrollments for course runs that have
-      already ended. A course run with no end_date is treated as not yet
-      ended and is excluded too.
-    - Audit course run enrollments, for any course run (ended or not).
-    - Course run grades and certificates for those same ended course runs.
-    - Program enrollments and certificates, unconditionally - independent of
-      enrollment mode (verified or audit) and with no "ended" concept, since
-      neither applies at the program level the way they do for a course run.
+    Moves, for the source user, unconditionally - in any enrollment mode
+    (verified or audit) and whether or not the course run has ended:
+    - Course run enrollments, grades and certificates.
+    - Program enrollments and certificates.
     - The FULFILLED Order(s) and PaidCourseRun record(s) backing each
       verified course run enrollment that transfers, so the payment record -
       and the "already paid for this" check it drives - follows the
@@ -50,11 +44,11 @@ class Command(BaseCommand):
     matching enrollment/grade/certificate; transferred and skipped counts are
     reported at the end.
 
-    After the transfer commits, each transferred active enrollment (verified
-    or audit) for a course run whose courseware_id contains "MITxT" is also
-    created in edX for the destination user, in the same mode. If edX already
-    has an active enrollment for them in that run, it's reported and skipped.
-    edX failures are reported per course run and don't undo the transfer.
+    After the transfer commits, each transferred active enrollment for a
+    course run whose courseware_id contains "MITxT" is also created in edX
+    for the destination user, in the same mode. An enrollment that already
+    exists (in mitxonline or edX) is reported and skipped, and edX errors are
+    reported per course run without undoing the transfer.
 
     Example: transfer_user_course_records --from_email=old@example.com --to_email=new@example.com
     """
@@ -112,8 +106,8 @@ class Command(BaseCommand):
         )
         self._sync_edx_enrollments(
             destination_user,
-            to_transfer["course_run_enrollments"]
-            + to_transfer["audit_course_run_enrollments"],
+            to_transfer["course_run_enrollments"],
+            source_records["course_run_enrollments"],
         )
 
     def _fetch_user(self, email, option_name):
@@ -128,44 +122,23 @@ class Command(BaseCommand):
         """
         Load all transfer candidates for the source user.
 
-        Verified (paid) course run enrollments are restricted to course runs
-        that have already ended - in-progress/self-paced (no end_date) runs
-        are excluded outright, not just filtered later. Audit course run
-        enrollments are loaded for every course run, ended or not, and are
-        kept separate so they never pull an order along. Grades/certificates
-        for course runs use the same ended-run filter. Program enrollments/certificates aren't tied
-        to a single course run, so they're loaded unconditionally - no mode
-        or end-date filter applies to them.
+        Every record is loaded unconditionally - no enrollment mode or
+        course run end-date filter applies.
         """
-        now = now_in_utc()
-        ended_run = {"run__end_date__isnull": False, "run__end_date__lt": now}
-        ended_course_run = {
-            "course_run__end_date__isnull": False,
-            "course_run__end_date__lt": now,
-        }
-
         return {
             "course_run_enrollments": list(
-                CourseRunEnrollment.all_objects.filter(
-                    user=source_user,
-                    enrollment_mode__in=EDX_ENROLLMENTS_PAID_MODES,
-                    **ended_run,
-                ).select_related("run")
-            ),
-            "audit_course_run_enrollments": list(
-                CourseRunEnrollment.all_objects.filter(
-                    user=source_user,
-                    enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
-                ).select_related("run")
+                CourseRunEnrollment.all_objects.filter(user=source_user).select_related(
+                    "run"
+                )
             ),
             "course_run_grades": list(
-                CourseRunGrade.objects.filter(
-                    user=source_user, **ended_course_run
-                ).select_related("course_run")
+                CourseRunGrade.objects.filter(user=source_user).select_related(
+                    "course_run"
+                )
             ),
             "course_run_certificates": list(
                 CourseRunCertificate.all_objects.filter(
-                    user=source_user, **ended_course_run
+                    user=source_user
                 ).select_related("course_run")
             ),
             "program_enrollments": list(
@@ -221,11 +194,6 @@ class Command(BaseCommand):
                 for enrollment in source_records["course_run_enrollments"]
                 if enrollment.run_id not in conflicting_run_ids
             ],
-            "audit_course_run_enrollments": [
-                enrollment
-                for enrollment in source_records["audit_course_run_enrollments"]
-                if enrollment.run_id not in conflicting_run_ids
-            ],
             "course_run_grades": [
                 grade
                 for grade in source_records["course_run_grades"]
@@ -255,11 +223,10 @@ class Command(BaseCommand):
 
     def _verified_orders(self, source_user, to_transfer):
         """
-        Find the FULFILLED ecommerce Order(s) backing the verified course
-        run enrollments that are actually transferring (every enrollment
-        loaded here is already verified+ended - _load_source_records only
-        loads those - so this just needs the ones that survived the
-        duplicate-skip in _partition_conflicts).
+        Find the FULFILLED ecommerce Order(s) backing the verified (paid)
+        course run enrollments that are actually transferring - i.e. the
+        ones that survived the duplicate-skip in _partition_conflicts. Audit
+        enrollments transfer without moving any order.
 
         A pending/canceled/declined/errored/refunded order for the same
         course run is left with the source user.
@@ -269,7 +236,9 @@ class Command(BaseCommand):
         with the enrollment - Orders aren't split by line.
         """
         run_ids = [
-            enrollment.run_id for enrollment in to_transfer["course_run_enrollments"]
+            enrollment.run_id
+            for enrollment in to_transfer["course_run_enrollments"]
+            if enrollment.enrollment_mode in EDX_ENROLLMENTS_PAID_MODES
         ]
         if not run_ids:
             return []
@@ -295,10 +264,7 @@ class Command(BaseCommand):
         destination_user,
     ):
         """Transfer each record set and return counts by label."""
-        for enrollment in (
-            to_transfer["course_run_enrollments"]
-            + to_transfer["audit_course_run_enrollments"]
-        ):
+        for enrollment in to_transfer["course_run_enrollments"]:
             enrollment.user = destination_user
             enrollment.save_and_log(None)
 
@@ -359,27 +325,37 @@ class Command(BaseCommand):
                 )
             )
 
-    def _sync_edx_enrollments(self, destination_user, enrollments):
+    def _sync_edx_enrollments(
+        self, destination_user, transferred_enrollments, source_enrollments
+    ):
         """
         Create edX enrollments for the destination user for transferred
-        active enrollments in "MITxT" course runs. A course run where edX
-        already has an active enrollment for the destination user is reported
-        and skipped; any other edX error is reported and the next course run
-        is tried.
+        enrollments in "MITxT" course runs. Enrollments that already exist -
+        skipped as duplicates in mitxonline, or already active in edX - and
+        inactive enrollments are reported and skipped. Any edX error is
+        reported and the next course run is tried.
         """
-        enrollments = [
-            enrollment
-            for enrollment in enrollments
-            if enrollment.active
-            and EDX_SYNC_COURSEWARE_ID_MARKER in enrollment.run.courseware_id
-        ]
-        if not enrollments:
-            return
-
-        edx_client = get_edx_api_service_client()
-        for enrollment in enrollments:
+        transferred_ids = {enrollment.id for enrollment in transferred_enrollments}
+        edx_client = None
+        for enrollment in source_enrollments:
             courseware_id = enrollment.run.courseware_id
+            if EDX_SYNC_COURSEWARE_ID_MARKER not in courseware_id:
+                continue
+            if enrollment.id not in transferred_ids:
+                self.stdout.write(
+                    f"{destination_user.email} already has an enrollment in "
+                    f"{courseware_id}, skipping edX sync."
+                )
+                continue
+            if not enrollment.active:
+                self.stdout.write(
+                    f"Enrollment in {courseware_id} is inactive "
+                    f"(change_status={enrollment.change_status}), skipping edX sync."
+                )
+                continue
             try:
+                if edx_client is None:
+                    edx_client = get_edx_api_service_client()
                 existing = [
                     edx_enrollment
                     for edx_enrollment in edx_client.enrollments.get_enrollments(
@@ -405,6 +381,9 @@ class Command(BaseCommand):
                             f"in {courseware_id} (mode={enrollment.enrollment_mode})."
                         )
                     )
+                if not enrollment.edx_enrolled:
+                    enrollment.edx_enrolled = True
+                    enrollment.save(update_fields=["edx_enrolled"])
             except Exception as exc:  # noqa: BLE001
                 self.stdout.write(
                     self.style.ERROR(
@@ -412,8 +391,3 @@ class Command(BaseCommand):
                         f"in {courseware_id}: {exc}"
                     )
                 )
-                continue
-
-            if not enrollment.edx_enrolled:
-                enrollment.edx_enrolled = True
-                enrollment.save(update_fields=["edx_enrolled"])
