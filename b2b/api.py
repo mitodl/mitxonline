@@ -2236,6 +2236,7 @@ def upgrade_user_enrollments_for_contracts(user, contracts):
             enrollment.enrollment_mode = EDX_ENROLLMENT_VERIFIED_MODE
             if not enrollment.run.is_fake_course_run:
                 enrollment.edx_enrolled = False
+                enrollment.edx_enrollment_retry_count = 0
             if enrollment.b2b_contract_id is None:
                 enrollment.b2b_contract = contract
             enrollment.save_and_log(None)
