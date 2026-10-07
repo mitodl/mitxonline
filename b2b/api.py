@@ -59,10 +59,22 @@ from b2b.provisioning import (
     KeycloakConnection,
     sync_organization_members_to_keycloak,
 )
-from b2b.tasks import queue_contract_sheet_update_post_save, queue_enrollment_code_check
+from b2b.tasks import (
+    push_upgraded_enrollments_to_edx,
+    queue_contract_sheet_update_post_save,
+    queue_enrollment_code_check,
+)
 from cms.api import get_home_page
 from courses.constants import ALL_ENROLL_CHANGE_STATUSES
-from courses.models import Course, CourseRun, Department, EnrollmentMode, Program
+from courses.models import (
+    Course,
+    CourseRun,
+    CourseRunEnrollment,
+    Department,
+    EnrollmentMode,
+    Program,
+    ProgramEnrollment,
+)
 from courses.utils import is_uai_course_run, is_uai_program, is_xpro_course_run
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
@@ -2170,6 +2182,104 @@ def reconcile_keycloak_orgs():
             )
 
     return (created_count, updated_count)
+
+
+def upgrade_user_enrollments_for_contracts(user, contracts):
+    """
+    Upgrade the user's audit enrollments in the given contracts to verified.
+
+    A learner may have audited a run or program that is also in a contract,
+    while it was still publicly available. When they join that contract, those
+    enrollments should become verified. The upgrade happens locally right away.
+    The edX side is queued, because this runs during login (via
+    reconcile_user_orgs), and we don't want a slow or unavailable edX to hold
+    up the page load.
+
+    Upgraded run enrollments are flagged edx_enrolled=False until the task
+    succeeds, so retry_failed_edx_enrollments will pick them up if it doesn't.
+
+    A run is eligible if it's live, has a verified mode, and its upgrade
+    deadline hasn't passed. A program is eligible if it's live and has a
+    verified mode. Enrollments that are inactive or that have a change status
+    (deferred, refunded, etc.) are left alone, as are verified ones.
+
+    Args:
+    - user (User): the user that was attached to the contracts
+    - contracts (Iterable[ContractPage]): the contracts the user was attached to
+    Returns:
+    - tuple(list[CourseRunEnrollment], list[ProgramEnrollment]): the upgraded
+      enrollments
+    """
+
+    now = now_in_utc()
+    upgraded_runs = []
+    upgraded_programs = []
+
+    for contract in contracts:
+        run_enrollments = (
+            CourseRunEnrollment.objects.filter(
+                user=user,
+                enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+                run__b2b_contracts=contract,
+                run__live=True,
+                run__enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+            )
+            .filter(
+                Q(run__upgrade_deadline__isnull=True) | Q(run__upgrade_deadline__gt=now)
+            )
+            .exclude(change_status__in=ALL_ENROLL_CHANGE_STATUSES)
+            .select_related("run")
+            .distinct()
+        )
+
+        for enrollment in run_enrollments:
+            enrollment.enrollment_mode = EDX_ENROLLMENT_VERIFIED_MODE
+            if not enrollment.run.is_fake_course_run:
+                enrollment.edx_enrolled = False
+            if enrollment.b2b_contract_id is None:
+                enrollment.b2b_contract = contract
+            enrollment.save_and_log(None)
+            upgraded_runs.append(enrollment)
+
+        program_enrollments = (
+            ProgramEnrollment.objects.filter(
+                user=user,
+                enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+                program__contract_memberships__contract=contract,
+                program__live=True,
+                program__enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+            )
+            .exclude(change_status__in=ALL_ENROLL_CHANGE_STATUSES)
+            .distinct()
+        )
+
+        for enrollment in program_enrollments:
+            enrollment.enrollment_mode = EDX_ENROLLMENT_VERIFIED_MODE
+            if enrollment.b2b_contract_id is None:
+                enrollment.b2b_contract = contract
+            enrollment.save_and_log(None)
+            upgraded_programs.append(enrollment)
+
+    edx_enrollment_ids = [
+        enrollment.id
+        for enrollment in upgraded_runs
+        if not enrollment.run.is_fake_course_run
+    ]
+
+    if edx_enrollment_ids:
+        transaction.on_commit(
+            lambda: push_upgraded_enrollments_to_edx.delay(edx_enrollment_ids)
+        )
+
+    if upgraded_runs or upgraded_programs:
+        log.info(
+            "upgrade_user_enrollments_for_contracts: upgraded %s run and %s program enrollments for %s",
+            len(upgraded_runs),
+            len(upgraded_programs),
+            user.id,
+        )
+
+    return upgraded_runs, upgraded_programs
 
 
 def add_user_org_membership(org, user):

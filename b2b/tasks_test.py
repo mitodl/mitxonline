@@ -6,9 +6,16 @@ from b2b.api import create_contract_run_key
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.tasks import (
     create_program_contract_runs,
+    push_upgraded_enrollments_to_edx,
 )
-from courses.factories import CourseFactory, CourseRunFactory, ProgramFactory
+from courses.factories import (
+    CourseFactory,
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+    ProgramFactory,
+)
 from courses.models import ProgramRequirement, ProgramRequirementNodeType
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 
 pytestmark = [pytest.mark.django_db]
 
@@ -353,3 +360,33 @@ def test_create_program_contract_runs_logging_output(mocker):
     assert final_call[0][3] == 1
     assert final_call[0][4] == 0
     assert final_call[0][5] == 0
+
+
+def test_push_upgraded_enrollments_to_edx(mocker):
+    """Pushed enrollments are marked enrolled; failures are left for retry."""
+
+    good, bad, already_done = CourseRunEnrollmentFactory.create_batch(
+        3, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE, edx_enrolled=False
+    )
+    already_done.edx_enrolled = True
+    already_done.save()
+
+    def fake_enroll(user, runs, *, mode):
+        if runs[0] == bad.run:
+            raise ConnectionError
+
+    mocked_enroll = mocker.patch(
+        "openedx.api.enroll_in_edx_course_runs", side_effect=fake_enroll
+    )
+
+    push_upgraded_enrollments_to_edx([good.id, bad.id, already_done.id])
+
+    assert mocked_enroll.call_count == 2
+    mocked_enroll.assert_any_call(
+        good.user, [good.run], mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    good.refresh_from_db()
+    bad.refresh_from_db()
+    assert good.edx_enrolled is True
+    assert bad.edx_enrolled is False
