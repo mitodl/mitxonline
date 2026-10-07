@@ -1517,7 +1517,11 @@ paths:
   /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/contracts/{id}/setup-status/:
     get:
       operationId: b2b_provisioning_organizations_contracts_setup_status_retrieve
-      description: Report the edX clones and enrollment codes still outstanding.
+      description: |-
+        Report the edX clones and enrollment codes still outstanding.
+
+        Also lists, per variant set, which of the contract's courses have a
+        run for it.
       parameters:
       - in: path
         name: id
@@ -6325,10 +6329,17 @@ components:
             $ref: '#/components/schemas/ContractRunSetup'
         enrollment_codes:
           $ref: '#/components/schemas/ContractEnrollmentCodeSetup'
+        variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContractVariantSet'
+          description: Which of the contract's courses have a run for each of its
+            variant sets. A missing run does not change the status.
       required:
       - enrollment_codes
       - runs
       - status
+      - variants
     ContractSetupStatusEnum:
       enum:
       - in_progress
@@ -6372,7 +6383,9 @@ components:
 
         A listed course with a source run and no contract run gets a run for this
         set when its courseware is next added to the contract, if the set is
-        active.
+        active. A course in unsupported_courses has no active variant set of its
+        own with this language, length and industry, so adding its courseware
+        doesn't pick a source run for this set.
       properties:
         id:
           type: integer
@@ -6392,6 +6405,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ContractVariantCourse'
+        unsupported_courses:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContractVariantUnsupportedCourse'
       required:
       - active
       - b2b_only
@@ -6399,8 +6416,27 @@ components:
       - default_variant
       - id
       - language
+      - unsupported_courses
       - variant_industry
       - variant_length
+    ContractVariantUnsupportedCourse:
+      type: object
+      description: One of the contract's courses that a variant set does not match.
+      properties:
+        course_id:
+          type: integer
+        readable_id:
+          type: string
+        title:
+          type: string
+        contract_run:
+          type: string
+          nullable: true
+          description: The contract's run for this variant, if it has one anyway.
+      required:
+      - course_id
+      - readable_id
+      - title
     Country:
       type: object
       description: Serializer for pycountry countries, with states for US/CA

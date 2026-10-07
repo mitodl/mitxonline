@@ -763,7 +763,12 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
     @extend_schema(responses={200: ContractSetupStatusSerializer})
     @action(detail=True, methods=["get"], url_path="setup-status")
     def setup_status(self, request, pk=None, **kwargs):  # noqa: ARG002
-        """Report the edX clones and enrollment codes still outstanding."""
+        """
+        Report the edX clones and enrollment codes still outstanding.
+
+        Also lists, per variant set, which of the contract's courses have a
+        run for it.
+        """
 
         return Response(
             ContractSetupStatusSerializer(

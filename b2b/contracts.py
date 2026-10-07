@@ -331,9 +331,14 @@ def get_contract_setup_status(contract: ContractPage) -> dict:
     were tracked) has no clone status and does not hold the contract in
     progress.
 
+    A course with no run for one of the contract's variant sets does not
+    change the status. Nothing is queued to create that run, and a course with
+    no source run for the set is a gap in the content, not a failed setup.
+
     Returns a dict with `status` (a CONTRACT_SETUP_STATUS_* value), `runs` (the
-    clone status, attempts and last error of each contract run) and
-    `enrollment_codes` (how many the contract needs and how many it has).
+    clone status, attempts and last error of each contract run),
+    `enrollment_codes` (how many the contract needs and how many it has) and
+    `variants` (get_contract_variant_coverage's report).
     """
 
     runs = list(contract.get_course_runs().order_by("courseware_id"))
@@ -372,6 +377,7 @@ def get_contract_setup_status(contract: ContractPage) -> dict:
         "status": status,
         "runs": run_statuses,
         "enrollment_codes": {"expected": expected_codes, "existing": existing_codes},
+        "variants": get_contract_variant_coverage(contract),
     }
 
 
@@ -474,8 +480,13 @@ def get_contract_variant_coverage(contract: ContractPage) -> list[dict]:
     would create a run for, as long as the set is active.
 
     Returns a dict per variant set, default first: `variant` (the
-    SupportedVariant) and `courses`, each with `course`, `has_source_run` and
-    `contract_run` (the contract's run for this variant, or None).
+    SupportedVariant), `courses`, each with `course`, `has_source_run` and
+    `contract_run` (the contract's run for this variant, or None), and
+    `unsupported_courses` (the contract's courses with no active variant set
+    of their own that matches, each with `course` and `contract_run`). Such a
+    course can still have a run for the set: one added by its run ID, one made
+    before the course's set was turned off, or the fallback run of a course
+    with no default variant set.
     """
 
     courses = list(
@@ -519,6 +530,14 @@ def get_contract_variant_coverage(contract: ContractPage) -> list[dict]:
                     }
                     for course in courses
                     if fields in course_variants[course.id]
+                ],
+                "unsupported_courses": [
+                    {
+                        "course": course,
+                        "contract_run": contract_runs.get((course.id, *fields)),
+                    }
+                    for course in courses
+                    if fields not in course_variants[course.id]
                 ],
             }
         )

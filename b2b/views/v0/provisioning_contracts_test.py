@@ -219,6 +219,18 @@ def test_add_courseware_and_follow_setup(admin_drf_client, mocked_tasks):
             "clone_error": "",
         }
     ]
+    [variant_set] = setup["variants"]
+    assert variant_set["id"] == contract.default_variant_options.id
+    assert variant_set["courses"] == [
+        {
+            "course_id": course.id,
+            "readable_id": course.readable_id,
+            "title": course.title,
+            "has_source_run": True,
+            "contract_run": run.courseware_id,
+        }
+    ]
+    assert variant_set["unsupported_courses"] == []
 
     CourseRunClone.objects.filter(course_run=run).update(
         status=COURSE_RUN_CLONE_STATUS_CLONED
@@ -414,6 +426,7 @@ def test_list_variant_sets(admin_drf_client):
                     "contract_run": contract_run.courseware_id,
                 }
             ],
+            "unsupported_courses": [],
         },
         {
             "id": french.id,
@@ -432,6 +445,7 @@ def test_list_variant_sets(admin_drf_client):
                     "contract_run": None,
                 }
             ],
+            "unsupported_courses": [],
         },
     ]
 

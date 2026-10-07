@@ -555,13 +555,29 @@ class ContractVariantCourseSerializer(serializers.Serializer):
     )
 
 
+class ContractVariantUnsupportedCourseSerializer(serializers.Serializer):
+    """One of the contract's courses that a variant set does not match."""
+
+    course_id = serializers.IntegerField(source="course.id")
+    readable_id = serializers.CharField(source="course.readable_id")
+    title = serializers.CharField(source="course.title")
+    contract_run = serializers.CharField(
+        source="contract_run.courseware_id",
+        allow_null=True,
+        default=None,
+        help_text="The contract's run for this variant, if it has one anyway.",
+    )
+
+
 class ContractVariantSetSerializer(serializers.Serializer):
     """
     One of a contract's variant sets, with the contract's courses it matches.
 
     A listed course with a source run and no contract run gets a run for this
     set when its courseware is next added to the contract, if the set is
-    active.
+    active. A course in unsupported_courses has no active variant set of its
+    own with this language, length and industry, so adding its courseware
+    doesn't pick a source run for this set.
     """
 
     id = serializers.IntegerField(source="variant.id")
@@ -572,6 +588,7 @@ class ContractVariantSetSerializer(serializers.Serializer):
     active = serializers.BooleanField(source="variant.active")
     b2b_only = serializers.BooleanField(source="variant.b2b_only")
     courses = ContractVariantCourseSerializer(many=True)
+    unsupported_courses = ContractVariantUnsupportedCourseSerializer(many=True)
 
 
 class CreateContractVariantSetSerializer(serializers.ModelSerializer):
@@ -627,6 +644,11 @@ class ContractSetupStatusSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=CONTRACT_SETUP_STATUS_CHOICES)
     runs = ContractRunSetupSerializer(many=True)
     enrollment_codes = ContractEnrollmentCodeSetupSerializer()
+    variants = ContractVariantSetSerializer(
+        many=True,
+        help_text="Which of the contract's courses have a run for each of its "
+        "variant sets. A missing run does not change the status.",
+    )
 
 
 class ExpiredEnrollmentCodeSerializer(serializers.Serializer):
