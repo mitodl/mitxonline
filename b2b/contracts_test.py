@@ -275,7 +275,25 @@ def test_variant_coverage_lists_courses_that_do_not_support_a_set():
     assert [listed["course"] for listed in default["courses"]] == [course]
     assert default["unsupported_courses"] == []
     assert french["courses"] == []
-    assert french["unsupported_courses"] == [course]
+    assert french["unsupported_courses"] == [{"course": course, "contract_run": None}]
+
+
+def test_variant_coverage_keeps_the_run_of_a_course_that_dropped_a_set():
+    """A course whose variant set was turned off still shows its contract run."""
+
+    contract = ContractPageFactory.create()
+    add_contract_variant_set(contract, language="fr")
+    course = _bilingual_source_course()
+    add_courseware_to_contract(contract, course)
+    french_run = contract.get_course_runs().get(language="fr")
+    course.possible_variant_sets.filter(language="fr").update(active=False)
+
+    french = get_contract_variant_coverage(contract)[1]
+
+    assert french["courses"] == []
+    assert french["unsupported_courses"] == [
+        {"course": course, "contract_run": french_run}
+    ]
 
 
 def test_setup_status_reports_variant_coverage_without_changing_status():
