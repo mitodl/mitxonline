@@ -558,7 +558,7 @@ def test_user_enrollments_create_export_compliance_blocked(
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
-        "detail": "Unable to complete enrollment. Error code: CS_700"
+        "detail": "Unable to complete enrollment. Error code: CS_700."
     }
     assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
 
