@@ -315,6 +315,32 @@ def test_create_edx_user(  # noqa: PLR0913
         assert user.openedx_users.first().edx_username == original_username
 
 
+@pytest.mark.usefixtures("application")
+@responses.activate
+def test_create_edx_user_logs_failed_existence_check(mocker, settings):
+    """A failed edX user lookup is logged instead of swallowed"""
+    patched_log_warning = mocker.patch("openedx.api.log.warning")
+    user = UserFactory.create(openedx_user__has_been_synced=True)
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/mobile/v0.5/my_user_info",
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+    registration = responses.add(
+        responses.POST,
+        f"{settings.OPENEDX_API_BASE_URL}/user_api/v1/account/registration/",
+        json=dict(success=True),  # noqa: C408
+        status=status.HTTP_200_OK,
+    )
+
+    assert create_edx_user(user) is True
+
+    patched_log_warning.assert_called_once_with(
+        "_edx_user_exists: could not verify edX user for: %s", user.id, exc_info=True
+    )
+    assert registration.call_count == 0
+
+
 @responses.activate
 @pytest.mark.usefixtures("application")
 @pytest.mark.parametrize(
