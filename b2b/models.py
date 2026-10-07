@@ -127,8 +127,8 @@ class StaffDashboardContractPanel(HelpPanel):
             super().__init__(**kwargs)
             self.content = format_html(
                 'Edit this contract, its courseware and its enrollment codes in the <a href="{}">staff '
-                "dashboard</a>. Only the extra welcome message, the Google Sheet "
-                "target and the order of its programs are edited here.",
+                "dashboard</a>. The extra welcome message, the Google Sheet target "
+                "and tab, and the order of its programs are edited here.",
                 f"/staff-dashboard/b2b_organizations/show/{self.instance.organization.org_key}"
                 f"/contracts/{self.instance.pk}",
             )

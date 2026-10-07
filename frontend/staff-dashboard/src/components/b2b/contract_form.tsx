@@ -96,7 +96,7 @@ export const ContractForm: React.FC<IContractFormProps> = ({ form, onFinish, ini
         <Form.Item
             label="Description"
             name="description"
-            extra="Stored as HTML. Plain text is fine; keep any tags that are already there."
+            extra="Stored as HTML. Plain text is fine; keep any tags that are already there. Only text markup is kept on save: an embedded image or media is removed if you change this field."
         >
             <Input.TextArea rows={4} />
         </Form.Item>
