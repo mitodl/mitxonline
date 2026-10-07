@@ -201,7 +201,11 @@ def test_contract_description_keeps_only_rich_text_markup(admin_drf_client):
                 "<script>alert(1)</script>"
                 '<a href="javascript:alert(1)">bad</a>'
                 '<a href="https://example.edu">good</a>'
+                '<a linktype="page" id="3">page</a>'
+                '<a href="tel:+16175550100">call</a>'
                 "<img src=x onerror=alert(1)>"
+                '<embed embedtype="image" id="10" alt="Logo" format="left"/>'
+                "<h2>Heading</h2><ul><li>item</li></ul>"
             )
         },
         format="json",
@@ -214,6 +218,9 @@ def test_contract_description_keeps_only_rich_text_markup(admin_drf_client):
         "alert(1)"
         "<a>bad</a>"
         '<a href="https://example.edu">good</a>'
+        '<a linktype="page" id="3">page</a>'
+        '<a href="tel:+16175550100">call</a>'
+        "<h2>Heading</h2><ul><li>item</li></ul>"
     )
 
     created = admin_drf_client.post(

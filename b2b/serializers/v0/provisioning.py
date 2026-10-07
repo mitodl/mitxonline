@@ -463,9 +463,11 @@ CONTRACT_WRITABLE_FIELDS = [
     field for field in ContractPage.PROVISIONED_FIELDS if field != "active"
 ]
 
-# What Wagtail's rich text editor stores for the description. The staff
-# dashboard edits it as text, so nothing else has filtered it by the time it
-# gets here.
+# The text markup Wagtail's rich text editor stores for the description. The
+# staff dashboard edits it as text, so nothing else has filtered it by the
+# time it gets here. Wagtail's <embed/> (an image or media) is left out:
+# bleach rewrites the self-closing tag Wagtail's parser looks for, so an
+# embed is dropped from a description edited through the API.
 CONTRACT_DESCRIPTION_TAGS = frozenset(
     {"p", "br", "b", "i", "strong", "em", "h2", "h3", "h4", "ol", "ul", "li", "hr", "a"}
 )
@@ -473,6 +475,7 @@ CONTRACT_DESCRIPTION_ATTRIBUTES = {
     "*": ["data-block-key"],
     "a": ["href", "linktype", "id"],
 }
+CONTRACT_DESCRIPTION_PROTOCOLS = frozenset({"http", "https", "mailto", "tel"})
 
 
 class ContractDescriptionMixin:
@@ -485,6 +488,7 @@ class ContractDescriptionMixin:
             value,
             tags=CONTRACT_DESCRIPTION_TAGS,
             attributes=CONTRACT_DESCRIPTION_ATTRIBUTES,
+            protocols=CONTRACT_DESCRIPTION_PROTOCOLS,
             strip=True,
         )
 

@@ -309,7 +309,8 @@ therefore can't put back a contract's old name, dates, seat cap or price.
 
 `description` is Wagtail rich text. On the way in it is reduced to the markup
 Wagtail's editor stores (paragraphs, headings, bold, italic, lists, links);
-anything else is stripped.
+anything else is stripped, including an image or media embedded through
+Wagtail's editor.
 
 ## Errors
 

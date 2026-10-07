@@ -84,15 +84,15 @@ B2B data is designed to be managed via Wagtail, and some things can be viewed or
 
 Organizations and Contracts are Wagtail pages. An index page for organizations is be under the Home Page, and new organizations can be added here.
 
-Under each Organization page, any number of Contracts can be created as child pages.
+Each Organization page has its Contracts as child pages.
 
 ### In Wagtail
 
-You can create new and manage existing organizations and contracts within Wagtail. There are some things to be aware of before using this interface, though.
+Organizations and contracts are created and edited in the staff dashboard, and only a few of their fields are still edited in Wagtail. There are some things to be aware of before using this interface, though.
 
 - Organizations are best made in Keycloak, and then imported into MITx Online. There is a Celery task that will import organizations on a regular basis, or you can run the import manually. This will allow user management to be centralized within Keycloak. If you _must_ create an organization that exists outside of Keycloak, it's important that the Organization ID field remain blank.
 - Do not modify the Organization ID within an Organization record. Doing so will break the sync between the org and the Keycloak org, and you'll end up with a duplicate organization when the Keycloak one is synced back into the system.
-- Contracts are created and edited in the staff dashboard, on the organization's page under B2B Organizations, which also adds courseware and lists, assigns and expires enrollment codes. In Wagtail a contract's page only edits the extra welcome message, the Google Sheet target and the order of its programs; its other fields are read-only there. See [the provisioning API](provisioning_api.md).
+- Contracts are created and edited in the staff dashboard, on the organization's page under B2B Organizations, which also adds courseware and lists, assigns and expires enrollment codes. In Wagtail a contract's page edits the extra welcome message, the Google Sheet target and tab, and its list of programs; its other fields are read-only there, and a contract can't be created or copied there. See [the provisioning API](provisioning_api.md).
 
 ### In Django Admin
 
