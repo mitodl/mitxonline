@@ -14,7 +14,7 @@ def test_from_cause_appends_the_causes_error_code(user):
 
     error = EnrollmentError.from_cause(exc)
 
-    assert str(error.detail) == "Unable to complete enrollment. Error code: CS_700"
+    assert str(error.detail) == "Unable to complete enrollment. Error code: CS_700."
 
 
 def test_from_cause_without_an_error_code_keeps_the_default_detail(user):
@@ -39,4 +39,4 @@ def test_from_cause_preserves_the_subclass(user):
     )
 
     assert isinstance(error, EnrollmentCreationFailedError)
-    assert str(error.detail).endswith("Error code: CS_700")
+    assert str(error.detail).endswith("Error code: CS_700.")

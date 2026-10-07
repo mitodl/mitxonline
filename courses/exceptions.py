@@ -40,7 +40,7 @@ class EnrollmentError(APIException):
         error_code = getattr(exc, "error_code", None)
         if not error_code:
             return cls()
-        return cls(f"{cls.default_detail} Error code: {error_code}")
+        return cls(f"{cls.default_detail} Error code: {error_code}.")
 
 
 class EnrollmentCreationFailedError(EnrollmentError):
