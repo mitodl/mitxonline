@@ -9,10 +9,13 @@ Most people will use it through the staff dashboard's B2B Organizations
 section, which covers organizations, onboarding state, IdPs, the change
 history and contracts. A contract's page there creates and edits the contract,
 adds and removes courseware, shows how far the edX clones and enrollment codes
-have got, and assigns and expires codes. Three things on a contract still need
-Wagtail or the API: `welcome_message_extra` and the Google Sheet target, which
-the contract routes don't carry, and variant sets, which have routes and no UI
-yet. This page is the reference for engineers working on the API or the UI, and for
+have got, and assigns and expires codes. Some things on a contract still need
+Wagtail or the API: `welcome_message_extra`, the Google Sheet target and the
+order of a contract's programs, which the contract routes don't carry, and
+variant sets, which have routes and no UI yet. The contract routes save the
+page without a Wagtail revision, so publishing a contract page in Wagtail can
+write back older values of the fields the dashboard edits. Check them after a
+Wagtail publish. This page is the reference for engineers working on the API or the UI, and for
 anyone who needs to know what a button in the dashboard actually does.
 
 The design came from the B2B onboarding RFC,
@@ -339,6 +342,6 @@ changes an existing `org_key`.
   likely place, but it has no token field yet.
 - An IdP edit form over the `PATCH` route, and a test-login flow.
 - The contract fields the staff dashboard can't reach
-  (`welcome_message_extra`, `google_sheet_target`, `google_sheet_target_tab`)
-  and a variant set editor. The Wagtail contract page can't go read-only
+  (`welcome_message_extra`, `google_sheet_target`, `google_sheet_target_tab`,
+  program order) and a variant set editor. The Wagtail contract page can't go read-only
   until the dashboard covers them.

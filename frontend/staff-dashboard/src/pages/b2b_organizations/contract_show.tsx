@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Show } from "@refinedev/antd";
 import { useApiUrl, useCustom, useGo, useParsed } from "@refinedev/core";
 import { Button, Card, Col, Descriptions, Result, Row, Tag, Typography } from "antd";
@@ -11,6 +11,17 @@ import { IContractSetupStatus, IProvisionedContract } from "interfaces";
 import { formatIncome, mitxOnlineUrl } from "utils";
 
 const SETUP_POLL_INTERVAL_MS = 5000;
+// How long to wait for enrollment codes after the page loads or changes
+// something. A contract can stay short of codes for good (e.g. after its
+// unused ones are expired), so this cannot wait until the count is met.
+const CODE_POLL_WINDOW_MS = 2 * 60 * 1000;
+
+// Clones are checked individually: the API reports "failed" as soon as one
+// clone fails, while others may still be running.
+const shouldPoll = (setupStatus: IContractSetupStatus | undefined, codesDeadline: number) =>
+    !!setupStatus &&
+    (setupStatus.runs.some((run) => run.clone_status === "pending" || run.clone_status === "cloning") ||
+        (setupStatus.enrollment_codes.existing < setupStatus.enrollment_codes.expected && Date.now() < codesDeadline));
 
 // The description is Wagtail rich text. Show its text rather than its markup,
 // without putting stored HTML into the page.
@@ -29,20 +40,22 @@ export const ContractShow: React.FC = () => {
         method: "get",
         queryOptions: { retry: false },
     });
-    // edX clones and enrollment codes finish in Celery, so keep asking until
-    // nothing is outstanding.
+    const [codesDeadline, setCodesDeadline] = useState(() => Date.now() + CODE_POLL_WINDOW_MS);
+    // edX clones and enrollment codes finish in Celery, so keep asking while
+    // either is outstanding.
     const setupQuery = useCustom<IContractSetupStatus>({
         url: `${contractUrl}/setup-status/`,
         method: "get",
         queryOptions: {
             retry: false,
-            refetchInterval: (response) => (response?.data.status === "in_progress" ? SETUP_POLL_INTERVAL_MS : false),
+            refetchInterval: (response) => (shouldPoll(response?.data, codesDeadline) ? SETUP_POLL_INTERVAL_MS : false),
         },
     });
     const contract = contractQuery.data?.data;
     const setupStatus = setupQuery.data?.data;
 
     const refresh = () => {
+        setCodesDeadline(Date.now() + CODE_POLL_WINDOW_MS);
         contractQuery.refetch();
         setupQuery.refetch();
     };
@@ -59,7 +72,7 @@ export const ContractShow: React.FC = () => {
                     <Button icon={<ReloadOutlined />} onClick={refresh}>
                         Refresh
                     </Button>
-                    {/* The welcome page's extra content and the Google Sheet target are not in the contract API yet. */}
+                    {/* The welcome page's extra content, the Google Sheet target and program order are not in the contract API yet. */}
                     {contract && (
                         <Button icon={<ExportOutlined />} href={mitxOnlineUrl(`/cms/pages/${contract.id}/edit/`)} target="_blank">
                             Open in Wagtail
