@@ -606,6 +606,8 @@ class ContractPage(Page, ClusterableModel):
         # revision saved before a program was linked would delete the link
         # when published. Wagtail still orders them, so keep the stored links
         # in the revision's order, with any it doesn't have after the rest.
+        # Wagtail saves an unpublished page's form straight to the database
+        # without coming through here, so this only protects a live page.
         revision_position = {
             item.program_id: position
             for position, item in enumerate(page.contract_programs.all())

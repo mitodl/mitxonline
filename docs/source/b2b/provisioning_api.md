@@ -308,7 +308,10 @@ row whenever Wagtail loads or publishes one. Publishing an old revision
 therefore can't put back a contract's old name, dates, seat cap or price.
 The same goes for which programs a contract has: a publish keeps the stored
 program links and takes only their order from the revision, so a program
-added or removed on the Wagtail page is not saved.
+added or removed on the Wagtail page is not saved, and one removed there moves
+to the end of the order. This holds for a live page. Wagtail saves the form of
+an unpublished contract page straight to the database, so there an added or
+removed program is saved, and an added one queues run creation.
 
 `description` is Wagtail rich text. On the way in it is reduced to the markup
 Wagtail's editor stores (paragraphs, headings, bold, italic, lists, links);
