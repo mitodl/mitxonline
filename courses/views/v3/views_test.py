@@ -129,7 +129,9 @@ def test_user_enrollments_detail(
             "language": enrollment.run.language,
             "language_label": enrollment.run.language_label,
             "variant_industry": enrollment.run.variant_industry,
+            "variant_industry_label": enrollment.run.variant_industry_label,
             "variant_length": enrollment.run.variant_length,
+            "variant_length_label": enrollment.run.variant_length_label,
         },
         "edx_emails_subscription": enrollment.edx_emails_subscription,
         "grades": [
@@ -205,7 +207,9 @@ def test_user_enrollments_list(
                 "language": enrollment.run.language,
                 "language_label": enrollment.run.language_label,
                 "variant_industry": enrollment.run.variant_industry,
+                "variant_industry_label": enrollment.run.variant_industry_label,
                 "variant_length": enrollment.run.variant_length,
+                "variant_length_label": enrollment.run.variant_length_label,
             },
             "edx_emails_subscription": enrollment.edx_emails_subscription,
             "grades": [
@@ -323,7 +327,9 @@ def test_user_enrollments_list_filter_exclude_b2b(
                 "language": enrollment.run.language,
                 "language_label": enrollment.run.language_label,
                 "variant_industry": enrollment.run.variant_industry,
+                "variant_industry_label": enrollment.run.variant_industry_label,
                 "variant_length": enrollment.run.variant_length,
+                "variant_length_label": enrollment.run.variant_length_label,
             },
             "edx_emails_subscription": enrollment.edx_emails_subscription,
             "grades": [
@@ -400,7 +406,9 @@ def test_user_enrollments_list_filter_exclude_b2b(
                 "language": enrollment.run.language,
                 "language_label": enrollment.run.language_label,
                 "variant_industry": enrollment.run.variant_industry,
+                "variant_industry_label": enrollment.run.variant_industry_label,
                 "variant_length": enrollment.run.variant_length,
+                "variant_length_label": enrollment.run.variant_length_label,
             },
             "edx_emails_subscription": enrollment.edx_emails_subscription,
             "grades": [
