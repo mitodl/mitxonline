@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Show } from "@refinedev/antd";
 import { useApiUrl, useCustom, useGo, useParsed } from "@refinedev/core";
 import { Button, Card, Col, Descriptions, Result, Row, Tag, Typography } from "antd";
@@ -18,10 +18,10 @@ const CODE_POLL_WINDOW_MS = 2 * 60 * 1000;
 
 // Clones are checked individually: the API reports "failed" as soon as one
 // clone fails, while others may still be running.
-const shouldPoll = (setupStatus: IContractSetupStatus | undefined, codesDeadline: number) =>
+const shouldPoll = (setupStatus: IContractSetupStatus | undefined, waitingForCodes: boolean) =>
     !!setupStatus &&
     (setupStatus.runs.some((run) => run.clone_status === "pending" || run.clone_status === "cloning") ||
-        (setupStatus.enrollment_codes.existing < setupStatus.enrollment_codes.expected && Date.now() < codesDeadline));
+        (setupStatus.enrollment_codes.existing < setupStatus.enrollment_codes.expected && waitingForCodes));
 
 // The description is Wagtail rich text. Show its text rather than its markup,
 // without putting stored HTML into the page.
@@ -41,6 +41,14 @@ export const ContractShow: React.FC = () => {
         queryOptions: { retry: false },
     });
     const [codesDeadline, setCodesDeadline] = useState(() => Date.now() + CODE_POLL_WINDOW_MS);
+    // State, not a comparison with the clock, so the page re-renders and can
+    // say so when the wait ends.
+    const [waitingForCodes, setWaitingForCodes] = useState(true);
+    useEffect(() => {
+        setWaitingForCodes(true);
+        const timer = setTimeout(() => setWaitingForCodes(false), codesDeadline - Date.now());
+        return () => clearTimeout(timer);
+    }, [codesDeadline]);
     // edX clones and enrollment codes finish in Celery, so keep asking while
     // either is outstanding.
     const setupQuery = useCustom<IContractSetupStatus>({
@@ -48,7 +56,7 @@ export const ContractShow: React.FC = () => {
         method: "get",
         queryOptions: {
             retry: false,
-            refetchInterval: (response) => (shouldPoll(response?.data, codesDeadline) ? SETUP_POLL_INTERVAL_MS : false),
+            refetchInterval: (response) => (shouldPoll(response?.data, waitingForCodes) ? SETUP_POLL_INTERVAL_MS : false),
         },
     });
     const contract = contractQuery.data?.data;
@@ -125,7 +133,7 @@ export const ContractShow: React.FC = () => {
                         </Card>
                     </Col>
                     <Col span={24}>
-                        <ContractCourseware contractUrl={contractUrl} contract={contract} setupStatus={setupStatus} refresh={refresh} />
+                        <ContractCourseware contractUrl={contractUrl} contract={contract} setupStatus={setupStatus} waitingForCodes={waitingForCodes} refresh={refresh} />
                     </Col>
                     <Col span={24}>
                         <ContractCodes

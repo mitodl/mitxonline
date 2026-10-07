@@ -22,6 +22,8 @@ interface IContractCoursewareProps {
     contractUrl: string;
     contract: IProvisionedContract;
     setupStatus?: IContractSetupStatus;
+    // False once the page has given up polling for enrollment codes.
+    waitingForCodes: boolean;
     refresh: () => void;
 }
 
@@ -68,7 +70,7 @@ const isCourseRunId = (courseware_id: string) => /^course-v1:[^+]+\+[^+]+\+[^+]+
 
 // A contract write returns once MITx Online's rows exist. The edX clones and
 // the enrollment codes follow in Celery, so this shows how far they have got.
-export const ContractCourseware: React.FC<IContractCoursewareProps> = ({ contractUrl, contract, setupStatus, refresh }) => {
+export const ContractCourseware: React.FC<IContractCoursewareProps> = ({ contractUrl, contract, setupStatus, waitingForCodes, refresh }) => {
     const [form] = Form.useForm<ICoursewareForm>();
     const { mutate, isLoading } = useCustomMutation();
     const status = setupStatus && CONTRACT_SETUP_STATUSES[setupStatus.status];
@@ -192,7 +194,12 @@ export const ContractCourseware: React.FC<IContractCoursewareProps> = ({ contrac
                     <Alert
                         type="info"
                         showIcon
-                        message={`This contract has ${codes?.existing} of the ${codes?.expected} enrollment codes its courseware needs. They are created in the background after courseware is added. If the count is not moving, e.g. after expiring codes, Retry setup creates the missing ones.`}
+                        message={`This contract has ${codes?.existing} of the ${codes?.expected} enrollment codes its courseware needs. They are created in the background after courseware is added.`}
+                        description={
+                            waitingForCodes
+                                ? "This page is checking for new codes every few seconds."
+                                : "This page has stopped checking for new codes. Retry setup creates the missing ones, e.g. after expiring codes, and reloading the page checks again."
+                        }
                     />
                 )}
                 {setupStatus?.status === "failed" && (
