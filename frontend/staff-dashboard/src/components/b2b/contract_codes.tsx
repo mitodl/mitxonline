@@ -64,7 +64,7 @@ export const ContractCodes: React.FC<IContractCodesProps> = ({ contractUrl, cont
         if (existingCodes !== undefined && listedCodes !== undefined && existingCodes !== listedCodes) {
             reload();
         }
-    }, [existingCodes]);
+    }, [existingCodes, listedCodes]);
 
     const refreshCodes = () => {
         reload();
