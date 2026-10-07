@@ -38,6 +38,17 @@ const ServiceProviderDetails: React.FC<{ idp: IOrganizationIdentityProvider }> =
                 <Copyable value={idp.service_provider.redirect_uri} />
             </Descriptions.Item>
         )}
+        <Descriptions.Item label="Login link">
+            <Copyable value={idp.login_url} />
+            {idp.login_url ? (
+                <div>
+                    <Typography.Text type="secondary">
+                        Signs a user in through this identity provider once it is in Testing or Active. Open it in a
+                        private window to test.
+                    </Typography.Text>
+                </div>
+            ) : null}
+        </Descriptions.Item>
         <Descriptions.Item label="Metadata source">
             <Typography.Text style={{ wordBreak: "break-all" }}>
                 {idp.metadata_source.trimStart().startsWith("<") ? "Pasted XML document" : idp.metadata_source}

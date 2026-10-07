@@ -1653,5 +1653,25 @@ MIT_LEARN_ATTACH_URL = get_string(
     description="The URL to use for generating contract attachment URLs for B2B.",
 )
 
+B2B_IDP_LOGIN_CLIENT_ID = get_string(
+    name="B2B_IDP_LOGIN_CLIENT_ID",
+    default=None,
+    description=(
+        "The Keycloak client ID used in the login link for a B2B identity"
+        " provider. It is the client of the app partner learners land in."
+    ),
+)
+
+B2B_IDP_LOGIN_REDIRECT_URI = get_string(
+    name="B2B_IDP_LOGIN_REDIRECT_URI",
+    default=None,
+    description=(
+        "Where Keycloak sends the browser after a login through a B2B identity"
+        " provider's login link. It is the API gateway login URL of the app"
+        " partner learners land in, and a valid redirect URI of"
+        " B2B_IDP_LOGIN_CLIENT_ID."
+    ),
+)
+
 if ECOMMERCE_DEFAULT_PAYMENT_GATEWAY == "None":  # noqa: F405
     ECOMMERCE_DEFAULT_PAYMENT_GATEWAY = MITOL_PAYMENT_GATEWAY_CYBERSOURCE
