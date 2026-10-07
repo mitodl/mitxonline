@@ -547,26 +547,18 @@ def _get_source_runs_for_course(  # noqa: PLR0913
         if only_lang:
             course_variants = [cv for cv in course_variants if cv[0] == only_lang]
 
-        variant_opts = Q(
-            Q(language=course_variants[0][0])
-            & Q(variant_length=course_variants[0][1])
-            & Q(variant_industry=course_variants[0][2])
-        )
-
-        for v in course_variants[1:]:
-            variant_opts = variant_opts | Q(
-                Q(language=v[0]) & Q(variant_length=v[1]) & Q(variant_industry=v[2])
+        # Seeded with a match-nothing Q, not Q(), so that no surviving variants
+        # means no source runs instead of every source run.
+        variant_opts = Q(pk__in=[])
+        for language, length, industry in course_variants:
+            variant_opts |= Q(
+                language=language, variant_length=length, variant_industry=industry
             )
-
         source_runs = source_runs.filter(variant_opts)
 
     if not source_runs.count():
         if not require_designated:
-            fallback = (
-                course.courseruns.filter(b2b_contract__isnull=True)
-                .order_by("-id")
-                .first()
-            )
+            fallback = course.courseruns.filter(b2b_only=False).order_by("-id").first()
             if not fallback:
                 msg = f"No course runs available for {course}."
                 raise SourceCourseIncompleteError(msg)
@@ -575,7 +567,7 @@ def _get_source_runs_for_course(  # noqa: PLR0913
                 course,
                 fallback,
             )
-            return fallback
+            return CourseRun.all_objects.filter(pk=fallback.pk)
         msg = f"No source run found for {course}."
         raise SourceCourseIncompleteError(msg)
 
