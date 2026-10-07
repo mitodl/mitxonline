@@ -2,7 +2,6 @@
 
 import logging
 from decimal import Decimal
-from urllib.parse import urljoin
 
 from django.conf import settings
 from django.contrib import admin
@@ -1033,8 +1032,10 @@ class OrganizationIdentityProvider(TimestampedModel, ValidateOnSaveMixin):
           OIDC redirect URI) and metadata_url (the SAML SP descriptor)
         """
 
-        realm_url = urljoin(
-            settings.KEYCLOAK_BASE_URL, f"/realms/{settings.KEYCLOAK_REALM_NAME}"
+        # Not urljoin: a leading slash there drops any path in the base URL.
+        realm_url = (
+            f"{settings.KEYCLOAK_BASE_URL.removesuffix('/')}"
+            f"/realms/{settings.KEYCLOAK_REALM_NAME}"
         )
         endpoint = f"{realm_url}/broker/{self.alias}/endpoint"
 

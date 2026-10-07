@@ -921,12 +921,23 @@ def test_list_organizations_filters_on_onboarding_state(staff_drf_client):
     assert [org["org_key"] for org in response.json()["results"]] == [live.org_key]
 
 
+@pytest.mark.parametrize(
+    ("base_url", "realm_url"),
+    [
+        ("https://sso.example.mit.edu", "https://sso.example.mit.edu/realms/olapps"),
+        ("https://sso.example.mit.edu/", "https://sso.example.mit.edu/realms/olapps"),
+        (
+            "https://sso.example.mit.edu/auth",
+            "https://sso.example.mit.edu/auth/realms/olapps",
+        ),
+    ],
+)
 def test_identity_provider_includes_the_service_provider_details(
-    staff_drf_client, settings
+    staff_drf_client, settings, base_url, realm_url
 ):
     """An operator hands the partner these, so the API serves them."""
 
-    settings.KEYCLOAK_BASE_URL = "https://sso.example.mit.edu"
+    settings.KEYCLOAK_BASE_URL = base_url
     settings.KEYCLOAK_REALM_NAME = "olapps"
     organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
     _identity_provider(organization)
@@ -936,9 +947,9 @@ def test_identity_provider_includes_the_service_provider_details(
     )
 
     assert response.json()["service_provider"] == {
-        "entity_id": "https://sso.example.mit.edu/realms/olapps",
-        "redirect_uri": "https://sso.example.mit.edu/realms/olapps/broker/exampleu/endpoint",
-        "metadata_url": "https://sso.example.mit.edu/realms/olapps/broker/exampleu/endpoint/descriptor",
+        "entity_id": realm_url,
+        "redirect_uri": f"{realm_url}/broker/exampleu/endpoint",
+        "metadata_url": f"{realm_url}/broker/exampleu/endpoint/descriptor",
     }
 
 
