@@ -26,6 +26,39 @@ def queue_enrollment_code_check(contract_id: int):
 
 
 @app.task(acks_late=True)
+def push_upgraded_enrollments_to_edx(enrollment_ids: list[int]):
+    """
+    Push enrollments that were upgraded to verified locally into edX.
+
+    Each enrollment is pushed on its own, so one bad run doesn't block the
+    rest. Failures are left with edx_enrolled=False for
+    retry_failed_edx_enrollments to pick up.
+    """
+    from courses.models import CourseRunEnrollment
+    from openedx.api import enroll_in_edx_course_runs
+
+    enrollments = CourseRunEnrollment.objects.filter(
+        id__in=enrollment_ids, edx_enrolled=False
+    ).select_related("user", "run")
+
+    for enrollment in enrollments:
+        try:
+            enroll_in_edx_course_runs(
+                enrollment.user, [enrollment.run], mode=enrollment.enrollment_mode
+            )
+        except Exception:  # noqa: BLE001
+            log.warning(
+                "Couldn't push upgraded enrollment %s to edX, leaving it for retry",
+                enrollment.id,
+                exc_info=True,
+            )
+            continue
+
+        enrollment.edx_enrolled = True
+        enrollment.save_and_log(None)
+
+
+@app.task(acks_late=True)
 def queue_organization_sync():
     """Queue the sync_organizations call."""
     from b2b.api import reconcile_keycloak_orgs

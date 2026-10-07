@@ -41,6 +41,7 @@ from b2b.api import (
     reconcile_keycloak_orgs,
     reconcile_single_keycloak_org,
     reconcile_user_orgs,
+    upgrade_user_enrollments_for_contracts,
     validate_basket_for_b2b_purchase,
 )
 from b2b.constants import (
@@ -58,12 +59,17 @@ from b2b.models import (
     OrganizationPage,
     UserOrganization,
 )
-from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
+from courses.constants import (
+    ENROLL_CHANGE_STATUS_DEFERRED,
+    ENROLL_CHANGE_STATUS_UNENROLLED,
+)
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     DepartmentFactory,
+    EnrollmentModeFactory,
+    ProgramEnrollmentFactory,
     ProgramFactory,
 )
 from courses.models import CourseRunEnrollment, ProgramEnrollment
@@ -3190,3 +3196,215 @@ def test_find_unlinked_page_for_alias_ignores_a_missing_alias():
     factories.OrganizationPageFactory.create(sso_organization_id=None)
 
     assert find_unlinked_page_for_alias(None) is None
+
+
+@pytest.fixture
+def mocked_edx_upgrade_push(mocker):
+    """Mock the task that pushes upgraded enrollments to edX."""
+
+    return mocker.patch("b2b.api.push_upgraded_enrollments_to_edx.delay")
+
+
+def _make_contract_with_courseware():
+    """Make an auto contract with a public run and a program in it."""
+
+    org = OrganizationPageFactory.create()
+    contract = ContractPageFactory.create(organization=org, membership_type="auto")
+    run = CourseRunFactory.create(b2b_contracts=[contract])
+    program = ProgramFactory.create()
+    ContractProgramItem(contract=contract, program=program).save(skip_run_creation=True)
+
+    return org, contract, run, program
+
+
+@pytest.mark.parametrize("attach_via", ["org", "contract", "reverse"])
+def test_attach_upgrades_audit_enrollments(
+    mocked_b2b_org_attach,
+    mocked_edx_upgrade_push,
+    django_capture_on_commit_callbacks,
+    attach_via,
+):
+    """Joining a contract upgrades the user's audit enrollments in it."""
+
+    org, contract, run, program = _make_contract_with_courseware()
+    other_run = CourseRunFactory.create()
+    user = UserFactory.create()
+
+    run_enrollment = CourseRunEnrollmentFactory.create(
+        user=user,
+        run=run,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        edx_enrolled=True,
+    )
+    other_enrollment = CourseRunEnrollmentFactory.create(
+        user=user,
+        run=other_run,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        edx_enrolled=True,
+    )
+    program_enrollment = ProgramEnrollmentFactory.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+
+    with django_capture_on_commit_callbacks(execute=True):
+        if attach_via == "org":
+            process_add_org_membership(user, org)
+        elif attach_via == "contract":
+            user.b2b_contracts.add(contract)
+        else:
+            contract.users.add(user)
+
+    run_enrollment.refresh_from_db()
+    other_enrollment.refresh_from_db()
+    program_enrollment.refresh_from_db()
+
+    assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    assert run_enrollment.b2b_contract == contract
+    # Left for the async task (or the retry job) to push into edX
+    assert run_enrollment.edx_enrolled is False
+    assert program_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    assert program_enrollment.b2b_contract == contract
+
+    assert other_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+    assert other_enrollment.edx_enrolled is True
+
+    mocked_edx_upgrade_push.assert_called_once_with([run_enrollment.id])
+
+
+@pytest.mark.parametrize(
+    "ineligibility",
+    [
+        "not_live",
+        "deadline_passed",
+        "no_verified_mode",
+        "change_status",
+        "inactive",
+    ],
+)
+def test_attach_skips_ineligible_enrollments(
+    mocked_edx_upgrade_push, django_capture_on_commit_callbacks, ineligibility
+):
+    """Enrollments that can't be upgraded are left alone on attach."""
+
+    _, contract, run, program = _make_contract_with_courseware()
+    user = UserFactory.create()
+    enrollment_kwargs = {}
+
+    if ineligibility == "not_live":
+        run.live = False
+        run.save()
+        program.live = False
+        program.save()
+    elif ineligibility == "deadline_passed":
+        run.upgrade_deadline = now_in_utc() - timedelta(days=1)
+        run.save()
+        # Programs don't have an upgrade deadline, so use another reason
+        program.enrollment_modes.set(
+            [EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)]
+        )
+    elif ineligibility == "no_verified_mode":
+        audit_mode = EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)
+        run.enrollment_modes.set([audit_mode])
+        program.enrollment_modes.set([audit_mode])
+    elif ineligibility == "change_status":
+        enrollment_kwargs["change_status"] = ENROLL_CHANGE_STATUS_DEFERRED
+    else:
+        enrollment_kwargs["active"] = False
+        enrollment_kwargs["change_status"] = ENROLL_CHANGE_STATUS_UNENROLLED
+
+    run_enrollment = CourseRunEnrollmentFactory.create(
+        user=user,
+        run=run,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        edx_enrolled=True,
+        **enrollment_kwargs,
+    )
+    program_enrollment = ProgramEnrollmentFactory.create(
+        user=user,
+        program=program,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        **enrollment_kwargs,
+    )
+
+    with django_capture_on_commit_callbacks(execute=True):
+        user.b2b_contracts.add(contract)
+
+    run_enrollment.refresh_from_db()
+    program_enrollment.refresh_from_db()
+
+    assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+    assert run_enrollment.edx_enrolled is True
+    assert run_enrollment.b2b_contract is None
+    assert program_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+    mocked_edx_upgrade_push.assert_not_called()
+
+
+def test_attach_leaves_existing_memberships_alone(
+    mocked_b2b_org_attach, mocked_edx_upgrade_push, django_capture_on_commit_callbacks
+):
+    """Re-adding a contract the user is already in doesn't upgrade anything."""
+
+    org, contract, run, _ = _make_contract_with_courseware()
+    user = UserFactory.create()
+    user.b2b_contracts.add(contract)
+
+    enrollment = CourseRunEnrollmentFactory.create(
+        user=user, run=run, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+
+    with django_capture_on_commit_callbacks(execute=True):
+        org.add_user_contracts(user)
+
+    enrollment.refresh_from_db()
+    assert enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+    mocked_edx_upgrade_push.assert_not_called()
+
+
+def test_upgrade_enrollments_skips_edx_for_fake_runs(
+    mocked_edx_upgrade_push, django_capture_on_commit_callbacks
+):
+    """Fake runs are upgraded locally but never pushed into edX."""
+
+    _, contract, run, _ = _make_contract_with_courseware()
+    run.run_tag = "fake-run"
+    run.save()
+    user = UserFactory.create()
+    enrollment = CourseRunEnrollmentFactory.create(
+        user=user,
+        run=run,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        edx_enrolled=True,
+    )
+
+    with django_capture_on_commit_callbacks(execute=True):
+        upgraded_runs, upgraded_programs = upgrade_user_enrollments_for_contracts(
+            user, [contract]
+        )
+
+    enrollment.refresh_from_db()
+    assert upgraded_runs == [enrollment]
+    assert upgraded_programs == []
+    assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    assert enrollment.edx_enrolled is True
+    mocked_edx_upgrade_push.assert_not_called()
+
+
+def test_upgrade_enrollments_keeps_existing_contract(mocked_edx_upgrade_push):
+    """An enrollment already tied to a contract keeps that contract."""
+
+    _, contract, run, _ = _make_contract_with_courseware()
+    other_contract = ContractPageFactory.create()
+    run.b2b_contracts.add(other_contract)
+    user = UserFactory.create()
+    enrollment = CourseRunEnrollmentFactory.create(
+        user=user,
+        run=run,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        b2b_contract=other_contract,
+    )
+
+    upgrade_user_enrollments_for_contracts(user, [contract])
+
+    enrollment.refresh_from_db()
+    assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    assert enrollment.b2b_contract == other_contract
