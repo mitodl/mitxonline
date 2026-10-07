@@ -282,6 +282,10 @@ the contract's courses (from its runs and its programs) that support the same
 language, length and industry, whether each has a source run for it, and the
 contract's run for it if there is one. A course with a source run and no
 contract run gets one the next time its courseware is added to the contract.
+Each set also lists, as `unsupported_courses`, the contract's courses with no
+matching variant set of their own, which get no run for it. `setup-status`
+returns the same report as `variants`. A missing run doesn't change the setup
+status.
 `POST` adds a set (`language`, `variant_length`, `variant_industry`,
 `b2b_only`). It never adds a default, since every contract already has one, and
 a set the contract already has, active or not, is a 400. Adding a set creates
