@@ -55,15 +55,19 @@ export const ContractCodes: React.FC<IContractCodesProps> = ({ contractUrl, cont
         config: { query: { page, page_size: PAGE_SIZE } },
     });
 
+    // Back to the first page: the page being shown may no longer exist once
+    // codes have been expired or a run removed, and DRF answers that with 404.
+    const reload = () => (page === 1 ? refetch() : setPage(1));
+
     const listedCodes = data?.data.count;
     useEffect(() => {
         if (existingCodes !== undefined && listedCodes !== undefined && existingCodes !== listedCodes) {
-            refetch();
+            reload();
         }
-    }, [existingCodes, listedCodes, refetch]);
+    }, [existingCodes]);
 
     const refreshCodes = () => {
-        refetch();
+        reload();
         refresh();
     };
 
@@ -71,7 +75,7 @@ export const ContractCodes: React.FC<IContractCodesProps> = ({ contractUrl, cont
         Modal.confirm({
             title: `Expire ${contract.name}'s unused enrollment codes?`,
             content:
-                "Every code that has not been redeemed is taken out of the contract, including codes already emailed to someone who has not used theirs yet. Redeemed codes are left alone. This cannot be undone.",
+                "Codes that have been neither assigned nor redeemed are taken out of the contract. A code already assigned to someone keeps working, and so does a redeemed one. The contract is then short of codes, and replacements are created the next time its enrollment code check runs: on Retry setup, on an edit to the contract, or when courseware is added.",
             okButtonProps: { danger: true },
             okText: "Expire unused codes",
             onOk: () =>
@@ -86,12 +90,7 @@ export const ContractCodes: React.FC<IContractCodesProps> = ({ contractUrl, cont
                         },
                         errorNotification: apiErrorNotification("Could not expire the codes"),
                     },
-                    {
-                        onSuccess: () => {
-                            setPage(1);
-                            refreshCodes();
-                        },
-                    },
+                    { onSuccess: refreshCodes },
                 ),
         });
 

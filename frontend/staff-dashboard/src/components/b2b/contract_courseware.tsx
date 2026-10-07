@@ -25,21 +25,34 @@ interface IContractCoursewareProps {
     refresh: () => void;
 }
 
+// Zero runs is not a failure: a program added again is still linked, and a
+// course whose run is already in the contract is left as it is.
 const additionSummary = ({ data }: { data: ICoursewareAddition }) => ({
-    type: data.runs_added ? ("success" as const) : ("error" as const),
-    message: `${data.runs_added} contract run${data.runs_added === 1 ? "" : "s"} added`,
-    description: [
-        data.courses_without_source_run
-            ? `${data.courses_without_source_run} course${data.courses_without_source_run === 1 ? " has" : "s have"} no source run to clone.`
-            : "",
-        data.skipped_reason,
-    ]
-        .filter(Boolean)
-        .join(" "),
+    type: "success" as const,
+    message: data.runs_added
+        ? `${data.runs_added} contract run${data.runs_added === 1 ? "" : "s"} added`
+        : "No new contract runs",
+    description:
+        [
+            data.courses_without_source_run
+                ? `${data.courses_without_source_run} course${data.courses_without_source_run === 1 ? " has" : "s have"} no source run to clone.`
+                : "",
+            data.skipped_reason,
+        ]
+            .filter(Boolean)
+            .join(" ") || (data.runs_added ? undefined : "The contract already has a run for this courseware."),
 });
 
 const removalSummary = ({ data }: { data: IRemovedContractRun[] }) => {
     const kept = data.filter((run) => !run.unlinked);
+
+    if (data.length === 0) {
+        return {
+            type: "success" as const,
+            message: "Removed from the contract",
+            description: "No contract runs were closed.",
+        };
+    }
 
     return {
         type: "success" as const,
@@ -57,6 +70,7 @@ export const ContractCourseware: React.FC<IContractCoursewareProps> = ({ contrac
     const { mutate, isLoading } = useCustomMutation();
     const status = setupStatus && CONTRACT_SETUP_STATUSES[setupStatus.status];
     const codes = setupStatus?.enrollment_codes;
+    const codesShort = !!codes && codes.existing < codes.expected;
 
     const add = ({ courseware_id }: ICoursewareForm) =>
         mutate(
@@ -78,8 +92,9 @@ export const ContractCourseware: React.FC<IContractCoursewareProps> = ({ contrac
     const remove = (courseware_id: string, remove_program_runs: boolean) =>
         Modal.confirm({
             title: `Remove ${courseware_id} from ${contract.name}?`,
-            content:
-                "Its contract runs are closed to new enrollments. A run with enrolled learners stays linked to the contract so they keep their course.",
+            content: remove_program_runs
+                ? "If this is a program, it is unlinked from the contract and its courses' contract runs are closed. A closed run takes no new enrollments, its products are deactivated, and its unassigned, unredeemed enrollment codes are deleted. A run with enrolled learners stays linked to the contract so they keep their course."
+                : "If this is a program, it is only unlinked from the contract: its courses' contract runs stay open. A course or course run is closed: it takes no new enrollments, its products are deactivated, and its unassigned, unredeemed enrollment codes are deleted. A run with enrolled learners stays linked to the contract so they keep their course.",
             okButtonProps: { danger: true },
             okText: "Remove",
             onOk: () =>
@@ -153,6 +168,13 @@ export const ContractCourseware: React.FC<IContractCoursewareProps> = ({ contrac
                     </Descriptions.Item>
                 </Descriptions>
 
+                {codesShort && (
+                    <Alert
+                        type="info"
+                        showIcon
+                        message={`This contract has ${codes?.existing} of the ${codes?.expected} enrollment codes its courseware needs. They are created in the background after courseware is added. If the count is not moving, e.g. after expiring codes, Retry setup creates the missing ones.`}
+                    />
+                )}
                 {setupStatus?.status === "failed" && (
                     <Alert
                         type="error"
@@ -208,7 +230,7 @@ export const ContractCourseware: React.FC<IContractCoursewareProps> = ({ contrac
                         label="Program, course or course run"
                         name="courseware_id"
                         rules={[{ required: true, whitespace: true, message: "Enter a readable ID." }]}
-                        extra="A readable ID, e.g. program-v1:MITx+DEDP or course-v1:MITx+14.100x. Adding creates a contract run for each course, cloned from its source run in edX. Adding the same courseware again does not create a second run."
+                        extra="A readable ID, e.g. program-v1:MITx+DEDP or course-v1:MITx+14.100x. Adding creates a contract run for each course, cloned from its source run in edX. Adding the same courseware again does not create a second run. A course run ID attaches that existing run as it is, and removing it later closes it, so only enter a run that was made for this contract."
                     >
                         <Input style={{ maxWidth: 480 }} />
                     </Form.Item>

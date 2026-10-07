@@ -95,6 +95,7 @@ export const apiErrorNotification = (message: string) => (error?: HttpError) => 
     return {
         type: "error" as const,
         message,
-        description: typeof detail === "string" ? detail : data ? JSON.stringify(data) : undefined,
+        // A 500 or 502 can carry an HTML page, which has no place in a notification.
+        description: typeof detail === "string" ? detail : data && typeof data === "object" ? JSON.stringify(data) : undefined,
     };
 };
