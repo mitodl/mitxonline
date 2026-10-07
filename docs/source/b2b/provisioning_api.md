@@ -12,10 +12,9 @@ adds and removes courseware, shows how far the edX clones and enrollment codes
 have got, and assigns and expires codes. Some things on a contract still need
 Wagtail or the API: `welcome_message_extra`, the Google Sheet target and the
 order of a contract's programs, which the contract routes don't carry, and
-variant sets, which have routes and no UI yet. The contract routes save the
-page without a Wagtail revision, so publishing a contract page in Wagtail can
-write back older values of the fields the dashboard edits. Check them after a
-Wagtail publish. This page is the reference for engineers working on the API or the UI, and for
+variant sets, which have routes and no UI yet. Every other contract field is
+read-only on the Wagtail page, and contracts can't be created there. This
+page is the reference for engineers working on the API or the UI, and for
 anyone who needs to know what a button in the dashboard actually does.
 
 The design came from the B2B onboarding RFC,
@@ -302,6 +301,16 @@ and assign codes to people by email the same way the manager dashboard's bulk
 assign does. They return redeemable codes, which is part of why every route
 here requires staff, including reads.
 
+The contract routes save the page without a Wagtail revision. A revision
+holds the whole page as it was when it was saved, so `ContractPage` takes the
+fields these routes write (`ContractPage.PROVISIONED_FIELDS`) from the stored
+row whenever Wagtail loads or publishes one. Publishing an old revision
+therefore can't put back a contract's old name, dates, seat cap or price.
+
+`description` is Wagtail rich text. On the way in it is reduced to the markup
+Wagtail's editor stores (paragraphs, headings, bold, italic, lists, links);
+anything else is stripped.
+
 ## Errors
 
 | Condition | Status |
@@ -343,5 +352,5 @@ changes an existing `org_key`.
 - An IdP edit form over the `PATCH` route, and a test-login flow.
 - The contract fields the staff dashboard can't reach
   (`welcome_message_extra`, `google_sheet_target`, `google_sheet_target_tab`,
-  program order) and a variant set editor. The Wagtail contract page can't go read-only
-  until the dashboard covers them.
+  program order) and a variant set editor. They are all the Wagtail contract
+  page is still needed for.
