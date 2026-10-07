@@ -304,9 +304,12 @@ its courseware is added to the contract, as long as the set is active. The list
 also shows a removed course whose closed run stays linked for its enrolled
 learners, and a course outside the contract's programs whose run in it isn't
 live. `variants/sync/` skips both. Each set also lists, as
-`unsupported_courses`, the contract's courses with no matching variant set of
-their own, which get no run for it. `setup-status` returns the same report as
-`variants`. A missing run doesn't change the setup status.
+`unsupported_courses`, the contract's courses with no active variant set of
+their own that matches, so adding their courseware picks no source run for it.
+`contract_run` is there too, since such a course can still have a run for the
+set (e.g. its own set was turned off afterwards). `setup-status` and
+`retry-setup` return the same report as `variants`. A missing run doesn't
+change the setup status.
 `POST` adds a set (`language`, `variant_length`, `variant_industry`,
 `b2b_only`). It never adds a default, since every contract already has one, and
 a set the contract already has, active or not, is a 400. Adding a set creates
