@@ -1,6 +1,19 @@
 Release Notes
 =============
 
+Version 1.169.11
+----------------
+
+- Copy only the compiled frontend into the production image (#4108)
+- Fix the two crash paths in picking a contract run's source run (#4073)
+- Upgrade eligible audit enrollments when a user joins a contract (#4114)
+- Terminate the enrollment error code sentence with a period (#4113)
+- Add staff API routes for a contract's variant sets (#4068)
+- Write Keycloak last when changing an existing provisioning resource (#4028)
+- Let staff edit an identity provider instead of deleting and recreating it (staff UI 5/5) (#4005)
+- Link unlinked organizations to their Keycloak org by alias (#3993)
+- Return a specific error code in the API error for compliance check failure (#3938)
+
 Version 1.169.10
 ----------------
 
