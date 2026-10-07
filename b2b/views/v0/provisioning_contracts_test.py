@@ -188,6 +188,20 @@ def test_patch_contract(
     assert mocked_tasks.code_check.called is queues_code_check
 
 
+def test_deactivated_contract_can_be_edited_and_reactivated(admin_drf_client):
+    """A contract switched off through the API still takes edits, and switches back on."""
+
+    contract = ContractPageFactory.create()
+    url = _contract_url(contract)
+
+    for payload in ({"active": False}, {"name": "Renamed"}, {"active": True}):
+        response = admin_drf_client.patch(url, payload, format="json")
+        assert response.status_code == status.HTTP_200_OK, response.json()
+
+    assert response.json()["name"] == "Renamed"
+    assert response.json()["active"] is True
+
+
 def test_contract_description_keeps_only_rich_text_markup(admin_drf_client):
     """A description is stored with nothing Wagtail's editor would not store."""
 

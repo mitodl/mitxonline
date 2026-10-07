@@ -21,7 +21,7 @@ from modelcluster.fields import ParentalKey
 from requests.exceptions import HTTPError
 from wagtail.admin.panels import FieldPanel, HelpPanel, InlinePanel, MultiFieldPanel
 from wagtail.fields import RichTextField
-from wagtail.models import ClusterableModel, Orderable, Page
+from wagtail.models import ClusterableModel, Orderable, Page, PageManager
 
 from b2b.constants import (
     CONTRACT_MEMBERSHIP_AUTOS,
@@ -382,12 +382,42 @@ class ActiveContractManager(models.Manager):
         )
 
 
+class ContractPageManager(PageManager):
+    """
+    Default manager for contracts: every contract, except through a relation.
+
+    Wagtail reloads a page through its model's default manager when it saves
+    one (``Page.specific``), so a default manager that hides contracts that
+    aren't valid for use makes them impossible to save. Django also builds
+    related managers (``user.b2b_contracts``, ``run.b2b_contracts``,
+    ``organization.contracts``) from the default manager's class, and the code
+    that reads those relies on them leaving out contracts that aren't valid.
+    A related manager is the one with an ``instance``, so only it filters.
+    """
+
+    def get_queryset(self):
+        """Filter to contracts valid for use when reached through a relation."""
+
+        queryset = super().get_queryset()
+
+        if not hasattr(self, "instance"):
+            return queryset
+
+        now = now_in_utc()
+
+        return queryset.filter(active=True).exclude(
+            models.Q(contract_start__gt=now) | models.Q(contract_end__lt=now)
+        )
+
+
 class ContractPage(Page, ClusterableModel):
     """Stores information about a contract with an organization."""
 
     parent_page_types = ["b2b.OrganizationPage"]
     # Contracts are created in the staff dashboard, through the contract API.
     is_creatable = False
+    # Declared first so it is the default manager; see ContractPageManager.
+    objects = ContractPageManager()
     active_objects = ActiveContractManager()
 
     # Written only by the contract API, which saves the row without a Wagtail
@@ -550,8 +580,9 @@ class ContractPage(Page, ClusterableModel):
             heading="Programs",
             help_text=(
                 "Order the programs in this contract. Add and remove programs "
-                "in the staff dashboard: a program added or removed here is "
-                "not saved."
+                "in the staff dashboard. On a published page a program added "
+                "or removed here is not saved. On an unpublished page it is "
+                "saved, and adding one creates its contract runs."
             ),
         ),
     ]

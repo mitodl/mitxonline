@@ -1,15 +1,22 @@
 """Tests for models."""
 
+from datetime import timedelta
 from importlib import import_module
 from uuid import uuid4
 
 import faker
 import pytest
+from mitol.common.utils import now_in_utc
+from wagtail.models import Page
 
 from b2b.api import ensure_enrollment_codes_exist
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
-from b2b.models import ContractProgramItem, DiscountContractAttachmentRedemption
+from b2b.models import (
+    ContractPage,
+    ContractProgramItem,
+    DiscountContractAttachmentRedemption,
+)
 from courses.factories import (
     CourseRunFactory,
     ProgramFactory,
@@ -263,6 +270,51 @@ def test_organization_description_html_to_text(value, expected):
     )
 
     assert migration.html_to_text(value) == expected
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"active": False},
+        {"contract_end": now_in_utc() - timedelta(days=1)},
+        {"contract_start": now_in_utc() + timedelta(days=1)},
+    ],
+)
+def test_contract_not_valid_for_use_can_be_saved(changes):
+    """
+    A contract that is inactive, ended or not yet started can still be saved,
+    and stays out of the relations that code reads valid contracts through.
+    """
+
+    contract = ContractPageFactory.create()
+    user = UserFactory.create()
+    user.b2b_contracts.add(contract)
+    run = CourseRunFactory.create()
+    run.b2b_contracts.add(contract)
+
+    for field, value in changes.items():
+        setattr(contract, field, value)
+    contract.save()
+
+    contract = ContractPage.objects.get(pk=contract.pk)
+    contract.name = "Renamed"
+    contract.save()
+
+    assert Page.objects.get(pk=contract.pk).specific.name == "Renamed"
+    assert not ContractPage.active_objects.filter(pk=contract.pk).exists()
+    assert not user.b2b_contracts.exists()
+    assert not run.b2b_contracts.exists()
+    assert not contract.organization.contracts.exists()
+    [prefetched] = type(run).objects.filter(pk=run.pk).prefetch_related("b2b_contracts")
+    assert list(prefetched.b2b_contracts.all()) == []
+
+    contract.active = True
+    contract.contract_start = None
+    contract.contract_end = None
+    contract.save()
+
+    assert user.b2b_contracts.get() == contract
+    assert contract.organization.contracts.get() == contract
 
 
 def test_publishing_a_stale_contract_revision_keeps_api_written_fields():

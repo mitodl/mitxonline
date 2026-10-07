@@ -472,13 +472,10 @@ class CourseViewSet(
         # prefetch selects the whole multi-table row - ~50 columns including two
         # RichTextFields - once per (run, contract) pair.
         #
-        # active_objects, not objects: the M2M related manager is built from
-        # ContractPage._default_manager, which is ActiveContractManager because
-        # active_objects is ContractPage's only *local* manager (see
-        # CourseRunAdmin.formfield_for_foreignkey for the same reasoning). So
-        # this prefetch has always filtered to active, in-window contracts, and
-        # ContractPage.objects - Wagtail's inherited, unfiltered PageManager -
-        # would silently widen it.
+        # active_objects, not objects: the M2M related manager filters to
+        # active, in-window contracts (see ContractPageManager), so this
+        # prefetch always has, and the unfiltered ContractPage.objects would
+        # silently widen it.
         #
         # ``contract.id`` stays free under only(): it is the MTI parent's pk, so
         # DeferredAttribute._check_parent_chain resolves it from the loaded
