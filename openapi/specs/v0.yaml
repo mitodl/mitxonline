@@ -5096,6 +5096,8 @@ components:
           type: string
         course_id:
           type: integer
+        readable_id:
+          type: string
         language:
           type: string
         variant_length:
@@ -5106,6 +5108,7 @@ components:
       - course_id
       - courseware_id
       - language
+      - readable_id
       - variant_industry
       - variant_length
     Country:
