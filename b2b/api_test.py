@@ -691,6 +691,31 @@ def test_create_contract_run_falls_back_to_newest_non_b2b_run(mocker):
     mocked_clone_run.assert_called_once_with(created_run.id, newest_run.courseware_id)
 
 
+def test_create_contract_run_fallback_goes_by_b2b_only(mocker):
+    """
+    The fallback skips B2B-only runs. A public run stays eligible when it is
+    attached to a contract.
+    """
+
+    contract = factories.ContractPageFactory.create()
+    other_contract = factories.ContractPageFactory.create()
+    course = CourseFactory.create()
+    mocked_clone_run = mocker.patch("openedx.tasks.clone_courserun.delay")
+    public_run = CourseRunFactory.create(
+        course=course, is_source_run=False, language="en"
+    )
+    public_run.b2b_contracts.add(other_contract)
+    CourseRunFactory.create(
+        course=course, is_source_run=False, language="en", b2b_only=True
+    )
+
+    [(created_run, _)] = create_contract_run(
+        contract, course, require_designated_source_run=False
+    )
+
+    mocked_clone_run.assert_called_once_with(created_run.id, public_run.courseware_id)
+
+
 def test_create_contract_run_variants(mocker):
     """
     Test creating runs for a contract when there are variant runs.

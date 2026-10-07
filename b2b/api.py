@@ -546,11 +546,7 @@ def _get_source_runs_for_course(  # noqa: PLR0913
 
     if not source_runs.count():
         if not require_designated:
-            fallback = (
-                course.courseruns.filter(b2b_contract__isnull=True)
-                .order_by("-id")
-                .first()
-            )
+            fallback = course.courseruns.filter(b2b_only=False).order_by("-id").first()
             if not fallback:
                 msg = f"No course runs available for {course}."
                 raise SourceCourseIncompleteError(msg)
