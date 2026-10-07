@@ -30,6 +30,7 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework.status import HTTP_404_NOT_FOUND
 
+from b2b.api import process_add_org_membership
 from cms.api import create_default_courseware_page
 from compliance.api import verify_user_with_exports
 from compliance.exceptions import ExportComplianceCheckError, ExportComplianceError
@@ -230,8 +231,6 @@ def _add_user_to_run_contract(user, run, enrollment):
     if not contract:
         return
 
-    from b2b.api import process_add_org_membership  # noqa: PLC0415
-
     process_add_org_membership(user, contract.organization, keep_until_seen=True)
     user.b2b_contracts.add(contract)
     user.save()
@@ -279,6 +278,13 @@ def create_run_enrollments(  # noqa: C901, PLR0913
             created in mitxonline, paired with a boolean indicating whether or not the edX enrollment API call was successful
             for all of the given course runs
     """
+
+    successful_enrollments = []
+    edx_request_success = True
+
+    if len(runs) == 0:
+        return (successful_enrollments, edx_request_success)
+
     # Pre-existing: only runs[0] is screened, so runs[1:] go unscreened for the
     # two multi-run callers (upgrade_audit_run_enrollments_for_program_purchase,
     # ecommerce.api.downgrade_learner_from_order).
@@ -296,12 +302,9 @@ def create_run_enrollments(  # noqa: C901, PLR0913
             features.IGNORE_EDX_FAILURES, False
         )
 
-    successful_enrollments = []
-
     def send_enrollment_emails():
         subscribe_edx_course_emails.delay(enrollment.id)
 
-    edx_request_success = True
     if not runs[0].is_fake_course_run:
         # Make the API call to enroll the user in edX only if the run is not a fake course run
         try:
@@ -632,13 +635,35 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
         user=user, program=program
     ).filter(enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE, b2b_contract__isnull=True)
 
+    eligible_runs = []
+    for run_enrollment in verified_run_enrollments:
+        run = run_enrollment.run
+        if (
+            PaidCourseRun.objects.filter(
+                user=user,
+                course_run=run,
+                order__state=OrderStatus.FULFILLED,
+            )
+            .exclude(
+                order__total_price_paid=0,
+                order__discounts__redeemed_discount__discount_code__startswith=program.readable_id,
+            )
+            .exists()
+        ):
+            continue
+        eligible_runs.append(run)
+
+    if not eligible_runs:
+        return downgraded_program_enrollment, []
+
     downgraded_run_enrollments, _ = create_run_enrollments(
         user,
-        verified_run_enrollments,
+        eligible_runs,
         mode=EDX_ENROLLMENT_AUDIT_MODE,
         change_status=ENROLL_CHANGE_STATUS_REFUNDED,
         keep_failed_enrollments=True,
     )
+
     return downgraded_program_enrollment, downgraded_run_enrollments
 
 

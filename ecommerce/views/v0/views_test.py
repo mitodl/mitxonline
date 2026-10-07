@@ -2119,7 +2119,10 @@ def test_refund_request_b2b_order(user, user_drf_client):
     product_version = Version.objects.get_for_object(product).last()
     order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
     LineFactory.create(
-        order=order, purchased_object=courserun, product_version=product_version
+        order=order,
+        purchased_object=courserun,
+        product_version=product_version,
+        b2b_contract=contract,
     )
 
     resp = user_drf_client.post(

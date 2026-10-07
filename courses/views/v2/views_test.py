@@ -1192,7 +1192,9 @@ def test_user_enrollments_create_b2b_run_invalid_v2(user_drf_client, user):
     """v2 enrollments API should reject creating enrollments for B2B course runs."""
     contract = ContractPageFactory.create()
     course = CourseFactory.create()
-    run = CourseRunFactory.create(course=course, b2b_contracts=[contract])
+    run = CourseRunFactory.create(
+        course=course, b2b_only=True, b2b_contracts=[contract]
+    )
 
     resp = user_drf_client.post(
         reverse("v2:user-enrollments-api-list"), data={"run_id": run.id}

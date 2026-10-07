@@ -692,7 +692,7 @@ def test_create_contract_run_falls_back_to_newest_non_b2b_run(mocker):
         contract, course, require_designated_source_run=False
     )
 
-    assert created_run.b2b_contract == contract
+    assert created_run.b2b_contracts.filter(pk=contract.id).exists()
     assert older_run.id < newest_run.id
     mocked_clone_run.assert_called_once_with(created_run.id, newest_run.courseware_id)
 

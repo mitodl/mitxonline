@@ -1431,14 +1431,16 @@ def test_refund_status_ineligible_for_unfulfilled_orders(state):
 @pytest.mark.skip_nplusone_check
 def test_refund_status_ineligible_for_b2b_orders():
     """B2B contract orders are handled off the self-service path."""
+    contract = ContractPageFactory.create()
     order = OrderFactory.create(state=OrderStatus.FULFILLED)
-    run = CourseRunFactory.create(b2b_contracts=[ContractPageFactory.create()])
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
     with reversion.create_revision():
         product = ProductFactory.create(purchasable_object=run)
     LineFactory.create(
         order=order,
         purchased_object=run,
         product_version=Version.objects.get_for_object(product).last(),
+        b2b_contract=contract,
     )
 
     assert order.refund_status == OrderRefundStatus.INELIGIBLE

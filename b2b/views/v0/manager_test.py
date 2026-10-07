@@ -313,24 +313,29 @@ def test_org_contract_run_enrollments(org_setup, manager_drf_client):
             CourseRunEnrollment.objects.create(
                 user=users_to_enroll[0],
                 run=runs[0],
+                b2b_contract=contract,
             ),
             CourseRunEnrollment.objects.create(
                 user=users_to_enroll[1],
                 run=runs[0],
+                b2b_contract=contract,
             ),
         ],
         [
             CourseRunEnrollment.objects.create(
                 user=users_to_enroll[0],
                 run=runs[1],
+                b2b_contract=contract,
             ),
             CourseRunEnrollment.objects.create(
                 user=users_to_enroll[1],
                 run=runs[1],
+                b2b_contract=contract,
             ),
             CourseRunEnrollment.objects.create(
                 user=users_to_enroll[2],
                 run=runs[1],
+                b2b_contract=contract,
             ),
         ],
     ]
