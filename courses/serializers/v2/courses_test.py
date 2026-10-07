@@ -312,7 +312,7 @@ class TestUserEnrollmentFiltering:
         org = OrganizationPageFactory.create(title="Test B2B Org")
         contract = ContractPageFactory.create(organization=org)
         b2b_enrollment = CourseRunEnrollmentFactory.create(
-            run__b2b_contracts=[contract], run__b2b_only=True
+            run__b2b_contracts=[contract], run__b2b_only=True, b2b_contract=contract
         )
 
         queryset = CourseRunEnrollment.objects.filter(
@@ -415,7 +415,7 @@ def test_course_serializer_canonical_run_fallback_to_oldest(mock_context):
 @pytest.mark.parametrize(
     ("context_key", "expected_key"),
     [
-        (None, "first"),
+        (None, None),
         ("contract_id", "second"),
         ("org_id", "second"),
     ],
@@ -423,7 +423,7 @@ def test_course_serializer_canonical_run_fallback_to_oldest(mock_context):
 def test_course_run_serializer_b2b_contract(mock_context, context_key, expected_key):
     """
     The b2b_contract field returns the contract the request was scoped to, or
-    the lowest-ID contract otherwise.
+    to None.
     """
     contracts = {
         "first": ContractPageFactory.create(),
@@ -439,7 +439,11 @@ def test_course_run_serializer_b2b_contract(mock_context, context_key, expected_
 
     data = CourseRunSerializer(run, context=context).data
 
-    assert data["b2b_contract"] == contracts[expected_key].id
+    if expected_key:
+        assert data["b2b_contract"] == contracts[expected_key].id
+    else:
+        assert not data["b2b_contract"]
+
     assert (
         CourseRunSerializer(CourseRunFactory.create(), context=context).data[
             "b2b_contract"
