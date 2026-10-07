@@ -1113,7 +1113,7 @@ class Order(TimestampedModel):
     @cached_property
     def is_b2b_order(self):
         """
-        Return True if any purchased run belongs to a B2B contract.
+        Return True if any line item belongs to a B2B contract.
 
         Reads the line's denormalized `purchased_object` rather than resolving
         `product.purchasable_object` through reversion. The two identify the same
@@ -1124,7 +1124,7 @@ class Order(TimestampedModel):
         ``OrderHistoryViewSet`` annotates this same name with
         ``b2b_order_exists()`` so a page of orders doesn't query per row.
         """
-        return any(run.has_b2b_contracts for run in self.purchased_runs)
+        return any(line.b2b_contract for line in self.lines.all())
 
     @cached_property
     def funds_fulfilled_redemption(self):

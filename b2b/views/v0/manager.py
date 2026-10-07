@@ -487,7 +487,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         # Get enrollments for this course run
         enrollments = (
-            CourseRunEnrollment.objects.filter(run=course_run)
+            CourseRunEnrollment.objects.filter(run=course_run, b2b_contract=contract)
             .select_related("user")
             .order_by("-created_on")
         )

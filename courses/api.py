@@ -230,6 +230,8 @@ def _add_user_to_run_contract(user, run, enrollment):
     if not contract:
         return
 
+    from b2b.api import process_add_org_membership  # noqa: PLC0415
+
     process_add_org_membership(user, contract.organization, keep_until_seen=True)
     user.b2b_contracts.add(contract)
     user.save()
@@ -628,34 +630,11 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
 
     verified_run_enrollments = CourseRunEnrollment.get_program_run_enrollments(
         user=user, program=program
-    ).filter(enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE)
-
-    eligible_runs = []
-    for run_enrollment in verified_run_enrollments:
-        run = run_enrollment.run
-        if run.has_b2b_contracts:
-            continue
-        if (
-            PaidCourseRun.objects.filter(
-                user=user,
-                course_run=run,
-                order__state=OrderStatus.FULFILLED,
-            )
-            .exclude(
-                order__total_price_paid=0,
-                order__discounts__redeemed_discount__discount_code__startswith=program.readable_id,
-            )
-            .exists()
-        ):
-            continue
-        eligible_runs.append(run)
-
-    if not eligible_runs:
-        return downgraded_program_enrollment, []
+    ).filter(enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE, b2b_contract__isnull=True)
 
     downgraded_run_enrollments, _ = create_run_enrollments(
         user,
-        eligible_runs,
+        verified_run_enrollments,
         mode=EDX_ENROLLMENT_AUDIT_MODE,
         change_status=ENROLL_CHANGE_STATUS_REFUNDED,
         keep_failed_enrollments=True,
