@@ -107,14 +107,12 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
         here: this runs once per enrollment, so a lookup would be an N+1 across
         the dashboard.
 
-        That covers list and retrieve, which is every route the dashboard uses.
-        It falls back to False anywhere the queryset was not involved - a
-        serializer used directly, or the v3 create route, which is unreachable
-        for a separate reason (`run_id` is read in `create()` but never
-        declared as a field) and is not called: the frontend enrols through
-        /api/v1/enrollments/.
+        Read directly rather than through a defaulting getattr, so a route that
+        serializes an enrollment without annotating it fails instead of
+        reporting False for a user who does hold the role. That makes the
+        annotation an invariant of this serializer, not a convention.
         """
-        return bool(getattr(enrollment, "has_course_staff_role", False))
+        return enrollment.has_course_staff_role
 
     @extend_schema_field(serializers.IntegerField(allow_null=True))
     def get_b2b_organization_id(self, enrollment):
