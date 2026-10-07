@@ -558,9 +558,15 @@ class ContractVariantCourseSerializer(serializers.Serializer):
 class ContractVariantUnsupportedCourseSerializer(serializers.Serializer):
     """One of the contract's courses that a variant set does not match."""
 
-    course_id = serializers.IntegerField(source="id")
-    readable_id = serializers.CharField()
-    title = serializers.CharField()
+    course_id = serializers.IntegerField(source="course.id")
+    readable_id = serializers.CharField(source="course.readable_id")
+    title = serializers.CharField(source="course.title")
+    contract_run = serializers.CharField(
+        source="contract_run.courseware_id",
+        allow_null=True,
+        default=None,
+        help_text="The contract's run for this variant, if it has one anyway.",
+    )
 
 
 class ContractVariantSetSerializer(serializers.Serializer):
@@ -570,7 +576,8 @@ class ContractVariantSetSerializer(serializers.Serializer):
     A listed course with a source run and no contract run gets a run for this
     set when its courseware is next added to the contract, if the set is
     active. A course in unsupported_courses has no active variant set of its
-    own with this language, length and industry, so it gets no run for it.
+    own with this language, length and industry, so adding its courseware
+    doesn't pick a source run for this set.
     """
 
     id = serializers.IntegerField(source="variant.id")

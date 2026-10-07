@@ -482,8 +482,11 @@ def get_contract_variant_coverage(contract: ContractPage) -> list[dict]:
     Returns a dict per variant set, default first: `variant` (the
     SupportedVariant), `courses`, each with `course`, `has_source_run` and
     `contract_run` (the contract's run for this variant, or None), and
-    `unsupported_courses` (the contract's courses with no matching variant set
-    of their own, which get no run for this set).
+    `unsupported_courses` (the contract's courses with no active variant set
+    of their own that matches, each with `course` and `contract_run`). Such a
+    course can still have a run for the set: one added by its run ID, one made
+    before the course's set was turned off, or the fallback run of a course
+    with no default variant set.
     """
 
     courses = list(
@@ -529,7 +532,10 @@ def get_contract_variant_coverage(contract: ContractPage) -> list[dict]:
                     if fields in course_variants[course.id]
                 ],
                 "unsupported_courses": [
-                    course
+                    {
+                        "course": course,
+                        "contract_run": contract_runs.get((course.id, *fields)),
+                    }
                     for course in courses
                     if fields not in course_variants[course.id]
                 ],

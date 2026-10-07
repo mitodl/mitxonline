@@ -28,6 +28,37 @@ class Command(BaseCommand):
             help="Add a default variant if there's not one.",
         )
 
+    def _write_variant_set(self, entry):
+        """Print one variant set and the contract's courses under it."""
+
+        variant = entry["variant"]
+        inactive = "" if variant.active else " (inactive)"
+
+        self.stdout.write(
+            f"Language = {variant.language} Industry = {variant.variant_industry} Length = {variant.variant_length}{inactive}"
+        )
+
+        if not entry["courses"] and not entry["unsupported_courses"]:
+            self.stdout.write(f"\t{self.style.WARNING('NO COURSES')}")
+
+        for listed in entry["courses"]:
+            if listed["contract_run"]:
+                run_status = listed["contract_run"].courseware_id
+            elif listed["has_source_run"]:
+                run_status = self.style.WARNING("NO RUN")
+            else:
+                run_status = self.style.WARNING("NO RUN, NO SOURCE RUN")
+
+            self.stdout.write(f"\t{listed['course'].readable_id}: {run_status}")
+
+        for listed in entry["unsupported_courses"]:
+            run = listed["contract_run"]
+            run_status = self.style.WARNING("NOT IN THE COURSE VARIANTS")
+            if run:
+                run_status = f"{run.courseware_id} {run_status}"
+
+            self.stdout.write(f"\t{listed['course'].readable_id}: {run_status}")
+
     def handle(self, *_args, **kwargs):
         """Perform the check."""
 
@@ -68,27 +99,4 @@ class Command(BaseCommand):
         )
 
         for entry in get_contract_variant_coverage(contract_obj):
-            variant = entry["variant"]
-            inactive = "" if variant.active else " (inactive)"
-
-            self.stdout.write(
-                f"Language = {variant.language} Industry = {variant.variant_industry} Length = {variant.variant_length}{inactive}"
-            )
-
-            if not entry["courses"]:
-                self.stdout.write(f"\t{self.style.WARNING('NO COURSES')}")
-
-            for listed in entry["courses"]:
-                if listed["contract_run"]:
-                    run_status = listed["contract_run"].courseware_id
-                elif listed["has_source_run"]:
-                    run_status = self.style.WARNING("NO RUN")
-                else:
-                    run_status = self.style.WARNING("NO RUN, NO SOURCE RUN")
-
-                self.stdout.write(f"\t{listed['course'].readable_id}: {run_status}")
-
-            for course in entry["unsupported_courses"]:
-                self.stdout.write(
-                    f"\t{course.readable_id}: {self.style.WARNING('NOT IN THE COURSE VARIANTS')}"
-                )
+            self._write_variant_set(entry)
