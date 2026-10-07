@@ -245,8 +245,8 @@ learners can't be routed by email domain. The API gateway builds the normal
 login request and drops `kc_idp_hint`, so `/login/?kc_idp_hint=<alias>` doesn't
 work. The link goes to Keycloak's authorization endpoint with the hint, and
 Keycloak redirects to the gateway's login route once the user has a session.
-Open it in a private window when testing, because Keycloak ignores the hint for
-a browser that is already signed in.
+Open it in a private window when testing, because a browser that is already
+signed in to Keycloak is not sent to the IdP.
 
 `login_url` is `null` unless `B2B_IDP_LOGIN_CLIENT_ID` and
 `B2B_IDP_LOGIN_REDIRECT_URI` are set. They name the Keycloak client and gateway

@@ -971,6 +971,7 @@ def test_identity_provider_includes_a_login_url_with_its_alias_as_the_hint(
         _identity_provider_url(organization.org_key, "exampleu")
     )
 
+    assert response.status_code == status.HTTP_200_OK
     login_url = urlsplit(response.json()["login_url"])
     assert login_url._replace(query="").geturl() == (
         "https://sso.example.mit.edu/realms/olapps/protocol/openid-connect/auth"
@@ -982,6 +983,18 @@ def test_identity_provider_includes_a_login_url_with_its_alias_as_the_hint(
         "scope": ["openid"],
         "kc_idp_hint": ["exampleu"],
     }
+
+
+def test_login_url_escapes_the_alias(settings):
+    """Nothing restricts an alias's characters, so it can't add parameters."""
+
+    settings.B2B_IDP_LOGIN_CLIENT_ID = "learn-client"
+    settings.B2B_IDP_LOGIN_REDIRECT_URI = "https://api.learn.example.mit.edu/login"
+
+    login_url = OrganizationIdentityProvider(alias="a&client_id=b").login_url
+
+    assert login_url.endswith("&kc_idp_hint=a%26client_id%3Db")
+    assert "redirect_uri=https%3A%2F%2Fapi.learn.example.mit.edu%2Flogin&" in login_url
 
 
 @pytest.mark.parametrize(

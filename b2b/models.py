@@ -1040,9 +1040,10 @@ class OrganizationIdentityProvider(TimestampedModel, ValidateOnSaveMixin):
         which starts its own login and completes it from the Keycloak session
         the user now has. The code Keycloak appends to that redirect is unused.
 
-        It is the same link partners without email-domain routing give their
-        learners. Keycloak ignores the hint for a browser that already has a
-        Keycloak session, and for an IdP that is not enabled.
+        Partners without email-domain routing give their learners a link of
+        this shape, built by hand. The realm's browser flow checks the Keycloak
+        session cookie before the IdP redirector, so a browser that is already
+        signed in to Keycloak never reaches the IdP.
 
         Returns:
         - str: the link, or None when the login client isn't configured
