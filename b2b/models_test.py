@@ -263,3 +263,61 @@ def test_organization_description_html_to_text(value, expected):
     )
 
     assert migration.html_to_text(value) == expected
+
+
+def test_publishing_a_stale_contract_revision_keeps_api_written_fields():
+    """A Wagtail publish does not put back fields the contract API has changed."""
+
+    contract = ContractPageFactory.create(
+        name="Before", max_learners=5, welcome_message="Hello"
+    )
+    contract.welcome_message_extra = "<p>Old extra</p>"
+    revision = contract.save_revision()
+
+    # The contract API saves the row without a revision.
+    contract.name = "After"
+    contract.max_learners = 50
+    contract.welcome_message = "Hello again"
+    contract.save()
+
+    # Wagtail's editor starts from the latest revision.
+    edited = contract.get_latest_revision_as_object()
+    assert edited.name == "After"
+    assert edited.max_learners == 50
+
+    edited.welcome_message_extra = "<p>New extra</p>"
+    edited.save_revision().publish()
+
+    contract.refresh_from_db()
+    assert contract.name == "After"
+    assert contract.title == "After"
+    assert contract.max_learners == 50
+    assert contract.welcome_message == "Hello again"
+    assert contract.welcome_message_extra == "<p>New extra</p>"
+
+    # Republishing the revision saved before the API write.
+    revision.publish()
+
+    contract.refresh_from_db()
+    assert contract.name == "After"
+    assert contract.max_learners == 50
+    assert contract.welcome_message == "Hello again"
+    assert contract.welcome_message_extra == "<p>Old extra</p>"
+
+
+def test_contract_wagtail_editor_only_edits_what_the_api_does_not(admin_client):
+    """The Wagtail edit form loads, links to the dashboard, and can't change API fields."""
+
+    contract = ContractPageFactory.create(name="Read only", max_learners=5)
+
+    response = admin_client.get(f"/cms/pages/{contract.id}/edit/")
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert (
+        f"/staff-dashboard/b2b_organizations/show/{contract.organization.org_key}"
+        f"/contracts/{contract.id}"
+    ) in content
+    form = response.context["form"]
+    assert not set(contract.PROVISIONED_FIELDS) & set(form.fields)
+    assert {"welcome_message_extra", "google_sheet_target"} <= set(form.fields)
