@@ -63,6 +63,9 @@ const removalSummary = ({ data }: { data: IRemovedContractRun[] }) => {
     };
 };
 
+// course-v1:ORG+COURSE is a course, course-v1:ORG+COURSE+RUN a run of it.
+const isCourseRunId = (courseware_id: string) => /^course-v1:[^+]+\+[^+]+\+[^+]+$/.test(courseware_id);
+
 // A contract write returns once MITx Online's rows exist. The edX clones and
 // the enrollment codes follow in Celery, so this shows how far they have got.
 export const ContractCourseware: React.FC<IContractCoursewareProps> = ({ contractUrl, contract, setupStatus, refresh }) => {
@@ -72,14 +75,14 @@ export const ContractCourseware: React.FC<IContractCoursewareProps> = ({ contrac
     const codes = setupStatus?.enrollment_codes;
     const codesShort = !!codes && codes.existing < codes.expected;
 
-    const add = ({ courseware_id }: ICoursewareForm) =>
+    const postAddition = (courseware_id: string) =>
         mutate(
             {
                 url: `${contractUrl}/courseware/`,
                 method: "post",
-                values: { courseware_id: courseware_id.trim() },
+                values: { courseware_id },
                 successNotification: (response) => additionSummary(response as { data: ICoursewareAddition }),
-                errorNotification: apiErrorNotification(`Could not add ${courseware_id.trim()}`),
+                errorNotification: apiErrorNotification(`Could not add ${courseware_id}`),
             },
             {
                 onSuccess: () => {
@@ -88,6 +91,23 @@ export const ContractCourseware: React.FC<IContractCoursewareProps> = ({ contrac
                 },
             },
         );
+
+    // A program or course gets new contract runs cloned for it. A course run
+    // is different: that run itself is moved into the contract.
+    const add = (values: ICoursewareForm) => {
+        const courseware_id = values.courseware_id.trim();
+        if (!isCourseRunId(courseware_id)) {
+            postAddition(courseware_id);
+            return;
+        }
+        Modal.confirm({
+            title: `Attach the existing run ${courseware_id}?`,
+            content:
+                "This looks like a course run ID, not a course ID. No new run is cloned: this run itself is attached to the contract as it is. Removing it from the contract later closes it to new enrollments and deactivates its products. To give the contract its own run of a course, enter the course ID instead.",
+            okText: "Attach this run",
+            onOk: () => postAddition(courseware_id),
+        });
+    };
 
     const remove = (courseware_id: string, remove_program_runs: boolean) =>
         Modal.confirm({
@@ -230,7 +250,7 @@ export const ContractCourseware: React.FC<IContractCoursewareProps> = ({ contrac
                         label="Program, course or course run"
                         name="courseware_id"
                         rules={[{ required: true, whitespace: true, message: "Enter a readable ID." }]}
-                        extra="A readable ID, e.g. program-v1:MITx+DEDP or course-v1:MITx+14.100x. Adding creates a contract run for each course, cloned from its source run in edX. Adding the same courseware again does not create a second run. A course run ID attaches that existing run as it is, and removing it later closes it, so only enter a run that was made for this contract."
+                        extra="A readable ID, e.g. program-v1:MITx+DEDP or course-v1:MITx+14.100x. Adding creates a contract run for each course, cloned from its source run in edX. Adding the same courseware again does not create a second run."
                     >
                         <Input style={{ maxWidth: 480 }} />
                     </Form.Item>
