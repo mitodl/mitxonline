@@ -1,6 +1,21 @@
 Release Notes
 =============
 
+Version 1.169.10
+----------------
+
+- Allow purchasing B2B-associated runs as a non-B2B purchase (#4079)
+- Allow upgrades through the B2B one-click enrollment API (#4077)
+- Share one requirement-tree evaluator; validate requirement trees at every depth (#4067)
+- Update pytest-split test durations (#4094)
+- Serialize enrollment code assignment per contract (#4048)
+- Build the docs with uv and remove Pants (#4054)
+- Serializers and Filtering: Decide whether an enrollment is B2B from its own contract (#4084)
+- Add a CoursePage toggle for the Learn course outline section (#4090)
+- feat: add course run id search in courserungrade admin (#3986)
+- Update HubSpot line item sync for existing items (#4080)
+- Group verifiable-credential fields into their own CMS panel (#4071)
+
 Version 1.169.9
 ---------------
 
