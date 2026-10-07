@@ -190,6 +190,37 @@ def add_courseware_to_contract(  # noqa: PLR0913
     return CoursewareAddition(runs_added=len(created))
 
 
+def _unlink_shared_run(contract: ContractPage, run: CourseRun) -> bool | None:
+    """
+    Take a run that another contract also holds out of this contract.
+
+    The run is not closed, because that would close it for the other
+    contract's learners too, and its products and codes are left alone. It is
+    unlinked unless this contract's learners are enrolled in it.
+
+    Returns True if the run was unlinked, or None if no other contract holds
+    the run.
+    """
+
+    # Through ContractPage.objects, not run.b2b_contracts, so a contract that
+    # isn't valid for use right now (e.g. one that hasn't started) counts.
+    holders = Q(course_runs=run)
+    if run.b2b_contract_id:
+        holders |= Q(pk=run.b2b_contract_id)
+    if not ContractPage.objects.filter(holders).exclude(pk=contract.pk).exists():
+        return None
+
+    if CourseRunEnrollment.objects.filter(run=run, b2b_contract=contract).exists():
+        return False
+
+    if run.b2b_contract_id == contract.pk:
+        run.b2b_contract = None
+        run.save()
+    run.b2b_contracts.remove(contract)
+
+    return True
+
+
 def _remove_run_from_contract(contract: ContractPage, run: CourseRun) -> bool:
     """
     Close a contract run to new enrollments and take it out of the contract.
@@ -199,8 +230,15 @@ def _remove_run_from_contract(contract: ContractPage, run: CourseRun) -> bool:
     Enrollment codes left applying to no product, and never redeemed, are
     deleted.
 
+    A run that another contract also holds is only unlinked; see
+    _unlink_shared_run.
+
     Returns True if the run was unlinked.
     """
+
+    shared_unlinked = _unlink_shared_run(contract, run)
+    if shared_unlinked is not None:
+        return shared_unlinked
 
     unlinked = not CourseRunEnrollment.objects.filter(run=run).exists()
 

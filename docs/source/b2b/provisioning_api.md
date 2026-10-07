@@ -285,6 +285,9 @@ run that already belongs to another contract is skipped and stays where it is.
 
 `courseware/remove/` closes the removed runs to new enrollments. A run that
 already has enrolled learners stays linked to the contract so they keep access.
+A run another contract also holds is not closed and keeps its products and
+codes. It is unlinked from this contract, unless this contract's learners are
+enrolled in it.
 
 `variants/` lists the contract's variant sets, default first. Each set lists
 the contract's courses (from its runs and its programs) that support the same

@@ -56,7 +56,7 @@ const removalSummary = ({ data }: { data: IRemovedContractRun[] }) => {
 
     return {
         type: "success" as const,
-        message: `${data.length} contract run${data.length === 1 ? "" : "s"} closed to new enrollments`,
+        message: `${data.length} contract run${data.length === 1 ? "" : "s"} closed to new enrollments or unlinked`,
         description: kept.length
             ? `Still linked to the contract because learners are enrolled: ${kept.map((run) => run.courseware_id).join(", ")}`
             : undefined,
@@ -113,8 +113,8 @@ export const ContractCourseware: React.FC<IContractCoursewareProps> = ({ contrac
         Modal.confirm({
             title: `Remove ${courseware_id} from ${contract.name}?`,
             content: remove_program_runs
-                ? "If this is a program, it is unlinked from the contract and its courses' contract runs are closed. A closed run takes no new enrollments, its products are deactivated, and its unassigned, unredeemed enrollment codes are deleted. A run with enrolled learners stays linked to the contract so they keep their course."
-                : "If this is a program, it is only unlinked from the contract: its courses' contract runs stay open. A course or course run is closed: it takes no new enrollments, its products are deactivated, and its unassigned, unredeemed enrollment codes are deleted. A run with enrolled learners stays linked to the contract so they keep their course.",
+                ? "If this is a program, it is unlinked from the contract and its courses' contract runs are closed. A closed run takes no new enrollments, its products are deactivated, and its unassigned, unredeemed enrollment codes are deleted. A run with enrolled learners stays linked to the contract so they keep their course. A run another contract also uses is not closed, only unlinked from this one."
+                : "If this is a program, it is only unlinked from the contract: its courses' contract runs stay open. A course or course run is closed: it takes no new enrollments, its products are deactivated, and its unassigned, unredeemed enrollment codes are deleted. A run with enrolled learners stays linked to the contract so they keep their course. A run another contract also uses is not closed, only unlinked from this one.",
             okButtonProps: { danger: true },
             okText: "Remove",
             onOk: () =>

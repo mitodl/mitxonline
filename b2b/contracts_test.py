@@ -34,6 +34,7 @@ from courses.factories import (
     CourseRunFactory,
     ProgramFactory,
 )
+from courses.models import CourseRun
 from users.factories import UserFactory
 from variants.factories import CourseSupportedVariantFactory
 
@@ -154,6 +155,39 @@ def test_remove_course(has_enrollments):
     assert removed_run.live is False
     assert contract.get_course_runs().filter(id=run.id).exists() is has_enrollments
     assert not contract.get_products().exists()
+
+
+@pytest.mark.parametrize("other_contract_active", [True, False])
+@pytest.mark.parametrize("has_enrollments", [True, False])
+def test_remove_run_another_contract_holds(other_contract_active, has_enrollments):
+    """
+    A run another contract also holds is unlinked without being closed, and
+    stays linked while this contract's learners are enrolled in it.
+    """
+
+    contract = ContractPageFactory.create()
+    course = _source_run().course
+    add_courseware_to_contract(contract, course, skip_edx=True)
+    [run] = contract.get_course_runs()
+    other_contract = ContractPageFactory.create(active=other_contract_active)
+    CourseRun.b2b_contracts.through.objects.create(
+        courserun=run, contractpage=other_contract
+    )
+    CourseRunEnrollmentFactory.create(run=run, b2b_contract=other_contract)
+    if has_enrollments:
+        CourseRunEnrollmentFactory.create(run=run, b2b_contract=contract)
+    products = contract.get_products().count()
+
+    [(removed_run, unlinked)] = remove_courseware_from_contract(contract, run)
+
+    removed_run.refresh_from_db()
+    assert unlinked is not has_enrollments
+    assert removed_run.live is True
+    assert removed_run.b2b_contract_id == (contract.id if has_enrollments else None)
+    assert other_contract.get_products().count() == products
+    assert CourseRun.b2b_contracts.through.objects.filter(
+        courserun=run, contractpage=other_contract
+    ).exists()
 
 
 def test_remove_run_outside_contract():
