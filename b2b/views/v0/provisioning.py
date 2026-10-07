@@ -41,6 +41,7 @@ from b2b.contracts import (
     queue_enrollment_code_check_if_required,
     remove_courseware_from_contract,
     retry_contract_setup,
+    sync_contract_variants,
     update_contract_variant_set,
 )
 from b2b.exceptions import (
@@ -79,6 +80,7 @@ from b2b.serializers.v0.provisioning import (
     ContractCoursewareSerializer,
     ContractSetupStatusSerializer,
     ContractVariantSetSerializer,
+    ContractVariantSyncSerializer,
     CoursewareAdditionSerializer,
     CreateContractSerializer,
     CreateContractVariantSetSerializer,
@@ -824,8 +826,8 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
         """
         Add a variant set to the contract.
 
-        Creates no runs. Adding the courseware to the contract again creates
-        runs for the new set.
+        Creates no runs. variants/sync creates them for the courseware already
+        in the contract.
         """
 
         contract = self.get_object()
@@ -908,6 +910,27 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
             )
 
         return self._variant_set_response(contract, variant, status.HTTP_200_OK)
+
+    @extend_schema(request=None, responses={200: ContractVariantSyncSerializer})
+    @action(detail=True, methods=["post"], url_path="variants/sync")
+    def sync_variants(self, request, pk=None, **kwargs):  # noqa: ARG002
+        """
+        Create the runs the contract's courses are missing for its variant sets.
+
+        Run it after adding variant sets to a contract that already has
+        courseware. Courses and variants that already have a run are left
+        alone, so repeating the call creates nothing more. The new runs' edX
+        clones are queued, and so is the enrollment code check for a contract
+        that uses codes.
+        """
+
+        contract = self.get_object()
+        synced = sync_contract_variants(contract)
+
+        if synced["runs_created"]:
+            queue_enrollment_code_check_if_required(contract)
+
+        return Response(ContractVariantSyncSerializer(synced).data)
 
     @extend_schema(responses={200: ManagerEnrollmentCodeSerializer(many=True)})
     @action(detail=True, methods=["get"])

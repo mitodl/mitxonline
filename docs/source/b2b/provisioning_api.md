@@ -257,6 +257,7 @@ POST   .../contracts/{id}/codes/assign/
 GET    .../contracts/{id}/variants/
 POST   .../contracts/{id}/variants/
 PATCH  .../contracts/{id}/variants/{variant_id}/
+POST   .../contracts/{id}/variants/sync/
 ```
 
 These replace running `b2b_contract`, `b2b_courseware`, `b2b_codes` and
@@ -281,7 +282,8 @@ already has enrolled learners stays linked to the contract so they keep access.
 the contract's courses (from its runs and its programs) that support the same
 language, length and industry, whether each has a source run for it, and the
 contract's run for it if there is one. A course with a source run and no
-contract run gets one the next time its courseware is added to the contract.
+contract run gets one from `variants/sync/`, or the next time its courseware
+is added to the contract.
 `POST` adds a set (`language`, `variant_length`, `variant_industry`,
 `b2b_only`). It never adds a default, since every contract already has one, and
 a set the contract already has, active or not, is a 400. Adding a set creates
@@ -290,6 +292,16 @@ runs and its runs drop out of the contract's course list, but they stay in the
 contract and their enrollments are untouched, so turning it back on restores
 them. The default set can't be turned off or made B2B-only. Variant set changes
 are recorded in the organization's change history.
+
+`variants/sync/` creates the runs the contract's courses are missing for its
+active variant sets, so courseware added before a set doesn't have to be added
+again course by course. It takes no body. A course and variant that already has
+a run in the contract is left alone, so repeating the call creates nothing
+more. The response lists `runs_created`, `missing_source_runs` (a course
+supports the set and has no source run to clone) and `failed` (a source run
+exists and the contract run could not be created, e.g. the course's readable ID
+doesn't make a valid run key). The new runs' edX clones are queued, and so is
+the enrollment code check for a contract that uses codes.
 
 The codes routes list a contract's enrollment codes, expire the unused ones,
 and assign codes to people by email the same way the manager dashboard's bulk

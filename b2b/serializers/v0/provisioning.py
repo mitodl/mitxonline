@@ -580,6 +580,45 @@ class ContractVariantSetSerializer(serializers.Serializer):
     courses = ContractVariantCourseSerializer(many=True)
 
 
+class ContractVariantSyncCourseSerializer(serializers.Serializer):
+    """A course and one of the contract's variant sets."""
+
+    course_id = serializers.IntegerField(source="course.id")
+    readable_id = serializers.CharField(source="course.readable_id")
+    variant_id = serializers.IntegerField(source="variant.id")
+    language = serializers.CharField(source="variant.language")
+    variant_length = serializers.CharField(
+        source="variant.variant_length", allow_blank=True
+    )
+    variant_industry = serializers.CharField(
+        source="variant.variant_industry", allow_blank=True
+    )
+
+
+class ContractVariantSyncRunSerializer(serializers.Serializer):
+    """A contract run created for a variant set."""
+
+    courseware_id = serializers.CharField()
+    course_id = serializers.IntegerField()
+    language = serializers.CharField()
+    variant_length = serializers.CharField(allow_blank=True)
+    variant_industry = serializers.CharField(allow_blank=True)
+
+
+class ContractVariantSyncSerializer(serializers.Serializer):
+    """What creating a contract's missing variant runs did."""
+
+    runs_created = ContractVariantSyncRunSerializer(many=True)
+    missing_source_runs = ContractVariantSyncCourseSerializer(
+        many=True,
+        help_text="Courses that support a set and have no source run for it.",
+    )
+    failed = ContractVariantSyncCourseSerializer(
+        many=True,
+        help_text="Courses with a source run for a set whose run was not created.",
+    )
+
+
 class CreateContractVariantSetSerializer(serializers.ModelSerializer):
     """
     Request body for adding a variant set to a contract.

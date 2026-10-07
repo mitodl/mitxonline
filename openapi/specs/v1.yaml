@@ -1577,8 +1577,8 @@ paths:
       description: |-
         Add a variant set to the contract.
 
-        Creates no runs. Adding the courseware to the contract again creates
-        runs for the new set.
+        Creates no runs. variants/sync creates them for the courseware already
+        in the contract.
       parameters:
       - in: path
         name: id
@@ -1679,6 +1679,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/contracts/{id}/variants/sync/:
+    post:
+      operationId: b2b_provisioning_organizations_contracts_variants_sync_create
+      description: |-
+        Create the runs the contract's courses are missing for its variant sets.
+
+        Run it after adding variant sets to a contract that already has
+        courseware. Courses and variants that already have a run are left
+        alone, so repeating the call creates nothing more. The new runs' edX
+        clones are queued, and so is the enrollment code check for a contract
+        that uses codes.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Contract.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractVariantSync'
           description: ''
   /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/identity-providers/:
     get:
@@ -6487,6 +6520,71 @@ components:
       - variant_industry_label
       - variant_length
       - variant_length_label
+    ContractVariantSync:
+      type: object
+      description: What creating a contract's missing variant runs did.
+      properties:
+        runs_created:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContractVariantSyncRun'
+        missing_source_runs:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContractVariantSyncCourse'
+          description: Courses that support a set and have no source run for it.
+        failed:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContractVariantSyncCourse'
+          description: Courses with a source run for a set whose run was not created.
+      required:
+      - failed
+      - missing_source_runs
+      - runs_created
+    ContractVariantSyncCourse:
+      type: object
+      description: A course and one of the contract's variant sets.
+      properties:
+        course_id:
+          type: integer
+        readable_id:
+          type: string
+        variant_id:
+          type: integer
+        language:
+          type: string
+        variant_length:
+          type: string
+        variant_industry:
+          type: string
+      required:
+      - course_id
+      - language
+      - readable_id
+      - variant_id
+      - variant_industry
+      - variant_length
+    ContractVariantSyncRun:
+      type: object
+      description: A contract run created for a variant set.
+      properties:
+        courseware_id:
+          type: string
+        course_id:
+          type: integer
+        language:
+          type: string
+        variant_length:
+          type: string
+        variant_industry:
+          type: string
+      required:
+      - course_id
+      - courseware_id
+      - language
+      - variant_industry
+      - variant_length
     Country:
       type: object
       description: Serializer for pycountry countries, with states for US/CA
