@@ -670,6 +670,15 @@ MIT_LEARN_BASE_URL = get_string(
     description="Base URL of the MIT Learn instance for this environment",
 )
 
+# MIT Learn's API is on a separate host, so MIT_LEARN_BASE_URL cannot be reused.
+# Defaults to empty: this setting is called rather than used to build links, and
+# an unconfigured deployment should make no outbound request at all.
+MIT_LEARN_API_BASE_URL = get_string(
+    name="MIT_LEARN_API_BASE_URL",
+    default="",
+    description="Base URL of the MIT Learn API",
+)
+
 MIT_LEARN_DASHBOARD_URL = get_string(
     name="MIT_LEARN_DASHBOARD_URL",
     default=f"{MIT_LEARN_BASE_URL}/dashboard",
