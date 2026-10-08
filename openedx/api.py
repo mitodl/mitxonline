@@ -2281,7 +2281,7 @@ def update_notification_preference(user, preference):
         ) from exc
 
 
-def _edx_mode_expiration(edx_mode: CourseMode) -> datetime | None:
+def get_edx_mode_expiration(edx_mode: CourseMode) -> datetime | None:
     """
     Read expiration_datetime off an edX course mode without letting a malformed
     value blow up the caller.
@@ -2301,6 +2301,29 @@ def _edx_mode_expiration(edx_mode: CourseMode) -> datetime | None:
             edx_mode.course_id,
         )
         return None
+
+
+def get_edx_verified_mode(
+    courseware_id: str, *, client: EdxApi | None = None
+) -> CourseMode | None:
+    """
+    Get the verified course mode for an edX course, or None if it has none.
+
+    Args:
+    - courseware_id (str): the edX course ID
+    Keyword Args:
+    - client (EdxApi): edX client (if you want to reuse one)
+    Returns:
+    - CourseMode or None
+    """
+
+    edx_client = client if client else get_edx_api_service_client()
+
+    return find_object_with_matching_attr(
+        get_edx_course_modes(courseware_id, client=edx_client),
+        "mode_slug",
+        EDX_ENROLLMENT_VERIFIED_MODE,
+    )
 
 
 def sync_courserun_upgrade_deadline_to_edx(
@@ -2334,11 +2357,7 @@ def sync_courserun_upgrade_deadline_to_edx(
 
     edx_client = client if client else get_edx_api_service_client()
 
-    verified_mode = find_object_with_matching_attr(
-        get_edx_course_modes(course_run.courseware_id, client=edx_client),
-        "mode_slug",
-        EDX_ENROLLMENT_VERIFIED_MODE,
-    )
+    verified_mode = get_edx_verified_mode(course_run.courseware_id, client=edx_client)
 
     if verified_mode is None:
         log.warning(
@@ -2348,7 +2367,7 @@ def sync_courserun_upgrade_deadline_to_edx(
         )
         return UpgradeDeadlineSyncResult.NO_VERIFIED_MODE
 
-    edx_deadline = _edx_mode_expiration(verified_mode)
+    edx_deadline = get_edx_mode_expiration(verified_mode)
     new_deadline = course_run.upgrade_deadline
 
     if new_deadline is None:
