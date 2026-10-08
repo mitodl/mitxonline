@@ -170,6 +170,7 @@ def test_contracts_are_scoped_to_their_organization(admin_drf_client):
     ("membership_type", "queues_code_check"),
     [(CONTRACT_MEMBERSHIP_CODE, True), (CONTRACT_MEMBERSHIP_MANAGED, False)],
 )
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
 def test_patch_contract(
     admin_drf_client, mocked_tasks, membership_type, queues_code_check
 ):
@@ -187,6 +188,7 @@ def test_patch_contract(
     assert mocked_tasks.code_check.called is queues_code_check
 
 
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
 def test_add_courseware_and_follow_setup(admin_drf_client, mocked_tasks):
     """
     Adding a course creates its run before returning, and setup status tracks

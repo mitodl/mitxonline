@@ -410,6 +410,9 @@ class TestEdxCertificateWebhook:
             "audit_passed",
         ],
     )
+    # Certificate creation catches exceptions broadly and logs them, so without
+    # this the zeal warning surfaces only as a missing certificate.
+    @pytest.mark.zeal_allow("cms.CertificatePage", "get()")
     def test_certificate_status(  # noqa: PLR0913
         self,
         mocker,
@@ -455,6 +458,9 @@ class TestEdxCertificateWebhook:
             == cert_should_exist
         )
 
+    # Certificate creation catches exceptions broadly and logs them, so without
+    # this the zeal warning surfaces only as a missing certificate.
+    @pytest.mark.zeal_allow("cms.CertificatePage", "get()")
     def test_idempotent_certificate_already_exists(
         self,
         mocker,

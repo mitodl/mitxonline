@@ -166,9 +166,24 @@ def webpack_stats(settings):
 
 @pytest.fixture(autouse=True)
 def check_nplusone(request):
-    """Raise nplusone errors"""
+    """
+    Fail on N+1s, except where a test opts out.
+
+    `skip_nplusone_check` ignores every N+1 in the test. `zeal_allow(model, field)`
+    ignores N+1s on that model and field anywhere in the test, so the test still
+    catches any other N+1; `field` is "get()" for zeal's repeated-.get() detection.
+    """
     if request.node.get_closest_marker("skip_nplusone_check"):
         with zeal_ignore():
+            yield
+        return
+
+    allowlist = [
+        {"model": marker.args[0], "field": marker.args[1]}
+        for marker in request.node.iter_markers("zeal_allow")
+    ]
+    if allowlist:
+        with zeal_ignore(allowlist=allowlist):
             yield
     else:
         yield

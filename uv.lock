@@ -1092,11 +1092,11 @@ wheels = [
 
 [[package]]
 name = "django-zeal"
-version = "2.0.4"
+version = "2.2.4"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/9b/51/c6997d7f4524002359f0e1a657504b9effe7d82ab90e0acea505ffda4582/django_zeal-2.0.4.tar.gz", hash = "sha256:934cd3968c1ede3f3ec5314c4da285ef4796f4b6de1f95870c5999370280e17e", size = 15479, upload-time = "2025-01-28T08:15:02.564Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3e/b5/d10702bcdb31f0746c014071277b4a59698effe608a2140f4d39a40de976/django_zeal-2.2.4.tar.gz", hash = "sha256:e5caedfc0092e877baa318af2146f3ba9c07104d122af4f900fcf9cc49f46e74", size = 21946, upload-time = "2026-08-28T16:48:41.682Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b1/6c/cfce455cea55e0ce9256e57164d2a92be111ec9886b89aec5af8e0959b9a/django_zeal-2.0.4-py3-none-any.whl", hash = "sha256:c37b0a7d203572d8eb8462a601f19dedfdf82324a25c7eb7273afdc52fc519fa", size = 12476, upload-time = "2025-01-28T08:15:00.742Z" },
+    { url = "https://files.pythonhosted.org/packages/4d/29/e4f2879c807693fdc04b8fd0fbfd1d5270f234ea73aaa00a3a53cb5c76f4/django_zeal-2.2.4-py3-none-any.whl", hash = "sha256:f5d424833450e47fcb000fe5cee7cc78be4952c36afbc47ed772375b90a727d8", size = 15758, upload-time = "2026-08-28T16:48:40.535Z" },
 ]
 
 [[package]]
@@ -2407,7 +2407,7 @@ dev = [
     { name = "bpython", specifier = ">=0.26,<0.27" },
     { name = "ddt", specifier = ">=1.6.0,<2" },
     { name = "django-debug-toolbar", specifier = ">=6.0.0,<7" },
-    { name = "django-zeal", specifier = ">=2.0.4,<3" },
+    { name = "django-zeal", specifier = ">=2.2.4,<3" },
     { name = "factory-boy", specifier = ">=3.2.0,<4" },
     { name = "faker", specifier = "<=40.15.0,>=40.15.0" },
     { name = "flaky", specifier = ">=3.7.0,<4" },
