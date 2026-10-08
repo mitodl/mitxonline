@@ -10,7 +10,6 @@ from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError
 
 from courses.factories import CourseRunFactory
-from main import features
 from openedx.constants import UpgradeDeadlineSyncResult
 
 pytestmark = [pytest.mark.django_db]
@@ -19,14 +18,13 @@ COMMAND = "sync_courserun_deadlines"
 
 
 @pytest.fixture(autouse=True)
-def _enable_and_isolate(settings, mocker):
+def _isolate(mocker):
     """
-    Turn the flag on and stub the edX client for every test in this module.
+    Stub the edX client for every test in this module.
 
     The command builds one client for the batch, so that call has to be patched
     even for the paths that never issue a write.
     """
-    settings.FEATURES[features.SYNC_UPGRADE_DEADLINE_TO_EDX] = True
     mocker.patch(
         "courses.management.commands.sync_courserun_deadlines.get_edx_api_service_client"
     )
@@ -152,18 +150,6 @@ def test_reports_missing_verified_mode(mock_sync):
     call_command(COMMAND, run=run.courseware_id, stdout=out)
 
     assert "no verified mode in edX" in out.getvalue()
-
-
-def test_warns_when_feature_disabled(settings, mock_sync):
-    """A disabled flag should be called out, not silently produce zero work."""
-    settings.FEATURES[features.SYNC_UPGRADE_DEADLINE_TO_EDX] = False
-    run = CourseRunFactory.create()
-    mock_sync.return_value = UpgradeDeadlineSyncResult.DISABLED
-    out = StringIO()
-
-    call_command(COMMAND, run=run.courseware_id, stdout=out)
-
-    assert "FEATURE_SYNC_UPGRADE_DEADLINE_TO_EDX is off" in out.getvalue()
 
 
 def test_one_failure_does_not_stop_the_batch(mock_sync):

@@ -39,6 +39,7 @@ COURSE_RUN_CLONE_STATUS_CHOICES = [
     (COURSE_RUN_CLONE_STATUS_FAILED, "Failed"),
 ]
 
+
 class UpgradeDeadlineSyncResult(StrEnum):
     """
     Outcome of pushing a CourseRun.upgrade_deadline into the edX verified mode's
@@ -54,8 +55,6 @@ class UpgradeDeadlineSyncResult(StrEnum):
     # The deadline was cleared on our side, but edX's course modes API cannot
     # represent "no deadline" on an update - see CANNOT_CLEAR_DEADLINE_MSG.
     CLEAR_UNSUPPORTED = "clear_unsupported"
-    # The FEATURE_SYNC_UPGRADE_DEADLINE_TO_EDX flag is off.
-    DISABLED = "disabled"
 
 
 # The course modes serializer in edX declares expiration_datetime as a

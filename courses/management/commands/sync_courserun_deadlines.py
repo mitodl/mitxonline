@@ -121,14 +121,6 @@ class Command(BaseCommand):
             counts[result] += 1
             self.report_result(run, result)
 
-        if counts[UpgradeDeadlineSyncResult.DISABLED]:
-            self.stdout.write(
-                self.style.WARNING(
-                    "FEATURE_SYNC_UPGRADE_DEADLINE_TO_EDX is off - "
-                    f"{counts[UpgradeDeadlineSyncResult.DISABLED]} run(s) skipped."
-                )
-            )
-
         summary = ", ".join(
             f"{result.value}: {count}" for result, count in counts.items() if count
         )
