@@ -1,0 +1,112 @@
+{
+  "trace_ids": [
+    "1bd31e321ae0c9b0e935ea5d05d5012",
+    "2bc563daa9916dc655ccbb1ea49b6021",
+    "8525bbf16bfa1f1f78a05ea8ba3fa89c",
+    "a7e64645f6615a3b7e295e64daf5850e"
+  ],
+  "requests": 4,
+  "queries": [
+    {
+      "query": "enrollments page query",
+      "per_req": 1.0,
+      "sql_ms": 5.925,
+      "gap_ms": 32.554,
+      "total_ms": 38.479
+    },
+    {
+      "query": "certificates prefetch",
+      "per_req": 1.0,
+      "sql_ms": 5.004,
+      "gap_ms": 19.396,
+      "total_ms": 24.4,
+      "row_floor": 26
+    },
+    {
+      "query": "b2b contract prefetch",
+      "per_req": 1.0,
+      "sql_ms": 2.812,
+      "gap_ms": 16.935,
+      "total_ms": 19.747,
+      "row_floor": 2
+    },
+    {
+      "query": "course page prefetch",
+      "per_req": 1.0,
+      "sql_ms": 3.014,
+      "gap_ms": 5.574,
+      "total_ms": 8.588
+    },
+    {
+      "query": "session last_login update",
+      "per_req": 1.0,
+      "sql_ms": 2.532,
+      "gap_ms": 3.614,
+      "total_ms": 6.146,
+      "row_floor": 2
+    },
+    {
+      "query": "grades prefetch",
+      "per_req": 1.0,
+      "sql_ms": 2.673,
+      "gap_ms": 3.293,
+      "total_ms": 5.966,
+      "row_floor": 35
+    },
+    {
+      "query": "enrollment modes prefetch",
+      "per_req": 1.0,
+      "sql_ms": 1.785,
+      "gap_ms": 2.483,
+      "total_ms": 4.268,
+      "row_floor": 166
+    },
+    {
+      "query": "courses prefetch",
+      "per_req": 1.0,
+      "sql_ms": 1.36,
+      "gap_ms": 1.986,
+      "total_ms": 3.346,
+      "row_floor": 72
+    },
+    {
+      "query": "redis session fetch",
+      "per_req": 1.0,
+      "sql_ms": 1.14,
+      "gap_ms": 1.941,
+      "total_ms": 3.081
+    },
+    {
+      "query": "products prefetch",
+      "per_req": 1.0,
+      "sql_ms": 1.702,
+      "gap_ms": 0.8,
+      "total_ms": 2.502,
+      "row_floor": 167
+    },
+    {
+      "query": "session user",
+      "per_req": 2.0,
+      "sql_ms": 1.726,
+      "gap_ms": 0.692,
+      "total_ms": 2.418,
+      "row_floor": 1
+    },
+    {
+      "query": "products deferred content_type (N+1)",
+      "per_req": 98.2,
+      "sql_ms": 0.634,
+      "gap_ms": 0.456,
+      "total_ms": 1.09,
+      "row_floor": 1
+    },
+    {
+      "query": "products deferred object_id (N+1)",
+      "per_req": 98.2,
+      "sql_ms": 0.635,
+      "gap_ms": 0.454,
+      "total_ms": 1.089,
+      "row_floor": 1
+    }
+  ]
+}

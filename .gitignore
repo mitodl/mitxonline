@@ -128,3 +128,11 @@ certs/*
 .claude/
 
 .drf_lint_cache.json
+
+# mitol-django-benchmark
+.bench/
+benchmarks/benchmark.local.toml
+# Exported OTel traces are production data and are never committed. Only the
+# distilled benchmarks/*.baseline.json belongs in the repository.
+traces/
+*.trace.json

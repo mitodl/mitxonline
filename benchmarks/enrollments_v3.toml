@@ -1,0 +1,243 @@
+# v3 user-enrollments list: does adding content_type/object_id to the
+# run__products prefetch's .only() remove the deferred-field N+1?
+#
+# Every knob below is annotated OBSERVED or GUESS. OBSERVED means a production
+# OTel trace or a sample production response states it; the artifact is named.
+# Guesses are identical in both arms, so they move the baseline, not the delta.
+#
+# Evidence base: four production traces of GET /api/v3/enrollments/ (no query
+# string, 200) from grafanacloud-mitolproduction-traces, and one sample
+# production response (5 enrollments, 6787 bytes).
+#
+# Note on the traces: the instrumentation truncates db.statement at 2048
+# characters, so a placeholder count taken from a long statement is a floor
+# rather than a total. Only statements shorter than that are exact, and those
+# are the ones the knobs below are drawn from.
+
+[benchmark]
+name = "enrollments_v3"
+description = "v3 user-enrollments list: deferred-field N+1 on the run__products GenericRelation"
+
+[knobs]
+# OBSERVED (trace, exact): the enrollment_modes prefetch's IN-list is one entry
+# per enrolled run, and the statement is short enough to be untruncated.
+# Across the four traces: 64, 105, 107, 166. Median 106.
+enrollments = 106
+
+# OBSERVED (trace, exact): the courses_course prefetch IN-list, untruncated.
+# Across the four traces: 36, 71, 72, 67. Median 69. Runs therefore spread
+# over courses at roughly 1.5 runs per course rather than one run each.
+courses = 69
+
+# OBSERVED (trace, exact): the number of products actually fetched equals half
+# the deferred-load span count, since Django issues one content_type and one
+# object_id query per product. Across the four traces: 63, 90, 92, 148.
+# Median 92 — about 0.87 products per run, not 1.0. Product has a unique
+# constraint on (object_id, content_type), so a run carries at most one.
+products = 92
+
+# OBSERVED (sample response): four of five enrollments carry exactly one grade.
+grades = 106
+
+# FLOOR, not a count (trace): the certificate prefetch statement is truncated
+# at 2048 characters, so its 26 placeholders mean "at least 13 (run, user)
+# pairs", not 13. The sample response had certificate null on all five rows.
+# Untargeted and cheap either way; identical across arms.
+certificates = 13
+
+# GUESS: no artifact shows how large the enrollment table is or how enrollments
+# distribute across other users. Production ids are around 500k, so the real
+# table is far larger — but the page query is an index lookup on user_id, so
+# table size is not what this benchmark turns on. Identical in both arms.
+noise_users = 100
+noise_enrollments = 2000
+
+# DEVIATION, deliberately 0: the sample response showed 2 of 5 enrollments
+# carrying a b2b_contract, and production runs a run__b2b_contracts prefetch
+# that will return no rows here. b2b_contract is select_related, so modelling
+# it adds no queries and cannot affect the products path under test; splitting
+# the seed to model it would have meant splitting the strongest observable
+# (106 runs) across two buckets sized from a single 5-row sample. The cost is
+# a slightly undersized response, which the response-bytes observable below is
+# there to catch. Raise this and split the run steps if it does.
+b2b_enrollments = 0
+
+# ---------------------------------------------------------------- seed -----
+# Steps run in declaration order. Counts that cycle a shorter list than the
+# step length would repeat pairs, so each step below stays within the unique
+# constraints: CourseRunEnrollment is unique on (user, run), CourseRunGrade on
+# (user, course_run), Product on (object_id, content_type).
+
+[[seed.step]]
+name = "user"
+factory = "users.factories:UserFactory"
+count = 1
+
+[[seed.step]]
+name = "noise_users"
+factory = "users.factories:UserFactory"
+count = "$knob:noise_users"
+
+[[seed.step]]
+# CourseFactory also builds the Wagtail CoursePage the run__course__page
+# prefetch reads, including its feature image.
+name = "courses"
+factory = "courses.factories:CourseFactory"
+count = "$knob:courses"
+
+[[seed.step]]
+# CourseRunFactory's post_generation attaches the audit and verified
+# EnrollmentModes, which is what production shows: two modes per run.
+name = "runs"
+factory = "courses.factories:CourseRunFactory"
+count = "$knob:enrollments"
+kwargs = { course = "$cycle:courses" }
+
+[[seed.step]]
+# 92 products over 106 runs: $cycle lands them on runs[0..91], all distinct,
+# leaving 14 runs productless exactly as production has them.
+name = "products"
+factory = "ecommerce.factories:ProductFactory"
+count = "$knob:products"
+kwargs = { purchasable_object = "$cycle:runs", is_active = true }
+
+[[seed.step]]
+name = "enrollments"
+factory = "courses.factories:CourseRunEnrollmentFactory"
+count = "$knob:enrollments"
+kwargs = { user = "$ref:user", run = "$cycle:runs" }
+
+[[seed.step]]
+name = "grades"
+factory = "courses.factories:CourseRunGradeFactory"
+count = "$knob:grades"
+kwargs = { user = "$ref:user", course_run = "$cycle:runs" }
+
+[[seed.step]]
+name = "certificates"
+factory = "courses.factories:CourseRunCertificateFactory"
+count = "$knob:certificates"
+kwargs = { user = "$ref:user", course_run = "$cycle:runs" }
+
+[[seed.step]]
+# Rows the page does not return. 100 users against 106 runs repeats a
+# (user, run) pair only after lcm(100, 106) = 5300 rows, so 2000 is safe.
+name = "noise_enrollments"
+factory = "courses.factories:CourseRunEnrollmentFactory"
+count = "$knob:noise_enrollments"
+kwargs = { user = "$cycle:noise_users", run = "$cycle:runs" }
+
+[seed.export]
+user_id = "user.pk"
+
+# -------------------------------------------------------------- target -----
+
+[target]
+# reverse over path: it fails at validation rather than 404-ing mid-run.
+reverse = "v3:user_enrollments_api-list"
+expect_status = 200
+# The endpoint declares no pagination class, so the response is a bare list of
+# every enrollment the user has. grades is the one nested collection per row;
+# declaring it means a serializer change that empties it voids the comparison
+# instead of reading as a speed-up.
+nested_keys = ["grades"]
+
+[auth]
+user_id = "$ids:user_id"
+
+# --------------------------------------------------- query classifiers -----
+# Tried in declaration order, most specific first. The two deferred-load
+# patterns must precede the products prefetch pattern, which would otherwise
+# swallow them. per_req in the output is the check on this ordering.
+
+[[trace.classify]]
+label = "products deferred content_type (N+1)"
+pattern = '"ecommerce_product"\."content_type_id" FROM'
+targeted = true
+
+[[trace.classify]]
+label = "products deferred object_id (N+1)"
+pattern = '"ecommerce_product"\."object_id" FROM'
+targeted = true
+
+[[trace.classify]]
+# The prefetch itself: the change widens its column list, so it is targeted
+# and excluded from the drift check.
+label = "products prefetch"
+pattern = '"ecommerce_product"\."price"'
+targeted = true
+
+[[trace.classify]]
+# Session auth stamping last_login. Must precede the "session user" SELECT
+# rule, which only matches FROM, and is untargeted: the change cannot move it.
+label = "session last_login update"
+pattern = 'UPDATE "users_user"'
+
+[[trace.classify]]
+# The redis instrumentation reports its command as the statement.
+label = "redis session fetch"
+pattern = '^GET '
+
+[[trace.classify]]
+label = "course page prefetch"
+pattern = "cms_coursepage"
+
+[[trace.classify]]
+label = "b2b contract prefetch"
+pattern = "courses_courserun_b2b_contracts"
+
+[[trace.classify]]
+label = "enrollment modes prefetch"
+pattern = "courses_enrollmentmode"
+
+[[trace.classify]]
+label = "certificates prefetch"
+pattern = "courses_courseruncertificate"
+
+[[trace.classify]]
+label = "grades prefetch"
+pattern = "courses_courserungrade"
+
+[[trace.classify]]
+label = "enrollments page query"
+pattern = "courses_courserunenrollment"
+
+[[trace.classify]]
+label = "courses prefetch"
+pattern = 'FROM "courses_course" WHERE'
+
+[[trace.classify]]
+label = "session user"
+pattern = 'FROM "users_user"'
+
+# ---------------------------------------------------------- calibration ----
+
+[[calibration.observable]]
+name = "enrollments per response"
+source = "trace: enrollment_modes prefetch IN-list, median of 4 traces"
+production = 106
+response = "results"
+
+[[calibration.observable]]
+# DERIVED, not observed: the one sample response is 6787 bytes for 5
+# enrollments (1357 bytes each), and no trace carries a response-size
+# attribute, so production's size at 106 rows is an extrapolation. It is here
+# as a bound on the seed's payload realism, not as a fit target - a seed whose
+# row counts all match can still serialize a fraction of production's bytes.
+# Tolerance is wide because the seed omits the b2b fields and carries a higher
+# share of runs with products than the sample did.
+name = "response bytes"
+source = "sample response, extrapolated 1357 bytes/enrollment x 106"
+production = 143884
+response = "response_bytes"
+tolerance = 0.4
+
+[calibration.floors]
+# Exact (untruncated statement), not merely a floor: the products prefetch
+# binds one content_type plus one object_id per run, 107 placeholders for 106
+# runs; the enrollment_modes prefetch IN-list agrees.
+runs = 106
+
+[calibration]
+baseline = "enrollments_v3.baseline.json"
+drift_factor = 5

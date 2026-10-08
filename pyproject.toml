@@ -14,7 +14,7 @@ dependencies = [
     "celery-redbeat>=2.0.0,<3",
     "click>=8.1,!=8.2.0",
     "deepdiff>=8.0.0,<9",
-    "dj-database-url>=0.5.0,<0.6",
+    "dj-database-url>=2,<4",
     "django>=5.2,<5.3",
     "django-anymail[mailgun]>=11.1,<12",
     "django-cors-headers>=4.0.0,<5",
@@ -117,6 +117,7 @@ dev = [
     "pytest-urllib3>=0.2.0",
     "granian[reload]>=2.5.4,<3",
     "pytest-split>=0.9,<1",
+    "mitol-django-benchmark[django,drf,factories,postgres]>=2026.9.30",
 ]
 docs = [
     "insipid-sphinx-theme>=0.4.4,<0.5",

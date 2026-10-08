@@ -1,0 +1,63 @@
+# Project-wide benchmark configuration. Committed.
+#
+# Everything here is the same for every benchmark in this repository: how a
+# step process starts Django, and where the scratch database lives. Nothing
+# about a particular benchmark belongs in this file, and nothing about a
+# particular developer's machine does either — that is benchmark.local.toml,
+# which is not committed.
+#
+# Run a benchmark from inside the web container, which is where this project's
+# Python environment and the database both are:
+#
+#     docker compose run --rm --no-deps web sh -c \
+#       'cd /src && ol-benchmark run benchmarks/<name>.toml --base-ref main'
+#
+# The defaults below need no benchmark.local.toml. Add one only to override
+# them for your machine, with `ol-benchmark init --local`; it is gitignored.
+# The working tree must be clean, or the run is refused - the two arms would
+# not be the two refs you think.
+#
+# Any string below may use ${VAR} or ${VAR:-default} to read the environment.
+
+[django]
+# The settings module the application really runs, not the test settings.
+# Test settings commonly enable profilers and coverage that scale with the
+# work under test, which is the fastest way to manufacture a result.
+settings_module = "main.settings"
+# Prepended to sys.path in the step process, relative to chdir.
+pythonpath = []
+chdir = "."
+# Applied to every step. Most commonly used to turn off remote object storage,
+# without which seed factories try to upload files.
+#
+# CourseFactory builds a Wagtail CoursePage whose feature_image writes through
+# default storage, and an environment with MITX_ONLINE_USE_S3 set resolves
+# STORAGES["default"] to S3Boto3Storage - so seeding would attempt uploads.
+# Turn the flag off rather than clearing a credential: settings raises
+# ImproperlyConfigured when the flag is on and any one of the three AWS values
+# is missing, so a partial override fails to import at all.
+env = { MITX_ONLINE_USE_S3 = "False", MEDIA_ROOT = "/tmp/bench-media/" }
+
+[database]
+# The scratch database is DROPPED and recreated on every run. Its name is
+# derived as <name_prefix><benchmark name> and must start with "bench".
+name_prefix = "bench_"
+# The DSN as the application process sees it; {name} is filled in per
+# benchmark. In a cluster this differs from what the host can reach, which is
+# why it comes from the environment.
+#
+# The default is the compose service name rather than localhost: steps run
+# inside the web container, where the database resolves as "db". The host
+# cannot use 5432 anyway - compose publishes the database on an ephemeral
+# port.
+url_template = "${BENCH_DATABASE_URL_TEMPLATE:-postgres://postgres:postgres@db:5432/{name}}"  # pragma: allowlist secret
+# Where DROP/CREATE DATABASE is issued from. Must not be the scratch database.
+admin_url = "${BENCH_ADMIN_DATABASE_URL:-postgres://postgres:postgres@db:5432/postgres}"  # pragma: allowlist secret
+# Refresh planner statistics after seeding. A freshly loaded table has none,
+# and the plans it produces are not the plans production runs.
+analyze = true
+
+[defaults.measure]
+warmup = 3
+iterations = 15
+trace_repeats = 7
