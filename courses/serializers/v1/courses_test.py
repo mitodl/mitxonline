@@ -164,7 +164,9 @@ def test_serialize_course_run():
             "language": course_run.language,
             "language_label": course_run.language_label,
             "variant_industry": "",
+            "variant_industry_label": "Original",
             "variant_length": "",
+            "variant_length_label": "Full",
             "course_id": course_run.course.id,
         },
     )
@@ -204,7 +206,9 @@ def test_serialize_course_run_with_course():
         "language": course_run.language,
         "language_label": course_run.language_label,
         "variant_industry": course_run.variant_industry,
+        "variant_industry_label": course_run.variant_industry_label,
         "variant_length": course_run.variant_length,
+        "variant_length_label": course_run.variant_length_label,
         "course_id": course_run.course.id,
     }
 
