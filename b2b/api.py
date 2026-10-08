@@ -123,6 +123,7 @@ def get_user_b2b_organizations(user):
         Prefetch(
             "contracts",
             queryset=ContractPage.objects.prefetch_related(
+                "variant_options",
                 Prefetch(
                     "contract_programs",
                     queryset=ContractProgramItem.objects.order_by("sort_order"),
