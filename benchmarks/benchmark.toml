@@ -6,6 +6,17 @@
 # particular developer's machine does either — that is benchmark.local.toml,
 # which is not committed.
 #
+# Run a benchmark from inside the web container, which is where this project's
+# Python environment and the database both are:
+#
+#     docker compose run --rm --no-deps web sh -c \
+#       'cd /src && ol-benchmark run benchmarks/<name>.toml --base-ref main'
+#
+# The defaults below need no benchmark.local.toml. Add one only to override
+# them for your machine, with `ol-benchmark init --local`; it is gitignored.
+# The working tree must be clean, or the run is refused - the two arms would
+# not be the two refs you think.
+#
 # Any string below may use ${VAR} or ${VAR:-default} to read the environment.
 
 [django]
@@ -36,9 +47,9 @@ name_prefix = "bench_"
 # why it comes from the environment.
 #
 # The default is the compose service name rather than localhost: steps run
-# inside the web container (see the invocation in benchmark.local.toml), where
-# the database resolves as "db". The host cannot use 5432 anyway - compose
-# publishes the database on an ephemeral port.
+# inside the web container, where the database resolves as "db". The host
+# cannot use 5432 anyway - compose publishes the database on an ephemeral
+# port.
 url_template = "${BENCH_DATABASE_URL_TEMPLATE:-postgres://postgres:postgres@db:5432/{name}}"  # pragma: allowlist secret
 # Where DROP/CREATE DATABASE is issued from. Must not be the scratch database.
 admin_url = "${BENCH_ADMIN_DATABASE_URL:-postgres://postgres:postgres@db:5432/postgres}"  # pragma: allowlist secret

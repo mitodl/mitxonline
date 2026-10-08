@@ -89,6 +89,22 @@ yarn build             # Production build
 yarn dev-server        # Development server with HMR
 ```
 
+### Endpoint benchmarks
+
+`benchmarks/` holds [mitol-django-benchmark](https://github.com/mitodl/ol-django/tree/main/src/benchmark)
+configs, which A/B one endpoint across two git refs against a single
+production-shaped scratch database. Run them inside the web container, where
+this project's Python environment and the database both are:
+
+```bash
+docker compose run --rm --no-deps web sh -c \
+  'cd /src && ol-benchmark run benchmarks/enrollments_v3.toml --base-ref main'
+```
+
+The working tree must be clean or the run is refused, since otherwise the two
+arms are not the two refs you think. Results land in `.bench/out/<name>/`;
+read `comparison.json` and check `verdict` before quoting any number.
+
 ### Documentation
 
 ```bash
