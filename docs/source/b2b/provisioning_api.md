@@ -282,6 +282,8 @@ enrollment codes are created afterwards by Celery tasks, and `setup-status`
 reports what's still pending or has failed. `retry-setup` queues the failed
 parts again. Adding the same courseware twice doesn't create a second run. A
 run that already belongs to another contract is skipped and stays where it is.
+A source run's ID is a 400 that names its course: contract runs are cloned from
+a source run, so the course is what gets added.
 
 `courseware/remove/` closes the removed runs to new enrollments. A run that
 already has enrolled learners stays linked to the contract so they keep access.

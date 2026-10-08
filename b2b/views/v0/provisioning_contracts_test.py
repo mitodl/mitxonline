@@ -306,6 +306,25 @@ def test_add_unknown_courseware_is_a_404(admin_drf_client):
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
+def test_add_source_run_is_a_400(admin_drf_client):
+    """A source run is refused by name, and the answer points at its course."""
+
+    contract = ContractPageFactory.create()
+    source_run = CourseRunFactory.create(is_source_run=True)
+
+    response = admin_drf_client.post(
+        _contract_url(contract, "courseware"),
+        {"courseware_id": source_run.courseware_id},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    detail = response.json()["detail"]
+    assert "is a source run" in detail
+    assert source_run.course.readable_id in detail
+    assert not contract.get_course_runs().exists()
+
+
 def test_add_course_without_source_run_is_a_400(admin_drf_client):
     """A course with nothing to clone from is reported, not a 500."""
 
