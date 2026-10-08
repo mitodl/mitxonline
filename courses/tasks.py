@@ -66,7 +66,18 @@ def sync_courserun_upgrade_deadline(course_run_id):
         )
         return None
 
-    return str(sync_courserun_upgrade_deadline_to_edx(run))
+    try:
+        return str(sync_courserun_upgrade_deadline_to_edx(run))
+    except HTTPError as exc:
+        status_code = exc.response.status_code if exc.response is not None else None
+        if status_code is None or status_code == 429 or status_code >= 500:  # noqa: PLR2004
+            # Rate limited or an edX outage: autoretry_for retries these.
+            raise
+        # Any other 4xx (e.g. the course isn't in edX) won't succeed on retry.
+        log.exception(
+            "edX rejected the upgrade deadline push for %s", run.courseware_id
+        )
+        return None
 
 
 @app.task(acks_late=True)

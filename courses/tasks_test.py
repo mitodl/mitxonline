@@ -1,6 +1,9 @@
 """Tests for Course related tasks"""
 
 import pytest
+from celery.exceptions import Retry
+from requests import Response
+from requests.exceptions import HTTPError
 
 from courses.factories import (
     CourseRunEnrollmentFactory,
@@ -112,3 +115,45 @@ def test_sync_courserun_upgrade_deadline_finds_source_runs(mocker):
     sync_courserun_upgrade_deadline.delay(run.id)
 
     sync_patch.assert_called_once_with(run)
+
+
+def _http_error(status_code):
+    """Build an HTTPError carrying a response with the given status."""
+    response = Response()
+    response.status_code = status_code
+    return HTTPError(response=response)
+
+
+@pytest.mark.parametrize("status_code", [429, 503])
+def test_sync_courserun_upgrade_deadline_retries_transient_errors(mocker, status_code):
+    """Rate limiting and edX outages are scheduled for a retry."""
+    run = CourseRunFactory.create()
+    sync_patch = mocker.patch(
+        "openedx.api.sync_courserun_upgrade_deadline_to_edx",
+        side_effect=_http_error(status_code),
+    )
+
+    with pytest.raises(Retry):
+        sync_courserun_upgrade_deadline.delay(run.id)
+
+    sync_patch.assert_called_once_with(run)
+
+
+@pytest.mark.parametrize("status_code", [400, 404])
+def test_sync_courserun_upgrade_deadline_does_not_retry_client_errors(
+    mocker, caplog, status_code
+):
+    """Other 4xx errors won't succeed on retry, so they're logged once."""
+    run = CourseRunFactory.create()
+    sync_patch = mocker.patch(
+        "openedx.api.sync_courserun_upgrade_deadline_to_edx",
+        side_effect=_http_error(status_code),
+    )
+
+    result = sync_courserun_upgrade_deadline.delay(run.id)
+
+    assert result.get() is None
+    sync_patch.assert_called_once_with(run)
+    assert f"edX rejected the upgrade deadline push for {run.courseware_id}" in (
+        caplog.text
+    )
