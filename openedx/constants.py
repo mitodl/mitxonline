@@ -26,6 +26,16 @@ OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES = 5
 
 OPENEDX_USERNAME_MAX_LEN = 30
 
+# The course-level Open edX roles we mirror, and the ones we treat as granting
+# courseware access before a run's start date.
+#
+# Open edX itself lets more people in early than this: global staff, the
+# org-wide OrgStaffRole/OrgInstructorRole, and beta testers via
+# `days_early_for_beta`. None of those are reflected here - we only see what
+# the ol_openedx_events_handler plugin sends, which is governed by its
+# ENROLLMENT_COURSE_ACCESS_ROLES setting, so the two lists must stay in step.
+OPENEDX_COURSE_STAFF_ROLES = ("instructor", "staff")
+
 COURSE_RUN_CLONE_STATUS_PENDING = "pending"
 COURSE_RUN_CLONE_STATUS_CLONING = "cloning"
 COURSE_RUN_CLONE_STATUS_CLONED = "cloned"

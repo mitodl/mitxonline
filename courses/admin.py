@@ -21,6 +21,7 @@ from courses.models import (
     BlockedCountry,
     Course,
     CourseRun,
+    CourseRunAccessRole,
     CourseRunCertificate,
     CourseRunEnrollment,
     CourseRunEnrollmentAudit,
@@ -1338,3 +1339,22 @@ class EnrollmentModeAdmin(admin.ModelAdmin):
     list_filter = [
         "requires_payment",
     ]
+
+
+@admin.register(CourseRunAccessRole)
+class CourseRunAccessRoleAdmin(TimestampedModelAdmin):
+    """Admin for CourseRunAccessRole"""
+
+    model = CourseRunAccessRole
+    search_fields = [
+        "user__email",
+        "user__username",
+        "run__courseware_id",
+        "run__title",
+    ]
+    list_display = ("id", "user__email", "run__courseware_id", "role")
+    list_filter = ["role"]
+    raw_id_fields = ("user", "run")
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("user", "run")

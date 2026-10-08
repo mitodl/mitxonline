@@ -15,8 +15,8 @@ from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 
 from courses.api import create_local_enrollment, generate_course_run_certificates
-from courses.models import CourseRun, CourseRunCertificate
-from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE
+from courses.models import CourseRun, CourseRunAccessRole, CourseRunCertificate
+from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, OPENEDX_COURSE_STAFF_ROLES
 from users.models import User
 
 log = logging.getLogger(__name__)
@@ -40,6 +40,10 @@ def edx_enrollment_webhook(request):
     or a course team manually enrolls learners from the instructor dashboard), the
     Open edX plugin POSTs to this endpoint so MITx Online can mirror the enrollment
     in the corresponding course run.
+
+    A payload carrying a course staff "role" also records that role locally, so
+    the dashboard can tell whether a user is on a run's course team. See
+    CourseRunAccessRole.
 
     Authentication: OAuth2 Bearer token (Django OAuth Toolkit access token).
 
@@ -94,6 +98,33 @@ def edx_enrollment_webhook(request):
         return Response(
             {"error": f"Course run with id {course_id} not found"},
             status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # --- Record the course access role ---
+    # Done before the enrollment so a role grant is never silently dropped by a
+    # downstream enrollment failure; the two are independent facts.
+    if role in OPENEDX_COURSE_STAFF_ROLES:
+        _, role_created = CourseRunAccessRole.objects.get_or_create(
+            user=user, run=course_run, role=role
+        )
+        log.info(
+            "Webhook: Recorded course access role %s for user %s in course run %s (created: %s)",
+            role,
+            email,
+            course_id,
+            role_created,
+        )
+    elif role:
+        # The success log below prints the role either way, which would read as
+        # if it had been handled. Say so when it has not: a role arriving that
+        # we do not record means the plugin's allowed-role setting and
+        # OPENEDX_COURSE_STAFF_ROLES have drifted, or the casing differs.
+        log.warning(
+            "Webhook: Role %s for user %s in course run %s is not in "
+            "OPENEDX_COURSE_STAFF_ROLES, so it was not recorded.",
+            role,
+            email,
+            course_id,
         )
 
     # --- Create local enrollment ---

@@ -2579,6 +2579,44 @@ class CourseRunEnrollmentAudit(AuditModel):
         return "enrollment"
 
 
+class CourseRunAccessRole(TimestampedModel):
+    """
+    A course access role a user holds in Open edX for a given course run.
+
+    Open edX is the system of record. Rows here are mirrored from its
+    COURSE_ACCESS_ROLE_ADDED event by the enrollment webhook, so that MITx
+    Online can answer "is this user on the course team?" locally instead of
+    calling Open edX once per enrollment when the dashboard loads. The
+    plugin's `sync_course_access_roles` management command posts to the same
+    webhook to backfill roles granted before we started recording them; it
+    skips org-wide roles, which have no single run to attach to.
+
+    Two limits worth knowing. A row only lands here if the role passes both
+    the plugin's ENROLLMENT_COURSE_ACCESS_ROLES setting and our own
+    OPENEDX_COURSE_STAFF_ROLES, so this is not a complete picture of a run's
+    course team. And nothing removes a row, because Open edX's
+    COURSE_ACCESS_ROLE_REMOVED event is not forwarded, so a revoked role stays
+    recorded until it is deleted by hand.
+    """
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="course_run_access_roles"
+    )
+    run = models.ForeignKey(
+        "courses.CourseRun", on_delete=models.CASCADE, related_name="access_roles"
+    )
+    role = models.CharField(
+        max_length=64,
+        help_text="The Open edX course access role name, e.g. 'staff' or 'instructor'.",
+    )
+
+    class Meta:
+        unique_together = ("user", "run", "role")
+
+    def __str__(self):
+        return f"{self.role} for {self.user} in {self.run.courseware_id}"
+
+
 class ProgramEnrollmentCertificatePrefetcher(Prefetcher):
     """Prefetcher for ProgramEnrollment certificates"""
 
