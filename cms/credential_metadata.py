@@ -26,8 +26,6 @@ CREDENTIAL_METADATA_PATH = "/api/v0/credential_metadata/"
 # needs to cover a slow network, not a model call.
 REQUEST_TIMEOUT_SECONDS = 10
 
-HTTP_NOT_FOUND = 404
-
 
 class CredentialMetadataUnavailableError(Exception):
     """
@@ -126,7 +124,7 @@ def fetch_credential_metadata(readable_id: str) -> CredentialMetadata | None:
     # Nothing stored for this course. A genuine gap rather than an error --
     # note that an unpublished course may still have stored metadata, so this
     # is not a proxy for "course is not published".
-    if response.status_code == HTTP_NOT_FOUND:
+    if response.status_code == requests.codes.not_found:
         log.info("MIT Learn has no stored credential metadata for %s", readable_id)
         return None
 

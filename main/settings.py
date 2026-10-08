@@ -670,17 +670,13 @@ MIT_LEARN_BASE_URL = get_string(
     description="Base URL of the MIT Learn instance for this environment",
 )
 
-# MIT Learn's API is served from a separate host, not a path under the web app,
-# so MIT_LEARN_BASE_URL cannot be reused for it.
-#
-# Unlike the MIT_LEARN_*_URL settings above, which only build links, this one is
-# called. It defaults to empty so that a deployment which has not configured it
-# makes no outbound request at all, rather than silently reaching an instance it
-# did not choose. Same convention as VERIFIABLE_CREDENTIAL_SIGNER_URL.
+# MIT Learn's API is on a separate host, so MIT_LEARN_BASE_URL cannot be reused.
+# Defaults to empty: this setting is called rather than used to build links, and
+# an unconfigured deployment should make no outbound request at all.
 MIT_LEARN_API_BASE_URL = get_string(
     name="MIT_LEARN_API_BASE_URL",
     default="",
-    description="Base URL of the MIT Learn API; lookups are disabled when unset",
+    description="Base URL of the MIT Learn API",
 )
 
 MIT_LEARN_DASHBOARD_URL = get_string(
