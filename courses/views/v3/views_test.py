@@ -5,7 +5,9 @@ Tests for courses api views v3
 from datetime import timedelta
 
 import pytest
+from django.db import connection
 from django.db.models import Q
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from faker import Faker
 from mitol.common.utils import now_in_utc
@@ -31,7 +33,7 @@ from courses.models import (
 )
 from courses.serializers.v3.programs import SimpleProgramSerializer
 from courses.test_utils import maybe_serialize_course_cert, maybe_serialize_program_cert
-from ecommerce.factories import OrderFactory
+from ecommerce.factories import OrderFactory, ProductFactory
 from ecommerce.models import OrderStatus
 from main.test_utils import drf_datetime
 from openedx.exceptions import EdxApiCourseOutlineError
@@ -446,6 +448,41 @@ def test_user_enrollments_list_query_count_guard(
     with django_assert_max_num_queries(20):
         resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
     assert resp.status_code == status.HTTP_200_OK
+
+
+def test_user_enrollments_list_query_count_does_not_scale_with_products(
+    user, user_drf_client, django_assert_num_queries
+):
+    """
+    The list endpoint's query count must not grow with the number of enrolled
+    runs that have products. run.products is a GenericRelation, so Django reads
+    content_type and object_id off every prefetched product to bucket it under
+    its parent run - deferring either costs an extra query per product.
+    """
+    url = reverse("v3:user_enrollments_api-list")
+
+    def enroll_with_product():
+        run = CourseRunFactory.create(in_progress=True)
+        ProductFactory.create(purchasable_object=run)
+        return CourseRunEnrollmentFactory.create(run=run, user=user)
+
+    enroll_with_product()
+    # Warm the process-level caches (ContentType, Site) so they don't skew counts.
+    assert user_drf_client.get(url).status_code == status.HTTP_200_OK
+
+    with CaptureQueriesContext(connection) as captured:
+        resp = user_drf_client.get(url)
+    assert resp.status_code == status.HTTP_200_OK
+    assert len(resp.json()) == 1
+    one_enrollment_queries = len(captured.captured_queries)
+
+    for _ in range(7):
+        enroll_with_product()
+
+    with django_assert_num_queries(one_enrollment_queries):
+        resp = user_drf_client.get(url)
+    assert resp.status_code == status.HTTP_200_OK
+    assert len(resp.json()) == 8
 
 
 def test_program_enrollments(

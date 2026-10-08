@@ -124,7 +124,13 @@ class UserEnrollmentsApiViewSet(
             ),
             Prefetch(
                 "run__products",
-                queryset=Product.objects.only("id", "price", "is_active"),
+                # content_type and object_id look unused here, but products is a
+                # GenericRelation: Django reads both off every fetched product to
+                # bucket it under its parent run. Deferring them costs two extra
+                # queries per product.
+                queryset=Product.objects.only(
+                    "id", "price", "is_active", "content_type", "object_id"
+                ),
                 to_attr="prefetched_products",
             ),
         )
