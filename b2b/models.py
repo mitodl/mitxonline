@@ -36,6 +36,7 @@ from b2b.constants import (
     ORG_INDEX_SLUG,
     PROVISIONING_ACTION_CHOICES,
 )
+from b2b.exceptions import SourceCourseIncompleteError
 from courses.models import Program
 from main.models import AuditModel, ValidateOnSaveMixin
 from variants.models import SupportedVariant
@@ -731,6 +732,11 @@ class ContractPage(Page, ClusterableModel):
 
         This defaults to not allowing re-runs to happen.
 
+        A course with no source run for the requested variants is skipped and
+        counted, and the rest of the program is still added. The check for a
+        source run happens before anything is created for a course, so a
+        skipped course leaves nothing behind.
+
         Args:
         - program (courses.Program): the program to add
         Kwargs:
@@ -740,7 +746,7 @@ class ContractPage(Page, ClusterableModel):
         Returns:
         - tuple: Tuple with two integers:
             - number of course runs created
-            - number of courses with no source run
+            - number of courses skipped for having no usable source run
         """
 
         from b2b.api import create_contract_run  # noqa: PLC0415
@@ -750,36 +756,42 @@ class ContractPage(Page, ClusterableModel):
             delattr(program, "_courses_with_requirements_data")
 
         managed = 0
-        no_source = program.courses_qset.exclude(
-            models.Q(courseruns__is_source_run=True)
-            | models.Q(courseruns__run_tag="SOURCE")
-        ).count()
+        no_source = 0
 
-        for course in program.courses_qset.filter(
-            models.Q(courseruns__is_source_run=True)
-            | models.Q(courseruns__run_tag="SOURCE")
-        ).all():
-            created_runs = create_contract_run(
-                self,
-                course,
-                no_reruns=no_reruns,
-                skip_edx=skip_edx,
-                org_prefix=org_prefix,
-                ignore_langs=ignore_langs,
-                only_lang=only_lang,
-                filter_variants=filter_variants,
-            )
+        for course in program.courses_qset.all():
+            try:
+                created_runs = create_contract_run(
+                    self,
+                    course,
+                    no_reruns=no_reruns,
+                    skip_edx=skip_edx,
+                    org_prefix=org_prefix,
+                    ignore_langs=ignore_langs,
+                    only_lang=only_lang,
+                    filter_variants=filter_variants,
+                )
+            except SourceCourseIncompleteError:
+                log.warning(
+                    "No usable source run for course %s in program %s, "
+                    "skipping it for contract %s",
+                    course.readable_id,
+                    program.readable_id,
+                    self.id,
+                    exc_info=True,
+                )
+                no_source += 1
+                continue
             managed += len(created_runs)
 
-        if order is None:
-            last_item = self.contract_programs.order_by("-sort_order").first()
-            order = (last_item.sort_order + 1) if last_item else 0
-
-        existing_item = ContractProgramItem.objects.filter(
+        already_linked = ContractProgramItem.objects.filter(
             contract=self, program=program
-        ).first()
+        ).exists()
 
-        if not existing_item:
+        if not already_linked:
+            if order is None:
+                last_item = self.contract_programs.order_by("-sort_order").first()
+                order = (last_item.sort_order + 1) if last_item else 0
+
             item = ContractProgramItem(contract=self, program=program, sort_order=order)
             item.save(skip_run_creation=True)
 

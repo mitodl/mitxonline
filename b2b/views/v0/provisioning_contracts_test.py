@@ -16,7 +16,7 @@ from b2b.constants import (
 )
 from b2b.contracts import add_contract_variant_set, add_courseware_to_contract
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
-from courses.factories import CourseFactory, CourseRunFactory
+from courses.factories import CourseFactory, CourseRunFactory, ProgramFactory
 from openedx.constants import (
     COURSE_RUN_CLONE_STATUS_CLONED,
     COURSE_RUN_CLONE_STATUS_FAILED,
@@ -274,6 +274,35 @@ def test_add_course_with_no_shared_variant_is_a_400(admin_drf_client):
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "source run" in response.json()["detail"]
+
+
+@pytest.mark.usefixtures("mocked_tasks")
+def test_add_program_skips_a_course_with_no_shared_variant(admin_drf_client):
+    """One course with no usable source run doesn't stop the rest of the program."""
+
+    contract = ContractPageFactory.create()
+    program = ProgramFactory.create()
+    usable = CourseRunFactory.create(
+        is_source_run=True, language="en", is_primary_language=True
+    ).course
+    french = CourseRunFactory.create(
+        is_source_run=True, language="fr", is_primary_language=True
+    ).course
+    french.possible_variant_sets.update(language="fr")
+    program.add_requirement(french)
+    program.add_requirement(usable)
+
+    response = admin_drf_client.post(
+        _contract_url(contract, "courseware"),
+        {"courseware_id": program.readable_id},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["runs_added"] == 1
+    assert response.json()["courses_without_source_run"] == 1
+    assert contract.programs.filter(id=program.id).exists()
+    assert [run.course for run in contract.get_course_runs()] == [usable]
 
 
 def test_retry_setup_requeues_failed_clones(admin_drf_client, mocked_tasks):
