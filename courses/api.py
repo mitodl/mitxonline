@@ -2265,6 +2265,7 @@ def rerun_course_run(  # noqa: PLR0913
     is_self_paced: bool | None = None,
     live: bool | None = None,
     enrollment_modes: list[EnrollmentMode] | None = None,
+    upgrade_deadline: datetime | None = None,
 ) -> CourseRun:
     """
     Re-run an existing course run.
@@ -2273,7 +2274,8 @@ def rerun_course_run(  # noqa: PLR0913
     The resulting run must not exist in edX.
 
     By default, the created run will share all the same parameters as the base
-    run, other than the run tag.
+    run, other than the run tag and the upgrade deadline. The base run's deadline
+    belongs to an earlier session, so the new run only gets one if it's passed in.
 
     When specifying start and end dates, be aware that course start and end must
     be set to set enrollment start and end, and the enrollment start and end dates
@@ -2299,6 +2301,8 @@ def rerun_course_run(  # noqa: PLR0913
     - is_self_paced (bool): course is self-paced
     - live (bool): course is live (in MITx Online)
     - enrollment_modes (list[EnrollmentMode]): modes to add to the new run
+    - upgrade_deadline (DateTime): upgrade deadline; also set on the verified mode
+      when it's created in edX
     Returns:
     - CourseRun, the created run
     """
@@ -2332,6 +2336,7 @@ def rerun_course_run(  # noqa: PLR0913
             if is_self_paced is not None
             else base_run.is_self_paced,
             live=live if live is not None else base_run.live,
+            upgrade_deadline=upgrade_deadline,
         )
 
         for mode in (

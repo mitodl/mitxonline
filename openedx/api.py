@@ -2057,6 +2057,14 @@ def push_edx_modes_from_run(course_run: CourseRun, *, edx_client=None) -> int:
                 mode_slug=mode.mode_slug,
                 mode_display_name=mode.mode_display_name,
                 min_price=(1 if mode.requires_payment else 0),
+                # The CourseRun post_save signal skips new runs because their edX
+                # course doesn't exist yet, so this is where a rerun's deadline
+                # reaches edX.
+                expiration_datetime=(
+                    course_run.upgrade_deadline
+                    if mode.mode_slug == EDX_ENROLLMENT_VERIFIED_MODE
+                    else None
+                ),
                 client=edx_client,
             )
             created_count += 1

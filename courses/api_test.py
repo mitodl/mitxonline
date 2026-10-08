@@ -69,6 +69,7 @@ from courses.api import (
     partner_schools_for_program,
     process_course_run_grade_certificate,
     pull_course_modes,
+    rerun_course_run,
     sync_course_mode,
     sync_course_runs,
     upgrade_audit_run_enrollments_for_program_purchase,
@@ -5417,3 +5418,19 @@ def test_partner_schools_for_program_excludes_unassigned_when_flag_on(settings):
     PartnerSchoolFactory.create(name="Unassigned School")
 
     assert list(partner_schools_for_program(program)) == []
+
+
+@pytest.mark.parametrize("upgrade_deadline", [None, now_in_utc() + timedelta(days=60)])
+def test_rerun_course_run_upgrade_deadline(mocker, upgrade_deadline):
+    """
+    A rerun gets the upgrade deadline it's given, never the base run's: that
+    deadline belongs to an earlier session.
+    """
+    mocked_clone = mocker.patch("courses.api.process_course_run_clone")
+    base_run = CourseRunFactory.create(upgrade_deadline=now_in_utc())
+
+    new_run = rerun_course_run(base_run, "9T2099", upgrade_deadline=upgrade_deadline)
+
+    new_run.refresh_from_db()
+    assert new_run.upgrade_deadline == upgrade_deadline
+    mocked_clone.assert_called_once_with(new_run, base_run.courseware_id)
