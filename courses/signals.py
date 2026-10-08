@@ -253,12 +253,15 @@ def sync_upgrade_deadline_to_edx_on_save(
         # refetch and we have nothing meaningful to compare against anyway.
         return
 
-    previous = getattr(instance, PREVIOUS_UPGRADE_DEADLINE_ATTR, None)
-    if not created and previous == instance.upgrade_deadline:
+    if created:
+        # A new run usually has no edX course yet - rerun_course_run creates the
+        # CourseRun first and clones it in edX afterwards - so there is no
+        # verified mode to update. push_edx_modes_from_run sets the deadline
+        # when it creates the modes for a rerun.
         return
 
-    if created and instance.upgrade_deadline is None:
-        # Nothing to push, and edX cannot represent "no deadline" on update.
+    previous = getattr(instance, PREVIOUS_UPGRADE_DEADLINE_ATTR, None)
+    if previous == instance.upgrade_deadline:
         return
 
     from courses.tasks import sync_courserun_upgrade_deadline  # noqa: PLC0415

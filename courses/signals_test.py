@@ -237,16 +237,13 @@ def test_resaving_same_deadline_does_not_queue_edx_sync(mock_deadline_sync_task)
     mock_deadline_sync_task.assert_not_called()
 
 
-def test_new_run_with_deadline_queues_edx_sync(mock_deadline_sync_task):
-    """A run created with a deadline should push it."""
-    run = CourseRunFactory.create(upgrade_deadline=now_in_utc() + timedelta(days=10))
-
-    mock_deadline_sync_task.assert_called_once_with(run.id)
-
-
-def test_new_run_without_deadline_does_not_queue_edx_sync(mock_deadline_sync_task):
-    """Creating a run with no deadline has nothing to push."""
-    CourseRunFactory.create(upgrade_deadline=None)
+@pytest.mark.parametrize("upgrade_deadline", [None, now_in_utc() + timedelta(days=10)])
+def test_new_run_does_not_queue_edx_sync(mock_deadline_sync_task, upgrade_deadline):
+    """
+    Creating a run never pushes: a rerun's edX course doesn't exist until the
+    clone finishes, and push_edx_modes_from_run sets the deadline then.
+    """
+    CourseRunFactory.create(upgrade_deadline=upgrade_deadline)
 
     mock_deadline_sync_task.assert_not_called()
 

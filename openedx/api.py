@@ -2332,13 +2332,6 @@ def sync_courserun_upgrade_deadline_to_edx(
         HTTPError: if the edX API rejects the read or the write.
     """
 
-    if not settings.FEATURES.get(features.SYNC_UPGRADE_DEADLINE_TO_EDX, False):
-        log.debug(
-            "Upgrade deadline sync is disabled, skipping %s",
-            course_run.courseware_id,
-        )
-        return UpgradeDeadlineSyncResult.DISABLED
-
     edx_client = client if client else get_edx_api_service_client()
 
     verified_mode = find_object_with_matching_attr(
