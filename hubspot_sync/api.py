@@ -1737,13 +1737,10 @@ def sync_line_item_with_hubspot(line: Line) -> SimplePublicObject:
         sync_deal_with_hubspot(line.order)
         deal_hubspot_id = get_hubspot_id_for_object(line.order)
     if deal_hubspot_id:
-        _associate_objects_with_retry(
-            HubspotObjectType.LINES.value,
-            result.id,
-            HubspotObjectType.DEALS.value,
-            deal_hubspot_id,
-            HubspotAssociationType.LINE_DEAL.value,
-        )
+        # This may be unacceptably fragile - it relies on the fact that this is only ever called after gates on
+        # MITOL_HUBSPOT_API_PRIVATE_TOKEN. If it's ever accidentally called with a line which
+        # should be synced to a non-default account it won't work properly
+        _upsert_target_deal_line_item(line, deal_hubspot_id, HubspotApi())
     else:
         log.warning(
             "No HubSpot ID found for order %d after sync; skipping line-deal association for line %d",

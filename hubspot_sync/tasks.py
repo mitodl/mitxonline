@@ -200,6 +200,8 @@ def sync_deal_with_hubspot(order_id: int) -> str | None:
     Returns:
         str | None: The hubspot id for the deal, or None if skipped for B2B users
     """
+    # TODO: Is this used? It doesn't seem like it, if not we should remove it since it doesn't properly handle # noqa: TD002, TD003, FIX002
+    # the two downstream Hubspot accounts in play (see sync_deal_with_hubspot_targeted)
     result = api.sync_deal_with_hubspot(Order.objects.get(id=order_id))
     return result.id if result else None
 
