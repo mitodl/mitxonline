@@ -5696,6 +5696,10 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
+        variant_industry_label:
+          type: string
+          description: Return the display label for the variant industry.
+          readOnly: true
         variant_length:
           description: |-
             Variant: Describes the length of the run (short/long).
@@ -5705,6 +5709,10 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
+        variant_length_label:
+          type: string
+          description: Return the display label for the variant length.
+          readOnly: true
         course_id:
           type: integer
           readOnly: true
@@ -5721,6 +5729,8 @@ components:
       - language_label
       - run_tag
       - title
+      - variant_industry_label
+      - variant_length_label
     BaseProduct:
       type: object
       description: Simple serializer for Product without related purchasable objects
@@ -6382,6 +6392,12 @@ components:
           type: string
         variant_industry:
           type: string
+        variant_length_label:
+          type: string
+          readOnly: true
+        variant_industry_label:
+          type: string
+          readOnly: true
         default_variant:
           type: boolean
         active:
@@ -6400,7 +6416,9 @@ components:
       - id
       - language
       - variant_industry
+      - variant_industry_label
       - variant_length
+      - variant_length_label
     Country:
       type: object
       description: Serializer for pycountry countries, with states for US/CA
@@ -7189,6 +7207,10 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
+        variant_industry_label:
+          type: string
+          description: Return the display label for the variant industry.
+          readOnly: true
         variant_length:
           description: |-
             Variant: Describes the length of the run (short/long).
@@ -7198,6 +7220,10 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
+        variant_length_label:
+          type: string
+          description: Return the display label for the variant length.
+          readOnly: true
         course_id:
           type: integer
           readOnly: true
@@ -7230,6 +7256,8 @@ components:
       - products
       - run_tag
       - title
+      - variant_industry_label
+      - variant_length_label
     CourseRunWithCourseV3:
       type: object
       description: CourseRun serializer
@@ -7395,6 +7423,10 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
+        variant_industry_label:
+          type: string
+          description: Return the display label for the variant industry.
+          readOnly: true
         variant_length:
           description: |-
             Variant: Describes the length of the run (short/long).
@@ -7404,6 +7436,10 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
+        variant_length_label:
+          type: string
+          description: Return the display label for the variant length.
+          readOnly: true
         course_id:
           type: integer
           readOnly: true
@@ -7442,6 +7478,8 @@ components:
       - upgrade_product_id
       - upgrade_product_is_active
       - upgrade_product_price
+      - variant_industry_label
+      - variant_length_label
     CourseRunWithCourseV3Request:
       type: object
       description: CourseRun serializer
@@ -11801,6 +11839,14 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
+        variant_length_label:
+          type: string
+          description: Return the display label for the variant length.
+          readOnly: true
+        variant_industry_label:
+          type: string
+          description: Return the display label for the variant industry.
+          readOnly: true
         active:
           type: boolean
           readOnly: true
@@ -11818,7 +11864,9 @@ components:
       - default_variant
       - language
       - variant_industry
+      - variant_industry_label
       - variant_length
+      - variant_length_label
     TestimonialItem:
       type: object
       description: Serializer for testimonial items shown on course/program pages.
@@ -12696,6 +12744,10 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
+        variant_industry_label:
+          type: string
+          description: Return the display label for the variant industry.
+          readOnly: true
         variant_length:
           description: |-
             Variant: Describes the length of the run (short/long).
@@ -12705,6 +12757,10 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
+        variant_length_label:
+          type: string
+          description: Return the display label for the variant length.
+          readOnly: true
         course_id:
           type: integer
           readOnly: true
@@ -12732,6 +12788,8 @@ components:
       - products
       - run_tag
       - title
+      - variant_industry_label
+      - variant_length_label
     V1CourseRunWithCourse:
       type: object
       description: CourseRun model serializer - also serializes the parent Course.
@@ -12897,6 +12955,10 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
+        variant_industry_label:
+          type: string
+          description: Return the display label for the variant industry.
+          readOnly: true
         variant_length:
           description: |-
             Variant: Describes the length of the run (short/long).
@@ -12906,6 +12968,10 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
+        variant_length_label:
+          type: string
+          description: Return the display label for the variant length.
+          readOnly: true
         course_id:
           type: integer
           readOnly: true
@@ -12939,6 +13005,8 @@ components:
       - products
       - run_tag
       - title
+      - variant_industry_label
+      - variant_length_label
     V1CourseRunWithCourseRequest:
       type: object
       description: CourseRun model serializer - also serializes the parent Course.
@@ -13624,6 +13692,10 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantIndustryEnum'
           - $ref: '#/components/schemas/BlankEnum'
+        variant_industry_label:
+          type: string
+          description: Return the display label for the variant industry.
+          readOnly: true
         variant_length:
           description: |-
             Variant: Describes the length of the run (short/long).
@@ -13633,6 +13705,10 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
+        variant_length_label:
+          type: string
+          description: Return the display label for the variant length.
+          readOnly: true
         course_id:
           type: integer
           readOnly: true
@@ -13670,6 +13746,8 @@ components:
       - products
       - run_tag
       - title
+      - variant_industry_label
+      - variant_length_label
     V2CourseRunWithCourseRequest:
       type: object
       description: CourseRun model serializer - also serializes the parent Course.

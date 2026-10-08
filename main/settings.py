@@ -39,7 +39,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "1.169.11"
+VERSION = "1.169.12"
 
 log = logging.getLogger()
 
@@ -668,6 +668,15 @@ MIT_LEARN_BASE_URL = get_string(
     name="MIT_LEARN_BASE_URL",
     default=f"https://{ENV_TO_LEARN_HOSTNAME_MAP.get(ENVIRONMENT, 'learn.mit.edu')}",
     description="Base URL of the MIT Learn instance for this environment",
+)
+
+# MIT Learn's API is on a separate host, so MIT_LEARN_BASE_URL cannot be reused.
+# Defaults to empty: this setting is called rather than used to build links, and
+# an unconfigured deployment should make no outbound request at all.
+MIT_LEARN_API_BASE_URL = get_string(
+    name="MIT_LEARN_API_BASE_URL",
+    default="",
+    description="Base URL of the MIT Learn API",
 )
 
 MIT_LEARN_DASHBOARD_URL = get_string(

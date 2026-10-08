@@ -9,7 +9,8 @@ import {
   USER_MSG_COOKIE_NAME,
   USER_MSG_TYPE_COMPLETED_AUTH,
   USER_MSG_TYPE_ENROLL_FAILED,
-  USER_MSG_TYPE_ENROLLED
+  USER_MSG_TYPE_ENROLLED,
+  USER_MSG_TYPE_PAYMENT_ERROR
 } from "../constants"
 import IntegrationTestHelper from "../util/integration_test_helper"
 
@@ -31,6 +32,13 @@ describe("notifications API", () => {
       [{}, { type: null }, { type: "unrecognized" }].forEach(userMsgJson => {
         assert.isNull(notificationsApi.parseStoredUserMessage(userMsgJson))
       })
+    })
+
+    it("returns an error message for a 'payment error' message cookie value", () => {
+      const message = notificationsApi.parseStoredUserMessage({
+        type: USER_MSG_TYPE_PAYMENT_ERROR
+      })
+      assert.equal(message && message.type, "danger")
     })
 
     it("returns the correct message properties given an 'enrolled' message cookie value", () => {
