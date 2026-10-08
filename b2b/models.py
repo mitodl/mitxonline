@@ -257,6 +257,60 @@ class OrganizationPage(Page):
             ).values_list("id", flat=True),
         ).delete()
 
+    def reconcile_all_user_contracts(self):
+        """
+        Ensure the automatic contracts' memberships are aligned with the org membership.
+
+        Users in automatic membership contracts (e.g. "managed" type) are added
+        and removed from the contract as org members log into the system. This
+        requires that the users remain active in the system; if they don't, seat
+        counts may be off from reality.
+        """
+
+        reconciliation_result: dict[str, dict] = {}
+
+        for contract in self.contracts.filter(
+            membership_type__in=CONTRACT_MEMBERSHIP_AUTOS
+        ).all():
+            log.info("reconcile_all_user_contracts: Reconciling contract %s", contract)
+            missing_users = self.organization_users.exclude(
+                user__in=contract.b2b_contract_users.values_list("user")
+            ).values_list("user")
+
+            for user in missing_users:
+                log.info(
+                    "reconcile_all_user_contracts: Adding missing user %s to contract %s",
+                    user.user,
+                    contract,
+                )
+                user.user.b2b_contracts.add(contract)
+
+            extra_users = contract.b2b_contract_users.exclude(
+                user__in=self.organization_users.values_list("user")
+            ).all()
+
+            for user in extra_users:
+                log.info(
+                    "reconcile_all_user_contracts: Removing extra user %s from contract %s",
+                    user.user,
+                    contract,
+                )
+                user.user.b2b_contracts.remove(contract)
+
+            log.info(
+                "reconcile_all_user_contracts: Added %s and removed %s users from contract %s",
+                len(missing_users),
+                len(extra_users),
+                contract,
+            )
+
+            reconciliation_result[str(contract)] = {
+                "added": missing_users,
+                "removed": extra_users,
+            }
+
+        return reconciliation_result
+
     def __str__(self):
         """Return a reasonable representation of the org as a string."""
 
