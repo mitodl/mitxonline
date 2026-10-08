@@ -207,14 +207,23 @@ def _unlink_shared_run(contract: ContractPage, run: CourseRun) -> bool | None:
     holders = Q(course_runs=run)
     if run.b2b_contract_id:
         holders |= Q(pk=run.b2b_contract_id)
-    if not ContractPage.objects.filter(holders).exclude(pk=contract.pk).exists():
+    other_holder = (
+        ContractPage.objects.filter(holders)
+        .exclude(pk=contract.pk)
+        .order_by("pk")
+        .first()
+    )
+    if other_holder is None:
         return None
 
     if CourseRunEnrollment.objects.filter(run=run, b2b_contract=contract).exists():
         return False
 
     if run.b2b_contract_id == contract.pk:
-        run.b2b_contract = None
+        # Code that still reads the legacy FK (e.g. is_contract_order, the
+        # discount source run filter) takes a run without one for a
+        # non-contract run, so hand it to a contract that still holds the run.
+        run.b2b_contract = other_holder
         run.save()
     run.b2b_contracts.remove(contract)
 

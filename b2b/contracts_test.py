@@ -183,7 +183,9 @@ def test_remove_run_another_contract_holds(other_contract_active, has_enrollment
     removed_run.refresh_from_db()
     assert unlinked is not has_enrollments
     assert removed_run.live is True
-    assert removed_run.b2b_contract_id == (contract.id if has_enrollments else None)
+    assert removed_run.b2b_contract_id == (
+        contract.id if has_enrollments else other_contract.id
+    )
     assert other_contract.get_products().count() == products
     assert CourseRun.b2b_contracts.through.objects.filter(
         courserun=run, contractpage=other_contract

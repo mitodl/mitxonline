@@ -289,7 +289,10 @@ a source run, so the course is what gets added.
 already has enrolled learners stays linked to the contract so they keep access.
 A run another contract also holds is not closed and keeps its products and
 codes. It is unlinked from this contract, unless this contract's learners are
-enrolled in it.
+enrolled in it. The codes this contract had for that run stay attached to the
+run's product, because a code belongs to a product and not to a contract. If
+this contract was the run's legacy `b2b_contract`, that moves to a contract
+that still holds the run.
 
 `variants/` lists the contract's variant sets, default first. Each set lists
 the contract's courses (from its runs and its programs) that support the same
