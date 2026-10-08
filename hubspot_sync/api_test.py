@@ -643,6 +643,10 @@ def test_sync_line_item_with_hubspot(
     """Test that the hubspot CRM API is called properly for a line_item sync"""
     line = hubspot_order.lines.first()
     course_run_enrollment = CourseRunEnrollmentFactory.create(user=line.order.purchaser)  # noqa: F841
+    mock_hubspot_client = mocker.patch("hubspot_sync.api.HubspotApi", autospec=True)
+    mock_upsert_line_item = mocker.patch(
+        "hubspot_sync.api._upsert_target_deal_line_item", autospec=True
+    )
     api.sync_line_item_with_hubspot(line)
     assert (
         api.HubspotObject.objects.get(
@@ -650,11 +654,8 @@ def test_sync_line_item_with_hubspot(
         ).hubspot_id
         == FAKE_HUBSPOT_ID
     )
-    mock_hubspot_api.return_value.crm.associations.v4.basic_api.create_default.assert_called_once_with(
-        from_object_type=api.HubspotObjectType.LINES.value,
-        from_object_id=FAKE_HUBSPOT_ID,
-        to_object_type=api.HubspotObjectType.DEALS.value,
-        to_object_id=hubspot_order_id,
+    mock_upsert_line_item.assert_called_once_with(
+        line, hubspot_order_id, mock_hubspot_client.return_value
     )
 
 
@@ -669,11 +670,17 @@ def test_sync_line_item_with_hubspot_syncs_deal_when_missing(
     # Sequence: line lookup (discarded), order first check (None→retry), order after sync
     mock_get_id = mocker.patch("hubspot_sync.api.get_hubspot_id_for_object")
     mock_get_id.side_effect = [None, None, "deal-hs-id"]
+    mock_hubspot_client = mocker.patch("hubspot_sync.api.HubspotApi", autospec=True)
+    mock_upsert_line_item = mocker.patch(
+        "hubspot_sync.api._upsert_target_deal_line_item", autospec=True
+    )
 
     api.sync_line_item_with_hubspot(line)
 
     mock_sync_deal.assert_called_once_with(hubspot_order)
-    mock_hubspot_api.return_value.crm.associations.v4.basic_api.create_default.assert_called_once()
+    mock_upsert_line_item.assert_called_once_with(
+        line, "deal-hs-id", mock_hubspot_client.return_value
+    )
 
 
 def test_associate_objects_with_retry_succeeds_on_first_attempt(mocker):
