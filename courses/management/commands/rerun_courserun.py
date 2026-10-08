@@ -1,10 +1,11 @@
 """Re-run a course."""
 
 import logging
-from argparse import RawTextHelpFormatter
+from argparse import ArgumentTypeError, RawTextHelpFormatter
 from decimal import Decimal
 
 import reversion
+from dateutil.parser import isoparse
 from django.core.management import BaseCommand, CommandError
 from opaque_keys.edx.keys import CourseKey
 
@@ -12,6 +13,21 @@ from courses.api import rerun_course_run, resolve_courseware_object_from_id
 from ecommerce.models import Product
 
 log = logging.getLogger(__name__)
+
+
+def _aware_datetime(value):
+    """Parse an ISO 8601 datetime, requiring a timezone."""
+    try:
+        parsed = isoparse(value)
+    except ValueError as exc:
+        msg = f"{value!r} is not an ISO 8601 datetime"
+        raise ArgumentTypeError(msg) from exc
+
+    if parsed.tzinfo is None:
+        msg = "must include a timezone, e.g. 2027-03-02T23:59:00Z"
+        raise ArgumentTypeError(msg)
+
+    return parsed
 
 
 class Command(BaseCommand):
@@ -58,6 +74,12 @@ In either case, the command will try to create a new run. If it exists in edX al
             "--keep-product",
             action="store_true",
             help="If set, create a new product for the new run that mirrors the prior run's product. Overrides --price.",
+        )
+
+        parser.add_argument(
+            "--upgrade-deadline",
+            type=_aware_datetime,
+            help="The upgrade deadline for the new run, as an ISO 8601 datetime with a timezone (e.g. 2027-03-02T23:59:00Z). Also set on the verified mode in edX. Not copied from the run being re-run.",
         )
 
         parser.add_argument(
@@ -116,6 +138,7 @@ In either case, the command will try to create a new run. If it exists in edX al
             run_tag,
             organization=org,
             skip_edx=kwargs.get("skip_edx", False),
+            upgrade_deadline=kwargs.pop("upgrade_deadline", None),
         )
 
         self.stdout.write(self.style.SUCCESS(f"Created new run {new_course_run}"))

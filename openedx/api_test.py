@@ -2151,7 +2151,10 @@ def test_update_edx_user_profile_error(mock_session, mock_get_auth, mocker, user
 
 
 def test_push_edx_modes_from_run(mocker):
-    """Test that we can push modes into edX from a course"""
+    """
+    Test that we can push modes into edX from a course. The verified mode gets
+    the run's upgrade deadline as its expiration; other modes get none.
+    """
 
     mocked_edx_modes = mocker.patch("openedx.api.get_edx_course_modes", return_value=[])
     mocked_create_edx_mode = mocker.patch("openedx.api.create_edx_course_mode")
@@ -2168,10 +2171,16 @@ def test_push_edx_modes_from_run(mocker):
                 mode_slug=mode.mode_slug,
                 mode_display_name=mode.mode_display_name,
                 min_price=(1 if mode.requires_payment else 0),
+                expiration_datetime=(
+                    course_run.upgrade_deadline
+                    if mode.mode_slug == EDX_ENROLLMENT_VERIFIED_MODE
+                    else None
+                ),
                 client=ANY,
             )
         )
 
+    assert {mode.mode_slug for mode in mxo_modes} >= {EDX_ENROLLMENT_VERIFIED_MODE}
     assert course_run.edx_modes == []
     assert course_run.enrollment_modes.count() == 2
     assert mocked_edx_modes.called
