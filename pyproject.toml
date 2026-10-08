@@ -343,7 +343,6 @@ filterwarnings = [
     # factoryboy
     "ignore:.*\\._after_postgeneration will stop saving the instance after postgeneration hooks in the next major release",
     "ignore:authlib\\.jose module is deprecated, please use joserfc instead:authlib.deprecate.AuthlibDeprecationWarning",
-    "ignore:N+1 detected on",
     "ignore:Failed to load HostKeys"
 ]
 env = [
