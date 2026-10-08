@@ -275,7 +275,7 @@ class OrganizationPage(Page):
             log.info("reconcile_all_user_contracts: Reconciling contract %s", contract)
             missing_users = self.organization_users.exclude(
                 user__in=contract.b2b_contract_users.values_list("user")
-            ).values_list("user")
+            ).all()
 
             for user in missing_users:
                 log.info(
