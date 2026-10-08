@@ -53,6 +53,7 @@ class CoursewareAddition:
 
     runs_added: int = 0
     courses_without_source_run: int = 0
+    courses_with_invalid_key: int = 0
     skipped_reason: str = ""
 
 
@@ -126,7 +127,7 @@ def add_courseware_to_contract(  # noqa: PLR0913
     Add a program, course or course run to a contract.
 
     - A program gets contract runs for each of its courses that has a source
-      run, and is linked to the contract.
+      run with a valid course key, and is linked to the contract.
     - A course gets contract runs from its source runs.
     - An existing run is attached as it is. A run already in another contract
       is left there and reported as skipped: a run can legitimately belong to
@@ -134,7 +135,8 @@ def add_courseware_to_contract(  # noqa: PLR0913
       learners' courseware with it.
 
     Runs are created for the variant sets in filter_variants, which defaults to
-    the contract's active variant sets. no_reruns defaults to True, unlike
+    the contract's active variant sets. A contract with no active variant sets
+    gets no runs. no_reruns defaults to True, unlike
     create_contract_run, so repeating a call does not mint another run.
     org_prefix defaults to the organization's own prefix.
     """
@@ -143,7 +145,7 @@ def add_courseware_to_contract(  # noqa: PLR0913
         filter_variants = list(contract.active_variant_options())
 
     if courseware.is_program:
-        runs_added, no_source = contract.add_program_courses(
+        runs_added, no_source, invalid_key = contract.add_program_courses(
             courseware,
             skip_edx=skip_edx,
             no_reruns=no_reruns,
@@ -153,7 +155,9 @@ def add_courseware_to_contract(  # noqa: PLR0913
             filter_variants=filter_variants,
         )
         return CoursewareAddition(
-            runs_added=runs_added, courses_without_source_run=no_source
+            runs_added=runs_added,
+            courses_without_source_run=no_source,
+            courses_with_invalid_key=invalid_key,
         )
 
     if courseware.is_run:

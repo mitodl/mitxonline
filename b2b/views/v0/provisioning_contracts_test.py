@@ -301,6 +301,7 @@ def test_add_program_skips_a_course_with_no_shared_variant(admin_drf_client):
     assert response.status_code == status.HTTP_200_OK
     assert response.json()["runs_added"] == 1
     assert response.json()["courses_without_source_run"] == 1
+    assert response.json()["courses_with_invalid_key"] == 0
     assert contract.programs.filter(id=program.id).exists()
     assert [run.course for run in contract.get_course_runs()] == [usable]
 

@@ -177,3 +177,31 @@ def test_b2b_courseware_remove_run_does_not_delete_used_discount_contract_attach
     ).exists()
 
     assert Discount.objects.filter(id=discount.id).exists()
+
+
+@pytest.mark.parametrize("variant_args", [[], ["--variant", "zz"]])
+def test_b2b_courseware_add_import_with_no_variant_selection_imports_nothing(
+    mocker, variant_args
+):
+    """No variant sets, or a --variant matching none, imports and creates nothing."""
+
+    mock_import = mocker.patch("courses.api.import_courserun_from_edx")
+    contract = ContractPageFactory.create()
+    if not variant_args:
+        contract.variant_options.all().delete()
+    err = StringIO()
+
+    call_command(
+        "b2b_courseware",
+        "add",
+        "--import",
+        "Engineering",
+        *variant_args,
+        str(contract.id),
+        "course-v1:MITx+6.00x+2T2023",
+        stderr=err,
+    )
+
+    mock_import.assert_not_called()
+    assert "No usable source run for course-v1:MITx+6.00x+2T2023" in err.getvalue()
+    assert not contract.get_course_runs().exists()

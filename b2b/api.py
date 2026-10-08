@@ -384,6 +384,7 @@ def import_and_create_contract_run(  # noqa: PLR0913
     skip_edx: bool = False,
     require_designated_source_run: bool = False,
     org_prefix: str | None = None,
+    filter_variants: list | None = None,
 ):
     """
     Create a contract run for the given course, importing it from edX if necessary.
@@ -434,10 +435,18 @@ def import_and_create_contract_run(  # noqa: PLR0913
         ingest_content_files_for_ai (bool): Set the "ingest_content_files_for_ai" flag on the new page.
         skip_edx (bool): Don't try to create a course run in edX.
         require_designated_source_run (bool): Require a flagged source run.
+        filter_variants (list|None): Only create runs for these variant sets. An
+            empty list raises SourceCourseIncompleteError before anything is
+            imported; None means every variant the course supports.
     Returns:
         CourseRun: The created CourseRun object.
         Product: The created Product object.
     """
+
+    # create_contract_run rejects this too, but only after the import.
+    if filter_variants == []:
+        msg = f"No variant sets to create runs of {course_run_id} for."
+        raise SourceCourseIncompleteError(msg)
 
     run_qs = CourseRun.all_objects.filter(courseware_id=course_run_id)
 
@@ -473,6 +482,7 @@ def import_and_create_contract_run(  # noqa: PLR0913
         skip_edx=skip_edx,
         require_designated_source_run=require_designated_source_run,
         org_prefix=org_prefix,
+        filter_variants=filter_variants,
     )
 
 
@@ -502,6 +512,9 @@ def _get_source_runs_for_course(  # noqa: PLR0913
         only_lang: If set, only add the specified additional language (plus the
             default)
         filter_variants: If provided, a list of SupportedVariant objects to filter by.
+            An empty list matches no variants; None means no filter. The
+            legacy and ignore_langs paths don't apply it, so create_contract_run
+            rejects an empty list before calling this.
         no_variants: If True, only return runs that match the default variant set.
     Returns:
         List of distinct source CourseRun objects, one per language (or one
@@ -537,7 +550,7 @@ def _get_source_runs_for_course(  # noqa: PLR0913
             for sv in course.possible_variant_sets.filter(active=True).all()
         ]
 
-        if filter_variants:
+        if filter_variants is not None:
             fvs = [
                 (fv.language, fv.variant_length, fv.variant_industry)
                 for fv in filter_variants
@@ -635,11 +648,19 @@ def create_contract_run(  # noqa: PLR0913
         queue_codes (bool): Queue enrollment code generation after saving.
         ignore_langs (bool): Only create a run for the primary language.
         only_lang (str|None): Only create a run for the primary language and the specified one.
+        filter_variants (list|None): Only create runs for these variant sets. An
+            empty list matches none; None means every variant the course supports.
     Returns:
         list[tuple[CourseRun, Product]]: One (CourseRun, Product) pair per
         source language run. Legacy single-language courses produce a one-element
         list.
     """
+    # _get_source_runs_for_course doesn't apply filter_variants to a course with
+    # no default variant set, with ignore_langs, or in its fallback.
+    if filter_variants == []:
+        msg = f"No variant sets to create runs of {course} for."
+        raise SourceCourseIncompleteError(msg)
+
     source_runs = _get_source_runs_for_course(
         course,
         require_designated=require_designated_source_run,
@@ -647,6 +668,11 @@ def create_contract_run(  # noqa: PLR0913
         only_lang=only_lang,
         filter_variants=filter_variants,
     )
+
+    # Raises InvalidKeyError before the loop creates anything, so a course with
+    # one bad source run ID doesn't end up with runs for only some variants.
+    for source_run in source_runs:
+        CourseKey.from_string(source_run.readable_id)
 
     content_type = ContentType.objects.filter(
         app_label="courses", model="courserun"

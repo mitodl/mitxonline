@@ -37,7 +37,7 @@ def test_add_program_courses_to_contract(mocker):
 
     program.refresh_from_db()
 
-    created, no_source = contract.add_program_courses(program)
+    created, no_source, _ = contract.add_program_courses(program)
 
     assert created == 3
     assert no_source == 0
@@ -55,7 +55,7 @@ def test_add_program_courses_to_contract(mocker):
     program.save()
     program.refresh_from_db()
 
-    created, no_source = contract.add_program_courses(program)
+    created, no_source, _ = contract.add_program_courses(program)
 
     assert created == 1
     assert no_source == 0
@@ -86,11 +86,11 @@ def test_add_program_courses_skips_courses_without_a_usable_source_run(mocker):
     for course in (no_source, french, usable):
         program.add_requirement(course)
 
-    created, no_source_count = contract.add_program_courses(
+    created, no_source_count, invalid_key_count = contract.add_program_courses(
         program, filter_variants=list(contract.variant_options.all())
     )
 
-    assert (created, no_source_count) == (1, 2)
+    assert (created, no_source_count, invalid_key_count) == (1, 2, 0)
     assert contract.programs.count() == 1
     assert [run.course for run in contract.get_course_runs()] == [usable]
 

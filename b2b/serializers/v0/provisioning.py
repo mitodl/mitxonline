@@ -526,6 +526,7 @@ class CoursewareAdditionSerializer(serializers.Serializer):
 
     runs_added = serializers.IntegerField()
     courses_without_source_run = serializers.IntegerField()
+    courses_with_invalid_key = serializers.IntegerField()
     skipped_reason = serializers.CharField(allow_blank=True)
 
 

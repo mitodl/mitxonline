@@ -12,6 +12,7 @@ from opaque_keys import InvalidKeyError
 
 from b2b.api import import_and_create_contract_run
 from b2b.contracts import add_courseware_to_contract, remove_courseware_from_contract
+from b2b.exceptions import SourceCourseIncompleteError
 from b2b.management.utils import get_contract_by_id_or_slug
 from b2b.tasks import queue_enrollment_code_check
 from courses.api import resolve_courseware_object_from_id
@@ -191,6 +192,12 @@ Specifying a program will only unlink the program from the contract, unless "--r
             filter_val = filter_val.first()
             if filter_val:
                 filter_variants.append(filter_val)
+            else:
+                self.stderr.write(
+                    self.style.WARNING(
+                        f"The contract has no variant set matching '{variant}'; no runs will be created for it."
+                    )
+                )
 
         if can_import:
             # Get the courseware IDs we got passed in that weren't matched to
@@ -211,14 +218,23 @@ Specifying a program will only unlink the program from the contract, unless "--r
 
                 self.stdout.write(f"Attempting to import {importable_id} from edX...")
 
-                imported_runs = import_and_create_contract_run(
-                    contract=contract,
-                    course_run_id=importable_id,
-                    departments=can_import.split(sep=","),
-                    create_cms_page=True,
-                    create_depts=True,
-                    org_prefix=org_prefix,
-                )
+                try:
+                    imported_runs = import_and_create_contract_run(
+                        contract=contract,
+                        course_run_id=importable_id,
+                        departments=can_import.split(sep=","),
+                        create_cms_page=True,
+                        create_depts=True,
+                        org_prefix=org_prefix,
+                        filter_variants=filter_variants,
+                    )
+                except SourceCourseIncompleteError as exc:
+                    self.stderr.write(
+                        self.style.ERROR(
+                            f"No usable source run for {importable_id}: {exc}"
+                        )
+                    )
+                    continue
 
                 if not imported_runs:
                     self.stdout.write(
@@ -262,6 +278,18 @@ Specifying a program will only unlink the program from the contract, unless "--r
                     )
                 )
                 continue
+            except SourceCourseIncompleteError as exc:
+                self.stderr.write(
+                    self.style.ERROR(f"No usable source run for {courseware}: {exc}")
+                )
+                continue
+
+            if added.courses_with_invalid_key:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Program '{courseware.readable_id}' has {added.courses_with_invalid_key} courses that a contract run key could not be built for; cannot create contract runs for these courses. Check the source run IDs, the organization key and the prefix."
+                    )
+                )
 
             if added.skipped_reason:
                 self.stdout.write(self.style.WARNING(added.skipped_reason))
