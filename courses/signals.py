@@ -240,8 +240,8 @@ def sync_upgrade_deadline_to_edx_on_save(
     updating. Queueing the push here means the Django admin, management commands
     and the shell all propagate the change without each needing to remember to.
 
-    Note that queryset.update() does not emit signals, so bulk edits still need
-    the sync_courserun_deadlines management command.
+    Note that queryset.update() does not emit signals, so bulk edits are not
+    pushed to edX. Save each run instead.
     """
     if kwargs.get("raw", False):
         # Fixture loading: the DB may not be in a consistent state and we
