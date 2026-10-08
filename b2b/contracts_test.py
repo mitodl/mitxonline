@@ -118,8 +118,8 @@ def test_add_program():
     assert list(contract.programs) == [program]
 
 
-def test_add_run_in_another_contract_is_skipped():
-    """A run already in another contract stays there and is reported."""
+def test_add_run_in_another_contract_leaves_existing():
+    """A run that is linked to other contracts can be added to another contract."""
 
     run = CourseRunFactory.create()
     other_contract = ContractPageFactory.create()
@@ -128,9 +128,8 @@ def test_add_run_in_another_contract_is_skipped():
 
     added = add_courseware_to_contract(contract, run)
 
-    assert added.runs_added == 0
-    assert str(other_contract) in added.skipped_reason
-    assert not run.b2b_contracts.filter(id=contract.id).exists()
+    assert added.runs_added == 1
+    assert run.b2b_contracts.filter(id=contract.id).exists()
 
 
 @pytest.mark.parametrize("has_enrollments", [True, False])

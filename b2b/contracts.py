@@ -164,16 +164,6 @@ def add_courseware_to_contract(  # noqa: PLR0913
                 )
             )
 
-        other_contract = courseware.b2b_contracts.exclude(id=contract.id).first()
-        if other_contract:
-            return CoursewareAddition(
-                skipped_reason=(
-                    f"Run '{courseware.courseware_id}' is already in {other_contract}."
-                )
-            )
-
-        courseware.b2b_contract = contract
-        courseware.save()
         courseware.b2b_contracts.add(contract)
         return CoursewareAddition(runs_added=1)
 
