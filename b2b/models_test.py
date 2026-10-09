@@ -1,15 +1,22 @@
 """Tests for models."""
 
+from datetime import timedelta
 from importlib import import_module
 from uuid import uuid4
 
 import faker
 import pytest
+from mitol.common.utils import now_in_utc
+from wagtail.models import Page
 
 from b2b.api import ensure_enrollment_codes_exist
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
-from b2b.models import DiscountContractAttachmentRedemption
+from b2b.models import (
+    ContractPage,
+    ContractProgramItem,
+    DiscountContractAttachmentRedemption,
+)
 from courses.factories import (
     CourseRunFactory,
     ProgramFactory,
@@ -263,3 +270,163 @@ def test_organization_description_html_to_text(value, expected):
     )
 
     assert migration.html_to_text(value) == expected
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"active": False},
+        {"contract_end": now_in_utc() - timedelta(days=1)},
+        {"contract_start": now_in_utc() + timedelta(days=1)},
+    ],
+)
+def test_contract_not_valid_for_use_can_be_saved(changes):
+    """
+    A contract that is inactive, ended or not yet started can still be saved,
+    and stays out of the relations that code reads valid contracts through.
+    """
+
+    contract = ContractPageFactory.create()
+    user = UserFactory.create()
+    user.b2b_contracts.add(contract)
+    run = CourseRunFactory.create()
+    run.b2b_contracts.add(contract)
+
+    for field, value in changes.items():
+        setattr(contract, field, value)
+    contract.save()
+
+    contract = ContractPage.objects.get(pk=contract.pk)
+    contract.name = "Renamed"
+    contract.save()
+
+    assert Page.objects.get(pk=contract.pk).specific.name == "Renamed"
+    assert not ContractPage.active_objects.filter(pk=contract.pk).exists()
+    assert not user.b2b_contracts.exists()
+    assert not run.b2b_contracts.exists()
+    assert not contract.organization.contracts.exists()
+    [prefetched] = type(run).objects.filter(pk=run.pk).prefetch_related("b2b_contracts")
+    assert list(prefetched.b2b_contracts.all()) == []
+
+    contract.active = True
+    contract.contract_start = None
+    contract.contract_end = None
+    contract.save()
+
+    assert user.b2b_contracts.get() == contract
+    assert contract.organization.contracts.get() == contract
+
+
+def test_publishing_a_stale_contract_revision_keeps_api_written_fields():
+    """A Wagtail publish does not put back fields the contract API has changed."""
+
+    contract = ContractPageFactory.create(
+        name="Before", max_learners=5, welcome_message="Hello"
+    )
+    contract.welcome_message_extra = "<p>Old extra</p>"
+    revision = contract.save_revision()
+
+    # The contract API saves the row without a revision.
+    contract.name = "After"
+    contract.max_learners = 50
+    contract.welcome_message = "Hello again"
+    contract.save()
+
+    # Wagtail's editor starts from the latest revision.
+    edited = contract.get_latest_revision_as_object()
+    assert edited.name == "After"
+    assert edited.max_learners == 50
+
+    edited.welcome_message_extra = "<p>New extra</p>"
+    edited.save_revision().publish()
+
+    contract.refresh_from_db()
+    assert contract.name == "After"
+    assert contract.title == "After"
+    assert contract.max_learners == 50
+    assert contract.welcome_message == "Hello again"
+    assert contract.welcome_message_extra == "<p>New extra</p>"
+
+    # Republishing the revision saved before the API write.
+    revision.publish()
+
+    contract.refresh_from_db()
+    assert contract.name == "After"
+    assert contract.max_learners == 50
+    assert contract.welcome_message == "Hello again"
+    assert contract.welcome_message_extra == "<p>Old extra</p>"
+
+
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
+def test_contract_wagtail_editor_only_edits_what_the_api_does_not(admin_client):
+    """The Wagtail edit form loads, links to the dashboard, and can't change API fields."""
+
+    contract = ContractPageFactory.create(name="Read only", max_learners=5)
+
+    response = admin_client.get(f"/cms/pages/{contract.id}/edit/")
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert (
+        f"/staff-dashboard/b2b_organizations/show/{contract.organization.org_key}"
+        f"/contracts/{contract.id}"
+    ) in content
+    form = response.context["form"]
+    assert not set(contract.PROVISIONED_FIELDS) & set(form.fields)
+    assert {"welcome_message_extra", "google_sheet_target"} <= set(form.fields)
+
+
+def test_publishing_a_contract_revision_keeps_program_links_and_takes_its_order(
+    mocker,
+):
+    """A Wagtail publish reorders a contract's programs and can't add or drop one."""
+
+    queued = mocker.patch("b2b.tasks.create_program_contract_runs.delay")
+    contract = ContractPageFactory.create()
+    first, second, third = ProgramFactory.create_batch(3)
+    ContractProgramItem(contract=contract, program=first, sort_order=0).save(
+        skip_run_creation=True
+    )
+    stale = contract.save_revision()
+
+    # Linked by the contract API after the revision was saved.
+    ContractProgramItem(contract=contract, program=second, sort_order=1).save(
+        skip_run_creation=True
+    )
+
+    def linked_programs():
+        return list(
+            ContractProgramItem.objects.filter(contract=contract)
+            .order_by("sort_order")
+            .values_list("program_id", flat=True)
+        )
+
+    stale.publish()
+    assert linked_programs() == [first.id, second.id]
+
+    # Wagtail's editor starts from the latest revision and sees both.
+    edited = contract.get_latest_revision_as_object()
+    items = {item.program_id: item for item in edited.contract_programs.all()}
+    assert set(items) == {first.id, second.id}
+
+    items[first.id].sort_order = 1
+    items[second.id].sort_order = 0
+    edited.contract_programs = [
+        items[second.id],
+        items[first.id],
+        ContractProgramItem(program=third, sort_order=2),
+    ]
+    edited.save_revision().publish()
+
+    assert linked_programs() == [second.id, first.id]
+    queued.assert_not_called()
+
+    # A revision that leaves a program out doesn't unlink it. It goes after the
+    # programs the revision does have.
+    edited = contract.get_latest_revision_as_object()
+    edited.contract_programs = [
+        item for item in edited.contract_programs.all() if item.program_id == first.id
+    ]
+    edited.save_revision().publish()
+
+    assert linked_programs() == [first.id, second.id]

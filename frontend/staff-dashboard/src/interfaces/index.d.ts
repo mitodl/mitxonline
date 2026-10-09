@@ -210,3 +210,87 @@ export interface IProvisioningEvent {
     data_after: Record<string, unknown> | null;
     created_on: string;
 }
+
+export type ContractMembershipType = "managed" | "code" | "auto";
+
+export interface IContractProgram {
+    readable_id: string;
+    title: string;
+    sort_order: number;
+}
+
+export interface IProvisionedContract {
+    id: number;
+    name: string;
+    slug: string;
+    organization: number;
+    membership_type: ContractMembershipType;
+    // Rich text, stored as HTML.
+    description: string;
+    welcome_message: string;
+    contract_start: string | null;
+    contract_end: string | null;
+    active: boolean;
+    max_learners: number | null;
+    enrollment_fixed_price: string | null;
+    programs: IContractProgram[];
+}
+
+export type ContractSetupStatus = "in_progress" | "complete" | "failed";
+
+export type CourseRunCloneStatus = "pending" | "cloning" | "cloned" | "failed";
+
+export interface IContractRunSetup {
+    courseware_id: string;
+    // null for a run created without an edX clone.
+    clone_status: CourseRunCloneStatus | null;
+    clone_attempts: number;
+    clone_error: string;
+}
+
+export interface IContractSetupStatus {
+    status: ContractSetupStatus;
+    runs: IContractRunSetup[];
+    enrollment_codes: { expected: number; existing: number };
+}
+
+export interface ICoursewareAddition {
+    runs_added: number;
+    courses_without_source_run: number;
+    skipped_reason: string;
+}
+
+export interface IRemovedContractRun {
+    courseware_id: string;
+    unlinked: boolean;
+}
+
+export interface IContractEnrollmentCode {
+    id: number;
+    code: string;
+    redemption_status: "unassigned" | "assigned" | "redeemed";
+    assigned_to: string | null;
+    assigned_on: string | null;
+    assigned_name: string | null;
+    redeemed_on: string | null;
+    redeemed_by: string | null;
+    last_sent: string | null;
+    email_status: string | null;
+    email_status_event_timestamp: string | null;
+}
+
+export interface IBulkAssignResult {
+    assigned: IContractEnrollmentCode[];
+    errors: { email: string; name: string; detail: string }[];
+}
+
+export interface IExpiredEnrollmentCode {
+    code: string;
+    deleted: boolean;
+}
+
+// DRF's PageNumberPagination envelope.
+export interface IPage<T> {
+    count: number;
+    results: T[];
+}

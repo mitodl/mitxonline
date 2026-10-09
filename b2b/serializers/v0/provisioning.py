@@ -1,5 +1,6 @@
 """Serializers for the staff-only B2B provisioning API (v0)."""
 
+import bleach
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import RegexValidator
 from rest_framework import serializers
@@ -456,19 +457,43 @@ class ProvisionedContractSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+# Everything the API writes but `active`, which a new contract gets from the
+# model's default.
 CONTRACT_WRITABLE_FIELDS = [
-    "name",
-    "membership_type",
-    "description",
-    "welcome_message",
-    "contract_start",
-    "contract_end",
-    "max_learners",
-    "enrollment_fixed_price",
+    field for field in ContractPage.PROVISIONED_FIELDS if field != "active"
 ]
 
+# The text markup Wagtail's rich text editor stores for the description. The
+# staff dashboard edits it as text, so nothing else has filtered it by the
+# time it gets here. Wagtail's <embed/> (an image or media) is left out:
+# bleach rewrites the self-closing tag Wagtail's parser looks for, so an
+# embed is dropped from a description edited through the API.
+CONTRACT_DESCRIPTION_TAGS = frozenset(
+    {"p", "br", "b", "i", "strong", "em", "h2", "h3", "h4", "ol", "ul", "li", "hr", "a"}
+)
+CONTRACT_DESCRIPTION_ATTRIBUTES = {
+    "*": ["data-block-key"],
+    "a": ["href", "linktype", "id"],
+}
+CONTRACT_DESCRIPTION_PROTOCOLS = frozenset({"http", "https", "mailto", "tel"})
 
-class CreateContractSerializer(serializers.ModelSerializer):
+
+class ContractDescriptionMixin:
+    """Strip markup Wagtail's rich text editor would not have stored."""
+
+    def validate_description(self, value):
+        """Return the description with only rich text markup left in it."""
+
+        return bleach.clean(
+            value,
+            tags=CONTRACT_DESCRIPTION_TAGS,
+            attributes=CONTRACT_DESCRIPTION_ATTRIBUTES,
+            protocols=CONTRACT_DESCRIPTION_PROTOCOLS,
+            strip=True,
+        )
+
+
+class CreateContractSerializer(ContractDescriptionMixin, serializers.ModelSerializer):
     """
     Request body for creating a contract.
 
@@ -483,7 +508,7 @@ class CreateContractSerializer(serializers.ModelSerializer):
         extra_kwargs = {"membership_type": {"required": True}}
 
 
-class UpdateContractSerializer(serializers.ModelSerializer):
+class UpdateContractSerializer(ContractDescriptionMixin, serializers.ModelSerializer):
     """
     Request body for updating a contract.
 

@@ -21,7 +21,7 @@ from modelcluster.fields import ParentalKey
 from requests.exceptions import HTTPError
 from wagtail.admin.panels import FieldPanel, HelpPanel, InlinePanel, MultiFieldPanel
 from wagtail.fields import RichTextField
-from wagtail.models import ClusterableModel, Orderable, Page
+from wagtail.models import ClusterableModel, Orderable, Page, PageManager
 
 from b2b.constants import (
     CONTRACT_MEMBERSHIP_AUTOS,
@@ -113,9 +113,24 @@ class StaffDashboardOrganizationPanel(HelpPanel):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
             self.content = format_html(
-                'Edit this organization and its SSO setup in the <a href="{}">staff '
-                "dashboard</a>. Contracts are still managed here, as child pages.",
+                'Edit this organization, its SSO setup and its contracts in the <a href="{}">staff '
+                "dashboard</a>.",
                 f"/staff-dashboard/b2b_organizations/show/{self.instance.org_key}",
+            )
+
+
+class StaffDashboardContractPanel(HelpPanel):
+    """Links a contract's Wagtail page to its staff dashboard page."""
+
+    class BoundPanel(HelpPanel.BoundPanel):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.content = format_html(
+                'Edit this contract, its courseware and its enrollment codes in the <a href="{}">staff '
+                "dashboard</a>. The extra welcome message, the Google Sheet target "
+                "and tab, and the order of its programs are edited here.",
+                f"/staff-dashboard/b2b_organizations/show/{self.instance.organization.org_key}"
+                f"/contracts/{self.instance.pk}",
             )
 
 
@@ -367,11 +382,59 @@ class ActiveContractManager(models.Manager):
         )
 
 
+class ContractPageManager(PageManager):
+    """
+    Default manager for contracts: every contract, except through a relation.
+
+    Wagtail reloads a page through its model's default manager when it saves
+    one (``Page.specific``), so a default manager that hides contracts that
+    aren't valid for use makes them impossible to save. Django also builds
+    related managers (``user.b2b_contracts``, ``run.b2b_contracts``,
+    ``organization.contracts``) from the default manager's class, and the code
+    that reads those relies on them leaving out contracts that aren't valid.
+    A related manager is the one with an ``instance``, so only it filters.
+    """
+
+    def get_queryset(self):
+        """Filter to contracts valid for use when reached through a relation."""
+
+        queryset = super().get_queryset()
+
+        if not hasattr(self, "instance"):
+            return queryset
+
+        now = now_in_utc()
+
+        return queryset.filter(active=True).exclude(
+            models.Q(contract_start__gt=now) | models.Q(contract_end__lt=now)
+        )
+
+
 class ContractPage(Page, ClusterableModel):
     """Stores information about a contract with an organization."""
 
     parent_page_types = ["b2b.OrganizationPage"]
+    # Contracts are created in the staff dashboard, through the contract API.
+    is_creatable = False
+    # Declared first so it is the default manager; see ContractPageManager.
+    objects = ContractPageManager()
     active_objects = ActiveContractManager()
+
+    # Written only by the contract API, which saves the row without a Wagtail
+    # revision. A revision holds whatever these were when it was saved, so
+    # with_content_json() takes them from the stored row instead. It does the
+    # same for which programs the contract has.
+    PROVISIONED_FIELDS = (
+        "name",
+        "membership_type",
+        "description",
+        "welcome_message",
+        "contract_start",
+        "contract_end",
+        "max_learners",
+        "enrollment_fixed_price",
+        "active",
+    )
 
     name = models.CharField(max_length=255, help_text="The name of the contract.")
     description = RichTextField(
@@ -480,11 +543,12 @@ class ContractPage(Page, ClusterableModel):
         )
 
     content_panels = [
-        FieldPanel("name"),
+        StaffDashboardContractPanel(),
+        FieldPanel("name", read_only=True),
         MultiFieldPanel(
             [
-                FieldPanel("description"),
-                FieldPanel("welcome_message"),
+                FieldPanel("description", read_only=True),
+                FieldPanel("welcome_message", read_only=True),
                 FieldPanel("welcome_message_extra"),
                 FieldPanel("organization"),
             ],
@@ -493,9 +557,9 @@ class ContractPage(Page, ClusterableModel):
         ),
         MultiFieldPanel(
             [
-                FieldPanel("membership_type"),
-                FieldPanel("max_learners"),
-                FieldPanel("enrollment_fixed_price"),
+                FieldPanel("membership_type", read_only=True),
+                FieldPanel("max_learners", read_only=True),
+                FieldPanel("enrollment_fixed_price", read_only=True),
                 FieldPanel("google_sheet_target"),
                 FieldPanel("google_sheet_target_tab"),
             ],
@@ -504,9 +568,9 @@ class ContractPage(Page, ClusterableModel):
         ),
         MultiFieldPanel(
             [
-                FieldPanel("active"),
-                FieldPanel("contract_start"),
-                FieldPanel("contract_end"),
+                FieldPanel("active", read_only=True),
+                FieldPanel("contract_start", read_only=True),
+                FieldPanel("contract_end", read_only=True),
             ],
             heading="Availability",
             icon="calendar-alt",
@@ -514,7 +578,12 @@ class ContractPage(Page, ClusterableModel):
         InlinePanel(
             "contract_programs",
             heading="Programs",
-            help_text="Add and order programs in this contract",
+            help_text=(
+                "Order the programs in this contract. Add and remove programs "
+                "in the staff dashboard. On a published page a program added "
+                "or removed here is not saved. On an unpublished page it is "
+                "saved, and adding one creates its contract runs."
+            ),
         ),
     ]
 
@@ -542,6 +611,49 @@ class ContractPage(Page, ClusterableModel):
         self.title = str(self.name)
 
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
+
+    def with_content_json(self, content):
+        """
+        Build the page a revision describes, keeping the provisioned fields.
+
+        Wagtail calls this to load the editor and to publish. Without it,
+        publishing a revision saved before an API write puts the contract's
+        old name, dates, seat cap and price back.
+        """
+
+        page = super().with_content_json(content)
+        # Read from the database, not from self: when the editor publishes,
+        # self is the instance it loaded before the form was filled in.
+        stored = (
+            ContractPage.objects.filter(pk=self.pk)
+            .values(*self.PROVISIONED_FIELDS)
+            .get()
+        )
+        for field, value in stored.items():
+            setattr(page, field, value)
+        page.title = stored["name"]
+
+        # Which programs are in the contract is the API's to say, and a
+        # revision saved before a program was linked would delete the link
+        # when published. Wagtail still orders them, so keep the stored links
+        # in the revision's order, with any it doesn't have after the rest.
+        # Wagtail saves an unpublished page's form straight to the database
+        # without coming through here, so this only protects a live page.
+        revision_position = {
+            item.program_id: position
+            for position, item in enumerate(page.contract_programs.all())
+        }
+        programs = sorted(
+            ContractProgramItem.objects.filter(contract_id=self.pk),
+            key=lambda item: (
+                revision_position.get(item.program_id, len(revision_position)),
+                item.sort_order or 0,
+            ),
+        )
+        for sort_order, item in enumerate(programs):
+            item.sort_order = sort_order
+        page.contract_programs = programs
+        return page
 
     def get_learners(self):
         """Get the learners associated with this organization."""

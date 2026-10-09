@@ -105,6 +105,7 @@ from b2b.views.v0.manager import (
     bulk_assign_enrollment_codes,
 )
 from courses.api import resolve_courseware_object_from_id
+from courses.models import CourseRun
 from main.views import RefinePagination
 
 log = logging.getLogger(__name__)
@@ -674,6 +675,27 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
         request_serializer = ContractCoursewareSerializer(data=request.data)
         request_serializer.is_valid(raise_exception=True)
         courseware_id = request_serializer.validated_data["courseware_id"]
+
+        # CourseRun.objects leaves source runs out, so without this a source
+        # run's ID is a 404 that reads as if the run didn't exist.
+        source_run = (
+            CourseRun.all_objects.source()
+            .filter(courseware_id=courseware_id)
+            .select_related("course")
+            .first()
+        )
+        if source_run:
+            return Response(
+                {
+                    "detail": (
+                        f"{courseware_id} is a source run. Contract runs are "
+                        "cloned from it, so it can't be added to a contract. "
+                        f"Add its course, {source_run.course.readable_id}, instead."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         courseware = self._courseware(courseware_id)
 
         # The 400 bodies are built from the requested ID, never the exception

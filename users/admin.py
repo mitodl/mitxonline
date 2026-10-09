@@ -116,9 +116,8 @@ class UserContractPageInline(admin.TabularInline):
         Show inactive contracts in the contract dropdown.
 
         See CourseRunAdmin.formfield_for_foreignkey for the full explanation:
-        ContractPage's default manager is ActiveContractManager, so without
-        this override a user already linked to an inactive contract would
-        render with an empty selection here.
+        the choices have to include inactive contracts, or a user already
+        linked to one would render with an empty selection here.
         """
 
         if db_field.name == "contract_page":

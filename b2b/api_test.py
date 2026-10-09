@@ -2301,8 +2301,6 @@ def test_get_user_b2b_organizations_excludes_inactive_contracts():
         organization=user_org.organization,
         parent=user_org.organization,
     )
-    # Use .objects (Wagtail's unfiltered manager) to avoid DoesNotExist from
-    # ContractPage._default_manager (ActiveContractManager) filtering active=False.
     ContractPage.objects.filter(id=contract.id).update(active=False)
     user.b2b_contracts.add(contract)
 
