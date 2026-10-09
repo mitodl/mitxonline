@@ -25,7 +25,6 @@ from mitol.common.utils.datetime import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
 from rest_framework import status
-from reversion.models import Version
 
 from b2b.api import create_b2b_enrollment
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE
@@ -115,7 +114,6 @@ from courses.models import (
 from ecommerce.factories import (
     DiscountFactory,
     DiscountRedemptionFactory,
-    LineFactory,
     OrderFactory,
     ProductFactory,
 )
@@ -1590,15 +1588,11 @@ class TestDeactivateEnrollments:
         send_unenrollment_email = mocker.patch(
             "courses.api.mail_api.send_course_run_unenrollment_email"
         )
-        sync_hubspot_line_by_line_id = mocker.patch(
-            "hubspot_sync.task_helpers.sync_hubspot_line_by_line_id"
-        )
         log_exception = mocker.patch("courses.api.log.exception")
         return SimpleNamespace(
             edx_unenroll=edx_unenroll,
             send_unenrollment_email=send_unenrollment_email,
             log_exception=log_exception,
-            sync_hubspot_line_by_line_id=sync_hubspot_line_by_line_id,
         )
 
     def test_deactivate_run_enrollment(self, patches):
@@ -1607,22 +1601,12 @@ class TestDeactivateEnrollments:
         local enrollment record to inactive
         """
         enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
-        with reversion.create_revision():
-            product = ProductFactory.create(purchasable_object=enrollment.run)
-        version = Version.objects.get_for_object(product).first()
-        order = OrderFactory.create(
-            state=OrderStatus.PENDING, purchaser=enrollment.user
-        )
-        LineFactory.create(
-            order=order, purchased_object=enrollment.run, product_version=version
-        )
 
         returned_enrollment = deactivate_run_enrollment(
             enrollment, change_status=ENROLL_CHANGE_STATUS_REFUNDED
         )
         patches.edx_unenroll.assert_called_once_with(enrollment)
         patches.send_unenrollment_email.assert_called_once_with(enrollment)
-        patches.sync_hubspot_line_by_line_id.assert_called_once()
         enrollment.refresh_from_db()
         assert enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
         assert enrollment.active is False
@@ -1636,15 +1620,6 @@ class TestDeactivateEnrollments:
         If a flag is provided, deactivate_run_enrollment should set local enrollment record to inactive even if the API call fails
         """
         enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
-        with reversion.create_revision():
-            product = ProductFactory.create(purchasable_object=enrollment.run)
-        version = Version.objects.get_for_object(product).first()
-        order = OrderFactory.create(
-            state=OrderStatus.PENDING, purchaser=enrollment.user
-        )
-        LineFactory.create(
-            order=order, purchased_object=enrollment.run, product_version=version
-        )
         patches.edx_unenroll.side_effect = Exception
 
         deactivate_run_enrollment(
@@ -1652,30 +1627,11 @@ class TestDeactivateEnrollments:
             change_status=ENROLL_CHANGE_STATUS_REFUNDED,
             keep_failed_enrollments=keep_failed_enrollments,
         )
-        if not keep_failed_enrollments:
-            patches.sync_hubspot_line_by_line_id.assert_not_called()
-        else:
-            patches.sync_hubspot_line_by_line_id.assert_called_once()
         patches.edx_unenroll.assert_called_once_with(enrollment)
         patches.send_unenrollment_email.assert_not_called()
         patches.log_exception.assert_called_once()
         enrollment.refresh_from_db()
         assert enrollment.active is not keep_failed_enrollments
-
-    def test_deactivate_run_enrollment_line_does_not_exist(
-        self,
-        patches,
-    ):
-        """
-        If the enrollment does not have an associated Line object, don't call sync_line_item_with_hubspot()
-        """
-        enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
-
-        deactivate_run_enrollment(
-            enrollment,
-            change_status=ENROLL_CHANGE_STATUS_REFUNDED,
-        )
-        patches.sync_hubspot_line_by_line_id.assert_not_called()
 
 
 @pytest.mark.parametrize("keep_failed_enrollments", [True, False])
@@ -3839,7 +3795,6 @@ def test_deactivate_run_enrollment_removes_paid_course_run(mocker):
     """
     mocker.patch("courses.api.unenroll_edx_course_run")
     mocker.patch("courses.api.mail_api.send_course_run_unenrollment_email")
-    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_line_by_line_id")
 
     mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
     mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
@@ -3885,7 +3840,6 @@ def test_b2b_re_enrollment_after_multiple_unenrollments(mocker, user):
     mocker.patch("courses.api.unenroll_edx_course_run")
     mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
     mocker.patch("courses.api.mail_api.send_course_run_unenrollment_email")
-    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_line_by_line_id")
     mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
 
     mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")

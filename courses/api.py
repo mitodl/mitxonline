@@ -682,8 +682,6 @@ def deactivate_run_enrollment(
     Returns:
         CourseRunEnrollment: The deactivated enrollment
     """
-    from ecommerce.models import Line  # noqa: PLC0415
-    from hubspot_sync.task_helpers import sync_hubspot_line_by_line_id  # noqa: PLC0415
 
     if keep_failed_enrollments is None:
         keep_failed_enrollments = settings.FEATURES.get(
@@ -714,17 +712,6 @@ def deactivate_run_enrollment(
         user=run_enrollment.user, course_run=run_enrollment.run
     ).delete()
 
-    # Find an associated Line and update HubSpot.
-    content_type = ContentType.objects.get(app_label="courses", model="courserun")
-    line = Line.objects.filter(
-        purchased_object_id=run_enrollment.run.id,
-        purchased_content_type=content_type,
-        order__state__in=[OrderStatus.FULFILLED, OrderStatus.PENDING],
-        order__purchaser=run_enrollment.user,
-    )
-    if line:
-        line_id = line.first().id
-        sync_hubspot_line_by_line_id(line_id)
     return run_enrollment
 
 
