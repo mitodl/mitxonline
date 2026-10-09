@@ -6,13 +6,14 @@ import uuid
 
 import pytest
 import reversion
+from django.core.management import call_command
 from django.db import connection, transaction
 from django.urls import reverse
 from mitol.common.utils.datetime import now_in_utc
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from b2b.api import ensure_enrollment_codes_exist
+from b2b.api import ensure_enrollment_codes_exist, lock_contract_for_code_assignment
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE
 from b2b.factories import ContractPageFactory
 from b2b.models import (
@@ -29,11 +30,11 @@ from b2b.serializers.v0 import (
     BaseContractPageSerializer,
 )
 from b2b.serializers.v0.manager import ManagerEnrollmentSerializer
+from b2b.views.v0 import AttachContractApi
 from b2b.views.v0.manager import (
     CodeAssignment,
     bulk_assign_enrollment_codes,
     create_code_assignments,
-    lock_contract_for_code_assignment,
     queue_code_assignment_emails,
 )
 from courses.factories import CourseRunFactory
@@ -2470,3 +2471,119 @@ def test_concurrent_bulk_assigns_get_different_codes(org_setup, mock_email_task)
         DiscountContractAttachmentRedemption.objects.filter(discount=first_free).count()
         == 1
     )
+
+
+def _assign_while_other_writer_waits(contract, discount, other_writer, manager_user):
+    """
+    Assign a code under the contract lock while another writer is blocked.
+
+    The other writer runs in a thread and has to be waiting on a lock before
+    the assignment is written, so it can only have read the code as free.
+    """
+
+    errors = []
+
+    def run_other_writer():
+        try:
+            other_writer()
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=run_other_writer)
+    try:
+        with transaction.atomic():
+            lock_contract_for_code_assignment(contract)
+            thread.start()
+            _wait_for_lock_waiter()
+            create_code_assignments(
+                [
+                    CodeAssignment(
+                        contract=contract,
+                        discount=discount,
+                        email="first@example.com",
+                        name="",
+                        code=discount.discount_code,
+                    )
+                ],
+                manager_user,
+            )
+    finally:
+        # Joined even if the block above fails, so the writer can't outlive
+        # the test and write into the next one's database.
+        thread.join(timeout=10)
+    assert not thread.is_alive()
+    assert errors == []
+
+
+@pytest.mark.django_db(transaction=True)
+def test_b2b_codes_assign_waits_for_a_concurrent_assignment(org_setup, mock_email_task):
+    """
+    The b2b_codes command waits for an assignment in flight on the contract and
+    then sees its code as taken, instead of assigning the same code again.
+    """
+    manager_user, _, (contract_1, *_), *_ = org_setup
+    last_free, *others = contract_1.get_discounts().order_by("id")
+    create_code_assignments(
+        [
+            CodeAssignment(
+                contract=contract_1,
+                discount=discount,
+                email=f"taken{discount.id}@example.com",
+                name="",
+                code=discount.discount_code,
+            )
+            for discount in others
+        ],
+        manager_user,
+    )
+
+    _assign_while_other_writer_waits(
+        contract_1,
+        last_free,
+        lambda: call_command(
+            "b2b_codes",
+            "assign",
+            "--contract",
+            str(contract_1.id),
+            "--email",
+            "second@example.com",
+            "--name",
+            "Second Learner",
+            "--commit",
+        ),
+        manager_user,
+    )
+
+    assignment = DiscountContractAttachmentRedemption.objects.get(discount=last_free)
+    assert assignment.assigned_email == "first@example.com"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_redeeming_a_code_waits_for_a_concurrent_assignment(
+    org_setup, mock_email_task, mocker
+):
+    """
+    Redeeming a code waits for an assignment of it in flight and then redeems
+    that assignment's row, instead of adding a second row for the code.
+    """
+    manager_user, _, (contract_1, *_), *_ = org_setup
+    mocker.patch("b2b.views.v0.process_add_org_membership")
+    learner = UserFactory.create()
+    # Already a member, so the only write to wait on is the redemption itself.
+    learner.b2b_contracts.add(contract_1)
+    code = contract_1.get_discounts().order_by("id").first()
+
+    _assign_while_other_writer_waits(
+        contract_1,
+        code,
+        lambda: AttachContractApi()._attach_user_to_contracts(  # noqa: SLF001
+            learner, [contract_1], code
+        ),
+        manager_user,
+    )
+
+    redemption = DiscountContractAttachmentRedemption.objects.get(discount=code)
+    assert redemption.user == learner
+    assert redemption.assigned_email == "first@example.com"

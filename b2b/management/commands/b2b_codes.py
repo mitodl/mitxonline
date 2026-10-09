@@ -21,6 +21,7 @@ from b2b.api import (
     ensure_enrollment_codes_exist,
     get_contract_products_with_bad_pricing,
     get_contract_runs_without_products,
+    lock_contract_for_code_assignment,
 )
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
 from b2b.contracts import (
@@ -678,48 +679,56 @@ class Command(BaseCommand):
                 )
                 continue
 
-            already_assigned = list(
-                contract.discounts_qs.filter(
-                    contract_redemptions__assigned_email__in=[a[0] for a in assignees]
-                ).values_list("contract_redemptions__assigned_email", flat=True)
-            )
+            # Held from the free-code check through the insert, so this can't
+            # pick a code that a manager's bulk assign is handing out.
+            with transaction.atomic():
+                lock_contract_for_code_assignment(contract)
 
-            if len(already_assigned) > 0:
-                already_done = " ".join(already_assigned)
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"{len(already_assigned)} codes already assigned to these users: {already_done}"
+                already_assigned = list(
+                    contract.discounts_qs.filter(
+                        contract_redemptions__assigned_email__in=[
+                            a[0] for a in assignees
+                        ]
+                    ).values_list("contract_redemptions__assigned_email", flat=True)
+                )
+
+                if len(already_assigned) > 0:
+                    already_done = " ".join(already_assigned)
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"{len(already_assigned)} codes already assigned to these users: {already_done}"
+                        )
+                    )
+
+                unused_codes = contract.get_unused_discounts().exclude(
+                    pk__in=contract.get_assignments().values_list(
+                        "discount_id", flat=True
                     )
                 )
 
-            unused_codes = contract.get_unused_discounts().exclude(
-                pk__in=contract.get_assignments().values_list("discount_id", flat=True)
-            )
+                if unused_codes.count() < len(assignees) - len(already_assigned):
+                    self.stderr.write(
+                        f"Not enough free codes for {len(assignees)} new assignee(s) in contract {contract.title} ({unused_codes.count()}), skipping"
+                    )
+                    continue
 
-            if unused_codes.count() < len(assignees) - len(already_assigned):
-                self.stderr.write(
-                    f"Not enough free codes for {len(assignees)} new assignee(s) in contract {contract.title} ({unused_codes.count()}), skipping"
-                )
-                continue
+                unused_codes = list(unused_codes)
 
-            unused_codes = list(unused_codes)
+                now = now_in_utc()
 
-            now = now_in_utc()
+                code_assignments = [
+                    DiscountContractAttachmentRedemption(
+                        contract=contract,
+                        assigned_name=a[1],
+                        assigned_email=a[0],
+                        created_on=now,
+                        discount=unused_codes.pop(),
+                    )
+                    for a in assignees
+                    if a[0] not in already_assigned
+                ]
 
-            code_assignments = [
-                DiscountContractAttachmentRedemption(
-                    contract=contract,
-                    assigned_name=a[1],
-                    assigned_email=a[0],
-                    created_on=now,
-                    discount=unused_codes.pop(),
-                )
-                for a in assignees
-                if a[0] not in already_assigned
-            ]
-
-            if not dry_run:
-                with transaction.atomic():
+                if not dry_run:
                     self.stdout.write(
                         f"Committing {len(code_assignments)} new assignments for {contract.title}"
                     )
