@@ -1029,13 +1029,15 @@ def ensure_contract_run_pricing(contract: ContractPage) -> int:
     products = contract.get_products()
 
     for product in products:
-        product.price = (
-            contract.enrollment_fixed_price
-            if contract.enrollment_fixed_price
-            else Decimal(0)
-        )
+        if product.purchasable_object.b2b_only:
+            product.price = (
+                contract.enrollment_fixed_price
+                if contract.enrollment_fixed_price
+                else Decimal(0)
+            )
 
-    return Product.objects.bulk_update(products, ["price"])
+    with reversion.create_revision():
+        return Product.objects.bulk_update(products, ["price"])
 
 
 def _get_discount_defaults(discount_amount: Decimal) -> dict:
