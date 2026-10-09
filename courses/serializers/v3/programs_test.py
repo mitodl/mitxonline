@@ -34,5 +34,6 @@ def test_serialize_program_enrollment(user, with_certificate):
             if with_certificate
             else None,
             "enrollment_mode": enrollment.enrollment_mode,
+            "track": None,
         },
     )

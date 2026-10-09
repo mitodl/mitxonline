@@ -4,12 +4,15 @@ import "../../scss/requirements.scss"
  * Renders the Program admin's "Requirements" field as a stack of plain-language
  * requirement groups instead of a generic nested tree-editor form.
  *
- * The field's hidden input carries the same JSON tree
- * `ProgramRequirementTreeSerializer` already expects: a list of top-level
- * operator nodes ("groups"), each with `children` that are either course/program
- * leaves or (rarely) another nested operator node. This file only changes how
- * that JSON is edited, not its shape, so no serializer/backend changes are
- * needed here.
+ * The field's hidden input carries the JSON tree
+ * `ProgramRequirementTreeSerializer` expects: a list of top-level operator
+ * nodes ("groups") whose `children` are course/program leaves, or, for one
+ * "Minimum # of" group, tracks. A track holds groups of leaves of its own.
+ * `validate_requirement_tree` in courses/requirement_tree.py decides what
+ * saves. This editor steers toward those shapes: it offers tracks only where
+ * they may go, keeps a "Minimum # of" value within the group's item count,
+ * and shows anything else it finds in a loaded tree as a chip that can be
+ * removed. The validator's errors cover the rest on save.
  */
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -28,14 +31,31 @@ function initRequirementsField(root) {
   const OP = catalog.operatorValues
 
   // ProgramRequirement.title defaults to "" (not null) at the model level,
-  // so existing course/program leaves loaded from the database can carry a
-  // blank string here. The API serializer's title field rejects blank
-  // strings (only null is allowed), so re-saving an untouched leaf as-is
-  // would fail validation - normalize on load instead of carrying it through.
+  // so existing nodes loaded from the database can carry a blank string
+  // here. The API serializer's title field rejects blank strings (only null
+  // is allowed), so re-saving an untouched node as-is would fail validation -
+  // normalize on load instead of carrying it through.
   function normalizeTree(nodes) {
     for (const node of nodes) {
       if (node.data.title === "") node.data.title = null
+      // operator_value is a CharField, so a saved tree carries "1", and
+      // "1" + 1 is "11".
+      if (typeof node.data.operator_value === "string") {
+        node.data.operator_value = Number(node.data.operator_value)
+      }
       normalizeTree(node.children)
+    }
+  }
+
+  // A "Minimum # of" value above the item count can never be met; the
+  // validator rejects it, so keep it in range as items come and go.
+  function clampValues(nodes) {
+    for (const node of nodes) {
+      if (node.data.operator === OP.minNumberOf) {
+        const max = Math.max(1, node.children.length)
+        node.data.operator_value = Math.min(node.data.operator_value ?? 1, max)
+      }
+      clampValues(node.children)
     }
   }
 
@@ -64,6 +84,18 @@ function initRequirementsField(root) {
     return { list: parent.children, index: path[path.length - 1] }
   }
 
+  function isTrack(node) {
+    return node.data.node_type === NODE.track
+  }
+
+  function isGroup(node) {
+    return node.data.node_type === NODE.operator
+  }
+
+  function holdsTracks(group) {
+    return group.children.some(isTrack)
+  }
+
   function catalogItem(nodeType, id) {
     const list = nodeType === NODE.course ? catalog.courses : catalog.programs
     return list.find(item => item.id === id)
@@ -76,10 +108,13 @@ function initRequirementsField(root) {
         `${course.code} — ${course.title}` :
         `Course #${node.data.course}`
     }
-    const program = catalogItem(NODE.program, node.data.required_program)
-    return program ?
-      `${program.code} — ${program.title}` :
-      `Program #${node.data.required_program}`
+    if (node.data.node_type === NODE.program) {
+      const program = catalogItem(NODE.program, node.data.required_program)
+      return program ?
+        `${program.code} — ${program.title}` :
+        `Program #${node.data.required_program}`
+    }
+    return node.data.title || "Untitled group"
   }
 
   function makeGroup(mode) {
@@ -112,9 +147,22 @@ function initRequirementsField(root) {
     }
   }
 
+  // A track saves only once one of its groups holds a course or program, so
+  // it starts with an empty required group to fill in.
+  function makeTrack() {
+    return {
+      id:       null,
+      data:     { node_type: NODE.track, title: "New track", description: "" },
+      children: [makeGroup(OP.allOf)]
+    }
+  }
+
   function describeGroup(node) {
     const count = node.children.length
     const label = node.data.title || "Untitled group"
+    if (holdsTracks(node)) {
+      return `complete one of ${count} tracks in “${label}”`
+    }
     if (node.data.operator === OP.minNumberOf) {
       const n = node.data.operator_value ?? "?"
       return `choose ${n} of ${count} in “${label}”`
@@ -127,7 +175,7 @@ function initRequirementsField(root) {
       el.textContent = "No requirements defined yet."
       return
     }
-    const parts = state.map(describeGroup)
+    const parts = state.filter(isGroup).map(describeGroup)
     const joined =
       parts.length > 1 ?
         `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}` :
@@ -150,32 +198,44 @@ function initRequirementsField(root) {
 
     const list = document.createElement("div")
     list.className = "req-groups"
-    state.forEach((group, index) =>
-      list.appendChild(renderGroup(group, [index], 0))
+    state.forEach((node, index) =>
+      list.appendChild(
+        isGroup(node) ?
+          renderGroup(node, [index], { inTrack: false }) :
+          renderStrayChips(state, [node])
+      )
     )
     container.appendChild(list)
 
-    container.appendChild(renderAddGroupRow([]))
+    container.appendChild(renderAddGroupRow(state, { inTrack: false }))
   }
 
   function persistAndRender() {
+    clampValues(state)
     writeInput()
     render()
   }
 
-  function renderAddGroupRow(path) {
+  // Children that cannot be saved where they are (a course at the top
+  // level, a course beside tracks); shown only so they can be removed.
+  function renderStrayChips(list, nodes) {
+    const chips = document.createElement("div")
+    chips.className = "req-chips"
+    nodes.forEach(node => chips.appendChild(renderChip(list, node)))
+    return chips
+  }
+
+  function renderAddGroupRow(list, { inTrack }) {
     const row = document.createElement("div")
     row.className = "req-add-row"
 
     const addAllOf = document.createElement("button")
     addAllOf.type = "button"
     addAllOf.className = "req-add-btn"
-    addAllOf.textContent =
-      path.length === 0 ?
-        "+ Add a required group (all of)" :
-        "+ Add a required sub-group"
+    addAllOf.textContent = inTrack ?
+      "+ Add a required group" :
+      "+ Add a required group (all of)"
     addAllOf.addEventListener("click", () => {
-      const list = path.length === 0 ? state : nodeAt(path).children
       list.push(makeGroup(OP.allOf))
       persistAndRender()
     })
@@ -183,12 +243,10 @@ function initRequirementsField(root) {
     const addChooseN = document.createElement("button")
     addChooseN.type = "button"
     addChooseN.className = "req-add-btn req-add-btn--elective"
-    addChooseN.textContent =
-      path.length === 0 ?
-        "+ Add an elective group (choose N of)" :
-        "+ Add an elective sub-group"
+    addChooseN.textContent = inTrack ?
+      "+ Add an elective group" :
+      "+ Add an elective group (choose N of)"
     addChooseN.addEventListener("click", () => {
-      const list = path.length === 0 ? state : nodeAt(path).children
       list.push(makeGroup(OP.minNumberOf))
       persistAndRender()
     })
@@ -197,38 +255,122 @@ function initRequirementsField(root) {
     return row
   }
 
-  function renderGroup(node, path, depth) {
+  function renderGroup(node, path, { inTrack }) {
     const el = document.createElement("div")
-    el.className = `req-group${depth > 0 ? " req-group--nested" : ""}`
+    el.className = `req-group${inTrack ? " req-group--nested" : ""}`
     el.dataset.mode = node.data.operator === OP.minNumberOf ? "choose" : "all"
 
     el.appendChild(renderGroupHead(node, path))
-    el.appendChild(renderGroupSentence(node, path))
-    el.appendChild(renderLeafPicker(node))
+    el.appendChild(renderGroupSentence(node))
 
-    const subgroups = node.children.filter(
-      child => child.data.node_type === NODE.operator
-    )
-
-    if (subgroups.length || depth === 0) {
-      const nested = document.createElement("div")
-      nested.className = "req-subgroups"
-      subgroups.forEach(sub => {
-        const subIndex = node.children.indexOf(sub)
-        nested.appendChild(renderGroup(sub, [...path, subIndex], depth + 1))
-      })
-      const addNested = document.createElement("button")
-      addNested.type = "button"
-      addNested.className = "req-add-nested-btn"
-      addNested.textContent = "+ Add nested elective sub-group"
-      addNested.addEventListener("click", () => {
-        node.children.push(makeGroup(OP.minNumberOf))
-        persistAndRender()
-      })
-      nested.appendChild(addNested)
-      el.appendChild(nested)
+    if (holdsTracks(node)) {
+      el.appendChild(renderTracks(node, path))
+      return el
     }
 
+    el.appendChild(renderLeafPicker(node))
+    // Only one top-level "Minimum # of" group may hold tracks, and it holds
+    // nothing else, so the option appears only on an empty group while no
+    // other group holds tracks. Once a track is added, the track list replaces
+    // the picker.
+    if (
+      node.data.operator === OP.minNumberOf &&
+      node.children.length === 0 &&
+      !state.some(holdsTracks)
+    ) {
+      el.appendChild(renderAddTrackButton(node))
+    }
+    return el
+  }
+
+  function renderAddTrackButton(group) {
+    const addTrack = document.createElement("button")
+    addTrack.type = "button"
+    addTrack.className = "req-add-track-btn"
+    addTrack.textContent = "+ Add a track"
+    addTrack.addEventListener("click", () => {
+      // The validator requires a group that holds tracks to be elective (the
+      // flat required/elective course lists bucket by that flag) with a value
+      // of 1; the group's stepper is hidden from here on, and an empty
+      // "Minimum # of 0" group is valid and offers this button.
+      group.data.elective_flag = true
+      group.data.operator_value = 1
+      group.children.push(makeTrack())
+      persistAndRender()
+    })
+    return addTrack
+  }
+
+  function renderTracks(group, path) {
+    const tracks = document.createElement("div")
+    tracks.className = "req-tracks"
+    const strays = group.children.filter(child => !isTrack(child))
+    if (strays.length) {
+      tracks.appendChild(renderStrayChips(group.children, strays))
+    }
+    group.children.forEach((track, index) => {
+      if (isTrack(track)) {
+        tracks.appendChild(renderTrack(track, [...path, index]))
+      }
+    })
+    tracks.appendChild(renderAddTrackButton(group))
+    return tracks
+  }
+
+  function renderTrack(node, path) {
+    const el = document.createElement("div")
+    el.className = "req-track"
+
+    const head = document.createElement("div")
+    head.className = "req-track__head"
+
+    const pill = document.createElement("span")
+    pill.className = "req-track__pill"
+    pill.textContent = "TRACK"
+
+    const title = document.createElement("input")
+    title.type = "text"
+    title.className = "req-track__title"
+    title.value = node.data.title || ""
+    title.placeholder = "Track title"
+    title.addEventListener("input", event => {
+      node.data.title = event.target.value
+      writeInput()
+    })
+
+    const remove = document.createElement("button")
+    remove.type = "button"
+    remove.className = "req-group__remove"
+    remove.textContent = "✕"
+    remove.title = "Remove track"
+    remove.addEventListener("click", () => {
+      const { list, index } = locate(path)
+      list.splice(index, 1)
+      persistAndRender()
+    })
+
+    head.append(pill, title, remove)
+
+    const description = document.createElement("textarea")
+    description.className = "req-track__description"
+    description.value = node.data.description || ""
+    description.placeholder = "Description shown to learners choosing a track"
+    description.rows = 2
+    description.addEventListener("input", event => {
+      node.data.description = event.target.value
+      writeInput()
+    })
+
+    const groups = document.createElement("div")
+    groups.className = "req-track__groups"
+    node.children.forEach((group, index) =>
+      groups.appendChild(
+        renderGroup(group, [...path, index], { inTrack: true })
+      )
+    )
+    groups.appendChild(renderAddGroupRow(node.children, { inTrack: true }))
+
+    el.append(head, description, groups)
     return el
   }
 
@@ -287,13 +429,16 @@ function initRequirementsField(root) {
 
     const allBtn = document.createElement("button")
     allBtn.type = "button"
-    allBtn.textContent = "All of these"
+    allBtn.textContent = "All"
     allBtn.className = node.data.operator === OP.allOf ? "active" : ""
 
     const chooseBtn = document.createElement("button")
     chooseBtn.type = "button"
-    chooseBtn.textContent = "Choose these"
-    chooseBtn.className = node.data.operator === OP.minNumberOf ? "active" : ""
+    // The stepper beside the active button supplies the number; the inactive
+    // button stands in for it with a literal "N".
+    const chooseActive = node.data.operator === OP.minNumberOf
+    chooseBtn.textContent = chooseActive ? "At least" : "At least N"
+    chooseBtn.className = chooseActive ? "active" : ""
 
     function setMode(mode) {
       node.data.operator = mode
@@ -310,7 +455,17 @@ function initRequirementsField(root) {
     chooseBtn.addEventListener("click", () => setMode(OP.minNumberOf))
 
     segmented.append(allBtn, chooseBtn)
-    sentence.append(lead, segmented)
+    sentence.appendChild(lead)
+    // A group that holds tracks is always "Minimum # of" with a value of 1;
+    // the toggle and the stepper would only produce a tree the validator
+    // rejects.
+    if (holdsTracks(node)) {
+      const oneTrack = document.createElement("span")
+      oneTrack.textContent = "one of these tracks"
+      sentence.appendChild(oneTrack)
+      return sentence
+    }
+    sentence.appendChild(segmented)
 
     if (node.data.operator === OP.minNumberOf) {
       const stepper = document.createElement("div")
@@ -358,37 +513,45 @@ function initRequirementsField(root) {
 
     const chips = document.createElement("div")
     chips.className = "req-chips"
-    node.children
-      .filter(child => child.data.node_type !== NODE.operator)
-      .forEach(leaf => {
-        const chip = document.createElement("span")
-        chip.className = "req-chip"
-        if (leaf.data.node_type === NODE.program) {
-          const badge = document.createElement("span")
-          badge.className = "req-chip__badge"
-          badge.textContent = "PROGRAM"
-          chip.appendChild(badge)
-        }
-        const label = document.createElement("span")
-        label.textContent = leafLabel(leaf)
-        chip.appendChild(label)
-
-        const remove = document.createElement("button")
-        remove.type = "button"
-        remove.textContent = "✕"
-        remove.title = "Remove"
-        remove.addEventListener("click", () => {
-          const idx = node.children.indexOf(leaf)
-          node.children.splice(idx, 1)
-          persistAndRender()
-        })
-        chip.appendChild(remove)
-        chips.appendChild(chip)
-      })
+    node.children.forEach(child =>
+      chips.appendChild(renderChip(node.children, child))
+    )
     picker.appendChild(chips)
 
     picker.appendChild(renderCombobox(node))
     return picker
+  }
+
+  // A chip for any child of `list`: a course, a program, or a group that
+  // cannot be saved there (a group inside a group, a course beside tracks),
+  // which the badge names so it can be recognized and removed.
+  function renderChip(list, child) {
+    const chip = document.createElement("span")
+    chip.className = "req-chip"
+    const badgeText = {
+      [NODE.program]:  "PROGRAM",
+      [NODE.operator]: "GROUP"
+    }[child.data.node_type]
+    if (badgeText) {
+      const badge = document.createElement("span")
+      badge.className = "req-chip__badge"
+      badge.textContent = badgeText
+      chip.appendChild(badge)
+    }
+    const label = document.createElement("span")
+    label.textContent = leafLabel(child)
+    chip.appendChild(label)
+
+    const remove = document.createElement("button")
+    remove.type = "button"
+    remove.textContent = "✕"
+    remove.title = "Remove"
+    remove.addEventListener("click", () => {
+      list.splice(list.indexOf(child), 1)
+      persistAndRender()
+    })
+    chip.appendChild(remove)
+    return chip
   }
 
   function renderCombobox(node) {

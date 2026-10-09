@@ -38,6 +38,7 @@ class ProgramRequirementDataSerializer(StrictFieldsSerializer):
             ProgramRequirementNodeType.COURSE,
             ProgramRequirementNodeType.PROGRAM,
             ProgramRequirementNodeType.OPERATOR,
+            ProgramRequirementNodeType.TRACK,
         )
     )
     course = serializers.IntegerField(source="course_id", allow_null=True, default=None)
@@ -51,6 +52,7 @@ class ProgramRequirementDataSerializer(StrictFieldsSerializer):
     operator = serializers.CharField(allow_null=True, default=None)
     operator_value = serializers.CharField(allow_null=True, default=None)
     elective_flag = serializers.BooleanField(allow_null=True, default=False)
+    description = serializers.CharField(allow_blank=True, required=False, default="")
 
 
 @extend_schema_serializer(component_name="V2ProgramRequirement")

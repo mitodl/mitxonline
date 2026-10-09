@@ -456,6 +456,7 @@ def test_program_requirement_tree_serializer_save():
                 "required_program": None,
                 "title": "Required Courses",
                 "elective_flag": False,
+                "description": "",
             },
             "id": ANY,
             "children": [
@@ -469,6 +470,7 @@ def test_program_requirement_tree_serializer_save():
                         "required_program": None,
                         "title": None,
                         "elective_flag": False,
+                        "description": "",
                     },
                     "id": ANY,
                 }
@@ -484,6 +486,7 @@ def test_program_requirement_tree_serializer_save():
                 "required_program": None,
                 "title": "Elective Courses",
                 "elective_flag": False,
+                "description": "",
             },
             "id": ANY,
             "children": [
@@ -497,6 +500,7 @@ def test_program_requirement_tree_serializer_save():
                         "required_program": None,
                         "title": None,
                         "elective_flag": False,
+                        "description": "",
                     },
                     "id": ANY,
                 },
@@ -510,6 +514,7 @@ def test_program_requirement_tree_serializer_save():
                         "required_program": None,
                         "title": None,
                         "elective_flag": False,
+                        "description": "",
                     },
                     "id": ANY,
                 },

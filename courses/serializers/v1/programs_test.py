@@ -20,7 +20,9 @@ from courses.factories import (
     LearnerProgramRecordShareFactory,
     PartnerSchoolFactory,
     PartnerSchoolProgramFactory,
+    ProgramEnrollmentFactory,
     ProgramFactory,
+    create_program_with_tracks,
     program_with_empty_requirements,  # noqa: F401
     program_with_requirements,  # noqa: F401
 )
@@ -197,6 +199,7 @@ def test_program_requirement_tree_serializer_save():
                 "required_program": None,
                 "title": "",
                 "elective_flag": False,
+                "description": "",
             },
             "id": ANY,
             "children": [
@@ -210,6 +213,7 @@ def test_program_requirement_tree_serializer_save():
                         "required_program": None,
                         "title": "Required Courses",
                         "elective_flag": False,
+                        "description": "",
                     },
                     "id": ANY,
                     "children": [
@@ -223,6 +227,7 @@ def test_program_requirement_tree_serializer_save():
                                 "required_program": None,
                                 "title": None,
                                 "elective_flag": False,
+                                "description": "",
                             },
                             "id": ANY,
                         }
@@ -238,6 +243,7 @@ def test_program_requirement_tree_serializer_save():
                         "required_program": None,
                         "title": "Elective Courses",
                         "elective_flag": False,
+                        "description": "",
                     },
                     "id": ANY,
                     "children": [
@@ -251,6 +257,7 @@ def test_program_requirement_tree_serializer_save():
                                 "required_program": None,
                                 "title": None,
                                 "elective_flag": False,
+                                "description": "",
                             },
                             "id": ANY,
                         }
@@ -387,6 +394,7 @@ def test_learner_record_serializer(
                                 "program": program.id,
                                 "title": "",
                                 "elective_flag": False,
+                                "description": "",
                             },
                             "id": program.get_requirements_root()
                             .get_children()
@@ -406,6 +414,7 @@ def test_learner_record_serializer(
                                 "program": program.id,
                                 "title": "",
                                 "elective_flag": False,
+                                "description": "",
                             },
                             "id": program.get_requirements_root()
                             .get_children()
@@ -425,6 +434,7 @@ def test_learner_record_serializer(
                                 "program": program.id,
                                 "title": "",
                                 "elective_flag": False,
+                                "description": "",
                             },
                             "id": program.get_requirements_root()
                             .get_children()
@@ -444,6 +454,7 @@ def test_learner_record_serializer(
                         "program": program.id,
                         "title": "Required Courses",
                         "elective_flag": False,
+                        "description": "",
                     },
                     "id": program.get_requirements_root().get_children().first().id,
                 },
@@ -457,6 +468,7 @@ def test_learner_record_serializer(
                         "program": program.id,
                         "title": "Elective Courses",
                         "elective_flag": True,
+                        "description": "",
                     },
                     "id": program.get_requirements_root().get_children().last().id,
                 },
@@ -470,6 +482,7 @@ def test_learner_record_serializer(
                 "program": program.id,
                 "title": "",
                 "elective_flag": False,
+                "description": "",
             },
             "id": program.requirements_root.id,
         }
@@ -762,3 +775,107 @@ def test_learner_record_shows_all_schools_when_flag_off(settings):
         "DEDP School",
         "SCM School",
     ]
+
+
+def test_program_requirement_tree_serializer_ignores_other_programs_node_ids():
+    """A submitted node id from another program's tree creates a new node here instead of moving that one"""
+    program, other = ProgramFactory.create_batch(2)
+    other_group = other.requirements_root.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Other Required",
+    )
+
+    serializer = ProgramRequirementTreeSerializer(
+        instance=program.requirements_root,
+        data=[
+            {
+                "id": other_group.id,
+                "data": {
+                    "node_type": "operator",
+                    "title": "Required",
+                    "operator": "all_of",
+                },
+                "children": [],
+            }
+        ],
+        context={"program": program},
+    )
+
+    assert serializer.is_valid(), serializer.errors
+    serializer.save()
+
+    other_group.refresh_from_db()
+    assert other_group.program == other
+    assert program.requirements_root.get_children().get().title == "Required"
+
+
+def _node(node_type, children=(), **data):
+    return {"data": {"node_type": node_type, **data}, "children": list(children)}
+
+
+def test_program_requirement_tree_serializer_replaces_node_whose_type_changed():
+    """A submitted id with another node_type makes a new node; the old one is deleted, clearing enrollments that chose it"""
+    tracked = create_program_with_tracks()
+    track = tracked.track_nodes[0]
+    enrollment = ProgramEnrollmentFactory.create(program=tracked.program, track=track)
+
+    serializer = ProgramRequirementTreeSerializer(
+        instance=tracked.program.requirements_root,
+        data=[
+            {
+                "id": track.id,
+                **_node(
+                    "operator",
+                    [_node("course", course=tracked.core_courses[0].id)],
+                    title="Required",
+                    operator="all_of",
+                ),
+            }
+        ],
+        context={"program": tracked.program},
+    )
+
+    assert serializer.is_valid(), serializer.errors
+    serializer.save()
+
+    assert not ProgramRequirement.objects.filter(id=track.id).exists()
+    enrollment.refresh_from_db()
+    assert enrollment.track is None
+
+
+def test_program_requirement_tree_serializer_saves_track():
+    """A track node saves and reads back with its description and its groups"""
+    program = ProgramFactory.create()
+    course = CourseFactory.create()
+    group = _node(
+        "operator",
+        [_node("course", course=course.id)],
+        title="Required",
+        operator="all_of",
+    )
+    track = _node(
+        "track", [group], title="General Track", description="For generalists."
+    )
+    container = _node(
+        "operator",
+        [track],
+        title="Tracks",
+        operator="min_number_of",
+        operator_value="1",
+        elective_flag=True,
+    )
+
+    serializer = ProgramRequirementTreeSerializer(
+        instance=program.requirements_root,
+        data=[container],
+        context={"program": program},
+    )
+    assert serializer.is_valid(), serializer.errors
+    serializer.save()
+
+    saved = ProgramRequirementTreeSerializer(instance=program.requirements_root).data
+    saved_track = saved[0]["children"][0]["children"][0]
+    assert saved_track["data"]["node_type"] == "track"
+    assert saved_track["data"]["description"] == "For generalists."
+    assert saved_track["children"][0]["children"][0]["data"]["course"] == course.id
