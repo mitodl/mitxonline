@@ -31,6 +31,7 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework.status import HTTP_404_NOT_FOUND
 
+from b2b.api import process_add_org_membership
 from cms.api import create_default_courseware_page
 from compliance.api import verify_user_with_exports
 from compliance.exceptions import (
@@ -189,6 +190,68 @@ def create_local_enrollment(user, run, *, mode=EDX_DEFAULT_ENROLLMENT_MODE):
     return enrollment, created
 
 
+def _get_contract_for_user_run(user, run):
+    """
+    Figure out which B2B contract a user's enrollment in the run applies to.
+
+    A run can belong to several contracts. If the user is already in exactly
+    one of them, that's the one. If the user isn't in any of them and the run
+    only has one contract, use that. Otherwise, the contract is ambiguous (or
+    there isn't one) and this returns None.
+
+    Args:
+        user (User): the user enrolling
+        run (CourseRun): the run being enrolled in
+
+    Returns:
+        ContractPage | None: the contract that applies, if one can be determined
+    """
+    run_contracts = list(run.b2b_contracts.select_related("organization").all())
+    if not run_contracts:
+        return None
+
+    user_contract_ids = set(
+        user.b2b_contracts.filter(
+            pk__in=[contract.pk for contract in run_contracts]
+        ).values_list("pk", flat=True)
+    )
+    matching = [c for c in run_contracts if c.pk in user_contract_ids]
+
+    if len(matching) == 1:
+        return matching[0]
+
+    if not matching and len(run_contracts) == 1:
+        return run_contracts[0]
+
+    if not matching:
+        log.warning(
+            "Can't determine B2B contract for user %s in run %s: run has multiple contracts and the user is in none of them",
+            user,
+            run,
+        )
+
+    return None
+
+
+def _add_user_to_run_contract(user, run, enrollment):
+    """
+    If the run is associated with a B2B contract, add the contract to the
+    user's contract list, update their org memberships, and record the contract
+    on the enrollment if it doesn't have one already.
+    """
+    contract = _get_contract_for_user_run(user, run)
+    if not contract:
+        return
+
+    process_add_org_membership(user, contract.organization, keep_until_seen=True)
+    user.b2b_contracts.add(contract)
+    user.save()
+
+    if not enrollment.b2b_contract_id:
+        enrollment.b2b_contract = contract
+        enrollment.save(update_fields=["b2b_contract"])
+
+
 def create_run_enrollments(  # noqa: C901, PLR0913
     user,
     runs,
@@ -227,6 +290,13 @@ def create_run_enrollments(  # noqa: C901, PLR0913
             created in mitxonline, paired with a boolean indicating whether or not the edX enrollment API call was successful
             for all of the given course runs
     """
+
+    successful_enrollments = []
+    edx_request_success = True
+
+    if len(runs) == 0:
+        return (successful_enrollments, edx_request_success)
+
     # Pre-existing: only runs[0] is screened, so runs[1:] go unscreened for the
     # two multi-run callers (upgrade_audit_run_enrollments_for_program_purchase,
     # ecommerce.api.downgrade_learner_from_order).
@@ -244,12 +314,9 @@ def create_run_enrollments(  # noqa: C901, PLR0913
             features.IGNORE_EDX_FAILURES, False
         )
 
-    successful_enrollments = []
-
     def send_enrollment_emails():
         subscribe_edx_course_emails.delay(enrollment.id)
 
-    edx_request_success = True
     if not runs[0].is_fake_course_run:
         # Make the API call to enroll the user in edX only if the run is not a fake course run
         try:
@@ -290,6 +357,8 @@ def create_run_enrollments(  # noqa: C901, PLR0913
 
             if created:
                 enrollment.save_and_log(None)
+
+            _add_user_to_run_contract(user, run, enrollment)
 
             if not created:
                 enrollment_mode_changed = mode != enrollment.enrollment_mode
@@ -574,8 +643,8 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
 
     A course run's verified enrollment is left alone (not downgraded) if
     either:
-    - it's a B2B-provisioned run (has a b2b_contract or a b2b_contracts
-      entry) - governed by its contract, not this payment, or
+    - it's a B2B-provisioned run (has a b2b_contracts entry) - governed by
+      its contract, not this payment, or
     - the learner has a separate PaidCourseRun for it backed by a fulfilled
       order that isn't attributable to this program purchase - either a
       genuine, independent purchase of that specific run (total_price_paid
@@ -626,13 +695,11 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
 
     verified_run_enrollments = CourseRunEnrollment.get_program_run_enrollments(
         user=user, program=program
-    ).filter(enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE)
+    ).filter(enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE, b2b_contract__isnull=True)
 
     eligible_runs = []
     for run_enrollment in verified_run_enrollments:
         run = run_enrollment.run
-        if run.b2b_contract_id or run.b2b_contracts.exists():
-            continue
         if (
             PaidCourseRun.objects.filter(
                 user=user,
@@ -658,6 +725,7 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
         change_status=ENROLL_CHANGE_STATUS_REFUNDED,
         keep_failed_enrollments=True,
     )
+
     return downgraded_program_enrollment, downgraded_run_enrollments
 
 

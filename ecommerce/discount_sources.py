@@ -149,7 +149,7 @@ def resolve_program_child_purchase(
     # a program through either marker, the same test _program_for_product
     # applies to the target.
     source_run_ids = CourseRun.objects.filter(
-        course_id__in=child_course_ids, b2b_contract__isnull=True
+        course_id__in=child_course_ids, b2b_contracts__isnull=True
     ).values_list("id", flat=True)
     source_program_ids = Program.objects.filter(
         id__in=child_program_ids, b2b_only=False, contract_memberships__isnull=True

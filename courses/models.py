@@ -1396,19 +1396,15 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
 
         if org_id is not None:
             courseruns = filter(
-                lambda run: (
-                    run.b2b_contract_organization_id == org_id
-                    or any(c.organization_id == org_id for c in run.b2b_contracts.all())
+                lambda run: any(
+                    c.organization_id == org_id for c in run.b2b_contracts.all()
                 ),
                 courseruns,
             )
 
         if contract_id is not None:
             courseruns = filter(
-                lambda run: (
-                    run.b2b_contract_id == contract_id
-                    or any(c.id == contract_id for c in run.b2b_contracts.all())
-                ),
+                lambda run: any(c.id == contract_id for c in run.b2b_contracts.all()),
                 courseruns,
             )
 
@@ -1426,7 +1422,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
                 language=run.language,
                 variant_length=run.variant_length,
                 variant_industry=run.variant_industry,
-                b2b_only=bool(run.b2b_contract),
+                b2b_only=run.has_b2b_contracts,
             ).exists()
         )
 
@@ -1651,13 +1647,6 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
         EnrollmentMode, blank=True, related_name="+"
     )
 
-    b2b_contract = models.ForeignKey(
-        "b2b.ContractPage",
-        null=True,
-        blank=True,
-        on_delete=models.DO_NOTHING,
-        related_name="+",
-    )
     b2b_contracts = models.ManyToManyField(
         "b2b.ContractPage",
         blank=True,
@@ -1693,7 +1682,7 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
     class Meta:
         # The ``unique_primary_language_per_group`` and
         # ``unique_language_per_group`` rules used to live here as database
-        # UniqueConstraints that included the now-deprecated ``b2b_contract``
+        # UniqueConstraints that included the now-removed ``b2b_contract``
         # FK. A run can now belong to multiple contracts through the
         # ``b2b_contracts`` ManyToManyField, and M2M fields cannot participate
         # in a UniqueConstraint, so the rules are enforced in application code
@@ -1875,10 +1864,6 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
 
         if self.pk:
             self.validate_b2b_contract_group_uniqueness(self.contract_group_ids)
-        elif self.b2b_contract_id:
-            # The deprecated FK is populated before the first save, so the
-            # group it names is already known and can be checked now.
-            self.validate_b2b_contract_group_uniqueness([self.b2b_contract_id])
         elif not self.b2b_only:
             # An unsaved row has no primary key, so `b2b_contracts` can't be
             # queried yet - B2B runs get their contracts attached immediately
@@ -1915,33 +1900,37 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
             update_fields=update_fields,
         )
 
-    @cached_property
-    def b2b_contract_organization_id(self) -> int | None:
+    @property
+    def has_b2b_contracts(self) -> bool:
         """
-        Organization owning the deprecated single-contract ``b2b_contract`` FK.
+        Return True if the run is attached to any B2B contract.
 
-        This is the lazy path, for callers that reach a run without annotating.
-        ``CourseViewSet`` annotates this same name onto its ``courseruns``
-        prefetch; ``cached_property`` is a non-data descriptor, so the value the
-        annotation writes into the instance ``__dict__`` shadows this method and
-        the contract page is never loaded there.
+        This checks the M2M's through table directly, since the
+        ``b2b_contracts`` related manager is filtered to active contracts and a
+        run in an inactive (or expired) contract is still a contract run.
         """
-        if self.b2b_contract_id is None:
-            return None
-        return self.b2b_contract.organization_id
+        if not self.pk:
+            return False
+
+        return CourseRun.b2b_contracts.through.objects.filter(
+            courserun_id=self.pk
+        ).exists()
 
     @property
     def contract_group_ids(self):
         """
-        Return the ids of every contract group this run belongs to, combining
-        the ``b2b_contracts`` M2M with the deprecated ``b2b_contract`` FK.
+        Return the ids of every contract group this run belongs to.
         """
-        ids = set(self.b2b_contracts.values_list("id", flat=True)) if self.pk else set()
+        if not self.pk:
+            return set()
 
-        if self.b2b_contract_id:
-            ids.add(self.b2b_contract_id)
-
-        return ids
+        # Read the through table directly - the related manager only returns
+        # active contracts, but inactive ones are still contract groups.
+        return set(
+            CourseRun.b2b_contracts.through.objects.filter(
+                courserun_id=self.pk
+            ).values_list("contractpage_id", flat=True)
+        )
 
     def validate_b2b_contract_group_uniqueness(self, contract_ids):
         """
@@ -1949,7 +1938,7 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
         ``unique_primary_language_per_group`` and ``unique_language_per_group``
         database constraints.
 
-        Those constraints grouped runs by contract using the deprecated
+        Those constraints grouped runs by contract using the now-removed
         ``b2b_contract`` FK. Now that a run can be attached to several
         contracts via ``b2b_contracts``, the rules are applied once per
         contract group: within a given contract (or within the "no contract"
@@ -1979,17 +1968,10 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
                 is_source_run=self.is_source_run,
             ).exclude(pk=self.pk)
 
-            # Runs can be linked to a contract through the M2M or through the
-            # deprecated FK (which is still written directly in places), so
-            # both have to be considered when building a group.
             siblings = (
-                siblings.filter(
-                    Q(b2b_contracts__id=contract_id) | Q(b2b_contract_id=contract_id)
-                )
+                siblings.filter(b2b_contracts__id=contract_id)
                 if contract_id is not None
-                else siblings.filter(
-                    b2b_contracts__isnull=True, b2b_contract__isnull=True
-                )
+                else siblings.filter(b2b_contracts__isnull=True)
             )
             if (
                 self.is_primary_language

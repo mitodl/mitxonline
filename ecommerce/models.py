@@ -14,7 +14,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import Count, Q, TextChoices
+from django.db.models import Count, Exists, OuterRef, Q, TextChoices
 from django.utils.functional import cached_property
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
@@ -1113,15 +1113,18 @@ class Order(TimestampedModel):
     @cached_property
     def is_b2b_order(self):
         """
-        Return True if any purchased run belongs to a B2B contract.
+        Return True if any line item belongs to a B2B contract.
 
         Reads the line's denormalized `purchased_object` rather than resolving
         `product.purchasable_object` through reversion. The two identify the same
         object: `Line` rows are created with `purchased_object_id` and
         `purchased_content_type_id` copied straight off the product, and that
         triple is the line's uniqueness constraint.
+
+        ``OrderHistoryViewSet`` annotates this same name with
+        ``b2b_order_exists()`` so a page of orders doesn't query per row.
         """
-        return any(run.b2b_contract_id for run in self.purchased_runs)
+        return any(line.b2b_contract for line in self.lines.all())
 
     @cached_property
     def funds_fulfilled_redemption(self):
@@ -1519,6 +1522,22 @@ def _product_from_version(version):
         price=field_dict["price"],
         description=field_dict["description"],
         is_active=field_dict["is_active"],
+    )
+
+
+def b2b_order_exists() -> Exists:
+    """
+    The question ``Order.is_b2b_order`` asks, as an ``Exists`` for annotating
+    an Order queryset under that same name.
+    """
+    return Exists(
+        Line.objects.filter(
+            order_id=OuterRef("pk"),
+            purchased_content_type=ContentType.objects.get_for_model(CourseRun),
+            purchased_object_id__in=CourseRun.b2b_contracts.through.objects.values(
+                "courserun_id"
+            ),
+        )
     )
 
 

@@ -109,8 +109,8 @@ def org_setup():
 
     # Course run and products creation
 
-    contract_1_run_1 = CourseRunFactory.create(b2b_contract=contract_1)
-    contract_1_run_2 = CourseRunFactory.create(b2b_contract=contract_1)
+    contract_1_run_1 = CourseRunFactory.create(b2b_contracts=[contract_1])
+    contract_1_run_2 = CourseRunFactory.create(b2b_contracts=[contract_1])
 
     with reversion.create_revision():
         contract_1_run_1_product = ProductFactory.create(
@@ -120,8 +120,8 @@ def org_setup():
             purchasable_object=contract_1_run_2
         )
 
-    contract_2_run_1 = CourseRunFactory.create(b2b_contract=contract_2)
-    contract_2_run_2 = CourseRunFactory.create(b2b_contract=contract_2)
+    contract_2_run_1 = CourseRunFactory.create(b2b_contracts=[contract_2])
+    contract_2_run_2 = CourseRunFactory.create(b2b_contracts=[contract_2])
 
     with reversion.create_revision():
         contract_2_run_1_product = ProductFactory.create(
@@ -131,8 +131,8 @@ def org_setup():
             purchasable_object=contract_2_run_2
         )
 
-    contract_3_run_1 = CourseRunFactory.create(b2b_contract=contract_3)
-    contract_3_run_2 = CourseRunFactory.create(b2b_contract=contract_3)
+    contract_3_run_1 = CourseRunFactory.create(b2b_contracts=[contract_3])
+    contract_3_run_2 = CourseRunFactory.create(b2b_contracts=[contract_3])
 
     with reversion.create_revision():
         contract_3_run_1_product = ProductFactory.create(
@@ -313,24 +313,29 @@ def test_org_contract_run_enrollments(org_setup, manager_drf_client):
             CourseRunEnrollment.objects.create(
                 user=users_to_enroll[0],
                 run=runs[0],
+                b2b_contract=contract,
             ),
             CourseRunEnrollment.objects.create(
                 user=users_to_enroll[1],
                 run=runs[0],
+                b2b_contract=contract,
             ),
         ],
         [
             CourseRunEnrollment.objects.create(
                 user=users_to_enroll[0],
                 run=runs[1],
+                b2b_contract=contract,
             ),
             CourseRunEnrollment.objects.create(
                 user=users_to_enroll[1],
                 run=runs[1],
+                b2b_contract=contract,
             ),
             CourseRunEnrollment.objects.create(
                 user=users_to_enroll[2],
                 run=runs[1],
+                b2b_contract=contract,
             ),
         ],
     ]
@@ -534,7 +539,7 @@ def test_org_contract_detail_no_max_learners(org_setup, manager_drf_client):
         max_learners=None,
         organization=contract_1.organization,
     )
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_contracts=[contract])
     with reversion.create_revision():
         ProductFactory.create(purchasable_object=run)
 
@@ -1477,7 +1482,7 @@ def test_bulk_assign_provisions_codes_for_uncapped_contract(
         max_learners=None,
         organization=contract_1.organization,
     )
-    course_run = CourseRunFactory.create(b2b_contract=uncapped_contract)
+    course_run = CourseRunFactory.create(b2b_contracts=[uncapped_contract])
     with reversion.create_revision():
         ProductFactory.create(purchasable_object=course_run)
 

@@ -67,7 +67,7 @@ def test_b2b_course(page_published, include_regular_run):
     contract = ContractPageFactory.create()
 
     run = CourseRunFactory.create(
-        b2b_contract=contract,
+        b2b_contracts=[contract],
     )
     run.course.page.live = page_published
     run.course.page.save()

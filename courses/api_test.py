@@ -1064,8 +1064,7 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
     def test_preserves_b2b_run_enrollment(self, mocker, program_setup):
         """A verified enrollment in a B2B-contracted run is left alone."""
         contract = ContractPageFactory.create()
-        program_setup.run.b2b_contract = contract
-        program_setup.run.save()
+        program_setup.run.b2b_contracts.add(contract)
         run_enrollment = CourseRunEnrollmentFactory.create(
             user=program_setup.user,
             run=program_setup.run,
@@ -3900,7 +3899,7 @@ def test_b2b_re_enrollment_after_multiple_unenrollments(mocker, user):
         enrollment_fixed_price=Decimal("0.00"),
         membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
-    course_run = CourseRunFactory.create(b2b_contract=contract)
+    course_run = CourseRunFactory.create(b2b_contracts=[contract])
     with reversion.create_revision():
         product = ProductFactory.create(
             purchasable_object=course_run, price=contract.enrollment_fixed_price
@@ -4065,7 +4064,7 @@ def test_get_certificate_grade_eligible_runs(has_live, has_b2b, has_b2b_live):
         b2b_contract = ContractPageFactory.create()
         b2b_run = CourseRunFactory.create(
             certificate_available_date=None,
-            b2b_contract=b2b_contract,
+            b2b_contracts=[b2b_contract],
             live=has_b2b_live,
         )
 
@@ -5417,3 +5416,51 @@ def test_partner_schools_for_program_excludes_unassigned_when_flag_on(settings):
     PartnerSchoolFactory.create(name="Unassigned School")
 
     assert list(partner_schools_for_program(program)) == []
+
+
+@pytest.mark.parametrize(
+    ("run_contract_keys", "user_contract_keys", "expected_key"),
+    [
+        (["a"], [], "a"),
+        (["a"], ["a"], "a"),
+        (["a", "b"], ["b"], "b"),
+        (["a", "b"], [], None),
+        (["a", "b"], ["a", "b"], None),
+        ([], [], None),
+    ],
+)
+def test_create_run_enrollments_b2b_contract(
+    mocker, user, run_contract_keys, user_contract_keys, expected_key
+):
+    """
+    create_run_enrollments should figure out which of the run's contracts the
+    enrollment is for, add the user to it, and record it on the enrollment.
+    """
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+    patched_add_membership = mocker.patch("courses.api.process_add_org_membership")
+
+    contracts = {key: ContractPageFactory.create() for key in ("a", "b")}
+    run = CourseRunFactory.create(
+        b2b_only=bool(run_contract_keys),
+        b2b_contracts=[contracts[key] for key in run_contract_keys],
+    )
+    user.b2b_contracts.add(*[contracts[key] for key in user_contract_keys])
+
+    [enrollment], _ = create_run_enrollments(user, [run])
+
+    enrollment.refresh_from_db()
+    if expected_key:
+        expected = contracts[expected_key]
+        assert enrollment.b2b_contract == expected
+        assert user.b2b_contracts.filter(pk=expected.pk).exists()
+        patched_add_membership.assert_called_once_with(
+            user, expected.organization, keep_until_seen=True
+        )
+    else:
+        assert enrollment.b2b_contract is None
+        assert set(user.b2b_contracts.values_list("pk", flat=True)) == {
+            contracts[key].pk for key in user_contract_keys
+        }
+        patched_add_membership.assert_not_called()

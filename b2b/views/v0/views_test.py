@@ -930,9 +930,9 @@ def test_enroll_multi_contract_run_with_slug(mocker):
 
 
 def test_enroll_courserun_without_b2b_contract_not_found(mocker):
-    """A course run that exists but has no b2b_contract should not be matched."""
+    """A course run that exists but has no B2B contracts should not be matched."""
     mocker.patch("b2b.views.v0.create_b2b_enrollment")
-    courserun = CourseRunFactory.create(b2b_contract=None)
+    courserun = CourseRunFactory.create()
     ProductFactory.create(purchasable_object=courserun)
 
     user = UserFactory.create()

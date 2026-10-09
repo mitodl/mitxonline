@@ -122,7 +122,7 @@ def test_create_program_contract_runs_skips_existing_runs(mocker):
     existing_courseware_id = create_contract_run_key(source_run, contract)
 
     CourseRunFactory.create(
-        course=course, courseware_id=existing_courseware_id, b2b_contract=contract
+        course=course, courseware_id=existing_courseware_id, b2b_contracts=[contract]
     )
 
     mocker.patch("django.core.cache.cache.add", return_value=True)

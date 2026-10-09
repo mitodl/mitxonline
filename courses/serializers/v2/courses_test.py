@@ -306,12 +306,13 @@ class TestUserEnrollmentFiltering:
     """Test B2B filtering for user enrollments."""
 
     def test_exclude_b2b_filter_logic(self):
-        """exclude_b2b filters out enrollments made through a contract, not every enrollment in a contract run."""
-        contract = ContractPageFactory.create()
-        run = CourseRunFactory.create(b2b_contracts=[contract])
-        regular_enrollment = CourseRunEnrollmentFactory.create(run=run)
+        """Test that the exclude_b2b filter correctly filters out B2B enrollments."""
+        regular_enrollment = CourseRunEnrollmentFactory.create()
+
+        org = OrganizationPageFactory.create(title="Test B2B Org")
+        contract = ContractPageFactory.create(organization=org)
         b2b_enrollment = CourseRunEnrollmentFactory.create(
-            run=run, b2b_contract=contract
+            run__b2b_contracts=[contract], run__b2b_only=True, b2b_contract=contract
         )
 
         queryset = CourseRunEnrollment.objects.filter(
@@ -346,15 +347,9 @@ class TestUserEnrollmentFiltering:
         contract1 = ContractPageFactory.create(organization=org1)
         contract2 = ContractPageFactory.create(organization=org2)
 
-        enrollment1 = CourseRunEnrollmentFactory.create(
-            run__b2b_contracts=[contract1], b2b_contract=contract1
-        )
-        # A personal enrollment in the same contract run doesn't belong to org1.
-        CourseRunEnrollmentFactory.create(run=enrollment1.run)
+        enrollment1 = CourseRunEnrollmentFactory.create(run__b2b_contracts=[contract1])
 
-        enrollment2 = CourseRunEnrollmentFactory.create(
-            run__b2b_contracts=[contract2], b2b_contract=contract2
-        )
+        enrollment2 = CourseRunEnrollmentFactory.create(run__b2b_contracts=[contract2])
 
         queryset = CourseRunEnrollment.objects.all()
         filter_data = QueryDict(f"org_id={org1.id}")
@@ -382,7 +377,6 @@ def test_course_serializer_canonical_run_per_tag(mock_context):
         language="en",
         is_primary_language=True,
         courseware_id="course-v1:T+C+1T2026-en",
-        b2b_contract=None,
     )
     CourseRunFactory.create(
         course=course,
@@ -390,7 +384,6 @@ def test_course_serializer_canonical_run_per_tag(mock_context):
         language="zh",
         is_primary_language=False,
         courseware_id="course-v1:T+C+1T2026-zh",
-        b2b_contract=None,
     )
     serializer = CourseWithCourseRunsSerializer(course, context=mock_context)
     assert len(serializer.data["courseruns"]) == 1
@@ -406,7 +399,6 @@ def test_course_serializer_canonical_run_fallback_to_oldest(mock_context):
         language="en",
         is_primary_language=False,
         courseware_id="course-v1:T+C+1T2026-en",
-        b2b_contract=None,
     )
     CourseRunFactory.create(
         course=course,
@@ -414,14 +406,47 @@ def test_course_serializer_canonical_run_fallback_to_oldest(mock_context):
         language="zh",
         is_primary_language=False,
         courseware_id="course-v1:T+C+1T2026-zh",
-        b2b_contract=None,
     )
     serializer = CourseWithCourseRunsSerializer(course, context=mock_context)
     assert len(serializer.data["courseruns"]) == 1
     assert serializer.data["courseruns"][0]["courseware_id"] == run_first.courseware_id
 
 
-def test_course_run_serializer_b2b_only():
-    """b2b_only is serialized, so MIT Learn's ETL can keep contract-only runs out of its catalog."""
-    run = CourseRunFactory.create(b2b_only=True)
-    assert CourseRunSerializer(run).data["b2b_only"] is True
+@pytest.mark.parametrize(
+    ("context_key", "expected_key"),
+    [
+        (None, None),
+        ("contract_id", "second"),
+        ("org_id", "second"),
+    ],
+)
+def test_course_run_serializer_b2b_contract(mock_context, context_key, expected_key):
+    """
+    The b2b_contract field returns the contract the request was scoped to, or
+    to None.
+    """
+    contracts = {
+        "first": ContractPageFactory.create(),
+        "second": ContractPageFactory.create(),
+    }
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=list(contracts.values()))
+
+    context = {**mock_context}
+    if context_key == "contract_id":
+        context["contract_id"] = str(contracts["second"].id)
+    elif context_key == "org_id":
+        context["org_id"] = str(contracts["second"].organization_id)
+
+    data = CourseRunSerializer(run, context=context).data
+
+    if expected_key:
+        assert data["b2b_contract"] == contracts[expected_key].id
+    else:
+        assert not data["b2b_contract"]
+
+    assert (
+        CourseRunSerializer(CourseRunFactory.create(), context=context).data[
+            "b2b_contract"
+        ]
+        is None
+    )

@@ -8,7 +8,7 @@ from functools import cached_property
 import django_filters
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import F, Prefetch, Q
+from django.db.models import Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -341,14 +341,8 @@ class CourseFilterSet(django_filters.FilterSet):
 
         if user_has_org_access(user, value):
             return queryset.filter(
-                Q(
-                    courseruns__b2b_contract__organization_id=value,
-                    courseruns__b2b_contract__active=True,
-                )
-                | Q(
-                    courseruns__b2b_contracts__active=True,
-                    courseruns__b2b_contracts__organization_id=value,
-                )
+                courseruns__b2b_contracts__active=True,
+                courseruns__b2b_contracts__organization_id=value,
             )
         return Course.objects.none()
 
@@ -366,14 +360,8 @@ class CourseFilterSet(django_filters.FilterSet):
             and user.b2b_contracts.filter(id=value).exists()
         ):
             return queryset.filter(
-                Q(
-                    courseruns__b2b_contract__id=value,
-                    courseruns__b2b_contract__active=True,
-                )
-                | Q(
-                    courseruns__b2b_contracts__active=True,
-                    courseruns__b2b_contracts__id=value,
-                )
+                courseruns__b2b_contracts__active=True,
+                courseruns__b2b_contracts__id=value,
             )
         return Course.objects.none()
 
@@ -487,17 +475,11 @@ class CourseViewSet(
             "b2b_contracts",
             queryset=ContractPage.active_objects.only("organization_id"),
         )
-        # The deprecated single-contract FK is annotated rather than
-        # select_related for the same reason: the only read of it is
-        # get_filtered_runs comparing organization_id, and the serializer's
-        # "b2b_contract" field renders the pk straight off b2b_contract_id. The
-        # alias matches CourseRun.b2b_contract_organization_id, so the
-        # annotation shadows that cached_property.
         course_runs_prefetch = Prefetch(
             "courseruns",
-            queryset=CourseRun.objects.order_by("id")
-            .annotate(b2b_contract_organization_id=F("b2b_contract__organization_id"))
-            .prefetch_related(contracts_prefetch, modes_prefetch, products_prefetch),
+            queryset=CourseRun.objects.order_by("id").prefetch_related(
+                contracts_prefetch, modes_prefetch, products_prefetch
+            ),
         )
         # Topics are serialized per course along with their parent topics, whose
         # sort key is CoursesTopic.Meta.ordering == ["parent__name", "name"] -
@@ -723,7 +705,7 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
     def filter_org_id(self, queryset, name, value):  # noqa: ARG002
         """Filter enrollments by B2B organization ID."""
         if value:
-            return queryset.filter(b2b_contract__organization_id=value)
+            return queryset.filter(run__b2b_contracts__organization_id=value).distinct()
         return queryset
 
 
@@ -747,7 +729,7 @@ class UserEnrollmentsApiViewSet(
             "b2b_contract",
         )
         .prefetch_related(
-            "run__b2b_contract__organization",
+            "run__b2b_contracts",
             "run__course__page",
             Prefetch("run__enrollment_modes", to_attr="prefetched_enrollment_modes"),
         )
@@ -1146,6 +1128,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                     )
                     .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
                     .select_related("run__course__page", "b2b_contract")
+                    .prefetch_related("run__b2b_contracts")
                     .prefetch(
                         "run__course__programs",
                         "run__course__financial_assistance_form_url",
