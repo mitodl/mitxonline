@@ -424,6 +424,16 @@ class Discount(TimestampedModel):
         max_length=10,
         help_text="The location of this code in the B2B contract's code sheet.",
     )
+    # A course run can belong to several contracts, so the run's product can't
+    # say which contract an enrollment code is for.
+    b2b_contract = models.ForeignKey(
+        "b2b.ContractPage",
+        on_delete=models.DO_NOTHING,
+        related_name="discounts",
+        null=True,
+        blank=True,
+        help_text="The B2B contract this enrollment code belongs to, if it is one.",
+    )
 
     class Meta:
         # A storage-layer backstop for the row-local clauses of
@@ -723,23 +733,10 @@ class Discount(TimestampedModel):
         ).quantize(Decimal("0.01"))
 
     def b2b_contracts(self):
-        """Return the applicable B2B contract(s), if any."""
+        """Return the B2B contract this code belongs to, as a queryset."""
         from b2b.models import ContractPage  # noqa: PLC0415
 
-        products_qs = self.products.select_related(
-            "product", "product__content_type"
-        ).filter(
-            product__content_type__app_label="courses",
-            product__content_type__model="courserun",
-        )
-
-        courserun_ids = products_qs.all().values_list("product__object_id", flat=True)
-
-        return ContractPage.objects.filter(
-            pk__in=CourseRun.objects.filter(pk__in=courserun_ids)
-            .all()
-            .values_list("b2b_contracts__id", flat=True)
-        ).all()
+        return ContractPage.objects.filter(pk=self.b2b_contract_id)
 
 
 class DiscountProduct(TimestampedModel):

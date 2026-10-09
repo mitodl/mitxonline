@@ -2,9 +2,11 @@ import random
 import uuid
 from datetime import timedelta
 from decimal import Decimal
+from importlib import import_module
 
 import pytest
 import reversion
+from django.apps import apps as django_apps
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
 from django.db.models import ProtectedError
@@ -16,6 +18,7 @@ from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
 from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
+from b2b.models import DiscountContractAttachmentRedemption
 from compliance.api import ExportComplianceResult
 from courses.factories import (
     BlockedCountryFactory,
@@ -34,7 +37,10 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
+    PAYMENT_TYPE_MARKETING,
+    PAYMENT_TYPE_SALES,
     REDEMPTION_TYPE_INTERNAL,
+    REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
     REDEMPTION_TYPE_UNLIMITED,
     REFUND_WINDOW_DAYS,
@@ -2361,3 +2367,57 @@ def test_fulfill_links_b2b_contract_to_enrollment(
     enrollment = CourseRunEnrollment.objects.get(user=user, run=run)
     assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
     assert enrollment.b2b_contract == contract
+
+
+def _enrollment_code(run, **kwargs):
+    """Make a discount shaped like a B2B enrollment code for the run's product."""
+
+    discount = Discount.objects.create(
+        discount_code=uuid.uuid4(),
+        amount=0,
+        redemption_type=REDEMPTION_TYPE_ONE_TIME,
+        **{
+            "discount_type": DISCOUNT_TYPE_FIXED_PRICE,
+            "payment_type": PAYMENT_TYPE_SALES,
+            "is_bulk": True,
+            **kwargs,
+        },
+    )
+    product = run.products.first() or ProductFactory.create(purchasable_object=run)
+    DiscountProduct.objects.create(discount=discount, product=product)
+
+    return discount
+
+
+def test_backfill_discount_b2b_contract():
+    """The backfill links each enrollment code to the one contract it is for."""
+
+    contract_a, contract_b = ContractPageFactory.create_batch(2)
+    own_run = CourseRunFactory.create(b2b_contracts=[contract_a])
+    shared_run = CourseRunFactory.create(b2b_contracts=[contract_a, contract_b])
+    original_run = CourseRunFactory.create(
+        b2b_contract=contract_b, b2b_contracts=[contract_a]
+    )
+
+    own = _enrollment_code(own_run)
+    redeemed = _enrollment_code(shared_run)
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=redeemed, contract=contract_b, assigned_email="a@example.com"
+    )
+    original = _enrollment_code(original_run)
+    ambiguous = _enrollment_code(shared_run)
+    not_a_code = _enrollment_code(own_run, payment_type=PAYMENT_TYPE_MARKETING)
+
+    import_module(
+        "ecommerce.migrations.0058_backfill_discount_b2b_contract"
+    ).backfill_discount_contracts(django_apps, None)
+
+    for discount, contract in (
+        (own, contract_a),
+        (redeemed, contract_b),
+        (original, contract_b),
+        (ambiguous, None),
+        (not_a_code, None),
+    ):
+        discount.refresh_from_db()
+        assert discount.b2b_contract == contract

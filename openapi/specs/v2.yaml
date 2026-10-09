@@ -9466,6 +9466,11 @@ components:
           nullable: true
           description: The location of this code in the B2B contract's code sheet.
           maxLength: 10
+        b2b_contract:
+          type: integer
+          nullable: true
+          description: The B2B contract this enrollment code belongs to, if it is
+            one.
       required:
       - amount
       - created_on
