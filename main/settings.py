@@ -1349,6 +1349,17 @@ EDX_API_CLIENT_TIMEOUT = get_int(
     description="Timeout (in seconds) for requests made via the edX API client",
 )
 
+OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES = get_int(
+    name="OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES",
+    default=3,
+    description="How many times to retry a rate-limited (429) edX course list API request",
+)
+OPENEDX_COURSE_LIST_THROTTLE_WAIT_SECONDS = get_int(
+    name="OPENEDX_COURSE_LIST_THROTTLE_WAIT_SECONDS",
+    default=60,
+    description="Seconds to wait before retrying a rate-limited edX course list API request when edX sends no Retry-After header, and the longest wait allowed when it does",
+)
+
 OPENEDX_COURSE_CLONE_MAX_RETRIES = get_int(
     name="OPENEDX_COURSE_CLONE_MAX_RETRIES",
     default=5,
