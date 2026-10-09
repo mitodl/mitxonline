@@ -9,6 +9,8 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
 )
 
+from openapi.views import SpectacularSwaggerAllVersionsView
+
 urlpatterns = [
     path(
         "api/v0/schema/", SpectacularAPIView.as_view(api_version="v0"), name="v0_schema"
@@ -61,5 +63,10 @@ urlpatterns = [
         "api/v3/schema/redoc/",
         SpectacularRedocView.as_view(url_name="v3_schema"),
         name="v3_redoc",
+    ),
+    path(
+        "api/schema/swagger-ui/",
+        SpectacularSwaggerAllVersionsView.as_view(),
+        name="swagger_ui",
     ),
 ]
