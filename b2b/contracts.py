@@ -13,6 +13,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.db.models import Q
 from mitol.common.utils import now_in_utc
+from opaque_keys import InvalidKeyError
 
 from b2b.api import create_contract_run
 from b2b.constants import (
@@ -22,7 +23,7 @@ from b2b.constants import (
     PROVISIONING_ACTION_CONTRACT_VARIANT_ADDED,
     PROVISIONING_ACTION_CONTRACT_VARIANT_UPDATED,
 )
-from b2b.exceptions import ContractVariantError
+from b2b.exceptions import ContractVariantError, SourceCourseIncompleteError
 from b2b.models import ContractPage, ContractProgramItem, OrganizationPage
 from b2b.provisioning import _audit
 from b2b.tasks import queue_enrollment_code_check
@@ -524,6 +525,108 @@ def get_contract_variant_coverage(contract: ContractPage) -> list[dict]:
         )
 
     return coverage
+
+
+def sync_contract_variants(contract: ContractPage, *, skip_edx: bool = False) -> dict:
+    """
+    Create the runs a contract's courses are missing for its variant sets.
+
+    Adding a variant set creates no runs, so courseware added before the set
+    has none for it. For each active set, this creates a run for every course
+    get_contract_variant_coverage lists with a source run and no contract run.
+    A course and variant that already has a run in the contract is left alone,
+    so repeating the call creates nothing more.
+
+    Only courses still in the contract get runs: those of its programs, and
+    those with a live run in it. A removed course whose closed run stays linked
+    for its enrolled learners is skipped, so a new set doesn't bring it back.
+
+    Returns a dict with `runs_created` (the new CourseRuns),
+    `missing_source_runs` (a `course` and `variant` for each one that supports
+    the set and has no source run to clone) and `failed` (the same pair for
+    each one whose run could not be created). Queueing the enrollment code
+    check is left to the caller.
+    """
+
+    runs_created = []
+    missing_source_runs = []
+    failed = []
+    current_course_ids = set(
+        Course.objects.filter(
+            Q(in_programs__program__contract_memberships__contract=contract)
+            | Q(courseruns__b2b_contracts=contract, courseruns__live=True)
+        ).values_list("id", flat=True)
+    )
+
+    for entry in get_contract_variant_coverage(contract):
+        variant = entry["variant"]
+        if not variant.active:
+            continue
+
+        for listed in entry["courses"]:
+            course = listed["course"]
+            if course.id not in current_course_ids or listed["contract_run"]:
+                continue
+
+            pair = {"course": course, "variant": variant}
+            if not listed["has_source_run"]:
+                missing_source_runs.append(pair)
+                continue
+
+            # Without a default variant create_contract_run ignores
+            # filter_variants and clones the course's primary-language source
+            # runs, whatever set was asked for.
+            if not course.default_variant_options:
+                log.warning(
+                    "Not creating a %s run of %s for contract %s: the course "
+                    "has no default variant set",
+                    _variant_fields(variant),
+                    course.readable_id,
+                    contract.id,
+                )
+                failed.append(pair)
+                continue
+
+            # One variant per call, so a failure belongs to one course and
+            # variant and leaves the others' runs in place.
+            try:
+                created = create_contract_run(
+                    contract,
+                    course,
+                    skip_edx=skip_edx,
+                    no_reruns=True,
+                    filter_variants=[variant],
+                )
+            except (SourceCourseIncompleteError, InvalidKeyError):
+                log.warning(
+                    "Could not create a %s run of %s for contract %s",
+                    _variant_fields(variant),
+                    course.readable_id,
+                    contract.id,
+                    exc_info=True,
+                )
+                failed.append(pair)
+                continue
+
+            # Nothing back means create_contract_run saw a run the coverage
+            # report didn't, e.g. one linked only by the old b2b_contract key.
+            if not created:
+                log.warning(
+                    "No %s run of %s was created for contract %s",
+                    _variant_fields(variant),
+                    course.readable_id,
+                    contract.id,
+                )
+                failed.append(pair)
+                continue
+
+            runs_created.extend(run for run, _ in created)
+
+    return {
+        "runs_created": runs_created,
+        "missing_source_runs": missing_source_runs,
+        "failed": failed,
+    }
 
 
 @transaction.atomic
