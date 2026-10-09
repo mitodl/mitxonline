@@ -357,6 +357,7 @@ def test_publishing_a_stale_contract_revision_keeps_api_written_fields():
     assert contract.welcome_message_extra == "<p>Old extra</p>"
 
 
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
 def test_contract_wagtail_editor_only_edits_what_the_api_does_not(admin_client):
     """The Wagtail edit form loads, links to the dashboard, and can't change API fields."""
 

@@ -188,6 +188,7 @@ def test_patch_contract(
     assert mocked_tasks.code_check.called is queues_code_check
 
 
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
 def test_deactivated_contract_can_be_edited_and_reactivated(admin_drf_client):
     """A contract switched off through the API still takes edits, and switches back on."""
 
@@ -202,6 +203,7 @@ def test_deactivated_contract_can_be_edited_and_reactivated(admin_drf_client):
     assert response.json()["active"] is True
 
 
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
 def test_contract_description_keeps_only_rich_text_markup(admin_drf_client):
     """A description is stored with nothing Wagtail's editor would not store."""
 
