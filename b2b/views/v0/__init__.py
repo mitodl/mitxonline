@@ -389,6 +389,7 @@ class AttachContractApi(APIView):
 class DataConsentAPI(APIView):
     """View for recording data consent for a user on a contract."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAuthenticated]
 
     @extend_schema(

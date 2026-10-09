@@ -115,6 +115,41 @@ paths:
               schema:
                 $ref: '#/components/schemas/ContractPageVariantRunBadRequest'
           description: ''
+  /api/v0/b2b/data_consent/{contract_id}/:
+    post:
+      operationId: b2b_data_consent_create
+      description: View for recording data consent for a user on a contract.
+      parameters:
+      - in: path
+        name: contract_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataConsentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DataConsentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DataConsentRequest'
+        required: true
+      responses:
+        '204':
+          description: No response body
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataConsentValidationError'
+          description: ''
+        '403':
+          description: No response body
   /api/v0/b2b/enroll/{readable_id}/:
     post:
       operationId: b2b_enroll_create
@@ -755,6 +790,1108 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrganizationPage'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/:
+    get:
+      operationId: b2b_provisioning_organizations_list
+      description: |-
+        List organizations, without asking Keycloak about each one.
+
+        domains and redirect_url live only in Keycloak, so they are null here;
+        retrieve an organization to see them. One admin call per row would make
+        the list as slow as the realm is large.
+      parameters:
+      - name: l
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: o
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      - in: query
+        name: onboarding_state
+        schema:
+          type: string
+          enum:
+          - blocked
+          - contract_ready
+          - idp_configured
+          - idp_validated
+          - live
+          - org_created
+          - requested
+        description: |-
+          * `requested` - Requested
+          * `org_created` - Organization created
+          * `idp_configured` - Identity provider configured
+          * `idp_validated` - Identity provider validated
+          * `contract_ready` - Contract ready
+          * `live` - Live
+          * `blocked` - Blocked
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Search by name or org key, case-insensitively.
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProvisionedOrganizationList'
+          description: ''
+    post:
+      operationId: b2b_provisioning_organizations_create
+      description: |-
+        Provision a new organization.
+
+        Writes the Keycloak organization first, then the OrganizationPage and
+        its onboarding record in one transaction, compensating by deleting the
+        Keycloak organization if that transaction fails.
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisionedOrganization'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{org_key}/:
+    get:
+      operationId: b2b_provisioning_organizations_retrieve
+      description: Return an organization, including what Keycloak currently holds.
+      parameters:
+      - in: path
+        name: org_key
+        schema:
+          type: string
+          description: The short key used for the organization (for edX).
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisionedOrganization'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+    patch:
+      operationId: b2b_provisioning_organizations_partial_update
+      description: Update an organization in both systems. org_key cannot change.
+      parameters:
+      - in: path
+        name: org_key
+        schema:
+          type: string
+          description: The short key used for the organization (for edX).
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateOrganizationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateOrganizationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateOrganizationRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisionedOrganization'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{org_key}/events/:
+    get:
+      operationId: b2b_provisioning_organizations_events_list
+      description: |-
+        Return the organization's provisioning changes, newest first.
+
+        The review trail for partner SSO config now that changes are API calls
+        rather than reviewed Pulumi PRs.
+      parameters:
+      - name: l
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: o
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      - in: path
+        name: org_key
+        schema:
+          type: string
+          description: The short key used for the organization (for edX).
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOrganizationProvisioningAuditList'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{org_key}/onboarding/:
+    post:
+      operationId: b2b_provisioning_organizations_onboarding_create
+      description: |-
+        Record where this organization is in the onboarding sequence.
+
+        Descriptive only. Nothing in this API gates on the state; it exists so
+        a human can answer "what is left for this customer" without reading
+        four systems.
+      parameters:
+      - in: path
+        name: org_key
+        schema:
+          type: string
+          description: The short key used for the organization (for edX).
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetOnboardingStateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SetOnboardingStateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SetOnboardingStateRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationOnboarding'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/contracts/:
+    get:
+      operationId: b2b_provisioning_organizations_contracts_list
+      description: |-
+        List the organization's contracts.
+
+        An unknown org_key is a 404, not an empty list.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProvisionedContractList'
+          description: ''
+    post:
+      operationId: b2b_provisioning_organizations_contracts_create
+      description: Create a contract, with its default variant set.
+      parameters:
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateContractRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateContractRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateContractRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisionedContract'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/contracts/{id}/:
+    get:
+      operationId: b2b_provisioning_organizations_contracts_retrieve
+      description: Return a contract.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Contract.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisionedContract'
+          description: ''
+    patch:
+      operationId: b2b_provisioning_organizations_contracts_partial_update
+      description: |-
+        Update a contract.
+
+        Queues the enrollment code check for a contract that uses codes, so a
+        changed price, seat cap or membership type reaches its codes.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Contract.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateContractRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateContractRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateContractRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisionedContract'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/contracts/{id}/codes/:
+    get:
+      operationId: b2b_provisioning_organizations_contracts_codes_list
+      description: List the contract's enrollment codes, with each one's latest assignment.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Contract.
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedManagerEnrollmentCodeList'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/contracts/{id}/codes/assign/:
+    post:
+      operationId: b2b_provisioning_organizations_contracts_codes_assign_create
+      description: |-
+        Assign free enrollment codes to people and email each their code.
+
+        The same assignment as the manager dashboard's bulk assign.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Contract.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
+          multipart/form-data:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkAssignResult'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/contracts/{id}/codes/expire/:
+    post:
+      operationId: b2b_provisioning_organizations_contracts_codes_expire_create
+      description: Take the contract's unused enrollment codes out of it.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Contract.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExpiredEnrollmentCode'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/contracts/{id}/courseware/:
+    post:
+      operationId: b2b_provisioning_organizations_contracts_courseware_create
+      description: |-
+        Add a program, course or course run to the contract.
+
+        Contract runs and their products exist when this returns. Their edX
+        clones are queued, and so is the enrollment code check for a contract
+        that uses codes. Repeating the call does not create another run.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Contract.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContractCoursewareRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ContractCoursewareRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ContractCoursewareRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoursewareAddition'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/contracts/{id}/courseware/remove/:
+    post:
+      operationId: b2b_provisioning_organizations_contracts_courseware_remove_create
+      description: |-
+        Remove a program, course or course run from the contract.
+
+        Runs are closed to new enrollments. A run with enrolled learners stays
+        linked so they keep their course.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Contract.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemoveContractCoursewareRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RemoveContractCoursewareRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RemoveContractCoursewareRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RemovedContractRun'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/contracts/{id}/retry-setup/:
+    post:
+      operationId: b2b_provisioning_organizations_contracts_retry_setup_create
+      description: |-
+        Re-queue failed edX clones and the enrollment code check.
+
+        Returns setup status as it stands after queueing.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Contract.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractSetupStatus'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/contracts/{id}/setup-status/:
+    get:
+      operationId: b2b_provisioning_organizations_contracts_setup_status_retrieve
+      description: Report the edX clones and enrollment codes still outstanding.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Contract.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractSetupStatus'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/contracts/{id}/variants/:
+    get:
+      operationId: b2b_provisioning_organizations_contracts_variants_list
+      description: |-
+        List the contract's variant sets, default first.
+
+        Each set lists the contract's courses that support it, whether each has
+        a source run for it, and the contract's run for it if there is one.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Contract.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ContractVariantSet'
+          description: ''
+    post:
+      operationId: b2b_provisioning_organizations_contracts_variants_create
+      description: |-
+        Add a variant set to the contract.
+
+        Creates no runs. Adding the courseware to the contract again creates
+        runs for the new set.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Contract.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateContractVariantSetRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateContractVariantSetRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateContractVariantSetRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractVariantSet'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/contracts/{id}/variants/{variant_id}/:
+    patch:
+      operationId: b2b_provisioning_organizations_contracts_variants_partial_update
+      description: |-
+        Turn a variant set on or off, or change its b2b_only flag.
+
+        Turning a set off stops new runs being created for it and drops its
+        runs from the contract's course list. Its existing runs and their
+        enrollments are left alone. The default set can't be turned off or
+        made B2B-only.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Contract.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      - in: path
+        name: variant_id
+        schema:
+          type: integer
+        description: The variant set's ID.
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateContractVariantSetRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateContractVariantSetRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateContractVariantSetRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractVariantSet'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/identity-providers/:
+    get:
+      operationId: b2b_provisioning_organizations_identity_providers_list
+      description: |-
+        List the organization's identity providers.
+
+        Resolve the parent first so an unknown org_key is a 404 rather than an
+        empty list. A mistyped key otherwise reads as "this organization has no
+        identity providers", which is the wrong answer to act on.
+      parameters:
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrganizationIdentityProvider'
+          description: ''
+    post:
+      operationId: b2b_provisioning_organizations_identity_providers_create
+      description: |-
+        Provision an identity provider and link it to the organization.
+
+        The IdP lands in `draft`, which is disabled in Keycloak. Nobody can
+        reach it until it is transitioned to `testing`.
+      parameters:
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateIdentityProviderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateIdentityProviderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateIdentityProviderRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationIdentityProvider'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/identity-providers/{alias}/:
+    get:
+      operationId: b2b_provisioning_organizations_identity_providers_retrieve
+      description: Return a single identity provider.
+      parameters:
+      - in: path
+        name: alias
+        schema:
+          type: string
+          description: The Keycloak IdP alias. Realm-wide, not per-organization.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationIdentityProvider'
+          description: ''
+    patch:
+      operationId: b2b_provisioning_organizations_identity_providers_partial_update
+      description: |-
+        Update an identity provider in place.
+
+        Without this, rotating a partner's OIDC client secret or fixing a
+        mapper means deleting the IdP and creating it again, and Keycloak's
+        delete takes every user's federated identity link with it.
+      parameters:
+      - in: path
+        name: alias
+        schema:
+          type: string
+          description: The Keycloak IdP alias. Realm-wide, not per-organization.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateIdentityProviderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateIdentityProviderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateIdentityProviderRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationIdentityProvider'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+    delete:
+      operationId: b2b_provisioning_organizations_identity_providers_destroy
+      description: |-
+        Unlink and delete an identity provider.
+
+        Destructive beyond this API: Keycloak deletes every user's federated
+        identity link to the provider along with it, so everyone who has signed
+        in through it re-links on their next login. Prefer PATCH.
+      parameters:
+      - in: path
+        name: alias
+        schema:
+          type: string
+          description: The Keycloak IdP alias. Realm-wide, not per-organization.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      responses:
+        '204':
+          description: No response body
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/identity-providers/{alias}/refresh-metadata/:
+    post:
+      operationId: b2b_provisioning_organizations_identity_providers_refresh_metadata_create
+      description: |-
+        Re-fetch the partner's metadata and store what came back.
+
+        On failure the stored artifact is left untouched, which is the whole
+        reason it is stored.
+      parameters:
+      - in: path
+        name: alias
+        schema:
+          type: string
+          description: The Keycloak IdP alias. Realm-wide, not per-organization.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationIdentityProvider'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/identity-providers/{alias}/transition/:
+    post:
+      operationId: b2b_provisioning_organizations_identity_providers_transition_create
+      description: |-
+        Move the identity provider's lifecycle state.
+
+        The only mover, and it writes Keycloak's enabled flag in the same
+        operation so the two cannot drift. draft -> active is rejected: an IdP
+        goes live only after somebody has logged in through it.
+      parameters:
+      - in: path
+        name: alias
+        schema:
+          type: string
+          description: The Keycloak IdP alias. Realm-wide, not per-organization.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IdentityProviderTransitionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/IdentityProviderTransitionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/IdentityProviderTransitionRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationIdentityProvider'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/parse-metadata/:
+    post:
+      operationId: b2b_provisioning_parse_metadata_create
+      description: Return the config map Keycloak parses out of the given metadata.
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParseMetadataRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ParseMetadataRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ParseMetadataRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParsedIdentityProviderConfig'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
           description: ''
   /api/v0/b2b/service/organization-manager-check/:
     get:
@@ -2976,6 +4113,41 @@ paths:
           description: ''
 components:
   schemas:
+    ActionEnum:
+      enum:
+      - organization_created
+      - organization_updated
+      - onboarding_changed
+      - identity_provider_created
+      - identity_provider_updated
+      - identity_provider_transitioned
+      - identity_provider_metadata_refreshed
+      - identity_provider_deleted
+      - contract_variant_added
+      - contract_variant_updated
+      type: string
+      description: |-
+        * `organization_created` - Organization created
+        * `organization_updated` - Organization updated
+        * `onboarding_changed` - Onboarding state changed
+        * `identity_provider_created` - Identity provider created
+        * `identity_provider_updated` - Identity provider updated
+        * `identity_provider_transitioned` - Identity provider state changed
+        * `identity_provider_metadata_refreshed` - Identity provider metadata refreshed
+        * `identity_provider_deleted` - Identity provider deleted
+        * `contract_variant_added` - Contract variant set added
+        * `contract_variant_updated` - Contract variant set changed
+      x-enum-descriptions:
+      - Organization created
+      - Organization updated
+      - Onboarding state changed
+      - Identity provider created
+      - Identity provider updated
+      - Identity provider state changed
+      - Identity provider metadata refreshed
+      - Identity provider deleted
+      - Contract variant set added
+      - Contract variant set changed
     AssignRevokeCodeRequestRequest:
       type: object
       description: Serializer for the assign_code request body.
@@ -3604,6 +4776,31 @@ components:
       - Medium-sized (1000-9999 employees)
       - Large Enterprise (10,000+ employees)
       - Other (N/A or Don't know)
+    ContractCoursewareRequest:
+      type: object
+      description: |-
+        Request body for adding courseware to a contract.
+
+        A course run already in another contract is left there and reported as
+        skipped; there is no option to move it.
+      properties:
+        courseware_id:
+          type: string
+          minLength: 1
+          description: Readable ID of a program, course or course run.
+      required:
+      - courseware_id
+    ContractEnrollmentCodeSetup:
+      type: object
+      description: How many enrollment codes a contract needs and has.
+      properties:
+        expected:
+          type: integer
+        existing:
+          type: integer
+      required:
+      - existing
+      - expected
     ContractPage:
       type: object
       description: Serializer for the ContractPage model.
@@ -3680,6 +4877,138 @@ components:
           type: string
       required:
       - detail
+    ContractProgram:
+      type: object
+      description: A program in a contract, in the contract's order.
+      properties:
+        readable_id:
+          type: string
+        title:
+          type: string
+        sort_order:
+          type: integer
+          readOnly: true
+          nullable: true
+      required:
+      - readable_id
+      - sort_order
+      - title
+    ContractRunSetup:
+      type: object
+      description: The edX clone status of one contract run.
+      properties:
+        courseware_id:
+          type: string
+        clone_status:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/CourseRunCloneStatusEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        clone_attempts:
+          type: integer
+        clone_error:
+          type: string
+      required:
+      - clone_attempts
+      - clone_error
+      - clone_status
+      - courseware_id
+    ContractSetupStatus:
+      type: object
+      description: How far a contract's setup has got.
+      properties:
+        status:
+          $ref: '#/components/schemas/ContractSetupStatusEnum'
+        runs:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContractRunSetup'
+        enrollment_codes:
+          $ref: '#/components/schemas/ContractEnrollmentCodeSetup'
+      required:
+      - enrollment_codes
+      - runs
+      - status
+    ContractSetupStatusEnum:
+      enum:
+      - in_progress
+      - complete
+      - failed
+      type: string
+      description: |-
+        * `in_progress` - In progress
+        * `complete` - Complete
+        * `failed` - Failed
+      x-enum-descriptions:
+      - In progress
+      - Complete
+      - Failed
+    ContractVariantCourse:
+      type: object
+      description: One of the contract's courses that a variant set matches.
+      properties:
+        course_id:
+          type: integer
+        readable_id:
+          type: string
+        title:
+          type: string
+        has_source_run:
+          type: boolean
+          description: Whether the course has a source run for this variant to clone.
+        contract_run:
+          type: string
+          nullable: true
+          description: The contract's run for this variant, if it has one.
+      required:
+      - course_id
+      - has_source_run
+      - readable_id
+      - title
+    ContractVariantSet:
+      type: object
+      description: |-
+        One of a contract's variant sets, with the contract's courses it matches.
+
+        A listed course with a source run and no contract run gets a run for this
+        set when its courseware is next added to the contract, if the set is
+        active.
+      properties:
+        id:
+          type: integer
+        language:
+          type: string
+        variant_length:
+          type: string
+        variant_industry:
+          type: string
+        variant_length_label:
+          type: string
+          readOnly: true
+        variant_industry_label:
+          type: string
+          readOnly: true
+        default_variant:
+          type: boolean
+        active:
+          type: boolean
+        b2b_only:
+          type: boolean
+        courses:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContractVariantCourse'
+      required:
+      - active
+      - b2b_only
+      - courses
+      - default_variant
+      - id
+      - language
+      - variant_industry
+      - variant_industry_label
+      - variant_length
+      - variant_length_label
     Country:
       type: object
       description: Serializer for pycountry countries, with states for US/CA
@@ -3703,6 +5032,37 @@ components:
       - code
       - name
       - states
+    CourseRunCloneStatusEnum:
+      enum:
+      - pending
+      - cloning
+      - cloned
+      - failed
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `cloning` - Cloning
+        * `cloned` - Cloned
+        * `failed` - Failed
+      x-enum-descriptions:
+      - Pending
+      - Cloning
+      - Cloned
+      - Failed
+    CoursewareAddition:
+      type: object
+      description: What adding courseware to a contract did.
+      properties:
+        runs_added:
+          type: integer
+        courses_without_source_run:
+          type: integer
+        skipped_reason:
+          type: string
+      required:
+      - courses_without_source_run
+      - runs_added
+      - skipped_reason
     CreateB2BEnrollment:
       type: object
       description: |-
@@ -3757,6 +5117,239 @@ components:
           nullable: true
       required:
       - product_ids
+    CreateContractRequest:
+      type: object
+      description: |-
+        Request body for creating a contract.
+
+        membership_type is required even though the model has a default, as it is
+        for b2b_contract create: how learners join a contract is chosen, not
+        defaulted.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: The name of the contract.
+          maxLength: 255
+        membership_type:
+          allOf:
+          - $ref: '#/components/schemas/MembershipTypeEnum'
+          description: |-
+            The method to use to manage membership in the contract.
+
+            * `managed` - Managed
+            * `code` - Enrollment Code
+            * `auto` - Auto Enrollment
+        description:
+          type: string
+          description: Any useful extra information about the contract.
+        welcome_message:
+          type: string
+          description: A welcome message for learners.
+          maxLength: 255
+        contract_start:
+          type: string
+          format: date
+          nullable: true
+          description: The start date of the contract.
+        contract_end:
+          type: string
+          format: date
+          nullable: true
+          description: The end date of the contract.
+        max_learners:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+          description: The maximum number of learners allowed under this contract.
+            (Set to zero or leave blank for unlimited.)
+        enrollment_fixed_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          description: The fixed price for enrollment under this contract. (Set to
+            zero or leave blank for free.)
+      required:
+      - membership_type
+      - name
+    CreateContractVariantSetRequest:
+      type: object
+      description: |-
+        Request body for adding a variant set to a contract.
+
+        The set is never the default: every contract already has one.
+      properties:
+        language:
+          allOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          description: |-
+            ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr'). Leave blank for unspecified.
+
+            * `af_ZA` - af_ZA
+            * `ar` - ar
+            * `az` - az
+            * `bo` - bo
+            * `da` - da
+            * `de` - de
+            * `de_DE` - de_DE
+            * `el` - el
+            * `es_419` - es_419
+            * `es_ES` - es_ES
+            * `en` - en
+            * `fa` - fa
+            * `fr` - fr
+            * `fr_CA` - fr_CA
+            * `he` - he
+            * `hi` - hi
+            * `hu` - hu
+            * `id` - id
+            * `it_IT` - it_IT
+            * `ja` - ja
+            * `ka` - ka
+            * `kk` - kk
+            * `ko` - ko
+            * `lv` - lv
+            * `nl` - nl
+            * `pl` - pl
+            * `pt_BR` - pt_BR
+            * `pt_PT` - pt_PT
+            * `ro` - ro
+            * `ru` - ru
+            * `sq` - sq
+            * `sv` - sv
+            * `sw` - sw
+            * `te` - te
+            * `th` - th
+            * `tr_TR` - tr_TR
+            * `uk` - uk
+            * `uz` - uz
+            * `vi` - vi
+            * `zh_CN` - zh_CN
+            * `zh_HANS` - zh_HANS
+            * `zh_HK` - zh_HK
+        variant_length:
+          description: |-
+            Variant: Describes the length of the run (short/long).
+
+            * `` - Full
+            * `S` - Short
+          oneOf:
+          - $ref: '#/components/schemas/VariantLengthEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        variant_industry:
+          description: |-
+            Variant: Describes the industry the run is adapted for.
+
+            * `` - Original
+            * `E` - Energy
+            * `F` - Finance
+            * `HC` - Healthcare
+            * `M` - Manufacturing
+          oneOf:
+          - $ref: '#/components/schemas/VariantIndustryEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        b2b_only:
+          type: boolean
+          title: Set if this variant only applies within a B2B context.
+      required:
+      - language
+    CreateIdentityProviderRequest:
+      type: object
+      description: Request body for provisioning an identity provider.
+      properties:
+        alias:
+          type: string
+          minLength: 1
+          maxLength: 255
+        protocol:
+          $ref: '#/components/schemas/IdentityProviderProtocolEnum'
+        display_name:
+          type: string
+          default: ''
+          maxLength: 255
+        metadata_url:
+          type: string
+          format: uri
+        metadata_xml:
+          type: string
+        discovery_url:
+          type: string
+          format: uri
+        client_id:
+          type: string
+        client_secret:
+          type: string
+        attribute_map:
+          type: object
+          additionalProperties:
+            type: string
+            minLength: 1
+        attribute_name_map:
+          type: object
+          additionalProperties:
+            type: string
+            minLength: 1
+      required:
+      - alias
+      - protocol
+    CreateOrganizationRequest:
+      type: object
+      description: Request body for provisioning a new organization.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        org_key:
+          type: string
+          minLength: 1
+          pattern: ^[A-Za-z0-9_.\-]+$
+          maxLength: 30
+        org_key_prefix:
+          type: string
+          pattern: ^[A-Za-z0-9_.\-]+$
+          maxLength: 30
+        domains:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        description:
+          type: string
+          default: ''
+        redirect_url:
+          type: string
+          default: ''
+      required:
+      - name
+      - org_key
+    DataConsentFieldErrors:
+      type: object
+      properties:
+        consented:
+          type: array
+          items:
+            type: string
+          description: Errors for the 'consented' field, e.g. if missing or not a
+            boolean.
+    DataConsentRequest:
+      type: object
+      description: Records whether a user has consented to data sharing for a contract
+      properties:
+        consented:
+          type: boolean
+      required:
+      - consented
+    DataConsentValidationError:
+      type: object
+      description: Default DRF is_valid(raise_exception=True) error shape for DataConsentSerializer.
+      properties:
+        errors:
+          $ref: '#/components/schemas/DataConsentFieldErrors'
+      required:
+      - errors
     DetailError:
       type: object
       description: Serializer for generic detail error responses (404, etc.).
@@ -3979,6 +5572,18 @@ components:
       - b2b-error-missing-enrollment-code
       - b2b-invalid-basket
       - basket-empty
+    ExpiredEnrollmentCode:
+      type: object
+      description: An unused enrollment code taken out of a contract.
+      properties:
+        code:
+          type: string
+        deleted:
+          type: boolean
+          description: False when the code still applies to products outside the contract.
+      required:
+      - code
+      - deleted
     ExtendedLegalAddress:
       type: object
       description: Serializer class that includes email address as part of the legal
@@ -4028,7 +5633,7 @@ components:
           - $ref: '#/components/schemas/User'
           readOnly: true
         status:
-          $ref: '#/components/schemas/StatusEnum'
+          $ref: '#/components/schemas/FlexiblePriceAdminStatusEnum'
         country_of_income:
           type: string
           nullable: true
@@ -4074,7 +5679,7 @@ components:
       description: Serializer for Financial Assistance Requests
       properties:
         status:
-          $ref: '#/components/schemas/StatusEnum'
+          $ref: '#/components/schemas/FlexiblePriceAdminStatusEnum'
         country_of_income:
           type: string
           nullable: true
@@ -4093,6 +5698,29 @@ components:
           nullable: true
         country_of_residence:
           type: string
+    FlexiblePriceAdminStatusEnum:
+      enum:
+      - approved
+      - auto-approved
+      - created
+      - pending-manual-approval
+      - denied
+      - reset
+      type: string
+      description: |-
+        * `approved` - approved
+        * `auto-approved` - auto-approved
+        * `created` - created
+        * `pending-manual-approval` - pending-manual-approval
+        * `denied` - denied
+        * `reset` - reset
+      x-enum-descriptions:
+      - approved
+      - auto-approved
+      - created
+      - pending-manual-approval
+      - denied
+      - reset
     FlexiblePriceCoursewareAdmin:
       type: object
       description: Serializer for coursewares in flexible price requests
@@ -4252,6 +5880,65 @@ components:
       - Elementary/primary school
       - No formal education
       - Other education
+    IdentityProviderLifecycleStateEnum:
+      enum:
+      - draft
+      - testing
+      - active
+      - disabled
+      type: string
+      description: |-
+        * `draft` - Draft
+        * `testing` - Testing
+        * `active` - Active
+        * `disabled` - Disabled
+      x-enum-descriptions:
+      - Draft
+      - Testing
+      - Active
+      - Disabled
+    IdentityProviderProtocolEnum:
+      enum:
+      - saml
+      - oidc
+      type: string
+      description: |-
+        * `saml` - SAML
+        * `oidc` - OIDC
+      x-enum-descriptions:
+      - SAML
+      - OIDC
+    IdentityProviderServiceProvider:
+      type: object
+      description: |-
+        Our side of an IdP integration: what the partner configures their IdP with.
+
+        redirect_uri is the SAML assertion consumer service (ACS) URL for a SAML
+        IdP, and the OAuth redirect URI for an OIDC one.
+      properties:
+        entity_id:
+          type: string
+          nullable: true
+          description: The SAML SP entity ID. Null for OIDC.
+        redirect_uri:
+          type: string
+          description: The SAML ACS URL, or the OIDC redirect URI.
+        metadata_url:
+          type: string
+          nullable: true
+          description: The SAML SP metadata descriptor. Null for OIDC.
+      required:
+      - entity_id
+      - metadata_url
+      - redirect_uri
+    IdentityProviderTransitionRequest:
+      type: object
+      description: Request body for moving an identity provider's lifecycle state.
+      properties:
+        state:
+          $ref: '#/components/schemas/IdentityProviderLifecycleStateEnum'
+      required:
+      - state
     LanguageEnum:
       enum:
       - af_ZA
@@ -4716,6 +6403,20 @@ components:
       - redeemed_by
       - redeemed_on
       - redemption_status
+    MembershipTypeEnum:
+      enum:
+      - managed
+      - code
+      - auto
+      type: string
+      description: |-
+        * `managed` - Managed
+        * `code` - Enrollment Code
+        * `auto` - Auto Enrollment
+      x-enum-descriptions:
+      - Managed
+      - Enrollment Code
+      - Auto Enrollment
     Nested:
       type: object
       properties:
@@ -4796,6 +6497,32 @@ components:
     NullEnum:
       enum:
       - null
+    OnboardingStateEnum:
+      enum:
+      - requested
+      - org_created
+      - idp_configured
+      - idp_validated
+      - contract_ready
+      - live
+      - blocked
+      type: string
+      description: |-
+        * `requested` - Requested
+        * `org_created` - Organization created
+        * `idp_configured` - Identity provider configured
+        * `idp_validated` - Identity provider validated
+        * `contract_ready` - Contract ready
+        * `live` - Live
+        * `blocked` - Blocked
+      x-enum-descriptions:
+      - Requested
+      - Organization created
+      - Identity provider configured
+      - Identity provider validated
+      - Contract ready
+      - Live
+      - Blocked
     Order:
       type: object
       properties:
@@ -4996,6 +6723,78 @@ components:
       - reference_number
       - state
       - total_price_paid
+    OrganizationIdentityProvider:
+      type: object
+      description: |-
+        An identity provider we provisioned for an organization.
+
+        metadata_artifact is what Keycloak parsed out of the partner's metadata.
+        Credentials are never written to it, so this is safe to serve.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        alias:
+          type: string
+          readOnly: true
+          description: The Keycloak IdP alias. Realm-wide, not per-organization.
+        protocol:
+          allOf:
+          - $ref: '#/components/schemas/IdentityProviderProtocolEnum'
+          readOnly: true
+        display_name:
+          type: string
+          readOnly: true
+        lifecycle_state:
+          allOf:
+          - $ref: '#/components/schemas/IdentityProviderLifecycleStateEnum'
+          readOnly: true
+        internal_id:
+          type: string
+          readOnly: true
+          description: Keycloak's internalId for the IdP instance.
+        metadata_source:
+          type: string
+          readOnly: true
+          description: 'The metadata URL, or the inline XML, the config was parsed
+            from. Not blankable: refreshing an IdP re-reads this, so a row without
+            one cannot be refreshed.'
+        metadata_artifact:
+          readOnly: true
+          nullable: true
+          description: The config map Keycloak parsed out of the metadata. Persisted
+            so a partner's metadata endpoint going away can neither destroy config
+            nor block a deploy.
+        metadata_fetched_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        service_provider:
+          allOf:
+          - $ref: '#/components/schemas/IdentityProviderServiceProvider'
+          readOnly: true
+        created_on:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_on:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - alias
+      - created_on
+      - display_name
+      - id
+      - internal_id
+      - lifecycle_state
+      - metadata_artifact
+      - metadata_fetched_at
+      - metadata_source
+      - protocol
+      - service_provider
+      - updated_on
     OrganizationManagerCheck:
       type: object
       description: Response shape for the org-manager check.
@@ -5005,6 +6804,21 @@ components:
           description: True if the user manages the organization.
       required:
       - is_manager
+    OrganizationOnboarding:
+      type: object
+      description: Where an organization is in the onboarding sequence.
+      properties:
+        state:
+          $ref: '#/components/schemas/OnboardingStateEnum'
+        state_changed_at:
+          type: string
+          format: date-time
+          readOnly: true
+        notes:
+          type: string
+          description: Free-form operator notes; holds the reason when state is blocked.
+      required:
+      - state_changed_at
     OrganizationPage:
       type: object
       description: Serializer for the OrganizationPage model.
@@ -5051,6 +6865,43 @@ components:
       - name
       - slug
       - sso_organization_id
+    OrganizationProvisioningAudit:
+      type: object
+      description: One recorded provisioning change.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        action:
+          allOf:
+          - $ref: '#/components/schemas/ActionEnum'
+          readOnly: true
+        identity_provider_alias:
+          type: string
+          readOnly: true
+        actor:
+          allOf:
+          - $ref: '#/components/schemas/ProvisioningAuditActor'
+          readOnly: true
+          nullable: true
+        data_before:
+          readOnly: true
+          nullable: true
+        data_after:
+          readOnly: true
+          nullable: true
+        created_on:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - action
+      - actor
+      - created_on
+      - data_after
+      - data_before
+      - id
+      - identity_provider_alias
     PaginatedBaseContractPageList:
       type: object
       required:
@@ -5281,6 +7132,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OrganizationPage'
+    PaginatedOrganizationProvisioningAuditList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?o=400&l=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?o=200&l=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrganizationProvisioningAudit'
     PaginatedProductList:
       type: object
       required:
@@ -5304,6 +7178,52 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Product'
+    PaginatedProvisionedContractList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProvisionedContract'
+    PaginatedProvisionedOrganizationList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?o=400&l=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?o=200&l=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProvisionedOrganization'
     PaginatedStaffDashboardUserList:
       type: object
       required:
@@ -5373,6 +7293,31 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/V0Discount'
+    ParseMetadataRequest:
+      type: object
+      description: |-
+        Request body for parsing IdP metadata without creating anything.
+
+        Exactly one of metadata_url or metadata_xml.
+      properties:
+        protocol:
+          $ref: '#/components/schemas/IdentityProviderProtocolEnum'
+        metadata_url:
+          type: string
+          format: uri
+        metadata_xml:
+          type: string
+      required:
+      - protocol
+    ParsedIdentityProviderConfig:
+      type: object
+      properties:
+        config:
+          type: object
+          additionalProperties:
+            type: string
+      required:
+      - config
     PatchedChangeEmailRequestUpdateRequest:
       type: object
       description: Serializer for confirming a user email change
@@ -5401,7 +7346,7 @@ components:
       description: Serializer for Financial Assistance Requests
       properties:
         status:
-          $ref: '#/components/schemas/StatusEnum'
+          $ref: '#/components/schemas/FlexiblePriceAdminStatusEnum'
         country_of_income:
           type: string
           nullable: true
@@ -5444,6 +7389,135 @@ components:
         is_active:
           type: boolean
           description: Controls visibility of the product in the app.
+    PatchedUpdateContractRequest:
+      type: object
+      description: |-
+        Request body for updating a contract.
+
+        Enrollment codes are not changed here. The view queues the code check
+        afterwards for a contract that uses codes.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: The name of the contract.
+          maxLength: 255
+        membership_type:
+          allOf:
+          - $ref: '#/components/schemas/MembershipTypeEnum'
+          description: |-
+            The method to use to manage membership in the contract.
+
+            * `managed` - Managed
+            * `code` - Enrollment Code
+            * `auto` - Auto Enrollment
+        description:
+          type: string
+          description: Any useful extra information about the contract.
+        welcome_message:
+          type: string
+          description: A welcome message for learners.
+          maxLength: 255
+        contract_start:
+          type: string
+          format: date
+          nullable: true
+          description: The start date of the contract.
+        contract_end:
+          type: string
+          format: date
+          nullable: true
+          description: The end date of the contract.
+        max_learners:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+          description: The maximum number of learners allowed under this contract.
+            (Set to zero or leave blank for unlimited.)
+        enrollment_fixed_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          description: The fixed price for enrollment under this contract. (Set to
+            zero or leave blank for free.)
+        active:
+          type: boolean
+          description: Whether this contract is active or not. Date rules still apply.
+    PatchedUpdateContractVariantSetRequest:
+      type: object
+      description: Request body for changing a contract's variant set.
+      properties:
+        active:
+          type: boolean
+        b2b_only:
+          type: boolean
+    PatchedUpdateIdentityProviderRequest:
+      type: object
+      description: |-
+        Request body for updating an identity provider.
+
+        The protocol comes from the instance, through the context, because which
+        fields make sense depends on it: a client secret on a SAML IdP would be
+        written into its Keycloak config and never read.
+
+        alias and protocol are rejected rather than ignored. Keycloak refuses an
+        alias change outright, and changing the protocol is a different identity
+        provider, not an edit to this one.
+      properties:
+        display_name:
+          type: string
+          maxLength: 255
+        metadata_url:
+          type: string
+          format: uri
+          minLength: 1
+        metadata_xml:
+          type: string
+          minLength: 1
+        discovery_url:
+          type: string
+          format: uri
+          minLength: 1
+        client_id:
+          type: string
+          minLength: 1
+        client_secret:
+          type: string
+          minLength: 1
+        attribute_map:
+          type: object
+          additionalProperties:
+            type: string
+            minLength: 1
+        attribute_name_map:
+          type: object
+          additionalProperties:
+            type: string
+            minLength: 1
+    PatchedUpdateOrganizationRequest:
+      type: object
+      description: |-
+        Request body for updating an organization.
+
+        org_key is rejected rather than silently ignored. It is in every B2B
+        courseware ID via create_contract_run_key, so a caller who thinks they
+        changed it and did not is worse off than one who got an error.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+        redirect_url:
+          type: string
+        domains:
+          type: array
+          items:
+            type: string
+            minLength: 1
     PatchedUserDiscountMetaRequest:
       type: object
       description: Serializes UserDiscount but only allows depth = 1
@@ -5678,6 +7752,189 @@ components:
       required:
       - description
       - price
+    ProvisionedContract:
+      type: object
+      description: A contract as the staff contract API sees it.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+          description: The name of the contract.
+        slug:
+          type: string
+          readOnly: true
+          description: The name of the page as it will appear in URLs e.g http://domain.com/blog/[my-slug]/
+          pattern: ^[-\w]+$
+        organization:
+          type: integer
+          readOnly: true
+          description: The organization that owns this contract.
+        membership_type:
+          allOf:
+          - $ref: '#/components/schemas/MembershipTypeEnum'
+          readOnly: true
+          description: |-
+            The method to use to manage membership in the contract.
+
+            * `managed` - Managed
+            * `code` - Enrollment Code
+            * `auto` - Auto Enrollment
+        description:
+          type: string
+          readOnly: true
+          description: Any useful extra information about the contract.
+        welcome_message:
+          type: string
+          readOnly: true
+          description: A welcome message for learners.
+        contract_start:
+          type: string
+          format: date
+          readOnly: true
+          nullable: true
+          description: The start date of the contract.
+        contract_end:
+          type: string
+          format: date
+          readOnly: true
+          nullable: true
+          description: The end date of the contract.
+        active:
+          type: boolean
+          readOnly: true
+          description: Whether this contract is active or not. Date rules still apply.
+        max_learners:
+          type: integer
+          readOnly: true
+          nullable: true
+          description: The maximum number of learners allowed under this contract.
+            (Set to zero or leave blank for unlimited.)
+        enrollment_fixed_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+          description: The fixed price for enrollment under this contract. (Set to
+            zero or leave blank for free.)
+        programs:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContractProgram'
+          readOnly: true
+      required:
+      - active
+      - contract_end
+      - contract_start
+      - description
+      - enrollment_fixed_price
+      - id
+      - max_learners
+      - membership_type
+      - name
+      - organization
+      - programs
+      - slug
+      - welcome_message
+    ProvisionedOrganization:
+      type: object
+      description: |-
+        An organization as the provisioning API sees it.
+
+        `domains` and `redirect_url` live only in Keycloak, so they are populated
+        from the representation the view fetched rather than from our database.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+          description: The name of the organization
+        org_key:
+          type: string
+          readOnly: true
+          description: The short key used for the organization (for edX).
+        org_key_prefix:
+          type: string
+          readOnly: true
+          description: Prepended to the org key in courseware IDs, e.g. UAI_. Blank
+            means no prefix.
+        description:
+          type: string
+          readOnly: true
+          description: Any useful extra information about the organization
+        slug:
+          type: string
+          readOnly: true
+          description: The name of the page as it will appear in URLs e.g http://domain.com/blog/[my-slug]/
+          pattern: ^[-\w]+$
+        sso_organization_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+          title: Organization SSO ID
+          description: The UUID for the organization in the SSO provider.
+        domains:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Return the organization's Keycloak domains, if they were fetched.
+          readOnly: true
+        redirect_url:
+          type: string
+          nullable: true
+          description: Return the organization's Keycloak redirect URL, if it was
+            fetched.
+          readOnly: true
+        onboarding:
+          allOf:
+          - $ref: '#/components/schemas/OrganizationOnboarding'
+          readOnly: true
+        identity_providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrganizationIdentityProvider'
+          readOnly: true
+      required:
+      - description
+      - domains
+      - id
+      - identity_providers
+      - name
+      - onboarding
+      - org_key
+      - org_key_prefix
+      - redirect_url
+      - slug
+      - sso_organization_id
+    ProvisioningAuditActor:
+      type: object
+      description: The staff user who made a provisioning change.
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+      required:
+      - email
+      - id
+      - username
+    ProvisioningDetail:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
     PublicUser:
       type: object
       description: Serializer for public user data
@@ -5840,6 +8097,32 @@ components:
       - Review Required
       - Window Closed
       - Ineligible
+    RemoveContractCoursewareRequest:
+      type: object
+      description: Request body for removing courseware from a contract.
+      properties:
+        courseware_id:
+          type: string
+          minLength: 1
+          description: Readable ID of a program, course or course run.
+        remove_program_runs:
+          type: boolean
+          default: false
+          description: For a program, also remove its courses' runs from the contract.
+      required:
+      - courseware_id
+    RemovedContractRun:
+      type: object
+      description: A contract run that was removed from a contract.
+      properties:
+        courseware_id:
+          type: string
+        unlinked:
+          type: boolean
+          description: False when the run stays linked because learners are enrolled.
+      required:
+      - courseware_id
+      - unlinked
     ResultEnum:
       enum:
       - b2b-disallowed
@@ -5906,6 +8189,16 @@ components:
           type: string
       required:
       - detail
+    SetOnboardingStateRequest:
+      type: object
+      description: Request body for recording an organization's onboarding state.
+      properties:
+        state:
+          $ref: '#/components/schemas/OnboardingStateEnum'
+        notes:
+          type: string
+      required:
+      - state
     StaffDashboardUser:
       type: object
       description: Serializer for data we care about in the staff dashboard
@@ -5969,29 +8262,6 @@ components:
       - Refunded
       - Review
       - Partially Refunded
-    StatusEnum:
-      enum:
-      - approved
-      - auto-approved
-      - created
-      - pending-manual-approval
-      - denied
-      - reset
-      type: string
-      description: |-
-        * `approved` - approved
-        * `auto-approved` - auto-approved
-        * `created` - created
-        * `pending-manual-approval` - pending-manual-approval
-        * `denied` - denied
-        * `reset` - reset
-      x-enum-descriptions:
-      - approved
-      - auto-approved
-      - created
-      - pending-manual-approval
-      - denied
-      - reset
     SupportedVariant:
       type: object
       description: Serializer for the SupportedVariant model.
