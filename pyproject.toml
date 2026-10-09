@@ -32,14 +32,12 @@ dependencies = [
     "django-viewflow>=2.2.7,<3",
     "django-webpack-loader>=3.0.0,<4",
     "djangorestframework==3.17.2",
-    "djoser>=2.1.0,<3",
     "drf-extensions>=0.8.0,<0.9",
     "drf-spectacular>=0.29.0,<0.30",
     "edx-api-client>=1.14.0,<2",
     "hubspot-api-client>=12.0.0,<13",
     "ipython>=9.13,<10",
     "mitol-django-apigateway==2026.4.29",
-    "mitol-django-authentication==2026.4.29",
     "mitol-django-common==2026.6.16.4",
     "mitol-django-hubspot-api==2026.4.29",
     "mitol-django-mail==2026.4.29",
@@ -87,6 +85,7 @@ dependencies = [
     "pydantic>=2.13.4",
     "pynacl>=1.6.2",
     "datamodel-code-generator[http]>=0.72.4",
+    "pyjwt==2.14.0",
 ]
 
 [dependency-groups]
