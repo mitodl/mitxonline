@@ -81,4 +81,4 @@ repos:
         files: '(serializers\.py$|serializers/.*\.py$)'
         additional_dependencies:
           - "mitol-drf-lint==2026.8.28"
-          - "setuptools<82"
+          - "setuptools<84"
