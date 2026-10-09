@@ -70,6 +70,8 @@ class LearnUserAdapter(UserAdapter):
         ("fullName", None, None): "name",
     }
 
+    FULL_NAME_PATH = ("fullName", None, None)
+
     obj: "User"
 
     user_profile: UserProfile
@@ -191,7 +193,9 @@ class LearnUserAdapter(UserAdapter):
         self.obj.scim_username = d.get("userName")
         self.obj.scim_external_id = d.get("externalId")
         self.obj.global_id = self.obj.scim_external_id or ""
-        self.obj.name = d.get("fullName", self.obj.name)
+        full_name = self._clean_full_name(d.get("fullName"))
+        if full_name:
+            self.obj.name = full_name
 
         # Inbound name.givenName/familyName always writes to legal_address
         # directly - this is real data from an external SCIM client, never
@@ -208,6 +212,36 @@ class LearnUserAdapter(UserAdapter):
         family_name = (name.get("familyName") or "").strip()
         if family_name:
             self.legal_address.last_name = family_name
+
+    @staticmethod
+    def _clean_full_name(value: object) -> str:
+        """
+        Normalize an inbound fullName, returning "" when it carries no value.
+
+        Keycloak sends ``fullName: null`` for every user whose attribute is
+        empty. User.name is a non-nullable column, so writing that through
+        fails the save, the view returns a 500, and Keycloak retries the same
+        payload. A null or blank fullName is "no value provided" and leaves the
+        stored name alone, the same rule from_dict applies to
+        name.givenName/familyName. Anything that is not a string is also "no
+        value": the column holds text, and a client has no other type to send.
+        """
+        return value.strip() if isinstance(value, str) else ""
+
+    def _handle_resplace_nested_path(self, nested_path, nested_value):
+        """
+        Skip a PATCH replace of fullName that carries no value.
+
+        The parent resolves the path through ATTR_MAP with a plain setattr, so
+        this is the only place a null can be stopped before it reaches
+        User.name. Returning True marks the path handled.
+        """
+        if nested_path.first_path == self.FULL_NAME_PATH:
+            full_name = self._clean_full_name(nested_value)
+            if not full_name:
+                return True
+            nested_value = full_name
+        return super()._handle_resplace_nested_path(nested_path, nested_value)
 
     def _save_related(self):
         self.user_profile.user = self.obj

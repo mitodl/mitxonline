@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from mitol.scim.requests import InMemoryHttpRequest
 
@@ -205,6 +207,89 @@ def test_learn_user_adapter_blank_fields():
     assert user.name == "Joe Smith"
     assert user.legal_address.first_name == "Joe"
     assert user.legal_address.last_name == "Smith"
+
+
+@pytest.mark.parametrize("full_name", [None, "", "   "])
+def test_learn_user_adapter_from_dict_empty_full_name_keeps_name(full_name):
+    """A null or blank fullName on a full replace leaves User.name alone. The
+    column is non-nullable, so writing None through raises an IntegrityError
+    """
+    user = UserFactory.create(name="Joe Smith")
+
+    adapter = LearnUserAdapter(user)
+    adapter.from_dict(_unchanged_payload(user, fullName=full_name))
+    adapter.save()
+
+    user.refresh_from_db()
+    assert user.name == "Joe Smith"
+
+
+@pytest.mark.parametrize("encode", [lambda value: value, json.dumps])
+@pytest.mark.parametrize("full_name", [None, "", "   "])
+def test_learn_user_adapter_patch_empty_full_name_keeps_name(full_name, encode):
+    """A PATCH replace of fullName with null or blank is skipped rather than
+    setattr'd onto User.name. This is the payload Keycloak sends for a user
+    with no fullName attribute, and scim-for-keycloak sends the value as a
+    JSON-encoded string rather than an object
+    """
+    user = UserFactory.create(name="Joe Smith")
+
+    adapter = LearnUserAdapter(user)
+    adapter.handle_operations(
+        [{"op": "replace", "path": None, "value": encode({"fullName": full_name})}]
+    )
+
+    user.refresh_from_db()
+    assert user.name == "Joe Smith"
+
+
+@pytest.mark.parametrize("encode", [lambda value: value, json.dumps])
+def test_learn_user_adapter_patch_full_name_is_stripped(encode):
+    """A PATCH replace of fullName with a real value still lands"""
+    user = UserFactory.create(name="Joe Smith")
+
+    adapter = LearnUserAdapter(user)
+    adapter.handle_operations(
+        [
+            {
+                "op": "replace",
+                "path": None,
+                "value": encode({"fullName": " Joseph Smith "}),
+            }
+        ]
+    )
+
+    user.refresh_from_db()
+    assert user.name == "Joseph Smith"
+
+
+def test_learn_user_adapter_from_dict_full_name_is_stripped():
+    """A full replace with a real fullName still lands"""
+    user = UserFactory.create(name="Joe Smith")
+
+    adapter = LearnUserAdapter(user)
+    adapter.from_dict(_unchanged_payload(user, fullName=" Joseph Smith "))
+    adapter.save()
+
+    user.refresh_from_db()
+    assert user.name == "Joseph Smith"
+
+
+def test_learn_user_adapter_create_with_null_full_name():
+    """A new user created with a null fullName saves with the column default"""
+    adapter = LearnUserAdapter(User())
+    adapter.from_dict(
+        {
+            "active": True,
+            "userName": "brandnew",
+            "externalId": "new-1",
+            "emails": [{"value": "brandnew@example.com", "primary": True}],
+            "fullName": None,
+        }
+    )
+    adapter.save()
+
+    assert User.objects.get(username="brandnew").name == ""
 
 
 def _sync_mocks(mocker):
