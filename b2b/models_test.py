@@ -7,7 +7,7 @@ import faker
 import pytest
 
 from b2b.api import ensure_enrollment_codes_exist
-from b2b.constants import CONTRACT_MEMBERSHIP_CODE
+from b2b.constants import CONTRACT_MEMBERSHIP_CODE, CONTRACT_MEMBERSHIP_MANAGED
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.models import DiscountContractAttachmentRedemption
 from courses.factories import (
@@ -263,3 +263,42 @@ def test_organization_description_html_to_text(value, expected):
     )
 
     assert migration.html_to_text(value) == expected
+
+
+def test_reconcile_all_user_contracts():
+    """Test that the contract reconciliation works as expected"""
+
+    org = OrganizationPageFactory.create()
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED, organization=org
+    )
+
+    users = UserFactory.create_batch(4)
+    for user in users:
+        user.b2b_contracts.add(contract)
+        user.b2b_organizations.add(org)
+
+    org_only_users = UserFactory.create_batch(2)
+    for user in org_only_users:
+        user.b2b_organizations.add(org)
+
+    contract_only_users = UserFactory.create_batch(2)
+    for user in contract_only_users:
+        user.b2b_contracts.add(contract)
+
+    reconciliation_result = org.reconcile_all_user_contracts()
+
+    assert str(contract) in reconciliation_result
+    assert len(reconciliation_result[str(contract)]["added"]) == 2
+    assert len(reconciliation_result[str(contract)]["removed"]) == 2
+
+    expected_users = [user.id for user in [*users, *org_only_users]]
+
+    b2b_contract_user_qs = contract.b2b_contract_users.filter(
+        user__id__in=expected_users
+    )
+
+    assert b2b_contract_user_qs.count() == 6
+
+    for user in contract_only_users:
+        assert not user.user_b2b_contracts.filter(contract_page=contract).exists()
