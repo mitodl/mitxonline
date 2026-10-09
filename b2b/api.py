@@ -1029,6 +1029,8 @@ def ensure_contract_run_pricing(contract: ContractPage) -> int:
 
     products = contract.get_products()
 
+    updated_count = 0
+
     for product in products:
         if product.purchasable_object.b2b_only:
             product.price = (
@@ -1037,8 +1039,12 @@ def ensure_contract_run_pricing(contract: ContractPage) -> int:
                 else Decimal(0)
             )
 
-    with reversion.create_revision():
-        return Product.objects.bulk_update(products, ["price"])
+            # This did do bulk_update, but that doesn't trigger version creation.
+            with reversion.create_revision():
+                product.save()
+                updated_count += 1
+
+    return updated_count
 
 
 def _get_discount_defaults(discount_amount: Decimal) -> dict:

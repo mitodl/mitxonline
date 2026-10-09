@@ -1523,20 +1523,36 @@ def test_ensure_contract_run_products():
     assert created_products[0].purchasable_object == run
 
 
-def test_ensure_contract_run_pricing():
+@pytest.mark.parametrize(
+    "is_b2b_only",
+    [
+        True,
+        False,
+    ],
+)
+def test_ensure_contract_run_pricing(is_b2b_only):
     """Test that runs with bad pricing get fixed."""
 
+    bad_price = Decimal(76)
     contract = ContractPageFactory.create(enrollment_fixed_price=19)
 
-    run = CourseRunFactory.create(b2b_only=True)
+    run = CourseRunFactory.create(b2b_only=is_b2b_only)
     run.b2b_contracts.add(contract)
 
-    product = ProductFactory.create(price=76, purchasable_object=run)
+    with reversion.create_revision():
+        product = ProductFactory.create(price=bad_price, purchasable_object=run)
 
     ensure_contract_run_pricing(contract)
 
     product.refresh_from_db()
-    assert product.price == contract.enrollment_fixed_price
+    assert product.price == (
+        contract.enrollment_fixed_price if is_b2b_only else bad_price
+    )
+
+    product_version = reversion.models.Version.objects.get_for_object(product).first()
+    assert product_version.field_dict["price"] == (
+        contract.enrollment_fixed_price if is_b2b_only else bad_price
+    )
 
 
 def test_remove_extra_codes():
