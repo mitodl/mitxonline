@@ -1757,7 +1757,7 @@ paths:
   /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/identity-providers/{alias}/:
     get:
       operationId: b2b_provisioning_organizations_identity_providers_retrieve
-      description: Return a single identity provider.
+      description: Return an identity provider, including its attribute mappers.
       parameters:
       - in: path
         name: alias
@@ -1778,7 +1778,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OrganizationIdentityProvider'
+                $ref: '#/components/schemas/OrganizationIdentityProviderDetail'
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
           description: ''
     patch:
       operationId: b2b_provisioning_organizations_identity_providers_partial_update
@@ -9778,6 +9784,91 @@ components:
           readOnly: true
       required:
       - alias
+      - created_on
+      - display_name
+      - id
+      - internal_id
+      - lifecycle_state
+      - metadata_artifact
+      - metadata_fetched_at
+      - metadata_source
+      - protocol
+      - service_provider
+      - updated_on
+    OrganizationIdentityProviderDetail:
+      type: object
+      description: |-
+        A single identity provider, with the attribute mappers Keycloak holds.
+
+        The mappers are stored only in Keycloak, so the view reads them back and
+        attaches them. They are left off the list and off an organization's nested
+        identity providers, which would cost a Keycloak call per IdP.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        alias:
+          type: string
+          readOnly: true
+          description: The Keycloak IdP alias. Realm-wide, not per-organization.
+        protocol:
+          allOf:
+          - $ref: '#/components/schemas/IdentityProviderProtocolEnum'
+          readOnly: true
+        display_name:
+          type: string
+          readOnly: true
+        lifecycle_state:
+          allOf:
+          - $ref: '#/components/schemas/IdentityProviderLifecycleStateEnum'
+          readOnly: true
+        internal_id:
+          type: string
+          readOnly: true
+          description: Keycloak's internalId for the IdP instance.
+        metadata_source:
+          type: string
+          readOnly: true
+          description: 'The metadata URL, or the inline XML, the config was parsed
+            from. Not blankable: refreshing an IdP re-reads this, so a row without
+            one cannot be refreshed.'
+        metadata_artifact:
+          readOnly: true
+          nullable: true
+          description: The config map Keycloak parsed out of the metadata. Persisted
+            so a partner's metadata endpoint going away can neither destroy config
+            nor block a deploy.
+        metadata_fetched_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        service_provider:
+          allOf:
+          - $ref: '#/components/schemas/IdentityProviderServiceProvider'
+          readOnly: true
+        created_on:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_on:
+          type: string
+          format: date-time
+          readOnly: true
+        attribute_map:
+          type: object
+          additionalProperties:
+            type: string
+          readOnly: true
+        attribute_name_map:
+          type: object
+          additionalProperties:
+            type: string
+          readOnly: true
+      required:
+      - alias
+      - attribute_map
+      - attribute_name_map
       - created_on
       - display_name
       - id

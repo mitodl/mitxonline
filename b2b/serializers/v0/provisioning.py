@@ -83,6 +83,31 @@ class OrganizationIdentityProviderSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class OrganizationIdentityProviderDetailSerializer(
+    OrganizationIdentityProviderSerializer
+):
+    """
+    A single identity provider, with the attribute mappers Keycloak holds.
+
+    The mappers are stored only in Keycloak, so the view reads them back and
+    attaches them. They are left off the list and off an organization's nested
+    identity providers, which would cost a Keycloak call per IdP.
+    """
+
+    attribute_map = serializers.DictField(child=serializers.CharField(), read_only=True)
+    attribute_name_map = serializers.DictField(
+        child=serializers.CharField(), read_only=True
+    )
+
+    class Meta(OrganizationIdentityProviderSerializer.Meta):
+        fields = [
+            *OrganizationIdentityProviderSerializer.Meta.fields,
+            "attribute_map",
+            "attribute_name_map",
+        ]
+        read_only_fields = fields
+
+
 class ProvisionedOrganizationSerializer(serializers.ModelSerializer):
     """
     An organization as the provisioning API sees it.
