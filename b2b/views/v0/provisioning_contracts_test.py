@@ -465,6 +465,7 @@ def test_list_variant_sets(admin_drf_client):
     ]
 
 
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
 def test_sync_variants(admin_drf_client, mocked_tasks):
     """
     Syncing creates the run for a set added after the courseware, queues its
@@ -530,6 +531,7 @@ def test_sync_variants(admin_drf_client, mocked_tasks):
     mocked_tasks.code_check.assert_not_called()
 
 
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
 def test_sync_variants_without_codes(admin_drf_client, mocked_tasks):
     """A contract that doesn't use codes gets its runs and no code check."""
 
