@@ -7,9 +7,12 @@ import faker
 import pytest
 
 from b2b.api import ensure_enrollment_codes_exist
-from b2b.constants import CONTRACT_MEMBERSHIP_CODE
+from b2b.constants import CONTRACT_MEMBERSHIP_CODE, PROVISIONING_ACTION_ORG_UPDATED
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
-from b2b.models import DiscountContractAttachmentRedemption
+from b2b.models import (
+    DiscountContractAttachmentRedemption,
+    OrganizationProvisioningAudit,
+)
 from courses.factories import (
     CourseRunFactory,
     ProgramFactory,
@@ -81,6 +84,147 @@ def test_organization_page_slug_preserved_on_name_change():
     assert org.slug == original_slug
     # But the title should reflect the new name
     assert org.title == "MIT - Universal AI"
+
+
+def test_organization_page_save_without_sso_change_is_not_audited():
+    """Creating an organization, or saving one unchanged, writes no audit row."""
+    org = OrganizationPageFactory.create(sso_organization_id=uuid4())
+    org.name = "Renamed"
+    org.save()
+
+    assert not OrganizationProvisioningAudit.objects.filter(organization=org).exists()
+
+
+def test_organization_page_sso_change_is_audited():
+    """A changed sso_organization_id is recorded with the user passed to save."""
+    old_id = uuid4()
+    new_id = uuid4()
+    org = OrganizationPageFactory.create(sso_organization_id=old_id)
+    user = UserFactory.create(is_staff=True)
+
+    org.sso_organization_id = new_id
+    org.save(user=user)
+
+    audit = OrganizationProvisioningAudit.objects.get(organization=org)
+    assert audit.action == PROVISIONING_ACTION_ORG_UPDATED
+    assert audit.acting_user == user
+    assert audit.org_key == org.org_key
+    assert audit.data_before == {"sso_organization_id": str(old_id)}
+    assert audit.data_after == {"sso_organization_id": str(new_id)}
+
+
+def test_organization_page_publish_keeps_provisioned_fields():
+    """
+    A revision saved before an API write holds the old values. Publishing it
+    (a logo upload in the editor, a bulk publish) must not put them back.
+    """
+    org = OrganizationPageFactory.create(
+        name="Old name", description="Old description", sso_organization_id=None
+    )
+    stale = org.save_revision(user=UserFactory.create(is_staff=True))
+
+    new_id = uuid4()
+    org.name = "New name"
+    org.description = "New description"
+    org.sso_organization_id = new_id
+    org.save(audit_sso_link=False)
+
+    stale.publish()
+
+    org.refresh_from_db()
+    assert org.name == "New name"
+    assert org.title == "New name"
+    assert org.description == "New description"
+    assert org.sso_organization_id == new_id
+    assert not OrganizationProvisioningAudit.objects.filter(organization=org).exists()
+
+
+def test_organization_page_editor_loads_provisioned_fields_from_the_row():
+    """The Wagtail editor shows the stored values, not the latest revision's."""
+    org = OrganizationPageFactory.create(name="Old name", sso_organization_id=None)
+    org.save_revision()
+
+    new_id = uuid4()
+    org.name = "New name"
+    org.sso_organization_id = new_id
+    org.save(audit_sso_link=False)
+
+    in_editor = org.get_latest_revision_as_object()
+    assert in_editor.name == "New name"
+    assert in_editor.sso_organization_id == new_id
+
+
+def test_organization_page_revision_cannot_change_the_sso_link():
+    """A revision carrying a different link does not change the stored one."""
+    old_id = uuid4()
+    org = OrganizationPageFactory.create(sso_organization_id=old_id)
+
+    org.sso_organization_id = uuid4()
+    org.save_revision(user=UserFactory.create(is_staff=True)).publish()
+
+    org.refresh_from_db()
+    assert org.sso_organization_id == old_id
+    assert not OrganizationProvisioningAudit.objects.filter(organization=org).exists()
+
+
+def test_organization_page_draft_sso_change_is_not_audited():
+    """A draft of a live page writes a revision, not the stored link."""
+    org = OrganizationPageFactory.create(sso_organization_id=None)
+
+    org.sso_organization_id = uuid4()
+    org.save_revision(user=UserFactory.create(is_staff=True))
+
+    assert not OrganizationProvisioningAudit.objects.filter(organization=org).exists()
+
+
+@pytest.mark.parametrize(
+    "as_text",
+    [str, lambda sso_id: str(sso_id).upper(), lambda sso_id: sso_id.hex],
+    ids=["canonical", "uppercase", "unhyphenated"],
+)
+def test_organization_page_same_sso_id_as_text_is_not_audited(as_text):
+    """The same ID assigned as a str, saved without cleaning, is not a change."""
+    sso_id = uuid4()
+    org = OrganizationPageFactory.create(sso_organization_id=sso_id)
+
+    org.sso_organization_id = as_text(sso_id)
+    org.save(clean=False)
+
+    assert not OrganizationProvisioningAudit.objects.filter(organization=org).exists()
+
+
+def test_organization_page_sso_change_as_text_is_recorded_in_canonical_form():
+    """A new ID assigned as an unhyphenated str is recorded the way it is stored."""
+    new_id = uuid4()
+    org = OrganizationPageFactory.create(sso_organization_id=None)
+
+    org.sso_organization_id = new_id.hex.upper()
+    org.save(clean=False)
+
+    audit = OrganizationProvisioningAudit.objects.get(organization=org)
+    assert audit.data_after == {"sso_organization_id": str(new_id)}
+
+
+def test_organization_page_wagtail_form_edits_only_the_logo():
+    """The provisioned fields are read-only panels, so the form has no such fields."""
+    org = OrganizationPageFactory.create()
+    editor = UserFactory.create(is_staff=True, is_superuser=True)
+
+    form_class = org.get_edit_handler().get_form_class()
+    form = form_class(instance=org, for_user=editor)
+
+    assert "logo" in form.fields
+    assert not set(org.PROVISIONED_FIELDS) & set(form.fields)
+
+
+def test_organization_page_sso_audit_can_be_skipped():
+    """A caller that writes its own audit record can turn this one off."""
+    org = OrganizationPageFactory.create(sso_organization_id=None)
+
+    org.sso_organization_id = uuid4()
+    org.save(audit_sso_link=False)
+
+    assert not OrganizationProvisioningAudit.objects.filter(organization=org).exists()
 
 
 def test_organization_page_slug_generated_on_create():
