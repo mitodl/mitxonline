@@ -17,7 +17,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Manager, Prefetch, Q
+from django.db.models import Count, F, Manager, Prefetch, Q
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
 from pydantic import BaseModel, ConfigDict, Field
@@ -1651,14 +1651,20 @@ def _prepare_basket_for_b2b_enrollment(
     return basket
 
 
-def _apply_available_discount(
-    request, product: Product, basket: Basket, contract: ContractPage
-) -> None:
-    """Apply available discount to the basket if one exists."""
+def _get_or_create_contract_discount(
+    product: Product, contract: ContractPage
+) -> Discount:
+    """
+    Get an available enrollment code for the product, or create one.
 
-    # Changed to only check redemption count if the discount isn't unlimited -
-    # which it will be if the contract has unlimited seats - and order by ID
-    # so it matches what we send out to people.
+    A code is available if it hasn't been used for an order yet, or if it's
+    unlimited (which it will be if the contract has unlimited seats). Codes are
+    ordered by ID so the one picked matches what we send out to people.
+
+    Raises:
+        ValueError: if the product isn't for a course run in the contract.
+    """
+
     applicable_discounts_qs = (
         product.discounts.annotate(redemptions=Count("discount__order_redemptions"))
         .filter(discount__is_bulk=True, discount__products__product=product)
@@ -1669,34 +1675,40 @@ def _apply_available_discount(
     )
 
     if applicable_discounts_qs.exists():
-        # We have unused codes for this product, so we should apply one.
-        discount = applicable_discounts_qs.first().discount
-    else:
-        # At this point we've checked for available seats, and we've checked for
-        # an appropriate discount, and we couldn't find one, so now we need to
-        # make one for the learner (or for the contract).
+        # We have unused codes for this product, so we should use one.
+        return applicable_discounts_qs.first().discount
 
-        if (
-            not product.purchasable_object
-            or not product.purchasable_object.b2b_contracts.filter(
-                pk=contract.id
-            ).exists()
-        ):
-            msg = f"Product {product} has no purchasable object or the purchasable object is not in contract {contract}"
-            raise ValueError(msg)
+    # At this point we've checked for available seats, and we've checked for
+    # an appropriate discount, and we couldn't find one, so now we need to
+    # make one for the learner (or for the contract).
 
-        discount_amount = contract.enrollment_fixed_price
-        redemption_type = (
-            REDEMPTION_TYPE_ONE_TIME
-            if contract.max_learners and contract.max_learners > 0
-            else REDEMPTION_TYPE_UNLIMITED
-        )
+    if (
+        not product.purchasable_object
+        or not product.purchasable_object.b2b_contracts.filter(pk=contract.id).exists()
+    ):
+        msg = f"Product {product} has no purchasable object or the purchasable object is not in contract {contract}"
+        raise ValueError(msg)
 
-        log.error("B2B enroll: had to create a discount for %s", product)
+    discount_amount = contract.enrollment_fixed_price
+    redemption_type = (
+        REDEMPTION_TYPE_ONE_TIME
+        if contract.max_learners and contract.max_learners > 0
+        else REDEMPTION_TYPE_UNLIMITED
+    )
 
-        discount = _create_discount_with_product(
-            product, discount_amount if discount_amount else Decimal(0), redemption_type
-        )
+    log.error("B2B enroll: had to create a discount for %s", product)
+
+    return _create_discount_with_product(
+        product, discount_amount if discount_amount else Decimal(0), redemption_type
+    )
+
+
+def _apply_available_discount(
+    request, product: Product, basket: Basket, contract: ContractPage
+) -> None:
+    """Apply available discount to the basket if one exists."""
+
+    discount = _get_or_create_contract_discount(product, contract)
 
     basket_discount = BasketDiscount.objects.create(
         redemption_date=now_in_utc(),
@@ -1705,6 +1717,84 @@ def _apply_available_discount(
         redeemed_basket=basket,
     )
     basket_discount.save()
+
+
+def apply_contract_discounts_to_basket(basket: Basket) -> list[BasketItem]:
+    """
+    Apply enrollment codes for the basket user's contracts to the basket.
+
+    A learner can add a course run to their basket through the regular cart
+    flow when the run is also in a contract they belong to. In that case they
+    should get the contract's pricing, so this finds (or creates) the
+    contract's enrollment code for the product and applies it. If the code
+    wins - i.e. it prices the item at or below whatever the basket already
+    charges for it - the basket item is tied to the contract, so the order line
+    and enrollment are recorded against it.
+
+    An item that's already tied to a contract only gets that contract's code,
+    and only if the learner is in the contract - otherwise the learner has to
+    supply a code themselves, so it's left alone. Only course run products are
+    considered, since contract enrollment codes are only made for course runs.
+    If the learner is in more than one contract with the run, the cheapest
+    contract is used (lowest ID on a tie).
+
+    This should run after any other discounts are applied, so the basket ends
+    up with the contract's code whenever it's tied an item to the contract.
+
+    Args:
+        basket (Basket): the basket to check
+    Returns:
+        list of BasketItem: the items that were tied to a contract
+    """
+    from ecommerce.api import apply_discount_to_basket  # noqa: PLC0415
+
+    user = basket.user
+    if not user or not user.is_authenticated:
+        return []
+
+    course_run_ct = ContentType.objects.get_for_model(CourseRun)
+    items = basket.basket_items.filter(
+        product__content_type=course_run_ct
+    ).select_related("product")
+    updated_items = []
+
+    for item in items:
+        contracts_qs = ContractPage.active_objects.filter(
+            users=user, course_runs__id=item.product.object_id
+        )
+        if item.b2b_contract_id:
+            contracts_qs = contracts_qs.filter(pk=item.b2b_contract_id)
+
+        contract = contracts_qs.order_by(
+            F("enrollment_fixed_price").asc(nulls_first=True), "id"
+        ).first()
+
+        if not contract:
+            continue
+
+        discount = _get_or_create_contract_discount(item.product, contract)
+
+        if not basket.discounts.filter(redeemed_discount=discount).exists():
+            apply_discount_to_basket(basket, discount)
+
+            if not basket.discounts.filter(redeemed_discount=discount).exists():
+                # Something else in the basket is a better deal.
+                continue
+
+            log.info(
+                "Applied contract %s code %s to basket %s for %s",
+                contract,
+                discount,
+                basket,
+                item.product,
+            )
+
+        if not item.b2b_contract_id:
+            item.b2b_contract = contract
+            item.save(update_fields=["b2b_contract", "updated_on"])
+            updated_items.append(item)
+
+    return updated_items
 
 
 def create_b2b_enrollment(

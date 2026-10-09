@@ -24,6 +24,7 @@ from b2b.api import (
     _get_source_runs_for_course,
     _handle_extra_enrollment_codes,
     _validate_b2b_enrollment_prerequisites,
+    apply_contract_discounts_to_basket,
     create_b2b_enrollment,
     create_contract_run,
     create_contract_run_key,
@@ -90,6 +91,8 @@ from ecommerce.factories import (
 from ecommerce.models import (
     Basket,
     BasketDiscount,
+    BasketItem,
+    Discount,
     DiscountProduct,
     DiscountRedemption,
     Line,
@@ -3476,3 +3479,168 @@ def test_upgrade_enrollments_keeps_existing_contract(mocked_edx_upgrade_push):
     enrollment.refresh_from_db()
     assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
     assert enrollment.b2b_contract == other_contract
+
+
+@pytest.fixture
+def public_contract_run():
+    """A public run, priced at 100, that's also in a contract priced at 10."""
+
+    contract = factories.ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED,
+        enrollment_fixed_price=Decimal(10),
+    )
+    run = CourseRunFactory.create(b2b_only=False, b2b_contracts=[contract])
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run, price=Decimal(100))
+
+    return {"contract": contract, "run": run, "product": product}
+
+
+def _basket_with(user, product, contract=None):
+    """Make a basket for the user with the product in it."""
+
+    basket = BasketFactory.create(user=user)
+    BasketItem.objects.create(
+        basket=basket, product=product, quantity=1, b2b_contract=contract
+    )
+    return basket
+
+
+@pytest.mark.parametrize("code_exists", [True, False])
+def test_apply_contract_discounts_to_basket(public_contract_run, code_exists):
+    """
+    A contract member with a contract's run in the basket should get the
+    contract's code, creating one if there isn't one, and the item should be
+    tied to the contract.
+    """
+
+    contract = public_contract_run["contract"]
+    product = public_contract_run["product"]
+    existing = (
+        _attach_bulk_discount(product, amount=Decimal(10)) if code_exists else None
+    )
+    user = _make_contract_user({"c": contract}, ["c"])
+    basket = _basket_with(user, product)
+
+    updated = apply_contract_discounts_to_basket(basket)
+
+    item = basket.basket_items.get()
+    assert updated == [item]
+    assert item.b2b_contract == contract
+    discount = basket.discounts.get().redeemed_discount
+    if code_exists:
+        assert discount == existing
+    assert discount.is_bulk
+    assert discount.products.filter(product=product).exists()
+    assert item.discounted_price == Decimal(10)
+
+    # Running it again shouldn't change anything.
+    assert apply_contract_discounts_to_basket(basket) == []
+    assert basket.discounts.get().redeemed_discount == discount
+    assert Discount.objects.filter(products__product=product).count() == 1
+
+
+def test_apply_contract_discounts_to_basket_not_member(public_contract_run):
+    """A learner who isn't in the contract pays the regular price."""
+
+    basket = _basket_with(UserFactory.create(), public_contract_run["product"])
+
+    assert apply_contract_discounts_to_basket(basket) == []
+    assert basket.basket_items.get().b2b_contract is None
+    assert not basket.discounts.exists()
+    assert not Discount.objects.exists()
+
+
+def test_apply_contract_discounts_to_basket_anonymous(public_contract_run):
+    """Anonymous baskets get nothing."""
+
+    basket = BasketFactory.create(user=None, anonymous_id=uuid4())
+    BasketItem.objects.create(
+        basket=basket, product=public_contract_run["product"], quantity=1
+    )
+
+    assert apply_contract_discounts_to_basket(basket) == []
+    assert not basket.discounts.exists()
+
+
+def test_apply_contract_discounts_to_basket_better_discount(public_contract_run):
+    """If the basket already has a better deal, it's kept."""
+
+    contract = public_contract_run["contract"]
+    product = public_contract_run["product"]
+    user = _make_contract_user({"c": contract}, ["c"])
+    basket = _basket_with(user, product)
+    better = UnlimitedUseDiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_FIXED_PRICE, amount=Decimal(5)
+    )
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=better,
+        redeemed_basket=basket,
+    )
+
+    assert apply_contract_discounts_to_basket(basket) == []
+    assert basket.basket_items.get().b2b_contract is None
+    assert basket.discounts.get().redeemed_discount == better
+
+
+def test_apply_contract_discounts_to_basket_cheapest_contract(public_contract_run):
+    """A learner in several contracts with the run gets the cheapest one."""
+
+    contract = public_contract_run["contract"]
+    run = public_contract_run["run"]
+    product = public_contract_run["product"]
+    cheaper = factories.ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED,
+        enrollment_fixed_price=Decimal(3),
+    )
+    run.b2b_contracts.add(cheaper)
+    cheaper_code = _attach_bulk_discount(product, amount=Decimal(3))
+    user = _make_contract_user({"c": contract, "d": cheaper}, ["c", "d"])
+    basket = _basket_with(user, product)
+
+    apply_contract_discounts_to_basket(basket)
+
+    item = basket.basket_items.get()
+    assert item.b2b_contract == cheaper
+    assert basket.discounts.get().redeemed_discount == cheaper_code
+    assert item.discounted_price == Decimal(3)
+
+
+@pytest.mark.parametrize("user_in_contract", [True, False])
+def test_apply_contract_discounts_to_basket_tied_item(
+    public_contract_run, user_in_contract
+):
+    """
+    An item already tied to a contract only gets that contract's code, and only
+    if the learner is in it.
+    """
+
+    contract = public_contract_run["contract"]
+    product = public_contract_run["product"]
+    user = UserFactory.create()
+    if user_in_contract:
+        user.b2b_contracts.add(contract)
+    basket = _basket_with(user, product, contract)
+
+    assert apply_contract_discounts_to_basket(basket) == []
+    assert basket.basket_items.get().b2b_contract == contract
+    assert basket.discounts.exists() is user_in_contract
+
+
+def test_apply_user_discounts_applies_contract_code(public_contract_run):
+    """The cart page's discount step should pick up contract pricing."""
+
+    from ecommerce.api import apply_user_discounts  # noqa: PLC0415
+
+    contract = public_contract_run["contract"]
+    product = public_contract_run["product"]
+    user = _make_contract_user({"c": contract}, ["c"])
+    basket = _basket_with(user, product)
+
+    apply_user_discounts(_b2b_request(user))
+
+    item = basket.basket_items.get()
+    assert item.b2b_contract == contract
+    assert item.discounted_price == Decimal(10)

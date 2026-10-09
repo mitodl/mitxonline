@@ -34,7 +34,11 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
-from b2b.api import is_product_courserun, is_product_program
+from b2b.api import (
+    apply_contract_discounts_to_basket,
+    is_product_courserun,
+    is_product_program,
+)
 from b2b.serializers.v0.manager import DetailErrorSerializer
 from courses.models import (
     Course,
@@ -312,6 +316,10 @@ def _create_basket_from_product(
                 except Discount.DoesNotExist:
                     pass
 
+            # Contract pricing goes last - if it wins, the item gets tied to the
+            # contract, and that only holds if nothing replaces its code after.
+            apply_contract_discounts_to_basket(basket)
+
     basket.refresh_from_db()
 
     if checkout:
@@ -484,6 +492,8 @@ def create_basket_with_products(request):
             apply_discount_to_basket(basket, discount)
         except Discount.DoesNotExist:
             pass
+
+    apply_contract_discounts_to_basket(basket)
 
     basket.refresh_from_db()
 

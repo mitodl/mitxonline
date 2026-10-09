@@ -209,6 +209,8 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
     - gateway_type: specify specific gateway type (default None)
     """
 
+    from b2b.api import apply_contract_discounts_to_basket  # noqa: PLC0415
+
     basket = establish_basket(request)
 
     if not gateway_type:
@@ -239,6 +241,11 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
             "purchased_non_upgradeable_courserun": True,
             "error": USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
         }
+
+    if not skip_discount_check:
+        # Pick up contract pricing for anything in the basket that's in one of
+        # the user's contracts, if it isn't there already.
+        apply_contract_discounts_to_basket(basket)
 
     if not skip_discount_check and not check_basket_discounts_for_validity(request):
         # We only allow one discount per basket so clear all of them here.
@@ -376,14 +383,25 @@ def apply_user_discounts(request):
     reason, this will just do the first one. More logic needs to be added here
     if/when discounts apply to specific things.)
 
+    Once those are sorted out, this applies the enrollment codes for any
+    contracts the user is in that cover what's in the basket - see
+    b2b.api.apply_contract_discounts_to_basket.
+
     Args:
         - user (User): The currently authenticated user.
 
     Returns:
         None
     """
+    from b2b.api import apply_contract_discounts_to_basket  # noqa: PLC0415
+
     basket = establish_basket(request)
-    user = request.user
+    _apply_user_discounts_to_basket(basket, request.user)
+    apply_contract_discounts_to_basket(basket)
+
+
+def _apply_user_discounts_to_basket(basket, user):
+    """Apply the user's financial assistance or user-tied discount to the basket."""
     discount = None
 
     BasketDiscount.objects.filter(
