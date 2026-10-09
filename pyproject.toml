@@ -97,7 +97,7 @@ dev = [
     "bpython>=0.26,<0.27",
     "ddt>=1.6.0,<2",
     "django-debug-toolbar>=6.0.0,<7",
-    "django-zeal>=2.0.4,<3",
+    "django-zeal>=2.2.4,<3",
     "factory-boy>=3.2.0,<4",
     "faker>=40.15.0,<=40.15.0",
     "flaky>=3.7.0,<4",
@@ -343,7 +343,6 @@ filterwarnings = [
     # factoryboy
     "ignore:.*\\._after_postgeneration will stop saving the instance after postgeneration hooks in the next major release",
     "ignore:authlib\\.jose module is deprecated, please use joserfc instead:authlib.deprecate.AuthlibDeprecationWarning",
-    "ignore:N+1 detected on",
     "ignore:Failed to load HostKeys"
 ]
 env = [
@@ -388,7 +387,8 @@ env = [
 ]
 markers = [
   "dont_mock_enrollments",
-  "skip_nplusone_check"
+  "skip_nplusone_check",
+  "zeal_allow(model, field): ignore one known N+1 (see fixtures/common.py check_nplusone)"
 ]
 pythonpath = ["."]
 

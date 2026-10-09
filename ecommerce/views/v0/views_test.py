@@ -441,6 +441,8 @@ def test_add_basket_item(user_drf_client, user):
 @pytest.mark.parametrize("add_discount", [True, False])
 @pytest.mark.parametrize("bad_product", [True, False])
 @override_settings(ENABLE_MULTIPLE_CART_ITEMS=True)
+@pytest.mark.zeal_allow("ecommerce.Product", "get()")
+@pytest.mark.zeal_allow("ecommerce.BasketItem", "get()")
 def test_create_basket_with_products(
     user, user_client, existing_basket, add_discount, bad_product
 ):
@@ -567,6 +569,7 @@ def test_create_basket_with_products_checkout_redirects(user_client):
         (True, True, True, "worse"),
     ],
 )
+@pytest.mark.zeal_allow("ecommerce.BasketDiscount", "get()")
 def test_create_basket_with_product(  # noqa: PLR0913
     user,
     user_client,
@@ -696,6 +699,7 @@ def test_create_basket_with_product(  # noqa: PLR0913
 # whole test in its own outer transaction, so this is the only way to
 # actually exercise (and catch regressions in) that requirement.
 @pytest.mark.django_db(transaction=True)
+@pytest.mark.zeal_allow("ecommerce.Discount", "products")
 def test_create_basket_from_product_lists_the_paid_amount_off_credit(
     mocker, user_drf_client, paid_amount_off_source
 ):
@@ -1536,6 +1540,7 @@ def test_start_checkout_with_discounts(user, user_drf_client, products, discount
     assert order.state == OrderStatus.PENDING
 
 
+@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 def test_start_checkout_with_no_lines(user, user_drf_client):
     """Test that checking out with an empty cart generates an error."""
 
@@ -1705,6 +1710,7 @@ def test_start_checkout_with_bad_discount(user, user_drf_client):
     assert resp.status_code == 400
 
 
+@pytest.mark.zeal_allow("ecommerce.Product", "purchasable_object")
 def test_order_history_list(user, user_drf_client):
     """Test that we can get a user's order history."""
     with reversion.create_revision():
@@ -1797,6 +1803,7 @@ def _order_history_query_count(user_drf_client):
     return len(queries.captured_queries)
 
 
+@pytest.mark.zeal_allow("ecommerce.Product", "purchasable_object")
 def test_order_history_query_count_grows_only_by_the_known_page_walk(
     user, user_drf_client
 ):

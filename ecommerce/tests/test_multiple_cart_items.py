@@ -78,6 +78,7 @@ class TestMultipleCartItems:
         assert response.data["message"] == "Product not found"
 
     @override_settings(ENABLE_MULTIPLE_CART_ITEMS=True)
+    @pytest.mark.zeal_allow("ecommerce.Product", "purchasable_object")
     def test_cart_with_multiple_items_pricing(self, user_drf_client, user):
         """Test that cart pricing works correctly with multiple items"""
         # Create products with different prices
@@ -183,6 +184,7 @@ class TestMultipleCartItems:
         assert basket.basket_items.first().product == new_product
 
     @override_settings(ENABLE_MULTIPLE_CART_ITEMS=False)
+    @pytest.mark.zeal_allow("ecommerce.Product", "get()")
     def test_create_basket_with_products_single_item_mode_rejects_multiple(
         self,
         user_drf_client,

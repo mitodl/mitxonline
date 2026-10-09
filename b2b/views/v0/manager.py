@@ -310,11 +310,12 @@ class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
                 Prefetch(
                     "contracts",
                     queryset=ContractPage.objects.prefetch_related(
+                        "variant_options",
                         Prefetch(
                             "contract_programs",
                             queryset=ContractProgramItem.objects.order_by("sort_order"),
                             to_attr="contract_program_ids",
-                        )
+                        ),
                     ).filter(active=True),
                     to_attr="_active_contracts",
                 ),

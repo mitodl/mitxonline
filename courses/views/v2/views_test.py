@@ -1467,6 +1467,7 @@ def test_get_program_certificate_future_issue_date():
     assert resp.status_code == status.HTTP_404_NOT_FOUND
 
 
+@pytest.mark.zeal_allow("cms.CertificatePage", "get()")
 def test_program_enrollments_future_program_cert(user_drf_client, user):
     """
     Test that v2 program enrollments returns null for a ProgramCertificate with a
@@ -1488,6 +1489,7 @@ def test_program_enrollments_future_program_cert(user_drf_client, user):
     assert enrollment_data["certificate"] is None
 
 
+@pytest.mark.zeal_allow("cms.CertificatePage", "get()")
 def test_program_enrollments_future_course_cert(user_drf_client, user):
     """
     Test that v2 program enrollments returns null for a CourseRunCertificate with a
