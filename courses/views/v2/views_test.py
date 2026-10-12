@@ -36,6 +36,7 @@ from cms.factories import (
 )
 from cms.models import CoursePage
 from cms.serializers import ProgramPageSerializer
+from compliance.api import verify_user_with_exports
 from compliance.exceptions import ExportComplianceDataError, ExportComplianceError
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
@@ -2050,6 +2051,41 @@ def test_add_verified_program_course_enrollment(
             line = order.lines.last()
             assert course_run == line.purchased_object
             assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_VERIFIED_MODE
+
+
+@pytest.mark.skip_nplusone_check
+def test_add_verified_program_course_enrollment_incomplete_profile(
+    mocker, mocked_export_compliance, user, user_drf_client
+):
+    """An incomplete profile should be a 400, not a 500, on the verified program path."""
+    mocked_export_compliance.side_effect = verify_user_with_exports
+    mocker.patch("compliance.api.get_cybersource_client")
+    program = ProgramEnrollmentFactory.create(
+        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    ).program
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        for courseware in (program, course_run):
+            Product.objects.create(
+                price=10,
+                is_active=True,
+                object_id=courseware.id,
+                content_type=ContentType.objects.get_for_model(courseware),
+            )
+    user.legal_address.street_address_1 = ""
+    user.legal_address.save()
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={"courserun_id": course_run.courseware_id},
+        ),
+        data=[program.readable_id],
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
 
 
 @pytest.mark.skip_nplusone_check
