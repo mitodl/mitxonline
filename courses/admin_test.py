@@ -7,15 +7,16 @@ from django.contrib import admin as django_admin
 from django.urls import reverse
 from mitol.common.utils.datetime import now_in_utc
 
-from courses.admin import CourseRunEnrollmentAdmin
+from courses.admin import CourseRunAdmin, CourseRunEnrollmentAdmin
 from courses.factories import (
+    CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     PartnerSchoolFactory,
     PartnerSchoolProgramFactory,
     ProgramFactory,
 )
-from courses.models import CourseRunEnrollment
+from courses.models import CourseRun, CourseRunEnrollment
 from openedx.constants import OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES
 
 pytestmark = [pytest.mark.django_db]
@@ -225,3 +226,27 @@ def test_courserun_admin_silent_when_deadline_untouched(client, admin_user, mock
     assert not any(
         "upgrade deadline" in message.lower() for message in _admin_messages(response)
     )
+
+
+def test_courserun_admin_add_does_not_report_queued_sync(rf, admin_user, mocker):
+    """
+    Adding a run with a deadline doesn't queue a push (new runs are skipped), so
+    the admin mustn't say it did.
+    """
+    mocker.patch("courses.signals.transaction.on_commit")
+    mock_messages = mocker.patch("courses.admin.messages")
+    run = CourseRunFactory.build(
+        course=CourseFactory.create(),
+        upgrade_deadline=now_in_utc() + timedelta(days=10),
+    )
+    request = rf.post("/")
+    request.user = admin_user
+    form = mocker.Mock(changed_data=["upgrade_deadline"])
+
+    CourseRunAdmin(CourseRun, django_admin.site).save_model(
+        request, run, form, change=False
+    )
+
+    assert run.pk is not None
+    mock_messages.info.assert_not_called()
+    mock_messages.warning.assert_not_called()

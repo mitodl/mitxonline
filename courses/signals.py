@@ -195,7 +195,7 @@ PREVIOUS_UPGRADE_DEADLINE_ATTR = "_previous_upgrade_deadline"
 def capture_previous_upgrade_deadline(
     sender,  # noqa: ARG001
     instance,
-    **kwargs,  # noqa: ARG001
+    **kwargs,
 ):
     """
     Stash the currently-persisted upgrade_deadline so post_save can tell whether
@@ -207,6 +207,11 @@ def capture_previous_upgrade_deadline(
     per CourseRun save; runs are saved by nightly syncs and staff edits, never in
     a per-learner hot path.
     """
+    if kwargs.get("raw", False):
+        # Fixture loading: the DB may not be consistent, and post_save ignores
+        # raw saves anyway.
+        return
+
     if instance.pk is None:
         # A brand new run has no previous value; post_save keys off `created`.
         setattr(instance, PREVIOUS_UPGRADE_DEADLINE_ATTR, None)
