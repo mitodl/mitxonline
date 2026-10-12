@@ -2,7 +2,10 @@
 import { assert } from "chai"
 import sinon from "sinon"
 
-import CartPage, { CartPage as InnerCartPage } from "./CartPage"
+import CartPage, {
+  CartPage as InnerCartPage,
+  mapPropsToConfig
+} from "./CartPage"
 import IntegrationTestHelper from "../../../util/integration_test_helper"
 
 describe("CartPage", () => {
@@ -128,6 +131,14 @@ describe("CartPage", () => {
       Object.defineProperty(window, "location", originalLocation)
     })
 
+    it("only loads countries when the profile modal may be needed", () => {
+      const queryKeys = currentUser =>
+        mapPropsToConfig({ currentUser }).map(config => config.queryKey)
+
+      assert.include(queryKeys(incompleteUser), "countries")
+      assert.notInclude(queryKeys(loggedInUser), "countries")
+    })
+
     it("goes straight to checkout when nothing is missing", async () => {
       const { inner } = await renderPage()
       inner.find("OrderSummaryCard").prop("onCheckout")("/checkout/to_payment")
@@ -181,6 +192,24 @@ describe("CartPage", () => {
       assert.notProperty(body, "user_profile")
       assert.equal(window.location, "/checkout/to_payment")
       sinon.assert.calledWith(setSubmitting, false)
+    })
+
+    it("sends year of birth when the form changed it", async () => {
+      const { inner } = await renderPage({
+        entities: { currentUser: incompleteUser }
+      })
+      inner.find("OrderSummaryCard").prop("onCheckout")("/checkout/to_payment")
+
+      await inner.instance().saveProfile(
+        {
+          legal_address: incompleteUser.legal_address,
+          user_profile:  { year_of_birth: "1985" }
+        },
+        { setSubmitting: sinon.stub(), setErrors: sinon.stub() }
+      )
+
+      const { body } = helper.handleRequestStub.lastCall.args[2]
+      assert.deepEqual(body.user_profile, { year_of_birth: "1985" })
     })
 
     it("shows the server's field errors when the save is rejected", async () => {

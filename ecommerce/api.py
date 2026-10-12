@@ -29,7 +29,6 @@ from b2b.api import (
     get_active_contracts_from_basket_items,
     is_discount_supplied_for_b2b_purchase,
 )
-from compliance.api import BILL_TO_FIELD_TO_PROFILE_FIELD
 from compliance.exceptions import ExportComplianceDataError
 from courses.api import (
     create_run_enrollments,
@@ -229,10 +228,13 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
         has_blocked_products = basket.has_user_blocked_products(request.user)
     except ExportComplianceDataError as exc:
         # The learner can fix this themselves, unlike a compliance denial.
+        log.info(
+            "Checkout blocked on incomplete profile for user=%s: missing %s",
+            request.user.id,
+            exc.missing_fields,
+        )
         return {
-            "missing_profile_fields": sorted(
-                {BILL_TO_FIELD_TO_PROFILE_FIELD[field] for field in exc.missing_fields}
-            ),
+            "profile_incomplete": True,
             "error": USER_MSG_TYPE_PROFILE_INCOMPLETE,
         }
 

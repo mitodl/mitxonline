@@ -22,15 +22,8 @@ type Props = {
 const getInitialValues = (user: User) => ({
   name:          user.name,
   email:         user.email,
-  legal_address: {
-    first_name:       "",
-    last_name:        "",
-    street_address_1: "",
-    city:             "",
-    postal_code:      "",
-    ...user.legal_address
-  },
-  user_profile: {
+  legal_address: user.legal_address,
+  user_profile:  {
     year_of_birth: (user.user_profile && user.user_profile.year_of_birth) || ""
   }
 })

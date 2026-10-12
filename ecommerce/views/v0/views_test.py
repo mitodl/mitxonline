@@ -1648,7 +1648,6 @@ def test_start_checkout_with_incomplete_profile(
     assert resp.status_code == 400
     resp_body = resp.json()
     assert resp_body["error"] == USER_MSG_TYPE_PROFILE_INCOMPLETE
-    assert set(resp_body["missing_profile_fields"]) >= {"city", "street_address_1"}
     mock_client.return_value.validate_export_compliance.assert_not_called()
 
 

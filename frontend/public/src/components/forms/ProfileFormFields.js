@@ -376,8 +376,8 @@ const COMPLIANCE_TEXT_FIELDS = [
 
 /*
  * The legal address fields export compliance needs beyond country/state.
- * Like LegalAddressCountryFields, a field is shown only if it was empty when
- * the form opened, so it doesn't disappear while the learner types into it.
+ * Only fields that were empty when the form opened are shown, so a field
+ * doesn't disappear while the learner types into it.
  */
 export const LegalAddressComplianceFields = ({
   errors,

@@ -78,8 +78,8 @@ export class CartPage extends React.Component<Props, CartState> {
       currentUser
     )
     const profileData: Object = { legal_address: values.legal_address }
-    // The user serializer resets addl_field_flag whenever user_profile is
-    // sent, so only include it when the form actually changed it.
+    // UserSerializer.update recomputes addl_field_flag from the user_profile
+    // payload, so sending year_of_birth alone would clear it.
     if (
       String(values.user_profile.year_of_birth) !== String(currentYearOfBirth)
     ) {
@@ -101,6 +101,8 @@ export class CartPage extends React.Component<Props, CartState> {
     }
   }
 
+  closeComplianceModal = () => this.setState({ checkoutUrl: "" })
+
   renderComplianceInfoModal() {
     const { currentUser, countries } = this.props
     const { checkoutUrl } = this.state
@@ -114,9 +116,9 @@ export class CartPage extends React.Component<Props, CartState> {
         id="compliance-info-dialog"
         className="upgrade-enrollment-modal"
         isOpen={Boolean(checkoutUrl)}
-        toggle={() => this.setState({ checkoutUrl: "" })}
+        toggle={this.closeComplianceModal}
       >
-        <ModalHeader toggle={() => this.setState({ checkoutUrl: "" })}>
+        <ModalHeader toggle={this.closeComplianceModal}>
           Provide More Info
         </ModalHeader>
         <ModalBody>
@@ -305,7 +307,11 @@ const mapDispatchToProps = {
   updateProfile
 }
 
-const mapPropsToConfig = () => [cartQuery(), users.countriesQuery()]
+// Countries are only needed by the profile modal.
+export const mapPropsToConfig = ({ currentUser }: Object) =>
+  needsComplianceInfo(currentUser) ?
+    [cartQuery(), users.countriesQuery()] :
+    [cartQuery()]
 
 export default compose(
   connect(mapStateToProps, mapDispatchToProps),

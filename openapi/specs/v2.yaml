@@ -6222,16 +6222,9 @@ components:
             * `b2b-invalid-basket` - b2b-invalid-basket
             * `basket-empty` - basket-empty
             * `profile-incomplete` - profile-incomplete
-        missing_profile_fields:
-          type: array
-          items:
-            type: string
-          readOnly: true
-          description: Profile fields the user must fill in before checking out.
       required:
       - error
       - method
-      - missing_profile_fields
       - no_checkout
       - order_id
       - payload

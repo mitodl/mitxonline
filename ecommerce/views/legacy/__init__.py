@@ -1195,7 +1195,7 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
                 reverse("user-dashboard"),
                 {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
             )
-        if "missing_profile_fields" in checkout_payload:
+        if "profile_incomplete" in checkout_payload:
             return redirect_with_user_message(
                 reverse("cart"),
                 {"type": USER_MSG_TYPE_PROFILE_INCOMPLETE},
