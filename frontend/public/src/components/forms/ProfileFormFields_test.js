@@ -112,6 +112,11 @@ describe("ProfileFormFields", () => {
       ["a complete non-US address", values(), true],
       ["a blank city", values({ city: " " }), false],
       [
+        "a US address without a state",
+        values({ country: "US", state: "", postal_code: "02139" }),
+        false
+      ],
+      [
         "a US address without a postal code",
         values({ country: "US", state: "US-MA" }),
         false
