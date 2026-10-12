@@ -570,7 +570,9 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         deadline_changed = "upgrade_deadline" in (form.changed_data or [])
         super().save_model(request, obj, form, change)
 
-        if not deadline_changed:
+        if not change or not deadline_changed:
+            # New runs aren't pushed (see the CourseRun post_save receiver), so
+            # there's nothing to report.
             return
 
         if obj.upgrade_deadline is None:

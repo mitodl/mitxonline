@@ -17,6 +17,7 @@ from courses.factories import (
     UserFactory,
 )
 from courses.models import CourseRun
+from courses.signals import capture_previous_upgrade_deadline
 
 pytestmark = pytest.mark.django_db
 
@@ -275,3 +276,13 @@ def test_deferred_deadline_does_not_queue_edx_sync(mock_deadline_sync_task):
     deferred_run.save()
 
     mock_deadline_sync_task.assert_not_called()
+
+
+def test_capture_previous_upgrade_deadline_skips_raw_saves(
+    django_assert_num_queries,
+):
+    """Fixture loading (raw saves) shouldn't query the database for the old value."""
+    run = CourseRunFactory.create()
+
+    with django_assert_num_queries(0):
+        capture_previous_upgrade_deadline(sender=CourseRun, instance=run, raw=True)

@@ -7,8 +7,7 @@ import logging
 
 from django.db.models import Q
 from mitol.common.utils.datetime import now_in_utc
-from requests.exceptions import ConnectionError as RequestsConnectionError
-from requests.exceptions import HTTPError
+from requests.exceptions import HTTPError, RequestException
 
 from courses.models import (
     CourseRun,
@@ -39,7 +38,9 @@ def sync_courseruns_data():
 
 
 @app.task(
-    autoretry_for=(HTTPError, RequestsConnectionError),
+    # RequestException covers connection errors and timeouts. Permanent 4xx
+    # errors are caught in the task and never reach autoretry.
+    autoretry_for=(RequestException,),
     retry_backoff=True,
     retry_kwargs={"max_retries": 3},
 )

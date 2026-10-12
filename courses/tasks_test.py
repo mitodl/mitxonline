@@ -3,7 +3,7 @@
 import pytest
 from celery.exceptions import Retry
 from requests import Response
-from requests.exceptions import HTTPError
+from requests.exceptions import HTTPError, ReadTimeout
 
 from courses.factories import (
     CourseRunEnrollmentFactory,
@@ -157,3 +157,15 @@ def test_sync_courserun_upgrade_deadline_does_not_retry_client_errors(
     assert f"edX rejected the upgrade deadline push for {run.courseware_id}" in (
         caplog.text
     )
+
+
+def test_sync_courserun_upgrade_deadline_retries_read_timeouts(mocker):
+    """A slow edX response is retried like other transient failures."""
+    run = CourseRunFactory.create()
+    mocker.patch(
+        "openedx.api.sync_courserun_upgrade_deadline_to_edx",
+        side_effect=ReadTimeout(),
+    )
+
+    with pytest.raises(Retry):
+        sync_courserun_upgrade_deadline.delay(run.id)
