@@ -1,5 +1,6 @@
 // @flow
 import { assert } from "chai"
+import sinon from "sinon"
 
 import CartPage, { CartPage as InnerCartPage } from "./CartPage"
 import IntegrationTestHelper from "../../../util/integration_test_helper"
@@ -93,5 +94,120 @@ describe("CartPage", () => {
     })
     const summaryCard = inner.find("OrderSummaryCard")
     assert.isFalse(summaryCard.prop("isAuthenticated"))
+  })
+
+  describe("compliance info gate", () => {
+    let originalLocation
+
+    const incompleteUser = {
+      ...loggedInUser,
+      legal_address: {
+        country:          "US",
+        state:            "US-MA",
+        first_name:       "Test",
+        last_name:        "User",
+        street_address_1: "",
+        city:             "",
+        postal_code:      ""
+      },
+      user_profile:              { year_of_birth: 1990 },
+      compliance_missing_fields: ["city", "postal_code", "street_address_1"]
+    }
+
+    beforeEach(() => {
+      originalLocation = Object.getOwnPropertyDescriptor(window, "location")
+      Object.defineProperty(window, "location", {
+        writable:     true,
+        configurable: true,
+        value:        { href: "" }
+      })
+    })
+
+    afterEach(() => {
+      // $FlowFixMe - originalLocation is always defined for window.location
+      Object.defineProperty(window, "location", originalLocation)
+    })
+
+    it("goes straight to checkout when nothing is missing", async () => {
+      const { inner } = await renderPage()
+      inner.find("OrderSummaryCard").prop("onCheckout")("/checkout/to_payment")
+
+      assert.equal(window.location, "/checkout/to_payment")
+      assert.isFalse(inner.find("Modal").prop("isOpen"))
+    })
+
+    it("asks for the missing profile fields before checkout", async () => {
+      const { inner } = await renderPage({
+        entities: { currentUser: incompleteUser }
+      })
+      inner.find("OrderSummaryCard").prop("onCheckout")("/checkout/to_payment")
+      inner.update()
+
+      assert.notEqual(window.location, "/checkout/to_payment")
+      assert.isTrue(inner.find("Modal").prop("isOpen"))
+      assert.isTrue(
+        inner.find("AddlProfileFieldsForm").prop("requireComplianceFields")
+      )
+    })
+
+    it("saves the legal address and then continues to checkout", async () => {
+      const { inner } = await renderPage({
+        entities: { currentUser: incompleteUser }
+      })
+      inner.find("OrderSummaryCard").prop("onCheckout")("/checkout/to_payment")
+      const legalAddress = {
+        ...incompleteUser.legal_address,
+        street_address_1: "1 Main St",
+        city:             "Cambridge",
+        postal_code:      "02139"
+      }
+      const setSubmitting = sinon.stub()
+
+      await inner.instance().saveProfile(
+        {
+          legal_address: legalAddress,
+          user_profile:  { year_of_birth: 1990 }
+        },
+        { setSubmitting }
+      )
+
+      sinon.assert.calledWith(
+        helper.handleRequestStub,
+        "/api/v0/users/me",
+        "PATCH",
+        sinon.match({ body: { legal_address: legalAddress } })
+      )
+      const { body } = helper.handleRequestStub.lastCall.args[2]
+      assert.notProperty(body, "user_profile")
+      assert.equal(window.location, "/checkout/to_payment")
+      sinon.assert.calledWith(setSubmitting, false)
+    })
+
+    it("shows the server's field errors when the save is rejected", async () => {
+      const fieldErrors = {
+        legal_address: {
+          city: ["Ensure this field has no more than 255 characters."]
+        }
+      }
+      helper.handleRequestStub
+        .withArgs("/api/v0/users/me", "PATCH")
+        .returns({ status: 400, body: { errors: fieldErrors } })
+      const { inner } = await renderPage({
+        entities: { currentUser: incompleteUser }
+      })
+      inner.find("OrderSummaryCard").prop("onCheckout")("/checkout/to_payment")
+      const setErrors = sinon.stub()
+
+      await inner.instance().saveProfile(
+        {
+          legal_address: incompleteUser.legal_address,
+          user_profile:  { year_of_birth: 1990 }
+        },
+        { setSubmitting: sinon.stub(), setErrors }
+      )
+
+      sinon.assert.calledWith(setErrors, fieldErrors)
+      assert.notEqual(window.location, "/checkout/to_payment")
+    })
   })
 })

@@ -2151,7 +2151,7 @@ def test_has_user_blocked_products(mocker, blocked_country, compliance):
     assert basket_item.basket.has_user_blocked_products(user) == (
         blocked_country or compliance
     )
-    mocked_compliance_check.assert_called()
+    mocked_compliance_check.assert_called_once_with(user, courserun)
 
 
 def test_basket_get_products_contracts(user):

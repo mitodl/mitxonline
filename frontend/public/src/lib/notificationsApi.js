@@ -20,6 +20,7 @@ import {
   USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
   USER_MSG_TYPE_DISCOUNT_INVALID,
   USER_MSG_TYPE_PROFILE_CREATED,
+  USER_MSG_TYPE_PROFILE_INCOMPLETE,
   USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY
 } from "../constants"
 
@@ -60,6 +61,11 @@ export function parseStoredUserMessage(
     alertType = ALERT_TYPE_DANGER
     msgText =
         "We're sorry, your country is currently blocked from enrolling in this course."
+    break
+  case USER_MSG_TYPE_PROFILE_INCOMPLETE:
+    alertType = ALERT_TYPE_DANGER
+    msgText =
+        'We need a few more details about you before you can place your order. Please click "Place your order" again to provide them.'
     break
   case USER_MSG_TYPE_COURSE_NON_UPGRADABLE:
     alertType = ALERT_TYPE_DANGER

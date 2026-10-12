@@ -11,6 +11,7 @@ USER_MSG_TYPE_DISCOUNT_INVALID = "discount-invalid"
 USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY = "required-enrollment-code-empty"
 USER_MSG_TYPE_PROFILE_CREATED = "profile-created"
 USER_MSG_TYPE_BASKET_EMPTY = "basket-empty"
+USER_MSG_TYPE_PROFILE_INCOMPLETE = "profile-incomplete"
 
 USER_MSG_TYPE_PAYMENT_DECLINED = "payment-declined"
 USER_MSG_TYPE_PAYMENT_ERROR = "payment-error"

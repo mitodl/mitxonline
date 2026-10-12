@@ -102,6 +102,7 @@ from main.constants import (
     USER_MSG_TYPE_PAYMENT_DECLINED,
     USER_MSG_TYPE_PAYMENT_ERROR,
     USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
+    USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 from main.utils import redirect_with_user_message
 from main.views import RefinePagination
@@ -1193,6 +1194,11 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             return redirect_with_user_message(
                 reverse("user-dashboard"),
                 {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
+            )
+        if "missing_profile_fields" in checkout_payload:
+            return redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_PROFILE_INCOMPLETE},
             )
         if "no_checkout" in checkout_payload:
             order = checkout_payload["order"]
