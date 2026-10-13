@@ -7,6 +7,7 @@ from authlib.integrations.base_client.errors import InvalidTokenError
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import CommandError, call_command
 from django.db.models import ProtectedError
+from mitol.common.utils import now_in_utc
 
 from b2b.api import reconcile_user_orgs
 from b2b.constants import (
@@ -1655,14 +1656,19 @@ def test_link_organization_survives_member_sync_errors(connection, error):
     )
 
 
-def test_push_unconfirmed_members_pushes_only_flagged_members(connection):
-    """A member a token already confirmed is left to the token reconcile."""
+def test_push_unconfirmed_members_pushes_only_members_keycloak_lacks(connection):
+    """A member a token confirmed or Keycloak accepted is not pushed again."""
 
     organization = OrganizationPageFactory.create()
     unconfirmed = UserOrganizationFactory.create(
         organization=organization, keep_until_seen=True
     )
     UserOrganizationFactory.create(organization=organization, keep_until_seen=False)
+    UserOrganizationFactory.create(
+        organization=organization,
+        keep_until_seen=True,
+        added_to_keycloak_at=now_in_utc(),
+    )
 
     failed = push_unconfirmed_members_to_keycloak(connection=connection)
 
@@ -1672,6 +1678,46 @@ def test_push_unconfirmed_members_pushes_only_flagged_members(connection):
     )
     unconfirmed.refresh_from_db()
     assert unconfirmed.keep_until_seen is True
+    assert unconfirmed.added_to_keycloak_at is not None
+
+
+def test_push_unconfirmed_members_pushes_a_member_once(connection):
+    """A member removed in Keycloak after the push is not added back."""
+
+    UserOrganizationFactory.create(keep_until_seen=True)
+
+    push_unconfirmed_members_to_keycloak(connection=connection)
+    push_unconfirmed_members_to_keycloak(connection=connection)
+
+    connection.organizations.associate.assert_called_once()
+
+
+def test_push_unconfirmed_members_records_an_existing_keycloak_member(connection):
+    """A 409 means Keycloak has the member, so they are not pushed again."""
+
+    member = UserOrganizationFactory.create(keep_until_seen=True)
+    connection.organizations.associate.side_effect = _http_error(409)
+
+    assert push_unconfirmed_members_to_keycloak(connection=connection) == {}
+
+    member.refresh_from_db()
+    assert member.added_to_keycloak_at is not None
+
+
+def test_link_organization_pushes_members_added_to_a_previous_link(connection):
+    """A timestamp from an earlier Keycloak organization doesn't skip the push."""
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    member = UserOrganizationFactory.create(
+        organization=organization, added_to_keycloak_at=now_in_utc()
+    )
+
+    link_organization_to_keycloak(organization, connection=connection)
+
+    organization.refresh_from_db()
+    connection.organizations.associate.assert_called_once_with(
+        "members", organization.sso_organization_id, member.user.global_id
+    )
 
 
 def test_push_unconfirmed_members_skips_unlinked_organizations(connection):
@@ -1702,6 +1748,8 @@ def test_push_unconfirmed_members_reports_failures_and_carries_on(connection):
 
     assert failed == {missing_user.organization.org_key: [missing_user.user]}
     assert connection.organizations.associate.call_count == 2
+    missing_user.refresh_from_db()
+    assert missing_user.added_to_keycloak_at is None
     connection.organizations.associate.assert_any_call(
         "members", added.organization.sso_organization_id, added.user.global_id
     )

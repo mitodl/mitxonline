@@ -1026,6 +1026,11 @@ class UserOrganization(models.Model):
         blank=True,
         help_text="If True, the user is a manager of this organization and can access organization dashboard features.",
     )
+    added_to_keycloak_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When MITx Online added the user to the organization in Keycloak. Empty if it has not managed to yet, or if the membership came from Keycloak.",
+    )
 
     class Meta:
         unique_together = ("user", "organization")

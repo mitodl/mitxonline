@@ -485,7 +485,9 @@ def link_organization_to_keycloak(organization, *, connection=None, actor=None):
             raise AliasCollisionError(msg)
 
     with transaction.atomic():
-        organization.organization_users.update(keep_until_seen=True)
+        organization.organization_users.update(
+            keep_until_seen=True, added_to_keycloak_at=None
+        )
         organization.sso_organization_id = sso_organization_id
         organization.save(audit_sso_link=False)
         OrganizationOnboarding.objects.get_or_create(
@@ -517,10 +519,11 @@ def sync_organization_members_to_keycloak(organization, *, connection):
     """
     Add the organization's unconfirmed members to its Keycloak organization.
 
-    Only keep_until_seen members are pushed: those are the ones MITx Online
-    added itself and has not yet seen in the member's token. A member without
-    the flag was last confirmed by a token, so if Keycloak no longer has them
-    they were removed there, and pushing them would undo the removal.
+    Only keep_until_seen members with no added_to_keycloak_at are pushed: the
+    ones MITx Online added itself and has not yet got into Keycloak. A member
+    without the flag was last confirmed by a token, and one with the timestamp
+    was accepted by Keycloak, so if Keycloak no longer has either they were
+    removed there, and pushing them would undo the removal.
 
     Args:
     - organization (OrganizationPage): a linked organization
@@ -531,7 +534,7 @@ def sync_organization_members_to_keycloak(organization, *, connection):
 
     failed = []
     for user_org in organization.organization_users.filter(
-        keep_until_seen=True
+        keep_until_seen=True, added_to_keycloak_at__isnull=True
     ).select_related("user"):
         user = user_org.user
         if not user.global_id:
@@ -548,18 +551,21 @@ def sync_organization_members_to_keycloak(organization, *, connection):
             )
         except (RequestException, OAuthError) as exc:
             # An adopted realm org may already have this member.
-            if (
+            already_member = (
                 isinstance(exc, HTTPError)
                 and exc.response is not None
                 and exc.response.status_code == HTTPStatus.CONFLICT
-            ):
-                continue
-            log.exception(
-                "Could not add %s to Keycloak organization %s",
-                user,
-                organization.org_key,
             )
-            failed.append(user)
+            if not already_member:
+                log.exception(
+                    "Could not add %s to Keycloak organization %s",
+                    user,
+                    organization.org_key,
+                )
+                failed.append(user)
+                continue
+        user_org.added_to_keycloak_at = now_in_utc()
+        user_org.save(update_fields=["added_to_keycloak_at"])
 
     return failed
 
@@ -572,8 +578,10 @@ def push_unconfirmed_members_to_keycloak(connection=None):
     created, and carries on if Keycloak answers with an HTTP error. Nothing
     else retries it, so the member keeps access through keep_until_seen and
     Keycloak never learns about them. This pushes those members again, along
-    with any whose row already existed. The flag clears as usual, in
-    reconcile_user_orgs, once the organization shows up in the member's token.
+    with any whose row already existed. Each member is pushed until Keycloak
+    accepts them and no further, so removing them in Keycloak afterwards
+    sticks. The flag clears as usual, in reconcile_user_orgs, once the
+    organization shows up in the member's token.
 
     Args:
     - connection (KeycloakConnection): an existing connection, if any
@@ -584,6 +592,7 @@ def push_unconfirmed_members_to_keycloak(connection=None):
     organizations = OrganizationPage.objects.filter(
         sso_organization_id__isnull=False,
         organization_users__keep_until_seen=True,
+        organization_users__added_to_keycloak_at__isnull=True,
     ).distinct()
 
     failed = {}

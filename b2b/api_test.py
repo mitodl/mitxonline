@@ -1349,9 +1349,10 @@ def test_b2b_org_attach_calls_keycloak(mocked_b2b_org_attach, has_id):
     org = OrganizationPageFactory.create(sso_organization_id=has_id)
     user = UserFactory.create()
 
-    process_add_org_membership(user, org)
+    membership = process_add_org_membership(user, org)
 
     mocked_b2b_org_attach.assert_called() if has_id else mocked_b2b_org_attach.assert_not_called()
+    assert (membership.added_to_keycloak_at is not None) is bool(has_id)
 
 
 @pytest.mark.parametrize(
