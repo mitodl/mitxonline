@@ -1,10 +1,13 @@
 """Tests for Wagtail API views."""
 
+from datetime import date
+
 import pytest
 import wagtail_factories
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from cms.factories import CoursePageFactory, ProgramPageFactory
@@ -443,6 +446,41 @@ def test_course_page_detail_testimonials_empty_when_none_authored(user_drf_clien
     )
     assert resp.status_code == 200
     assert resp.json()["testimonials"] == []
+
+
+def test_testimonial_exposes_date_published(user_drf_client):
+    """A testimonial serializes date_published as an ISO date."""
+    page = CoursePageFactory.create()
+    ProductPageTestimonial.objects.create(
+        page=page,
+        quote="Dated quote.",
+        name="Erin",
+        date_published=date(2025, 3, 14),
+    )
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    assert resp.json()["testimonials"][0]["date_published"] == "2025-03-14"
+
+
+def test_testimonial_date_published_defaults_to_today(user_drf_client):
+    """
+    An unset date_published falls back to today.
+
+    Page revisions authored before this field existed rehydrate without it, so a
+    default keeps them saveable instead of raising on a NOT NULL column.
+    """
+    page = CoursePageFactory.create()
+    ProductPageTestimonial.objects.create(page=page, quote="Undated.", name="Frank")
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    assert (
+        resp.json()["testimonials"][0]["date_published"]
+        == timezone.localdate().isoformat()
+    )
 
 
 def test_testimonial_image_src_null_without_image(user_drf_client):
