@@ -966,7 +966,9 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     return True  # No products to validate means valid
 
 
-def get_contract_runs_without_products(contract: ContractPage):
+def get_contract_runs_without_products(
+    contract: ContractPage, *, b2b_only=False, public_only=False
+):
     """
     Return a list of contract course runs that don't have products.
 
@@ -977,8 +979,10 @@ def get_contract_runs_without_products(contract: ContractPage):
     - QuerySet of runs without products.
     """
 
-    return contract.get_course_runs().exclude(
-        id__in=contract.get_products().values_list("object_id", flat=True)
+    return contract.get_course_runs(b2b_only=b2b_only, public_only=public_only).exclude(
+        id__in=contract.get_products(
+            b2b_only=b2b_only, public_only=public_only
+        ).values_list("object_id", flat=True)
     )
 
 
@@ -987,13 +991,15 @@ def get_contract_products_with_bad_pricing(contract: ContractPage):
     Return a list of products that don't have correct prices set.
 
     This is products that have a price but the contract price is 0 or not set,
-    or products that have prices that aren't the same as the contract.
+    or products that have prices that aren't the same as the contract. Only
+    considers products that are for B2B-only runs (public runs may/may not have
+    products that match up with the contract pricing).
 
     Returns:
     - QuerySet of products with invalid prices.
     """
 
-    products_qset = contract.get_products()
+    products_qset = contract.get_products(b2b_only=True)
 
     if (
         not contract.enrollment_fixed_price
@@ -1007,39 +1013,52 @@ def get_contract_products_with_bad_pricing(contract: ContractPage):
 def ensure_contract_run_products(contract: ContractPage) -> list[Product]:
     """Ensure the contract's course runs all have products."""
 
-    fixable_crs = get_contract_runs_without_products(contract)
+    fixable_crs = get_contract_runs_without_products(contract, b2b_only=True)
 
     if len(fixable_crs) == 0:
         return []
 
     content_type = ContentType.objects.get_for_model(CourseRun)
-    return [
-        Product.objects.create(
-            content_type=content_type,
-            object_id=run.id,
-            price=contract.enrollment_fixed_price
-            if contract.enrollment_fixed_price
-            else Decimal(0),
-            is_active=True,
-            description=run.courseware_id,
-        )
-        for run in fixable_crs
-    ]
+
+    with reversion.create_revision():
+        return [
+            Product.all_objects.update_or_create(
+                content_type=content_type,
+                object_id=run.id,
+                defaults={
+                    "price": contract.enrollment_fixed_price
+                    if contract.enrollment_fixed_price
+                    else Decimal(0),
+                    "description": run.courseware_id,
+                    "is_active": True,
+                },
+            )[0]
+            for run in fixable_crs
+        ]
 
 
 def ensure_contract_run_pricing(contract: ContractPage) -> int:
     """Ensure the contract runs are all priced correctly."""
 
     products = contract.get_products()
+    expected_price = (
+        contract.enrollment_fixed_price
+        if contract.enrollment_fixed_price
+        else Decimal(0)
+    )
+
+    updated_count = 0
 
     for product in products:
-        product.price = (
-            contract.enrollment_fixed_price
-            if contract.enrollment_fixed_price
-            else Decimal(0)
-        )
+        if product.purchasable_object.b2b_only and product.price != expected_price:
+            product.price = expected_price
 
-    return Product.objects.bulk_update(products, ["price"])
+            # This did do bulk_update, but that doesn't trigger version creation.
+            with reversion.create_revision():
+                product.save()
+                updated_count += 1
+
+    return updated_count
 
 
 def _get_discount_defaults(discount_amount: Decimal) -> dict:
