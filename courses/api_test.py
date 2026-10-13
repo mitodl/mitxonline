@@ -46,6 +46,7 @@ from compliance.factories import ExportComplianceLogFactory
 from compliance.models import ExportComplianceDecision
 from courses.api import (
     MISSING_COMPLIANCE_DATA_CODE,
+    _has_earned_program_cert,
     check_course_modes,
     check_enrollment_eligibility,
     create_local_enrollment,
@@ -97,6 +98,7 @@ from courses.factories import (
     ProgramFactory,
     program_with_empty_requirements,  # noqa: F401
     program_with_requirements,  # noqa: F401
+    program_with_tracks,  # noqa: F401
 )
 
 # pylint: disable=redefined-outer-name
@@ -5417,3 +5419,25 @@ def test_partner_schools_for_program_excludes_unassigned_when_flag_on(settings):
     PartnerSchoolFactory.create(name="Unassigned School")
 
     assert list(partner_schools_for_program(program)) == []
+
+
+def _pass_courses(user, courses):
+    """Give the user an active run enrollment and a certificate in each course."""
+    for course in courses:
+        run = CourseRunFactory.create(course=course)
+        CourseRunEnrollmentFactory.create(user=user, run=run)
+        CourseRunCertificateFactory.create(user=user, course_run=run)
+
+
+@pytest.mark.parametrize("whole_track", [False, True])
+def test_has_earned_program_cert_with_tracks(
+    user,
+    program_with_tracks,  # noqa: F811
+    whole_track,
+):
+    """Core plus one whole track earns the certificate; one course from each track does not"""
+    general, methods = program_with_tracks.track_courses
+    _pass_courses(user, program_with_tracks.core_courses)
+    _pass_courses(user, general if whole_track else general[:1] + methods[:1])
+
+    assert _has_earned_program_cert(user, program_with_tracks.program) is whole_track
