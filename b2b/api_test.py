@@ -3769,7 +3769,9 @@ def test_apply_contract_discounts_to_basket(public_contract_run, code_exists):
     contract = public_contract_run["contract"]
     product = public_contract_run["product"]
     existing = (
-        _attach_bulk_discount(product, amount=Decimal(10)) if code_exists else None
+        _attach_bulk_discount(contract, product, amount=Decimal(10))
+        if code_exists
+        else None
     )
     user = _make_contract_user({"c": contract}, ["c"])
     basket = _basket_with(user, product)
@@ -3848,7 +3850,7 @@ def test_apply_contract_discounts_to_basket_cheapest_contract(public_contract_ru
         enrollment_fixed_price=Decimal(3),
     )
     run.b2b_contracts.add(cheaper)
-    cheaper_code = _attach_bulk_discount(product, amount=Decimal(3))
+    cheaper_code = _attach_bulk_discount(cheaper, product, amount=Decimal(3))
     user = _make_contract_user({"c": contract, "d": cheaper}, ["c", "d"])
     basket = _basket_with(user, product)
 

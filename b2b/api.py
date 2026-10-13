@@ -1726,11 +1726,15 @@ def _get_or_create_contract_discount(
         else REDEMPTION_TYPE_UNLIMITED
     )
 
+    discount = _create_discount_with_product(
+        contract,
+        product,
+        discount_amount if discount_amount else Decimal(0),
+        redemption_type,
+    )
     log.error("B2B enroll: had to create a discount for %s", product)
 
-    return _create_discount_with_product(
-        product, discount_amount if discount_amount else Decimal(0), redemption_type
-    )
+    return discount
 
 
 def _apply_available_discount(
