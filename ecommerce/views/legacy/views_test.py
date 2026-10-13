@@ -19,6 +19,7 @@ from rest_framework.test import APIClient
 from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
+from compliance.exceptions import ExportComplianceDataError
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
@@ -70,6 +71,7 @@ from main import features
 from main.constants import (
     USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
+    USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
@@ -2141,3 +2143,22 @@ def test_backoffice_callback_good_order(mocker, client, settings):
 
     assert response.status_code == 200
     mocked_processor.assert_called()
+
+
+def test_checkout_interstitial_with_invalid_profile_data(mocker, user, user_client):
+    """
+    A profile the export compliance check can't use redirects like a blocked
+    enrollment instead of erroring.
+    """
+    mocker.patch(
+        "ecommerce.views.legacy.api.generate_checkout_payload",
+        side_effect=ExportComplianceDataError(user, ["postal_code"]),
+    )
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("user-dashboard")
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_ENROLL_BLOCKED}
+    )

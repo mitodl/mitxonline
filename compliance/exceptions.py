@@ -1,5 +1,7 @@
 """Exceptions for the compliance app"""
 
+from compliance.constants import BILL_TO_FIELD_TO_PROFILE_FIELD
+
 
 class ExportComplianceCheckError(Exception):
     """Base class for export compliance verification failures"""
@@ -47,7 +49,15 @@ class ExportComplianceError(ExportComplianceCheckError):
 
 
 class ExportComplianceDataError(ExportComplianceCheckError):
-    """A user is missing the profile data required to run an export compliance check"""
+    """
+    A user is missing the profile data required to run an export compliance
+    check, or has data CyberSource rejected as invalid
+    """
+
+    #: Support-facing code for a profile the learner can fix themselves -
+    #: unlike ``ExportComplianceError.error_code``, retrying after updating
+    #: the profile can succeed.
+    error_code = "CS_701"
 
     def __init__(self, user, missing_fields, msg=None):
         """
@@ -66,6 +76,17 @@ class ExportComplianceDataError(ExportComplianceCheckError):
                 "Please update your profile or contact support."
             )
         super().__init__(msg)
+
+    @property
+    def profile_fields(self) -> list[str]:
+        """The profile field names (as in ``compliance_missing_fields``) to fix."""
+        return sorted(
+            {
+                BILL_TO_FIELD_TO_PROFILE_FIELD[field]
+                for field in self.missing_fields
+                if field in BILL_TO_FIELD_TO_PROFILE_FIELD
+            }
+        )
 
     def to_error_detail(self) -> dict:
         """Return a JSON-serializable representation of this error for API responses."""

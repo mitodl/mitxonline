@@ -38,6 +38,7 @@ from rest_framework.viewsets import (
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.api import is_product_courserun, is_product_program
+from compliance.exceptions import ExportComplianceCheckError
 from courses.models import (
     Course,
     CourseRun,
@@ -1189,6 +1190,10 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             checkout_payload = api.generate_checkout_payload(request)
         except ObjectDoesNotExist:
             return HttpResponse("No basket")
+        except ExportComplianceCheckError:
+            # The profile can't be checked; treat it like a blocked enrollment.
+            # The underlying cause is logged where it's raised.
+            checkout_payload = {"country_blocked": True}
         if "country_blocked" in checkout_payload:
             return redirect_with_user_message(
                 reverse("user-dashboard"),
