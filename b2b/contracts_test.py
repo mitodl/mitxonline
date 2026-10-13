@@ -3,6 +3,7 @@
 from decimal import Decimal
 
 import pytest
+from opaque_keys import InvalidKeyError
 
 from b2b.api import ensure_enrollment_codes_exist
 from b2b.constants import (
@@ -23,7 +24,7 @@ from b2b.contracts import (
     remove_courseware_from_contract,
     update_contract_variant_set,
 )
-from b2b.exceptions import ContractVariantError
+from b2b.exceptions import ContractVariantError, SourceCourseIncompleteError
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.models import (
     DiscountContractAttachmentRedemption,
@@ -34,8 +35,10 @@ from courses.factories import (
     CourseRunFactory,
     ProgramFactory,
 )
+from courses.models import CourseRun
 from users.factories import UserFactory
 from variants.factories import CourseSupportedVariantFactory
+from variants.models import SupportedVariant
 
 pytestmark = [pytest.mark.django_db]
 
@@ -116,6 +119,77 @@ def test_add_program():
     assert added.runs_added == 2
     assert added.courses_without_source_run == 0
     assert list(contract.programs) == [program]
+
+
+def test_add_program_skips_a_course_with_an_invalid_source_run_key():
+    """A source run ID that isn't a course key skips that course, not the program."""
+
+    contract = ContractPageFactory.create()
+    program = ProgramFactory.create()
+    bad_run = _source_run()
+    CourseRun.all_objects.filter(id=bad_run.id).update(courseware_id="not-a-course-key")
+    usable = _source_run().course
+    # The bad course goes first, so the usable one is only reached if the loop
+    # carries on past it.
+    program.add_requirement(bad_run.course)
+    program.add_requirement(usable)
+
+    added = add_courseware_to_contract(contract, program, skip_edx=True)
+
+    assert added.runs_added == 1
+    assert added.courses_without_source_run == 0
+    assert added.courses_with_invalid_key == 1
+    assert list(contract.programs) == [program]
+    assert [run.course for run in contract.get_course_runs()] == [usable]
+
+
+def test_add_course_with_one_invalid_source_run_key_creates_nothing():
+    """One bad source run ID fails the course before any of its runs are made."""
+
+    contract = ContractPageFactory.create()
+    SupportedVariant.objects.create(variant_object=contract, language="fr")
+    course = _source_run().course
+    SupportedVariant.objects.create(variant_object=course, language="fr")
+    bad_run = CourseRunFactory.create(course=course, is_source_run=True, language="fr")
+    CourseRun.all_objects.filter(id=bad_run.id).update(courseware_id="not-a-course-key")
+
+    with pytest.raises(InvalidKeyError):
+        add_courseware_to_contract(contract, course, skip_edx=True)
+
+    assert not contract.get_course_runs().exists()
+
+
+def test_add_course_to_contract_with_no_variant_sets_creates_nothing():
+    """No variant sets on the contract means no runs, not a run for every variant."""
+
+    contract = ContractPageFactory.create()
+    contract.variant_options.all().delete()
+    course = _source_run().course
+
+    with pytest.raises(SourceCourseIncompleteError):
+        add_courseware_to_contract(contract, course, skip_edx=True)
+
+    assert not contract.get_course_runs().exists()
+
+
+@pytest.mark.parametrize("has_default_variant", [True, False])
+def test_add_program_to_contract_with_no_variant_sets_creates_nothing(
+    has_default_variant,
+):
+    """Every course is skipped, including one with no default variant set."""
+
+    contract = ContractPageFactory.create()
+    contract.variant_options.all().delete()
+    program = ProgramFactory.create()
+    course = _source_run().course
+    if not has_default_variant:
+        course.possible_variant_sets.all().delete()
+    program.add_requirement(course)
+
+    added = add_courseware_to_contract(contract, program, skip_edx=True)
+
+    assert (added.runs_added, added.courses_without_source_run) == (0, 1)
+    assert not contract.get_course_runs().exists()
 
 
 def test_add_run_in_another_contract_is_skipped():
