@@ -171,6 +171,12 @@ send to the partner.
 An IdP alias is chosen by staff, not derived from `org_key`, because one
 organization can have more than one IdP.
 
+`GET` on a single IdP also returns `attribute_map` and `attribute_name_map`,
+read from Keycloak's attribute-importer mappers at request time, so it returns
+502 when that Keycloak call fails. The list and an organization's nested
+`identity_providers` leave them out, because they would cost a Keycloak call
+per IdP.
+
 ### Editing an identity provider
 
 `DELETE` on an IdP is destructive beyond this API. Keycloak's IdP delete also
@@ -194,8 +200,9 @@ merge into it. For SAML, send both maps together (an empty object for the one
 with no entries), because sending one alone would delete the other's mappers.
 A user attribute can be in only one of the two, and the pair can't leave a
 SAML IdP with no mappers. OIDC takes `attribute_map` only, and an empty
-object clears its mappers. Mappers of other types added in the Keycloak
-console are left alone.
+object clears its mappers. To change one mapping, read the current maps from
+the IdP's `GET` and send them back with the change. Mappers of other types
+added in the Keycloak console are left alone.
 
 `alias` and `protocol` can't be changed. Sending either is a 400, and so is a
 field that belongs to the other protocol or a body with no fields. The
@@ -334,5 +341,4 @@ changes an existing `org_key`.
 - Domain verification, before C2.
 - Where C2's partner invite token is stored. `OrganizationOnboarding` is the
   likely place, but it has no token field yet.
-- A contracts section in the staff dashboard, an IdP edit form over the
-  `PATCH` route, and a test-login flow.
+- A contracts section in the staff dashboard and a test-login flow.

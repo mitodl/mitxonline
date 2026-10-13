@@ -782,6 +782,46 @@ def _attribute_importer_mappers(connection, alias):
     ]
 
 
+def get_identity_provider_attribute_maps(identity_provider, *, connection=None):
+    """
+    Return the IdP's attribute mappers as the two maps an update takes.
+
+    The maps replace the whole mapper set on an update, so a caller editing one
+    mapping has to start from what Keycloak holds now. Keycloak is the only
+    place the mappers are stored.
+
+    A SAML mapper carrying both a FriendlyName and a Name is reported by its
+    FriendlyName. Nothing here or in ol-infrastructure creates one.
+
+    Args:
+    - identity_provider (OrganizationIdentityProvider): the IdP to read
+    - connection (KeycloakConnection): the Keycloak connection to use
+    Returns:
+    - tuple of (attribute_map, attribute_name_map)
+    """
+
+    connection = connection or KeycloakConnection()
+    attribute_map = {}
+    attribute_name_map = {}
+
+    for mapper in _attribute_importer_mappers(connection, identity_provider.alias):
+        config = mapper.config or {}
+        user_attribute = config.get("user.attribute")
+        if identity_provider.protocol == IDP_PROTOCOL_OIDC:
+            source, target = config.get("claim"), attribute_map
+        elif config.get("attribute.friendly.name"):
+            source, target = config["attribute.friendly.name"], attribute_map
+        else:
+            source, target = config.get("attribute.name"), attribute_name_map
+        # A mapper with no user attribute or no source imports nothing, so
+        # there is nothing to report. One edited into that state in the
+        # Keycloak console must not stop the rest from being read.
+        if user_attribute and source:
+            target[user_attribute] = source
+
+    return attribute_map, attribute_name_map
+
+
 def _replace_attribute_mappers(  # noqa: PLR0913
     connection, alias, protocol, existing, attribute_map, attribute_name_map
 ):

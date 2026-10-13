@@ -63,6 +63,7 @@ from b2b.provisioning import (
     create_identity_provider,
     create_organization,
     delete_identity_provider,
+    get_identity_provider_attribute_maps,
     parse_identity_provider_metadata,
     refresh_identity_provider_metadata,
     set_onboarding_state,
@@ -86,6 +87,7 @@ from b2b.serializers.v0.provisioning import (
     CreateOrganizationSerializer,
     ExpiredEnrollmentCodeSerializer,
     IdentityProviderTransitionSerializer,
+    OrganizationIdentityProviderDetailSerializer,
     OrganizationIdentityProviderSerializer,
     OrganizationOnboardingSerializer,
     OrganizationProvisioningAuditSerializer,
@@ -397,11 +399,24 @@ class IdentityProviderProvisioningViewSet(
 
         return Response(self.get_serializer(self.get_queryset(), many=True).data)
 
-    @extend_schema(responses={200: OrganizationIdentityProviderSerializer})
+    @extend_schema(
+        responses={
+            200: OrganizationIdentityProviderDetailSerializer,
+            502: DetailSerializer,
+        }
+    )
     def retrieve(self, request, alias=None, **kwargs):  # noqa: ARG002
-        """Return a single identity provider."""
+        """Return an identity provider, including its attribute mappers."""
 
-        return Response(self.get_serializer(self.get_object()).data)
+        identity_provider = self.get_object()
+        (
+            identity_provider.attribute_map,
+            identity_provider.attribute_name_map,
+        ) = get_identity_provider_attribute_maps(identity_provider)
+
+        return Response(
+            OrganizationIdentityProviderDetailSerializer(identity_provider).data
+        )
 
     @extend_schema(
         request=CreateIdentityProviderSerializer,

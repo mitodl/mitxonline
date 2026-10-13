@@ -14,6 +14,7 @@ import { DiscountList, DiscountEdit, DiscountShow, DiscountCreate, BulkDiscountC
 import { FlexiblePricingList } from "./pages/flexible_pricing";
 import {
   IdentityProviderCreate,
+  IdentityProviderEdit,
   OrganizationCreate,
   OrganizationEdit,
   OrganizationList,
@@ -140,6 +141,14 @@ export default function App() {
                 element={
                   <CanAccess resource={PROVISIONING_RESOURCE} action="create" fallback={<ErrorComponent />}>
                     <IdentityProviderCreate />
+                  </CanAccess>
+                }
+              />
+              <Route
+                path="/b2b_organizations/show/:orgKey/identity-providers/:alias/edit"
+                element={
+                  <CanAccess resource={PROVISIONING_RESOURCE} action="edit" fallback={<ErrorComponent />}>
+                    <IdentityProviderEdit />
                   </CanAccess>
                 }
               />
