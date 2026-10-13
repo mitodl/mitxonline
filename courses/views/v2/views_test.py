@@ -1267,9 +1267,9 @@ def test_user_enrollments_create_export_compliance_blocked_v2(
 def test_user_enrollments_create_export_compliance_missing_data_v2(
     mocker, user_drf_client, user
 ):
-    """Missing profile data is not a CyberSource rejection, so it carries no error code."""
+    """Missing profile data carries the fixable-data code and the fields to fix."""
     run = CourseRunFactory.create()
-    exc = ExportComplianceDataError(user, ["bill_to_country"])
+    exc = ExportComplianceDataError(user, ["country"])
     mocker.patch(
         "courses.serializers.v2.courses.create_run_enrollments",
         side_effect=exc,
@@ -1278,7 +1278,10 @@ def test_user_enrollments_create_export_compliance_missing_data_v2(
         reverse("v2:user-enrollments-api-list"), data={"run_id": run.id}
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
-    assert resp.json() == {"detail": "Unable to complete enrollment."}
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "missing_fields": ["country"],
+    }
     assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
 
 

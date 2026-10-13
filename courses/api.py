@@ -116,11 +116,9 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-#: Support-facing code for a learner whose profile is missing the fields
-#: required to run an export compliance check at all. Unlike
-#: ``ExportComplianceError.error_code`` this is not set on the exception, so
-#: that the existing enrollment endpoints keep their bare error detail.
-MISSING_COMPLIANCE_DATA_CODE = "CS_701"
+#: Support-facing code for a learner whose profile is missing (or has invalid
+#: values for) the fields required to run an export compliance check.
+MISSING_COMPLIANCE_DATA_CODE = ExportComplianceDataError.error_code
 
 UserEnrollments = namedtuple(  # noqa: PYI024
     "UserEnrollments",
@@ -419,42 +417,37 @@ def reconcile_verified_program_enrollments(
 
     Raises:
         EnrollmentError: if reconciliation failed
+        ExportComplianceCheckError: if the export compliance check failed
     """
-    try:
-        if len(verified_program_enrollments) == 0:
-            # No verified enrollments, so it doesn't matter - the user will get an
-            # audit one. (But make the audit enrollment to not confuse the course run
-            # process later.)
-            create_program_enrollments(
-                user, programs, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
-            )
-        elif (
-            len(verified_program_enrollments) == 1
-            and verified_program_enrollments[0].program == root_program
-        ):
-            # The verified enrollment that's here is for the root program, so we can
-            # create a verified enrollment for the other program.
-            create_program_enrollments(
-                user, programs, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
-            )
-        elif (
-            len(verified_program_enrollments) == 1
-            and verified_program_enrollments[0].program != root_program
-        ):
-            # The verified enrollment that's here is _not_ for the root program, so
-            # we should stop.
-            log.error(
-                "reconcile_verified_program_enrollments: user %s enrolling in %s has no verified enrollment in %s",
-                user,
-                courserun_id,
-                root_program,
-            )
-            raise EnrollmentError
-    except ExportComplianceCheckError as exc:
-        # Don't propagate the specifics of the compliance decision to the
-        # client - only an opaque support code, if the cause declares one.
-        # The underlying cause is logged where it's raised.
-        raise EnrollmentError.from_cause(exc) from exc
+    if len(verified_program_enrollments) == 0:
+        # No verified enrollments, so it doesn't matter - the user will get an
+        # audit one. (But make the audit enrollment to not confuse the course run
+        # process later.)
+        create_program_enrollments(
+            user, programs, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+        )
+    elif (
+        len(verified_program_enrollments) == 1
+        and verified_program_enrollments[0].program == root_program
+    ):
+        # The verified enrollment that's here is for the root program, so we can
+        # create a verified enrollment for the other program.
+        create_program_enrollments(
+            user, programs, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        )
+    elif (
+        len(verified_program_enrollments) == 1
+        and verified_program_enrollments[0].program != root_program
+    ):
+        # The verified enrollment that's here is _not_ for the root program, so
+        # we should stop.
+        log.error(
+            "reconcile_verified_program_enrollments: user %s enrolling in %s has no verified enrollment in %s",
+            user,
+            courserun_id,
+            root_program,
+        )
+        raise EnrollmentError
 
 
 def get_program_and_ancestor_ids(program):
