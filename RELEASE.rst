@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.170.0
+---------------
+
+- feat(scim): add --fill-only to remediate_keycloak_user_names (#3999)
+- fix: ask for missing profile fields at checkout instead of returning a 500 (#4136)
+- Update Django Zeal, add targeted suppressions for most new N+1 (#4126)
+- Add enrollment eligibility endpoints (#4020)
+
 Version 1.169.12
 ----------------
 
