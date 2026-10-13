@@ -1016,20 +1016,22 @@ def ensure_contract_run_products(contract: ContractPage) -> list[Product]:
         return []
 
     content_type = ContentType.objects.get_for_model(CourseRun)
-    return [
-        Product.all_objects.update_or_create(
-            content_type=content_type,
-            object_id=run.id,
-            defaults={
-                "price": contract.enrollment_fixed_price
-                if contract.enrollment_fixed_price
-                else Decimal(0),
-                "description": run.courseware_id,
-                "is_active": True,
-            },
-        )[0]
-        for run in fixable_crs
-    ]
+
+    with reversion.create_revision():
+        return [
+            Product.all_objects.update_or_create(
+                content_type=content_type,
+                object_id=run.id,
+                defaults={
+                    "price": contract.enrollment_fixed_price
+                    if contract.enrollment_fixed_price
+                    else Decimal(0),
+                    "description": run.courseware_id,
+                    "is_active": True,
+                },
+            )[0]
+            for run in fixable_crs
+        ]
 
 
 def ensure_contract_run_pricing(contract: ContractPage) -> int:
