@@ -2,6 +2,7 @@
 
 import logging
 from decimal import Decimal
+from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib import admin
@@ -1017,6 +1018,54 @@ class OrganizationIdentityProvider(TimestampedModel, ValidateOnSaveMixin):
     )
     metadata_fetched_at = models.DateTimeField(null=True, blank=True)
 
+    @staticmethod
+    def _realm_url():
+        """Return the URL of the Keycloak realm the IdPs live in."""
+
+        # Not urljoin: a leading slash there drops any path in the base URL.
+        return (
+            f"{settings.KEYCLOAK_BASE_URL.removesuffix('/')}"
+            f"/realms/{settings.KEYCLOAK_REALM_NAME}"
+        )
+
+    @property
+    def login_url(self):
+        """
+        Return a link that signs a user in through this IdP.
+
+        The API gateway builds the normal login request and doesn't forward
+        kc_idp_hint, so /login/?kc_idp_hint=<alias> never reaches Keycloak.
+        This goes to Keycloak directly instead: the hint sends the browser to
+        this IdP, and Keycloak then redirects to the gateway's login route,
+        which starts its own login and completes it from the Keycloak session
+        the user now has. The code Keycloak appends to that redirect is unused.
+
+        Partners without email-domain routing give their learners a link of
+        this shape, built by hand. The realm's browser flow checks the Keycloak
+        session cookie before the IdP redirector, so a browser that is already
+        signed in to Keycloak never reaches the IdP.
+
+        Returns:
+        - str: the link, or None when the login client isn't configured
+        """
+
+        if not (
+            settings.B2B_IDP_LOGIN_CLIENT_ID and settings.B2B_IDP_LOGIN_REDIRECT_URI
+        ):
+            return None
+
+        query = urlencode(
+            {
+                "response_type": "code",
+                "client_id": settings.B2B_IDP_LOGIN_CLIENT_ID,
+                "redirect_uri": settings.B2B_IDP_LOGIN_REDIRECT_URI,
+                "scope": "openid",
+                "kc_idp_hint": self.alias,
+            }
+        )
+
+        return f"{self._realm_url()}/protocol/openid-connect/auth?{query}"
+
     @property
     def service_provider(self):
         """
@@ -1032,11 +1081,7 @@ class OrganizationIdentityProvider(TimestampedModel, ValidateOnSaveMixin):
           OIDC redirect URI) and metadata_url (the SAML SP descriptor)
         """
 
-        # Not urljoin: a leading slash there drops any path in the base URL.
-        realm_url = (
-            f"{settings.KEYCLOAK_BASE_URL.removesuffix('/')}"
-            f"/realms/{settings.KEYCLOAK_REALM_NAME}"
-        )
+        realm_url = self._realm_url()
         endpoint = f"{realm_url}/broker/{self.alias}/endpoint"
 
         if self.protocol != IDP_PROTOCOL_SAML:

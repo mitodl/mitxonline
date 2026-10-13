@@ -237,8 +237,20 @@ Allowed transitions:
 | `disabled` | `testing`, `active` |
 
 There's no `draft` to `active` move. An IdP only goes live after someone has
-logged in through it. Nothing in MITx Online passes `kc_idp_hint` through to
-Keycloak yet, so testing an IdP still takes a hand-built login URL.
+logged in through it.
+
+Each IdP response includes `login_url`, a link that signs a user in through
+that IdP. Use it to test an IdP in `testing`, and give it to a partner whose
+learners can't be routed by email domain. The API gateway builds the normal
+login request and drops `kc_idp_hint`, so `/login/?kc_idp_hint=<alias>` doesn't
+work. The link goes to Keycloak's authorization endpoint with the hint, and
+Keycloak redirects to the gateway's login route once the user has a session.
+Open it in a private window when testing, because a browser that is already
+signed in to Keycloak is not sent to the IdP.
+
+`login_url` is `null` unless `B2B_IDP_LOGIN_CLIENT_ID` and
+`B2B_IDP_LOGIN_REDIRECT_URI` are set. They name the Keycloak client and gateway
+login URL of the app partner learners land in.
 
 ## Contracts
 

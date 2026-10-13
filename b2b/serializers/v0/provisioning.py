@@ -63,6 +63,14 @@ class OrganizationIdentityProviderSerializer(serializers.ModelSerializer):
     """
 
     service_provider = IdentityProviderServiceProviderSerializer(read_only=True)
+    login_url = serializers.CharField(
+        read_only=True,
+        allow_null=True,
+        help_text=(
+            "A link that signs a user in through this IdP. Null when the login"
+            " client isn't configured."
+        ),
+    )
 
     class Meta:
         model = OrganizationIdentityProvider
@@ -77,6 +85,7 @@ class OrganizationIdentityProviderSerializer(serializers.ModelSerializer):
             "metadata_artifact",
             "metadata_fetched_at",
             "service_provider",
+            "login_url",
             "created_on",
             "updated_on",
         ]
