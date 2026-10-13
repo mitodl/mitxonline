@@ -564,8 +564,11 @@ def sync_organization_members_to_keycloak(organization, *, connection):
                 )
                 failed.append(user)
                 continue
-        user_org.added_to_keycloak_at = now_in_utc()
-        user_org.save(update_fields=["added_to_keycloak_at"])
+        # An update, not a save: the membership may have been removed since
+        # the loop started, and saving a deleted row raises.
+        organization.organization_users.filter(pk=user_org.pk).update(
+            added_to_keycloak_at=now_in_utc()
+        )
 
     return failed
 
