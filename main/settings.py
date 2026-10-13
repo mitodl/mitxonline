@@ -1065,6 +1065,13 @@ CELERY_BEAT_SCHEDULE = {
             offset=timedelta(seconds=KEYCLOAK_ORG_SYNC_OFFSET),
         ),
     },
+    "push-unconfirmed-org-members-to-keycloak": {
+        "task": "b2b.tasks.push_unconfirmed_org_members_to_keycloak",
+        "schedule": OffsettingSchedule(
+            run_every=timedelta(seconds=KEYCLOAK_ORG_SYNC_FREQUENCY),
+            offset=timedelta(seconds=KEYCLOAK_ORG_SYNC_OFFSET),
+        ),
+    },
     "clear-expired-tokens": {
         "task": "main.tasks.run_clear_tokens",
         "schedule": crontab(minute=0, hour=9, day_of_week=1),  # every week

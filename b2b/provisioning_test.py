@@ -59,6 +59,7 @@ from b2b.provisioning import (
     create_organization,
     delete_identity_provider,
     link_organization_to_keycloak,
+    push_unconfirmed_members_to_keycloak,
     refresh_identity_provider_metadata,
     set_onboarding_state,
     transition_identity_provider,
@@ -1652,6 +1653,67 @@ def test_link_organization_survives_member_sync_errors(connection, error):
     assert all(
         UserOrganization.objects.get(pk=member.pk).keep_until_seen for member in members
     )
+
+
+def test_push_unconfirmed_members_pushes_only_flagged_members(connection):
+    """A member a token already confirmed is left to the token reconcile."""
+
+    organization = OrganizationPageFactory.create()
+    unconfirmed = UserOrganizationFactory.create(
+        organization=organization, keep_until_seen=True
+    )
+    UserOrganizationFactory.create(organization=organization, keep_until_seen=False)
+
+    failed = push_unconfirmed_members_to_keycloak(connection=connection)
+
+    assert failed == {}
+    connection.organizations.associate.assert_called_once_with(
+        "members", organization.sso_organization_id, unconfirmed.user.global_id
+    )
+    unconfirmed.refresh_from_db()
+    assert unconfirmed.keep_until_seen is True
+
+
+def test_push_unconfirmed_members_skips_unlinked_organizations(connection):
+    """An organization with no Keycloak record has nowhere to push to."""
+
+    UserOrganizationFactory.create(
+        organization=OrganizationPageFactory.create(sso_organization_id=None),
+        keep_until_seen=True,
+    )
+
+    assert push_unconfirmed_members_to_keycloak(connection=connection) == {}
+    connection.organizations.associate.assert_not_called()
+
+
+def test_push_unconfirmed_members_reports_failures_and_carries_on(connection):
+    """One member Keycloak won't take doesn't stop the other organizations."""
+
+    missing_user, added = UserOrganizationFactory.create_batch(2, keep_until_seen=True)
+
+    def fake_associate(_association_type, _org_id, user_id):
+        if user_id == missing_user.user.global_id:
+            raise _http_error(404)
+        return True
+
+    connection.organizations.associate.side_effect = fake_associate
+
+    failed = push_unconfirmed_members_to_keycloak(connection=connection)
+
+    assert failed == {missing_user.organization.org_key: [missing_user.user]}
+    connection.organizations.associate.assert_any_call(
+        "members", added.organization.sso_organization_id, added.user.global_id
+    )
+
+
+def test_push_unconfirmed_members_does_not_connect_with_nothing_to_push(mocker):
+    """Bootstrapping the client costs two requests, so skip it when idle."""
+
+    mocked_connection = mocker.patch("b2b.provisioning.KeycloakConnection")
+    UserOrganizationFactory.create(keep_until_seen=False)
+
+    assert push_unconfirmed_members_to_keycloak() == {}
+    mocked_connection.assert_not_called()
 
 
 def test_backfill_command_dry_run_writes_nothing(mocker, connection):

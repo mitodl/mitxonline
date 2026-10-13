@@ -66,6 +66,14 @@ def queue_organization_sync():
     reconcile_keycloak_orgs()
 
 
+@app.task(acks_late=True)
+def push_unconfirmed_org_members_to_keycloak():
+    """Retry adding members to Keycloak that it has not confirmed yet."""
+    from b2b.provisioning import push_unconfirmed_members_to_keycloak
+
+    push_unconfirmed_members_to_keycloak()
+
+
 @app.task(bind=True)
 def create_program_contract_runs(
     self, contract_id: int, program_id: int, org_prefix: str | None = None

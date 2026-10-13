@@ -515,7 +515,12 @@ def link_organization_to_keycloak(organization, *, connection=None, actor=None):
 
 def sync_organization_members_to_keycloak(organization, *, connection):
     """
-    Add the organization's MITx Online members to its Keycloak organization.
+    Add the organization's unconfirmed members to its Keycloak organization.
+
+    Only keep_until_seen members are pushed: those are the ones MITx Online
+    added itself and has not yet seen in the member's token. A member without
+    the flag was last confirmed by a token, so if Keycloak no longer has them
+    they were removed there, and pushing them would undo the removal.
 
     Args:
     - organization (OrganizationPage): a linked organization
@@ -525,7 +530,9 @@ def sync_organization_members_to_keycloak(organization, *, connection):
     """
 
     failed = []
-    for user_org in organization.organization_users.select_related("user"):
+    for user_org in organization.organization_users.filter(
+        keep_until_seen=True
+    ).select_related("user"):
         user = user_org.user
         if not user.global_id:
             log.warning(
@@ -553,6 +560,45 @@ def sync_organization_members_to_keycloak(organization, *, connection):
                 organization.org_key,
             )
             failed.append(user)
+
+    return failed
+
+
+def push_unconfirmed_members_to_keycloak(connection=None):
+    """
+    Retry the Keycloak membership write for every unconfirmed member.
+
+    process_add_org_membership writes Keycloak once, when the membership is
+    created, and carries on if that write fails. Nothing else retries it, so
+    the member keeps access through keep_until_seen and Keycloak never learns
+    about them. This pushes those members again. The flag clears as usual, in
+    reconcile_user_orgs, once the organization shows up in the member's token.
+
+    Args:
+    - connection (KeycloakConnection): an existing connection, if any
+    Returns:
+    - dict[str, list[User]]: the members who could not be added, by org_key
+    """
+
+    organizations = OrganizationPage.objects.filter(
+        sso_organization_id__isnull=False,
+        organization_users__keep_until_seen=True,
+    ).distinct()
+
+    failed = {}
+    for organization in organizations:
+        connection = connection or KeycloakConnection()
+        failed_members = sync_organization_members_to_keycloak(
+            organization, connection=connection
+        )
+        if failed_members:
+            failed[organization.org_key] = failed_members
+            log.warning(
+                "Could not add %s member(s) of %s to its Keycloak organization: %s",
+                len(failed_members),
+                organization.org_key,
+                [user.id for user in failed_members],
+            )
 
     return failed
 
