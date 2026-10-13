@@ -465,12 +465,7 @@ def test_testimonial_exposes_date_published(user_drf_client):
 
 
 def test_testimonial_date_published_defaults_to_today(user_drf_client):
-    """
-    An unset date_published falls back to today.
-
-    Page revisions authored before this field existed rehydrate without it, so a
-    default keeps them saveable instead of raising on a NOT NULL column.
-    """
+    """An unset date_published falls back to today."""
     page = CoursePageFactory.create()
     ProductPageTestimonial.objects.create(page=page, quote="Undated.", name="Frank")
     resp = user_drf_client.get(
@@ -481,6 +476,35 @@ def test_testimonial_date_published_defaults_to_today(user_drf_client):
         resp.json()["testimonials"][0]["date_published"]
         == timezone.localdate().isoformat()
     )
+
+
+def test_testimonial_date_published_restamped_by_pre_field_revision():
+    """
+    A revision saved before this field existed restamps the date on publish.
+
+    modelcluster builds child objects only from the keys present in the stored
+    revision JSON, so an absent date_published falls back to the model default
+    rather than raising on the NOT NULL column. The backfilled value is lost.
+    """
+    page = CoursePageFactory.create()
+    testimonial = ProductPageTestimonial.objects.create(
+        page=page,
+        quote="Authored long ago.",
+        name="Grace",
+        date_published=date(2020, 1, 2),
+    )
+
+    revision = page.save_revision()
+    content = revision.content
+    for child in content["testimonials_list"]:
+        child.pop("date_published", None)
+    revision.content = content
+    revision.save()
+
+    revision.as_object().save()
+
+    testimonial.refresh_from_db()
+    assert testimonial.date_published == timezone.localdate()
 
 
 def test_testimonial_image_src_null_without_image(user_drf_client):
