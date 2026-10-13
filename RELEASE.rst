@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.169.12
+----------------
+
+- Return display labels for variant industry and length (#4123)
+- Read credential metadata from the MIT Learn API (#4110)
+- Transfer audit and verified enrollments and sync with edx (#4116)
+- Show notifications on pages that hide header (including cart) (#4081)
+
 Version 1.169.11
 ----------------
 
