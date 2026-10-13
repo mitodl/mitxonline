@@ -569,9 +569,10 @@ def push_unconfirmed_members_to_keycloak(connection=None):
     Retry the Keycloak membership write for every unconfirmed member.
 
     process_add_org_membership writes Keycloak once, when the membership is
-    created, and carries on if that write fails. Nothing else retries it, so
-    the member keeps access through keep_until_seen and Keycloak never learns
-    about them. This pushes those members again. The flag clears as usual, in
+    created, and carries on if Keycloak answers with an HTTP error. Nothing
+    else retries it, so the member keeps access through keep_until_seen and
+    Keycloak never learns about them. This pushes those members again, along
+    with any whose row already existed. The flag clears as usual, in
     reconcile_user_orgs, once the organization shows up in the member's token.
 
     Args:

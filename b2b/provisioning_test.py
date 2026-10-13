@@ -1701,6 +1701,7 @@ def test_push_unconfirmed_members_reports_failures_and_carries_on(connection):
     failed = push_unconfirmed_members_to_keycloak(connection=connection)
 
     assert failed == {missing_user.organization.org_key: [missing_user.user]}
+    assert connection.organizations.associate.call_count == 2
     connection.organizations.associate.assert_any_call(
         "members", added.organization.sso_organization_id, added.user.global_id
     )
