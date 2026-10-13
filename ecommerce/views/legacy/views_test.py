@@ -20,6 +20,7 @@ from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
 from compliance.api import verify_user_with_exports
+from compliance.exceptions import ExportComplianceDataError
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
