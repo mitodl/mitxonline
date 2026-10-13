@@ -231,6 +231,8 @@ def test_b2b_basket_validation(user, run_contract, apply_code):
         product.purchasable_object.b2b_only = True
         product.purchasable_object.save()
         product.refresh_from_db()
+        discount.b2b_contract = contract
+        discount.save()
 
     basket = create_basket(user, [product])
 
@@ -254,6 +256,31 @@ def test_b2b_basket_validation(user, run_contract, apply_code):
         assert check_result is False
     else:
         assert check_result is True
+
+
+def test_b2b_basket_validation_requires_contract_code(user):
+    """A discount for the product that isn't the contract's code doesn't count."""
+
+    contract = factories.ContractPageFactory.create()
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
+    product = ProductFactory.create(purchasable_object=run)
+    discount = UnlimitedUseDiscountFactory.create()
+    DiscountProduct.objects.create(discount=discount, product=product)
+
+    basket = create_basket(user, [product])
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=discount,
+        redeemed_basket=basket,
+    )
+
+    assert (
+        validate_basket_for_b2b_purchase(
+            basket, get_active_contracts_from_basket_items(basket)
+        )
+        is False
+    )
 
 
 @pytest.mark.parametrize(
@@ -410,7 +437,7 @@ def test_ensure_enrollment_codes_clears_extras():
     assert updated == 0
     assert errors == 0
 
-    random_extra_code = UnlimitedUseDiscountFactory.create()
+    random_extra_code = UnlimitedUseDiscountFactory.create(b2b_contract=contract)
     DiscountProduct.objects.create(discount=random_extra_code, product=product)
 
     assert contract.get_discounts().count() == 11
@@ -422,6 +449,63 @@ def test_ensure_enrollment_codes_clears_extras():
     assert errors == 1
 
     assert contract.get_discounts().count() == 10
+
+
+def test_b2b_basket_validation_code_for_free_member_contract(user):
+    """
+    On a run shared with a priced contract, a code for the free contract the
+    user belongs to is enough.
+    """
+
+    free_contract = factories.ContractPageFactory.create(enrollment_fixed_price=0)
+    priced_contract = factories.ContractPageFactory.create(enrollment_fixed_price=50)
+    user.b2b_contracts.add(free_contract)
+    run = CourseRunFactory.create(
+        b2b_only=True, b2b_contracts=[free_contract, priced_contract]
+    )
+    product = ProductFactory.create(purchasable_object=run)
+    discount = UnlimitedUseDiscountFactory.create(b2b_contract=free_contract)
+    DiscountProduct.objects.create(discount=discount, product=product)
+
+    basket = create_basket(user, [product])
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=discount,
+        redeemed_basket=basket,
+    )
+
+    assert (
+        validate_basket_for_b2b_purchase(
+            basket, get_active_contracts_from_basket_items(basket)
+        )
+        is True
+    )
+
+
+def test_ensure_enrollment_codes_shared_run():
+    """Contracts that share a course run should each get their own codes."""
+
+    contracts = ContractPageFactory.create_batch(
+        2, max_learners=3, membership_type=CONTRACT_MEMBERSHIP_CODE
+    )
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=contracts)
+    ProductFactory.create(purchasable_object=run)
+
+    for contract in contracts:
+        assert ensure_enrollment_codes_exist(contract) == (3, 0, 0)
+
+    pools = [set(contract.get_discounts()) for contract in contracts]
+
+    assert [len(pool) for pool in pools] == [3, 3]
+    assert pools[0].isdisjoint(pools[1])
+    for contract, pool in zip(contracts, pools, strict=True):
+        assert {code.b2b_contract for code in pool} == {contract}
+        assert all(list(code.b2b_contracts()) == [contract] for code in pool)
+
+    # Running it again for one contract leaves the other's codes alone.
+    assert ensure_enrollment_codes_exist(contracts[0]) == (0, 3, 0)
+    assert set(contracts[1].get_discounts()) == pools[1]
 
 
 @pytest.mark.parametrize("user_authenticated", [True, False])
@@ -1565,7 +1649,7 @@ def test_remove_extra_codes():
 
     assert len(codes_we_should_keep) == 5
 
-    more_codes = OneTimeDiscountFactory.create_batch(5)
+    more_codes = OneTimeDiscountFactory.create_batch(5, b2b_contract=contract)
 
     for code in more_codes:
         DiscountProduct.objects.create(discount=code, product=product)
@@ -2934,16 +3018,19 @@ def b2b_enrollment_mocks(mocker, settings):
     settings.OPENEDX_SERVICE_WORKER_USERNAME = "a username"
 
 
-def _attach_bulk_discount(product, amount=Decimal(0)):
+def _attach_bulk_discount(contract, product, amount=Decimal(0)):
     """
-    Attach an unlimited fixed-price bulk discount to the product.
+    Give the contract an unlimited fixed-price bulk code for the product.
 
-    _apply_available_discount can only create a discount on the fly for runs
-    in a single contract, so runs in several contracts need one ahead of time.
+    Without one, _apply_available_discount makes a code on the fly at the
+    contract's own price.
     """
 
     discount = UnlimitedUseDiscountFactory.create(
-        is_bulk=True, discount_type=DISCOUNT_TYPE_FIXED_PRICE, amount=amount
+        is_bulk=True,
+        discount_type=DISCOUNT_TYPE_FIXED_PRICE,
+        amount=amount,
+        b2b_contract=contract,
     )
     DiscountProduct.objects.create(discount=discount, product=product)
     return discount
@@ -2970,7 +3057,7 @@ def test_create_b2b_enrollment_stores_contract(
     user = _make_contract_user(contracts, ["a", "b"])
     run = overlapping_contracts["runs"]["ab"]
     product = overlapping_contracts["products"]["ab"]
-    _attach_bulk_discount(product)
+    _attach_bulk_discount(contracts[slug_key], product)
 
     result = create_b2b_enrollment(
         _b2b_request(user), product, contract_slug=contracts[slug_key].slug
@@ -2999,7 +3086,7 @@ def test_create_b2b_enrollment_with_program_stores_contract(
     run = overlapping_contracts["runs"]["ab"]
     product = overlapping_contracts["products"]["ab"]
     program = overlapping_contracts["programs"]["b"]
-    _attach_bulk_discount(product)
+    _attach_bulk_discount(contracts["b"], product)
 
     result = create_b2b_enrollment(
         _b2b_request(user), product, program_id=program.readable_id
@@ -3047,7 +3134,7 @@ def test_create_b2b_enrollment_requires_checkout_keeps_contract(
     product = overlapping_contracts["products"]["ab"]
     product.price = Decimal(100)
     product.save()
-    _attach_bulk_discount(product, amount=Decimal(50))
+    _attach_bulk_discount(contracts["b"], product, amount=Decimal(50))
 
     result = create_b2b_enrollment(
         _b2b_request(user), product, contract_slug=contracts["b"].slug
