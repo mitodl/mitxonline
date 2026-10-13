@@ -80,6 +80,7 @@ from courses.utils import (
     verified_courserun_exists,
 )
 from ecommerce.api import create_verified_program_course_run_enrollment
+from ecommerce.exceptions import VerifiedProgramInvalidOrderError
 from ecommerce.models import Product
 from main import features
 from main.pagination import Pagination
@@ -913,9 +914,14 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
     # Everything checks out for a verified enrollment, so generate one.
     # This requires generating an order.
 
-    enrollment = create_verified_program_course_run_enrollment(
-        request, run, program_enrollment.program
-    )
+    try:
+        enrollment = create_verified_program_course_run_enrollment(
+            request, run, program_enrollment.program
+        )
+    except VerifiedProgramInvalidOrderError as exc:
+        # Checkout refused the order, e.g. an incomplete profile or a compliance
+        # denial. The cause is logged where it's detected.
+        raise EnrollmentError.from_cause(exc) from exc
 
     return _created_enrollment_response(enrollment)
 

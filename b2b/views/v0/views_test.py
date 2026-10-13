@@ -22,6 +22,7 @@ from b2b.models import (
     UserB2BContract,
     UserOrganization,
 )
+from compliance.api import verify_user_with_exports
 from courses.factories import CourseRunFactory
 from courses.models import CourseRunEnrollment
 from ecommerce.constants import DISCOUNT_TYPE_FIXED_PRICE
@@ -447,6 +448,38 @@ def test_b2b_contract_attachment_full_contract_with_used_code(mocker):
     assert not DiscountContractAttachmentRedemption.objects.filter(
         contract=contract, user=user, discount=contract_code
     ).exists()
+
+
+@pytest.mark.skip_nplusone_check
+def test_b2b_enroll_incomplete_profile(mocker, settings, mocked_export_compliance):
+    """A free B2B enrollment should say the profile is incomplete, not just that checkout is required."""
+    mocked_export_compliance.side_effect = verify_user_with_exports
+    mocker.patch("compliance.api.get_cybersource_client")
+    mocker.patch("hubspot_sync.tasks.sync_cart_add_event_with_hubspot.apply_async")
+    mocker.patch("openedx.tasks.clone_courserun.delay")
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "a token"  # noqa: S105
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED, enrollment_fixed_price=0
+    )
+    source_courserun = CourseRunFactory.create(
+        is_source_run=True, language="en", is_primary_language=True
+    )
+    [(courserun, _)] = create_contract_run(
+        contract, source_courserun.course, queue_codes=True
+    )
+    user = UserFactory.create()
+    user.b2b_contracts.add(contract)
+    user.legal_address.street_address_1 = ""
+    user.legal_address.save()
+    client = APIClient()
+    client.force_login(user)
+
+    resp = client.post(
+        reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
+    )
+
+    assert resp.status_code == 400
+    assert resp.json()["checkout_result"]["profile_incomplete"] is True
 
 
 @pytest.mark.skip_nplusone_check

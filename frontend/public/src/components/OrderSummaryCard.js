@@ -16,7 +16,8 @@ type Props = {
   addDiscount?: Function,
   discountCode: string,
   cardTitle?: string,
-  isAuthenticated: boolean
+  isAuthenticated: boolean,
+  onCheckout?: (checkoutUrl: string) => void
 }
 
 type FormValues = {
@@ -140,6 +141,15 @@ export class OrderSummaryCard extends React.Component<Props, State> {
       "/checkout/anonymous/"
   }
 
+  goToCheckout() {
+    const { onCheckout } = this.props
+    if (onCheckout) {
+      onCheckout(this.getCheckoutUrl())
+    } else {
+      window.location = this.getCheckoutUrl()
+    }
+  }
+
   handlePlaceOrder = async () => {
     const formik = this.formikRef.current
     const { discounts } = this.props
@@ -150,7 +160,7 @@ export class OrderSummaryCard extends React.Component<Props, State> {
       discounts.length > 0 &&
       (!formik || !formik.values.couponCode || !formik.values.couponCode.trim())
     ) {
-      window.location = this.getCheckoutUrl()
+      this.goToCheckout()
       return
     }
 
@@ -161,7 +171,7 @@ export class OrderSummaryCard extends React.Component<Props, State> {
       await formik.submitForm()
     } else {
       // No coupon code, proceed directly to payment
-      window.location = this.getCheckoutUrl()
+      this.goToCheckout()
     }
   }
 
@@ -239,7 +249,7 @@ export class OrderSummaryCard extends React.Component<Props, State> {
 
                     if (this.state.submittingPlaceOrder) {
                       // Redirect only if there were no errors and this was from Place Order button
-                      window.location = this.getCheckoutUrl()
+                      this.goToCheckout()
                     }
                   }
 

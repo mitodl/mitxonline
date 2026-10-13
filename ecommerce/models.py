@@ -167,7 +167,9 @@ class Basket(TimestampedModel):
             )
 
             try:
-                _verify_exports_compliance_for_enrollment(user, basket_items[0])
+                _verify_exports_compliance_for_enrollment(
+                    user, basket_items[0].product.purchasable_object
+                )
             except ExportComplianceError:
                 return True
 
