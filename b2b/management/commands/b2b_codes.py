@@ -442,6 +442,21 @@ class Command(BaseCommand):
                     self.style.SUCCESS(f"Added {len(new_products)} products.")
                 )
 
+            public_products = contract.get_products(public_only=True)
+
+            if public_products.count() > 0:
+                public_run_keys = [
+                    public_product.purchasable_object.courseware_id
+                    for public_product in public_products
+                ]
+                public_run_keys = ", ".join(public_run_keys)
+
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Contract {contract} has associated course runs and products that are public - will not update the price for these: {public_run_keys}"
+                    )
+                )
+
             # Step 2: make sure the products have the right pricing
 
             if get_contract_products_with_bad_pricing(contract).count() > 0:

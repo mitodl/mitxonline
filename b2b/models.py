@@ -581,16 +581,30 @@ class ContractPage(Page, ClusterableModel):
             and self.enrollment_fixed_price > Decimal(0)
         ) or self.membership_type not in CONTRACT_MEMBERSHIP_AUTOS
 
-    def get_course_runs(self):
-        """Get the runs associated with the contract."""
+    def get_course_runs(self, *, b2b_only=False, public_only=False):
+        """
+        Get the runs associated with the contract.
+
+        Set b2b_only to filter out public runs.
+        Set public_only to filter out course runs that aren't public.
+        Set neither to True to retrieve everything.
+        """
 
         from courses.models import CourseRun  # noqa: PLC0415
 
-        return (
+        run_qs = (
             CourseRun.objects.prefetch_related("course")
             .filter(b2b_contracts=self)
             .all()
         )
+
+        if b2b_only:
+            run_qs = run_qs.filter(b2b_only=True)
+
+        if public_only:
+            run_qs = run_qs.filter(b2b_only=False)
+
+        return run_qs
 
     def get_variant_courses(self, *, only_relevant=False):
         """
@@ -672,8 +686,14 @@ class ContractPage(Page, ClusterableModel):
             .all()
         )
 
-    def get_products(self):
-        """Get the products associated with the contract."""
+    def get_products(self, *, b2b_only: bool = False, public_only=False):
+        """
+        Get the products associated with the contract.
+
+        Set b2b_only to filter out products for course runs that are public.
+        Set public_only to filter out products for course runs that aren't public.
+        Set neither to True to retrieve everything.
+        """
 
         from courses.models import CourseRun  # noqa: PLC0415
         from ecommerce.models import Product  # noqa: PLC0415
@@ -683,7 +703,9 @@ class ContractPage(Page, ClusterableModel):
         return Product.objects.filter(
             is_active=True,
             content_type=content_type,
-            object_id__in=self.get_course_runs().values_list("id", flat=True),
+            object_id__in=self.get_course_runs(
+                b2b_only=b2b_only, public_only=public_only
+            ).values_list("id", flat=True),
         ).all()
 
     @property
