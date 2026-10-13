@@ -1792,7 +1792,7 @@ def create_b2b_enrollment(
 
     if basket_price == 0:
         # This call should go ahead and fulfill the order.
-        response = generate_checkout_payload(request)
+        response = generate_checkout_payload(request, raise_compliance_data_errors=True)
 
         if "no_checkout" in response:
             # Course run enrollment succeeded - now handle program enrollment

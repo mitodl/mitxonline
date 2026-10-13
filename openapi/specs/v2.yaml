@@ -6221,6 +6221,7 @@ components:
             * `b2b-error-missing-enrollment-code` - b2b-error-missing-enrollment-code
             * `b2b-invalid-basket` - b2b-invalid-basket
             * `basket-empty` - basket-empty
+            * `profile-incomplete` - profile-incomplete
       required:
       - error
       - method
@@ -8539,6 +8540,7 @@ components:
       - b2b-error-missing-enrollment-code
       - b2b-invalid-basket
       - basket-empty
+      - profile-incomplete
       type: string
       description: |-
         * `enroll-blocked` - enroll-blocked
@@ -8548,6 +8550,7 @@ components:
         * `b2b-error-missing-enrollment-code` - b2b-error-missing-enrollment-code
         * `b2b-invalid-basket` - b2b-invalid-basket
         * `basket-empty` - basket-empty
+        * `profile-incomplete` - profile-incomplete
       x-enum-descriptions:
       - enroll-blocked
       - enroll-duplicated
@@ -8556,6 +8559,7 @@ components:
       - b2b-error-missing-enrollment-code
       - b2b-invalid-basket
       - basket-empty
+      - profile-incomplete
     ExpiredEnrollmentCode:
       type: object
       description: An unused enrollment code taken out of a contract.
@@ -8728,6 +8732,10 @@ components:
         purposes.
       properties:
         country_blocked:
+          type: boolean
+          nullable: true
+          default: false
+        profile_incomplete:
           type: boolean
           nullable: true
           default: false

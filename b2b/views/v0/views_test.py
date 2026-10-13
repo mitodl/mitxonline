@@ -454,6 +454,41 @@ def test_b2b_contract_attachment_full_contract_with_used_code(mocker):
 
 
 @pytest.mark.skip_nplusone_check
+def test_b2b_enroll_incomplete_profile(mocker, settings, mocked_export_compliance):
+    """A free B2B enrollment with an incomplete profile names the fields to fix."""
+    mocked_export_compliance.side_effect = verify_user_with_exports
+    mocker.patch("compliance.api.get_cybersource_client")
+    mocker.patch("hubspot_sync.tasks.sync_cart_add_event_with_hubspot.apply_async")
+    mocker.patch("openedx.tasks.clone_courserun.delay")
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "a token"  # noqa: S105
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED, enrollment_fixed_price=0
+    )
+    source_courserun = CourseRunFactory.create(
+        is_source_run=True, language="en", is_primary_language=True
+    )
+    [(courserun, _)] = create_contract_run(
+        contract, source_courserun.course, queue_codes=True
+    )
+    user = UserFactory.create()
+    user.b2b_contracts.add(contract)
+    user.legal_address.street_address_1 = ""
+    user.legal_address.save()
+    client = APIClient()
+    client.force_login(user)
+
+    resp = client.post(
+        reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
+    )
+
+    assert resp.status_code == 400
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "missing_fields": ["street_address_1"],
+    }
+
+
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize("user_has_edx_user", [True, False])
 @pytest.mark.parametrize("has_price", [True, False])
 @pytest.mark.parametrize("run_is_enrollable", [True, False])

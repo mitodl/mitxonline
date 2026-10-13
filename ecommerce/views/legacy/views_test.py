@@ -19,7 +19,7 @@ from rest_framework.test import APIClient
 from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
-from compliance.exceptions import ExportComplianceDataError
+from compliance.api import verify_user_with_exports
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
@@ -71,10 +71,10 @@ from main import features
 from main.constants import (
     USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
-    USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+    USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 from main.settings import TIME_ZONE
 from main.test_utils import assert_drf_json_equal
@@ -1664,6 +1664,27 @@ def test_paid_and_unpaid_courserun_checkout(
 
 
 @pytest.mark.skip_nplusone_check
+def test_checkout_interstitial_incomplete_profile(
+    mocker, mocked_export_compliance, user, user_client, products
+):
+    """An incomplete legal address should send the learner back to the cart to fix it."""
+    mocked_export_compliance.side_effect = verify_user_with_exports
+    mocker.patch("compliance.api.get_cybersource_client")
+    user.legal_address.street_address_1 = ""
+    user.legal_address.save()
+    create_basket_with_product(user, products[0])
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_PROFILE_INCOMPLETE}
+    )
+    assert not PendingOrder.objects.filter(purchaser=user).exists()
+
+
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize(
     "decision, expected_state, basket_exists",  # noqa: PT006
     [
@@ -2143,22 +2164,3 @@ def test_backoffice_callback_good_order(mocker, client, settings):
 
     assert response.status_code == 200
     mocked_processor.assert_called()
-
-
-def test_checkout_interstitial_with_invalid_profile_data(mocker, user, user_client):
-    """
-    A profile the export compliance check can't use redirects like a blocked
-    enrollment instead of erroring.
-    """
-    mocker.patch(
-        "ecommerce.views.legacy.api.generate_checkout_payload",
-        side_effect=ExportComplianceDataError(user, ["postal_code"]),
-    )
-
-    resp = user_client.get(reverse("checkout_interstitial_page"))
-
-    assert resp.status_code == 302
-    assert resp.url == reverse("user-dashboard")
-    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
-        {"type": USER_MSG_TYPE_ENROLL_BLOCKED}
-    )
