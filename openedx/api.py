@@ -33,11 +33,14 @@ from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from main import features
 from main.utils import get_partitioned_set_difference, get_redis_lock
 from openedx.constants import (
+    CANNOT_CLEAR_DEADLINE_MSG,
     EDX_DEFAULT_ENROLLMENT_MODE,
+    EDX_ENROLLMENT_VERIFIED_MODE,
     OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
     OPENEDX_USERNAME_MAX_LEN,
     PLATFORM_EDX,
+    UpgradeDeadlineSyncResult,
 )
 from openedx.exceptions import (
     EdxApiCourseOutlineError,
@@ -1997,8 +2000,19 @@ def update_edx_course_mode(  # noqa: PLR0913
     expiration_datetime: datetime | None = None,
     client: EdxApi | None = None,
     min_price: int = 0,
-) -> CourseMode:
-    """Create a course mode for the given edX course."""
+) -> None:
+    """
+    Update a course mode for the given edX course.
+
+    Returns None - edx-api-client's update_course_mode has no return value, and
+    edX answers the PATCH with 204 No Content.
+
+    Note that every non-None argument here is sent to edX and overwrites what is
+    already there, so callers doing a partial update (e.g. only the expiration
+    date) must pass the mode's current values for everything else. In particular
+    `min_price` defaults to 0 rather than None, so leaving it out zeroes the
+    price of a paid mode.
+    """
 
     edx_client = client if client else get_edx_api_service_client()
 
@@ -2043,8 +2057,149 @@ def push_edx_modes_from_run(course_run: CourseRun, *, edx_client=None) -> int:
                 mode_slug=mode.mode_slug,
                 mode_display_name=mode.mode_display_name,
                 min_price=(1 if mode.requires_payment else 0),
+                # The CourseRun post_save signal skips new runs because their edX
+                # course doesn't exist yet, so this is where a rerun's deadline
+                # reaches edX.
+                expiration_datetime=(
+                    course_run.upgrade_deadline
+                    if mode.mode_slug == EDX_ENROLLMENT_VERIFIED_MODE
+                    else None
+                ),
                 client=edx_client,
             )
             created_count += 1
 
     return created_count
+
+
+def get_edx_mode_expiration(edx_mode: CourseMode) -> datetime | None:
+    """
+    Read expiration_datetime off an edX course mode without letting a malformed
+    value blow up the caller.
+
+    edx-api-client parses the raw string with dateutil and only guards against
+    a missing key, so a non-null-but-unparseable value (e.g. "") raises
+    ParserError instead of returning None.
+    """
+
+    try:
+        return edx_mode.expiration_datetime
+    except ValueError:
+        log.warning(
+            "Could not parse expiration_datetime %r on the %s mode of %s",
+            edx_mode.json.get("expiration_datetime"),
+            edx_mode.mode_slug,
+            edx_mode.course_id,
+        )
+        return None
+
+
+def get_edx_verified_mode(
+    courseware_id: str, *, client: EdxApi | None = None
+) -> CourseMode | None:
+    """
+    Get the verified course mode for an edX course, or None if it has none.
+
+    Args:
+    - courseware_id (str): the edX course ID
+    Keyword Args:
+    - client (EdxApi): edX client (if you want to reuse one)
+    Returns:
+    - CourseMode or None
+    """
+
+    edx_client = client if client else get_edx_api_service_client()
+
+    return find_object_with_matching_attr(
+        get_edx_course_modes(courseware_id, client=edx_client),
+        "mode_slug",
+        EDX_ENROLLMENT_VERIFIED_MODE,
+    )
+
+
+def sync_courserun_upgrade_deadline_to_edx(
+    course_run: "courses.models.CourseRun", *, client: EdxApi | None = None
+) -> UpgradeDeadlineSyncResult:
+    """
+    Push a CourseRun's upgrade_deadline into the expiration_datetime of its
+    verified course mode in edX.
+
+    MITx Online's upgrade_deadline is what actually gates paid enrollment (it
+    drives CourseRun.is_upgradable, which gates checkout), while edX keeps its
+    own copy on the verified mode. Nothing synced the two, so edX's copy drifted
+    - it gets rewritten to `course.end - 10 days` on every Studio publish. This
+    makes MITx Online authoritative: whatever a staff member sets here is pushed
+    to edX, and setting expiration_datetime flips edX's
+    expiration_datetime_is_explicit flag, which stops the publish signal from
+    overwriting it again.
+
+    Args:
+        course_run (CourseRun): the run whose deadline should be pushed.
+        client (EdxApi): optional edX client to reuse across calls.
+
+    Returns:
+        UpgradeDeadlineSyncResult: what happened. Callers that care about
+            partial success (the management command, the admin) branch on this
+            rather than on an exception.
+
+    Raises:
+        HTTPError: if the edX API rejects the read or the write.
+    """
+
+    edx_client = client if client else get_edx_api_service_client()
+
+    verified_mode = get_edx_verified_mode(course_run.courseware_id, client=edx_client)
+
+    if verified_mode is None:
+        log.warning(
+            "No %s mode exists in edX for %s, so there is no upgrade deadline to set",
+            EDX_ENROLLMENT_VERIFIED_MODE,
+            course_run.courseware_id,
+        )
+        return UpgradeDeadlineSyncResult.NO_VERIFIED_MODE
+
+    edx_deadline = get_edx_mode_expiration(verified_mode)
+    new_deadline = course_run.upgrade_deadline
+
+    if new_deadline is None:
+        if edx_deadline is None:
+            return UpgradeDeadlineSyncResult.UNCHANGED
+        log.warning(
+            CANNOT_CLEAR_DEADLINE_MSG.format(
+                courseware_id=course_run.courseware_id,
+                edx_deadline=edx_deadline.isoformat(),
+            )
+        )
+        return UpgradeDeadlineSyncResult.CLEAR_UNSUPPORTED
+
+    if edx_deadline == new_deadline:
+        log.debug(
+            "edX already has upgrade deadline %s for %s",
+            new_deadline.isoformat(),
+            course_run.courseware_id,
+        )
+        return UpgradeDeadlineSyncResult.UNCHANGED
+
+    # Every non-None field we send overwrites edX's copy, so echo the mode's
+    # current values back and let only expiration_datetime actually change.
+    # min_price especially: update_edx_course_mode defaults it to 0, which would
+    # turn the paid mode free.
+    update_edx_course_mode(
+        course_id=course_run.courseware_id,
+        mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+        mode_display_name=verified_mode.mode_display_name,
+        description=verified_mode.description,
+        currency=verified_mode.currency or "USD",
+        min_price=verified_mode.min_price or 0,
+        expiration_datetime=new_deadline,
+        client=edx_client,
+    )
+
+    log.info(
+        "Pushed upgrade deadline %s to the edX %s mode of %s (was %s)",
+        new_deadline.isoformat(),
+        EDX_ENROLLMENT_VERIFIED_MODE,
+        course_run.courseware_id,
+        edx_deadline.isoformat() if edx_deadline else None,
+    )
+    return UpgradeDeadlineSyncResult.UPDATED
