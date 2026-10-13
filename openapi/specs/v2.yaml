@@ -11831,10 +11831,14 @@ components:
           type: string
         title:
           type: string
+        date_published:
+          type: string
+          format: date
         image_src:
           type: string
           nullable: true
       required:
+      - date_published
       - id
       - image_src
       - name

@@ -76,6 +76,7 @@ class TestimonialItemSerializer(serializers.Serializer):
     quote = serializers.CharField()
     name = serializers.CharField()
     title = serializers.CharField(allow_blank=True)
+    date_published = serializers.DateField()
     image_src = serializers.CharField(allow_null=True)
 
 
