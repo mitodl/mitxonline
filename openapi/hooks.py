@@ -1,7 +1,13 @@
 """Extensions for OpenAPI schema"""
 
 import re
+from types import SimpleNamespace
 
+from django.core.exceptions import ImproperlyConfigured
+from django.urls import URLResolver, get_resolver
+from rest_framework.views import APIView
+
+from main.versioning import NoVersioning
 from openapi.exceptions import EnumDescriptionError
 
 ENUM_DESCRIPTION_RE = re.compile(r"\w*\*\s`(?P<key>.*)`\s\-\s(?P<description>.*)")
@@ -119,6 +125,78 @@ def exclude_paths_hook(endpoints, **kwargs):  # noqa: ARG001
         for (path, path_regex, method, callback) in endpoints
         if not any(path.startswith(prefix) for prefix in EXCLUDED_PATHS)
     ]
+
+
+def iter_drf_routes(resolver=None, prefix="", namespaces=()):
+    """
+    Yield (namespace, path, callback) for every DRF view in the URLconf, where
+    `namespace` is the colon-joined instance namespace a request to that route
+    resolves to - the value NamespaceVersioning reads the version from.
+    """
+    for pattern in (resolver or get_resolver()).url_patterns:
+        if isinstance(pattern, URLResolver):
+            yield from iter_drf_routes(
+                pattern,
+                prefix + str(pattern.pattern),
+                namespaces + ((pattern.namespace,) if pattern.namespace else ()),
+            )
+            continue
+
+        callback = pattern.callback
+        view_class = getattr(callback, "cls", None) or getattr(
+            callback, "view_class", None
+        )
+        if isinstance(view_class, type) and issubclass(view_class, APIView):
+            yield ":".join(namespaces), prefix + str(pattern.pattern), callback
+
+
+def require_api_version_hook(endpoints, **kwargs):  # noqa: ARG001
+    """
+    Fail schema generation for any endpoint that resolves to no API version.
+
+    Schema generation matches views on version, so a view whose version is
+    None is silently missing from every spec, and a view with
+    `versioning_class = None` skips the match and lands in every spec. Each
+    view must get a version from its namespace or its versioning_class, or
+    say NoVersioning.
+
+    Runs after exclude_paths_hook, so it checks exactly the endpoints that
+    reach schema generation. It runs whenever a schema is generated
+    (generate_openapi_spec in CI, and the /api/vN/schema/ views), never on
+    an API request.
+    """
+    # Keyed by route, not callback: one view can be mounted under several
+    # namespaces (flexible pricing at /api/ and /api/v0/). drf-spectacular
+    # builds path_regex the same way iter_drf_routes builds its path.
+    namespaces = {route: namespace for namespace, route, _ in iter_drf_routes()}
+    unversioned = []
+    for path, path_regex, method, callback in endpoints:
+        versioning_class = callback.initkwargs.get(
+            "versioning_class", callback.cls.versioning_class
+        )
+        if versioning_class is not None and issubclass(versioning_class, NoVersioning):
+            continue
+        request = SimpleNamespace(
+            resolver_match=SimpleNamespace(namespace=namespaces.get(path_regex, ""))
+        )
+        if (
+            versioning_class is None
+            or versioning_class().determine_version(request) is None
+        ):
+            unversioned.append(f"{method} {path}")
+
+    if unversioned:
+        msg = (
+            "These endpoints resolve to no API version, so they would be missing "
+            "from every OpenAPI spec (or, with versioning_class = None, in every "
+            "one). Give each view a versioning_class: "
+            "V0Versioning or V2Versioning to put it in a spec, or NoVersioning "
+            "to keep it out of all of them (needed even with "
+            "extend_schema(exclude=True), which drf-spectacular applies after "
+            "this check).\n  " + "\n  ".join(unversioned)
+        )
+        raise ImproperlyConfigured(msg)
+    return endpoints
 
 
 def insert_wagtail_pages_schema(endpoints, **kwargs):  # noqa: ARG001

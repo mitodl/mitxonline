@@ -234,6 +234,8 @@ def list(self, request):
 
 **Queryset optimization:** Use `extend_schema_get_queryset` decorator (from `openapi/utils.py`) when queryset depends on request context not available at schema generation time.
 
+**API versions:** A view's spec (`v0.yaml` … `v3.yaml`) comes from its URL namespace (`v1`, `v2`, …). A view mounted outside a version namespace (b2b, users, Wagtail), and not dropped by `exclude_paths_hook` in `openapi/hooks.py`, fails `generate_openapi_spec` until it declares `versioning_class` from `main/versioning.py`: `V0Versioning`/`V2Versioning` to put it in that spec, or `NoVersioning` to keep it out of every spec.
+
 ### Celery Tasks
 
 **Task organization:**

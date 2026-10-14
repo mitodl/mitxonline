@@ -2,7 +2,12 @@
 
 import pytest
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from drf_spectacular.generators import SchemaGenerator
+from rest_framework.views import APIView
+
+from main.versioning import NoVersioning
+from openapi.hooks import require_api_version_hook
 
 WAGTAIL_TYPE_FILTER_PATHS = [
     "/api/v2/pages/?fields=*&type=cms.certificatepage",
@@ -87,3 +92,43 @@ def test_real_wagtail_pages_endpoints_still_documented(schemas):
     paths = schemas["v2"]["paths"]
     assert paths["/api/v2/pages/"]["get"]["operationId"] == "pages_list"
     assert paths["/api/v2/pages/{id}/"]["get"]["operationId"] == "pages_retrieve"
+
+
+class UnversionedView(APIView):
+    """A DRF view outside any version namespace, with the default versioning"""
+
+
+@pytest.mark.parametrize(
+    "initkwargs",
+    [
+        {},  # FallbackNamespaceVersioning, resolving to None outside a namespace
+        {"versioning_class": None},  # skips version matching: lands in every spec
+    ],
+)
+def test_require_api_version_hook_rejects_unversioned_endpoints(initkwargs):
+    """An endpoint that resolves to no single version fails schema generation."""
+    endpoints = [
+        (
+            "/api/unversioned/",
+            "^api/unversioned/$",
+            "GET",
+            UnversionedView.as_view(**initkwargs),
+        )
+    ]
+
+    with pytest.raises(ImproperlyConfigured, match="GET /api/unversioned/"):
+        require_api_version_hook(endpoints=endpoints)
+
+
+def test_require_api_version_hook_allows_no_versioning():
+    """A view marked NoVersioning stays out of every spec without failing."""
+    endpoints = [
+        (
+            "/api/unversioned/",
+            "^api/unversioned/$",
+            "GET",
+            UnversionedView.as_view(versioning_class=NoVersioning),
+        )
+    ]
+
+    assert require_api_version_hook(endpoints=endpoints) == endpoints

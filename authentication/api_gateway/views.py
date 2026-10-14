@@ -13,7 +13,12 @@ from django.views.generic.base import RedirectView
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
-from rest_framework.decorators import api_view, permission_classes, renderer_classes
+from rest_framework.decorators import (
+    api_view,
+    permission_classes,
+    renderer_classes,
+    versioning_class,
+)
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
@@ -29,6 +34,7 @@ from main.constants import (
     USER_MSG_TYPE_PROFILE_CREATED,
 )
 from main.utils import encode_json_cookie_value, is_success_response
+from main.versioning import NoVersioning
 from users.models import UserProfile
 
 User = get_user_model()
@@ -42,6 +48,7 @@ class ProfileDetailsAPIView(APIView):
     serializer_class = None
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = [IsAuthenticated]
+    versioning_class = NoVersioning
 
     def get_serializer_cls(self):  # pragma: no cover
         """Return the serializer cls"""
@@ -174,6 +181,7 @@ class OpenedxAndApiGatewayLogoutView(RedirectView):
 @api_view(["GET"])
 @renderer_classes([JSONRenderer])
 @permission_classes([])
+@versioning_class(NoVersioning)
 def logout_complete(request):  # noqa: ARG001
     """Simple response for openedx logout being complete"""
     return Response({"message": "Logout complete"}, content_type="application/json")

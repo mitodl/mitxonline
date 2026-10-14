@@ -21,7 +21,8 @@ class FallbackNamespaceVersioning(NamespaceVersioning):
 
     Subclass it with an explicit `default_version` to attribute such a
     view to a spec, since schema generation matches on version and None
-    matches nothing.
+    matches nothing. openapi.hooks.require_api_version_hook fails schema
+    generation for a view left at None that isn't marked NoVersioning.
     """
 
     def determine_version(self, request, *args, **kwargs):
@@ -29,6 +30,20 @@ class FallbackNamespaceVersioning(NamespaceVersioning):
             return super().determine_version(request, *args, **kwargs)
         except exceptions.NotFound:
             return self.default_version
+
+
+class NoVersioning(NamespaceVersioning):
+    """
+    Marks a view as deliberately in no OpenAPI spec.
+
+    A NamespaceVersioning subclass rather than BaseVersioning because
+    drf-spectacular treats versioning classes it doesn't recognise as
+    unversioned: it would warn (failing `--fail-on-warn`) and put the view
+    in every spec. Returning None makes it match no requested version.
+    """
+
+    def determine_version(self, request, *args, **kwargs):  # noqa: ARG002
+        return None
 
 
 class V0Versioning(FallbackNamespaceVersioning):
