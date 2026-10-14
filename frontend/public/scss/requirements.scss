@@ -60,12 +60,6 @@
             gap: 8px;
         }
 
-        &__handle {
-            color: var(--body-quiet-color);
-            cursor: grab;
-            user-select: none;
-        }
-
         &__title {
             flex: 1;
             min-width: 0;
@@ -132,6 +126,31 @@
             b {
                 color: var(--body-fg);
                 font-weight: 600;
+            }
+        }
+    }
+
+    .req-move {
+        display: inline-flex;
+
+        button {
+            border: none;
+            background: transparent;
+            color: var(--body-quiet-color);
+            font-size: 13px;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 4px;
+            line-height: 1;
+
+            &:hover:not(:disabled) {
+                background: var(--darkened-bg);
+                color: var(--body-fg);
+            }
+
+            &:disabled {
+                opacity: 0.3;
+                cursor: default;
             }
         }
     }
@@ -212,6 +231,18 @@
         &:empty {
             display: none;
         }
+
+        // One course per line, so each row's move buttons line up.
+        &--ordered {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+
+    .req-leaf {
+        display: flex;
+        align-items: center;
+        gap: 4px;
     }
 
     .req-chip {
@@ -464,4 +495,10 @@ html[data-theme="dark"] .program-requirements-field {
         --req-elective-color: #d99a5c;
         --req-track-color: #7fb3d5;
     }
+}
+
+// Django admin's .form-row has overflow: hidden, which cuts off the course
+// picker's dropdown at the bottom of the Requirements row.
+.form-row:has(.program-requirements-field) {
+    overflow: visible;
 }
