@@ -57,7 +57,7 @@ REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE = "program-child-purchase"
 # An internal discount reaches a basket only through application code that has
 # already decided the learner is entitled to it — the one such caller is
 # ecommerce.api.create_verified_program_course_run_enrollment. Every
-# learner-facing route refuses it (Discount._within_redemption_limits), and
+# learner-facing route refuses it (Discount.eligibility_for), and
 # pricing does not re-check eligibility: its product links say what it is for,
 # not where it applies.
 REDEMPTION_TYPE_INTERNAL = "internal"
