@@ -136,6 +136,7 @@ class UserOrganizationInline(admin.TabularInline):
 
     model = UserOrganization
     extra = 0
+    readonly_fields = ["added_to_keycloak_at"]
 
 
 @admin.register(User)

@@ -15,6 +15,7 @@ from django.core.exceptions import ValidationError
 from django.test import RequestFactory
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
+from requests import HTTPError, Response
 
 from b2b import factories
 from b2b.api import (
@@ -1349,9 +1350,28 @@ def test_b2b_org_attach_calls_keycloak(mocked_b2b_org_attach, has_id):
     org = OrganizationPageFactory.create(sso_organization_id=has_id)
     user = UserFactory.create()
 
-    process_add_org_membership(user, org)
+    membership = process_add_org_membership(user, org)
 
     mocked_b2b_org_attach.assert_called() if has_id else mocked_b2b_org_attach.assert_not_called()
+    assert (membership.added_to_keycloak_at is not None) is bool(has_id)
+
+
+def test_b2b_org_attach_failure_leaves_the_member_for_the_push(mocker):
+    """A member Keycloak refused has no timestamp, so the periodic push retries."""
+
+    response = Response()
+    response.status_code = 500
+    mocker.patch(
+        "b2b.api.add_user_org_membership", side_effect=HTTPError(response=response)
+    )
+
+    membership = process_add_org_membership(
+        UserFactory.create(), OrganizationPageFactory.create(), keep_until_seen=True
+    )
+
+    membership.refresh_from_db()
+    assert membership.keep_until_seen is True
+    assert membership.added_to_keycloak_at is None
 
 
 @pytest.mark.parametrize(
@@ -3278,6 +3298,26 @@ def test_reconcile_keeps_the_members_of_a_page_it_links(reconcile_realm):
     assert UserOrganization.objects.filter(
         pk=members[0].pk, keep_until_seen=True
     ).exists()
+
+
+def test_reconcile_pushes_members_added_to_a_previous_link(reconcile_realm):
+    """A timestamp from an earlier Keycloak organization doesn't skip the push."""
+
+    reconcile, connection = reconcile_realm
+    legacy = factories.OrganizationPageFactory.create(
+        org_key="UTK", sso_organization_id=None
+    )
+    member = factories.UserOrganizationFactory.create(
+        organization=legacy, added_to_keycloak_at=now_in_utc()
+    )
+    org = factories.OrganizationRepresentationFactory.create(alias="utk")
+
+    reconcile(org)
+
+    legacy.refresh_from_db()
+    connection.organizations.associate.assert_called_once_with(
+        "members", legacy.sso_organization_id, member.user.global_id
+    )
 
 
 def test_reconcile_leaves_the_members_of_a_linked_page_alone(reconcile_realm):

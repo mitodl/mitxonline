@@ -2154,7 +2154,9 @@ def reconcile_keycloak_orgs():
                     ).exists()
                 )
                 if linked:
-                    page.organization_users.update(keep_until_seen=True)
+                    page.organization_users.update(
+                        keep_until_seen=True, added_to_keycloak_at=None
+                    )
 
                 if created:
                     parent_org_page.add_child(instance=page)
@@ -2385,7 +2387,9 @@ def process_add_org_membership(user, organization, *, keep_until_seen=False):
         obj.keep_until_seen = keep_until_seen
         obj.save()
         try:
-            organization.attach_user(user)
+            if organization.attach_user(user):
+                obj.added_to_keycloak_at = now_in_utc()
+                obj.save(update_fields=["added_to_keycloak_at"])
         except ConnectionError:
             log.exception(
                 "Could not attach %s to Keycloak org for %s", user, organization
