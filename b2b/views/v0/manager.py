@@ -24,7 +24,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
-from b2b.api import _create_discount_with_product, is_potentially_valid_mailgun_webhook
+from b2b.api import (
+    _create_discount_with_product,
+    is_potentially_valid_mailgun_webhook,
+    lock_contract_for_code_assignment,
+)
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
 from b2b.models import (
     EMAIL_STATUS_FAILED,
@@ -84,21 +88,6 @@ def clear_assignment_email_deliverability_fields(assignment):
     assignment.email_status = ""
     assignment.email_status_event_timestamp = None
     return assignment
-
-
-def lock_contract_for_code_assignment(contract: ContractPage) -> None:
-    """
-    Serialize code assignment for a contract until the transaction ends.
-
-    Assigning checks which codes are free and then inserts assignment rows.
-    Locking the candidate discounts would not close that gap, because a
-    concurrent assignment inserts a redemption row and never updates the
-    discount, so Postgres has nothing to re-check. Holding the contract row
-    instead makes the second request wait and then read the first one's rows.
-    Only the contract's own table is locked, not the Wagtail page row.
-    """
-
-    ContractPage.objects.select_for_update(of=("self",)).get(pk=contract.pk)
 
 
 def create_code_assignments(
