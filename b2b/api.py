@@ -1909,7 +1909,7 @@ def _enroll_in_program_for_b2b(
     )
 
 
-def reconcile_user_orgs(user, organizations):
+def reconcile_user_orgs(user, organizations, *, request=False):
     """
     Reconcile the specified user with the provided organization list.
 
@@ -1949,19 +1949,80 @@ def reconcile_user_orgs(user, organizations):
     """
 
     user_org_cache_key = f"org-membership-cache-{user.id}"
+    last_login_cache_key = f"user-last-login-time-{user.global_id}"
+
     cached_org_membership = caches["redis"].get(user_org_cache_key, False)
+    cached_login_time = caches["redis"].get(last_login_cache_key, False)
+
+    my_login_time = request.session.get("login_time", False) if request else False
+
+    log.info(
+        "reconcile_user_orgs: --> start - key %s user %s value is false %s",
+        user_org_cache_key,
+        user.id,
+        "yes it is" if cached_org_membership is False else "no it isn't",
+    )
+
+    if cached_org_membership is False:
+        log.info(
+            "reconcile_user_orgs: did not get a cache hit for key %s user %s",
+            user_org_cache_key,
+            user.id,
+        )
+
+    if cached_login_time is False:
+        log.info(
+            "reconcile_user_orgs: did not get a cache hit for key %s user %s",
+            last_login_cache_key,
+            user.global_id,
+        )
+
+    if my_login_time is False:
+        log.info("reconcile_user_orgs: no last login time for user %s", user.global_id)
+
+    if cached_login_time and my_login_time:
+        cached_login_datetime = datetime.fromisoformat(cached_login_time)
+        my_login_datetime = datetime.fromisoformat(request.session.get("login_time"))
+
+        if my_login_datetime < cached_login_datetime:
+            log.info(
+                "reconcile_user_orgs: there's a newer session - ignoring reconciliation (%s vs %s)",
+                cached_login_time,
+                request.session.get("login_time"),
+            )
+
+            return (
+                0,
+                0,
+            )
+        else:
+            log.info(
+                "reconcile_user_orgs: we're the current session so proceed with reconcile (%s vs %s)",
+                cached_login_time,
+                request.session.get("login_time"),
+            )
+    else:
+        log.info(
+            "reconcile_user_orgs: no timestamps to compare, so can't trust this payload, skipping reconciliation"
+        )
+        return (
+            0,
+            0,
+        )
 
     if cached_org_membership:
+        log.info("reconcile_user_orgs: orgs passed: %s", ",".join(organizations))
+        log.info("reconcile_user_orgs: cached membership: %s", cached_org_membership)
         cached_expected_org_membership = [
-            str(org_id)
-            for org_id, not_expected_in_payload in cached_org_membership
-            if not_expected_in_payload
+            str(org_id) for org_id, _ in cached_org_membership
         ]
 
         if sorted(cached_expected_org_membership) == sorted(organizations):
             log.info(
-                "reconcile_user_orgs: everything OK, skipping reconcilation for %s",
+                "reconcile_user_orgs: everything OK, skipping reconcilation for %s (cache %s - sent %s)",
                 user.id,
+                ",".join(cached_expected_org_membership),
+                ",".join(organizations),
             )
             return (
                 0,
@@ -2013,6 +2074,13 @@ def reconcile_user_orgs(user, organizations):
 
     user_org_cache_key = f"org-membership-cache-{user.id}"
     caches["redis"].set(user_org_cache_key, sorted(orgs))
+
+    log.info(
+        "reconcile_user_orgs: set cache for key %s (user %s) to %s",
+        user_org_cache_key,
+        user.id,
+        ",".join([cachedata[0] for cachedata in sorted(orgs)]),
+    )
 
     return (len(orgs_to_add), len(orgs_to_remove))
 

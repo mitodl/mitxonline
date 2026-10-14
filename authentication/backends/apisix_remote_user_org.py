@@ -6,8 +6,10 @@ This should go in the ol-django app. It's here to make it easier to write.
 
 import logging
 
+from django.core.cache import caches
 from mitol.apigateway.api import decode_x_header
 from mitol.apigateway.backends import ApisixRemoteUserBackend
+from mitol.common.utils.datetime import now_in_utc
 
 from b2b.api import reconcile_user_orgs
 
@@ -29,6 +31,13 @@ class ApisixRemoteUserOrgBackend(ApisixRemoteUserBackend):
 
         user = super().configure_user(request, user, *args, created=created)
 
+        cache_key = f"user-last-login-time-{user.global_id}"
+
+        if not request.session.get("login_time", False):
+            login_time = now_in_utc().isoformat()
+            request.session["login_time"] = login_time
+            caches["redis"].set(cache_key, login_time)
+
         apisix_header = decode_x_header(request)
 
         org_uuids = []
@@ -40,6 +49,6 @@ class ApisixRemoteUserOrgBackend(ApisixRemoteUserBackend):
             ]
 
         # Task should check to see if it needs to run or not
-        reconcile_user_orgs(user, org_uuids)
+        reconcile_user_orgs(user, org_uuids, request=request)
 
         return user
