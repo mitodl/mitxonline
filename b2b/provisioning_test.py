@@ -1755,6 +1755,30 @@ def test_push_unconfirmed_members_reports_failures_and_carries_on(connection):
     )
 
 
+@pytest.mark.parametrize(
+    "error",
+    [
+        _http_error(503),
+        requests.ConnectionError("dropped"),
+        requests.Timeout("slow"),
+        InvalidTokenError(),
+    ],
+)
+def test_push_unconfirmed_members_stops_when_keycloak_is_unavailable(connection, error):
+    """An outage ends the run instead of every remaining member timing out."""
+
+    UserOrganizationFactory.create_batch(2, keep_until_seen=True)
+    connection.organizations.associate.side_effect = error
+
+    with pytest.raises(type(error)):
+        push_unconfirmed_members_to_keycloak(connection=connection)
+
+    connection.organizations.associate.assert_called_once()
+    assert not UserOrganization.objects.filter(
+        added_to_keycloak_at__isnull=False
+    ).exists()
+
+
 def test_push_unconfirmed_members_does_not_connect_with_nothing_to_push(mocker):
     """Bootstrapping the client costs two requests, so skip it when idle."""
 

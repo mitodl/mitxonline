@@ -33,7 +33,8 @@ from authlib.integrations.base_client.errors import OAuthError
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from mitol.common.utils import now_in_utc
-from requests import HTTPError, RequestException
+from requests import ConnectionError as RequestsConnectionError
+from requests import HTTPError, RequestException, Timeout
 
 from b2b.constants import (
     IDP_ALLOWED_TRANSITIONS,
@@ -515,7 +516,20 @@ def link_organization_to_keycloak(organization, *, connection=None, actor=None):
     return created, failed_members
 
 
-def sync_organization_members_to_keycloak(organization, *, connection):
+def _is_keycloak_outage(exc):
+    """Whether a failed write means Keycloak is unavailable, not that it refused one member."""
+
+    if isinstance(exc, HTTPError):
+        return (
+            exc.response is not None
+            and exc.response.status_code >= HTTPStatus.INTERNAL_SERVER_ERROR
+        )
+    return isinstance(exc, (RequestsConnectionError, Timeout, OAuthError))
+
+
+def sync_organization_members_to_keycloak(
+    organization, *, connection, stop_on_outage=False
+):
     """
     Add the organization's unconfirmed members to its Keycloak organization.
 
@@ -528,6 +542,9 @@ def sync_organization_members_to_keycloak(organization, *, connection):
     Args:
     - organization (OrganizationPage): a linked organization
     - connection (KeycloakConnection): the Keycloak connection to use
+    - stop_on_outage (bool): re-raise a connection error, timeout, 5xx or
+      token failure instead of trying the next member, each of whom would
+      wait out the same request timeout
     Returns:
     - list[User]: the members who could not be added
     """
@@ -550,6 +567,8 @@ def sync_organization_members_to_keycloak(organization, *, connection):
                 "members", organization.sso_organization_id, user.global_id
             )
         except (RequestException, OAuthError) as exc:
+            if stop_on_outage and _is_keycloak_outage(exc):
+                raise
             # An adopted realm org may already have this member.
             already_member = (
                 isinstance(exc, HTTPError)
@@ -586,6 +605,9 @@ def push_unconfirmed_members_to_keycloak(connection=None):
     sticks. The flag clears as usual, in reconcile_user_orgs, once the
     organization shows up in the member's token.
 
+    If Keycloak is unavailable the run stops there, raising, and the next
+    scheduled run carries on from whoever is still unconfirmed.
+
     Args:
     - connection (KeycloakConnection): an existing connection, if any
     Returns:
@@ -602,7 +624,7 @@ def push_unconfirmed_members_to_keycloak(connection=None):
     for organization in organizations:
         connection = connection or KeycloakConnection()
         failed_members = sync_organization_members_to_keycloak(
-            organization, connection=connection
+            organization, connection=connection, stop_on_outage=True
         )
         if failed_members:
             failed[organization.org_key] = failed_members
