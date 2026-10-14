@@ -558,7 +558,8 @@ class Discount(TimestampedModel):
     ) -> RedemptionEligibility | None:
         """
         Enforces the redemption rules for a given discount: whether its type is
-        learner-redeemable at all, whether it is inside its date window, how
+        learner-redeemable at all, whether it is inside its date window, whether
+        this user is in the contract the code belongs to (if it is one), how
         often it may be redeemed, and — for a program-child-purchase redemption
         — whether this user still holds an unconsumed qualifying purchase for
         one of the products in hand.
@@ -587,6 +588,17 @@ class Discount(TimestampedModel):
             return None
 
         if not self.valid_now():
+            return None
+
+        # A contract's codes are for its members. Holding one doesn't make
+        # someone a member: learners join a code contract through the attach
+        # endpoint, which the code-assignment email links to, and managed and
+        # auto contracts take members from their organization.
+        if self.b2b_contract_id and not (
+            user is not None
+            and user.is_authenticated
+            and user.b2b_contracts.filter(pk=self.b2b_contract_id).exists()
+        ):
             return None
 
         if (
