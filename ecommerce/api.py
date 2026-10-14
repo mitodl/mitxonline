@@ -29,6 +29,7 @@ from b2b.api import (
     get_active_contracts_from_basket_items,
     is_discount_supplied_for_b2b_purchase,
 )
+from compliance.exceptions import ExportComplianceDataError
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -114,6 +115,7 @@ from main.constants import (
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 from main.utils import parse_supplied_date
 from openedx.api import create_user
@@ -222,7 +224,21 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
         else:
             gateway_type = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 
-    if basket.has_user_blocked_products(request.user):
+    try:
+        has_blocked_products = basket.has_user_blocked_products(request.user)
+    except ExportComplianceDataError as exc:
+        # The learner can fix this themselves, unlike a compliance denial.
+        log.info(
+            "Checkout blocked on incomplete profile for user=%s: missing %s",
+            request.user.id,
+            exc.missing_fields,
+        )
+        return {
+            "profile_incomplete": True,
+            "error": USER_MSG_TYPE_PROFILE_INCOMPLETE,
+        }
+
+    if has_blocked_products:
         return {
             "country_blocked": True,
             "error": USER_MSG_TYPE_ENROLL_BLOCKED,

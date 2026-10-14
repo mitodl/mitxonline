@@ -19,6 +19,7 @@ from rest_framework.test import APIClient
 from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
+from compliance.api import verify_user_with_exports
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
@@ -73,6 +74,7 @@ from main.constants import (
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+    USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 from main.settings import TIME_ZONE
 from main.test_utils import assert_drf_json_equal
@@ -566,7 +568,7 @@ def test_start_checkout_with_discounts_and_b2b(
     product.refresh_from_db()
 
     if apply_discount:
-        discount = UnlimitedUseDiscountFactory.create(amount=1)
+        discount = UnlimitedUseDiscountFactory.create(amount=1, b2b_contract=contract)
         discount_product = DiscountProduct.objects.create(
             discount=discount, product=product
         )
@@ -1659,6 +1661,27 @@ def test_paid_and_unpaid_courserun_checkout(
     basket = create_basket_with_product(user, unpaid_product)
     resp = user_client.get(reverse("checkout_interstitial_page"))
     assert resp.status_code == 200
+
+
+@pytest.mark.skip_nplusone_check
+def test_checkout_interstitial_incomplete_profile(
+    mocker, mocked_export_compliance, user, user_client, products
+):
+    """An incomplete legal address should send the learner back to the cart to fix it."""
+    mocked_export_compliance.side_effect = verify_user_with_exports
+    mocker.patch("compliance.api.get_cybersource_client")
+    user.legal_address.street_address_1 = ""
+    user.legal_address.save()
+    create_basket_with_product(user, products[0])
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_PROFILE_INCOMPLETE}
+    )
+    assert not PendingOrder.objects.filter(purchaser=user).exists()
 
 
 @pytest.mark.skip_nplusone_check

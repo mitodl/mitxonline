@@ -9,13 +9,17 @@ import { mutateAsync } from "redux-query"
 import { connectRequest } from "redux-query-react"
 import { createStructuredSelector } from "reselect"
 import { pathOr } from "ramda"
+// $FlowFixMe
+import { Modal, ModalBody, ModalHeader } from "reactstrap"
 
 import type { BasketItem, Discount } from "../../../flow/cartTypes"
-import type { CurrentUser } from "../../../flow/authTypes"
+import type { Country, CurrentUser } from "../../../flow/authTypes"
 
 import Loader from "../../../components/Loader"
 import { CartItemCard } from "../../../components/CartItemCard"
 import { OrderSummaryCard } from "../../../components/OrderSummaryCard"
+import AddlProfileFieldsForm from "../../../components/forms/AddlProfileFieldsForm"
+import { needsComplianceInfo } from "../../../components/forms/ProfileFormFields"
 
 import {
   cartQuery,
@@ -26,7 +30,7 @@ import {
   discountSelector,
   applyDiscountCodeMutation
 } from "../../../lib/queries/cart"
-import { currentUserSelector } from "../../../lib/queries/users"
+import users, { currentUserSelector } from "../../../lib/queries/users"
 
 import type { RouterHistory } from "react-router"
 import { isSuccessResponse } from "../../../lib/util"
@@ -42,16 +46,95 @@ type Props = {
   applyDiscountCode: (code: string) => Promise<any>,
   addUserNotification: Function,
   forceRequest: Function,
-  currentUser: ?CurrentUser
+  currentUser: ?CurrentUser,
+  countries: Array<Country>,
+  updateProfile: (profileData: Object) => Promise<any>
 }
 
 type CartState = {
-  discountCode: string
+  discountCode: string,
+  checkoutUrl: string
 }
 
 export class CartPage extends React.Component<Props, CartState> {
   state = {
-    discountCode: ""
+    discountCode: "",
+    checkoutUrl:  ""
+  }
+
+  handleCheckout(checkoutUrl: string) {
+    if (needsComplianceInfo(this.props.currentUser)) {
+      this.setState({ checkoutUrl })
+    } else {
+      window.location = checkoutUrl
+    }
+  }
+
+  async saveProfile(values: Object, { setSubmitting, setErrors }: Object) {
+    const { currentUser, updateProfile } = this.props
+    const currentYearOfBirth = pathOr(
+      null,
+      ["user_profile", "year_of_birth"],
+      currentUser
+    )
+    const profileData: Object = { legal_address: values.legal_address }
+    // UserSerializer.update recomputes addl_field_flag from the user_profile
+    // payload, so sending year_of_birth alone would clear it.
+    if (
+      String(values.user_profile.year_of_birth) !== String(currentYearOfBirth)
+    ) {
+      profileData.user_profile = {
+        year_of_birth: values.user_profile.year_of_birth
+      }
+    }
+
+    try {
+      const resp = await updateProfile(profileData)
+      if (isSuccessResponse(resp)) {
+        window.location = this.state.checkoutUrl
+      } else if (resp.body && resp.body.errors) {
+        // e.g. {errors: {legal_address: {city: ["..."]}}}
+        setErrors(resp.body.errors)
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  closeComplianceModal = () => this.setState({ checkoutUrl: "" })
+
+  renderComplianceInfoModal() {
+    const { currentUser, countries } = this.props
+    const { checkoutUrl } = this.state
+
+    if (!currentUser || !currentUser.is_authenticated) {
+      return null
+    }
+
+    return (
+      <Modal
+        id="compliance-info-dialog"
+        className="upgrade-enrollment-modal"
+        isOpen={Boolean(checkoutUrl)}
+        toggle={this.closeComplianceModal}
+      >
+        <ModalHeader toggle={this.closeComplianceModal}>
+          Provide More Info
+        </ModalHeader>
+        <ModalBody>
+          <p>
+            We need a few more details about you before you can place your
+            order.
+          </p>
+          <AddlProfileFieldsForm
+            onSubmit={this.saveProfile.bind(this)}
+            user={currentUser}
+            countries={countries}
+            requireComplianceFields={true}
+          />
+        </ModalBody>
+      </Modal>
+    )
   }
 
   async addDiscount(ev: Object, { setErrors }: any) {
@@ -114,6 +197,7 @@ export class CartPage extends React.Component<Props, CartState> {
         addDiscount={this.addDiscount.bind(this)}
         discountCode={this.state.discountCode}
         isAuthenticated={Boolean(currentUser && currentUser.is_authenticated)}
+        onCheckout={this.handleCheckout.bind(this)}
       />
     )
   }
@@ -193,6 +277,7 @@ export class CartPage extends React.Component<Props, CartState> {
                 {this.renderOrderSummaryCard()}
               </div>
             </div>
+            {this.renderComplianceInfoModal()}
           </div>
         </Loader>
       </DocumentTitle>
@@ -203,21 +288,30 @@ export class CartPage extends React.Component<Props, CartState> {
 const applyDiscountCode = (code: string) =>
   mutateAsync(applyDiscountCodeMutation(code))
 
+const updateProfile = (profileData: Object) =>
+  mutateAsync(users.editProfileMutation(profileData))
+
 const mapStateToProps = createStructuredSelector({
   cartItems:       cartSelector,
   totalPrice:      totalPriceSelector,
   discountedPrice: discountedPriceSelector,
   discounts:       discountSelector,
   isLoading:       pathOr(true, ["queries", cartQueryKey, "isPending"]),
-  currentUser:     currentUserSelector
+  currentUser:     currentUserSelector,
+  countries:       users.countriesSelector
 })
 
 const mapDispatchToProps = {
   addUserNotification,
-  applyDiscountCode
+  applyDiscountCode,
+  updateProfile
 }
 
-const mapPropsToConfig = () => [cartQuery()]
+// Countries are only needed by the profile modal.
+export const mapPropsToConfig = ({ currentUser }: Object) =>
+  needsComplianceInfo(currentUser) ?
+    [cartQuery(), users.countriesQuery()] :
+    [cartQuery()]
 
 export default compose(
   connect(mapStateToProps, mapDispatchToProps),

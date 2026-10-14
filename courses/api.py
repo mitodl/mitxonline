@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from collections import Counter, namedtuple
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -20,6 +21,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Exists, OuterRef, Prefetch, Q
 from django_countries import countries
+from edx_api.course_list.constants import BATCH_SIZE as COURSE_LIST_BATCH_SIZE
 from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
     first_or_none,
@@ -29,7 +31,12 @@ from mitol.olposthog.features import is_enabled
 from opaque_keys.edx.keys import CourseKey
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
-from rest_framework.status import HTTP_404_NOT_FOUND
+from rest_framework.status import (
+    HTTP_401_UNAUTHORIZED,
+    HTTP_403_FORBIDDEN,
+    HTTP_404_NOT_FOUND,
+    HTTP_429_TOO_MANY_REQUESTS,
+)
 
 from cms.api import create_default_courseware_page
 from compliance.api import verify_user_with_exports
@@ -976,7 +983,7 @@ def sync_course_runs(runs):
         are skipped and counted as neither success nor failure), and
         failure_count is the number of runs that errored while syncing.
     """
-    api_client = get_edx_api_course_list_client()
+    api_client, using_jwt = get_edx_api_course_list_client()
 
     success_count = 0
     failure_count = 0
@@ -987,12 +994,26 @@ def sync_course_runs(runs):
         log.warning("No valid course keys found to sync")
         return 0, len(runs)
 
-    try:
-        received_course_ids = set()
-        for course_detail in api_client.get_courses(
-            course_keys=valid_course_ids,
-            username=settings.OPENEDX_SERVICE_WORKER_USERNAME,
-        ):
+    received_course_ids = set()
+    failed_course_ids = set()
+    # Fetch one batch at a time so a failed batch doesn't stop the rest.
+    for start in range(0, len(valid_course_ids), COURSE_LIST_BATCH_SIZE):
+        batch = valid_course_ids[start : start + COURSE_LIST_BATCH_SIZE]
+        try:
+            try:
+                course_details = _get_course_list_batch(api_client, batch)
+            except HTTPError as e:
+                # Switch before refetching, so later batches use the static
+                # token whatever this refetch returns.
+                api_client, using_jwt = _static_client_if_jwt_rejected(e, using_jwt)
+                course_details = _get_course_list_batch(api_client, batch)
+        except Exception:  # pylint: disable=broad-except
+            failure_count += len(batch)
+            failed_course_ids.update(batch)
+            log.exception("Bulk course list API error for course keys %s", batch)
+            continue
+
+        for course_detail in course_details:
             received_course_ids.add(course_detail.course_id)
 
             if course_detail.course_id not in runs_by_course_id:
@@ -1016,21 +1037,106 @@ def sync_course_runs(runs):
                 log.error("%s: %s", str(e), run.courseware_id)  # noqa: TRY400
                 failure_count += 1
 
-        missing_course_ids = set(valid_course_ids) - received_course_ids
-        if missing_course_ids:
-            log.warning(
-                "No data received for requested courses: %s",
-                list(missing_course_ids),
-            )
-
-    except HTTPError as e:
-        failure_count += 1
-        log.error("Bulk course list API error: %s", str(e))  # noqa: TRY400
-    except Exception as e:  # pylint: disable=broad-except  # noqa: BLE001
-        failure_count += 1
-        log.error("Unexpected error in bulk sync: %s", str(e))  # noqa: TRY400
+    # Failed batches were already logged above
+    missing_course_ids = set(valid_course_ids) - received_course_ids - failed_course_ids
+    if missing_course_ids:
+        log.warning(
+            "No data received for requested courses: %s",
+            list(missing_course_ids),
+        )
 
     return success_count, failure_count
+
+
+def _get_course_list_batch(api_client, course_keys):
+    """
+    Fetch course details for one batch of course keys, waiting and retrying
+    when edX rate-limits the request (HTTP 429).
+
+    Args:
+        api_client (CourseList): the edX course list client
+        course_keys (list of str): the course keys in this batch
+
+    Returns:
+        list of CourseDetail: the course details edX returned for the batch
+    """
+    max_retries = settings.OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES
+    for attempt in range(max_retries + 1):
+        try:
+            return list(
+                api_client.get_courses(
+                    course_keys=course_keys,
+                    username=settings.OPENEDX_SERVICE_WORKER_USERNAME,
+                )
+            )
+        except HTTPError as e:  # noqa: PERF203
+            response = e.response
+            if (
+                response is None
+                or response.status_code != HTTP_429_TOO_MANY_REQUESTS
+                or attempt == max_retries
+            ):
+                raise
+            wait_seconds = _course_list_retry_wait_seconds(response)
+            log.warning(
+                "Course list API rate-limited us, retrying in %s seconds", wait_seconds
+            )
+            time.sleep(wait_seconds)
+    msg = "unreachable"  # the loop either returns or raises
+    raise AssertionError(msg)
+
+
+def _static_client_if_jwt_rejected(error, using_jwt):
+    """
+    Get the static service worker token's course list client if edX rejected
+    the client-credentials JWT (401/403), e.g. because its app is owned by a
+    non-staff user. Any other error is re-raised.
+
+    Args:
+        error (HTTPError): the error from fetching a batch of course details
+        using_jwt (bool): whether that fetch used the client-credentials JWT
+
+    Returns:
+        tuple: (CourseList, bool) the static token's client, and False
+    """
+    if (
+        not using_jwt
+        or error.response is None
+        or error.response.status_code not in (HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN)
+    ):
+        raise error
+    log.error(
+        "Course list API rejected the client-credentials JWT (HTTP %s), "
+        "using the static service worker token instead",
+        error.response.status_code,
+    )
+    return get_edx_api_course_list_client(use_jwt=False)
+
+
+def _course_list_retry_wait_seconds(response):
+    """
+    How long to wait before retrying a rate-limited course list request.
+
+    edX's course list API drops the throttle's Retry-After header (its
+    DeveloperErrorViewMixin rebuilds the error response), but keeps the wait in
+    the body's developer_message, e.g. "Request was throttled. Expected
+    available in 12 seconds." Use Retry-After if it's ever sent, then that
+    message, and otherwise a full throttle window. Never wait longer than one
+    window.
+    """
+    max_wait = settings.OPENEDX_COURSE_LIST_THROTTLE_WAIT_SECONDS
+    retry_after = response.headers.get("Retry-After", "")
+    if not retry_after.isdecimal():
+        try:
+            message = response.json().get("developer_message", "")
+        except (ValueError, AttributeError):
+            message = ""
+        match = re.search(r"available in (\d+) second", str(message))
+        retry_after = match.group(1) if match else ""
+    try:
+        return min(int(retry_after), max_wait)
+    except ValueError:
+        return max_wait
 
 
 def pull_course_modes(run: CourseRun) -> tuple[list[CourseMode], int]:

@@ -39,7 +39,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "1.169.11"
+VERSION = "1.170.0"
 
 log = logging.getLogger()
 
@@ -1347,6 +1347,17 @@ EDX_API_CLIENT_TIMEOUT = get_int(
     name="EDX_API_CLIENT_TIMEOUT",
     default=60,
     description="Timeout (in seconds) for requests made via the edX API client",
+)
+
+OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES = get_int(
+    name="OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES",
+    default=3,
+    description="How many times to retry a rate-limited (429) edX course list API request",
+)
+OPENEDX_COURSE_LIST_THROTTLE_WAIT_SECONDS = get_int(
+    name="OPENEDX_COURSE_LIST_THROTTLE_WAIT_SECONDS",
+    default=60,
+    description="Seconds to wait before retrying a rate-limited edX course list API request when edX doesn't say how long to wait, and the longest wait allowed when it does",
 )
 
 OPENEDX_COURSE_CLONE_MAX_RETRIES = get_int(

@@ -175,7 +175,7 @@ def _create_discount_codes_for_contract(
 
     for _ in range(count_to_provision):
         discount = _create_discount_with_product(
-            product, Decimal(0), REDEMPTION_TYPE_ONE_TIME
+            contract, product, Decimal(0), REDEMPTION_TYPE_ONE_TIME
         )
         new_discounts.append(discount)
 

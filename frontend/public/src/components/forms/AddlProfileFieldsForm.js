@@ -4,7 +4,9 @@ import { Formik, Form } from "formik"
 import { ConnectedFocusError } from "focus-formik-error"
 
 import {
+  LegalAddressComplianceFields,
   LegalAddressCountryFields,
+  complianceAddressValidation,
   legalAddressCountryValidation
 } from "./ProfileFormFields"
 
@@ -13,7 +15,8 @@ import type { User, Country } from "../../flow/authTypes"
 type Props = {
   onSubmit: Function,
   user: User,
-  countries: Array<Country>
+  countries: Array<Country>,
+  requireComplianceFields?: boolean
 }
 
 const getInitialValues = (user: User) => ({
@@ -25,8 +28,15 @@ const getInitialValues = (user: User) => ({
   }
 })
 
-const AddlProfileFieldsForm = ({ onSubmit, user, countries }: Props) => {
-  const validation = legalAddressCountryValidation
+const AddlProfileFieldsForm = ({
+  onSubmit,
+  user,
+  countries,
+  requireComplianceFields
+}: Props) => {
+  const validation = requireComplianceFields ?
+    complianceAddressValidation :
+    legalAddressCountryValidation
 
   return (
     <Formik
@@ -45,6 +55,9 @@ const AddlProfileFieldsForm = ({ onSubmit, user, countries }: Props) => {
               countries={countries}
               values={values}
             />
+            {requireComplianceFields ? (
+              <LegalAddressComplianceFields errors={errors} values={values} />
+            ) : null}
             <div className="row submit-row no-gutters">
               <div className="col d-flex justify-content-end">
                 <button

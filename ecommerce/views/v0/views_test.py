@@ -21,6 +21,7 @@ from reversion.models import Version
 
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE, CONTRACT_MEMBERSHIP_MANAGED
 from b2b.factories import ContractPageFactory
+from compliance.api import verify_user_with_exports
 from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
 from courses.factories import (
     BlockedCountryFactory,
@@ -92,6 +93,7 @@ from main.constants import (
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 from main.settings import TIME_ZONE
 from main.test_utils import assert_drf_json_equal
@@ -1623,6 +1625,30 @@ def test_start_checkout_with_blocked_country(user, user_drf_client):
     assert "error" in resp_body
     assert resp_body["error"] == USER_MSG_TYPE_ENROLL_BLOCKED
     assert resp.status_code == 400
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout_with_incomplete_profile(
+    mocker, mocked_export_compliance, user, user_drf_client
+):
+    """Checkout should ask for the missing profile fields instead of erroring."""
+    mocked_export_compliance.side_effect = verify_user_with_exports
+    mock_client = mocker.patch("compliance.api.get_cybersource_client")
+    courserun = CourseRunFactory.create()
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=courserun)
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product)
+    user.legal_address.street_address_1 = ""
+    user.legal_address.city = ""
+    user.legal_address.save()
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+
+    assert resp.status_code == 400
+    resp_body = resp.json()
+    assert resp_body["error"] == USER_MSG_TYPE_PROFILE_INCOMPLETE
+    mock_client.return_value.validate_export_compliance.assert_not_called()
 
 
 @pytest.mark.skip_nplusone_check

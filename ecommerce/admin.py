@@ -157,6 +157,7 @@ class BasketItemAdmin(VersionAdmin):
 class DiscountAdmin(admin.ModelAdmin):
     model = Discount
     exclude = ["is_program_discount"]
+    raw_id_fields = ["b2b_contract"]
     search_fields = ["discount_type", "redemption_type", "discount_code"]
     list_display = [
         "id",

@@ -44,6 +44,7 @@ from main.constants import (
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 from users.serializers import (
     ExtendedLegalAddressSerializer,
@@ -1158,6 +1159,7 @@ class CheckoutPayloadSerializer(serializers.Serializer):
             USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
             USER_MSG_TYPE_B2B_INVALID_BASKET,
             USER_MSG_TYPE_BASKET_EMPTY,
+            USER_MSG_TYPE_PROFILE_INCOMPLETE,
         ),
     )
 
