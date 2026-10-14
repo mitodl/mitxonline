@@ -2351,13 +2351,16 @@ def lock_contract_for_code_assignment(contract: ContractPage) -> None:
     instead makes the second request wait and then read the first one's rows.
     Only the contract's own table is locked, not the Wagtail page row.
 
-    Take this before anything else in the transaction touches the contract.
-    Inserting a row that references the contract holds a key-share lock on
-    it, and two transactions that each hold one and then ask for this lock
-    deadlock.
+    FOR NO KEY UPDATE serializes callers of this against each other but does
+    not conflict with the key-share lock an insert referencing the contract
+    takes. A transaction may therefore take this after writing rows that
+    reference the contract without deadlocking another caller, and those
+    writes elsewhere don't wait on an assignment holding it.
     """
 
-    ContractPage.objects.select_for_update(of=("self",)).get(pk=contract.pk)
+    ContractPage.objects.select_for_update(of=("self",), no_key=True).get(
+        pk=contract.pk
+    )
 
 
 def process_add_org_membership(user, organization, *, keep_until_seen=False):

@@ -374,9 +374,7 @@ class AttachContractApi(APIView):
             user.b2b_contracts.add(contract)
             # A code assignment in flight for this contract may be about to
             # commit a row for this code. Without the lock the lookup here
-            # misses it and inserts a second row for the same code. This is
-            # its own transaction, after the writes above, so the lock is the
-            # first thing it takes on the contract.
+            # misses it and inserts a second row for the same code.
             with transaction.atomic():
                 lock_contract_for_code_assignment(contract)
                 DiscountContractAttachmentRedemption.objects.update_or_create(
