@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 1.170.1
+---------------
+
+- Retry rate-limited course list batches and sync with client credentials (#4076)
+- Make the provisioning API the only writer of an organization's name, description and Keycloak link (#4089)
+- If the product's purchasable object is not B2B, don't change its price (#4132)
+- Program tracks: track nodes, the learner's chosen track, and the admin editor (#4093)
+- Scope B2B enrollment codes to their contract (#4099)
+
 Version 1.170.0
 ---------------
 
