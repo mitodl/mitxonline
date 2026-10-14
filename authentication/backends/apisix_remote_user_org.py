@@ -12,6 +12,7 @@ from mitol.apigateway.backends import ApisixRemoteUserBackend
 from mitol.common.utils.datetime import now_in_utc
 
 from b2b.api import reconcile_user_orgs
+from main.constants import B2B_USER_LAST_LOGIN_CACHE
 
 log = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class ApisixRemoteUserOrgBackend(ApisixRemoteUserBackend):
 
         user = super().configure_user(request, user, *args, created=created)
 
-        cache_key = f"user-last-login-time-{user.global_id}"
+        cache_key = B2B_USER_LAST_LOGIN_CACHE.format(user.global_id)
 
         if not request.session.get("login_time", False):
             login_time = now_in_utc().isoformat()

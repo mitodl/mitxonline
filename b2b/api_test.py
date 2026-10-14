@@ -11,7 +11,10 @@ import pytest
 import reversion
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
+from django.contrib.sessions.middleware import SessionMiddleware
+from django.core.cache import caches
 from django.core.exceptions import ValidationError
+from django.http import HttpResponse
 from django.test import RequestFactory
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
@@ -97,6 +100,8 @@ from ecommerce.models import (
     OrderStatus,
 )
 from main.constants import (
+    B2B_USER_LAST_LOGIN_CACHE,
+    B2B_USER_ORG_MEMBERSHIP_CACHE,
     USER_MSG_TYPE_B2B_DISALLOWED,
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
     USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED,
@@ -1061,6 +1066,83 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
     user.refresh_from_db()
     assert user.b2b_organizations.count() == 3
     assert user.b2b_organizations.filter(pk=weird_organization.id).exists()
+
+
+def test_reconcile_user_orgs_stale_session():
+    """
+    Test that the reconciliation is skipped if the user's session is older than
+    the last time things were reconciled.
+    """
+
+    user = UserFactory.create()
+    user_org_cache_key = B2B_USER_ORG_MEMBERSHIP_CACHE.format(user.global_id)
+    last_login_cache_key = B2B_USER_LAST_LOGIN_CACHE.format(user.global_id)
+
+    org_1, org_2 = OrganizationPageFactory.create_batch(2)
+    org_3 = OrganizationPageFactory.create(sso_organization_id=None)
+    user.b2b_organizations.add(org_3)
+
+    assert user.b2b_contracts.count() == 0
+    assert user.b2b_organizations.count() == 1
+
+    request = RequestFactory().get("/")
+    request.user = user
+    middleware = SessionMiddleware(lambda _: HttpResponse())
+    middleware.process_request(request)
+    request.session.save()
+
+    # In the past - adding a single org.
+    with freezegun.freeze_time(now_in_utc() - timedelta(minutes=30)):
+        faketime = now_in_utc().isoformat()
+
+    request.session["login_time"] = faketime
+    caches["redis"].set(last_login_cache_key, faketime)
+
+    added, removed = reconcile_user_orgs(
+        user, [str(org_1.sso_organization_id)], request=request
+    )
+
+    assert added == 1
+    assert removed == 0
+    assert caches["redis"].get(user_org_cache_key, False)
+    assert user.b2b_organizations.count() == 2
+
+    # Current time - adding another org. This should add one to the user.
+    faketime = now_in_utc().isoformat()
+
+    request.session["login_time"] = faketime
+    caches["redis"].set(last_login_cache_key, faketime)
+
+    added, removed = reconcile_user_orgs(
+        user,
+        [
+            str(org_1.sso_organization_id),
+            str(org_2.sso_organization_id),
+        ],
+        request=request,
+    )
+
+    assert added == 1
+    assert removed == 0
+    assert caches["redis"].get(user_org_cache_key, False)
+    assert user.b2b_organizations.count() == 3
+
+    # In the past again - this is the "you had a session open already" case
+    # Testing with zero orgs, but nothing should change.
+
+    with freezegun.freeze_time(now_in_utc() - timedelta(minutes=120)):
+        faketime = now_in_utc().isoformat()
+
+    request.session["login_time"] = faketime
+    # Not setting the cache here - this should only get set if the user is
+    # logging in fresh (session doesn't have a login_time in it)
+
+    added, removed = reconcile_user_orgs(user, [], request=request)
+
+    assert added == 0
+    assert removed == 0
+    assert caches["redis"].get(user_org_cache_key, False)
+    assert user.b2b_organizations.count() == 3
 
 
 @pytest.mark.parametrize(
