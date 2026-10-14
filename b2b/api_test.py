@@ -959,6 +959,8 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
     """Test that we can get a list of B2B orgs from somewhere and fix a user's associations."""
 
     user = UserFactory.create()
+    user_org_cache_key = B2B_USER_ORG_MEMBERSHIP_CACHE.format(user.global_id)
+
     organization_to_add = OrganizationPageFactory.create()
     organization_to_ignore = OrganizationPageFactory.create()
     organization_to_remove = OrganizationPageFactory.create()
@@ -970,8 +972,12 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
     # Step 1: pass in an org to a user that's not in anything
     # We should get back one addition, which is the org we're adding
 
+    caches["redis"].set(user_org_cache_key, [])
     added, removed = reconcile_user_orgs(
-        user, [organization_to_add.sso_organization_id]
+        user,
+        [
+            str(organization_to_add.sso_organization_id),
+        ],
     )
 
     assert added == 1
@@ -992,8 +998,12 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
 
     assert user.b2b_organizations.count() == 2
 
+    caches["redis"].set(user_org_cache_key, [])
     added, removed = reconcile_user_orgs(
-        user, [organization_to_add.sso_organization_id]
+        user,
+        [
+            str(organization_to_add.sso_organization_id),
+        ],
     )
 
     assert added == 0
@@ -1013,8 +1023,12 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
 
     assert user.b2b_organizations.count() == 2
 
+    caches["redis"].set(user_org_cache_key, [])
     added, removed = reconcile_user_orgs(
-        user, [organization_to_add.sso_organization_id]
+        user,
+        [
+            str(organization_to_add.sso_organization_id),
+        ],
     )
 
     assert added == 0
@@ -1028,11 +1042,12 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
 
     # Step 3.5: now reconcile with the remove org, we should clear the flag
 
+    caches["redis"].set(user_org_cache_key, [])
     added, removed = reconcile_user_orgs(
         user,
         [
-            organization_to_add.sso_organization_id,
-            organization_to_remove.sso_organization_id,
+            str(organization_to_add.sso_organization_id),
+            str(organization_to_remove.sso_organization_id),
         ],
     )
 
@@ -1052,11 +1067,12 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
         user=user, organization=weird_organization, keep_until_seen=False
     )
 
+    caches["redis"].set(user_org_cache_key, [])
     added, removed = reconcile_user_orgs(
         user,
         [
-            organization_to_add.sso_organization_id,
-            organization_to_remove.sso_organization_id,
+            str(organization_to_add.sso_organization_id),
+            str(organization_to_remove.sso_organization_id),
         ],
     )
 
