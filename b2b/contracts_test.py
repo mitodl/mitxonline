@@ -9,6 +9,7 @@ from b2b.constants import (
     CONTRACT_MEMBERSHIP_AUTO,
     CONTRACT_MEMBERSHIP_CODE,
     CONTRACT_MEMBERSHIP_MANAGED,
+    CONTRACT_SETUP_STATUS_COMPLETE,
     PROVISIONING_ACTION_CONTRACT_VARIANT_ADDED,
     PROVISIONING_ACTION_CONTRACT_VARIANT_UPDATED,
 )
@@ -19,6 +20,7 @@ from b2b.contracts import (
     ensure_default_variant,
     expected_enrollment_code_count,
     expire_unused_enrollment_codes,
+    get_contract_setup_status,
     get_contract_variant_coverage,
     remove_courseware_from_contract,
     update_contract_variant_set,
@@ -256,6 +258,60 @@ def test_variant_coverage():
         assert listed["contract_run"].language == language
     [listed] = coverage[2]["courses"]
     assert listed["has_source_run"] is False
+    assert listed["contract_run"] is None
+    assert [entry["unsupported_courses"] for entry in coverage] == [[], [], []]
+
+
+def test_variant_coverage_lists_courses_that_do_not_support_a_set():
+    """A contract course with no matching variant set of its own is unsupported."""
+
+    contract = ContractPageFactory.create()
+    course = _source_run().course
+    add_courseware_to_contract(contract, course)
+    add_contract_variant_set(contract, language="fr")
+
+    default, french = get_contract_variant_coverage(contract)
+
+    assert [listed["course"] for listed in default["courses"]] == [course]
+    assert default["unsupported_courses"] == []
+    assert french["courses"] == []
+    assert french["unsupported_courses"] == [{"course": course, "contract_run": None}]
+
+
+def test_variant_coverage_keeps_the_run_of_a_course_that_dropped_a_set():
+    """A course whose variant set was turned off still shows its contract run."""
+
+    contract = ContractPageFactory.create()
+    add_contract_variant_set(contract, language="fr")
+    course = _bilingual_source_course()
+    add_courseware_to_contract(contract, course)
+    french_run = contract.get_course_runs().get(language="fr")
+    course.possible_variant_sets.filter(language="fr").update(active=False)
+
+    french = get_contract_variant_coverage(contract)[1]
+
+    assert french["courses"] == []
+    assert french["unsupported_courses"] == [
+        {"course": course, "contract_run": french_run}
+    ]
+
+
+def test_setup_status_reports_variant_coverage_without_changing_status():
+    """A course missing a run for a variant set leaves the contract complete."""
+
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED, enrollment_fixed_price=None
+    )
+    add_courseware_to_contract(contract, _bilingual_source_course(), skip_edx=True)
+    french = add_contract_variant_set(contract, language="fr")
+
+    setup = get_contract_setup_status(contract)
+
+    assert setup["status"] == CONTRACT_SETUP_STATUS_COMPLETE
+    assert setup["variants"] == get_contract_variant_coverage(contract)
+    [listed] = setup["variants"][1]["courses"]
+    assert setup["variants"][1]["variant"] == french
+    assert listed["has_source_run"] is True
     assert listed["contract_run"] is None
 
 
