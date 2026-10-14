@@ -1357,7 +1357,7 @@ OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES = get_int(
 OPENEDX_COURSE_LIST_THROTTLE_WAIT_SECONDS = get_int(
     name="OPENEDX_COURSE_LIST_THROTTLE_WAIT_SECONDS",
     default=60,
-    description="Seconds to wait before retrying a rate-limited edX course list API request when edX sends no Retry-After header, and the longest wait allowed when it does",
+    description="Seconds to wait before retrying a rate-limited edX course list API request when edX doesn't say how long to wait, and the longest wait allowed when it does",
 )
 
 OPENEDX_COURSE_CLONE_MAX_RETRIES = get_int(

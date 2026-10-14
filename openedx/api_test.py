@@ -1095,9 +1095,10 @@ def test_get_edx_api_course_list_client(mocker, settings, has_client_credentials
     mock_resp.raise_for_status.side_effect = None
     mock_post = mocker.patch("openedx.api.requests.post", return_value=mock_resp)
 
-    course_list = get_edx_api_course_list_client()
+    course_list, using_jwt = get_edx_api_course_list_client()
 
     auth_header = course_list._requester.headers["Authorization"]  # noqa: SLF001
+    assert using_jwt is has_client_credentials
     if has_client_credentials:
         assert auth_header == "jwt a_jwt"
         assert mock_post.call_args.kwargs["data"] == {
@@ -1119,8 +1120,8 @@ def test_get_edx_api_course_list_client(mocker, settings, has_client_credentials
         ("http_503", logging.WARNING),
         ("connection_error", logging.WARNING),
         ("timeout", logging.WARNING),
-        ("missing_access_token", logging.WARNING),
-        ("invalid_json", logging.WARNING),
+        ("missing_access_token", logging.ERROR),
+        ("invalid_json", logging.ERROR),
     ],
 )
 def test_get_edx_api_course_list_client_falls_back_to_static_token(
@@ -1129,8 +1130,8 @@ def test_get_edx_api_course_list_client_falls_back_to_static_token(
     """
     If the client-credentials JWT can't be obtained, the course list client uses
     the static service worker token instead of failing. A 4xx from the token
-    endpoint means the app is set up wrong, so it's logged as an error; other
-    failures are logged as warnings. Neither log includes the client secret.
+    endpoint, or a response without a usable token, means the app is set up
+    wrong, so it's logged as an error; other failures are logged as warnings. Neither log includes the client secret.
     """
     settings.OPENEDX_API_BASE_URL = "http://example.com"
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "static_token"  # noqa: S105
@@ -1153,10 +1154,11 @@ def test_get_edx_api_course_list_client_falls_back_to_static_token(
         mock_resp.json.side_effect = ValueError
 
     with caplog.at_level(logging.WARNING, logger="openedx.api"):
-        course_list = get_edx_api_course_list_client()
+        course_list, using_jwt = get_edx_api_course_list_client()
 
     auth_header = course_list._requester.headers["Authorization"]  # noqa: SLF001
     assert auth_header == "Bearer static_token"
+    assert using_jwt is False
     (record,) = caplog.records
     assert record.levelno == expected_level
     assert record.exc_info is None
@@ -1171,8 +1173,9 @@ def test_get_edx_api_course_list_client_static_token_only(mocker, settings):
     settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET = "courses_client_secret"  # noqa: S105
     mock_post = mocker.patch("openedx.api.requests.post")
 
-    course_list = get_edx_api_course_list_client(use_jwt=False)
+    course_list, using_jwt = get_edx_api_course_list_client(use_jwt=False)
 
+    assert using_jwt is False
     auth_header = course_list._requester.headers["Authorization"]  # noqa: SLF001
     assert auth_header == "Bearer static_token"
     mock_post.assert_not_called()

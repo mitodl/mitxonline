@@ -983,7 +983,7 @@ def sync_course_runs(runs):
         are skipped and counted as neither success nor failure), and
         failure_count is the number of runs that errored while syncing.
     """
-    initial_client = api_client = get_edx_api_course_list_client()
+    api_client, using_jwt = get_edx_api_course_list_client()
 
     success_count = 0
     failure_count = 0
@@ -1000,9 +1000,13 @@ def sync_course_runs(runs):
     for start in range(0, len(valid_course_ids), COURSE_LIST_BATCH_SIZE):
         batch = valid_course_ids[start : start + COURSE_LIST_BATCH_SIZE]
         try:
-            api_client, course_details = _get_course_list_batch_with_fallback(
-                api_client, batch, can_fall_back=api_client is initial_client
-            )
+            try:
+                course_details = _get_course_list_batch(api_client, batch)
+            except HTTPError as e:
+                # Switch before refetching, so later batches use the static
+                # token whatever this refetch returns.
+                api_client, using_jwt = _static_client_if_jwt_rejected(e, using_jwt)
+                course_details = _get_course_list_batch(api_client, batch)
         except Exception:  # pylint: disable=broad-except
             failure_count += len(batch)
             failed_course_ids.update(batch)
@@ -1082,36 +1086,31 @@ def _get_course_list_batch(api_client, course_keys):
     raise AssertionError(msg)
 
 
-def _get_course_list_batch_with_fallback(api_client, course_keys, *, can_fall_back):
+def _static_client_if_jwt_rejected(error, using_jwt):
     """
-    Fetch one batch of course details. If edX rejects the client-credentials
-    JWT (401/403), e.g. because its app is owned by a non-staff user, switch to
-    the static service worker token and fetch the batch again.
+    Get the static service worker token's course list client if edX rejected
+    the client-credentials JWT (401/403), e.g. because its app is owned by a
+    non-staff user. Any other error is re-raised.
 
     Args:
-        api_client (CourseList): the edX course list client
-        course_keys (list of str): the course keys in this batch
-        can_fall_back (bool): whether to switch tokens on a 401/403
+        error (HTTPError): the error from fetching a batch of course details
+        using_jwt (bool): whether that fetch used the client-credentials JWT
 
     Returns:
-        tuple: (the course list client for later batches, the course details)
+        tuple: (CourseList, bool) the static token's client, and False
     """
-    try:
-        return api_client, _get_course_list_batch(api_client, course_keys)
-    except HTTPError as e:
-        if (
-            not can_fall_back
-            or e.response is None
-            or e.response.status_code not in (HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN)
-        ):
-            raise
-        log.error(  # noqa: TRY400
-            "Course list API rejected the client-credentials JWT (HTTP %s), "
-            "using the static service worker token instead",
-            e.response.status_code,
-        )
-    static_client = get_edx_api_course_list_client(use_jwt=False)
-    return static_client, _get_course_list_batch(static_client, course_keys)
+    if (
+        not using_jwt
+        or error.response is None
+        or error.response.status_code not in (HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN)
+    ):
+        raise error
+    log.error(
+        "Course list API rejected the client-credentials JWT (HTTP %s), "
+        "using the static service worker token instead",
+        error.response.status_code,
+    )
+    return get_edx_api_course_list_client(use_jwt=False)
 
 
 def _course_list_retry_wait_seconds(response):

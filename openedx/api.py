@@ -1196,7 +1196,8 @@ def get_edx_api_course_list_client(*, use_jwt=True):
         use_jwt (bool): False to skip the JWT and use the static token
 
     Returns:
-        CourseList: edx api course list client instance
+        tuple: (CourseList, bool) the edx api course list client instance, and
+        whether it uses the client-credentials JWT
     """
     if (
         use_jwt
@@ -1220,8 +1221,15 @@ def get_edx_api_course_list_client(*, use_jwt=True):
                 "(HTTP %s), using the static service worker token instead",
                 status_code,
             )
-        except (requests.RequestException, KeyError, ValueError) as e:
+        except (KeyError, ValueError) as e:
+            # A 200 without a usable token also means the app is set up wrong.
             # No exc_info, the traceback's frames hold the client secret.
+            log.error(  # noqa: TRY400
+                "Could not get a client-credentials JWT for the course list API "
+                "(%s), using the static service worker token instead",
+                type(e).__name__,
+            )
+        except requests.RequestException as e:
             log.warning(
                 "Could not get a client-credentials JWT for the course list API "
                 "(%s), using the static service worker token instead",
@@ -1233,9 +1241,9 @@ def get_edx_api_course_list_client(*, use_jwt=True):
             return CourseList(
                 edx_client.get_requester(token_type="jwt"),  # noqa: S106
                 edx_client.base_url,
-            )
+            ), True
     edx_client = get_edx_api_service_client()
-    return edx_client.course_list
+    return edx_client.course_list, False
 
 
 def get_edx_api_grades_client():
