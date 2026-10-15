@@ -12,7 +12,7 @@
   "cms/serializers.py:235:20:ORM001",
   "cms/serializers.py:246:39:ORM001",
   "cms/serializers.py:30:39:ORM006",
-  "cms/serializers.py:311:39:ORM006",
+  "cms/serializers.py:312:39:ORM006",
   "cms/serializers.py:80:4:ORM005",
   "courses/serializers/base.py:76:16:ORM001",
   "courses/serializers/v1/base.py:197:15:ORM004",

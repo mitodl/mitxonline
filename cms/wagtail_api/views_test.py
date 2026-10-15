@@ -1,10 +1,13 @@
 """Tests for Wagtail API views."""
 
+from datetime import date
+
 import pytest
 import wagtail_factories
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from freezegun import freeze_time
 from rest_framework.test import APIClient
 
 from cms.factories import CoursePageFactory, ProgramPageFactory
@@ -443,6 +446,65 @@ def test_course_page_detail_testimonials_empty_when_none_authored(user_drf_clien
     )
     assert resp.status_code == 200
     assert resp.json()["testimonials"] == []
+
+
+def test_testimonial_exposes_date_published(user_drf_client):
+    """A testimonial serializes date_published as an ISO date."""
+    page = CoursePageFactory.create()
+    ProductPageTestimonial.objects.create(
+        page=page,
+        quote="Dated quote.",
+        name="Erin",
+        date_published=date(2025, 3, 14),
+    )
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    assert resp.json()["testimonials"][0]["date_published"] == "2025-03-14"
+
+
+@freeze_time("2025-06-01")
+def test_testimonial_date_published_defaults_to_today(user_drf_client):
+    """An unset date_published falls back to today."""
+    page = CoursePageFactory.create()
+    ProductPageTestimonial.objects.create(page=page, quote="Undated.", name="Frank")
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    assert resp.json()["testimonials"][0]["date_published"] == "2025-06-01"
+
+
+@freeze_time("2025-06-01")
+def test_testimonial_date_published_restamped_by_pre_field_revision():
+    """
+    A revision saved before this field existed restamps the date on publish.
+
+    modelcluster builds child objects only from the keys present in the stored
+    revision JSON, so an absent date_published falls back to the model default
+    rather than raising on the NOT NULL column. Any stored date, including the
+    migration backfill, is overwritten with today.
+    """
+    page = CoursePageFactory.create()
+    testimonial = ProductPageTestimonial.objects.create(
+        page=page,
+        quote="Authored long ago.",
+        name="Grace",
+        date_published=date(2020, 1, 2),
+    )
+
+    revision = page.save_revision()
+    content = revision.content
+    for child in content["testimonials_list"]:
+        child.pop("date_published", None)
+    revision.content = content
+    revision.save()
+
+    revision.as_object().save()
+
+    testimonial.refresh_from_db()
+    assert testimonial.date_published == date(2025, 6, 1)
 
 
 def test_testimonial_image_src_null_without_image(user_drf_client):
