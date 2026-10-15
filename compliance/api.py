@@ -30,8 +30,10 @@ from mitol.common.utils.datetime import now_in_utc
 from nacl.encoding import Base64Encoder
 from nacl.public import PublicKey, SealedBox
 
-from compliance.constants import BILL_TO_FIELD_TO_PROFILE_FIELD
-from compliance.exceptions import ExportComplianceDataError
+from compliance.exceptions import (
+    BILL_TO_FIELD_TO_PROFILE_FIELD,
+    ExportComplianceDataError,
+)
 from compliance.models import ExportComplianceLog
 
 log = logging.getLogger(__name__)
