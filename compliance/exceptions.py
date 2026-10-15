@@ -91,7 +91,11 @@ class ExportComplianceDataError(ExportComplianceCheckError):
     @property
     def profile_fields(self) -> list[str]:
         """The profile field names (as in ``compliance_missing_fields``) to fix."""
-        return sorted({BILL_TO_FIELD_TO_PROFILE_FIELD[f] for f in self.missing_fields})
+        # A name outside the map passes through as-is rather than failing the
+        # error response that reports it.
+        return sorted(
+            {BILL_TO_FIELD_TO_PROFILE_FIELD.get(f, f) for f in self.missing_fields}
+        )
 
     def to_error_detail(self) -> dict:
         """Return a JSON-serializable representation of this error for API responses."""

@@ -1043,6 +1043,40 @@ def test_checkout_product_with_verified_program_enrollment_no_entitlement(
 
 
 @pytest.mark.dont_mock_enrollments
+@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
+def test_checkout_product_verified_program_shortcut_with_unusable_profile(
+    mocked_export_compliance, user, user_client
+):
+    """
+    When the learner's profile can't pass the export compliance check, the
+    verified-program shortcut errors rather than falling through to the cart,
+    where the course would be charged at full price.
+    """
+    program = ProgramFactory.create()
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        ProductFactory.create(purchasable_object=program)
+        ProductFactory.create(purchasable_object=course_run)
+    ProgramEnrollmentFactory.create(
+        program=program,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+    )
+    make_paid_program(user, program)
+    mocked_export_compliance.side_effect = ExportComplianceDataError(
+        user, ["last_name"]
+    )
+
+    with pytest.raises(ExportComplianceDataError):
+        user_client.get(
+            reverse("checkout-product"), {"course_id": course_run.courseware_id}
+        )
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
+
+
+@pytest.mark.dont_mock_enrollments
 def test_checkout_product_with_existing_verified_run_enrollment(user, user_client):
     """
     Verifies that /cart/add?course_id=? skips straight to the dashboard,

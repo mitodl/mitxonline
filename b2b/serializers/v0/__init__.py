@@ -173,9 +173,6 @@ class GenerateCheckoutPayloadSerializer(serializers.Serializer):
     country_blocked = serializers.BooleanField(
         default=False, allow_null=True, required=False
     )
-    profile_incomplete = serializers.BooleanField(
-        default=False, allow_null=True, required=False
-    )
     purchased_same_courserun = serializers.BooleanField(
         default=False, allow_null=True, required=False
     )

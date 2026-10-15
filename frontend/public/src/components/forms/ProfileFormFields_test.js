@@ -223,6 +223,25 @@ describe("ProfileFormFields", () => {
       })
       assert.deepEqual(shownFields(wrapper), ["legal_address.street_address_1"])
     })
+
+    it("still shows a rejected postal code outside US/CA", () => {
+      const wrapper = renderFields(
+        {
+          country:          "FR",
+          first_name:       "Test",
+          last_name:        "User",
+          street_address_1: "1 Rue",
+          city:             "Paris",
+          postal_code:      "_"
+        },
+        ["postal_code"]
+      )
+      assert.deepEqual(shownFields(wrapper), ["legal_address.postal_code"])
+      assert.equal(
+        wrapper.find("#postal_code-error").last().text(),
+        "Please enter a valid postal code."
+      )
+    })
   })
 
   describe("LegalAddressCountryFields", () => {
