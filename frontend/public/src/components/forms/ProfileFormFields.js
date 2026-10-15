@@ -221,7 +221,10 @@ export const LegalAddressCountryFields = ({
   values,
   rejectedFields = []
 }: LegalAddressProps & { rejectedFields?: Array<string> }) => {
-  const addressErrors = errors && errors.legal_address
+  const addressErrors = (errors && errors.legal_address) || {}
+  // Checkout rejected the field (e.g. a state CyberSource refused), and the
+  // form's own validation, which takes precedence, hasn't flagged it.
+  const rejected = name => rejectedFields.includes(name) && !addressErrors[name]
   const [showYearOfBirthField, setShowYearOfBirthField] = React.useState(
     values.user_profile.year_of_birth === ""
   )
@@ -272,10 +275,12 @@ export const LegalAddressCountryFields = ({
               name="legal_address.country"
               id="legal_address.country"
               aria-invalid={
-                addressErrors && addressErrors.country ? "true" : null
+                addressErrors.country || rejected("country") ? "true" : null
               }
               aria-describedby={
-                addressErrors && addressErrors.country ? "country-error" : null
+                addressErrors.country || rejected("country") ?
+                  "country-error" :
+                  null
               }
               className="form-control"
               autoComplete="country"
@@ -291,11 +296,17 @@ export const LegalAddressCountryFields = ({
                 )) :
                 null}
             </Field>
-            <ErrorMessage
-              id="country-error"
-              name="legal_address.country"
-              component={FormError}
-            />
+            {rejected("country") ? (
+              <FormError id="country-error">
+                Please enter a valid country.
+              </FormError>
+            ) : (
+              <ErrorMessage
+                id="country-error"
+                name="legal_address.country"
+                component={FormError}
+              />
+            )}
           </div>
           {findStates(values.legal_address.country, countries) ? (
             <div className="form-group">
@@ -309,10 +320,12 @@ export const LegalAddressCountryFields = ({
                 name="legal_address.state"
                 id="legal_address.state"
                 aria-invalid={
-                  addressErrors && addressErrors.state ? "true" : null
+                  addressErrors.state || rejected("state") ? "true" : null
                 }
                 aria-describedby={
-                  addressErrors && addressErrors.state ? "state-error" : null
+                  addressErrors.state || rejected("state") ?
+                    "state-error" :
+                    null
                 }
                 aria-description="The state, territory, or province where you live."
                 className="form-control"
@@ -331,11 +344,17 @@ export const LegalAddressCountryFields = ({
                   ) :
                   null}
               </Field>
-              <ErrorMessage
-                id="state-error"
-                name="legal_address.state"
-                component={FormError}
-              />
+              {rejected("state") ? (
+                <FormError id="state-error">
+                  Please enter a valid state.
+                </FormError>
+              ) : (
+                <ErrorMessage
+                  id="state-error"
+                  name="legal_address.state"
+                  component={FormError}
+                />
+              )}
             </div>
           ) : null}
         </div>
