@@ -133,6 +133,22 @@ def test_add_run_in_another_contract_leaves_existing():
     assert run.b2b_contracts.filter(id=contract.id).exists()
 
 
+@pytest.mark.parametrize("active", [True, False])
+def test_add_run_already_in_contract_is_skipped(active):
+    """
+    A run already in the contract is reported as such, whether or not the
+    contract is valid for use.
+    """
+
+    contract = ContractPageFactory.create(active=active)
+    run = CourseRunFactory.create(b2b_contract=contract)
+
+    added = add_courseware_to_contract(contract, run)
+
+    assert added.runs_added == 0
+    assert "already in this contract" in added.skipped_reason
+
+
 @pytest.mark.parametrize("has_enrollments", [True, False])
 def test_remove_course(has_enrollments):
     """

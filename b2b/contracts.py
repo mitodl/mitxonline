@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from mitol.common.utils import now_in_utc
 
 from b2b.api import create_contract_run
@@ -157,7 +157,8 @@ def add_courseware_to_contract(  # noqa: PLR0913
         )
 
     if courseware.is_run:
-        if courseware.b2b_contracts.filter(id=contract.id).exists():
+        holders = _run_holders(courseware)
+        if holders.filter(pk=contract.pk).exists():
             return CoursewareAddition(
                 skipped_reason=(
                     f"Run '{courseware.courseware_id}' is already in this contract."
@@ -180,6 +181,20 @@ def add_courseware_to_contract(  # noqa: PLR0913
     return CoursewareAddition(runs_added=len(created))
 
 
+def _run_holders(run: CourseRun) -> QuerySet[ContractPage]:
+    """
+    Return every contract that holds a run, oldest first.
+
+    Through ContractPage.objects, not run.b2b_contracts, so a contract that
+    isn't valid for use right now (e.g. one that hasn't started) counts.
+    """
+
+    holders = Q(course_runs=run)
+    if run.b2b_contract_id:
+        holders |= Q(pk=run.b2b_contract_id)
+    return ContractPage.objects.filter(holders).order_by("pk")
+
+
 def _unlink_shared_run(contract: ContractPage, run: CourseRun) -> bool | None:
     """
     Take a run that another contract also holds out of this contract.
@@ -192,17 +207,7 @@ def _unlink_shared_run(contract: ContractPage, run: CourseRun) -> bool | None:
     the run.
     """
 
-    # Through ContractPage.objects, not run.b2b_contracts, so a contract that
-    # isn't valid for use right now (e.g. one that hasn't started) counts.
-    holders = Q(course_runs=run)
-    if run.b2b_contract_id:
-        holders |= Q(pk=run.b2b_contract_id)
-    other_holder = (
-        ContractPage.objects.filter(holders)
-        .exclude(pk=contract.pk)
-        .order_by("pk")
-        .first()
-    )
+    other_holder = _run_holders(run).exclude(pk=contract.pk).first()
     if other_holder is None:
         return None
 
