@@ -1694,13 +1694,15 @@ def _get_or_create_contract_discount(
 
     applicable_discounts_qs = (
         product.discounts.annotate(
-            redemptions=Count("discount__order_redemptions"),
-            filter=Q(
-                order_redemptions__redeemed_order__state__in=[
-                    OrderStatus.FULFILLED,
-                    OrderStatus.REFUNDED,
-                    OrderStatus.PARTIALLY_REFUNDED,
-                ]
+            redemptions=Count(
+                "discount__order_redemptions",
+                filter=Q(
+                    discount__order_redemptions__redeemed_order__state__in=[
+                        OrderStatus.FULFILLED,
+                        OrderStatus.REFUNDED,
+                        OrderStatus.PARTIALLY_REFUNDED,
+                    ]
+                ),
             ),
         )
         .filter(
