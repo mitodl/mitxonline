@@ -117,10 +117,6 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-#: Support-facing code for a learner whose profile is missing (or has invalid
-#: values for) the fields required to run an export compliance check.
-MISSING_COMPLIANCE_DATA_CODE = ExportComplianceDataError.error_code
-
 UserEnrollments = namedtuple(  # noqa: PYI024
     "UserEnrollments",
     [
@@ -612,14 +608,9 @@ def check_enrollment_eligibility(user, courseware_object) -> EnrollmentEligibili
     """
     try:
         _verify_exports_compliance_for_enrollment(user, courseware_object)
-    except ExportComplianceError as exc:
+    except (ExportComplianceError, ExportComplianceDataError) as exc:
+        # CS_700 for a rejection; CS_701 for profile data the learner can fix.
         return EnrollmentEligibility(enrollable=False, reason_code=exc.error_code)
-    except ExportComplianceDataError:
-        # The user's profile is missing fields we need to even run the check.
-        # Distinct from a rejection: they can fix this themselves.
-        return EnrollmentEligibility(
-            enrollable=False, reason_code=MISSING_COMPLIANCE_DATA_CODE
-        )
     except ExportComplianceCheckError:
         # A compliance failure mode this endpoint has no code for yet. Fail
         # closed rather than 500, but do not invent a code for it.

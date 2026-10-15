@@ -23,8 +23,10 @@ from compliance.api import (
     log_export_compliance_check,
     verify_user_with_exports,
 )
-from compliance.constants import BILL_TO_FIELD_TO_PROFILE_FIELD
-from compliance.exceptions import ExportComplianceDataError
+from compliance.exceptions import (
+    BILL_TO_FIELD_TO_PROFILE_FIELD,
+    ExportComplianceDataError,
+)
 from compliance.factories import ExportComplianceLogFactory
 from compliance.models import ExportComplianceDecision, ExportComplianceLog
 from courses.factories import CourseRunFactory

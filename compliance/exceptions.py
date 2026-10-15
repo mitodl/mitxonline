@@ -1,6 +1,17 @@
 """Exceptions for the compliance app"""
 
-from compliance.constants import BILL_TO_FIELD_TO_PROFILE_FIELD
+# Maps CyberSource bill-to field names to the profile field names an API
+# consumer should show the user as missing.
+BILL_TO_FIELD_TO_PROFILE_FIELD = {
+    "first_name": "first_name",
+    "last_name": "last_name",
+    "email": "email",
+    "address1": "street_address_1",
+    "locality": "city",
+    "country": "country",
+    "administrative_area": "state",
+    "postal_code": "postal_code",
+}
 
 
 class ExportComplianceCheckError(Exception):
@@ -80,13 +91,7 @@ class ExportComplianceDataError(ExportComplianceCheckError):
     @property
     def profile_fields(self) -> list[str]:
         """The profile field names (as in ``compliance_missing_fields``) to fix."""
-        return sorted(
-            {
-                BILL_TO_FIELD_TO_PROFILE_FIELD[field]
-                for field in self.missing_fields
-                if field in BILL_TO_FIELD_TO_PROFILE_FIELD
-            }
-        )
+        return sorted({BILL_TO_FIELD_TO_PROFILE_FIELD[f] for f in self.missing_fields})
 
     def to_error_detail(self) -> dict:
         """Return a JSON-serializable representation of this error for API responses."""
