@@ -1815,7 +1815,9 @@ def apply_contract_discounts_to_basket(basket: Basket) -> list[BasketItem]:
         if not contract:
             continue
 
-        discount = _get_or_create_contract_discount(item.product, contract)
+        with transaction.atomic():
+            lock_contract_for_code_assignment(contract)
+            discount = _get_or_create_contract_discount(item.product, contract)
 
         if not basket.discounts.filter(redeemed_discount=discount).exists():
             apply_discount_to_basket(basket, discount)
