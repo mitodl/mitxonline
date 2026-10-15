@@ -191,7 +191,12 @@ def _validate_basket_steps_for_b2b(basket, request):
 
 
 def generate_checkout_payload(  # noqa: PLR0911, C901
-    request, *, skip_discount_check=False, skip_receipt=False, gateway_type=None
+    request,
+    *,
+    skip_discount_check=False,
+    skip_receipt=False,
+    gateway_type=None,
+    raise_compliance_data_errors=False,
 ):
     """
     Generate the checkout payload for the current basket.
@@ -209,6 +214,8 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
     - skip_discount_check: skip checking discounts for validity (default False)
     - skip_receipt: skip sending order receipt email (default False)
     - gateway_type: specify specific gateway type (default None)
+    - raise_compliance_data_errors: raise ExportComplianceDataError rather than
+      returning a profile_incomplete payload (default False)
     """
 
     basket = establish_basket(request)
@@ -227,6 +234,8 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
     try:
         has_blocked_products = basket.has_user_blocked_products(request.user)
     except ExportComplianceDataError as exc:
+        if raise_compliance_data_errors:
+            raise
         # The learner can fix this themselves, unlike a compliance denial.
         log.info(
             "Checkout blocked on incomplete profile for user=%s: missing %s",
@@ -236,6 +245,7 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
         return {
             "profile_incomplete": True,
             "error": USER_MSG_TYPE_PROFILE_INCOMPLETE,
+            "missing_fields": exc.profile_fields,
         }
 
     if has_blocked_products:
@@ -1681,7 +1691,10 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
         raise VerifiedProgramInvalidBasketError(msg)
 
     processed_order = generate_checkout_payload(
-        request, skip_discount_check=True, skip_receipt=True
+        request,
+        skip_discount_check=True,
+        skip_receipt=True,
+        raise_compliance_data_errors=True,
     )
 
     if "no_checkout" not in processed_order:

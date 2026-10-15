@@ -20,6 +20,7 @@ from reversion.models import Version
 from b2b.factories import ContractPageFactory
 from b2b.models import DiscountContractAttachmentRedemption
 from compliance.api import ExportComplianceResult
+from compliance.exceptions import ExportComplianceDataError
 from courses.factories import (
     BlockedCountryFactory,
     CourseRunEnrollmentFactory,
@@ -2158,6 +2159,22 @@ def test_has_user_blocked_products(mocker, blocked_country, compliance):
         blocked_country or compliance
     )
     mocked_compliance_check.assert_called_once_with(user, courserun)
+
+
+def test_has_user_blocked_products_with_invalid_profile_data(mocker):
+    """
+    A profile the compliance check can't use isn't a block - it raises, so the
+    caller can tell the user which fields to fix.
+    """
+    basket_item = BasketItemFactory.create()
+    user = basket_item.basket.user
+    mocker.patch(
+        "courses.api.verify_user_with_exports",
+        side_effect=ExportComplianceDataError(user, ["last_name"]),
+    )
+
+    with pytest.raises(ExportComplianceDataError):
+        basket_item.basket.has_user_blocked_products(user)
 
 
 def test_basket_get_products_contracts(user):
