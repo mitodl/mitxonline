@@ -541,6 +541,8 @@ def test_b2b_enroll_incomplete_profile(mocker, settings, mocked_export_complianc
     )
     user = UserFactory.create()
     user.b2b_contracts.add(contract)
+    # A country that doesn't require state/postal code, so only this is missing
+    user.legal_address.country = "GB"
     user.legal_address.street_address_1 = ""
     user.legal_address.save()
     client = APIClient()
@@ -704,6 +706,10 @@ def test_b2b_enroll_cybersource_invalid_request(mocker, settings):
     )
     user = UserFactory.create()
     user.b2b_contracts.add(contract)
+    # A country that doesn't require state/postal code, so the local checks pass
+    # and the request reaches the mocked CyberSource response
+    user.legal_address.country = "GB"
+    user.legal_address.save()
 
     client = APIClient()
     client.force_login(user)

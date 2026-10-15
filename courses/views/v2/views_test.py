@@ -2076,6 +2076,8 @@ def test_add_verified_program_course_enrollment_incomplete_profile(
                 object_id=courseware.id,
                 content_type=ContentType.objects.get_for_model(courseware),
             )
+    # A country that doesn't require state/postal code, so only this is missing
+    user.legal_address.country = "GB"
     user.legal_address.street_address_1 = ""
     user.legal_address.save()
 
