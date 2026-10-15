@@ -1,60 +1,44 @@
 """
-Views for Wagtail API Schema
+Schema-only views for the Wagtail pages API type filters.
+
+Wagtail serves every page type from a single endpoint, `/api/v2/pages/`,
+discriminated by a `?type=` query parameter. Clients rely on knowing the
+concrete response shape per type, which a single operation on the real
+path cannot express, so each type filter is published as its own
+operation keyed by the full query string.
+
+OpenAPI has no way to key an operation on a query string, so these are
+injected as extra endpoints by `openapi.hooks.insert_wagtail_pages_schema`
+rather than routed. Nothing dispatches to them at request time - the real
+viewset is `cms.wagtail_api.views.WagtailPagesAPIViewSet`, which serves
+`/api/v2/pages/` and `/api/v2/pages/{id}/`.
+
+Do not set `operation_id` here: the generated ids are derived from the
+path (e.g. `pages_?fields=*&type=cms.coursepage_retrieve`) and downstream
+generated clients are built against those names.
 """
 
-from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from main.versioning import SchemaOnlyV2Versioning
 
 from .serializers import (
     CertificatePageListSerializer,
     CoursePageListSerializer,
-    PageListSerializer,
     ProgramPageListSerializer,
 )
 
-
-class WagtailPagesSchemaView(APIView):
-    """
-    View for listing all Wagtail pages with schema documentation.
-    """
-
-    @extend_schema(
-        summary="List all Wagtail Pages",
-        description="Returns pages of all types",
-        operation_id="pages_list",
-        parameters=[
-            OpenApiParameter(
-                name="type",
-                required=False,
-                type=str,
-                description="Filter by Wagtail page type",
-            ),
-            OpenApiParameter(
-                name="fields",
-                required=False,
-                type=str,
-                description="Specify fields (e.g. `*`)",
-            ),
-        ],
-        responses=PageListSerializer,
-    )
-    def get(self, request, *args, **kwargs):  # noqa: ARG002
-        # You can return a dummy response or redirect to actual Wagtail logic
-        return Response(
-            {
-                "meta": {
-                    "total_count": 0,
-                },
-                "items": [],
-            }
-        )
+EMPTY_PAGE_LIST = {"meta": {"total_count": 0}, "items": []}
 
 
 class WagtailCertificatePagesSchemaView(APIView):
     """
-    View for listing all Certificate Pages with schema documentation.
+    Documents `/api/v2/pages/?fields=*&type=cms.certificatepage`.
     """
+
+    versioning_class = SchemaOnlyV2Versioning
 
     @extend_schema(
         summary="List all Certificate Pages",
@@ -62,21 +46,15 @@ class WagtailCertificatePagesSchemaView(APIView):
         responses=CertificatePageListSerializer,
     )
     def get(self, request, *args, **kwargs):  # noqa: ARG002
-        # You can return a dummy response or redirect to actual Wagtail logic
-        return Response(
-            {
-                "meta": {
-                    "total_count": 0,
-                },
-                "items": [],
-            }
-        )
+        return Response(EMPTY_PAGE_LIST)
 
 
 class WagtailCoursePagesSchemaView(APIView):
     """
-    View for listing all Course Pages with schema documentation.
+    Documents `/api/v2/pages/?fields=*&type=cms.coursepage`.
     """
+
+    versioning_class = SchemaOnlyV2Versioning
 
     @extend_schema(
         summary="List all Course Pages",
@@ -92,21 +70,15 @@ class WagtailCoursePagesSchemaView(APIView):
         ],
     )
     def get(self, request, *args, **kwargs):  # noqa: ARG002
-        # You can return a dummy response or redirect to actual Wagtail logic
-        return Response(
-            {
-                "meta": {
-                    "total_count": 0,
-                },
-                "items": [],
-            }
-        )
+        return Response(EMPTY_PAGE_LIST)
 
 
 class WagtailProgramPagesSchemaView(APIView):
     """
-    View for listing all Program Pages with schema documentation.
+    Documents `/api/v2/pages/?fields=*&type=cms.programpage`.
     """
+
+    versioning_class = SchemaOnlyV2Versioning
 
     @extend_schema(
         summary="List all Program Pages",
@@ -122,62 +94,4 @@ class WagtailProgramPagesSchemaView(APIView):
         ],
     )
     def get(self, request, *args, **kwargs):  # noqa: ARG002
-        # You can return a dummy response or redirect to actual Wagtail logic
-        return Response(
-            {
-                "meta": {
-                    "total_count": 0,
-                },
-                "items": [],
-            }
-        )
-
-
-class WagtailPagesRetrieveSchemaView(APIView):
-    """
-    View for retrieving details of a specific Wagtail page with schema documentation.
-    """
-
-    @extend_schema(
-        summary="Get Wagtail Page Details",
-        description="Returns details of a specific Wagtail page by ID",
-        operation_id="pages_retrieve",
-        parameters=[
-            OpenApiParameter(
-                name="id",
-                type=int,
-                location=OpenApiParameter.PATH,
-                required=True,
-                description="ID of the Wagtail page",
-            ),
-            OpenApiParameter(
-                name="revision_id",
-                required=False,
-                type=int,
-                description="Optional certificate revision ID to retrieve a specific revision of the certificate page",
-            ),
-        ],
-        responses={
-            200: OpenApiResponse(
-                response={
-                    "oneOf": [
-                        {"$ref": "#/components/schemas/CoursePageItem"},
-                        {"$ref": "#/components/schemas/ProgramPageItem"},
-                        {"$ref": "#/components/schemas/CertificatePage"},
-                        {"$ref": "#/components/schemas/Page"},
-                    ]
-                },
-                description="Returns a page of any known Wagtail page type",
-            )
-        },
-    )
-    def get(self, request, id, *args, **kwargs):  # noqa: ARG002, A002
-        return Response(
-            {
-                "id": id,
-                "title": "Sample Page",
-                "meta": {
-                    "total_count": 1,
-                },
-            }
-        )
+        return Response(EMPTY_PAGE_LIST)

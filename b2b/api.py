@@ -2154,7 +2154,9 @@ def reconcile_keycloak_orgs():
                     ).exists()
                 )
                 if linked:
-                    page.organization_users.update(keep_until_seen=True)
+                    page.organization_users.update(
+                        keep_until_seen=True, added_to_keycloak_at=None
+                    )
 
                 if created:
                     parent_org_page.add_child(instance=page)
@@ -2340,6 +2342,29 @@ def add_user_org_membership(org, user):
     return org_model.associate("members", org.sso_organization_id, user.global_id)
 
 
+def lock_contract_for_code_assignment(contract: ContractPage) -> None:
+    """
+    Serialize code assignment for a contract until the transaction ends.
+
+    Assigning checks which codes are free and then inserts assignment rows.
+    Locking the candidate discounts would not close that gap, because a
+    concurrent assignment inserts a redemption row and never updates the
+    discount, so Postgres has nothing to re-check. Holding the contract row
+    instead makes the second request wait and then read the first one's rows.
+    Only the contract's own table is locked, not the Wagtail page row.
+
+    FOR NO KEY UPDATE serializes callers of this against each other but does
+    not conflict with the key-share lock an insert referencing the contract
+    takes. A transaction may therefore take this after writing rows that
+    reference the contract without deadlocking another caller, and those
+    writes elsewhere don't wait on an assignment holding it.
+    """
+
+    ContractPage.objects.select_for_update(of=("self",), no_key=True).get(
+        pk=contract.pk
+    )
+
+
 def process_add_org_membership(user, organization, *, keep_until_seen=False):
     """
     Add a user to an org, and kick off contract processing.
@@ -2362,7 +2387,9 @@ def process_add_org_membership(user, organization, *, keep_until_seen=False):
         obj.keep_until_seen = keep_until_seen
         obj.save()
         try:
-            organization.attach_user(user)
+            if organization.attach_user(user):
+                obj.added_to_keycloak_at = now_in_utc()
+                obj.save(update_fields=["added_to_keycloak_at"])
         except ConnectionError:
             log.exception(
                 "Could not attach %s to Keycloak org for %s", user, organization

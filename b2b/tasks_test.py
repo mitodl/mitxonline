@@ -6,6 +6,7 @@ from b2b.api import create_contract_run_key
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.tasks import (
     create_program_contract_runs,
+    push_unconfirmed_org_members_to_keycloak,
     push_upgraded_enrollments_to_edx,
 )
 from courses.factories import (
@@ -360,6 +361,16 @@ def test_create_program_contract_runs_logging_output(mocker):
     assert final_call[0][3] == 1
     assert final_call[0][4] == 0
     assert final_call[0][5] == 0
+
+
+def test_push_unconfirmed_org_members_to_keycloak(mocker):
+    """The task runs the push."""
+
+    mocked_push = mocker.patch("b2b.provisioning.push_unconfirmed_members_to_keycloak")
+
+    push_unconfirmed_org_members_to_keycloak()
+
+    mocked_push.assert_called_once_with()
 
 
 def test_push_upgraded_enrollments_to_edx(mocker):

@@ -1065,6 +1065,13 @@ CELERY_BEAT_SCHEDULE = {
             offset=timedelta(seconds=KEYCLOAK_ORG_SYNC_OFFSET),
         ),
     },
+    "push-unconfirmed-org-members-to-keycloak": {
+        "task": "b2b.tasks.push_unconfirmed_org_members_to_keycloak",
+        "schedule": OffsettingSchedule(
+            run_every=timedelta(seconds=KEYCLOAK_ORG_SYNC_FREQUENCY),
+            offset=timedelta(seconds=KEYCLOAK_ORG_SYNC_OFFSET),
+        ),
+    },
     "clear-expired-tokens": {
         "task": "main.tasks.run_clear_tokens",
         "schedule": crontab(minute=0, hour=9, day_of_week=1),  # every week
@@ -1180,9 +1187,9 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "EXCEPTION_HANDLER": "main.exceptions.exception_handler",
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
-    "DEFAULT_VERSIONING": "rest_framework.versioning.NamespaceVersioning",
+    "DEFAULT_VERSIONING_CLASS": "main.versioning.FallbackNamespaceVersioning",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "ALLOWED_VERSIONS": ["v0", "v1", "v2"],
+    "ALLOWED_VERSIONS": ["v0", "v1", "v2", "v3"],
     "DEFAULT_THROTTLE_RATES": {
         "enrollment_eligibility": ENROLLMENT_ELIGIBILITY_THROTTLE_RATE,
     },

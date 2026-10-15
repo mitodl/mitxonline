@@ -3,6 +3,7 @@
 import logging
 
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.types import OpenApiTypes
@@ -19,7 +20,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_api_key.permissions import HasAPIKey
 
-from b2b.api import create_b2b_enrollment, process_add_org_membership
+from b2b.api import (
+    create_b2b_enrollment,
+    lock_contract_for_code_assignment,
+    process_add_org_membership,
+)
 from b2b.models import (
     ContractPage,
     ContractProgramItem,
@@ -40,6 +45,7 @@ from ecommerce.constants import REDEMPTION_TYPE_UNLIMITED
 from ecommerce.models import Discount, Product
 from main.authentication import CsrfExemptSessionAuthentication
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+from main.versioning import V0Versioning
 
 log = logging.getLogger(__name__)
 
@@ -48,6 +54,8 @@ class OrganizationPageViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Viewset for the OrganizationPage model.
     """
+
+    versioning_class = V0Versioning
 
     queryset = OrganizationPage.objects.prefetch_related(
         Prefetch(
@@ -73,6 +81,7 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
     Viewset for the ContractPage model.
     """
 
+    versioning_class = V0Versioning
     serializer_class = ContractPageSerializer
     permission_classes = [IsAdminUser | HasAPIKey]
     lookup_field = "slug"
@@ -146,6 +155,7 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
 class Enroll(APIView):
     """View for enrolling in a B2B course."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
@@ -190,6 +200,7 @@ class Enroll(APIView):
 class AttachContractApi(APIView):
     """View for attaching a user to a B2B contract."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAuthenticated]
     authentication_classes = [
         CsrfExemptSessionAuthentication,
@@ -367,12 +378,17 @@ class AttachContractApi(APIView):
                 user, contract.organization, keep_until_seen=True
             )
             user.b2b_contracts.add(contract)
-            DiscountContractAttachmentRedemption.objects.update_or_create(
-                discount=code,
-                contract=contract,
-                user=None,
-                defaults={"user": user, "redeemed_on": now_in_utc()},
-            )
+            # A code assignment in flight for this contract may be about to
+            # commit a row for this code. Without the lock the lookup here
+            # misses it and inserts a second row for the same code.
+            with transaction.atomic():
+                lock_contract_for_code_assignment(contract)
+                DiscountContractAttachmentRedemption.objects.update_or_create(
+                    discount=code,
+                    contract=contract,
+                    user=None,
+                    defaults={"user": user, "redeemed_on": now_in_utc()},
+                )
             contracts_attached = True
 
         user.save()
@@ -383,6 +399,7 @@ class AttachContractApi(APIView):
 class DataConsentAPI(APIView):
     """View for recording data consent for a user on a contract."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
