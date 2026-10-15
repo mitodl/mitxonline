@@ -298,9 +298,12 @@ that still holds the run.
 `variants/` lists the contract's variant sets, default first. Each set lists
 the contract's courses (from its runs and its programs) that support the same
 language, length and industry, whether each has a source run for it, and the
-contract's run for it if there is one. A course with a source run and no
-contract run gets one from `variants/sync/`, or the next time its courseware
-is added to the contract, as long as the set is active.
+contract's run for it if there is one. A course still in the contract with a
+source run and no contract run gets one from `variants/sync/`, or the next time
+its courseware is added to the contract, as long as the set is active. The list
+also shows a removed course whose closed run stays linked for its enrolled
+learners, and a course outside the contract's programs whose run in it isn't
+live. `variants/sync/` skips both.
 `POST` adds a set (`language`, `variant_length`, `variant_industry`,
 `b2b_only`). It never adds a default, since every contract already has one, and
 a set the contract already has, active or not, is a 400. Adding a set creates
