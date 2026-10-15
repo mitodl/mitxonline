@@ -1501,7 +1501,9 @@ def test_check_enrollment_eligibility_missing_profile_data(mocker, user):
     run = CourseRunFactory.create()
     mocker.patch(
         "courses.api.verify_user_with_exports",
-        side_effect=ExportComplianceDataError(user, ["postal_code", "administrative_area"]),
+        side_effect=ExportComplianceDataError(
+            user, ["postal_code", "administrative_area"]
+        ),
     )
 
     eligibility = check_enrollment_eligibility(user, run)

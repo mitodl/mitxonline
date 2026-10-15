@@ -923,7 +923,9 @@ class TestEnrollmentEligibility:
         courseware_object = self._courseware_object(kind)
         mocker.patch(
             "courses.api.verify_user_with_exports",
-            side_effect=ExportComplianceDataError(user, ["postal_code", "administrative_area"]),
+            side_effect=ExportComplianceDataError(
+                user, ["postal_code", "administrative_area"]
+            ),
         )
 
         resp = user_drf_client.post(endpoints[kind](courseware_object))
