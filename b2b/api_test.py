@@ -11,10 +11,8 @@ import pytest
 import reversion
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
-from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
-from django.http import HttpResponse
 from django.test import RequestFactory
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
@@ -100,7 +98,7 @@ from ecommerce.models import (
     OrderStatus,
 )
 from main.constants import (
-    B2B_USER_LAST_LOGIN_CACHE,
+    B2B_USER_LATEST_SESSION_CACHE,
     B2B_USER_ORG_MEMBERSHIP_CACHE,
     USER_MSG_TYPE_B2B_DISALLOWED,
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
@@ -972,7 +970,7 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
     # Step 1: pass in an org to a user that's not in anything
     # We should get back one addition, which is the org we're adding
 
-    caches["redis"].set(user_org_cache_key, [])
+    caches["redis"].delete(user_org_cache_key)
     added, removed = reconcile_user_orgs(
         user,
         [
@@ -998,7 +996,7 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
 
     assert user.b2b_organizations.count() == 2
 
-    caches["redis"].set(user_org_cache_key, [])
+    caches["redis"].delete(user_org_cache_key)
     added, removed = reconcile_user_orgs(
         user,
         [
@@ -1023,7 +1021,7 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
 
     assert user.b2b_organizations.count() == 2
 
-    caches["redis"].set(user_org_cache_key, [])
+    caches["redis"].delete(user_org_cache_key)
     added, removed = reconcile_user_orgs(
         user,
         [
@@ -1042,7 +1040,7 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
 
     # Step 3.5: now reconcile with the remove org, we should clear the flag
 
-    caches["redis"].set(user_org_cache_key, [])
+    caches["redis"].delete(user_org_cache_key)
     added, removed = reconcile_user_orgs(
         user,
         [
@@ -1067,7 +1065,7 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
         user=user, organization=weird_organization, keep_until_seen=False
     )
 
-    caches["redis"].set(user_org_cache_key, [])
+    caches["redis"].delete(user_org_cache_key)
     added, removed = reconcile_user_orgs(
         user,
         [
@@ -1084,81 +1082,94 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
     assert user.b2b_organizations.filter(pk=weird_organization.id).exists()
 
 
+def test_reconcile_user_orgs_empty_cache_is_a_hit(django_assert_num_queries):
+    """Test that a cached empty org list counts as a cache hit, not a miss."""
+
+    user = UserFactory.create()
+    user_org_cache_key = B2B_USER_ORG_MEMBERSHIP_CACHE.format(user.global_id)
+    caches["redis"].set(user_org_cache_key, [])
+
+    with django_assert_num_queries(0):
+        added, removed = reconcile_user_orgs(user, [])
+
+    assert added == 0
+    assert removed == 0
+
+    # A payload that doesn't match the cache still reconciles
+    org = OrganizationPageFactory.create()
+
+    added, removed = reconcile_user_orgs(user, [str(org.sso_organization_id)])
+
+    assert added == 1
+    assert caches["redis"].get(user_org_cache_key) == [
+        (str(org.sso_organization_id), True)
+    ]
+
+
 def test_reconcile_user_orgs_stale_session():
     """
-    Test that the reconciliation is skipped if the user's session is older than
-    the last time things were reconciled.
+    Test that reconciliation is skipped for a session that's older than the
+    newest one we've seen for the user.
     """
 
     user = UserFactory.create()
     user_org_cache_key = B2B_USER_ORG_MEMBERSHIP_CACHE.format(user.global_id)
-    last_login_cache_key = B2B_USER_LAST_LOGIN_CACHE.format(user.global_id)
+    latest_session_cache_key = B2B_USER_LATEST_SESSION_CACHE.format(user.global_id)
 
     org_1, org_2 = OrganizationPageFactory.create_batch(2)
     org_3 = OrganizationPageFactory.create(sso_organization_id=None)
     user.b2b_organizations.add(org_3)
 
-    assert user.b2b_contracts.count() == 0
     assert user.b2b_organizations.count() == 1
 
-    request = RequestFactory().get("/")
-    request.user = user
-    middleware = SessionMiddleware(lambda _: HttpResponse())
-    middleware.process_request(request)
-    request.session.save()
+    old_session = int((now_in_utc() - timedelta(minutes=120)).timestamp())
+    new_session = int(now_in_utc().timestamp())
 
-    # In the past - adding a single org.
-    with freezegun.freeze_time(now_in_utc() - timedelta(minutes=30)):
-        faketime = now_in_utc().isoformat()
-
-    request.session["login_time"] = faketime
-    caches["redis"].set(last_login_cache_key, faketime)
-
+    # Older session, first one we've seen - this should reconcile
     added, removed = reconcile_user_orgs(
-        user, [str(org_1.sso_organization_id)], request=request
+        user, [str(org_1.sso_organization_id)], session_auth_time=old_session
     )
 
     assert added == 1
     assert removed == 0
-    assert caches["redis"].get(user_org_cache_key, False)
+    assert caches["redis"].get(latest_session_cache_key) == old_session
     assert user.b2b_organizations.count() == 2
 
-    # Current time - adding another org. This should add one to the user.
-    faketime = now_in_utc().isoformat()
-
-    request.session["login_time"] = faketime
-    caches["redis"].set(last_login_cache_key, faketime)
-
+    # Newer session with another org - this should reconcile and move the mark
     added, removed = reconcile_user_orgs(
         user,
         [
             str(org_1.sso_organization_id),
             str(org_2.sso_organization_id),
         ],
-        request=request,
+        session_auth_time=new_session,
     )
 
     assert added == 1
     assert removed == 0
-    assert caches["redis"].get(user_org_cache_key, False)
+    assert caches["redis"].get(latest_session_cache_key) == new_session
     assert user.b2b_organizations.count() == 3
 
-    # In the past again - this is the "you had a session open already" case
-    # Testing with zero orgs, but nothing should change.
+    # The older session comes back with its stale (empty) org list. Nothing
+    # should change, even with the org membership cache cleared.
+    caches["redis"].delete(user_org_cache_key)
 
-    with freezegun.freeze_time(now_in_utc() - timedelta(minutes=120)):
-        faketime = now_in_utc().isoformat()
-
-    request.session["login_time"] = faketime
-    # Not setting the cache here - this should only get set if the user is
-    # logging in fresh (session doesn't have a login_time in it)
-
-    added, removed = reconcile_user_orgs(user, [], request=request)
+    added, removed = reconcile_user_orgs(user, [], session_auth_time=old_session)
 
     assert added == 0
     assert removed == 0
-    assert caches["redis"].get(user_org_cache_key, False)
+    assert caches["redis"].get(latest_session_cache_key) == new_session
     assert user.b2b_organizations.count() == 3
+
+    # A different user's sessions are tracked separately
+    other_user = UserFactory.create()
+
+    added, removed = reconcile_user_orgs(
+        other_user, [str(org_1.sso_organization_id)], session_auth_time=old_session
+    )
+
+    assert added == 1
+    assert other_user.b2b_organizations.count() == 1
 
 
 @pytest.mark.parametrize(

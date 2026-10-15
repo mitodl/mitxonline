@@ -1909,7 +1909,7 @@ def _enroll_in_program_for_b2b(
     )
 
 
-def reconcile_user_orgs(user, organizations, *, request=False):  # noqa: C901
+def reconcile_user_orgs(user, organizations, *, session_auth_time=None):
     """
     Reconcile the specified user with the provided organization list.
 
@@ -1936,6 +1936,12 @@ def reconcile_user_orgs(user, organizations, *, request=False):  # noqa: C901
     try to keep the query count low. The cache is a list of tuples of (org_uuid,
     not_expected_in_payload).
 
+    The user may have more than one APISIX session open, and each one carries
+    the org list from when it was created, so an older session can have stale
+    data. If session_auth_time is given, we keep the newest one we've seen for
+    the user in redis and skip reconciliation for any session older than that.
+    Otherwise, the older session would undo changes the newer one picked up.
+
     If the user is enrolled in any courses that are in a contract they'll be
     removed from, they will be left there. Not real sure what we should do in
     that case.
@@ -1943,6 +1949,8 @@ def reconcile_user_orgs(user, organizations, *, request=False):  # noqa: C901
     Args:
     - user (User): the user to work with
     - organizations (dict[str]): UUIDs of the organizations for the user
+    - session_auth_time (int|None): when the user authenticated for the session
+      the organizations came from (epoch seconds), if known
 
     Returns:
     - tuple(int, int); contracts added and contracts removed
@@ -1951,76 +1959,51 @@ def reconcile_user_orgs(user, organizations, *, request=False):  # noqa: C901
     user_org_cache_key = main_constants.B2B_USER_ORG_MEMBERSHIP_CACHE.format(
         user.global_id
     )
-    last_login_cache_key = main_constants.B2B_USER_LAST_LOGIN_CACHE.format(
-        user.global_id
-    )
 
-    cached_org_membership = caches["redis"].get(user_org_cache_key, False)
-    cached_login_time = caches["redis"].get(last_login_cache_key, False)
+    log.debug("reconcile_user_orgs: --> start - user %s", user.global_id)
 
-    my_login_time = request.session.get("login_time", False) if request else False
-
-    log.info(
-        "reconcile_user_orgs: --> start - user %s",
-        user.global_id,
-    )
-
-    if cached_org_membership is False:
-        log.info(
-            "reconcile_user_orgs: did not get a cache hit for key %s user %s",
-            user_org_cache_key,
-            user.id,
+    if session_auth_time is not None:
+        latest_session_cache_key = main_constants.B2B_USER_LATEST_SESSION_CACHE.format(
+            user.global_id
         )
+        latest_session_auth_time = caches["redis"].get(latest_session_cache_key)
 
-    if cached_login_time is False:
-        log.info(
-            "reconcile_user_orgs: did not get a cache hit for key %s user %s",
-            last_login_cache_key,
-            user.global_id,
-        )
-
-    if my_login_time is False:
-        log.info("reconcile_user_orgs: no last login time for user %s", user.global_id)
-
-    if request and not (cached_login_time and my_login_time):
-        log.info(
-            "reconcile_user_orgs: no login timestamps to compare, so can't trust this payload, skipping reconciliation"
-        )
-        return (
-            0,
-            0,
-        )
-    elif request:
-        cached_login_datetime = datetime.fromisoformat(cached_login_time)
-        my_login_datetime = datetime.fromisoformat(request.session.get("login_time"))
-
-        if my_login_datetime < cached_login_datetime:
-            log.info(
-                "reconcile_user_orgs: there's a newer session - ignoring reconciliation (%s vs %s)",
-                cached_login_time,
-                request.session.get("login_time"),
+        if (
+            latest_session_auth_time is not None
+            and session_auth_time < latest_session_auth_time
+        ):
+            log.debug(
+                "reconcile_user_orgs: there's a newer session for user %s - skipping reconciliation (%s vs %s)",
+                user.global_id,
+                session_auth_time,
+                latest_session_auth_time,
             )
-
             return (
                 0,
                 0,
             )
 
-        log.info(
-            "reconcile_user_orgs: we're the current session so proceed with reconcile (%s vs %s)",
-            cached_login_time,
-            request.session.get("login_time"),
+        # Refresh the timeout on every request so the mark doesn't expire out
+        # from under a session that's still in use.
+        caches["redis"].set(
+            latest_session_cache_key,
+            session_auth_time,
+            timeout=settings.B2B_USER_LATEST_SESSION_CACHE_TIMEOUT,
         )
 
-    if cached_org_membership:
-        log.info("reconcile_user_orgs: orgs passed: %s", ",".join(organizations))
-        log.info("reconcile_user_orgs: cached membership: %s", cached_org_membership)
+    cached_org_membership = caches["redis"].get(user_org_cache_key, False)
+
+    if cached_org_membership is not False:
+        log.debug("reconcile_user_orgs: orgs passed: %s", ",".join(organizations))
+        log.debug("reconcile_user_orgs: cached membership: %s", cached_org_membership)
         cached_expected_org_membership = [
-            str(org_id) for org_id, _ in cached_org_membership
+            str(org_id)
+            for org_id, not_expected_in_payload in cached_org_membership
+            if not_expected_in_payload
         ]
 
         if sorted(cached_expected_org_membership) == sorted(organizations):
-            log.info(
+            log.debug(
                 "reconcile_user_orgs: everything OK, skipping reconcilation for %s (cache %s - sent %s)",
                 user.id,
                 ",".join(cached_expected_org_membership),
@@ -2031,7 +2014,7 @@ def reconcile_user_orgs(user, organizations, *, request=False):  # noqa: C901
                 0,
             )
 
-    log.info("reconcile_user_orgs: running reconcilation for %s", user.id)
+    log.debug("reconcile_user_orgs: running reconcilation for %s", user.id)
 
     # we've checked the cached org membership, so now figure out what orgs
     # we're in but aren't in the list, and vice versa
@@ -2054,12 +2037,12 @@ def reconcile_user_orgs(user, organizations, *, request=False):  # noqa: C901
         )
 
         add_org.add_user_contracts(user)
-        log.info("reconcile_user_orgs: added user %s to org %s", user.id, add_org)
+        log.debug("reconcile_user_orgs: added user %s to org %s", user.id, add_org)
 
     for remove_org in orgs_to_remove:
         # remove org, remove contracts
         remove_org.organization.remove_user_contracts(user)
-        log.info(
+        log.debug(
             "reconcile_user_orgs: removed user %s from org %s", user.id, remove_org
         )
         remove_org.delete()
@@ -2076,7 +2059,7 @@ def reconcile_user_orgs(user, organizations, *, request=False):  # noqa: C901
 
     caches["redis"].set(user_org_cache_key, sorted(orgs))
 
-    log.info(
+    log.debug(
         "reconcile_user_orgs: set cache for key %s (user %s) to %s",
         user_org_cache_key,
         user.id,

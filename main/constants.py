@@ -73,5 +73,5 @@ ENV_TO_LEARN_HOSTNAME_MAP = {
 }
 
 # Redis cache key templates for B2B org reconciliation
-B2B_USER_ORG_MEMBERSHIP_CACHE = "org-membership-cache-%s"
-B2B_USER_LAST_LOGIN_CACHE = "user-last-login-time-%s"
+B2B_USER_ORG_MEMBERSHIP_CACHE = "org-membership-cache-{}"
+B2B_USER_LATEST_SESSION_CACHE = "user-latest-session-auth-time-{}"
