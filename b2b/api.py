@@ -89,6 +89,7 @@ from ecommerce.models import (
     Discount,
     DiscountProduct,
     Order,
+    OrderStatus,
     Product,
 )
 from hubspot_sync.task_helpers import sync_hubspot_cart_add
@@ -1692,7 +1693,16 @@ def _get_or_create_contract_discount(
     """
 
     applicable_discounts_qs = (
-        product.discounts.annotate(redemptions=Count("discount__order_redemptions"))
+        product.discounts.annotate(
+            redemptions=Count("discount__order_redemptions"),
+            filter=Q(
+                order_redemptions__redeemed_order__state__in=[
+                    OrderStatus.FULFILLED,
+                    OrderStatus.REFUNDED,
+                    OrderStatus.PARTIALLY_REFUNDED,
+                ]
+            ),
+        )
         .filter(
             discount__is_bulk=True,
             discount__products__product=product,
@@ -1708,9 +1718,8 @@ def _get_or_create_contract_discount(
         # We have unused codes for this product, so we should use one.
         return applicable_discounts_qs.first().discount
 
-    # At this point we've checked for available seats, and we've checked for
-    # an appropriate discount, and we couldn't find one, so now we need to
-    # make one for the learner (or for the contract).
+    # We've checked for an appropriate discount, and we couldn't find one, so
+    # now we need to make one for the learner (or for the contract).
 
     if (
         not product.purchasable_object
