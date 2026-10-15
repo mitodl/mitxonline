@@ -1,6 +1,22 @@
 Release Notes
 =============
 
+Version 1.170.0
+---------------
+
+- feat(scim): add --fill-only to remediate_keycloak_user_names (#3999)
+- fix: ask for missing profile fields at checkout instead of returning a 500 (#4136)
+- Update Django Zeal, add targeted suppressions for most new N+1 (#4126)
+- Add enrollment eligibility endpoints (#4020)
+
+Version 1.169.12
+----------------
+
+- Return display labels for variant industry and length (#4123)
+- Read credential metadata from the MIT Learn API (#4110)
+- Transfer audit and verified enrollments and sync with edx (#4116)
+- Show notifications on pages that hide header (including cart) (#4081)
+
 Version 1.169.11
 ----------------
 

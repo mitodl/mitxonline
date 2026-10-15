@@ -954,16 +954,21 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
         for contract in check_contracts:
             product_ids.update(contract.get_products().values_list("pk", flat=True))
 
-    # Validate that at least one discount applies to these products
+    # Validate that at least one discount applies to these products, and is
+    # a code for one of the basket's contracts. That can be a free contract
+    # the user is already in, which check_contracts leaves out.
     if product_ids:
         return basket.discounts.filter(
-            redeemed_discount__products__product__in=product_ids
+            redeemed_discount__b2b_contract__in=active_contracts,
+            redeemed_discount__products__product__in=product_ids,
         ).exists()
 
     return True  # No products to validate means valid
 
 
-def get_contract_runs_without_products(contract: ContractPage):
+def get_contract_runs_without_products(
+    contract: ContractPage, *, b2b_only=False, public_only=False
+):
     """
     Return a list of contract course runs that don't have products.
 
@@ -974,8 +979,10 @@ def get_contract_runs_without_products(contract: ContractPage):
     - QuerySet of runs without products.
     """
 
-    return contract.get_course_runs().exclude(
-        id__in=contract.get_products().values_list("object_id", flat=True)
+    return contract.get_course_runs(b2b_only=b2b_only, public_only=public_only).exclude(
+        id__in=contract.get_products(
+            b2b_only=b2b_only, public_only=public_only
+        ).values_list("object_id", flat=True)
     )
 
 
@@ -984,13 +991,15 @@ def get_contract_products_with_bad_pricing(contract: ContractPage):
     Return a list of products that don't have correct prices set.
 
     This is products that have a price but the contract price is 0 or not set,
-    or products that have prices that aren't the same as the contract.
+    or products that have prices that aren't the same as the contract. Only
+    considers products that are for B2B-only runs (public runs may/may not have
+    products that match up with the contract pricing).
 
     Returns:
     - QuerySet of products with invalid prices.
     """
 
-    products_qset = contract.get_products()
+    products_qset = contract.get_products(b2b_only=True)
 
     if (
         not contract.enrollment_fixed_price
@@ -1004,39 +1013,52 @@ def get_contract_products_with_bad_pricing(contract: ContractPage):
 def ensure_contract_run_products(contract: ContractPage) -> list[Product]:
     """Ensure the contract's course runs all have products."""
 
-    fixable_crs = get_contract_runs_without_products(contract)
+    fixable_crs = get_contract_runs_without_products(contract, b2b_only=True)
 
     if len(fixable_crs) == 0:
         return []
 
     content_type = ContentType.objects.get_for_model(CourseRun)
-    return [
-        Product.objects.create(
-            content_type=content_type,
-            object_id=run.id,
-            price=contract.enrollment_fixed_price
-            if contract.enrollment_fixed_price
-            else Decimal(0),
-            is_active=True,
-            description=run.courseware_id,
-        )
-        for run in fixable_crs
-    ]
+
+    with reversion.create_revision():
+        return [
+            Product.all_objects.update_or_create(
+                content_type=content_type,
+                object_id=run.id,
+                defaults={
+                    "price": contract.enrollment_fixed_price
+                    if contract.enrollment_fixed_price
+                    else Decimal(0),
+                    "description": run.courseware_id,
+                    "is_active": True,
+                },
+            )[0]
+            for run in fixable_crs
+        ]
 
 
 def ensure_contract_run_pricing(contract: ContractPage) -> int:
     """Ensure the contract runs are all priced correctly."""
 
     products = contract.get_products()
+    expected_price = (
+        contract.enrollment_fixed_price
+        if contract.enrollment_fixed_price
+        else Decimal(0)
+    )
+
+    updated_count = 0
 
     for product in products:
-        product.price = (
-            contract.enrollment_fixed_price
-            if contract.enrollment_fixed_price
-            else Decimal(0)
-        )
+        if product.purchasable_object.b2b_only and product.price != expected_price:
+            product.price = expected_price
 
-    return Product.objects.bulk_update(products, ["price"])
+            # This did do bulk_update, but that doesn't trigger version creation.
+            with reversion.create_revision():
+                product.save()
+                updated_count += 1
+
+    return updated_count
 
 
 def _get_discount_defaults(discount_amount: Decimal) -> dict:
@@ -1050,13 +1072,17 @@ def _get_discount_defaults(discount_amount: Decimal) -> dict:
 
 
 def _create_discount_with_product(
-    product: Product, discount_amount: Decimal, redemption_type: str
+    contract: ContractPage,
+    product: Product,
+    discount_amount: Decimal,
+    redemption_type: str,
 ) -> Discount:
-    """Create a discount and associate it with a product."""
+    """Create a discount for the contract and associate it with a product."""
     defaults = _get_discount_defaults(discount_amount)
     discount = Discount(
         discount_code=uuid4(),
         redemption_type=redemption_type,
+        b2b_contract=contract,
         **defaults,
     )
     discount.save()
@@ -1172,7 +1198,7 @@ def _handle_unlimited_seats(
 
     if len(product_discounts) == 0:
         discount = _create_discount_with_product(
-            product, discount_amount, REDEMPTION_TYPE_UNLIMITED
+            contract, product, discount_amount, REDEMPTION_TYPE_UNLIMITED
         )
         log.info(
             "Contract %s: Created unlimited discount %s for product %s",
@@ -1292,7 +1318,7 @@ def _handle_limited_seats(
 
     for _ in range(create_count):
         discount = _create_discount_with_product(
-            product, discount_amount, REDEMPTION_TYPE_ONE_TIME
+            contract, product, discount_amount, REDEMPTION_TYPE_ONE_TIME
         )
         created += 1
         log.info(
@@ -1354,7 +1380,7 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
             created, updated, errors = _handle_unlimited_seats(
                 contract,
                 product,
-                Discount.objects.filter(products__product=product).distinct(),
+                contract.get_discounts().filter(products__product=product).distinct(),
             )
         else:
             # Limited seats - multiple discounts per product
@@ -1661,7 +1687,11 @@ def _apply_available_discount(
     # so it matches what we send out to people.
     applicable_discounts_qs = (
         product.discounts.annotate(redemptions=Count("discount__order_redemptions"))
-        .filter(discount__is_bulk=True, discount__products__product=product)
+        .filter(
+            discount__is_bulk=True,
+            discount__products__product=product,
+            discount__b2b_contract=contract,
+        )
         .filter(
             Q(redemptions=0) | Q(discount__redemption_type=REDEMPTION_TYPE_UNLIMITED)
         )
@@ -1695,7 +1725,10 @@ def _apply_available_discount(
         log.error("B2B enroll: had to create a discount for %s", product)
 
         discount = _create_discount_with_product(
-            product, discount_amount if discount_amount else Decimal(0), redemption_type
+            contract,
+            product,
+            discount_amount if discount_amount else Decimal(0),
+            redemption_type,
         )
 
     basket_discount = BasketDiscount.objects.create(
@@ -2121,7 +2154,9 @@ def reconcile_keycloak_orgs():
                     ).exists()
                 )
                 if linked:
-                    page.organization_users.update(keep_until_seen=True)
+                    page.organization_users.update(
+                        keep_until_seen=True, added_to_keycloak_at=None
+                    )
 
                 if created:
                     parent_org_page.add_child(instance=page)
@@ -2307,6 +2342,29 @@ def add_user_org_membership(org, user):
     return org_model.associate("members", org.sso_organization_id, user.global_id)
 
 
+def lock_contract_for_code_assignment(contract: ContractPage) -> None:
+    """
+    Serialize code assignment for a contract until the transaction ends.
+
+    Assigning checks which codes are free and then inserts assignment rows.
+    Locking the candidate discounts would not close that gap, because a
+    concurrent assignment inserts a redemption row and never updates the
+    discount, so Postgres has nothing to re-check. Holding the contract row
+    instead makes the second request wait and then read the first one's rows.
+    Only the contract's own table is locked, not the Wagtail page row.
+
+    FOR NO KEY UPDATE serializes callers of this against each other but does
+    not conflict with the key-share lock an insert referencing the contract
+    takes. A transaction may therefore take this after writing rows that
+    reference the contract without deadlocking another caller, and those
+    writes elsewhere don't wait on an assignment holding it.
+    """
+
+    ContractPage.objects.select_for_update(of=("self",), no_key=True).get(
+        pk=contract.pk
+    )
+
+
 def process_add_org_membership(user, organization, *, keep_until_seen=False):
     """
     Add a user to an org, and kick off contract processing.
@@ -2329,7 +2387,9 @@ def process_add_org_membership(user, organization, *, keep_until_seen=False):
         obj.keep_until_seen = keep_until_seen
         obj.save()
         try:
-            organization.attach_user(user)
+            if organization.attach_user(user):
+                obj.added_to_keycloak_at = now_in_utc()
+                obj.save(update_fields=["added_to_keycloak_at"])
         except ConnectionError:
             log.exception(
                 "Could not attach %s to Keycloak org for %s", user, organization

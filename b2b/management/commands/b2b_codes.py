@@ -21,6 +21,7 @@ from b2b.api import (
     ensure_enrollment_codes_exist,
     get_contract_products_with_bad_pricing,
     get_contract_runs_without_products,
+    lock_contract_for_code_assignment,
 )
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
 from b2b.contracts import (
@@ -245,6 +246,184 @@ class Command(BaseCommand):
 
         return codes
 
+    def _validate_contract_products(self, contract, *, fix=False):
+        """Validate the products for the given contract."""
+
+        public_runs_no_products = get_contract_runs_without_products(
+            contract, public_only=True
+        )
+
+        if public_runs_no_products.count() > 0:
+            public_runs_no_product_keys = ", ".join(
+                [public_run.courseware_id for public_run in public_runs_no_products]
+            )
+            msg = f"Contract {contract} contains public course runs with no products (or no active products): {public_runs_no_product_keys}"
+            raise CommandError(msg)
+
+        if get_contract_runs_without_products(contract).count() > 0:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Contract {contract} has associated course runs that are missing products."
+                )
+            )
+
+            if fix:
+                new_products = ensure_contract_run_products(contract)
+
+                self.stdout.write(
+                    self.style.SUCCESS(f"Added {len(new_products)} products.")
+                )
+            else:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Dry-run: would have added {get_contract_runs_without_products(contract).count()} products."
+                    )
+                )
+
+        public_products = contract.get_products(public_only=True)
+
+        if public_products.count() > 0:
+            public_run_keys = [
+                public_product.purchasable_object.courseware_id
+                for public_product in public_products
+            ]
+            public_run_keys = ", ".join(public_run_keys)
+
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Contract {contract} has associated course runs and products that are public - will not update the price for these: {public_run_keys}"
+                )
+            )
+
+    def _validate_contract_pricing(self, contract, *, fix=False):
+        """Validate the contract product pricing"""
+
+        if get_contract_products_with_bad_pricing(contract).count() > 0:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Contract {contract} has course runs with products that have incorrect pricing."
+                )
+            )
+
+            if fix:
+                fixed_products = ensure_contract_run_pricing(contract)
+
+                self.stdout.write(
+                    self.style.SUCCESS(f"Updated {fixed_products} products.")
+                )
+            else:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Dry-run: would have updated {get_contract_products_with_bad_pricing(contract).count()} products."
+                    )
+                )
+
+    def _validate_contract_codes(self, contract, *, fix=False):
+        """Validate/update the enrollment codes for the contract"""
+
+        if (
+            contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS
+            and not contract.enrollment_fixed_price
+        ):
+            # This is a managed contract with no price - people are added to
+            # this automatically, so there shouldn't be any unredeemed codes.
+
+            # Step 4: remove any unused codes, since we shouldn't have any.
+            # There may be redeemed codes, because this contract may have
+            # changed types or prices at some point. Those are left alone.
+
+            total_codes = contract.get_discounts()
+            unredeemed_codes = contract.get_unused_discounts()
+
+            if total_codes.count() > unredeemed_codes.count():
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Contract {contract} has too many codes: {unredeemed_codes.count()} available out of {total_codes.count()} total, expecting 0."
+                    )
+                )
+
+                removed_codes = ",".join(
+                    [code.discount_code for code in unredeemed_codes]
+                )
+
+                # Remove unredeemed codes.
+                if fix:
+                    unredeemed_codes.delete()
+                    self.stdout.write(
+                        self.style.SUCCESS(f"Removed codes: {removed_codes}")
+                    )
+                else:
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"Dry-run: would have removed codes: {removed_codes}"
+                        )
+                    )
+        else:
+            # This contract requires enrollment codes. Check to make sure
+            # we have the proper amount and that they're set up correctly.
+
+            # Step 4: figure out what codes should be there
+
+            expected_amount = (
+                0
+                if not contract.enrollment_fixed_price
+                else contract.enrollment_fixed_price
+            )
+
+            expected_codes_count = expected_enrollment_code_count(contract)
+            code_redemption_type = (
+                REDEMPTION_TYPE_ONE_TIME
+                if contract.max_learners
+                else REDEMPTION_TYPE_UNLIMITED
+            )
+
+            total_code_count = contract.get_discounts().count()
+
+            self.stdout.write(
+                f"Found {total_code_count} enrollment codes, expected {expected_codes_count}"
+            )
+
+            if expected_codes_count != total_code_count:
+                # We either have too many or too few codes.
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Code count for {contract} is not what is expected: expected {expected_codes_count}, got {total_code_count}"
+                    )
+                )
+
+                if fix:
+                    ensure_enrollment_codes_exist(contract)
+
+            # Step 5: make sure the codes are the right type and amount
+
+            bad_settings_codes_qs = contract.get_discounts().exclude(
+                redemption_type=code_redemption_type, amount=expected_amount
+            )
+
+            if bad_settings_codes_qs.count() > 0:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Contract {contract} has {bad_settings_codes_qs.count()} codes with bad settings"
+                    )
+                )
+
+                bad_codes = bad_settings_codes_qs.all()
+
+                if fix:
+                    for code in bad_codes:
+                        code.redemption_type = code_redemption_type
+                        code.amount = expected_amount
+
+                    updated_count = Discount.objects.bulk_update(
+                        bad_codes, ["redemption_type", "amount"]
+                    )
+
+                    self.stdout.write(f"Updated {updated_count} codes.")
+                else:
+                    self.stdout.write(
+                        f"Dry-run: would have updated {bad_codes.count()} codes."
+                    )
+
     def handle_output(self, **kwargs):  # noqa: C901
         """Output code information."""
 
@@ -423,131 +602,19 @@ class Command(BaseCommand):
         """Validate and fix enrollment codes."""
 
         contracts = self._get_contract_list(**kwargs, allow_everything=False)
+        fix = kwargs.get("fix", False)
 
         for contract in contracts:
             self.stdout.write(f"Contract {contract} is type {contract.membership_type}")
 
             # Step 1: check for products for the associated course runs
-
-            if get_contract_runs_without_products(contract).count() > 0:
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"Contract {contract} has associated course runs that are missing products."
-                    )
-                )
-
-                new_products = ensure_contract_run_products(contract)
-
-                self.stdout.write(
-                    self.style.SUCCESS(f"Added {len(new_products)} products.")
-                )
+            self._validate_contract_products(contract, fix=fix)
 
             # Step 2: make sure the products have the right pricing
-
-            if get_contract_products_with_bad_pricing(contract).count() > 0:
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"Contract {contract} has course runs with products that have incorrect pricing."
-                    )
-                )
-
-                fixed_products = ensure_contract_run_pricing(contract)
-
-                self.stdout.write(
-                    self.style.SUCCESS(f"Updated {fixed_products} products.")
-                )
+            self._validate_contract_pricing(contract, fix=fix)
 
             # Step 3: check if the contract should have codes
-
-            if (
-                contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS
-                and not contract.enrollment_fixed_price
-            ):
-                # This is a managed contract with no price - people are added to
-                # this automatically, so there shouldn't be any unredeemed codes.
-
-                # Step 4: remove any unused codes, since we shouldn't have any.
-                # There may be redeemed codes, because this contract may have
-                # changed types or prices at some point. Those are left alone.
-
-                total_codes = contract.get_discounts()
-                unredeemed_codes = contract.get_unused_discounts()
-
-                if total_codes.count() > unredeemed_codes.count():
-                    self.stdout.write(
-                        self.style.WARNING(
-                            f"Contract {contract} has too many codes: {unredeemed_codes.count()} available out of {total_codes.count()} total, expecting 0."
-                        )
-                    )
-
-                    removed_codes = ",".join(
-                        [code.discount_code for code in unredeemed_codes]
-                    )
-
-                    # Remove unredeemed codes.
-                    unredeemed_codes.delete()
-                    self.stdout.write(
-                        self.style.SUCCESS(f"Removed codes: {removed_codes}")
-                    )
-            else:
-                # This contract requires enrollment codes. Check to make sure
-                # we have the proper amount and that they're set up correctly.
-
-                # Step 4: figure out what codes should be there
-
-                expected_amount = (
-                    0
-                    if not contract.enrollment_fixed_price
-                    else contract.enrollment_fixed_price
-                )
-
-                expected_codes_count = expected_enrollment_code_count(contract)
-                code_redemption_type = (
-                    REDEMPTION_TYPE_ONE_TIME
-                    if contract.max_learners
-                    else REDEMPTION_TYPE_UNLIMITED
-                )
-
-                total_code_count = contract.get_discounts().count()
-
-                self.stdout.write(
-                    f"Found {total_code_count} enrollment codes, expected {expected_codes_count}"
-                )
-
-                if expected_codes_count != total_code_count:
-                    # We either have too many or too few codes.
-                    self.stdout.write(
-                        self.style.WARNING(
-                            f"Code count for {contract} is not what is expected: expected {expected_codes_count}, got {total_code_count}"
-                        )
-                    )
-
-                    ensure_enrollment_codes_exist(contract)
-
-                # Step 5: make sure the codes are the right type and amount
-
-                bad_settings_codes_qs = contract.get_discounts().exclude(
-                    redemption_type=code_redemption_type, amount=expected_amount
-                )
-
-                if bad_settings_codes_qs.count() > 0:
-                    self.stdout.write(
-                        self.style.WARNING(
-                            f"Contract {contract} has {bad_settings_codes_qs.count()} codes with bad settings"
-                        )
-                    )
-
-                    bad_codes = bad_settings_codes_qs.all()
-
-                    for code in bad_codes:
-                        code.redemption_type = code_redemption_type
-                        code.amount = expected_amount
-
-                    updated_count = Discount.objects.bulk_update(
-                        bad_codes, ["redemption_type", "amount"]
-                    )
-
-                    self.stdout.write(f"Updated {updated_count} codes.")
+            self._validate_contract_codes(contract, fix=fix)
 
         self.stdout.write(self.style.SUCCESS(f"Checked {len(contracts)} contracts."))
 
@@ -678,48 +745,56 @@ class Command(BaseCommand):
                 )
                 continue
 
-            already_assigned = list(
-                contract.discounts_qs.filter(
-                    contract_redemptions__assigned_email__in=[a[0] for a in assignees]
-                ).values_list("contract_redemptions__assigned_email", flat=True)
-            )
+            # Held from the free-code check through the insert, so this can't
+            # pick a code that a manager's bulk assign is handing out.
+            with transaction.atomic():
+                lock_contract_for_code_assignment(contract)
 
-            if len(already_assigned) > 0:
-                already_done = " ".join(already_assigned)
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"{len(already_assigned)} codes already assigned to these users: {already_done}"
+                already_assigned = list(
+                    contract.discounts_qs.filter(
+                        contract_redemptions__assigned_email__in=[
+                            a[0] for a in assignees
+                        ]
+                    ).values_list("contract_redemptions__assigned_email", flat=True)
+                )
+
+                if len(already_assigned) > 0:
+                    already_done = " ".join(already_assigned)
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"{len(already_assigned)} codes already assigned to these users: {already_done}"
+                        )
+                    )
+
+                unused_codes = contract.get_unused_discounts().exclude(
+                    pk__in=contract.get_assignments().values_list(
+                        "discount_id", flat=True
                     )
                 )
 
-            unused_codes = contract.get_unused_discounts().exclude(
-                pk__in=contract.get_assignments().values_list("discount_id", flat=True)
-            )
+                if unused_codes.count() < len(assignees) - len(already_assigned):
+                    self.stderr.write(
+                        f"Not enough free codes for {len(assignees)} new assignee(s) in contract {contract.title} ({unused_codes.count()}), skipping"
+                    )
+                    continue
 
-            if unused_codes.count() < len(assignees) - len(already_assigned):
-                self.stderr.write(
-                    f"Not enough free codes for {len(assignees)} new assignee(s) in contract {contract.title} ({unused_codes.count()}), skipping"
-                )
-                continue
+                unused_codes = list(unused_codes)
 
-            unused_codes = list(unused_codes)
+                now = now_in_utc()
 
-            now = now_in_utc()
+                code_assignments = [
+                    DiscountContractAttachmentRedemption(
+                        contract=contract,
+                        assigned_name=a[1],
+                        assigned_email=a[0],
+                        created_on=now,
+                        discount=unused_codes.pop(),
+                    )
+                    for a in assignees
+                    if a[0] not in already_assigned
+                ]
 
-            code_assignments = [
-                DiscountContractAttachmentRedemption(
-                    contract=contract,
-                    assigned_name=a[1],
-                    assigned_email=a[0],
-                    created_on=now,
-                    discount=unused_codes.pop(),
-                )
-                for a in assignees
-                if a[0] not in already_assigned
-            ]
-
-            if not dry_run:
-                with transaction.atomic():
+                if not dry_run:
                     self.stdout.write(
                         f"Committing {len(code_assignments)} new assignments for {contract.title}"
                     )
