@@ -195,3 +195,10 @@ class EnrollmentEligibilitySerializer(serializers.Serializer):
             "information needed to run that check."
         ),
     )
+    missing_fields = serializers.ListField(
+        child=serializers.CharField(),
+        help_text=(
+            "With CS_701, the profile fields to fix: empty ones, or ones "
+            "CyberSource rejected as invalid."
+        ),
+    )

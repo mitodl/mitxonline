@@ -218,18 +218,22 @@ const renderYearOfBirthField = errors => {
 export const LegalAddressCountryFields = ({
   errors,
   countries,
-  values
-}: LegalAddressProps) => {
+  values,
+  rejectedFields = []
+}: LegalAddressProps & { rejectedFields?: Array<string> }) => {
   const addressErrors = errors && errors.legal_address
   const [showYearOfBirthField, setShowYearOfBirthField] = React.useState(
     values.user_profile.year_of_birth === ""
   )
-  // Show country field if country is not set, or if it's set to US or CA, and no state is selected
+  // Show country field if country is not set, or if it's set to US or CA, and no state is selected,
+  // or if checkout rejected the country or state
   const [showCountryField, setShowCountryField] = React.useState(
     values.legal_address.country === "" ||
       ((values.legal_address.country === "US" ||
         values.legal_address.country === "CA") &&
-        !values.legal_address.state)
+        !values.legal_address.state) ||
+      rejectedFields.includes("country") ||
+      rejectedFields.includes("state")
   )
 
   React.useEffect(() => {
@@ -377,14 +381,18 @@ const COMPLIANCE_TEXT_FIELDS = [
 /*
  * The legal address fields export compliance needs beyond country/state.
  * Only fields that were empty when the form opened are shown, so a field
- * doesn't disappear while the learner types into it.
+ * doesn't disappear while the learner types into it - plus any checkout
+ * rejected (rejectedFields: e.g. a last name CyberSource refused), which are
+ * flagged even though they're filled in.
  */
 export const LegalAddressComplianceFields = ({
   errors,
-  values
+  values,
+  rejectedFields = []
 }: {
   errors: Object,
-  values: Object
+  values: Object,
+  rejectedFields?: Array<string>
 }) => {
   const addressErrors = (errors && errors.legal_address) || {}
   const [emptyOnOpen] = React.useState(() =>
@@ -400,11 +408,15 @@ export const LegalAddressComplianceFields = ({
     <React.Fragment>
       {COMPLIANCE_TEXT_FIELDS.filter(
         field =>
-          emptyOnOpen.includes(field.name) &&
+          (emptyOnOpen.includes(field.name) ||
+            rejectedFields.includes(field.name)) &&
           (field.name !== "postal_code" || showsPostalCode)
       ).map(field => {
         const fieldName = `legal_address.${field.name}`
         const errorId = `${field.name}-error`
+        // The form's own validation error takes precedence over the rejection.
+        const rejected =
+          rejectedFields.includes(field.name) && !addressErrors[field.name]
         return (
           <div className="form-group" key={field.name}>
             <CardLabel
@@ -419,11 +431,25 @@ export const LegalAddressComplianceFields = ({
               className="form-control"
               autoComplete={field.autoComplete}
               maxLength={field.maxLength}
-              aria-invalid={addressErrors[field.name] ? "true" : null}
-              aria-describedby={addressErrors[field.name] ? errorId : null}
+              aria-invalid={
+                addressErrors[field.name] || rejected ? "true" : null
+              }
+              aria-describedby={
+                addressErrors[field.name] || rejected ? errorId : null
+              }
               required
             />
-            <ErrorMessage id={errorId} name={fieldName} component={FormError} />
+            {rejected ? (
+              <FormError id={errorId}>
+                Please enter a valid {field.label.toLowerCase()}.
+              </FormError>
+            ) : (
+              <ErrorMessage
+                id={errorId}
+                name={fieldName}
+                component={FormError}
+              />
+            )}
           </div>
         )
       })}

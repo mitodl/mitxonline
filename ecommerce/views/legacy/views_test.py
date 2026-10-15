@@ -1670,6 +1670,8 @@ def test_checkout_interstitial_incomplete_profile(
     """An incomplete legal address should send the learner back to the cart to fix it."""
     mocked_export_compliance.side_effect = verify_user_with_exports
     mocker.patch("compliance.api.get_cybersource_client")
+    # A country that doesn't require state/postal code, so only this is missing
+    user.legal_address.country = "GB"
     user.legal_address.street_address_1 = ""
     user.legal_address.save()
     create_basket_with_product(user, products[0])
@@ -1677,7 +1679,8 @@ def test_checkout_interstitial_incomplete_profile(
     resp = user_client.get(reverse("checkout_interstitial_page"))
 
     assert resp.status_code == 302
-    assert resp.url == reverse("cart")
+    # The cart opens its profile dialog on the fields named here.
+    assert resp.url == f"{reverse('cart')}?profile_incomplete=street_address_1"
     assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
         {"type": USER_MSG_TYPE_PROFILE_INCOMPLETE}
     )

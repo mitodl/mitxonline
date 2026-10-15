@@ -245,6 +245,7 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
         return {
             "profile_incomplete": True,
             "error": USER_MSG_TYPE_PROFILE_INCOMPLETE,
+            "missing_fields": exc.profile_fields,
         }
 
     if has_blocked_products:

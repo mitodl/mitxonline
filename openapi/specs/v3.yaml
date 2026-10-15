@@ -1202,8 +1202,15 @@ components:
           description: Null when enrollable. CS_700 when an export compliance check
             rejected the learner; CS_701 when their profile is missing the information
             needed to run that check.
+        missing_fields:
+          type: array
+          items:
+            type: string
+          description: 'With CS_701, the profile fields to fix: empty ones, or ones
+            CyberSource rejected as invalid.'
       required:
       - enrollable
+      - missing_fields
       - reason_code
     EnrollmentEligibilityNotFound:
       type: object

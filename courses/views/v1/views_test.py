@@ -887,7 +887,7 @@ def test_create_enrollments_export_compliance_missing_data(mocker, user_client, 
     when the export compliance check can't run due to incomplete profile data.
     """
     run = CourseRunFactory.create()
-    exc = ExportComplianceDataError(user, ["postal_code", "state"])
+    exc = ExportComplianceDataError(user, ["postal_code", "administrative_area"])
     mocker.patch(
         "courses.views.v1.create_run_enrollments",
         side_effect=exc,
