@@ -39,6 +39,7 @@ from rest_framework.viewsets import (
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.api import is_product_courserun, is_product_program
+from compliance.exceptions import ExportComplianceDataError
 from courses.models import (
     Course,
     CourseRun,
@@ -1060,7 +1061,7 @@ class CheckoutProductView(RedirectView):
 
         return super().get_redirect_url(*args, **kwargs)
 
-    def _enroll_via_verified_program(
+    def _enroll_via_verified_program(  # noqa: PLR0911
         self, product_ids, course_run_ids, courseware_ids, program_ids
     ):
         """
@@ -1118,6 +1119,10 @@ class CheckoutProductView(RedirectView):
             api.create_verified_program_course_run_enrollment(
                 self.request, run, program_enrollment.program
             )
+        except ExportComplianceDataError:
+            # Profile data the learner can fix: fall through to the cart, whose
+            # checkout sends them back to the profile dialog on those fields.
+            return None
         except (
             VerifiedProgramNoEnrollmentError,
             VerifiedProgramCourseNotInProgramError,

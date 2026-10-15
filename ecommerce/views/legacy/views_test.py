@@ -20,6 +20,7 @@ from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
 from compliance.api import verify_user_with_exports
+from compliance.exceptions import ExportComplianceDataError
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
@@ -987,6 +988,43 @@ def test_checkout_product_with_verified_program_enrollment(user, user_client):
     enrollment = CourseRunEnrollment.objects.get(user=user, run=course_run)
     assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
     assert not Basket.objects.filter(user=user).exists()
+
+
+@pytest.mark.dont_mock_enrollments
+@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
+def test_checkout_product_verified_program_shortcut_with_rejected_profile(
+    mocked_export_compliance, user, user_client
+):
+    """
+    The verified-program shortcut falls through to the cart when CyberSource
+    rejects the learner's profile data, so checkout can send them back to fix it.
+    """
+    program = ProgramFactory.create()
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        ProductFactory.create(purchasable_object=program)
+        product = ProductFactory.create(purchasable_object=course_run)
+    ProgramEnrollmentFactory.create(
+        program=program,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+    )
+    mocked_export_compliance.side_effect = ExportComplianceDataError(
+        user, ["last_name"]
+    )
+
+    resp = user_client.get(
+        reverse("checkout-product"), {"course_id": course_run.courseware_id}
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+    assert list(
+        Basket.objects.get(user=user).basket_items.values_list("product", flat=True)
+    ) == [product.id]
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
 
 
 @pytest.mark.dont_mock_enrollments

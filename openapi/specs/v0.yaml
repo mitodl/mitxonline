@@ -5843,10 +5843,6 @@ components:
           type: boolean
           nullable: true
           default: false
-        profile_incomplete:
-          type: boolean
-          nullable: true
-          default: false
         purchased_same_courserun:
           type: boolean
           nullable: true
