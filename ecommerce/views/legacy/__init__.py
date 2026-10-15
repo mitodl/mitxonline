@@ -4,6 +4,7 @@ MITxOnline ecommerce views
 
 import logging
 from distutils.util import strtobool  # noqa: F401
+from urllib.parse import urlencode
 
 import django_filters
 from django.conf import settings
@@ -1208,8 +1209,10 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
                 {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
             )
         if "profile_incomplete" in checkout_payload:
+            # The cart opens its profile dialog on these fields.
+            missing_fields = ",".join(checkout_payload["missing_fields"])
             return redirect_with_user_message(
-                reverse("cart"),
+                f"{reverse('cart')}?{urlencode({'profile_incomplete': missing_fields})}",
                 {"type": USER_MSG_TYPE_PROFILE_INCOMPLETE},
             )
         if "no_checkout" in checkout_payload:

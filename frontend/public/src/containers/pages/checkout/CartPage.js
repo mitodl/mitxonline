@@ -32,12 +32,13 @@ import {
 } from "../../../lib/queries/cart"
 import users, { currentUserSelector } from "../../../lib/queries/users"
 
-import type { RouterHistory } from "react-router"
+import type { Location, RouterHistory } from "react-router"
 import { isSuccessResponse } from "../../../lib/util"
 import { addUserNotification } from "../../../actions"
 
 type Props = {
   history: RouterHistory,
+  location?: Location,
   cartItems: Array<BasketItem>,
   totalPrice: number,
   discountedPrice: number,
@@ -56,10 +57,31 @@ type CartState = {
   checkoutUrl: string
 }
 
+/*
+ * Fields checkout sent the learner back to fix, e.g. a last name CyberSource
+ * refused: /checkout/to_payment redirects to /cart/?profile_incomplete=last_name.
+ */
+export const rejectedFieldsFromLocation = (
+  location: ?Location
+): Array<string> =>
+  (
+    new URLSearchParams(location ? location.search : "").get(
+      "profile_incomplete"
+    ) || ""
+  )
+    .split(",")
+    .filter(Boolean)
+
 export class CartPage extends React.Component<Props, CartState> {
   state = {
     discountCode: "",
     checkoutUrl:  ""
+  }
+
+  componentDidMount() {
+    if (rejectedFieldsFromLocation(this.props.location).length > 0) {
+      this.setState({ checkoutUrl: "/checkout/to_payment" })
+    }
   }
 
   handleCheckout(checkoutUrl: string) {
@@ -104,8 +126,9 @@ export class CartPage extends React.Component<Props, CartState> {
   closeComplianceModal = () => this.setState({ checkoutUrl: "" })
 
   renderComplianceInfoModal() {
-    const { currentUser, countries } = this.props
+    const { currentUser, countries, location } = this.props
     const { checkoutUrl } = this.state
+    const rejectedFields = rejectedFieldsFromLocation(location)
 
     if (!currentUser || !currentUser.is_authenticated) {
       return null
@@ -123,14 +146,16 @@ export class CartPage extends React.Component<Props, CartState> {
         </ModalHeader>
         <ModalBody>
           <p>
-            We need a few more details about you before you can place your
-            order.
+            {rejectedFields.length > 0 ?
+              "We couldn't verify some of your details. Please check the highlighted fields and try again." :
+              "We need a few more details about you before you can place your order."}
           </p>
           <AddlProfileFieldsForm
             onSubmit={this.saveProfile.bind(this)}
             user={currentUser}
             countries={countries}
             requireComplianceFields={true}
+            rejectedFields={rejectedFields}
           />
         </ModalBody>
       </Modal>
@@ -308,8 +333,9 @@ const mapDispatchToProps = {
 }
 
 // Countries are only needed by the profile modal.
-export const mapPropsToConfig = ({ currentUser }: Object) =>
-  needsComplianceInfo(currentUser) ?
+export const mapPropsToConfig = ({ currentUser, location }: Object) =>
+  needsComplianceInfo(currentUser) ||
+  rejectedFieldsFromLocation(location).length > 0 ?
     [cartQuery(), users.countriesQuery()] :
     [cartQuery()]
 

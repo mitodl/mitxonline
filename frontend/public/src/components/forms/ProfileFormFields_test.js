@@ -137,12 +137,16 @@ describe("ProfileFormFields", () => {
   })
 
   describe("LegalAddressComplianceFields", () => {
-    const renderFields = legalAddress => {
+    const renderFields = (legalAddress, rejectedFields) => {
       const values = { legal_address: legalAddress }
       return mount(
         <Formik initialValues={values} onSubmit={() => undefined}>
           {({ errors, values }) => (
-            <LegalAddressComplianceFields errors={errors} values={values} />
+            <LegalAddressComplianceFields
+              errors={errors}
+              values={values}
+              rejectedFields={rejectedFields}
+            />
           )}
         </Formik>
       )
@@ -164,6 +168,32 @@ describe("ProfileFormFields", () => {
         "legal_address.city",
         "legal_address.postal_code"
       ])
+    })
+
+    it("also shows and flags fields checkout rejected, even when filled in", () => {
+      const wrapper = renderFields(
+        {
+          country:          "US",
+          first_name:       "Test",
+          last_name:        ".",
+          street_address_1: "1 Main St",
+          city:             "",
+          postal_code:      "02139"
+        },
+        ["last_name"]
+      )
+
+      assert.deepEqual(shownFields(wrapper), [
+        "legal_address.last_name",
+        "legal_address.city"
+      ])
+      const lastName = wrapper.find('input[name="legal_address.last_name"]')
+      assert.equal(lastName.prop("aria-invalid"), "true")
+      assert.equal(lastName.prop("aria-describedby"), "last_name-error")
+      assert.equal(
+        wrapper.find("#last_name-error").last().text(),
+        "Please enter a valid last name."
+      )
     })
 
     it("limits each input to the length the server accepts", () => {

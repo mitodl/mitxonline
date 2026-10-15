@@ -963,7 +963,11 @@ class TestEnrollmentEligibility:
         resp = user_drf_client.post(endpoints[kind](courseware_object))
 
         assert resp.status_code == status.HTTP_200_OK
-        assert resp.json() == {"enrollable": True, "reason_code": None}
+        assert resp.json() == {
+            "enrollable": True,
+            "reason_code": None,
+            "missing_fields": [],
+        }
 
     @pytest.mark.parametrize("kind", ["run", "program"])
     def test_blocked_by_compliance(self, mocker, user_drf_client, endpoints, kind):
@@ -982,23 +986,31 @@ class TestEnrollmentEligibility:
         resp = user_drf_client.post(endpoints[kind](courseware_object))
 
         assert resp.status_code == status.HTTP_200_OK
-        assert resp.json() == {"enrollable": False, "reason_code": "CS_700"}
+        assert resp.json() == {
+            "enrollable": False,
+            "reason_code": "CS_700",
+            "missing_fields": [],
+        }
 
     @pytest.mark.parametrize("kind", ["run", "program"])
     def test_blocked_by_missing_profile_data(
         self, mocker, user, user_drf_client, endpoints, kind
     ):
-        """An incomplete profile reports CS_701, not CS_700."""
+        """An incomplete profile reports CS_701, not CS_700, and the fields to fix."""
         courseware_object = self._courseware_object(kind)
         mocker.patch(
             "courses.api.verify_user_with_exports",
-            side_effect=ExportComplianceDataError(user, ["postal_code", "state"]),
+            side_effect=ExportComplianceDataError(user, ["postal_code", "administrative_area"]),
         )
 
         resp = user_drf_client.post(endpoints[kind](courseware_object))
 
         assert resp.status_code == status.HTTP_200_OK
-        assert resp.json() == {"enrollable": False, "reason_code": "CS_701"}
+        assert resp.json() == {
+            "enrollable": False,
+            "reason_code": "CS_701",
+            "missing_fields": ["postal_code", "state"],
+        }
 
     @pytest.mark.parametrize("kind", ["run", "program"])
     def test_does_not_enroll(self, user, user_drf_client, endpoints, kind):
