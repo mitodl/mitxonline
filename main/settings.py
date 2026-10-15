@@ -342,6 +342,12 @@ ANONYMOUS_BASKET_CULL_AGE = get_int(
     description="Seconds of inactivity after which an anonymous (unclaimed) basket is deleted",
 )
 
+B2B_USER_LATEST_SESSION_CACHE_TIMEOUT = get_int(
+    name="B2B_USER_LATEST_SESSION_CACHE_TIMEOUT",
+    default=60 * 60 * 24 * 30,
+    description="Seconds to keep the auth time of a user's most recent APISIX session, used to skip org reconciliation for older sessions",
+)
+
 MITXONLINE_NEW_USER_LOGIN_URL = get_string(
     name="MITXONLINE_NEW_USER_LOGIN_URL",
     default="http://mitxonline.odl.local:8013/create-profile",

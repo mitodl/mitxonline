@@ -71,3 +71,7 @@ ENV_TO_LEARN_HOSTNAME_MAP = {
     "rc": "rc.learn.mit.edu",
     "ci": "ci.learn.mit.edu",
 }
+
+# Redis cache key templates for B2B org reconciliation
+B2B_USER_ORG_MEMBERSHIP_CACHE = "org-membership-cache-{}"
+B2B_USER_LATEST_SESSION_CACHE = "user-latest-session-auth-time-{}"

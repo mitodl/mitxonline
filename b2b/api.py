@@ -1909,7 +1909,7 @@ def _enroll_in_program_for_b2b(
     )
 
 
-def reconcile_user_orgs(user, organizations):
+def reconcile_user_orgs(user, organizations, *, session_auth_time=None):
     """
     Reconcile the specified user with the provided organization list.
 
@@ -1936,6 +1936,12 @@ def reconcile_user_orgs(user, organizations):
     try to keep the query count low. The cache is a list of tuples of (org_uuid,
     not_expected_in_payload).
 
+    The user may have more than one APISIX session open, and each one carries
+    the org list from when it was created, so an older session can have stale
+    data. If session_auth_time is given, we keep the newest one we've seen for
+    the user in redis and skip reconciliation for any session older than that.
+    Otherwise, the older session would undo changes the newer one picked up.
+
     If the user is enrolled in any courses that are in a contract they'll be
     removed from, they will be left there. Not real sure what we should do in
     that case.
@@ -1943,15 +1949,53 @@ def reconcile_user_orgs(user, organizations):
     Args:
     - user (User): the user to work with
     - organizations (dict[str]): UUIDs of the organizations for the user
+    - session_auth_time (int|None): when the user authenticated for the session
+      the organizations came from (epoch seconds), if known
 
     Returns:
     - tuple(int, int); contracts added and contracts removed
     """
 
-    user_org_cache_key = f"org-membership-cache-{user.id}"
+    user_org_cache_key = main_constants.B2B_USER_ORG_MEMBERSHIP_CACHE.format(
+        user.global_id
+    )
+
+    log.debug("reconcile_user_orgs: --> start - user %s", user.global_id)
+
+    if session_auth_time is not None:
+        latest_session_cache_key = main_constants.B2B_USER_LATEST_SESSION_CACHE.format(
+            user.global_id
+        )
+        latest_session_auth_time = caches["redis"].get(latest_session_cache_key)
+
+        if (
+            latest_session_auth_time is not None
+            and session_auth_time < latest_session_auth_time
+        ):
+            log.debug(
+                "reconcile_user_orgs: there's a newer session for user %s - skipping reconciliation (%s vs %s)",
+                user.global_id,
+                session_auth_time,
+                latest_session_auth_time,
+            )
+            return (
+                0,
+                0,
+            )
+
+        # Refresh the timeout on every request so the mark doesn't expire out
+        # from under a session that's still in use.
+        caches["redis"].set(
+            latest_session_cache_key,
+            session_auth_time,
+            timeout=settings.B2B_USER_LATEST_SESSION_CACHE_TIMEOUT,
+        )
+
     cached_org_membership = caches["redis"].get(user_org_cache_key, False)
 
-    if cached_org_membership:
+    if cached_org_membership is not False:
+        log.debug("reconcile_user_orgs: orgs passed: %s", ",".join(organizations))
+        log.debug("reconcile_user_orgs: cached membership: %s", cached_org_membership)
         cached_expected_org_membership = [
             str(org_id)
             for org_id, not_expected_in_payload in cached_org_membership
@@ -1959,16 +2003,18 @@ def reconcile_user_orgs(user, organizations):
         ]
 
         if sorted(cached_expected_org_membership) == sorted(organizations):
-            log.info(
-                "reconcile_user_orgs: everything OK, skipping reconcilation for %s",
+            log.debug(
+                "reconcile_user_orgs: everything OK, skipping reconcilation for %s (cache %s - sent %s)",
                 user.id,
+                ",".join(cached_expected_org_membership),
+                ",".join(organizations),
             )
             return (
                 0,
                 0,
             )
 
-    log.info("reconcile_user_orgs: running reconcilation for %s", user.id)
+    log.debug("reconcile_user_orgs: running reconcilation for %s", user.id)
 
     # we've checked the cached org membership, so now figure out what orgs
     # we're in but aren't in the list, and vice versa
@@ -1991,12 +2037,12 @@ def reconcile_user_orgs(user, organizations):
         )
 
         add_org.add_user_contracts(user)
-        log.info("reconcile_user_orgs: added user %s to org %s", user.id, add_org)
+        log.debug("reconcile_user_orgs: added user %s to org %s", user.id, add_org)
 
     for remove_org in orgs_to_remove:
         # remove org, remove contracts
         remove_org.organization.remove_user_contracts(user)
-        log.info(
+        log.debug(
             "reconcile_user_orgs: removed user %s from org %s", user.id, remove_org
         )
         remove_org.delete()
@@ -2011,8 +2057,14 @@ def reconcile_user_orgs(user, organizations):
         organization__sso_organization_id__in=organizations, keep_until_seen=True
     ).update(keep_until_seen=False)
 
-    user_org_cache_key = f"org-membership-cache-{user.id}"
     caches["redis"].set(user_org_cache_key, sorted(orgs))
+
+    log.debug(
+        "reconcile_user_orgs: set cache for key %s (user %s) to %s",
+        user_org_cache_key,
+        user.id,
+        ",".join([cachedata[0] for cachedata in sorted(orgs)]),
+    )
 
     return (len(orgs_to_add), len(orgs_to_remove))
 
