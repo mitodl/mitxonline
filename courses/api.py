@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import re
 import time
@@ -585,6 +586,7 @@ class EnrollmentEligibility:
 
     enrollable: bool
     reason_code: str | None = None
+    missing_fields: list[str] = dataclasses.field(default_factory=list)
 
 
 def check_enrollment_eligibility(user, courseware_object) -> EnrollmentEligibility:
@@ -609,8 +611,13 @@ def check_enrollment_eligibility(user, courseware_object) -> EnrollmentEligibili
     try:
         _verify_exports_compliance_for_enrollment(user, courseware_object)
     except (ExportComplianceError, ExportComplianceDataError) as exc:
-        # CS_700 for a rejection; CS_701 for profile data the learner can fix.
-        return EnrollmentEligibility(enrollable=False, reason_code=exc.error_code)
+        # CS_700 for a rejection; CS_701 for profile data the learner can fix,
+        # along with the profile fields to fix.
+        return EnrollmentEligibility(
+            enrollable=False,
+            reason_code=exc.error_code,
+            missing_fields=getattr(exc, "profile_fields", []),
+        )
     except ExportComplianceCheckError:
         # A compliance failure mode this endpoint has no code for yet. Fail
         # closed rather than 500, but do not invent a code for it.

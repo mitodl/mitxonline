@@ -139,6 +139,33 @@ describe("CartPage", () => {
       assert.notInclude(queryKeys(loggedInUser), "countries")
     })
 
+    it("loads countries when checkout sent the learner back with fields to fix", () => {
+      const queryKeys = mapPropsToConfig({
+        currentUser: loggedInUser,
+        location:    { search: "?profile_incomplete=state" }
+      }).map(config => config.queryKey)
+
+      assert.include(queryKeys, "countries")
+    })
+
+    it("opens the dialog on the fields checkout rejected", async () => {
+      const { inner } = await renderPage(
+        {},
+        { location: { search: "?profile_incomplete=last_name,postal_code" } }
+      )
+      inner.update()
+
+      assert.isTrue(inner.find("Modal").prop("isOpen"))
+      assert.deepEqual(
+        inner.find("AddlProfileFieldsForm").prop("rejectedFields"),
+        ["last_name", "postal_code"]
+      )
+      assert.include(
+        inner.find("ModalBody").find("p").text(),
+        "We couldn't verify some of your details."
+      )
+    })
+
     it("goes straight to checkout when nothing is missing", async () => {
       const { inner } = await renderPage()
       inner.find("OrderSummaryCard").prop("onCheckout")("/checkout/to_payment")
