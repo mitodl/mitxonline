@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 1.170.2
+---------------
+
+- Add a publication date to product page testimonials (#4137)
+- Fix OpenAPI spec partitioning (#4098)
+- chore(deps): move pytest-lazy-fixtures and datamodel-code-generator to dev (#4144)
+- Retry adding unconfirmed org members to Keycloak on a schedule (#4141)
+- Take the contract assignment lock in b2b_codes and in code redemption (#4096)
+- fix(docker): drop unused libcairo2-dev so the image runs on DHI Python (#4143)
+
 Version 1.170.1
 ---------------
 
