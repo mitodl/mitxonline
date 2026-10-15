@@ -1,4 +1,4 @@
-from django.db import migrations
+from django.db import migrations, models
 
 
 def backfill_b2b_contracts(apps, schema_editor):
@@ -41,13 +41,33 @@ def restore_b2b_contract(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("courses", "0109_add_manufacturing_variant"),
+        ("courses", "0110_program_tracks"),
+        ("ecommerce", "0058_backfill_discount_b2b_contract"),
     ]
 
     operations = [
         migrations.RunPython(backfill_b2b_contracts, restore_b2b_contract),
-        migrations.RemoveField(
-            model_name="courserun",
-            name="b2b_contract",
+        migrations.SeparateDatabaseAndState(
+            # The previous release still selects b2b_contract_id while pods roll,
+            # so the column stays; 0112 drops it once no deployed code reads it.
+            database_operations=[
+                # New code never clears this column, so a stale value would make
+                # deleting that contract fail on the FK constraint.
+                migrations.AlterField(
+                    model_name="courserun",
+                    name="b2b_contract",
+                    field=models.ForeignKey(
+                        "b2b.ContractPage",
+                        null=True,
+                        blank=True,
+                        on_delete=models.DO_NOTHING,
+                        related_name="+",
+                        db_constraint=False,
+                    ),
+                ),
+            ],
+            state_operations=[
+                migrations.RemoveField(model_name="courserun", name="b2b_contract"),
+            ],
         ),
     ]
