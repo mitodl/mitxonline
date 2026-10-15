@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from mitol.common.utils import now_in_utc
 
 from b2b.api import create_contract_run
@@ -157,7 +157,8 @@ def add_courseware_to_contract(  # noqa: PLR0913
         )
 
     if courseware.is_run:
-        if courseware.b2b_contracts.filter(id=contract.id).exists():
+        holders = _run_holders(courseware)
+        if holders.filter(pk=contract.pk).exists():
             return CoursewareAddition(
                 skipped_reason=(
                     f"Run '{courseware.courseware_id}' is already in this contract."
@@ -180,6 +181,50 @@ def add_courseware_to_contract(  # noqa: PLR0913
     return CoursewareAddition(runs_added=len(created))
 
 
+def _run_holders(run: CourseRun) -> QuerySet[ContractPage]:
+    """
+    Return every contract that holds a run, oldest first.
+
+    Through ContractPage.objects, not run.b2b_contracts, so a contract that
+    isn't valid for use right now (e.g. one that hasn't started) counts.
+    """
+
+    holders = Q(course_runs=run)
+    if run.b2b_contract_id:
+        holders |= Q(pk=run.b2b_contract_id)
+    return ContractPage.objects.filter(holders).order_by("pk")
+
+
+def _unlink_shared_run(contract: ContractPage, run: CourseRun) -> bool | None:
+    """
+    Take a run that another contract also holds out of this contract.
+
+    The run is not closed, because that would close it for the other
+    contract's learners too, and its products and codes are left alone. It is
+    unlinked unless this contract's learners are enrolled in it.
+
+    Returns True if the run was unlinked, or None if no other contract holds
+    the run.
+    """
+
+    other_holder = _run_holders(run).exclude(pk=contract.pk).first()
+    if other_holder is None:
+        return None
+
+    if CourseRunEnrollment.objects.filter(run=run, b2b_contract=contract).exists():
+        return False
+
+    if run.b2b_contract_id == contract.pk:
+        # Code that still reads the legacy FK (e.g. is_contract_order, the
+        # discount source run filter) takes a run without one for a
+        # non-contract run, so hand it to a contract that still holds the run.
+        run.b2b_contract = other_holder
+        run.save()
+    run.b2b_contracts.remove(contract)
+
+    return True
+
+
 def _remove_run_from_contract(contract: ContractPage, run: CourseRun) -> bool:
     """
     Close a contract run to new enrollments and take it out of the contract.
@@ -189,8 +234,15 @@ def _remove_run_from_contract(contract: ContractPage, run: CourseRun) -> bool:
     Enrollment codes left applying to no product, and never redeemed, are
     deleted.
 
+    A run that another contract also holds is only unlinked; see
+    _unlink_shared_run.
+
     Returns True if the run was unlinked.
     """
+
+    shared_unlinked = _unlink_shared_run(contract, run)
+    if shared_unlinked is not None:
+        return shared_unlinked
 
     unlinked = not CourseRunEnrollment.objects.filter(run=run).exists()
 
