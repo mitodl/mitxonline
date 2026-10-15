@@ -39,7 +39,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "1.169.9"
+VERSION = "1.170.1"
 
 log = logging.getLogger()
 
@@ -669,6 +669,15 @@ MIT_LEARN_BASE_URL = get_string(
     description="Base URL of the MIT Learn instance for this environment",
 )
 
+# MIT Learn's API is on a separate host, so MIT_LEARN_BASE_URL cannot be reused.
+# Defaults to empty: this setting is called rather than used to build links, and
+# an unconfigured deployment should make no outbound request at all.
+MIT_LEARN_API_BASE_URL = get_string(
+    name="MIT_LEARN_API_BASE_URL",
+    default="",
+    description="Base URL of the MIT Learn API",
+)
+
 MIT_LEARN_DASHBOARD_URL = get_string(
     name="MIT_LEARN_DASHBOARD_URL",
     default=f"{MIT_LEARN_BASE_URL}/dashboard",
@@ -1055,6 +1064,13 @@ CELERY_BEAT_SCHEDULE = {
             offset=timedelta(seconds=KEYCLOAK_ORG_SYNC_OFFSET),
         ),
     },
+    "push-unconfirmed-org-members-to-keycloak": {
+        "task": "b2b.tasks.push_unconfirmed_org_members_to_keycloak",
+        "schedule": OffsettingSchedule(
+            run_every=timedelta(seconds=KEYCLOAK_ORG_SYNC_FREQUENCY),
+            offset=timedelta(seconds=KEYCLOAK_ORG_SYNC_OFFSET),
+        ),
+    },
     "clear-expired-tokens": {
         "task": "main.tasks.run_clear_tokens",
         "schedule": crontab(minute=0, hour=9, day_of_week=1),  # every week
@@ -1152,6 +1168,15 @@ OAUTH2_PROVIDER = {
 
 SCIM_SERVICE_PROVIDER["USER_ADAPTER"] = "users.adapters.LearnUserAdapter"  # noqa: F405
 
+ENROLLMENT_ELIGIBILITY_THROTTLE_RATE = get_string(
+    name="ENROLLMENT_ELIGIBILITY_THROTTLE_RATE",
+    default="2/min",
+    description=(
+        "DRF throttle rate for the enrollment eligibility endpoints. A cache "
+        "miss there costs a live CyberSource export compliance call."
+    ),
+)
+
 # DRF configuration
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -1161,9 +1186,12 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "EXCEPTION_HANDLER": "main.exceptions.exception_handler",
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
-    "DEFAULT_VERSIONING": "rest_framework.versioning.NamespaceVersioning",
+    "DEFAULT_VERSIONING_CLASS": "main.versioning.FallbackNamespaceVersioning",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "ALLOWED_VERSIONS": ["v0", "v1", "v2"],
+    "ALLOWED_VERSIONS": ["v0", "v1", "v2", "v3"],
+    "DEFAULT_THROTTLE_RATES": {
+        "enrollment_eligibility": ENROLLMENT_ELIGIBILITY_THROTTLE_RATE,
+    },
     "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",)
     if not DEBUG
     else (
@@ -1316,6 +1344,17 @@ EDX_API_CLIENT_TIMEOUT = get_int(
     name="EDX_API_CLIENT_TIMEOUT",
     default=60,
     description="Timeout (in seconds) for requests made via the edX API client",
+)
+
+OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES = get_int(
+    name="OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES",
+    default=3,
+    description="How many times to retry a rate-limited (429) edX course list API request",
+)
+OPENEDX_COURSE_LIST_THROTTLE_WAIT_SECONDS = get_int(
+    name="OPENEDX_COURSE_LIST_THROTTLE_WAIT_SECONDS",
+    default=60,
+    description="Seconds to wait before retrying a rate-limited edX course list API request when edX doesn't say how long to wait, and the longest wait allowed when it does",
 )
 
 OPENEDX_COURSE_CLONE_MAX_RETRIES = get_int(

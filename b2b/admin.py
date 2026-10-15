@@ -392,7 +392,14 @@ class UserOrganizationAdmin(admin.ModelAdmin):
     list_display = ["user", "organization", "is_manager", "keep_until_seen"]
     list_filter = ["is_manager", "keep_until_seen", "organization"]
     search_fields = ["user__email", "user__username", "organization__name"]
-    fields = ["user", "organization", "is_manager", "keep_until_seen"]
+    fields = [
+        "user",
+        "organization",
+        "is_manager",
+        "keep_until_seen",
+        "added_to_keycloak_at",
+    ]
+    readonly_fields = ["added_to_keycloak_at"]
 
 
 @admin.register(OrganizationProvisioningAudit)

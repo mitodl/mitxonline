@@ -33,7 +33,8 @@ from authlib.integrations.base_client.errors import OAuthError
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from mitol.common.utils import now_in_utc
-from requests import HTTPError, RequestException
+from requests import ConnectionError as RequestsConnectionError
+from requests import HTTPError, RequestException, Timeout
 
 from b2b.constants import (
     IDP_ALLOWED_TRANSITIONS,
@@ -485,9 +486,11 @@ def link_organization_to_keycloak(organization, *, connection=None, actor=None):
             raise AliasCollisionError(msg)
 
     with transaction.atomic():
-        organization.organization_users.update(keep_until_seen=True)
+        organization.organization_users.update(
+            keep_until_seen=True, added_to_keycloak_at=None
+        )
         organization.sso_organization_id = sso_organization_id
-        organization.save()
+        organization.save(audit_sso_link=False)
         OrganizationOnboarding.objects.get_or_create(
             organization=organization,
             defaults={
@@ -513,19 +516,43 @@ def link_organization_to_keycloak(organization, *, connection=None, actor=None):
     return created, failed_members
 
 
-def sync_organization_members_to_keycloak(organization, *, connection):
+def _is_keycloak_outage(exc):
+    """Whether a failed write means Keycloak is unavailable, not that it refused one member."""
+
+    if isinstance(exc, HTTPError):
+        return (
+            exc.response is not None
+            and exc.response.status_code >= HTTPStatus.INTERNAL_SERVER_ERROR
+        )
+    return isinstance(exc, (RequestsConnectionError, Timeout, OAuthError))
+
+
+def sync_organization_members_to_keycloak(
+    organization, *, connection, stop_on_outage=False
+):
     """
-    Add the organization's MITx Online members to its Keycloak organization.
+    Add the organization's unconfirmed members to its Keycloak organization.
+
+    Only keep_until_seen members with no added_to_keycloak_at are pushed: the
+    ones MITx Online added itself and has not yet got into Keycloak. A member
+    without the flag was last confirmed by a token, and one with the timestamp
+    was accepted by Keycloak, so if Keycloak no longer has either they were
+    removed there, and pushing them would undo the removal.
 
     Args:
     - organization (OrganizationPage): a linked organization
     - connection (KeycloakConnection): the Keycloak connection to use
+    - stop_on_outage (bool): re-raise a connection error, timeout, 5xx or
+      token failure instead of trying the next member, each of whom would
+      wait out the same request timeout
     Returns:
     - list[User]: the members who could not be added
     """
 
     failed = []
-    for user_org in organization.organization_users.select_related("user"):
+    for user_org in organization.organization_users.filter(
+        keep_until_seen=True, added_to_keycloak_at__isnull=True
+    ).select_related("user"):
         user = user_org.user
         if not user.global_id:
             log.warning(
@@ -540,19 +567,73 @@ def sync_organization_members_to_keycloak(organization, *, connection):
                 "members", organization.sso_organization_id, user.global_id
             )
         except (RequestException, OAuthError) as exc:
+            if stop_on_outage and _is_keycloak_outage(exc):
+                raise
             # An adopted realm org may already have this member.
-            if (
+            already_member = (
                 isinstance(exc, HTTPError)
                 and exc.response is not None
                 and exc.response.status_code == HTTPStatus.CONFLICT
-            ):
-                continue
-            log.exception(
-                "Could not add %s to Keycloak organization %s",
-                user,
-                organization.org_key,
             )
-            failed.append(user)
+            if not already_member:
+                log.exception(
+                    "Could not add %s to Keycloak organization %s",
+                    user,
+                    organization.org_key,
+                )
+                failed.append(user)
+                continue
+        # An update, not a save: the membership may have been removed since
+        # the loop started, and saving a deleted row raises.
+        organization.organization_users.filter(pk=user_org.pk).update(
+            added_to_keycloak_at=now_in_utc()
+        )
+
+    return failed
+
+
+def push_unconfirmed_members_to_keycloak(connection=None):
+    """
+    Retry the Keycloak membership write for every unconfirmed member.
+
+    process_add_org_membership writes Keycloak once, when the membership is
+    created, and carries on if Keycloak answers with an HTTP error. Nothing
+    else retries it, so the member keeps access through keep_until_seen and
+    Keycloak never learns about them. This pushes those members again, along
+    with any whose row already existed. Each member is pushed until Keycloak
+    accepts them and no further, so removing them in Keycloak afterwards
+    sticks. The flag clears as usual, in reconcile_user_orgs, once the
+    organization shows up in the member's token.
+
+    If Keycloak is unavailable the run stops there, raising, and the next
+    scheduled run carries on from whoever is still unconfirmed.
+
+    Args:
+    - connection (KeycloakConnection): an existing connection, if any
+    Returns:
+    - dict[str, list[User]]: the members who could not be added, by org_key
+    """
+
+    organizations = OrganizationPage.objects.filter(
+        sso_organization_id__isnull=False,
+        organization_users__keep_until_seen=True,
+        organization_users__added_to_keycloak_at__isnull=True,
+    ).distinct()
+
+    failed = {}
+    for organization in organizations:
+        connection = connection or KeycloakConnection()
+        failed_members = sync_organization_members_to_keycloak(
+            organization, connection=connection, stop_on_outage=True
+        )
+        if failed_members:
+            failed[organization.org_key] = failed_members
+            log.warning(
+                "Could not add %s member(s) of %s to its Keycloak organization: %s",
+                len(failed_members),
+                organization.org_key,
+                [user.id for user in failed_members],
+            )
 
     return failed
 
@@ -1362,10 +1443,9 @@ def delete_identity_provider(identity_provider, *, connection=None, actor=None):
     """
 
     # Creation requires a provisioned organization, so this looks unreachable -
-    # but sso_organization_id is an editable panel on OrganizationPage
-    # (content_panels) and is nullable, so staff can blank it in the Wagtail
-    # admin after the IdP exists. Without the guard the unlink 502s and the IdP
-    # can never be deleted, with a message blaming Keycloak.
+    # but sso_organization_id is nullable and can be blanked outside the API
+    # after the IdP exists. Without the guard the unlink 502s and the IdP can
+    # never be deleted, with a message blaming Keycloak.
     connection = connection or KeycloakConnection()
 
     with transaction.atomic():

@@ -32,3 +32,22 @@ def test_clean_language():
         test_variant.clean_language()
 
     assert "Course language is invalid" in str(exc)
+
+
+@pytest.mark.parametrize(
+    ("variant_length", "variant_industry", "length_label", "industry_label"),
+    [
+        ("", "", "Full", "Original"),
+        ("S", "HC", "Short", "Healthcare"),
+        ("", "M", "Full", "Manufacturing"),
+    ],
+)
+def test_variant_labels(variant_length, variant_industry, length_label, industry_label):
+    """The variant label properties return the display names for the codes."""
+
+    run = CourseRunFactory.build(
+        variant_length=variant_length, variant_industry=variant_industry
+    )
+
+    assert run.variant_length_label == length_label
+    assert run.variant_industry_label == industry_label

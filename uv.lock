@@ -7,51 +7,51 @@ exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for 
 exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
+django-aqueduct = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+edx-sysadmin = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+edx-username-changer = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-apigateway = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-authentication = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-common = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-digitalcredentials = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-geoip = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 mitol-django-google-sheets = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-uai-content-customization = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-canvas-integration = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-concourse = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-olposthog = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-oauth-toolkit-extensions = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-social-auth = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-payment-gateway = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-ai-static-translations = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-google-sheets-deferrals = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 mitol-django-google-sheets-refunds = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-hubspot-api = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-mail = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-oauth-toolkit-extensions = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-observability = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-olposthog = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-openedx = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-payment-gateway = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-scim = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-transcoding = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-drf-lint = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-concourse = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-ai-static-translations = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-auto-select-language = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-canvas-integration = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-chat = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 ol-openedx-chat-xblock = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-checkout-external = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-course-export = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-course-outline-api = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-course-structure-api = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-course-sync = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-course-translations = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 ol-openedx-events-handler = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 ol-openedx-feedback = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-logging = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-rapid-response-reports = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-observability = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-authentication = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-lti-utilities = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-checkout-external = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-geoip = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 ol-openedx-git-auto-export = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-chat = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-hubspot-api = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-openedx-companion-auth = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-course-sync = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-digitalcredentials = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-common = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-sentry = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-rapid-response-xblock = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-mail = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-google-sheets-deferrals = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-course-translations = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-course-outline-api = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-transcoding = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-edx-username-changer = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-auto-select-language = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-apigateway = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-course-structure-api = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-drf-lint = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-django-aqueduct = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-logging = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-lti-utilities = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 ol-openedx-otel-monitoring = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-edx-sysadmin = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-ol-openedx-course-export = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-openedx = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-mitol-django-scim = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-rapid-response-reports = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-sentry = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-uai-content-customization = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-social-auth = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+openedx-companion-auth = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+rapid-response-xblock = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 
 [[package]]
 name = "alabaster"
@@ -1091,11 +1091,11 @@ wheels = [
 
 [[package]]
 name = "django-zeal"
-version = "2.0.4"
+version = "2.2.4"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/9b/51/c6997d7f4524002359f0e1a657504b9effe7d82ab90e0acea505ffda4582/django_zeal-2.0.4.tar.gz", hash = "sha256:934cd3968c1ede3f3ec5314c4da285ef4796f4b6de1f95870c5999370280e17e", size = 15479, upload-time = "2025-01-28T08:15:02.564Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3e/b5/d10702bcdb31f0746c014071277b4a59698effe608a2140f4d39a40de976/django_zeal-2.2.4.tar.gz", hash = "sha256:e5caedfc0092e877baa318af2146f3ba9c07104d122af4f900fcf9cc49f46e74", size = 21946, upload-time = "2026-08-28T16:48:41.682Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b1/6c/cfce455cea55e0ce9256e57164d2a92be111ec9886b89aec5af8e0959b9a/django_zeal-2.0.4-py3-none-any.whl", hash = "sha256:c37b0a7d203572d8eb8462a601f19dedfdf82324a25c7eb7273afdc52fc519fa", size = 12476, upload-time = "2025-01-28T08:15:00.742Z" },
+    { url = "https://files.pythonhosted.org/packages/4d/29/e4f2879c807693fdc04b8fd0fbfd1d5270f234ea73aaa00a3a53cb5c76f4/django_zeal-2.2.4-py3-none-any.whl", hash = "sha256:f5d424833450e47fcb000fe5cee7cc78be4952c36afbc47ed772375b90a727d8", size = 15758, upload-time = "2026-08-28T16:48:40.535Z" },
 ]
 
 [[package]]
@@ -2157,7 +2157,6 @@ dependencies = [
     { name = "celery" },
     { name = "celery-redbeat" },
     { name = "click" },
-    { name = "datamodel-code-generator", extra = ["http"] },
     { name = "deepdiff" },
     { name = "dj-database-url" },
     { name = "django" },
@@ -2212,7 +2211,6 @@ dependencies = [
     { name = "pynacl" },
     { name = "pyopenssl" },
     { name = "pyparsing" },
-    { name = "pytest-lazy-fixtures" },
     { name = "python-redis-lock" },
     { name = "redis" },
     { name = "requests" },
@@ -2234,6 +2232,7 @@ dependencies = [
 dev = [
     { name = "anys" },
     { name = "bpython" },
+    { name = "datamodel-code-generator", extra = ["http"] },
     { name = "ddt" },
     { name = "django-debug-toolbar" },
     { name = "django-zeal" },
@@ -2249,6 +2248,7 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-django" },
     { name = "pytest-env" },
+    { name = "pytest-lazy-fixtures" },
     { name = "pytest-mock" },
     { name = "pytest-split" },
     { name = "pytest-urllib3" },
@@ -2277,7 +2277,6 @@ requires-dist = [
     { name = "celery", specifier = ">=5.2.2,<6" },
     { name = "celery-redbeat", specifier = ">=2.0.0,<3" },
     { name = "click", specifier = ">=8.1,!=8.2.0" },
-    { name = "datamodel-code-generator", extras = ["http"], specifier = ">=0.72.4" },
     { name = "deepdiff", specifier = ">=8.0.0,<9" },
     { name = "dj-database-url", specifier = ">=0.5.0,<0.6" },
     { name = "django", specifier = ">=5.2,<5.3" },
@@ -2332,7 +2331,6 @@ requires-dist = [
     { name = "pynacl", specifier = ">=1.6.2" },
     { name = "pyopenssl", specifier = ">=26,<27" },
     { name = "pyparsing", specifier = ">=3.2,<4" },
-    { name = "pytest-lazy-fixtures", specifier = ">=1.1.4,<2" },
     { name = "python-redis-lock", specifier = ">=4.0.0,<5" },
     { name = "redis", specifier = ">=5.0.0,<6" },
     { name = "requests", specifier = ">=2.28.2,<3" },
@@ -2354,9 +2352,10 @@ requires-dist = [
 dev = [
     { name = "anys", specifier = ">=0.3.1,<0.4" },
     { name = "bpython", specifier = ">=0.26,<0.27" },
+    { name = "datamodel-code-generator", extras = ["http"], specifier = ">=0.72.4" },
     { name = "ddt", specifier = ">=1.6.0,<2" },
     { name = "django-debug-toolbar", specifier = ">=6.0.0,<7" },
-    { name = "django-zeal", specifier = ">=2.0.4,<3" },
+    { name = "django-zeal", specifier = ">=2.2.4,<3" },
     { name = "factory-boy", specifier = ">=3.2.0,<4" },
     { name = "faker", specifier = "<=40.15.0,>=40.15.0" },
     { name = "flaky", specifier = ">=3.7.0,<4" },
@@ -2369,6 +2368,7 @@ dev = [
     { name = "pytest-cov", specifier = ">=7.0.0,<8" },
     { name = "pytest-django", specifier = ">=4.5.2,<5" },
     { name = "pytest-env", specifier = ">=1.0.0,<2" },
+    { name = "pytest-lazy-fixtures", specifier = ">=1.1.4,<2" },
     { name = "pytest-mock", specifier = ">=3.11.1,<4" },
     { name = "pytest-split", specifier = ">=0.9,<1" },
     { name = "pytest-urllib3", specifier = ">=0.2.0" },

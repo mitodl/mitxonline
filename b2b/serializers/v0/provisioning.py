@@ -568,6 +568,12 @@ class ContractVariantSetSerializer(serializers.Serializer):
     language = serializers.CharField(source="variant.language")
     variant_length = serializers.CharField(source="variant.variant_length")
     variant_industry = serializers.CharField(source="variant.variant_industry")
+    variant_length_label = serializers.CharField(
+        source="variant.variant_length_label", read_only=True
+    )
+    variant_industry_label = serializers.CharField(
+        source="variant.variant_industry_label", read_only=True
+    )
     default_variant = serializers.BooleanField(source="variant.default_variant")
     active = serializers.BooleanField(source="variant.active")
     b2b_only = serializers.BooleanField(source="variant.b2b_only")

@@ -70,7 +70,6 @@ dependencies = [
     "mitol-django-google-sheets>=2025.6.13,<2026",
     "mitol-django-google-sheets-deferrals>=2025.3.17,<2026",
     "mitol-django-google-sheets-refunds>=2025.6.13,<2026",
-    "pytest-lazy-fixtures>=1.1.4,<2",
     "tabulate>=0.9.0,<0.10",
     "python-redis-lock>=4.0.0,<5",
     "django-object-actions>=5.0.0,<6",
@@ -84,7 +83,6 @@ dependencies = [
     "django-qp[drf]>=0.2.0",
     "pydantic>=2.13.4",
     "pynacl>=1.6.2",
-    "datamodel-code-generator[http]>=0.72.4",
     "pyjwt==2.14.0",
 ]
 
@@ -96,7 +94,7 @@ dev = [
     "bpython>=0.26,<0.27",
     "ddt>=1.6.0,<2",
     "django-debug-toolbar>=6.0.0,<7",
-    "django-zeal>=2.0.4,<3",
+    "django-zeal>=2.2.4,<3",
     "factory-boy>=3.2.0,<4",
     "faker>=40.15.0,<=40.15.0",
     "flaky>=3.7.0,<4",
@@ -106,6 +104,7 @@ dev = [
     "pytest-cov>=7.0.0,<8",
     "pytest-django>=4.5.2,<5",
     "pytest-env>=1.0.0,<2",
+    "pytest-lazy-fixtures>=1.1.4,<2",
     "pytest-mock>=3.11.1,<4",
     "responses>=0.26.0,<0.27",
     "ruff>=0.15,<0.16",
@@ -116,6 +115,7 @@ dev = [
     "pytest-urllib3>=0.2.0",
     "granian[reload]>=2.5.4,<3",
     "pytest-split>=0.9,<1",
+    "datamodel-code-generator[http]>=0.72.4",
 ]
 docs = [
     "insipid-sphinx-theme>=0.4.4,<0.5",
@@ -342,7 +342,6 @@ filterwarnings = [
     # factoryboy
     "ignore:.*\\._after_postgeneration will stop saving the instance after postgeneration hooks in the next major release",
     "ignore:authlib\\.jose module is deprecated, please use joserfc instead:authlib.deprecate.AuthlibDeprecationWarning",
-    "ignore:N+1 detected on",
     "ignore:Failed to load HostKeys"
 ]
 env = [
@@ -387,7 +386,8 @@ env = [
 ]
 markers = [
   "dont_mock_enrollments",
-  "skip_nplusone_check"
+  "skip_nplusone_check",
+  "zeal_allow(model, field): ignore one known N+1 (see fixtures/common.py check_nplusone)"
 ]
 pythonpath = ["."]
 

@@ -105,6 +105,7 @@ from b2b.views.v0.manager import (
     bulk_assign_enrollment_codes,
 )
 from courses.api import resolve_courseware_object_from_id
+from main.versioning import V0Versioning
 from main.views import RefinePagination
 
 log = logging.getLogger(__name__)
@@ -177,6 +178,7 @@ class OrganizationProvisioningViewSet(
 ):
     """Provision and inspect B2B organizations."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAdminUser]
     serializer_class = ProvisionedOrganizationSerializer
     lookup_field = "org_key"
@@ -369,6 +371,7 @@ class IdentityProviderProvisioningViewSet(
 ):
     """Provision and manage an organization's identity providers."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAdminUser]
     serializer_class = OrganizationIdentityProviderSerializer
     lookup_field = "alias"
@@ -558,6 +561,7 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
     the codes routes return redeemable enrollment codes.
     """
 
+    versioning_class = V0Versioning
     permission_classes = [IsAdminUser]
     serializer_class = ProvisionedContractSerializer
     pagination_class = ManagerContractOrgPagination
@@ -1009,6 +1013,7 @@ class ParseMetadataView(ProvisioningExceptionMixin, viewsets.ViewSet):
     needs an allowlist and a rate limit before it goes anywhere near a partner.
     """
 
+    versioning_class = V0Versioning
     permission_classes = [IsAdminUser]
 
     @extend_schema(

@@ -19,6 +19,7 @@ from rest_framework.test import APIClient
 from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
+from compliance.api import verify_user_with_exports
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
@@ -73,6 +74,7 @@ from main.constants import (
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+    USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 from main.settings import TIME_ZONE
 from main.test_utils import assert_drf_json_equal
@@ -512,6 +514,7 @@ def test_redeem_time_limited_discount(  # noqa: PLR0913
         assert "not found" in resp_json
 
 
+@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 def test_start_checkout_with_invalid_discounts(user, user_client, products, discounts):
     """
     Applies a discount, invalidates all the discounts, then hits the start
@@ -565,7 +568,7 @@ def test_start_checkout_with_discounts_and_b2b(
     product.refresh_from_db()
 
     if apply_discount:
-        discount = UnlimitedUseDiscountFactory.create(amount=1)
+        discount = UnlimitedUseDiscountFactory.create(amount=1, b2b_contract=contract)
         discount_product = DiscountProduct.objects.create(
             discount=discount, product=product
         )
@@ -952,6 +955,7 @@ def test_checkout_product_with_no_active_product_uses_cart(user, user_client):
 
 
 @pytest.mark.dont_mock_enrollments
+@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 def test_checkout_product_with_verified_program_enrollment(user, user_client):
     """
     Verifies that /cart/add?course_id=? skips the cart and redirects straight
@@ -1660,6 +1664,27 @@ def test_paid_and_unpaid_courserun_checkout(
 
 
 @pytest.mark.skip_nplusone_check
+def test_checkout_interstitial_incomplete_profile(
+    mocker, mocked_export_compliance, user, user_client, products
+):
+    """An incomplete legal address should send the learner back to the cart to fix it."""
+    mocked_export_compliance.side_effect = verify_user_with_exports
+    mocker.patch("compliance.api.get_cybersource_client")
+    user.legal_address.street_address_1 = ""
+    user.legal_address.save()
+    create_basket_with_product(user, products[0])
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_PROFILE_INCOMPLETE}
+    )
+    assert not PendingOrder.objects.filter(purchaser=user).exists()
+
+
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize(
     "decision, expected_state, basket_exists",  # noqa: PT006
     [
@@ -1977,6 +2002,7 @@ def test_bulk_discount_create(admin_drf_client, use_redemption_type_flags):
     assert discounts[0].is_bulk
 
 
+@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 def test_checkout_interstitial_google_analytics_object(
     mocker, settings, user, user_client, products
 ):
@@ -2007,6 +2033,7 @@ def test_checkout_interstitial_google_analytics_object(
         assert isinstance(item["quantity"], int)
 
 
+@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 def test_checkout_interstitial_no_ga_flag_without_global_id(
     mocker, settings, user_client, products
 ):
