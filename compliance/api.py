@@ -10,15 +10,13 @@ from datetime import timedelta
 from typing import Any
 from uuid import uuid4
 
+from CyberSource import RiskV1DecisionsPost201ResponseClientReferenceInformation
 from CyberSource.api.verification_api import VerificationApi
 from CyberSource.models.riskv1exportcomplianceinquiries_order_information import (
     Riskv1exportcomplianceinquiriesOrderInformation,
 )
 from CyberSource.models.riskv1exportcomplianceinquiries_order_information_bill_to import (
     Riskv1exportcomplianceinquiriesOrderInformationBillTo,
-)
-from CyberSource.models.riskv1liststypeentries_client_reference_information import (
-    Riskv1liststypeentriesClientReferenceInformation,
 )
 from CyberSource.models.validate_export_compliance_request import (
     ValidateExportComplianceRequest,
@@ -214,7 +212,8 @@ def _build_export_payload(user) -> Any:
     _validate_bill_to_fields(user, bill_to)
 
     return ValidateExportComplianceRequest(
-        client_reference_information=Riskv1liststypeentriesClientReferenceInformation(
+        # This is what the swagger type def requests in ValidateExportComplianceRequest
+        client_reference_information=RiskV1DecisionsPost201ResponseClientReferenceInformation(
             code=str(uuid4())
         ),
         order_information=Riskv1exportcomplianceinquiriesOrderInformation(

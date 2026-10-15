@@ -7,11 +7,10 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
 from mail import api
-from mail.constants import EMAIL_PW_RESET, EMAIL_VERIFICATION
+from mail.constants import EMAIL_VERIFICATION
 from mail.forms import EmailDebuggerForm
 
 EMAIL_DEBUG_EXTRA_CONTEXT = {
-    EMAIL_PW_RESET: {"uid": "abc-def", "token": "abc-def"},
     EMAIL_VERIFICATION: {"confirmation_url": "http://www.example.com/confirm/url"},
 }
 
