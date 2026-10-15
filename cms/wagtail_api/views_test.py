@@ -7,7 +7,7 @@ import wagtail_factories
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
-from django.utils import timezone
+from freezegun import freeze_time
 from rest_framework.test import APIClient
 
 from cms.factories import CoursePageFactory, ProgramPageFactory
@@ -464,6 +464,7 @@ def test_testimonial_exposes_date_published(user_drf_client):
     assert resp.json()["testimonials"][0]["date_published"] == "2025-03-14"
 
 
+@freeze_time("2025-06-01")
 def test_testimonial_date_published_defaults_to_today(user_drf_client):
     """An unset date_published falls back to today."""
     page = CoursePageFactory.create()
@@ -472,19 +473,18 @@ def test_testimonial_date_published_defaults_to_today(user_drf_client):
         reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
     )
     assert resp.status_code == 200
-    assert (
-        resp.json()["testimonials"][0]["date_published"]
-        == timezone.localdate().isoformat()
-    )
+    assert resp.json()["testimonials"][0]["date_published"] == "2025-06-01"
 
 
+@freeze_time("2025-06-01")
 def test_testimonial_date_published_restamped_by_pre_field_revision():
     """
     A revision saved before this field existed restamps the date on publish.
 
     modelcluster builds child objects only from the keys present in the stored
     revision JSON, so an absent date_published falls back to the model default
-    rather than raising on the NOT NULL column. The backfilled value is lost.
+    rather than raising on the NOT NULL column. Any stored date, including the
+    migration backfill, is overwritten with today.
     """
     page = CoursePageFactory.create()
     testimonial = ProductPageTestimonial.objects.create(
@@ -504,7 +504,7 @@ def test_testimonial_date_published_restamped_by_pre_field_revision():
     revision.as_object().save()
 
     testimonial.refresh_from_db()
-    assert testimonial.date_published == timezone.localdate()
+    assert testimonial.date_published == date(2025, 6, 1)
 
 
 def test_testimonial_image_src_null_without_image(user_drf_client):
