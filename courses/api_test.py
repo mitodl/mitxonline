@@ -45,7 +45,6 @@ from compliance.exceptions import (
 from compliance.factories import ExportComplianceLogFactory
 from compliance.models import ExportComplianceDecision
 from courses.api import (
-    MISSING_COMPLIANCE_DATA_CODE,
     check_course_modes,
     check_enrollment_eligibility,
     create_local_enrollment,
@@ -1506,7 +1505,7 @@ def test_check_enrollment_eligibility_missing_profile_data(mocker, user):
     eligibility = check_enrollment_eligibility(user, run)
 
     assert eligibility.enrollable is False
-    assert eligibility.reason_code == MISSING_COMPLIANCE_DATA_CODE
+    assert eligibility.reason_code == ExportComplianceDataError.error_code
     assert eligibility.reason_code == "CS_701"
 
 

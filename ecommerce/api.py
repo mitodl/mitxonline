@@ -208,11 +208,6 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
     This will use the default configured gateway unless it is able to determine that the current user should use a specific gateway. This can be
     overridden by specifying gateway_type.
 
-    A profile the export compliance check can't use is returned as a
-    profile_incomplete payload for the cart to prompt for. Enrollment APIs set
-    raise_compliance_data_errors instead, so the ExportComplianceDataError
-    reaches the API exception handler and the response names the fields to fix.
-
     Args:
     - request: the incoming http request
     Kwargs:
