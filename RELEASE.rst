@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 1.170.3
+---------------
+
+- Remove line item sync call during unenrollment (#4117)
+- Yarn up for js deps with critical severity issues. (#4131)
+- Requirements editor: reorder groups, tracks and courses; unclip the course picker (#4146)
+
 Version 1.170.2
 ---------------
 
