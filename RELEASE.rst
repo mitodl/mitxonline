@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.170.4
+---------------
+
+- Makes org reconciliation in user session more reliable (#4145)
+
 Version 1.170.3
 ---------------
 
