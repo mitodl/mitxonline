@@ -84,6 +84,42 @@ function initRequirementsField(root) {
     return { list: parent.children, index: path[path.length - 1] }
   }
 
+  // The node whose move button was just clicked, and in which direction, so
+  // the rebuilt button can take focus back; render() replaces every element.
+  let moved = null
+  let refocus = null
+
+  // Up/down buttons that swap list[index] with its neighbour. Groups, tracks
+  // and courses save, and the APIs return them, in this order.
+  function renderMoveButtons({ list, index }, label) {
+    const move = document.createElement("span")
+    move.className = "req-move"
+    for (const [text, offset, title] of [
+      ["↑", -1, `Move ${label} up`],
+      ["↓", 1, `Move ${label} down`]
+    ]) {
+      const button = document.createElement("button")
+      button.type = "button"
+      button.textContent = text
+      button.title = title
+      button.setAttribute("aria-label", title)
+      button.disabled = !list[index + offset]
+      button.addEventListener("click", () => {
+        const other = index + offset
+        ;[list[index], list[other]] = [list[other], list[index]]
+        moved = { node: list[other], offset }
+        persistAndRender()
+      })
+      move.appendChild(button)
+    }
+    if (moved && moved.node === list[index]) {
+      const [up, down] = move.children
+      const same = moved.offset < 0 ? up : down
+      refocus = same.disabled ? (same === up ? down : up) : same
+    }
+    return move
+  }
+
   function isTrack(node) {
     return node.data.node_type === NODE.track
   }
@@ -214,6 +250,9 @@ function initRequirementsField(root) {
     clampValues(state)
     writeInput()
     render()
+    if (refocus) refocus.focus()
+    moved = null
+    refocus = null
   }
 
   // Children that cannot be saved where they are (a course at the top
@@ -349,7 +388,7 @@ function initRequirementsField(root) {
       persistAndRender()
     })
 
-    head.append(pill, title, remove)
+    head.append(renderMoveButtons(locate(path), "track"), pill, title, remove)
 
     const description = document.createElement("textarea")
     description.className = "req-track__description"
@@ -377,11 +416,6 @@ function initRequirementsField(root) {
   function renderGroupHead(node, path) {
     const head = document.createElement("div")
     head.className = "req-group__head"
-
-    const handle = document.createElement("span")
-    handle.className = "req-group__handle"
-    handle.textContent = "⠿"
-    handle.title = "Groups are ordered top to bottom"
 
     const title = document.createElement("input")
     title.type = "text"
@@ -413,7 +447,7 @@ function initRequirementsField(root) {
       persistAndRender()
     })
 
-    head.append(handle, title, pill, remove)
+    head.append(renderMoveButtons(locate(path), "group"), title, pill, remove)
     return head
   }
 
@@ -512,10 +546,18 @@ function initRequirementsField(root) {
     picker.className = "req-picker"
 
     const chips = document.createElement("div")
-    chips.className = "req-chips"
-    node.children.forEach(child =>
-      chips.appendChild(renderChip(node.children, child))
-    )
+    chips.className = "req-chips req-chips--ordered"
+    const labels = { [NODE.program]: "program", [NODE.operator]: "group" }
+    node.children.forEach((child, index) => {
+      const row = document.createElement("div")
+      row.className = "req-leaf"
+      const label = labels[child.data.node_type] || "course"
+      row.append(
+        renderMoveButtons({ list: node.children, index }, label),
+        renderChip(node.children, child)
+      )
+      chips.appendChild(row)
+    })
     picker.appendChild(chips)
 
     picker.appendChild(renderCombobox(node))
