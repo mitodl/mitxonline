@@ -429,7 +429,9 @@ export const LegalAddressComplianceFields = ({
         field =>
           (emptyOnOpen.includes(field.name) ||
             rejectedFields.includes(field.name)) &&
-          (field.name !== "postal_code" || showsPostalCode)
+          (field.name !== "postal_code" ||
+            showsPostalCode ||
+            rejectedFields.includes("postal_code"))
       ).map(field => {
         const fieldName = `legal_address.${field.name}`
         const errorId = `${field.name}-error`
