@@ -66,6 +66,12 @@ In either case, the command will try to create a new run. If it exists in edX al
             help="If set, create a new product for the new run with the specified price.",
         )
 
+        parser.add_argument(
+            "--skip-edx",
+            action="store_true",
+            help="If set, this won't clone the run in edX.",
+        )
+
     def handle(self, *args, **kwargs):  # noqa: ARG002
         """Create the re-run according to the options passed."""
 
@@ -105,7 +111,12 @@ In either case, the command will try to create a new run. If it exists in edX al
 
         self.stdout.write(f"Rerunning {run_to_clone.courseware_id}...")
 
-        new_course_run = rerun_course_run(run_to_clone, run_tag, organization=org)
+        new_course_run = rerun_course_run(
+            run_to_clone,
+            run_tag,
+            organization=org,
+            skip_edx=kwargs.get("skip_edx", False),
+        )
 
         self.stdout.write(self.style.SUCCESS(f"Created new run {new_course_run}"))
 
