@@ -8,7 +8,7 @@ from factory.django import DjangoModelFactory
 from reversion.models import Version
 
 from courses.factories import CourseRunFactory, ProgramFactory
-from courses.models import CourseRun
+from courses.models import CourseRun, PaidProgram
 from ecommerce import models
 from ecommerce.constants import (
     DISCOUNT_TYPE_PAID_AMOUNT_OFF,
@@ -211,3 +211,13 @@ def make_paid_amount_off_offer(user, purchased):
         source_line=source_line,
         discount=discount,
     )
+
+
+def make_paid_program(user, program, *, state=models.OrderStatus.FULFILLED):
+    """
+    Record that ``user`` bought ``program``: an order in ``state`` and the
+    PaidProgram row that fulfilling a program purchase creates. Returns the
+    PaidProgram.
+    """
+    order = OrderFactory.create(purchaser=user, state=state)
+    return PaidProgram.objects.create(user=user, program=program, order=order)

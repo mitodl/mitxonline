@@ -99,6 +99,7 @@ from ecommerce.constants import (
 from ecommerce.exceptions import (
     VerifiedProgramCourseNotInProgramError,
     VerifiedProgramNoEnrollmentError,
+    VerifiedProgramNoEntitlementError,
 )
 from ecommerce.factories import (
     DiscountRedemptionFactory,
@@ -111,6 +112,7 @@ from ecommerce.factories import (
     ProductFactory,
     TransactionFactory,
     UnlimitedUseDiscountFactory,
+    make_paid_program,
     make_purchase,
 )
 from ecommerce.fixtures import (
@@ -1112,6 +1114,7 @@ def test_create_verified_program_course_run_enrollment(
     ProgramEnrollmentFactory.create(
         program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
+    make_paid_program(user, program)
 
     request = RequestFactory().get("/")
     request.user = user
@@ -1154,6 +1157,41 @@ def test_create_vpcre_no_program(bootstrapped_verified_program, user):
     assert "No verified enrollment" in str(exc.value)
 
 
+@pytest.mark.parametrize(
+    "scenario", ["not_purchased", "purchase_refunded", "course_already_verified"]
+)
+def test_create_vpcre_no_entitlement(bootstrapped_verified_program, user, scenario):
+    """
+    A verified program enrollment only grants a free verified run when the
+    program was bought, and only one per course: a program that became
+    verified because every course was bought separately, a refunded program
+    purchase, or a course already taken verified (even if unenrolled since)
+    is refused before a basket exists.
+    """
+    (program, _, course, courserun, _) = bootstrapped_verified_program
+    ProgramEnrollmentFactory.create(
+        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    if scenario == "purchase_refunded":
+        make_paid_program(user, program, state=OrderStatus.REFUNDED)
+    elif scenario == "course_already_verified":
+        make_paid_program(user, program)
+        CourseRunEnrollmentFactory.create(
+            user=user,
+            run=CourseRunFactory.create(course=course),
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=False,
+        )
+
+    request = RequestFactory().get("/")
+    request.user = user
+
+    with pytest.raises(VerifiedProgramNoEntitlementError):
+        create_verified_program_course_run_enrollment(request, courserun, program)
+
+    assert not BasketDiscount.objects.filter(redeemed_by=user).exists()
+
+
 def test_create_vpcre_run_not_in_program(bootstrapped_verified_program, user):
     """
     The program's discount prices anything it is attached to, so a run whose
@@ -1194,6 +1232,7 @@ def test_create_vpcre_bad_basket(
     prog_enrollment = ProgramEnrollmentFactory.create(
         program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
+    make_paid_program(prog_enrollment.user, program)
 
     request = RequestFactory().get("/")
     request.user = prog_enrollment.user
