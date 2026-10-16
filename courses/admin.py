@@ -8,7 +8,6 @@ from django.contrib import admin, messages
 from django.contrib.admin.decorators import display
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.db import models
-from django.db.models import Prefetch
 from django.forms import TextInput
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
@@ -521,35 +520,13 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         )
         self.populate_verifiable_credentials_for_certificate(request, certificates)
 
-    def get_queryset(self, request):  # noqa: ARG002
+    def get_queryset(self, request):
         """Use the all_objects manager so we can see source runs."""
 
         # Imported here to avoid a circular dependency at module load time,
         # matching ProgramContractPageInline above.
-        from b2b.models import ContractPage  # noqa: PLC0415
 
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        """
-        Show every contract in the b2b_contract dropdown, in a stable order.
-
-        The dropdown has to include inactive contracts. A run attached to one
-        - a retired run parked in the holding contract, or any run on an
-        expired contract - would otherwise render with an empty dropdown,
-        because its current value isn't among the choices. Since the field is
-        ``null=True, blank=True``, saving that form is valid and silently sets
-        ``b2b_contract`` to NULL, which turns a B2B run into a public-catalog
-        run (``CourseRunQuerySet.exclude_b2b`` treats a null contract as "not
-        B2B"). ``ContractPage.objects`` is the unfiltered manager.
-        """
-
-        if db_field.name == "b2b_contract":
-            # Imported here to avoid a circular dependency at module load time,
-            # matching ProgramContractPageInline above.
-            from b2b.models import ContractPage  # noqa: PLC0415
-
-            kwargs["queryset"] = ContractPage.objects.order_by(
-                "organization__name", "name"
-            )
+        return super().get_queryset(request)
 
     @admin.display(description="Primary?", ordering="is_primary_language")
     def primary(self, obj):
