@@ -451,6 +451,13 @@ def upgrade_audit_run_enrollments_for_program_purchase(user, program):
     Verified-track enrollments are left unchanged. If the user has a mix of
     verified and audit enrollments, only the audit-track ones are upgraded.
 
+    Each upgrade is backed by a zero-value order that redeems the program's
+    internal discount, the same as if the learner had enrolled in the run
+    after buying the program (see
+    ecommerce.api.create_verified_program_course_run_order). If that order
+    can't be made - most commonly because the run has no active product - the
+    enrollment is upgraded without one.
+
     Args:
         user (User): The user who purchased the program
         program (Program): The program that was purchased
@@ -476,12 +483,46 @@ def upgrade_audit_run_enrollments_for_program_purchase(user, program):
     if not eligible_runs:
         return []
 
-    upgraded_enrollments, _ = create_run_enrollments(
-        user,
-        eligible_runs,
-        mode=EDX_ENROLLMENT_VERIFIED_MODE,
-        keep_failed_enrollments=True,
+    from ecommerce.api import create_verified_program_course_run_order  # noqa: PLC0415
+    from ecommerce.exceptions import (  # noqa: PLC0415
+        VerifiedProgramCourseNotInProgramError,
+        VerifiedProgramInvalidOrderError,
+        VerifiedProgramNoEnrollmentError,
+        VerifiedProgramNoProductError,
     )
+
+    upgraded_enrollments = []
+    runs_without_orders = []
+
+    for run in eligible_runs:
+        try:
+            upgraded_enrollments.append(
+                create_verified_program_course_run_order(user, run, program)
+            )
+        except (  # noqa: PERF203
+            VerifiedProgramCourseNotInProgramError,
+            VerifiedProgramInvalidOrderError,
+            VerifiedProgramNoEnrollmentError,
+            VerifiedProgramNoProductError,
+        ):
+            log.exception(
+                "Couldn't create a program order for user %s, run %s, program %s; "
+                "upgrading the enrollment without one",
+                user.id,
+                run.courseware_id,
+                program.readable_id,
+            )
+            runs_without_orders.append(run)
+
+    if runs_without_orders:
+        orderless_enrollments, _ = create_run_enrollments(
+            user,
+            runs_without_orders,
+            mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            keep_failed_enrollments=True,
+        )
+        upgraded_enrollments.extend(orderless_enrollments)
+
     return upgraded_enrollments
 
 
