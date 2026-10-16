@@ -4,6 +4,10 @@ USER_MSG_COOKIE_MAX_AGE = 20
 USER_MSG_TYPE_ENROLLED = "enrolled"
 USER_MSG_TYPE_ENROLL_FAILED = "enroll-failed"
 USER_MSG_TYPE_ENROLL_BLOCKED = "enroll-blocked"
+# Enrollment couldn't be completed for a reason the learner may clear by
+# retrying. The value lands in a cookie the learner can read, so it names no
+# mechanism - see compliance.exceptions.ExportComplianceUnavailableError.
+USER_MSG_TYPE_ENROLL_UNAVAILABLE = "enroll-unavailable"
 USER_MSG_TYPE_ENROLL_DUPLICATED = "enroll-duplicated"
 USER_MSG_TYPE_COMPLETED_AUTH = "completed-auth"
 USER_MSG_TYPE_COURSE_NON_UPGRADABLE = "course-non-upgradable"

@@ -29,7 +29,10 @@ from b2b.api import (
     get_active_contracts_from_basket_items,
     is_discount_supplied_for_b2b_purchase,
 )
-from compliance.exceptions import ExportComplianceDataError
+from compliance.exceptions import (
+    ExportComplianceDataError,
+    ExportComplianceUnavailableError,
+)
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -115,6 +118,7 @@ from main.constants import (
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_ENROLL_UNAVAILABLE,
     USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 from main.utils import parse_supplied_date
@@ -226,6 +230,14 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
 
     try:
         has_blocked_products = basket.has_user_blocked_products(request.user)
+    except ExportComplianceUnavailableError:
+        # Fail closed, but before taking any money: we have no result, so we
+        # cannot clear this basket, and the learner should retry rather than
+        # be told they are blocked. Already logged where it is raised.
+        return {
+            "compliance_check_unavailable": True,
+            "error": USER_MSG_TYPE_ENROLL_UNAVAILABLE,
+        }
     except ExportComplianceDataError as exc:
         # The learner can fix this themselves, unlike a compliance denial.
         log.info(

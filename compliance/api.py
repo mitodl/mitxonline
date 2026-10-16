@@ -10,6 +10,7 @@ from datetime import timedelta
 from typing import Any
 from uuid import uuid4
 
+import backoff
 from CyberSource import RiskV1DecisionsPost201ResponseClientReferenceInformation
 from CyberSource.api.verification_api import VerificationApi
 from CyberSource.models.riskv1exportcomplianceinquiries_order_information import (
@@ -21,6 +22,7 @@ from CyberSource.models.riskv1exportcomplianceinquiries_order_information_bill_t
 from CyberSource.models.validate_export_compliance_request import (
     ValidateExportComplianceRequest,
 )
+from CyberSource.rest import ApiException
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
@@ -29,13 +31,35 @@ from mitol.common.utils.datetime import now_in_utc
 from nacl.encoding import Base64Encoder
 from nacl.public import PublicKey, SealedBox
 
-from compliance.exceptions import ExportComplianceDataError
+from compliance.exceptions import (
+    ExportComplianceDataError,
+    ExportComplianceUnavailableError,
+)
 from compliance.models import ExportComplianceLog
 
 log = logging.getLogger(__name__)
 
 ISO_3166_2_PART_COUNT = 2
 RECENT_EXPORT_COMPLIANCE_CHECK_WINDOW = timedelta(hours=24)
+
+#: Total requests made for one check, so the default of 2 is "retry once".
+#: The observed production failures are CyberSource-side ~3s timeouts arriving
+#: a few times a week with no outage clustering, so a second attempt is both
+#: cheap and likely to succeed. Raising this adds whole multiples of that ~3s
+#: to a request a learner is waiting on.
+EXPORT_COMPLIANCE_MAX_ATTEMPTS = 2
+
+#: Upper bound on the pause between attempts. Short on purpose - this runs
+#: inline in the enrollment request, not in a worker. ``backoff`` applies full
+#: jitter by default, so the actual wait is somewhere in [0, this).
+EXPORT_COMPLIANCE_RETRY_DELAY_SECONDS = 0.5
+
+#: Statuses worth a second attempt: CyberSource-side failures and rate limits.
+#: ``0`` is what the SDK reports for a connection failure or timeout, which it
+#: raises as an ``ApiException`` rather than letting urllib3's own error escape
+#: (see ``CyberSource/rest.py``). A 400 is excluded deliberately - an
+#: INVALID_REQUEST is our malformed payload and will fail identically forever.
+EXPORT_COMPLIANCE_RETRYABLE_STATUSES = frozenset({0, 429, 500, 502, 503, 504})
 
 DecryptedExportComplianceLog = namedtuple(  # noqa: PYI024
     "DecryptedExportComplianceLog", ["request", "response"]
@@ -375,12 +399,42 @@ def decrypt_export_compliance_log(
     return DecryptedExportComplianceLog(decrypted_request, decrypted_response)
 
 
+def _is_retryable_api_exception(exc: ApiException) -> bool:
+    """Return True when another attempt at `exc` could plausibly succeed."""
+    return exc.status in EXPORT_COMPLIANCE_RETRYABLE_STATUSES
+
+
+@backoff.on_exception(
+    backoff.constant,
+    ApiException,
+    max_tries=EXPORT_COMPLIANCE_MAX_ATTEMPTS,
+    interval=EXPORT_COMPLIANCE_RETRY_DELAY_SECONDS,
+    giveup=lambda exc: not _is_retryable_api_exception(exc),
+    logger=log,
+    backoff_log_level=logging.WARNING,
+)
+def _call_validate_export_compliance(client, request_payload) -> Any:
+    """Call CyberSource, retrying a transient failure.
+
+    Re-raises the underlying ``ApiException`` once the tries are spent or the
+    status says a retry is pointless; ``verify_user_with_exports`` converts it.
+    """
+    return client.validate_export_compliance(request_payload)
+
+
 def verify_user_with_exports(user, run) -> ExportComplianceResult:
     """
     Verify a user against CyberSource export compliance services for a given
     CourseRun or Program, reusing any cached result (accepted or failed)
     for the same courseware object, from the last 24 hours, or representing
     a prior failed check for this user.
+
+    Raises:
+        ExportComplianceUnavailableError: if CyberSource never answered. No
+            ``ExportComplianceLog`` row is written in that case, because
+            ``get_latest_export_compliance_log`` reuses a non-accepted row for
+            a user with no time bound - recording this would turn a transient
+            timeout into a block only staff could lift.
     """
     cached_log = get_latest_export_compliance_log(user, run)
     if cached_log is not None:
@@ -399,7 +453,28 @@ def verify_user_with_exports(user, run) -> ExportComplianceResult:
         user.id,
         run.id,
     )
-    response = client.validate_export_compliance(request_payload)
+    try:
+        response = _call_validate_export_compliance(client, request_payload)
+    except ApiException as exc:
+        # Every ApiException converts, not only the retryable ones - a 401
+        # from rotated credentials is still "we have no result", and a 500 at
+        # the enrollment endpoint helps the learner no more than it helps us.
+        # log.exception is what preserves the Sentry signal this used to
+        # produce by letting the ApiException escape uncaught.
+        attempts = (
+            EXPORT_COMPLIANCE_MAX_ATTEMPTS
+            if _is_retryable_api_exception(exc)
+            else 1  # given up on without a retry
+        )
+        log.exception(
+            "CyberSource export compliance check unavailable for user=%s "
+            "run=%s after %d attempt(s) (status=%s)",
+            user.id,
+            run.id,
+            attempts,
+            exc.status,
+        )
+        raise ExportComplianceUnavailableError(user, attempts) from exc
 
     result = ExportComplianceResult(
         decision=_get_response_value(response, "status"),

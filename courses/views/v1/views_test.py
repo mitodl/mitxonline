@@ -24,7 +24,11 @@ from reversion.models import Version
 from b2b.factories import ContractPageFactory
 from cms.factories import ProgramPageFactory
 from cms.serializers import CoursePageSerializer, ProgramPageSerializer
-from compliance.exceptions import ExportComplianceDataError, ExportComplianceError
+from compliance.exceptions import (
+    ExportComplianceDataError,
+    ExportComplianceError,
+    ExportComplianceUnavailableError,
+)
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
     BlockedCountryFactory,
@@ -76,6 +80,7 @@ from main.constants import (
     USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_FAILED,
+    USER_MSG_TYPE_ENROLL_UNAVAILABLE,
     USER_MSG_TYPE_ENROLLED,
 )
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
@@ -567,6 +572,31 @@ def test_user_enrollments_create_export_compliance_blocked(
     assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
 
 
+def test_user_enrollments_create_export_compliance_unavailable(
+    mocker, user_drf_client, user
+):
+    """
+    An unreachable CyberSource answers 400 with retry copy, not the 500 this
+    used to produce by letting the SDK's ApiException escape uncaught.
+    """
+    run = CourseRunFactory.create()
+    mocker.patch(
+        "courses.serializers.v1.courses.create_run_enrollments",
+        side_effect=ExportComplianceUnavailableError(user, 2),
+    )
+    resp = user_drf_client.post(
+        reverse("v1:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": (
+            "We're unable to complete your enrollment at this time. "
+            "Please try again in a few minutes. Error code: CS_503."
+        )
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
 def test_user_enrollments_create_export_compliance_missing_data(
     mocker, user_drf_client, user
 ):
@@ -818,6 +848,29 @@ def test_create_enrollments_export_compliance_blocked(mocker, user_client, user)
     assert USER_MSG_COOKIE_NAME in resp.cookies
     assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
         {"type": USER_MSG_TYPE_ENROLL_BLOCKED}
+    )
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+def test_create_enrollments_export_compliance_unavailable(mocker, user_client, user):
+    """
+    The form view must not tell a learner their country is blocked because
+    CyberSource timed out - that message is both wrong and alarming.
+    """
+    run = CourseRunFactory.create()
+    mocker.patch(
+        "courses.views.v1.create_run_enrollments",
+        side_effect=ExportComplianceUnavailableError(user, 2),
+    )
+    resp = user_client.post(
+        reverse("create-enrollment-via-form"),
+        data={"run": str(run.id)},
+        HTTP_REFERER=EXAMPLE_URL,
+    )
+    assert resp.status_code == status.HTTP_302_FOUND
+    assert resp.url == reverse("user-dashboard")
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_ENROLL_UNAVAILABLE}
     )
     assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
 
