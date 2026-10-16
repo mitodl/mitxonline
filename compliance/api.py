@@ -412,6 +412,11 @@ def _is_retryable_api_exception(exc: ApiException) -> bool:
     giveup=lambda exc: not _is_retryable_api_exception(exc),
     logger=log,
     backoff_log_level=logging.WARNING,
+    # Both default to ERROR, and sentry-sdk's LoggingIntegration turns an
+    # ERROR into an event. verify_user_with_exports already log.exception()s
+    # the give-up, so leaving these alone would file two Sentry events for
+    # one failure and double the rate this issue is being judged on.
+    giveup_log_level=logging.WARNING,
 )
 def _call_validate_export_compliance(client, request_payload) -> Any:
     """Call CyberSource, retrying a transient failure.

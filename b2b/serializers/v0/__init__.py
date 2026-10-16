@@ -176,6 +176,9 @@ class GenerateCheckoutPayloadSerializer(serializers.Serializer):
     profile_incomplete = serializers.BooleanField(
         default=False, allow_null=True, required=False
     )
+    enrollment_unavailable = serializers.BooleanField(
+        default=False, allow_null=True, required=False
+    )
     purchased_same_courserun = serializers.BooleanField(
         default=False, allow_null=True, required=False
     )

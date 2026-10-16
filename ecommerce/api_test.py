@@ -2721,9 +2721,12 @@ def test_generate_checkout_payload_export_compliance_unavailable(mocker):
     result = generate_checkout_payload(authed_request(user))
 
     assert result == {
-        "compliance_check_unavailable": True,
+        "enrollment_unavailable": True,
         "error": USER_MSG_TYPE_ENROLL_UNAVAILABLE,
     }
+    # The key is part of the response body, so it must stay as silent about
+    # the mechanism as the rendered message is.
+    assert "compliance" not in str(result).lower()
     assert not Order.objects.filter(purchaser=user).exists()
 
 

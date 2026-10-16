@@ -235,7 +235,7 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
         # cannot clear this basket, and the learner should retry rather than
         # be told they are blocked. Already logged where it is raised.
         return {
-            "compliance_check_unavailable": True,
+            "enrollment_unavailable": True,
             "error": USER_MSG_TYPE_ENROLL_UNAVAILABLE,
         }
     except ExportComplianceDataError as exc:

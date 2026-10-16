@@ -1,6 +1,7 @@
 """Tests for compliance API helpers."""
 
 import json
+import logging
 import uuid
 from datetime import timedelta
 from types import SimpleNamespace
@@ -539,6 +540,32 @@ def test_verify_user_with_exports_logs_nothing_when_cybersource_never_answers(
 
     assert not ExportComplianceLog.objects.filter(user=user).exists()
     assert get_latest_export_compliance_log(user, run) is None
+
+
+@pytest.mark.usefixtures("no_backoff_sleep")
+def test_an_unavailable_check_logs_exactly_one_error(mocker, export_settings, caplog):
+    """
+    sentry-sdk's LoggingIntegration files an event per ERROR record, so a
+    second ERROR here would double the failure rate this is measured on.
+    backoff's own give-up handler defaults to ERROR - it must not stay there.
+    """
+    user = _screenable_user()
+    run = CourseRunFactory.create()
+
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.side_effect = ApiException(
+        status=502, reason="General system failure"
+    )
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    with (
+        caplog.at_level(logging.DEBUG),
+        pytest.raises(ExportComplianceUnavailableError),
+    ):
+        verify_user_with_exports(user, run)
+
+    errors = [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert len(errors) == 1, [r.getMessage() for r in errors]
 
 
 def test_decrypt_export_compliance_log_round_trips(export_compliance_keypair):
