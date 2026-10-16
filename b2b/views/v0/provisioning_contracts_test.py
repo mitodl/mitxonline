@@ -189,6 +189,71 @@ def test_patch_contract(
 
 
 @pytest.mark.zeal_allow("wagtailcore.Page", "get()")
+def test_deactivated_contract_can_be_edited_and_reactivated(admin_drf_client):
+    """A contract switched off through the API still takes edits, and switches back on."""
+
+    contract = ContractPageFactory.create()
+    url = _contract_url(contract)
+
+    for payload in ({"active": False}, {"name": "Renamed"}, {"active": True}):
+        response = admin_drf_client.patch(url, payload, format="json")
+        assert response.status_code == status.HTTP_200_OK, response.json()
+
+    assert response.json()["name"] == "Renamed"
+    assert response.json()["active"] is True
+
+
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
+def test_contract_description_keeps_only_rich_text_markup(admin_drf_client):
+    """A description is stored with nothing Wagtail's editor would not store."""
+
+    contract = ContractPageFactory.create()
+
+    response = admin_drf_client.patch(
+        _contract_url(contract),
+        {
+            "description": (
+                '<p data-block-key="a1" onclick="x()">Pilot <b>cohort</b></p>'
+                "<script>alert(1)</script>"
+                '<a href="javascript:alert(1)">bad</a>'
+                '<a href="https://example.edu">good</a>'
+                '<a linktype="page" id="3">page</a>'
+                '<a href="tel:+16175550100">call</a>'
+                "<img src=x onerror=alert(1)>"
+                '<embed embedtype="image" id="10" alt="Logo" format="left"/>'
+                "<h2>Heading</h2><ul><li>item</li></ul>"
+            )
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    contract.refresh_from_db()
+    assert contract.description == (
+        '<p data-block-key="a1">Pilot <b>cohort</b></p>'
+        "alert(1)"
+        "<a>bad</a>"
+        '<a href="https://example.edu">good</a>'
+        '<a linktype="page" id="3">page</a>'
+        '<a href="tel:+16175550100">call</a>'
+        "<h2>Heading</h2><ul><li>item</li></ul>"
+    )
+
+    created = admin_drf_client.post(
+        _contracts_url(contract.organization.org_key),
+        {
+            "name": "Scripted",
+            "membership_type": CONTRACT_MEMBERSHIP_MANAGED,
+            "description": "<script>alert(1)</script>Plain & simple",
+        },
+        format="json",
+    )
+
+    assert created.status_code == status.HTTP_201_CREATED
+    assert created.json()["description"] == "alert(1)Plain &amp; simple"
+
+
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
 def test_add_courseware_and_follow_setup(admin_drf_client, mocked_tasks):
     """
     Adding a course creates its run before returning, and setup status tracks
@@ -241,6 +306,25 @@ def test_add_unknown_courseware_is_a_404(admin_drf_client):
     )
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_add_source_run_is_a_400(admin_drf_client):
+    """A source run is refused by name, and the answer points at its course."""
+
+    contract = ContractPageFactory.create()
+    source_run = CourseRunFactory.create(is_source_run=True)
+
+    response = admin_drf_client.post(
+        _contract_url(contract, "courseware"),
+        {"courseware_id": source_run.courseware_id},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    detail = response.json()["detail"]
+    assert "is a source run" in detail
+    assert source_run.course.readable_id in detail
+    assert not contract.get_course_runs().exists()
 
 
 def test_add_course_without_source_run_is_a_400(admin_drf_client):
@@ -400,6 +484,10 @@ def test_variant_routes_require_staff(user_drf_client):
         ).status_code
         == status.HTTP_403_FORBIDDEN
     )
+    assert (
+        user_drf_client.post(_contract_url(contract, "sync-variants")).status_code
+        == status.HTTP_403_FORBIDDEN
+    )
 
 
 def test_list_variant_sets(admin_drf_client):
@@ -459,6 +547,91 @@ def test_list_variant_sets(admin_drf_client):
             ],
         },
     ]
+
+
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
+def test_sync_variants(admin_drf_client, mocked_tasks):
+    """
+    Syncing creates the run for a set added after the courseware, queues its
+    clone and the code check, and creates nothing when repeated.
+    """
+
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_CODE, max_learners=5
+    )
+    course = _source_course()
+    CourseSupportedVariantFactory.create(
+        variant_object=course, language="fr", variant_length="", variant_industry=""
+    )
+    CourseSupportedVariantFactory.create(
+        variant_object=course, language="de", variant_length="", variant_industry=""
+    )
+    french_source = CourseRunFactory.create(
+        course=course, is_source_run=True, language="fr"
+    )
+    add_courseware_to_contract(contract, course)
+    add_contract_variant_set(contract, language="fr")
+    german = add_contract_variant_set(contract, language="de")
+    mocked_tasks.clone.reset_mock()
+    url = _contract_url(contract, "sync-variants")
+
+    response = admin_drf_client.post(url)
+
+    assert response.status_code == status.HTTP_200_OK
+    french_run = contract.get_course_runs().get(language="fr")
+    assert response.json() == {
+        "runs_created": [
+            {
+                "courseware_id": french_run.courseware_id,
+                "course_id": course.id,
+                "readable_id": course.readable_id,
+                "language": "fr",
+                "variant_length": "",
+                "variant_industry": "",
+            }
+        ],
+        "missing_source_runs": [
+            {
+                "course_id": course.id,
+                "readable_id": course.readable_id,
+                "variant_id": german.id,
+                "language": "de",
+                "variant_length": "",
+                "variant_industry": "",
+            }
+        ],
+        "failed": [],
+    }
+    mocked_tasks.clone.assert_called_once_with(
+        french_run.id, french_source.courseware_id
+    )
+    mocked_tasks.code_check.assert_called_once_with(contract.id)
+
+    mocked_tasks.code_check.reset_mock()
+    response = admin_drf_client.post(url)
+
+    assert response.json()["runs_created"] == []
+    assert contract.get_course_runs().count() == 2
+    mocked_tasks.code_check.assert_not_called()
+
+
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
+def test_sync_variants_without_codes(admin_drf_client, mocked_tasks):
+    """A contract that doesn't use codes gets its runs and no code check."""
+
+    contract = ContractPageFactory.create(membership_type=CONTRACT_MEMBERSHIP_MANAGED)
+    course = _source_course()
+    CourseSupportedVariantFactory.create(
+        variant_object=course, language="fr", variant_length="", variant_industry=""
+    )
+    CourseRunFactory.create(course=course, is_source_run=True, language="fr")
+    add_courseware_to_contract(contract, course)
+    add_contract_variant_set(contract, language="fr")
+
+    response = admin_drf_client.post(_contract_url(contract, "sync-variants"))
+
+    assert len(response.json()["runs_created"]) == 1
+    mocked_tasks.code_check.assert_not_called()
 
 
 def test_add_variant_set(admin_drf_client, admin_user):

@@ -6,9 +6,14 @@ members access to courseware. It lives under `/api/v0/b2b/provisioning/` and is
 staff-only.
 
 Most people will use it through the staff dashboard's B2B Organizations
-section, which covers organizations, onboarding state, IdPs and the change
-history. Contracts don't have a staff UI yet and are still edited in Wagtail,
-as child pages of the organization, or through the contract routes below. This
+section, which covers organizations, onboarding state, IdPs, the change
+history and contracts. A contract's page there creates and edits the contract,
+adds and removes courseware, shows how far the edX clones and enrollment codes
+have got, and assigns and expires codes. Some things on a contract still need
+Wagtail or the API: `welcome_message_extra`, the Google Sheet target and the
+order of a contract's programs, which the contract routes don't carry, and
+variant sets, which have routes and no UI yet. Every other contract field is
+read-only on the Wagtail page, and contracts can't be created there. This
 page is the reference for engineers working on the API or the UI, and for
 anyone who needs to know what a button in the dashboard actually does.
 
@@ -257,6 +262,7 @@ POST   .../contracts/{id}/codes/assign/
 GET    .../contracts/{id}/variants/
 POST   .../contracts/{id}/variants/
 PATCH  .../contracts/{id}/variants/{variant_id}/
+POST   .../contracts/{id}/variants/sync/
 ```
 
 These replace running `b2b_contract`, `b2b_courseware`, `b2b_codes` and
@@ -265,7 +271,11 @@ These replace running `b2b_contract`, `b2b_courseware`, `b2b_codes` and
 
 `POST` takes `name`, `membership_type` (required), `description`,
 `welcome_message`, `contract_start`, `contract_end`, `max_learners` and
-`enrollment_fixed_price`. `PATCH` takes the same fields plus `active`.
+`enrollment_fixed_price`. `PATCH` takes the same fields plus `active`. A
+contract that is inactive, ended or not yet started can still be read and
+edited here, and switched back on. It stays out of `user.b2b_contracts`,
+`run.b2b_contracts` and `organization.contracts`, which only return contracts
+valid for use (`ContractPageManager`).
 
 `courseware/` takes a program, course or course run readable ID. The contract
 runs and their products exist once the call returns. The edX course clones and
@@ -273,15 +283,27 @@ enrollment codes are created afterwards by Celery tasks, and `setup-status`
 reports what's still pending or has failed. `retry-setup` queues the failed
 parts again. Adding the same courseware twice doesn't create a second run. A
 run that already belongs to another contract is skipped and stays where it is.
+A source run's ID is a 400 that names its course: contract runs are cloned from
+a source run, so the course is what gets added.
 
 `courseware/remove/` closes the removed runs to new enrollments. A run that
 already has enrolled learners stays linked to the contract so they keep access.
+A run another contract also holds is not closed and keeps its products and
+codes. It is unlinked from this contract, unless this contract's learners are
+enrolled in it. The codes this contract had for that run stay attached to the
+run's product, because a code belongs to a product and not to a contract. If
+this contract was the run's legacy `b2b_contract`, that moves to a contract
+that still holds the run.
 
 `variants/` lists the contract's variant sets, default first. Each set lists
 the contract's courses (from its runs and its programs) that support the same
 language, length and industry, whether each has a source run for it, and the
-contract's run for it if there is one. A course with a source run and no
-contract run gets one the next time its courseware is added to the contract.
+contract's run for it if there is one. A course still in the contract with a
+source run and no contract run gets one from `variants/sync/`, or the next time
+its courseware is added to the contract, as long as the set is active. The list
+also shows a removed course whose closed run stays linked for its enrolled
+learners, and a course outside the contract's programs whose run in it isn't
+live. `variants/sync/` skips both.
 `POST` adds a set (`language`, `variant_length`, `variant_industry`,
 `b2b_only`). It never adds a default, since every contract already has one, and
 a set the contract already has, active or not, is a 400. Adding a set creates
@@ -291,10 +313,40 @@ contract and their enrollments are untouched, so turning it back on restores
 them. The default set can't be turned off or made B2B-only. Variant set changes
 are recorded in the organization's change history.
 
+`variants/sync/` creates the runs the contract's courses are missing for its
+active variant sets, so courseware added before a set doesn't have to be added
+again course by course. It takes no body. A course and variant that already has
+a run in the contract is left alone, so repeating the call creates nothing
+more. Only courses still in the contract get runs: those of its programs, and
+those with a live run in it. A removed course whose closed run stays linked for
+its enrolled learners is skipped. The response lists `runs_created`,
+`missing_source_runs` (a course supports the set and has no source run to
+clone) and `failed` (a source run exists and the contract run was not created,
+e.g. the course has no default variant set, or its readable ID doesn't make a
+valid run key). The new runs' edX clones are queued, and so is the enrollment
+code check for a contract that uses codes.
+
 The codes routes list a contract's enrollment codes, expire the unused ones,
 and assign codes to people by email the same way the manager dashboard's bulk
 assign does. They return redeemable codes, which is part of why every route
 here requires staff, including reads.
+
+The contract routes save the page without a Wagtail revision. A revision
+holds the whole page as it was when it was saved, so `ContractPage` takes the
+fields these routes write (`ContractPage.PROVISIONED_FIELDS`) from the stored
+row whenever Wagtail loads or publishes one. Publishing an old revision
+therefore can't put back a contract's old name, dates, seat cap or price.
+The same goes for which programs a contract has: a publish keeps the stored
+program links and takes only their order from the revision, so a program
+added or removed on the Wagtail page is not saved, and one removed there moves
+to the end of the order. This holds for a live page. Wagtail saves the form of
+an unpublished contract page straight to the database, so there an added or
+removed program is saved, and an added one queues run creation.
+
+`description` is Wagtail rich text. On the way in it is reduced to the markup
+Wagtail's editor stores (paragraphs, headings, bold, italic, lists, links);
+anything else is stripped, including an image or media embedded through
+Wagtail's editor.
 
 ## Errors
 
@@ -334,5 +386,8 @@ changes an existing `org_key`.
 - Domain verification, before C2.
 - Where C2's partner invite token is stored. `OrganizationOnboarding` is the
   likely place, but it has no token field yet.
-- A contracts section in the staff dashboard, an IdP edit form over the
-  `PATCH` route, and a test-login flow.
+- An IdP edit form over the `PATCH` route, and a test-login flow.
+- The contract fields the staff dashboard can't reach
+  (`welcome_message_extra`, `google_sheet_target`, `google_sheet_target_tab`,
+  program order) and a variant set editor. They are all the Wagtail contract
+  page is still needed for.

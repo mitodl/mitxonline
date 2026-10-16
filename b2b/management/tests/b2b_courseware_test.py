@@ -237,7 +237,7 @@ def test_add_courserun():
     )
 
     run.refresh_from_db()
-    assert run.b2b_contract == contract
+    assert run.b2b_contracts.filter(id=contract.id).exists()
 
 
 def test_add_courserun_existing_contract():
@@ -261,8 +261,10 @@ def test_add_courserun_existing_contract():
     )
 
     run.refresh_from_db()
-    assert run.b2b_contract == existing_contract
-    assert not run.b2b_contracts.filter(id=contract.id).exists()
+    assert (
+        run.b2b_contracts.filter(id__in=[contract.id, existing_contract.id]).count()
+        == 2
+    )
 
 
 @pytest.mark.parametrize(

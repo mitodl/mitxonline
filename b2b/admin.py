@@ -339,9 +339,8 @@ class ContractPageAdmin(ReadOnlyModelAdmin):
         """
         Use the unfiltered manager.
 
-        ContractPage's default manager (active_objects) filters to
-        active=True, which would make inactive contracts unsearchable via
-        the autocomplete widget used by UserContractPageInline.
+        Inactive contracts have to be searchable in the autocomplete widget
+        used by UserContractPageInline.
         """
 
         return ContractPage.objects.get_queryset()

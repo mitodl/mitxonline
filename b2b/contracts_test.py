@@ -21,9 +21,10 @@ from b2b.contracts import (
     expire_unused_enrollment_codes,
     get_contract_variant_coverage,
     remove_courseware_from_contract,
+    sync_contract_variants,
     update_contract_variant_set,
 )
-from b2b.exceptions import ContractVariantError
+from b2b.exceptions import ContractVariantError, SourceCourseIncompleteError
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.models import (
     DiscountContractAttachmentRedemption,
@@ -34,6 +35,7 @@ from courses.factories import (
     CourseRunFactory,
     ProgramFactory,
 )
+from courses.models import CourseRun
 from users.factories import UserFactory
 from variants.factories import CourseSupportedVariantFactory
 
@@ -118,8 +120,8 @@ def test_add_program():
     assert list(contract.programs) == [program]
 
 
-def test_add_run_in_another_contract_is_skipped():
-    """A run already in another contract stays there and is reported."""
+def test_add_run_in_another_contract_leaves_existing():
+    """A run that is linked to other contracts can be added to another contract."""
 
     run = CourseRunFactory.create()
     other_contract = ContractPageFactory.create()
@@ -128,9 +130,24 @@ def test_add_run_in_another_contract_is_skipped():
 
     added = add_courseware_to_contract(contract, run)
 
+    assert added.runs_added == 1
+    assert run.b2b_contracts.filter(id=contract.id).exists()
+
+
+@pytest.mark.parametrize("active", [True, False])
+def test_add_run_already_in_contract_is_skipped(active):
+    """
+    A run already in the contract is reported as such, whether or not the
+    contract is valid for use.
+    """
+
+    contract = ContractPageFactory.create(active=active)
+    run = CourseRunFactory.create(b2b_contract=contract)
+
+    added = add_courseware_to_contract(contract, run)
+
     assert added.runs_added == 0
-    assert str(other_contract) in added.skipped_reason
-    assert not run.b2b_contracts.filter(id=contract.id).exists()
+    assert "already in this contract" in added.skipped_reason
 
 
 @pytest.mark.parametrize("has_enrollments", [True, False])
@@ -154,6 +171,41 @@ def test_remove_course(has_enrollments):
     assert removed_run.live is False
     assert contract.get_course_runs().filter(id=run.id).exists() is has_enrollments
     assert not contract.get_products().exists()
+
+
+@pytest.mark.parametrize("other_contract_active", [True, False])
+@pytest.mark.parametrize("has_enrollments", [True, False])
+def test_remove_run_another_contract_holds(other_contract_active, has_enrollments):
+    """
+    A run another contract also holds is unlinked without being closed, and
+    stays linked while this contract's learners are enrolled in it.
+    """
+
+    contract = ContractPageFactory.create()
+    course = _source_run().course
+    add_courseware_to_contract(contract, course, skip_edx=True)
+    [run] = contract.get_course_runs()
+    other_contract = ContractPageFactory.create(active=other_contract_active)
+    CourseRun.b2b_contracts.through.objects.create(
+        courserun=run, contractpage=other_contract
+    )
+    CourseRunEnrollmentFactory.create(run=run, b2b_contract=other_contract)
+    if has_enrollments:
+        CourseRunEnrollmentFactory.create(run=run, b2b_contract=contract)
+    products = contract.get_products().count()
+
+    [(removed_run, unlinked)] = remove_courseware_from_contract(contract, run)
+
+    removed_run.refresh_from_db()
+    assert unlinked is not has_enrollments
+    assert removed_run.live is True
+    assert removed_run.b2b_contract_id == (
+        contract.id if has_enrollments else other_contract.id
+    )
+    assert other_contract.get_products().count() == products
+    assert CourseRun.b2b_contracts.through.objects.filter(
+        courserun=run, contractpage=other_contract
+    ).exists()
 
 
 def test_remove_run_outside_contract():
@@ -257,6 +309,141 @@ def test_variant_coverage():
     [listed] = coverage[2]["courses"]
     assert listed["has_source_run"] is False
     assert listed["contract_run"] is None
+
+
+def test_sync_contract_variants(mocked_edx):
+    """
+    A set added after the courseware gets its run, and the runs the contract
+    already has are left alone.
+    """
+
+    contract = ContractPageFactory.create()
+    course = _bilingual_source_course()
+    french_source = course.courseruns.get(is_source_run=True, language="fr")
+    add_courseware_to_contract(contract, course)
+    [english_run] = contract.get_course_runs()
+    mocked_edx.reset_mock()
+    add_contract_variant_set(contract, language="fr")
+
+    synced = sync_contract_variants(contract)
+
+    [french_run] = synced["runs_created"]
+    assert french_run.language == "fr"
+    assert synced["missing_source_runs"] == []
+    assert synced["failed"] == []
+    assert set(contract.get_course_runs()) == {english_run, french_run}
+    mocked_edx.assert_called_once_with(french_run.id, french_source.courseware_id)
+
+    assert sync_contract_variants(contract)["runs_created"] == []
+    assert contract.get_course_runs().count() == 2
+
+
+def test_sync_contract_variants_covers_program_courses():
+    """A program's courses get the new set's runs, including one with no runs yet."""
+
+    contract = ContractPageFactory.create()
+    program = ProgramFactory.create()
+    course = _bilingual_source_course()
+    program.add_requirement(course)
+    add_courseware_to_contract(contract, program, skip_edx=True)
+    [original_run] = contract.get_course_runs()
+    late_course = _bilingual_source_course()
+    program.add_requirement(late_course)
+    add_contract_variant_set(contract, language="fr")
+
+    synced = sync_contract_variants(contract, skip_edx=True)
+
+    assert sorted(
+        (run.course_id, run.language) for run in synced["runs_created"]
+    ) == sorted([(course.id, "fr"), (late_course.id, "en"), (late_course.id, "fr")])
+    assert original_run not in synced["runs_created"]
+    assert original_run in contract.get_course_runs()
+
+    assert sync_contract_variants(contract, skip_edx=True)["runs_created"] == []
+    assert contract.get_course_runs().count() == 4
+
+
+def test_sync_contract_variants_skips_removed_course():
+    """
+    A removed course whose run stays linked for its learners gets no run for a
+    set added afterwards.
+    """
+
+    contract = ContractPageFactory.create()
+    course = _bilingual_source_course()
+    add_courseware_to_contract(contract, course, skip_edx=True)
+    [run] = contract.get_course_runs()
+    CourseRunEnrollmentFactory.create(run=run)
+    remove_courseware_from_contract(contract, course)
+    add_contract_variant_set(contract, language="fr")
+
+    synced = sync_contract_variants(contract, skip_edx=True)
+
+    assert synced == {"runs_created": [], "missing_source_runs": [], "failed": []}
+    assert list(contract.get_course_runs()) == [run]
+
+
+def test_sync_contract_variants_needs_a_default_course_variant():
+    """
+    A course with no default variant set is reported and gets no run, since
+    create_contract_run would ignore the set asked for.
+    """
+
+    contract = ContractPageFactory.create()
+    course = _bilingual_source_course()
+    add_courseware_to_contract(contract, course, skip_edx=True)
+    french = add_contract_variant_set(contract, language="fr")
+    course.possible_variant_sets.filter(default_variant=True).update(
+        default_variant=False
+    )
+
+    synced = sync_contract_variants(contract, skip_edx=True)
+
+    assert synced == {
+        "runs_created": [],
+        "missing_source_runs": [],
+        "failed": [{"course": course, "variant": french}],
+    }
+    assert contract.get_course_runs().count() == 1
+
+
+@pytest.mark.parametrize(
+    "create_contract_run",
+    [{"side_effect": SourceCourseIncompleteError}, {"return_value": []}],
+    ids=["raises", "creates_nothing"],
+)
+def test_sync_contract_variants_reports_what_it_could_not_create(
+    mocker, create_contract_run
+):
+    """
+    A course with no source run for a set is reported, an inactive set is
+    skipped, and a run that can't be created doesn't stop the others.
+    """
+
+    contract = ContractPageFactory.create()
+    course = _bilingual_source_course()
+    for language in ["de", "es"]:
+        CourseSupportedVariantFactory.create(
+            variant_object=course,
+            language=language,
+            variant_length="",
+            variant_industry="",
+        )
+    CourseRunFactory.create(course=course, is_source_run=True, language="es")
+    add_courseware_to_contract(contract, course, skip_edx=True)
+    french = add_contract_variant_set(contract, language="fr")
+    german = add_contract_variant_set(contract, language="de")
+    spanish = add_contract_variant_set(contract, language="es")
+    update_contract_variant_set(contract, spanish, active=False)
+    mocker.patch("b2b.contracts.create_contract_run", **create_contract_run)
+
+    synced = sync_contract_variants(contract, skip_edx=True)
+
+    assert synced == {
+        "runs_created": [],
+        "missing_source_runs": [{"course": course, "variant": german}],
+        "failed": [{"course": course, "variant": french}],
+    }
 
 
 def test_add_variant_set_is_audited():
