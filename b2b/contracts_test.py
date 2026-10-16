@@ -142,7 +142,7 @@ def test_add_run_already_in_contract_is_skipped(active):
     """
 
     contract = ContractPageFactory.create(active=active)
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_contracts=[contract])
 
     added = add_courseware_to_contract(contract, run)
 
@@ -199,9 +199,7 @@ def test_remove_run_another_contract_holds(other_contract_active, has_enrollment
     removed_run.refresh_from_db()
     assert unlinked is not has_enrollments
     assert removed_run.live is True
-    assert removed_run.b2b_contract_id == (
-        contract.id if has_enrollments else other_contract.id
-    )
+    assert removed_run.b2b_contracts.filter(pk=contract.pk).exists() is has_enrollments
     assert other_contract.get_products().count() == products
     assert CourseRun.b2b_contracts.through.objects.filter(
         courserun=run, contractpage=other_contract
