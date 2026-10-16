@@ -190,10 +190,7 @@ def _run_holders(run: CourseRun) -> QuerySet[ContractPage]:
     isn't valid for use right now (e.g. one that hasn't started) counts.
     """
 
-    holders = Q(course_runs=run)
-    if run.b2b_contract_id:
-        holders |= Q(pk=run.b2b_contract_id)
-    return ContractPage.objects.filter(holders).order_by("pk")
+    return ContractPage.objects.filter(course_runs=run).order_by("pk")
 
 
 def _unlink_shared_run(contract: ContractPage, run: CourseRun) -> bool | None:
@@ -208,19 +205,12 @@ def _unlink_shared_run(contract: ContractPage, run: CourseRun) -> bool | None:
     the run.
     """
 
-    other_holder = _run_holders(run).exclude(pk=contract.pk).first()
-    if other_holder is None:
+    if not _run_holders(run).exclude(pk=contract.pk).exists():
         return None
 
     if CourseRunEnrollment.objects.filter(run=run, b2b_contract=contract).exists():
         return False
 
-    if run.b2b_contract_id == contract.pk:
-        # Code that still reads the legacy FK (e.g. is_contract_order, the
-        # discount source run filter) takes a run without one for a
-        # non-contract run, so hand it to a contract that still holds the run.
-        run.b2b_contract = other_holder
-        run.save()
     run.b2b_contracts.remove(contract)
 
     return True
