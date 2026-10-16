@@ -34,6 +34,7 @@ from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
     downgrade_program_enrollment_and_verified_runs,
+    has_program_course_entitlement,
 )
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.models import CourseRunEnrollment
@@ -84,6 +85,7 @@ from ecommerce.exceptions import (
     VerifiedProgramInvalidBasketError,
     VerifiedProgramInvalidOrderError,
     VerifiedProgramNoEnrollmentError,
+    VerifiedProgramNoEntitlementError,
     VerifiedProgramNoProductError,
 )
 from ecommerce.models import (
@@ -1622,6 +1624,9 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
       enrollment
     - VerifiedProgramCourseNotInProgramError if the run's course is not in the
       program's requirements
+    - VerifiedProgramNoEntitlementError if the learner didn't buy the program,
+      or already used its one verified run for this course (see
+      courses.api.has_program_course_entitlement)
     - VerifiedProgramNoProductError if the run has no active Product to purchase
     - VerifiedProgramInvalidBasketError if the basket isn't zero value
     - VerifiedProgramInvalidOrderError if the order doesn't get processed through
@@ -1638,6 +1643,13 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
     if not program.courses_qset.filter(courseruns=courserun).exists():
         msg = f"Course run {courserun} is not in program {program}"
         raise VerifiedProgramCourseNotInProgramError(msg)
+
+    if not has_program_course_entitlement(request.user, program, courserun.course):
+        msg = (
+            f"{request.user} has no program entitlement left in program {program} "
+            f"for course {courserun.course}"
+        )
+        raise VerifiedProgramNoEntitlementError(msg)
 
     discount = create_verified_program_discount(program)
 
