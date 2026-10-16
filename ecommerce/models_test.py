@@ -2,11 +2,9 @@ import random
 import uuid
 from datetime import timedelta
 from decimal import Decimal
-from importlib import import_module
 
 import pytest
 import reversion
-from django.apps import apps as django_apps
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
 from django.db.models import ProtectedError
@@ -18,7 +16,6 @@ from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
 from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
-from b2b.models import DiscountContractAttachmentRedemption
 from compliance.api import ExportComplianceResult
 from courses.factories import (
     BlockedCountryFactory,
@@ -37,7 +34,6 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
-    PAYMENT_TYPE_MARKETING,
     PAYMENT_TYPE_SALES,
     REDEMPTION_TYPE_INTERNAL,
     REDEMPTION_TYPE_ONE_TIME,
@@ -1437,14 +1433,16 @@ def test_refund_status_ineligible_for_unfulfilled_orders(state):
 @pytest.mark.skip_nplusone_check
 def test_refund_status_ineligible_for_b2b_orders():
     """B2B contract orders are handled off the self-service path."""
+    contract = ContractPageFactory.create()
     order = OrderFactory.create(state=OrderStatus.FULFILLED)
-    run = CourseRunFactory.create(b2b_contract=ContractPageFactory.create())
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
     with reversion.create_revision():
         product = ProductFactory.create(purchasable_object=run)
     LineFactory.create(
         order=order,
         purchased_object=run,
         product_version=Version.objects.get_for_object(product).last(),
+        b2b_contract=contract,
     )
 
     assert order.refund_status == OrderRefundStatus.INELIGIBLE
@@ -2387,37 +2385,3 @@ def _enrollment_code(run, **kwargs):
     DiscountProduct.objects.create(discount=discount, product=product)
 
     return discount
-
-
-def test_backfill_discount_b2b_contract():
-    """The backfill links each enrollment code to the one contract it is for."""
-
-    contract_a, contract_b = ContractPageFactory.create_batch(2)
-    own_run = CourseRunFactory.create(b2b_contracts=[contract_a])
-    shared_run = CourseRunFactory.create(b2b_contracts=[contract_a, contract_b])
-    original_run = CourseRunFactory.create(
-        b2b_contract=contract_b, b2b_contracts=[contract_a]
-    )
-
-    own = _enrollment_code(own_run)
-    redeemed = _enrollment_code(shared_run)
-    DiscountContractAttachmentRedemption.objects.create(
-        discount=redeemed, contract=contract_b, assigned_email="a@example.com"
-    )
-    original = _enrollment_code(original_run)
-    ambiguous = _enrollment_code(shared_run)
-    not_a_code = _enrollment_code(own_run, payment_type=PAYMENT_TYPE_MARKETING)
-
-    import_module(
-        "ecommerce.migrations.0058_backfill_discount_b2b_contract"
-    ).backfill_discount_contracts(django_apps, None)
-
-    for discount, contract in (
-        (own, contract_a),
-        (redeemed, contract_b),
-        (original, contract_b),
-        (ambiguous, None),
-        (not_a_code, None),
-    ):
-        discount.refresh_from_db()
-        assert discount.b2b_contract == contract

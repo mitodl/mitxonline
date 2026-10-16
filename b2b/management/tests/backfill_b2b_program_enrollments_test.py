@@ -41,8 +41,8 @@ def _setup_b2b_enrollment(*, add_course_to_program=True, link_contract_program=T
             contract=contract, program=program, sort_order=0
         )
 
-    run = CourseRunFactory.create(course=course, b2b_contract=contract)
-    enrollment = CourseRunEnrollmentFactory.create(run=run)
+    run = CourseRunFactory.create(course=course, b2b_contracts=[contract])
+    enrollment = CourseRunEnrollmentFactory.create(run=run, b2b_contract=contract)
 
     return enrollment, program
 
@@ -103,8 +103,8 @@ def test_backfill_skips_ambiguous_course():
             contract=contract, program=program, sort_order=0
         )
 
-    run = CourseRunFactory.create(course=course, b2b_contract=contract)
-    enrollment = CourseRunEnrollmentFactory.create(run=run)
+    run = CourseRunFactory.create(course=course, b2b_contracts=[contract])
+    enrollment = CourseRunEnrollmentFactory.create(run=run, b2b_contract=contract)
 
     call_command(COMMAND, "--commit")
 
@@ -122,12 +122,12 @@ def test_backfill_skips_course_not_in_any_program():
 
 
 def test_backfill_ignores_non_b2b_enrollments():
-    """Enrollments in runs without a B2B contract are untouched."""
+    """Enrollments without a B2B contract are untouched."""
 
     program = ProgramFactory.create()
     course = CourseFactory.create()
     program.add_requirement(course)
-    run = CourseRunFactory.create(course=course, b2b_contract=None)
+    run = CourseRunFactory.create(course=course)
     enrollment = CourseRunEnrollmentFactory.create(run=run)
 
     call_command(COMMAND, "--commit")
@@ -156,10 +156,10 @@ def test_backfill_counts_each_program_enrollment_once():
         ContractProgramItem.objects.get_or_create(
             contract=contract, program=program, defaults={"sort_order": 0}
         )
-        run = CourseRunFactory.create(course=course, b2b_contract=contract)
+        run = CourseRunFactory.create(course=course, b2b_contracts=[contract])
         # Reuse the same user across all three runs.
         enrollment = CourseRunEnrollmentFactory.create(
-            run=run, **({"user": user} if user else {})
+            run=run, b2b_contract=contract, **({"user": user} if user else {})
         )
         user = enrollment.user
 
