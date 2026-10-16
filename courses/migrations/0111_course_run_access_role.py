@@ -7,7 +7,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("courses", "0109_add_manufacturing_variant"),
+        ("courses", "0110_program_tracks"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

@@ -105,6 +105,18 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
     ),
 )
 class UserEnrollmentsApiViewSet(
+    # CreateModelMixin is inherited but POST cannot currently succeed: the v3
+    # serializer's create() reads validated_data["run_id"] while never
+    # declaring run_id as a field, so DRF drops it and the lookup raises
+    # KeyError. v1 and v2 both declare it; the dashboard creates through v1.
+    #
+    # Whoever fixes that must also annotate the created instance before it is
+    # serialized. get_queryset() annotates has_course_staff_role, and the
+    # serializer reads that attribute directly rather than defaulting it, so a
+    # response built from an unannotated instance raises AttributeError. The
+    # mixin is left in place rather than removed because dropping it would
+    # delete POST /api/v3/enrollments/ from the spec, which the oasdiff gate
+    # reads as a breaking change.
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.ListModelMixin,

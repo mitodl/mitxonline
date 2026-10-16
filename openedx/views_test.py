@@ -205,7 +205,13 @@ class TestEdxEnrollmentWebhook:
         api_client,
         oauth_token,
     ):
-        """Test returns 500 when enrollment creation raises an exception"""
+        """
+        An unexpected enrollment failure answers 5xx, so the sender retries.
+
+        The plugin drops a non-transient 4xx without retrying, so answering 400
+        here would lose the grant on a transient failure such as a lock wait
+        timeout. Nothing on this path says the request was bad.
+        """
         user = UserFactory.create()
         course_run = CourseRunFactory.create()
 
@@ -215,7 +221,7 @@ class TestEdxEnrollmentWebhook:
             "role": "instructor",
         }
         response = self._post_webhook(api_client, payload, token=oauth_token.token)
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert "Failed to create enrollment" in response.data["error"]
 
         # The role is recorded before the enrollment precisely so it survives
@@ -374,6 +380,59 @@ class TestEdxEnrollmentWebhook:
             ).count()
             == 1
         )
+
+    def test_role_grant_does_not_reactivate_a_deactivated_enrollment(
+        self, api_client, oauth_token
+    ):
+        """
+        A role grant leaves a deactivated enrollment deactivated.
+
+        Someone unenrolling is a decision. Re-granting a role, or re-running
+        the backfill over rows that already existed, is not an enrollment event
+        and must not quietly reverse it. An enrollment event -- a payload with
+        a mode -- still reactivates, because that is Open edX telling us the
+        user really was enrolled again.
+        """
+        user = UserFactory.create()
+        course_run = CourseRunFactory.create()
+        enrollment = CourseRunEnrollment.all_objects.create(
+            user=user,
+            run=course_run,
+            edx_enrolled=True,
+            enrollment_mode="audit",
+            active=False,
+        )
+
+        role_only = self._post_webhook(
+            api_client,
+            {
+                "email": user.email,
+                "course_id": course_run.courseware_id,
+                "role": "staff",
+            },
+            token=oauth_token.token,
+        )
+
+        assert role_only.status_code == status.HTTP_200_OK
+        enrollment.refresh_from_db()
+        assert enrollment.active is False
+        # The role is still recorded -- that is the part a role grant is about.
+        assert CourseRunAccessRole.objects.filter(
+            user=user, run=course_run, role="staff"
+        ).exists()
+
+        # An actual enrollment event does reactivate.
+        self._post_webhook(
+            api_client,
+            {
+                "email": user.email,
+                "course_id": course_run.courseware_id,
+                "mode": EDX_ENROLLMENT_AUDIT_MODE,
+            },
+            token=oauth_token.token,
+        )
+        enrollment.refresh_from_db()
+        assert enrollment.active is True
 
     @pytest.mark.parametrize("role", ["data_researcher", "beta_testers", ""])
     def test_non_staff_role_is_not_recorded(self, api_client, oauth_token, role):

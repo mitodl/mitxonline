@@ -65,7 +65,8 @@ def edx_enrollment_webhook(request):
     email = request.data.get("email")
     course_id = request.data.get("course_id")
     role = request.data.get("role", "")
-    mode = request.data.get("mode") or EDX_DEFAULT_ENROLLMENT_MODE
+    requested_mode = request.data.get("mode")
+    mode = requested_mode or EDX_DEFAULT_ENROLLMENT_MODE
 
     if not email or not course_id:
         return Response(
@@ -131,17 +132,30 @@ def edx_enrollment_webhook(request):
         )
 
     # --- Create local enrollment ---
+    # A payload carrying a role and no mode is a role grant rather than an
+    # enrollment event, so it must not resurrect an enrollment somebody
+    # deliberately deactivated. It still creates one when there is none: the
+    # dashboard is built from enrollments, so without one a course admin has no
+    # card to open, which is the whole reason the backfill exists.
+    is_role_grant = bool(role) and requested_mode is None
+
     try:
-        enrollment, created = create_local_enrollment(user, course_run, mode=mode)
+        enrollment, created = create_local_enrollment(
+            user, course_run, mode=mode, reactivate=not is_role_grant
+        )
     except Exception:
         log.exception(
             "Webhook: Error creating enrollment for user %s in course run %s",
             email,
             course_id,
         )
+        # 5xx rather than 400: nothing here says the request was bad, and the
+        # likely causes are transient. The sender drops a 4xx without retrying,
+        # so 400 would lose a grant a second attempt would have mirrored.
+        # Retrying is safe because both writes above are get_or_create.
         return Response(
             {"error": "Failed to create enrollment"},
-            status=status.HTTP_400_BAD_REQUEST,
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
     log.info(
