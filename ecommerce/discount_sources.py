@@ -208,8 +208,11 @@ def resolve_for_discount(discount, user, products) -> SourceResolution | None:
     basket that holds more than one linked program gets this one resolution on
     each of them; hq#12815 narrows pricing to the same single product.
     """
-    # Several discounts resolve in one request, and a lazy read of the links per
-    # discount trips the N+1 guard (zeal); an explicit prefetch does not.
+    # This costs one query per discount, and several discounts resolve in one
+    # request, so zeal reports it as an N+1. Batching the links means
+    # prefetching them for every discount at the caller. Prefetching rather than
+    # reading lazily caches the links on the instance, so resolving the same
+    # discount instance again skips the query.
     prefetch_related_objects([discount], "products")
     linked_product_ids = {link.product_id for link in discount.products.all()}
     product = next(

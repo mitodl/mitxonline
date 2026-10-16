@@ -10,12 +10,14 @@ from rest_framework.decorators import (
     api_view,
     authentication_classes,
     permission_classes,
+    versioning_class,
 )
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 
 from courses.api import create_local_enrollment, generate_course_run_certificates
 from courses.models import CourseRun, CourseRunAccessRole, CourseRunCertificate
+from main.versioning import NoVersioning
 from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, OPENEDX_COURSE_STAFF_ROLES
 from users.models import User
 
@@ -32,6 +34,7 @@ def openedx_private_auth_complete(request):  # noqa: ARG001
 @api_view(["POST"])
 @authentication_classes([OAuth2Authentication])
 @permission_classes([IsAdminUser])
+@versioning_class(NoVersioning)
 def edx_enrollment_webhook(request):
     """
     Webhook endpoint that receives enrollment notifications from Open edX.
@@ -164,6 +167,7 @@ def edx_enrollment_webhook(request):
 @api_view(["POST"])
 @authentication_classes([OAuth2Authentication])
 @permission_classes([IsAdminUser])
+@versioning_class(NoVersioning)
 def edx_certificate_webhook(request):
     """
     Webhook endpoint for receiving certificate creation events from Open edX.

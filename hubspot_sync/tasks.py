@@ -25,7 +25,7 @@ from mitol.hubspot_api.decorators import raise_429
 from mitol.hubspot_api.exceptions import TooManyRequestsException
 from mitol.hubspot_api.models import HubspotObject
 
-from ecommerce.models import Line, Order, Product
+from ecommerce.models import Order, Product
 from hubspot_sync import api
 from hubspot_sync.api import (
     get_hubspot_id_for_object,
@@ -277,28 +277,6 @@ def sync_program_certificate_with_hubspot(cert_id: int) -> str | None:
     cert = ProgramCertificate.all_objects.get(id=cert_id)
     result = api.sync_program_certificate_with_hubspot(cert)
     return result.id if result else None
-
-
-@app.task(
-    acks_late=True,
-    autoretry_for=(TooManyRequestsException, BlockingIOError),
-    max_retries=3,
-    retry_backoff=60,
-    retry_jitter=True,
-)
-@raise_429
-@single_task(10, key=task_obj_lock)
-def sync_line_with_hubspot(line_id: int) -> str:
-    """
-    Sync a Line with a hubspot line
-
-    Args:
-        line_id(int): The Line id
-
-    Returns:
-        str: The hubspot id for the line
-    """
-    return api.sync_line_item_with_hubspot(Line.objects.get(id=line_id)).id
 
 
 @app.task(

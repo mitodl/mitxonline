@@ -38,6 +38,7 @@ class ProgramRequirementDataSerializer(StrictFieldsSerializer):
             ProgramRequirementNodeType.COURSE,
             ProgramRequirementNodeType.PROGRAM,
             ProgramRequirementNodeType.OPERATOR,
+            ProgramRequirementNodeType.TRACK,
         )
     )
     course = serializers.IntegerField(source="course_id", allow_null=True, default=None)
@@ -51,6 +52,7 @@ class ProgramRequirementDataSerializer(StrictFieldsSerializer):
     operator = serializers.CharField(allow_null=True, default=None)
     operator_value = serializers.CharField(allow_null=True, default=None)
     elective_flag = serializers.BooleanField(allow_null=True, default=False)
+    description = serializers.CharField(allow_blank=True, required=False, default="")
 
 
 @extend_schema_serializer(component_name="V2ProgramRequirement")
@@ -186,7 +188,14 @@ class ProgramSerializer(serializers.ModelSerializer):
 
         programs_qs = programs_qs.filter(program__live=True, program__page__live=True)
 
-        programs = [req.program for req in programs_qs.select_related("program").all()]
+        # A parent can require this program from more than one group; list
+        # the parent once.
+        programs = list(
+            {
+                req.program_id: req.program
+                for req in programs_qs.select_related("program").all()
+            }.values()
+        )
 
         return BaseProgramSerializer(programs, many=True).data
 
@@ -298,23 +307,33 @@ class ProgramSerializer(serializers.ModelSerializer):
         required_programs = []
         elective_programs = []
         elective_operator_paths = _get_elective_operator_paths(requirements)
+        program_reqs = [
+            req
+            for req in requirements
+            if req.node_type == ProgramRequirementNodeType.PROGRAM
+            and req.required_program_id
+        ]
 
-        for req in requirements:
-            # Check node_type and required_program first to avoid unnecessary queries
-            if (
-                req.node_type == ProgramRequirementNodeType.PROGRAM
-                and req.required_program
-            ):
-                program_data = {
-                    "id": req.required_program.id,
-                    "readable_id": req.required_program.readable_id,
-                }
-                if _is_requirement_under_elective_operator(
-                    req, elective_operator_paths
-                ):
-                    elective_programs.append(program_data)
-                else:
-                    required_programs.append(program_data)
+        # A program can sit in more than one group; list it once, as required
+        # if any of its groups is required.
+        required_ids = {
+            req.required_program_id
+            for req in program_reqs
+            if not _is_requirement_under_elective_operator(req, elective_operator_paths)
+        }
+        seen_program_ids = set()
+        for req in program_reqs:
+            if req.required_program_id in seen_program_ids:
+                continue
+            seen_program_ids.add(req.required_program_id)
+            program_data = {
+                "id": req.required_program_id,
+                "readable_id": req.required_program.readable_id,
+            }
+            if req.required_program_id in required_ids:
+                required_programs.append(program_data)
+            else:
+                elective_programs.append(program_data)
         return required_programs, elective_programs
 
     def get_required_prerequisites(self, instance) -> bool:

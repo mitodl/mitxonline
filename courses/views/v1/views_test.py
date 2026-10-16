@@ -91,6 +91,7 @@ EXAMPLE_URL = "http://example.com"
 
 @pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
+@pytest.mark.zeal_allow("courses.CourseRun", "products")
 def test_get_programs(
     user_drf_client, django_assert_max_num_queries, course_catalog_data
 ):
@@ -110,6 +111,7 @@ def test_get_programs(
 
 @pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
+@pytest.mark.zeal_allow("courses.CourseRun", "products")
 def test_get_program(
     user_drf_client, django_assert_max_num_queries, course_catalog_data
 ):
@@ -208,6 +210,7 @@ def test_get_courses(
 
 @pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
+@pytest.mark.zeal_allow("courses.CourseRun", "products")
 def test_get_course(
     user_drf_client,
     course_catalog_data,
@@ -234,6 +237,7 @@ def test_get_course(
 @pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
 @pytest.mark.parametrize("program_is_live", [True, False])
 @pytest.mark.parametrize("program_page_is_live", [True, False])
+@pytest.mark.zeal_allow("courses.CourseRun", "products")
 def test_get_course_by_readable_id(  # noqa: PLR0913
     user_drf_client,
     course_catalog_data,
@@ -558,7 +562,7 @@ def test_user_enrollments_create_export_compliance_blocked(
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
-        "detail": "Unable to complete enrollment. Error code: CS_700"
+        "detail": "Unable to complete enrollment. Error code: CS_700."
     }
     assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
 

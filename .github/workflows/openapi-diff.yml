@@ -70,26 +70,41 @@ jobs:
           body-path: comment_body.md
       - name: Check for breaking changes
         id: oasdif_breaking
-        run: |
+        run: | # Check every spec before failing.
+          # The step runs under `bash -e`, so letting oasdiff's non-zero exit
+          # propagate mid-loop would abort the run and report only the first
+          # spec with breaking changes. Collect failures and fail at the end so
+          # a reviewer sees the whole picture in one run.
+          failed=()
           for spec in base/openapi/specs/*.yaml; do
             base_spec="$spec"
             head_spec="head/openapi/specs/$(basename "$spec")"
-            if [ -f "$head_spec" ]; then
-              echo "Checking $(basename "$spec") for breaking changes..."
-              err_ignore_flag=()
-              err_ignore_file="head/openapi/specs/oasdiff-err-ignore.txt"
-              if [ -f "$err_ignore_file" ]; then
-                err_ignore_flag=(--err-ignore "$err_ignore_file")
-              fi
-              docker run --rm \
-                --workdir ${{ github.workspace }} \
-                --volume ${{ github.workspace }}:${{ github.workspace }}:ro \
-                -e GITHUB_WORKSPACE=${{ github.workspace }} \
-                tufin/oasdiff breaking \
-                --fail-on ERR \
-                --format githubactions \
-                "${err_ignore_flag[@]}" \
-                "$base_spec" \
-                "$head_spec"
+            if [ ! -f "$head_spec" ]; then
+              # A base spec with no head counterpart means the whole spec file
+              # was deleted. That is always intentional-or-a-bug worth seeing,
+              # never something to pass silently.
+              echo "::error::$(basename "$spec") exists on the base branch but not on this branch - the entire spec file was removed."
+              failed+=("$(basename "$spec") (deleted)")
+              continue
             fi
+            echo "Checking $(basename "$spec") for breaking changes..."
+            err_ignore_flag=()
+            err_ignore_file="head/openapi/specs/oasdiff-err-ignore.txt"
+            if [ -f "$err_ignore_file" ]; then
+              err_ignore_flag=(--err-ignore "$err_ignore_file")
+            fi
+            docker run --rm \
+              --workdir ${{ github.workspace }} \
+              --volume ${{ github.workspace }}:${{ github.workspace }}:ro \
+              -e GITHUB_WORKSPACE=${{ github.workspace }} \
+              tufin/oasdiff breaking \
+              --fail-on ERR \
+              --format githubactions \
+              "${err_ignore_flag[@]}" \
+              "$base_spec" \
+              "$head_spec" || failed+=("$(basename "$spec")")
           done
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo "::error::Breaking changes found in: ${failed[*]}"
+            exit 1
+          fi

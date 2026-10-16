@@ -19,6 +19,7 @@ from django.forms import CheckboxInput, ChoiceField, IntegerField, Textarea
 from django.http import Http404, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.functional import cached_property
 from django.utils.safestring import mark_safe
 from django.utils.text import slugify
@@ -841,12 +842,22 @@ class ProductPageTestimonial(Orderable):
         related_name="+",
         help_text="Optional photo of the person quoted.",
     )
+    # Defaults to today so revisions saved before this field existed rehydrate
+    # without tripping the NOT NULL column.
+    date_published = models.DateField(
+        default=timezone.localdate,
+        help_text=(
+            "When this testimonial was published. Shown to search engines as the "
+            "review date, not displayed on the page."
+        ),
+    )
 
     panels = [
         FieldPanel("quote"),
         FieldPanel("name"),
         FieldPanel("title"),
         FieldPanel("image"),
+        FieldPanel("date_published"),
     ]
 
     def __str__(self):

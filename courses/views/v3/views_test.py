@@ -5,6 +5,7 @@ Tests for courses api views v3
 from datetime import timedelta
 
 import pytest
+from django.core.cache.backends.locmem import LocMemCache
 from django.db.models import Q
 from django.urls import reverse
 from faker import Faker
@@ -12,6 +13,7 @@ from mitol.common.utils import now_in_utc
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from compliance.api import ExportComplianceResult
 from compliance.exceptions import ExportComplianceDataError, ExportComplianceError
 from courses.conftest import B2BCourses, UserWithEnrollmentsAndCerts
 from courses.constants import (
@@ -24,14 +26,18 @@ from courses.factories import (
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
+    create_program_with_tracks,
+    program_with_tracks,  # noqa: F401
 )
 from courses.models import (
     CourseRunAccessRole,
+    CourseRunEnrollment,
     PaidProgram,
     ProgramEnrollment,
 )
 from courses.serializers.v3.programs import SimpleProgramSerializer
 from courses.test_utils import maybe_serialize_course_cert, maybe_serialize_program_cert
+from courses.throttles import EnrollmentEligibilityThrottle
 from ecommerce.factories import OrderFactory
 from ecommerce.models import OrderStatus
 from main.test_utils import drf_datetime
@@ -131,7 +137,9 @@ def test_user_enrollments_detail(
             "language": enrollment.run.language,
             "language_label": enrollment.run.language_label,
             "variant_industry": enrollment.run.variant_industry,
+            "variant_industry_label": enrollment.run.variant_industry_label,
             "variant_length": enrollment.run.variant_length,
+            "variant_length_label": enrollment.run.variant_length_label,
         },
         "edx_emails_subscription": enrollment.edx_emails_subscription,
         "grades": [
@@ -208,7 +216,9 @@ def test_user_enrollments_list(
                 "language": enrollment.run.language,
                 "language_label": enrollment.run.language_label,
                 "variant_industry": enrollment.run.variant_industry,
+                "variant_industry_label": enrollment.run.variant_industry_label,
                 "variant_length": enrollment.run.variant_length,
+                "variant_length_label": enrollment.run.variant_length_label,
             },
             "edx_emails_subscription": enrollment.edx_emails_subscription,
             "grades": [
@@ -327,7 +337,9 @@ def test_user_enrollments_list_filter_exclude_b2b(
                 "language": enrollment.run.language,
                 "language_label": enrollment.run.language_label,
                 "variant_industry": enrollment.run.variant_industry,
+                "variant_industry_label": enrollment.run.variant_industry_label,
                 "variant_length": enrollment.run.variant_length,
+                "variant_length_label": enrollment.run.variant_length_label,
             },
             "edx_emails_subscription": enrollment.edx_emails_subscription,
             "grades": [
@@ -405,7 +417,9 @@ def test_user_enrollments_list_filter_exclude_b2b(
                 "language": enrollment.run.language,
                 "language_label": enrollment.run.language_label,
                 "variant_industry": enrollment.run.variant_industry,
+                "variant_industry_label": enrollment.run.variant_industry_label,
                 "variant_length": enrollment.run.variant_length,
+                "variant_length_label": enrollment.run.variant_length_label,
             },
             "edx_emails_subscription": enrollment.edx_emails_subscription,
             "grades": [
@@ -550,6 +564,7 @@ def test_program_enrollments(
                 program_enrollment.program, user
             ),
             "enrollment_mode": program_enrollment.enrollment_mode,
+            "track": None,
         }
         for program_enrollment in program_enrollments
     ]
@@ -702,7 +717,7 @@ def test_create_program_enrollment_export_compliance_blocked(
 
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
-        "detail": "Unable to complete enrollment. Error code: CS_700"
+        "detail": "Unable to complete enrollment. Error code: CS_700."
     }
     assert not ProgramEnrollment.objects.filter(user=user, program=program).exists()
 
@@ -888,3 +903,283 @@ def test_course_outline_v3_upstream_failures(
     )
     assert resp.status_code == status.HTTP_502_BAD_GATEWAY
     assert resp.json() == {"detail": expected_detail}
+
+
+class TestEnrollmentEligibility:
+    """Tests for the /enrollment-eligible/ endpoints."""
+
+    @pytest.fixture(autouse=True)
+    def private_throttle_cache(self, mocker):
+        """
+        Give the throttle a per-test cache.
+
+        The real one is the shared ``redis`` cache, so without this the
+        counters leak between tests and across xdist workers.
+        """
+        mocker.patch.object(
+            EnrollmentEligibilityThrottle,
+            "cache",
+            LocMemCache("enrollment-eligibility-throttle-test", {}),
+        )
+
+    @pytest.fixture
+    def pinned_throttle_rate(self, mocker):
+        """
+        Pin the throttle to 2/min for this test.
+
+        Mutating ``settings.REST_FRAMEWORK`` in place would not work - it does
+        not fire ``setting_changed``, so DRF never reloads ``api_settings``.
+        """
+        mocker.patch.object(
+            EnrollmentEligibilityThrottle,
+            "THROTTLE_RATES",
+            {"enrollment_eligibility": "2/min"},
+        )
+
+    @pytest.fixture
+    def endpoints(self):
+        """The two eligibility URLs, keyed by the kind of thing they check."""
+        return {
+            "run": lambda obj: reverse(
+                "v3:course_run_enrollment_eligible", kwargs={"run_id": obj.id}
+            ),
+            "program": lambda obj: reverse(
+                "v3:program_enrollment_eligible", kwargs={"program_id": obj.id}
+            ),
+        }
+
+    @staticmethod
+    def _courseware_object(kind):
+        return CourseRunFactory.create() if kind == "run" else ProgramFactory.create()
+
+    @pytest.mark.parametrize("kind", ["run", "program"])
+    def test_eligible(self, user_drf_client, endpoints, kind):
+        """An accepted compliance check reports the user as enrollable."""
+        courseware_object = self._courseware_object(kind)
+
+        resp = user_drf_client.post(endpoints[kind](courseware_object))
+
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.json() == {"enrollable": True, "reason_code": None}
+
+    @pytest.mark.parametrize("kind", ["run", "program"])
+    def test_blocked_by_compliance(self, mocker, user_drf_client, endpoints, kind):
+        """A rejected compliance check reports CS_700."""
+        courseware_object = self._courseware_object(kind)
+        mocker.patch(
+            "courses.api.verify_user_with_exports",
+            return_value=ExportComplianceResult(
+                decision="DECLINED",
+                reason_code=102,
+                request_id="req-123",
+                raw={},
+            ),
+        )
+
+        resp = user_drf_client.post(endpoints[kind](courseware_object))
+
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.json() == {"enrollable": False, "reason_code": "CS_700"}
+
+    @pytest.mark.parametrize("kind", ["run", "program"])
+    def test_blocked_by_missing_profile_data(
+        self, mocker, user, user_drf_client, endpoints, kind
+    ):
+        """An incomplete profile reports CS_701, not CS_700."""
+        courseware_object = self._courseware_object(kind)
+        mocker.patch(
+            "courses.api.verify_user_with_exports",
+            side_effect=ExportComplianceDataError(user, ["postal_code", "state"]),
+        )
+
+        resp = user_drf_client.post(endpoints[kind](courseware_object))
+
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.json() == {"enrollable": False, "reason_code": "CS_701"}
+
+    @pytest.mark.parametrize("kind", ["run", "program"])
+    def test_does_not_enroll(self, user, user_drf_client, endpoints, kind):
+        """Asking the question must not create an enrollment."""
+        courseware_object = self._courseware_object(kind)
+
+        user_drf_client.post(endpoints[kind](courseware_object))
+
+        assert not CourseRunEnrollment.objects.filter(user=user).exists()
+        assert not ProgramEnrollment.objects.filter(user=user).exists()
+
+    @pytest.mark.parametrize(
+        ("url_name", "kwarg"),
+        [
+            ("v3:course_run_enrollment_eligible", "run_id"),
+            ("v3:program_enrollment_eligible", "program_id"),
+        ],
+    )
+    def test_unknown_id_is_404(self, user_drf_client, url_name, kwarg):
+        """An id that matches nothing is a 404."""
+        resp = user_drf_client.post(reverse(url_name, kwargs={kwarg: 9999999}))
+
+        assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.parametrize("kind", ["run", "program"])
+    def test_unauthenticated(self, endpoints, kind):
+        """Anonymous callers are rejected before any compliance work happens."""
+        courseware_object = self._courseware_object(kind)
+
+        resp = APIClient().post(endpoints[kind](courseware_object))
+
+        assert resp.status_code in (
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    @pytest.mark.parametrize("kind", ["run", "program"])
+    def test_get_not_allowed(self, user_drf_client, endpoints, kind):
+        """These are POST-only - the check has side effects."""
+        courseware_object = self._courseware_object(kind)
+
+        resp = user_drf_client.get(endpoints[kind](courseware_object))
+
+        assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+
+    @pytest.mark.usefixtures("pinned_throttle_rate")
+    def test_throttled_after_rate_exceeded(self, user_drf_client, endpoints):
+        """The third call in a window is throttled."""
+        run = CourseRunFactory.create()
+        url = endpoints["run"](run)
+
+        assert user_drf_client.post(url).status_code == status.HTTP_200_OK
+        assert user_drf_client.post(url).status_code == status.HTTP_200_OK
+        assert (
+            user_drf_client.post(url).status_code == status.HTTP_429_TOO_MANY_REQUESTS
+        )
+
+    @pytest.mark.usefixtures("pinned_throttle_rate")
+    def test_throttle_budget_is_shared_across_both_endpoints(
+        self, user_drf_client, endpoints
+    ):
+        """Runs and programs draw on one per-user budget, not one each."""
+        run = CourseRunFactory.create()
+        program = ProgramFactory.create()
+
+        assert (
+            user_drf_client.post(endpoints["run"](run)).status_code
+            == status.HTTP_200_OK
+        )
+        assert (
+            user_drf_client.post(endpoints["program"](program)).status_code
+            == status.HTTP_200_OK
+        )
+        assert (
+            user_drf_client.post(endpoints["run"](run)).status_code
+            == status.HTTP_429_TOO_MANY_REQUESTS
+        )
+
+
+def _program_enrollment_url(program):
+    return reverse(
+        "v3:user_program_enrollments_api-detail", kwargs={"program_id": program.id}
+    )
+
+
+def test_program_enrollments_include_track(
+    user_drf_client, user, django_assert_max_num_queries
+):
+    """The list carries each enrollment's chosen track with no query per enrollment"""
+    enrollments = [
+        ProgramEnrollmentFactory.create(
+            user=user, program=tracked.program, track=tracked.track_nodes[0]
+        )
+        for tracked in (create_program_with_tracks(), create_program_with_tracks())
+    ]
+
+    with django_assert_max_num_queries(4):
+        resp = user_drf_client.get(reverse("v3:user_program_enrollments_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert [enrollment["track"] for enrollment in resp.json()] == [
+        {"id": enrollment.track.id, "title": enrollment.track.title}
+        for enrollment in reversed(enrollments)
+    ]
+
+
+def test_update_program_enrollment_track(
+    user_drf_client,
+    user,
+    program_with_tracks,  # noqa: F811
+):
+    """PATCH sets, changes and clears the enrollment's track"""
+    enrollment = ProgramEnrollmentFactory.create(
+        user=user, program=program_with_tracks.program
+    )
+    url = _program_enrollment_url(enrollment.program)
+
+    for track in [*program_with_tracks.track_nodes, None]:
+        resp = user_drf_client.patch(
+            url, {"track": track.id if track else None}, format="json"
+        )
+
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.json()["track"] == (
+            {"id": track.id, "title": track.title} if track else None
+        )
+        enrollment.refresh_from_db()
+        assert enrollment.track == track
+
+
+def test_update_program_enrollment_track_without_field(
+    user_drf_client,
+    user,
+    program_with_tracks,  # noqa: F811
+):
+    """A PATCH that omits track leaves the chosen track alone"""
+    track = program_with_tracks.track_nodes[0]
+    enrollment = ProgramEnrollmentFactory.create(
+        user=user, program=program_with_tracks.program, track=track
+    )
+
+    resp = user_drf_client.patch(_program_enrollment_url(enrollment.program), {})
+
+    assert resp.status_code == status.HTTP_200_OK
+    enrollment.refresh_from_db()
+    assert enrollment.track == track
+
+
+@pytest.mark.parametrize("wrong_node", ["group", "other_program_track"])
+def test_update_program_enrollment_track_rejects_wrong_node(
+    user_drf_client,
+    user,
+    program_with_tracks,  # noqa: F811
+    wrong_node,
+):
+    """PATCH rejects a node that is not a track, and a track of another program"""
+    enrollment = ProgramEnrollmentFactory.create(
+        user=user, program=program_with_tracks.program
+    )
+    node = (
+        program_with_tracks.tracks_node
+        if wrong_node == "group"
+        else create_program_with_tracks().track_nodes[0]
+    )
+
+    resp = user_drf_client.patch(
+        _program_enrollment_url(enrollment.program), {"track": node.id}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert "track" in resp.json()["errors"]
+    enrollment.refresh_from_db()
+    assert enrollment.track is None
+
+
+def test_update_program_enrollment_track_without_enrollment(
+    user_drf_client,
+    program_with_tracks,  # noqa: F811
+):
+    """PATCH is a 404 when the user has no active enrollment in the program"""
+    resp = user_drf_client.patch(
+        _program_enrollment_url(program_with_tracks.program),
+        {"track": program_with_tracks.track_nodes[0].id},
+        format="json",
+    )
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND

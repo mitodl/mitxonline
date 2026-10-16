@@ -9,7 +9,9 @@ import {
   USER_MSG_COOKIE_NAME,
   USER_MSG_TYPE_COMPLETED_AUTH,
   USER_MSG_TYPE_ENROLL_FAILED,
-  USER_MSG_TYPE_ENROLLED
+  USER_MSG_TYPE_ENROLLED,
+  USER_MSG_TYPE_PAYMENT_ERROR,
+  USER_MSG_TYPE_PROFILE_INCOMPLETE
 } from "../constants"
 import IntegrationTestHelper from "../util/integration_test_helper"
 
@@ -33,6 +35,13 @@ describe("notifications API", () => {
       })
     })
 
+    it("returns an error message for a 'payment error' message cookie value", () => {
+      const message = notificationsApi.parseStoredUserMessage({
+        type: USER_MSG_TYPE_PAYMENT_ERROR
+      })
+      assert.equal(message && message.type, "danger")
+    })
+
     it("returns the correct message properties given an 'enrolled' message cookie value", () => {
       assert.deepEqual(
         notificationsApi.parseStoredUserMessage({
@@ -53,6 +62,18 @@ describe("notifications API", () => {
         }),
         {
           text: `Something went wrong with your enrollment. Please contact support at ${SETTINGS.support_email}.`,
+          type: "danger"
+        }
+      )
+    })
+
+    it("returns the correct message properties given a 'profile incomplete' message cookie value", () => {
+      assert.deepEqual(
+        notificationsApi.parseStoredUserMessage({
+          type: USER_MSG_TYPE_PROFILE_INCOMPLETE
+        }),
+        {
+          text: 'We need a few more details about you before you can place your order. Please click "Place your order" again to provide them.',
           type: "danger"
         }
       )

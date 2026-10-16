@@ -24,7 +24,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
-from b2b.api import _create_discount_with_product, is_potentially_valid_mailgun_webhook
+from b2b.api import (
+    _create_discount_with_product,
+    is_potentially_valid_mailgun_webhook,
+    lock_contract_for_code_assignment,
+)
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
 from b2b.models import (
     EMAIL_STATUS_FAILED,
@@ -61,6 +65,7 @@ from b2b.utils import is_redeemed_attachment_record
 from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME
 from ecommerce.models import Discount
+from main.versioning import V0Versioning
 
 log = logging.getLogger(__name__)
 
@@ -84,21 +89,6 @@ def clear_assignment_email_deliverability_fields(assignment):
     assignment.email_status = ""
     assignment.email_status_event_timestamp = None
     return assignment
-
-
-def lock_contract_for_code_assignment(contract: ContractPage) -> None:
-    """
-    Serialize code assignment for a contract until the transaction ends.
-
-    Assigning checks which codes are free and then inserts assignment rows.
-    Locking the candidate discounts would not close that gap, because a
-    concurrent assignment inserts a redemption row and never updates the
-    discount, so Postgres has nothing to re-check. Holding the contract row
-    instead makes the second request wait and then read the first one's rows.
-    Only the contract's own table is locked, not the Wagtail page row.
-    """
-
-    ContractPage.objects.select_for_update(of=("self",)).get(pk=contract.pk)
 
 
 def create_code_assignments(
@@ -175,7 +165,7 @@ def _create_discount_codes_for_contract(
 
     for _ in range(count_to_provision):
         discount = _create_discount_with_product(
-            product, Decimal(0), REDEMPTION_TYPE_ONE_TIME
+            contract, product, Decimal(0), REDEMPTION_TYPE_ONE_TIME
         )
         new_discounts.append(discount)
 
@@ -290,6 +280,7 @@ def _match_free_codes(
 class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
     """List organizations available for the current user."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAuthenticated]
     serializer_class = OrganizationPageSerializer
     pagination_class = ManagerContractOrgPagination
@@ -310,11 +301,12 @@ class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
                 Prefetch(
                     "contracts",
                     queryset=ContractPage.objects.prefetch_related(
+                        "variant_options",
                         Prefetch(
                             "contract_programs",
                             queryset=ContractProgramItem.objects.order_by("sort_order"),
                             to_attr="contract_program_ids",
-                        )
+                        ),
                     ).filter(active=True),
                     to_attr="_active_contracts",
                 ),
@@ -398,6 +390,7 @@ class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
 class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     """List an organization's contracts."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAuthenticated, IsOrganizationManager]
     # While we define this at the class level, we pretty much have to do the pagination manually in view defintions for anything that matters
     # The queryset we return is for ContractPages - course_run_enrollments and codes lookups are performed almost entirely in view

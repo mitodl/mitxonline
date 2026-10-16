@@ -20,8 +20,8 @@ def program_requirements_catalog():
 
     The requirements-admin.js widget renders its own "requirement groups" UI
     client-side; this just hands it the raw data it needs to populate course
-    and program pickers, plus the operator choices for a group's "all of" /
-    "choose N of" toggle.
+    and program pickers, the node types it writes, and the operator choices
+    for a group's "all of" / "choose N of" toggle.
     """
 
     courses = Course.objects.live().order_by("title")
@@ -32,6 +32,7 @@ def program_requirements_catalog():
             "course": ProgramRequirementNodeType.COURSE.value,
             "operator": ProgramRequirementNodeType.OPERATOR.value,
             "program": ProgramRequirementNodeType.PROGRAM.value,
+            "track": ProgramRequirementNodeType.TRACK.value,
         },
         "operators": [
             {"value": value, "label": label}

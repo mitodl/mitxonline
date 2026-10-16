@@ -41,6 +41,7 @@ from b2b.contracts import (
     queue_enrollment_code_check_if_required,
     remove_courseware_from_contract,
     retry_contract_setup,
+    sync_contract_variants,
     update_contract_variant_set,
 )
 from b2b.exceptions import (
@@ -79,6 +80,7 @@ from b2b.serializers.v0.provisioning import (
     ContractCoursewareSerializer,
     ContractSetupStatusSerializer,
     ContractVariantSetSerializer,
+    ContractVariantSyncSerializer,
     CoursewareAdditionSerializer,
     CreateContractSerializer,
     CreateContractVariantSetSerializer,
@@ -105,6 +107,8 @@ from b2b.views.v0.manager import (
     bulk_assign_enrollment_codes,
 )
 from courses.api import resolve_courseware_object_from_id
+from courses.models import CourseRun
+from main.versioning import V0Versioning
 from main.views import RefinePagination
 
 log = logging.getLogger(__name__)
@@ -177,6 +181,7 @@ class OrganizationProvisioningViewSet(
 ):
     """Provision and inspect B2B organizations."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAdminUser]
     serializer_class = ProvisionedOrganizationSerializer
     lookup_field = "org_key"
@@ -369,6 +374,7 @@ class IdentityProviderProvisioningViewSet(
 ):
     """Provision and manage an organization's identity providers."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAdminUser]
     serializer_class = OrganizationIdentityProviderSerializer
     lookup_field = "alias"
@@ -558,6 +564,7 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
     the codes routes return redeemable enrollment codes.
     """
 
+    versioning_class = V0Versioning
     permission_classes = [IsAdminUser]
     serializer_class = ProvisionedContractSerializer
     pagination_class = ManagerContractOrgPagination
@@ -674,6 +681,27 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
         request_serializer = ContractCoursewareSerializer(data=request.data)
         request_serializer.is_valid(raise_exception=True)
         courseware_id = request_serializer.validated_data["courseware_id"]
+
+        # CourseRun.objects leaves source runs out, so without this a source
+        # run's ID is a 404 that reads as if the run didn't exist.
+        source_run = (
+            CourseRun.all_objects.source()
+            .filter(courseware_id=courseware_id)
+            .select_related("course")
+            .first()
+        )
+        if source_run:
+            return Response(
+                {
+                    "detail": (
+                        f"{courseware_id} is a source run. Contract runs are "
+                        "cloned from it, so it can't be added to a contract. "
+                        f"Add its course, {source_run.course.readable_id}, instead."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         courseware = self._courseware(courseware_id)
 
         # The 400 bodies are built from the requested ID, never the exception
@@ -824,8 +852,8 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
         """
         Add a variant set to the contract.
 
-        Creates no runs. Adding the courseware to the contract again creates
-        runs for the new set.
+        Creates no runs. variants/sync creates them for the courseware already
+        in the contract.
         """
 
         contract = self.get_object()
@@ -908,6 +936,27 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
             )
 
         return self._variant_set_response(contract, variant, status.HTTP_200_OK)
+
+    @extend_schema(request=None, responses={200: ContractVariantSyncSerializer})
+    @action(detail=True, methods=["post"], url_path="variants/sync")
+    def sync_variants(self, request, pk=None, **kwargs):  # noqa: ARG002
+        """
+        Create the runs the contract's courses are missing for its variant sets.
+
+        Run it after adding variant sets to a contract that already has
+        courseware. Courses and variants that already have a run are left
+        alone, so repeating the call creates nothing more. The new runs' edX
+        clones are queued, and so is the enrollment code check for a contract
+        that uses codes.
+        """
+
+        contract = self.get_object()
+        synced = sync_contract_variants(contract)
+
+        if synced["runs_created"]:
+            queue_enrollment_code_check_if_required(contract)
+
+        return Response(ContractVariantSyncSerializer(synced).data)
 
     @extend_schema(responses={200: ManagerEnrollmentCodeSerializer(many=True)})
     @action(detail=True, methods=["get"])
@@ -1009,6 +1058,7 @@ class ParseMetadataView(ProvisioningExceptionMixin, viewsets.ViewSet):
     needs an allowlist and a rate limit before it goes anywhere near a partner.
     """
 
+    versioning_class = V0Versioning
     permission_classes = [IsAdminUser]
 
     @extend_schema(

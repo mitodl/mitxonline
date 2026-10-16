@@ -80,6 +80,7 @@ from courses.utils import (
     verified_courserun_exists,
 )
 from ecommerce.api import create_verified_program_course_run_enrollment
+from ecommerce.exceptions import VerifiedProgramInvalidOrderError
 from ecommerce.models import Product
 from main import features
 from main.pagination import Pagination
@@ -472,13 +473,10 @@ class CourseViewSet(
         # prefetch selects the whole multi-table row - ~50 columns including two
         # RichTextFields - once per (run, contract) pair.
         #
-        # active_objects, not objects: the M2M related manager is built from
-        # ContractPage._default_manager, which is ActiveContractManager because
-        # active_objects is ContractPage's only *local* manager (see
-        # CourseRunAdmin.formfield_for_foreignkey for the same reasoning). So
-        # this prefetch has always filtered to active, in-window contracts, and
-        # ContractPage.objects - Wagtail's inherited, unfiltered PageManager -
-        # would silently widen it.
+        # active_objects, not objects: the M2M related manager filters to
+        # active, in-window contracts (see ContractPageManager), so this
+        # prefetch always has, and the unfiltered ContractPage.objects would
+        # silently widen it.
         #
         # ``contract.id`` stays free under only(): it is the MTI parent's pk, so
         # DeferredAttribute._check_parent_chain resolves it from the loaded
@@ -913,9 +911,14 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
     # Everything checks out for a verified enrollment, so generate one.
     # This requires generating an order.
 
-    enrollment = create_verified_program_course_run_enrollment(
-        request, run, program_enrollment.program
-    )
+    try:
+        enrollment = create_verified_program_course_run_enrollment(
+            request, run, program_enrollment.program
+        )
+    except VerifiedProgramInvalidOrderError as exc:
+        # Checkout refused the order, e.g. an incomplete profile or a compliance
+        # denial. The cause is logged where it's detected.
+        raise EnrollmentError.from_cause(exc) from exc
 
     return _created_enrollment_response(enrollment)
 

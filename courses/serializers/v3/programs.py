@@ -4,6 +4,8 @@ from rest_framework import serializers
 from courses.models import (
     Program,
     ProgramEnrollment,
+    ProgramRequirement,
+    ProgramRequirementNodeType,
 )
 from courses.serializers.v3.certificates import ProgramCertificateSerializer
 
@@ -26,6 +28,15 @@ class SimpleProgramSerializer(serializers.ModelSerializer):
         ]
 
 
+@extend_schema_serializer(component_name="V3ProgramTrack")
+class ProgramTrackSerializer(serializers.ModelSerializer):
+    """A track node of a program's requirement tree."""
+
+    class Meta:
+        model = ProgramRequirement
+        fields = ("id", "title")
+
+
 @extend_schema_serializer(component_name="V3UserProgramEnrollment")
 class ProgramEnrollmentSerializer(serializers.ModelSerializer):
     """
@@ -34,10 +45,30 @@ class ProgramEnrollmentSerializer(serializers.ModelSerializer):
 
     program = SimpleProgramSerializer(read_only=True)
     certificate = ProgramCertificateSerializer(allow_null=True, read_only=True)
+    track = ProgramTrackSerializer(allow_null=True, read_only=True)
 
     class Meta:
         model = ProgramEnrollment
-        fields = ("program", "certificate", "enrollment_mode")
+        fields = ("program", "certificate", "enrollment_mode", "track")
+
+
+@extend_schema_serializer(component_name="V3ProgramEnrollmentTrack")
+class ProgramEnrollmentTrackSerializer(serializers.Serializer):
+    """Sets or clears the learner's chosen track on a program enrollment."""
+
+    track = serializers.PrimaryKeyRelatedField(
+        queryset=ProgramRequirement.objects.filter(
+            node_type=ProgramRequirementNodeType.TRACK
+        ),
+        allow_null=True,
+    )
+
+    def validate_track(self, value):
+        """Only a track of the enrollment's own program can be chosen."""
+        if value is not None and value.program_id != self.instance.program_id:
+            msg = "Must be a track of this program."
+            raise serializers.ValidationError(msg)
+        return value
 
 
 @extend_schema_serializer(component_name="V3ProgramEnrollmentRequest")

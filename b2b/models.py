@@ -9,7 +9,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
-from django.db import models
+from django.db import models, transaction
 from django.http import Http404
 from django.urls import reverse
 from django.utils.functional import cached_property
@@ -21,7 +21,7 @@ from modelcluster.fields import ParentalKey
 from requests.exceptions import HTTPError
 from wagtail.admin.panels import FieldPanel, HelpPanel, InlinePanel, MultiFieldPanel
 from wagtail.fields import RichTextField
-from wagtail.models import ClusterableModel, Orderable, Page
+from wagtail.models import ClusterableModel, Orderable, Page, PageManager
 
 from b2b.constants import (
     CONTRACT_MEMBERSHIP_AUTOS,
@@ -35,6 +35,7 @@ from b2b.constants import (
     ONBOARDING_STATE_REQUESTED,
     ORG_INDEX_SLUG,
     PROVISIONING_ACTION_CHOICES,
+    PROVISIONING_ACTION_ORG_UPDATED,
 )
 from courses.models import Program
 from main.models import AuditModel, ValidateOnSaveMixin
@@ -113,9 +114,24 @@ class StaffDashboardOrganizationPanel(HelpPanel):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
             self.content = format_html(
-                'Edit this organization and its SSO setup in the <a href="{}">staff '
-                "dashboard</a>. Contracts are still managed here, as child pages.",
+                'Edit this organization, its SSO setup and its contracts in the <a href="{}">staff '
+                "dashboard</a>.",
                 f"/staff-dashboard/b2b_organizations/show/{self.instance.org_key}",
+            )
+
+
+class StaffDashboardContractPanel(HelpPanel):
+    """Links a contract's Wagtail page to its staff dashboard page."""
+
+    class BoundPanel(HelpPanel.BoundPanel):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.content = format_html(
+                'Edit this contract, its courseware and its enrollment codes in the <a href="{}">staff '
+                "dashboard</a>. The extra welcome message, the Google Sheet target "
+                "and tab, and the order of its programs are edited here.",
+                f"/staff-dashboard/b2b_organizations/show/{self.instance.organization.org_key}"
+                f"/contracts/{self.instance.pk}",
             )
 
 
@@ -159,15 +175,26 @@ class OrganizationPage(Page):
         help_text="The UUID for the organization in the SSO provider.",
     )
 
-    # The staff dashboard has no logo upload, and sso_organization_id stays
-    # editable here to link organizations created before the dashboard.
+    # Written only by the provisioning API and the Keycloak reconciler. A
+    # Wagtail revision holds whatever these were when it was saved, so
+    # with_content_json() takes them from the stored row instead.
+    PROVISIONED_FIELDS = (
+        "name",
+        "org_key",
+        "org_key_prefix",
+        "description",
+        "sso_organization_id",
+    )
+
+    # The staff dashboard has no logo upload, so the logo is the one field
+    # still edited here.
     content_panels = [
         StaffDashboardOrganizationPanel(),
         FieldPanel("name", read_only=True),
         FieldPanel("description", read_only=True),
         FieldPanel("org_key", read_only=True),
+        FieldPanel("sso_organization_id", read_only=True),
         FieldPanel("logo"),
-        FieldPanel("sso_organization_id"),
     ]
 
     # Use default promote_panels from Page to allow manual slug editing
@@ -178,14 +205,95 @@ class OrganizationPage(Page):
 
         return slugify(f"org-{name}")
 
-    def save(self, clean=True, user=None, log_action=False, **kwargs):  # noqa: FBT002
-        """Save the page, and update the slug and title appropriately."""
+    def save(
+        self,
+        clean=True,  # noqa: FBT002
+        user=None,
+        log_action=False,  # noqa: FBT002
+        *,
+        audit_sso_link=True,
+        **kwargs,
+    ):
+        """
+        Save the page, and update the slug and title appropriately.
+
+        A change to sso_organization_id on an existing organization is
+        written to the provisioning audit trail here, so one made outside the
+        provisioning API (a management command, a shell) is still recorded.
+        Callers that write their own audit record pass audit_sso_link=False.
+        """
 
         self.title = str(self.name)
 
         if not self.slug:
             self.slug = self.slug_for_name(self.name)
-        Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
+
+        # save_revision() saves only the revision fields, with the edited
+        # value in memory and not yet written.
+        update_fields = kwargs.get("update_fields")
+        writes_sso_link = (
+            update_fields is None or "sso_organization_id" in update_fields
+        )
+
+        with transaction.atomic():
+            stored = None
+            if audit_sso_link and writes_sso_link and self.pk:
+                # Locked, so two overlapping saves each record the link they
+                # overwrote.
+                stored = (
+                    OrganizationPage.objects.select_for_update(of=("self",))
+                    .filter(pk=self.pk)
+                    .values("sso_organization_id")
+                    .first()
+                )
+
+            Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
+
+            if stored:
+                self._audit_sso_link_change(stored, user)
+
+    def with_content_json(self, content):
+        """
+        Build the page a revision describes, keeping the provisioned fields.
+
+        Wagtail calls this to load the editor and to publish. Without it,
+        publishing a revision saved before an API write puts the old name,
+        description and Keycloak link back.
+        """
+
+        page = super().with_content_json(content)
+        # Read from the database, not from self: when the editor publishes,
+        # self is the instance it loaded before the form was filled in.
+        stored = (
+            OrganizationPage.objects.filter(pk=self.pk)
+            .values(*self.PROVISIONED_FIELDS)
+            .get()
+        )
+        for field, value in stored.items():
+            setattr(page, field, value)
+        page.title = stored["name"]
+        return page
+
+    def _audit_sso_link_change(self, stored, user):
+        """Record a change to sso_organization_id made outside the provisioning API."""
+
+        # A caller may assign the ID as a str in any form uuid.UUID accepts,
+        # and a save that skips full_clean() leaves it one.
+        before = stored["sso_organization_id"]
+        after = self._meta.get_field("sso_organization_id").to_python(
+            self.sso_organization_id or None
+        )
+        if before == after:
+            return
+
+        OrganizationProvisioningAudit.objects.create(
+            organization=self,
+            org_key=self.org_key,
+            action=PROVISIONING_ACTION_ORG_UPDATED,
+            acting_user=user,
+            data_before={"sso_organization_id": str(before) if before else None},
+            data_after={"sso_organization_id": str(after) if after else None},
+        )
 
     def get_learners(self):
         """Get the learners associated with this organization."""
@@ -256,6 +364,60 @@ class OrganizationPage(Page):
                 membership_type__in=CONTRACT_MEMBERSHIP_AUTOS
             ).values_list("id", flat=True),
         ).delete()
+
+    def reconcile_all_user_contracts(self):
+        """
+        Ensure the automatic contracts' memberships are aligned with the org membership.
+
+        Users in automatic membership contracts (e.g. "managed" type) are added
+        and removed from the contract as org members log into the system. This
+        requires that the users remain active in the system; if they don't, seat
+        counts may be off from reality.
+        """
+
+        reconciliation_result: dict[str, dict] = {}
+
+        for contract in self.contracts.filter(
+            membership_type__in=CONTRACT_MEMBERSHIP_AUTOS
+        ).all():
+            log.info("reconcile_all_user_contracts: Reconciling contract %s", contract)
+            missing_users = self.organization_users.exclude(
+                user__in=contract.b2b_contract_users.values_list("user")
+            ).all()
+
+            for user in missing_users:
+                log.info(
+                    "reconcile_all_user_contracts: Adding missing user %s to contract %s",
+                    user.user,
+                    contract,
+                )
+                user.user.b2b_contracts.add(contract)
+
+            extra_users = contract.b2b_contract_users.exclude(
+                user__in=self.organization_users.values_list("user")
+            ).all()
+
+            for user in extra_users:
+                log.info(
+                    "reconcile_all_user_contracts: Removing extra user %s from contract %s",
+                    user.user,
+                    contract,
+                )
+                user.user.b2b_contracts.remove(contract)
+
+            log.info(
+                "reconcile_all_user_contracts: Added %s and removed %s users from contract %s",
+                len(missing_users),
+                len(extra_users),
+                contract,
+            )
+
+            reconciliation_result[str(contract)] = {
+                "added": missing_users,
+                "removed": extra_users,
+            }
+
+        return reconciliation_result
 
     def __str__(self):
         """Return a reasonable representation of the org as a string."""
@@ -367,11 +529,59 @@ class ActiveContractManager(models.Manager):
         )
 
 
+class ContractPageManager(PageManager):
+    """
+    Default manager for contracts: every contract, except through a relation.
+
+    Wagtail reloads a page through its model's default manager when it saves
+    one (``Page.specific``), so a default manager that hides contracts that
+    aren't valid for use makes them impossible to save. Django also builds
+    related managers (``user.b2b_contracts``, ``run.b2b_contracts``,
+    ``organization.contracts``) from the default manager's class, and the code
+    that reads those relies on them leaving out contracts that aren't valid.
+    A related manager is the one with an ``instance``, so only it filters.
+    """
+
+    def get_queryset(self):
+        """Filter to contracts valid for use when reached through a relation."""
+
+        queryset = super().get_queryset()
+
+        if not hasattr(self, "instance"):
+            return queryset
+
+        now = now_in_utc()
+
+        return queryset.filter(active=True).exclude(
+            models.Q(contract_start__gt=now) | models.Q(contract_end__lt=now)
+        )
+
+
 class ContractPage(Page, ClusterableModel):
     """Stores information about a contract with an organization."""
 
     parent_page_types = ["b2b.OrganizationPage"]
+    # Contracts are created in the staff dashboard, through the contract API.
+    is_creatable = False
+    # Declared first so it is the default manager; see ContractPageManager.
+    objects = ContractPageManager()
     active_objects = ActiveContractManager()
+
+    # Written only by the contract API, which saves the row without a Wagtail
+    # revision. A revision holds whatever these were when it was saved, so
+    # with_content_json() takes them from the stored row instead. It does the
+    # same for which programs the contract has.
+    PROVISIONED_FIELDS = (
+        "name",
+        "membership_type",
+        "description",
+        "welcome_message",
+        "contract_start",
+        "contract_end",
+        "max_learners",
+        "enrollment_fixed_price",
+        "active",
+    )
 
     name = models.CharField(max_length=255, help_text="The name of the contract.")
     description = RichTextField(
@@ -480,11 +690,12 @@ class ContractPage(Page, ClusterableModel):
         )
 
     content_panels = [
-        FieldPanel("name"),
+        StaffDashboardContractPanel(),
+        FieldPanel("name", read_only=True),
         MultiFieldPanel(
             [
-                FieldPanel("description"),
-                FieldPanel("welcome_message"),
+                FieldPanel("description", read_only=True),
+                FieldPanel("welcome_message", read_only=True),
                 FieldPanel("welcome_message_extra"),
                 FieldPanel("organization"),
             ],
@@ -493,9 +704,9 @@ class ContractPage(Page, ClusterableModel):
         ),
         MultiFieldPanel(
             [
-                FieldPanel("membership_type"),
-                FieldPanel("max_learners"),
-                FieldPanel("enrollment_fixed_price"),
+                FieldPanel("membership_type", read_only=True),
+                FieldPanel("max_learners", read_only=True),
+                FieldPanel("enrollment_fixed_price", read_only=True),
                 FieldPanel("google_sheet_target"),
                 FieldPanel("google_sheet_target_tab"),
             ],
@@ -504,9 +715,9 @@ class ContractPage(Page, ClusterableModel):
         ),
         MultiFieldPanel(
             [
-                FieldPanel("active"),
-                FieldPanel("contract_start"),
-                FieldPanel("contract_end"),
+                FieldPanel("active", read_only=True),
+                FieldPanel("contract_start", read_only=True),
+                FieldPanel("contract_end", read_only=True),
             ],
             heading="Availability",
             icon="calendar-alt",
@@ -514,7 +725,12 @@ class ContractPage(Page, ClusterableModel):
         InlinePanel(
             "contract_programs",
             heading="Programs",
-            help_text="Add and order programs in this contract",
+            help_text=(
+                "Order the programs in this contract. Add and remove programs "
+                "in the staff dashboard. On a published page a program added "
+                "or removed here is not saved. On an unpublished page it is "
+                "saved, and adding one creates its contract runs."
+            ),
         ),
     ]
 
@@ -542,6 +758,49 @@ class ContractPage(Page, ClusterableModel):
         self.title = str(self.name)
 
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
+
+    def with_content_json(self, content):
+        """
+        Build the page a revision describes, keeping the provisioned fields.
+
+        Wagtail calls this to load the editor and to publish. Without it,
+        publishing a revision saved before an API write puts the contract's
+        old name, dates, seat cap and price back.
+        """
+
+        page = super().with_content_json(content)
+        # Read from the database, not from self: when the editor publishes,
+        # self is the instance it loaded before the form was filled in.
+        stored = (
+            ContractPage.objects.filter(pk=self.pk)
+            .values(*self.PROVISIONED_FIELDS)
+            .get()
+        )
+        for field, value in stored.items():
+            setattr(page, field, value)
+        page.title = stored["name"]
+
+        # Which programs are in the contract is the API's to say, and a
+        # revision saved before a program was linked would delete the link
+        # when published. Wagtail still orders them, so keep the stored links
+        # in the revision's order, with any it doesn't have after the rest.
+        # Wagtail saves an unpublished page's form straight to the database
+        # without coming through here, so this only protects a live page.
+        revision_position = {
+            item.program_id: position
+            for position, item in enumerate(page.contract_programs.all())
+        }
+        programs = sorted(
+            ContractProgramItem.objects.filter(contract_id=self.pk),
+            key=lambda item: (
+                revision_position.get(item.program_id, len(revision_position)),
+                item.sort_order or 0,
+            ),
+        )
+        for sort_order, item in enumerate(programs):
+            item.sort_order = sort_order
+        page.contract_programs = programs
+        return page
 
     def get_learners(self):
         """Get the learners associated with this organization."""
@@ -581,16 +840,30 @@ class ContractPage(Page, ClusterableModel):
             and self.enrollment_fixed_price > Decimal(0)
         ) or self.membership_type not in CONTRACT_MEMBERSHIP_AUTOS
 
-    def get_course_runs(self):
-        """Get the runs associated with the contract."""
+    def get_course_runs(self, *, b2b_only=False, public_only=False):
+        """
+        Get the runs associated with the contract.
+
+        Set b2b_only to filter out public runs.
+        Set public_only to filter out course runs that aren't public.
+        Set neither to True to retrieve everything.
+        """
 
         from courses.models import CourseRun  # noqa: PLC0415
 
-        return (
+        run_qs = (
             CourseRun.objects.prefetch_related("course")
             .filter(b2b_contracts=self)
             .all()
         )
+
+        if b2b_only:
+            run_qs = run_qs.filter(b2b_only=True)
+
+        if public_only:
+            run_qs = run_qs.filter(b2b_only=False)
+
+        return run_qs
 
     def get_variant_courses(self, *, only_relevant=False):
         """
@@ -672,8 +945,14 @@ class ContractPage(Page, ClusterableModel):
             .all()
         )
 
-    def get_products(self):
-        """Get the products associated with the contract."""
+    def get_products(self, *, b2b_only: bool = False, public_only=False):
+        """
+        Get the products associated with the contract.
+
+        Set b2b_only to filter out products for course runs that are public.
+        Set public_only to filter out products for course runs that aren't public.
+        Set neither to True to retrieve everything.
+        """
 
         from courses.models import CourseRun  # noqa: PLC0415
         from ecommerce.models import Product  # noqa: PLC0415
@@ -683,7 +962,9 @@ class ContractPage(Page, ClusterableModel):
         return Product.objects.filter(
             is_active=True,
             content_type=content_type,
-            object_id__in=self.get_course_runs().values_list("id", flat=True),
+            object_id__in=self.get_course_runs(
+                b2b_only=b2b_only, public_only=public_only
+            ).values_list("id", flat=True),
         ).all()
 
     @property
@@ -692,7 +973,9 @@ class ContractPage(Page, ClusterableModel):
 
         from ecommerce.models import Discount  # noqa: PLC0415
 
-        return Discount.objects.filter(products__product__in=self.get_products())
+        return Discount.objects.filter(
+            b2b_contract=self, products__product__in=self.get_products()
+        )
 
     def get_discounts(self):
         """Get the discounts associated with the contract."""
@@ -908,6 +1191,11 @@ class UserOrganization(models.Model):
         null=True,
         blank=True,
         help_text="If True, the user is a manager of this organization and can access organization dashboard features.",
+    )
+    added_to_keycloak_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When MITx Online added the user to the organization in Keycloak. Empty if it has not managed to yet, or if the membership came from Keycloak.",
     )
 
     class Meta:

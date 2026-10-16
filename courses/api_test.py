@@ -25,7 +25,6 @@ from mitol.common.utils.datetime import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
 from rest_framework import status
-from reversion.models import Version
 
 from b2b.api import create_b2b_enrollment
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE
@@ -36,10 +35,19 @@ from b2b.factories import (
 )
 from cms.factories import CourseIndexPageFactory
 from cms.models import CoursePage, ProgramPage
-from compliance.api import ExportComplianceResult
-from compliance.exceptions import ExportComplianceError
+from compliance.api import ExportComplianceResult, verify_user_with_exports
+from compliance.exceptions import (
+    ExportComplianceCheckError,
+    ExportComplianceDataError,
+    ExportComplianceError,
+)
+from compliance.factories import ExportComplianceLogFactory
+from compliance.models import ExportComplianceDecision
 from courses.api import (
+    MISSING_COMPLIANCE_DATA_CODE,
+    _has_earned_program_cert,
     check_course_modes,
+    check_enrollment_eligibility,
     create_local_enrollment,
     create_program_enrollments,
     create_run_enrollments,
@@ -89,6 +97,7 @@ from courses.factories import (
     ProgramFactory,
     program_with_empty_requirements,  # noqa: F401
     program_with_requirements,  # noqa: F401
+    program_with_tracks,  # noqa: F401
 )
 
 # pylint: disable=redefined-outer-name
@@ -107,7 +116,6 @@ from courses.models import (
 from ecommerce.factories import (
     DiscountFactory,
     DiscountRedemptionFactory,
-    LineFactory,
     OrderFactory,
     ProductFactory,
 )
@@ -1440,6 +1448,139 @@ def test_create_program_enrollments_rejects_nonaccepted_exports(mocker, user):
     assert not ProgramEnrollment.objects.filter(user=user, program=program).exists()
 
 
+def _courseware_object(kind):
+    """Build the courseware object for an eligibility test."""
+    return CourseRunFactory.create() if kind == "run" else ProgramFactory.create()
+
+
+@pytest.mark.parametrize("courseware_kind", ["run", "program"])
+def test_check_enrollment_eligibility_accepted(mocker, user, courseware_kind):
+    """An accepted compliance decision means the user may enroll."""
+    courseware_object = _courseware_object(courseware_kind)
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="COMPLETED",
+            reason_code=100,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+
+    eligibility = check_enrollment_eligibility(user, courseware_object)
+
+    assert eligibility.enrollable is True
+    assert eligibility.reason_code is None
+    patched_verify.assert_called_once_with(user, courseware_object)
+
+
+@pytest.mark.parametrize("courseware_kind", ["run", "program"])
+def test_check_enrollment_eligibility_rejected(mocker, user, courseware_kind):
+    """A non-accepted compliance decision blocks enrollment with CS_700."""
+    courseware_object = _courseware_object(courseware_kind)
+    mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="DECLINED",
+            reason_code=102,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+
+    eligibility = check_enrollment_eligibility(user, courseware_object)
+
+    assert eligibility.enrollable is False
+    assert eligibility.reason_code == ExportComplianceError.error_code
+    assert eligibility.reason_code == "CS_700"
+
+
+def test_check_enrollment_eligibility_missing_profile_data(mocker, user):
+    """A profile too incomplete to run the check gets its own code, not CS_700."""
+    run = CourseRunFactory.create()
+    mocker.patch(
+        "courses.api.verify_user_with_exports",
+        side_effect=ExportComplianceDataError(user, ["postal_code", "state"]),
+    )
+
+    eligibility = check_enrollment_eligibility(user, run)
+
+    assert eligibility.enrollable is False
+    assert eligibility.reason_code == MISSING_COMPLIANCE_DATA_CODE
+    assert eligibility.reason_code == "CS_701"
+
+
+def test_check_enrollment_eligibility_unrecognized_failure_fails_closed(mocker, user):
+    """An unrecognized compliance failure blocks enrollment without a code."""
+    run = CourseRunFactory.create()
+    mocker.patch(
+        "courses.api.verify_user_with_exports",
+        side_effect=ExportComplianceCheckError("something new"),
+    )
+
+    eligibility = check_enrollment_eligibility(user, run)
+
+    assert eligibility.enrollable is False
+    assert eligibility.reason_code is None
+
+
+def test_check_enrollment_eligibility_skips_check_when_feature_disabled(
+    settings, mocker, user
+):
+    """With the flag off the user is eligible and CyberSource is never consulted."""
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = False
+    run = CourseRunFactory.create()
+    patched_verify = mocker.patch("courses.api.verify_user_with_exports")
+
+    eligibility = check_enrollment_eligibility(user, run)
+
+    assert eligibility.enrollable is True
+    assert eligibility.reason_code is None
+    patched_verify.assert_not_called()
+
+
+def test_check_enrollment_eligibility_reuses_cached_log(
+    mocker, user, export_compliance_keypair
+):
+    """A cached compliance log answers the question without calling CyberSource."""
+    run = CourseRunFactory.create()
+    ExportComplianceLogFactory.create(
+        user=user,
+        courseware_object=run,
+        decision=ExportComplianceDecision.DECLINED,
+        reason_code="MATCH-DPL",
+    )
+    # Unpatch the autouse mock so the real cache lookup in compliance.api runs.
+    mocker.patch("courses.api.verify_user_with_exports", verify_user_with_exports)
+    patched_client = mocker.patch("compliance.api.get_cybersource_client")
+
+    eligibility = check_enrollment_eligibility(user, run)
+
+    assert eligibility.enrollable is False
+    assert eligibility.reason_code == "CS_700"
+    patched_client.assert_not_called()
+
+
+def test_check_enrollment_eligibility_does_not_enroll(mocker, user):
+    """The check must never create an enrollment as a side effect."""
+    run = CourseRunFactory.create()
+    mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="COMPLETED",
+            reason_code=100,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+    assert check_enrollment_eligibility(user, run).enrollable is True
+
+    patched_edx_enroll.assert_not_called()
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
 class TestDeactivateEnrollments:
     """Test cases for functions that deactivate enrollments"""
 
@@ -1449,15 +1590,11 @@ class TestDeactivateEnrollments:
         send_unenrollment_email = mocker.patch(
             "courses.api.mail_api.send_course_run_unenrollment_email"
         )
-        sync_hubspot_line_by_line_id = mocker.patch(
-            "hubspot_sync.task_helpers.sync_hubspot_line_by_line_id"
-        )
         log_exception = mocker.patch("courses.api.log.exception")
         return SimpleNamespace(
             edx_unenroll=edx_unenroll,
             send_unenrollment_email=send_unenrollment_email,
             log_exception=log_exception,
-            sync_hubspot_line_by_line_id=sync_hubspot_line_by_line_id,
         )
 
     def test_deactivate_run_enrollment(self, patches):
@@ -1466,22 +1603,12 @@ class TestDeactivateEnrollments:
         local enrollment record to inactive
         """
         enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
-        with reversion.create_revision():
-            product = ProductFactory.create(purchasable_object=enrollment.run)
-        version = Version.objects.get_for_object(product).first()
-        order = OrderFactory.create(
-            state=OrderStatus.PENDING, purchaser=enrollment.user
-        )
-        LineFactory.create(
-            order=order, purchased_object=enrollment.run, product_version=version
-        )
 
         returned_enrollment = deactivate_run_enrollment(
             enrollment, change_status=ENROLL_CHANGE_STATUS_REFUNDED
         )
         patches.edx_unenroll.assert_called_once_with(enrollment)
         patches.send_unenrollment_email.assert_called_once_with(enrollment)
-        patches.sync_hubspot_line_by_line_id.assert_called_once()
         enrollment.refresh_from_db()
         assert enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
         assert enrollment.active is False
@@ -1495,15 +1622,6 @@ class TestDeactivateEnrollments:
         If a flag is provided, deactivate_run_enrollment should set local enrollment record to inactive even if the API call fails
         """
         enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
-        with reversion.create_revision():
-            product = ProductFactory.create(purchasable_object=enrollment.run)
-        version = Version.objects.get_for_object(product).first()
-        order = OrderFactory.create(
-            state=OrderStatus.PENDING, purchaser=enrollment.user
-        )
-        LineFactory.create(
-            order=order, purchased_object=enrollment.run, product_version=version
-        )
         patches.edx_unenroll.side_effect = Exception
 
         deactivate_run_enrollment(
@@ -1511,30 +1629,11 @@ class TestDeactivateEnrollments:
             change_status=ENROLL_CHANGE_STATUS_REFUNDED,
             keep_failed_enrollments=keep_failed_enrollments,
         )
-        if not keep_failed_enrollments:
-            patches.sync_hubspot_line_by_line_id.assert_not_called()
-        else:
-            patches.sync_hubspot_line_by_line_id.assert_called_once()
         patches.edx_unenroll.assert_called_once_with(enrollment)
         patches.send_unenrollment_email.assert_not_called()
         patches.log_exception.assert_called_once()
         enrollment.refresh_from_db()
         assert enrollment.active is not keep_failed_enrollments
-
-    def test_deactivate_run_enrollment_line_does_not_exist(
-        self,
-        patches,
-    ):
-        """
-        If the enrollment does not have an associated Line object, don't call sync_line_item_with_hubspot()
-        """
-        enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
-
-        deactivate_run_enrollment(
-            enrollment,
-            change_status=ENROLL_CHANGE_STATUS_REFUNDED,
-        )
-        patches.sync_hubspot_line_by_line_id.assert_not_called()
 
 
 @pytest.mark.parametrize("keep_failed_enrollments", [True, False])
@@ -1779,8 +1878,10 @@ def test_sync_course_runs(settings, mocker, mocked_api_response, expect_success)
     """
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
 
-    mock_course_list = mocker.patch("courses.api.get_edx_api_course_list_client")
-    mock_client = mock_course_list.return_value
+    mock_client = Mock()
+    mocker.patch(
+        "courses.api.get_edx_api_course_list_client", return_value=(mock_client, False)
+    )
 
     if isinstance(mocked_api_response, list):
         mock_client.get_courses.return_value = mocked_api_response
@@ -1813,7 +1914,8 @@ def test_sync_course_runs(settings, mocker, mocked_api_response, expect_success)
         assert course_run2.is_self_paced == mocked_api_response[1].is_self_paced()
     else:
         assert success_count == 0
-        assert failure_count == 1
+        # An API error fails the whole batch, so both runs count as failures
+        assert failure_count == (2 if isinstance(mocked_api_response, Exception) else 1)
 
 
 @patch("courses.signals.transaction.on_commit", side_effect=lambda callback: callback())
@@ -1840,8 +1942,11 @@ def test_sync_course_runs_skips_unchanged(
         }
     )
 
-    mock_course_list = mocker.patch("courses.api.get_edx_api_course_list_client")
-    mock_course_list.return_value.get_courses.return_value = [course_detail]
+    mock_client = Mock()
+    mock_client.get_courses.return_value = [course_detail]
+    mocker.patch(
+        "courses.api.get_edx_api_course_list_client", return_value=(mock_client, False)
+    )
 
     # Ignore any purges enqueued by the factory setup above so we only measure
     # purges caused by the sync calls themselves.
@@ -1857,6 +1962,291 @@ def test_sync_course_runs_skips_unchanged(
     success_count, failure_count = sync_course_runs([course_run])
     assert (success_count, failure_count) == (0, 0)
     assert mock_purge_delay.call_count == 0
+
+
+def _course_list_http_error(
+    status_code, retry_after=None, wait_in_body=None, body=None
+):
+    """
+    Build the HTTPError the edX course list client raises for a failed request.
+    edX reports a throttle's wait in the body's developer_message, not the
+    Retry-After header.
+    """
+    headers = {"Retry-After": retry_after} if retry_after else {}
+    response = Mock(status_code=status_code, headers=headers)
+    if body is not None:
+        response.json.return_value = body
+    elif wait_in_body is None:
+        response.json.side_effect = ValueError
+    else:
+        # DRF uses ngettext, so a 1-second wait reads "1 second."
+        unit = "second" if wait_in_body == 1 else "seconds"
+        response.json.return_value = {
+            "developer_message": f"Request was throttled. Expected available in {wait_in_body} {unit}."
+        }
+    return HTTPError(response=response)
+
+
+def _course_detail(courseware_id, name="Synced title"):
+    """Build a CourseDetail the edX course list API would return for a run"""
+    return CourseDetail(
+        {
+            "id": courseware_id,
+            "start": "2015-09-15T05:00:00Z",
+            "end": "2015-12-31T05:00:00Z",
+            "enrollment_start": None,
+            "enrollment_end": None,
+            "name": name,
+        }
+    )
+
+
+def _fake_get_courses(*results):
+    """
+    Build a side_effect for CourseList.get_courses that returns each result in
+    turn. The real method is a generator, so an error is raised while the
+    results are iterated, not when it's called.
+    """
+    results = iter(results)
+
+    def get_courses(course_keys, **kwargs):
+        result = next(results)
+        if isinstance(result, Exception):
+            raise result
+        yield from result
+
+    return get_courses
+
+
+@pytest.mark.parametrize(
+    ("retry_after", "wait_in_body", "body", "expected_wait"),
+    [
+        ("7", None, None, 7),
+        (None, 12, None, 12),
+        (None, 1, None, 1),
+        (None, 3600, None, 60),
+        (None, None, None, 60),
+        (None, None, ["not", "a", "dict"], 60),
+        ("3600", None, None, 60),
+        ("²", None, None, 60),
+        ("soon", None, None, 60),
+    ],
+)
+def test_sync_course_runs_retries_rate_limited_batch(  # noqa: PLR0913
+    settings, mocker, retry_after, wait_in_body, body, expected_wait
+):
+    """
+    A batch that edX rate-limits (429) is retried after waiting as long as edX
+    asks, capped at one throttle window, or a full window when edX doesn't say,
+    and then syncs.
+    """
+    settings.OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES = 3
+    settings.OPENEDX_COURSE_LIST_THROTTLE_WAIT_SECONDS = 60
+    mock_sleep = mocker.patch("time.sleep")
+    course_run = CourseRunFactory.create(courseware_id="course-v1:MITx+6.00.1x+3T2015")
+    mock_client = Mock()
+    mocker.patch(
+        "courses.api.get_edx_api_course_list_client", return_value=(mock_client, False)
+    )
+    mock_client.get_courses.side_effect = _fake_get_courses(
+        _course_list_http_error(429, retry_after, wait_in_body, body),
+        [_course_detail(course_run.courseware_id)],
+    )
+
+    assert sync_course_runs([course_run]) == (1, 0)
+
+    mock_sleep.assert_called_once_with(expected_wait)
+    assert mock_client.get_courses.call_count == 2
+    first_call, retry_call = mock_client.get_courses.call_args_list
+    assert first_call.kwargs["course_keys"] == [course_run.courseware_id]
+    assert retry_call.kwargs["course_keys"] == first_call.kwargs["course_keys"]
+    course_run.refresh_from_db()
+    assert course_run.title == "Synced title"
+
+
+def test_sync_course_runs_without_retries(settings, mocker):
+    """
+    With retries turned off, each batch is still requested once and a
+    rate-limited batch counts as a failure
+    """
+    settings.OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES = 0
+    mock_sleep = mocker.patch("time.sleep")
+    course_run = CourseRunFactory.create(courseware_id="course-v1:MITx+6.00.1x+3T2015")
+    mock_client = Mock()
+    mocker.patch(
+        "courses.api.get_edx_api_course_list_client", return_value=(mock_client, False)
+    )
+    mock_client.get_courses.side_effect = _fake_get_courses(
+        _course_list_http_error(429)
+    )
+
+    assert sync_course_runs([course_run]) == (0, 1)
+
+    assert mock_client.get_courses.call_count == 1
+    mock_sleep.assert_not_called()
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+def test_sync_course_runs_falls_back_to_static_token_on_auth_error(
+    settings, mocker, caplog, status_code
+):
+    """
+    If edX rejects the client-credentials JWT, e.g. because its app is owned by a
+    non-staff user, the sync switches to the static service worker token, logs
+    an error, and uses that token for this and every later batch
+    """
+    mocker.patch("courses.api.COURSE_LIST_BATCH_SIZE", 1)
+    runs = [
+        CourseRunFactory.create(courseware_id="course-v1:MITx+FIRST+1T2026"),
+        CourseRunFactory.create(courseware_id="course-v1:MITx+SECOND+1T2026"),
+    ]
+    jwt_client, static_client = Mock(), Mock()
+    jwt_client.get_courses.side_effect = _fake_get_courses(
+        _course_list_http_error(status_code)
+    )
+    static_client.get_courses.side_effect = _fake_get_courses(
+        *[[_course_detail(run.courseware_id)] for run in runs]
+    )
+    mocker.patch(
+        "courses.api.get_edx_api_course_list_client",
+        side_effect=lambda *, use_jwt=True: (
+            (jwt_client, True) if use_jwt else (static_client, False)
+        ),
+    )
+
+    with caplog.at_level(logging.ERROR, logger="courses.api"):
+        assert sync_course_runs(runs) == (2, 0)
+
+    assert jwt_client.get_courses.call_count == 1
+    assert [
+        c.kwargs["course_keys"] for c in static_client.get_courses.call_args_list
+    ] == [[run.courseware_id] for run in runs]
+    assert any("static service worker token" in r.getMessage() for r in caplog.records)
+
+
+def test_sync_course_runs_static_token_also_rejected(settings, mocker, caplog):
+    """
+    If the static token is rejected too, every batch counts as failed, and the
+    sync switches tokens only once instead of retrying the JWT for each batch
+    """
+    mocker.patch("courses.api.COURSE_LIST_BATCH_SIZE", 1)
+    runs = [
+        CourseRunFactory.create(courseware_id="course-v1:MITx+FIRST+1T2026"),
+        CourseRunFactory.create(courseware_id="course-v1:MITx+SECOND+1T2026"),
+    ]
+    jwt_client, static_client = Mock(), Mock()
+    jwt_client.get_courses.side_effect = _fake_get_courses(
+        *[_course_list_http_error(403) for _ in runs]
+    )
+    static_client.get_courses.side_effect = _fake_get_courses(
+        *[_course_list_http_error(403) for _ in runs]
+    )
+    mock_get_client = mocker.patch(
+        "courses.api.get_edx_api_course_list_client",
+        side_effect=lambda *, use_jwt=True: (
+            (jwt_client, True) if use_jwt else (static_client, False)
+        ),
+    )
+
+    with caplog.at_level(logging.ERROR, logger="courses.api"):
+        assert sync_course_runs(runs) == (0, 2)
+
+    assert mock_get_client.call_count == 2
+    assert jwt_client.get_courses.call_count == 1
+    assert static_client.get_courses.call_count == 2
+    assert sum("client-credentials JWT" in r.getMessage() for r in caplog.records) == 1
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+def test_sync_course_runs_static_token_rejected_without_jwt(
+    settings, mocker, caplog, status_code
+):
+    """
+    When no JWT is in use (none configured, or it couldn't be obtained), a
+    401/403 for the static token fails the batch without a token switch: one
+    request per batch and no log blaming the JWT
+    """
+    mocker.patch("courses.api.COURSE_LIST_BATCH_SIZE", 1)
+    runs = [
+        CourseRunFactory.create(courseware_id="course-v1:MITx+FIRST+1T2026"),
+        CourseRunFactory.create(courseware_id="course-v1:MITx+SECOND+1T2026"),
+    ]
+    static_client = Mock()
+    static_client.get_courses.side_effect = _fake_get_courses(
+        *[_course_list_http_error(status_code) for _ in runs]
+    )
+    mock_get_client = mocker.patch(
+        "courses.api.get_edx_api_course_list_client",
+        return_value=(static_client, False),
+    )
+
+    with caplog.at_level(logging.ERROR, logger="courses.api"):
+        assert sync_course_runs(runs) == (0, 2)
+
+    assert mock_get_client.call_count == 1
+    assert static_client.get_courses.call_count == 2
+    assert not any("client-credentials JWT" in r.getMessage() for r in caplog.records)
+
+
+@pytest.mark.parametrize(
+    "first_batch_error",
+    [
+        _course_list_http_error(429),
+        _course_list_http_error(500),
+        ConnectionError(),
+        KeyError("start"),
+    ],
+)
+def test_sync_course_runs_continues_after_failed_batch(
+    settings, mocker, caplog, first_batch_error
+):
+    """
+    When one batch of course keys fails, even after retrying a 429, every run in
+    it counts as a failure, all of its keys are logged once with a traceback,
+    and the batches after it are still fetched and synced.
+    """
+    settings.OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES = 2
+    mock_sleep = mocker.patch("time.sleep")
+    first_batch = CourseRunFactory.build_batch(100)
+    for index, run in enumerate(first_batch):
+        run.courseware_id = f"course-v1:MITx+FIRST.{index}+1T2026"
+    second_batch_run = CourseRunFactory.create(
+        courseware_id="course-v1:MITx+SECOND.0+1T2026"
+    )
+    course_detail = _course_detail(second_batch_run.courseware_id)
+
+    def get_courses(course_keys, **kwargs):
+        # Like edx-api-client: one request per 100 keys, yielded lazily
+        for start in range(0, len(course_keys), 100):
+            if second_batch_run.courseware_id not in course_keys[start : start + 100]:
+                raise first_batch_error
+            yield course_detail
+
+    mock_client = Mock()
+    mocker.patch(
+        "courses.api.get_edx_api_course_list_client", return_value=(mock_client, False)
+    )
+    mock_client.get_courses.side_effect = get_courses
+
+    with caplog.at_level(logging.WARNING, logger="courses.api"):
+        assert sync_course_runs([*first_batch, second_batch_run]) == (1, 100)
+
+    batch_error_logs = [r for r in caplog.records if r.levelno == logging.ERROR]
+    assert len(batch_error_logs) == 1
+    assert batch_error_logs[0].exc_info is not None
+    assert all(
+        run.courseware_id in batch_error_logs[0].getMessage() for run in first_batch
+    )
+    # The failed batch's keys were already logged, so they aren't reported
+    # again as courses edX sent no data for
+    assert not any("No data received" in r.getMessage() for r in caplog.records)
+
+    second_batch_run.refresh_from_db()
+    assert second_batch_run.title == "Synced title"
+    is_rate_limited = getattr(first_batch_error, "response", None) is not None and (
+        first_batch_error.response.status_code == 429
+    )
+    assert mock_sleep.call_count == (2 if is_rate_limited else 0)
 
 
 @pytest.mark.parametrize(
@@ -3655,8 +4045,10 @@ def test_sync_course_runs_bulk(settings, mocker, mocked_api_response, expect_suc
     """
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
 
-    mock_course_list = mocker.patch("courses.api.get_edx_api_course_list_client")
-    mock_client = mock_course_list.return_value
+    mock_client = Mock()
+    mocker.patch(
+        "courses.api.get_edx_api_course_list_client", return_value=(mock_client, False)
+    )
 
     if isinstance(mocked_api_response, list):
         mock_client.get_courses.return_value = mocked_api_response
@@ -3689,7 +4081,8 @@ def test_sync_course_runs_bulk(settings, mocker, mocked_api_response, expect_suc
         assert course_run2.is_self_paced == mocked_api_response[1].is_self_paced()
     else:
         assert success_count == 0
-        assert failure_count == 1
+        # An API error fails the whole batch, so both runs count as failures
+        assert failure_count == (2 if isinstance(mocked_api_response, Exception) else 1)
 
 
 def test_deactivate_run_enrollment_removes_paid_course_run(mocker):
@@ -3698,7 +4091,6 @@ def test_deactivate_run_enrollment_removes_paid_course_run(mocker):
     """
     mocker.patch("courses.api.unenroll_edx_course_run")
     mocker.patch("courses.api.mail_api.send_course_run_unenrollment_email")
-    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_line_by_line_id")
 
     mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
     mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
@@ -3744,7 +4136,6 @@ def test_b2b_re_enrollment_after_multiple_unenrollments(mocker, user):
     mocker.patch("courses.api.unenroll_edx_course_run")
     mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
     mocker.patch("courses.api.mail_api.send_course_run_unenrollment_email")
-    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_line_by_line_id")
     mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
 
     mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
@@ -5276,3 +5667,25 @@ def test_partner_schools_for_program_excludes_unassigned_when_flag_on(settings):
     PartnerSchoolFactory.create(name="Unassigned School")
 
     assert list(partner_schools_for_program(program)) == []
+
+
+def _pass_courses(user, courses):
+    """Give the user an active run enrollment and a certificate in each course."""
+    for course in courses:
+        run = CourseRunFactory.create(course=course)
+        CourseRunEnrollmentFactory.create(user=user, run=run)
+        CourseRunCertificateFactory.create(user=user, course_run=run)
+
+
+@pytest.mark.parametrize("whole_track", [False, True])
+def test_has_earned_program_cert_with_tracks(
+    user,
+    program_with_tracks,  # noqa: F811
+    whole_track,
+):
+    """Core plus one whole track earns the certificate; one course from each track does not"""
+    general, methods = program_with_tracks.track_courses
+    _pass_courses(user, program_with_tracks.core_courses)
+    _pass_courses(user, general if whole_track else general[:1] + methods[:1])
+
+    assert _has_earned_program_cert(user, program_with_tracks.program) is whole_track

@@ -11,8 +11,9 @@ from dataclasses import dataclass
 
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from mitol.common.utils import now_in_utc
+from opaque_keys import InvalidKeyError
 
 from b2b.api import create_contract_run
 from b2b.constants import (
@@ -22,7 +23,7 @@ from b2b.constants import (
     PROVISIONING_ACTION_CONTRACT_VARIANT_ADDED,
     PROVISIONING_ACTION_CONTRACT_VARIANT_UPDATED,
 )
-from b2b.exceptions import ContractVariantError
+from b2b.exceptions import ContractVariantError, SourceCourseIncompleteError
 from b2b.models import ContractPage, ContractProgramItem, OrganizationPage
 from b2b.provisioning import _audit
 from b2b.tasks import queue_enrollment_code_check
@@ -157,23 +158,14 @@ def add_courseware_to_contract(  # noqa: PLR0913
         )
 
     if courseware.is_run:
-        if courseware.b2b_contracts.filter(id=contract.id).exists():
+        holders = _run_holders(courseware)
+        if holders.filter(pk=contract.pk).exists():
             return CoursewareAddition(
                 skipped_reason=(
                     f"Run '{courseware.courseware_id}' is already in this contract."
                 )
             )
 
-        other_contract = courseware.b2b_contracts.exclude(id=contract.id).first()
-        if other_contract:
-            return CoursewareAddition(
-                skipped_reason=(
-                    f"Run '{courseware.courseware_id}' is already in {other_contract}."
-                )
-            )
-
-        courseware.b2b_contract = contract
-        courseware.save()
         courseware.b2b_contracts.add(contract)
         return CoursewareAddition(runs_added=1)
 
@@ -190,6 +182,50 @@ def add_courseware_to_contract(  # noqa: PLR0913
     return CoursewareAddition(runs_added=len(created))
 
 
+def _run_holders(run: CourseRun) -> QuerySet[ContractPage]:
+    """
+    Return every contract that holds a run, oldest first.
+
+    Through ContractPage.objects, not run.b2b_contracts, so a contract that
+    isn't valid for use right now (e.g. one that hasn't started) counts.
+    """
+
+    holders = Q(course_runs=run)
+    if run.b2b_contract_id:
+        holders |= Q(pk=run.b2b_contract_id)
+    return ContractPage.objects.filter(holders).order_by("pk")
+
+
+def _unlink_shared_run(contract: ContractPage, run: CourseRun) -> bool | None:
+    """
+    Take a run that another contract also holds out of this contract.
+
+    The run is not closed, because that would close it for the other
+    contract's learners too, and its products and codes are left alone. It is
+    unlinked unless this contract's learners are enrolled in it.
+
+    Returns True if the run was unlinked, or None if no other contract holds
+    the run.
+    """
+
+    other_holder = _run_holders(run).exclude(pk=contract.pk).first()
+    if other_holder is None:
+        return None
+
+    if CourseRunEnrollment.objects.filter(run=run, b2b_contract=contract).exists():
+        return False
+
+    if run.b2b_contract_id == contract.pk:
+        # Code that still reads the legacy FK (e.g. is_contract_order, the
+        # discount source run filter) takes a run without one for a
+        # non-contract run, so hand it to a contract that still holds the run.
+        run.b2b_contract = other_holder
+        run.save()
+    run.b2b_contracts.remove(contract)
+
+    return True
+
+
 def _remove_run_from_contract(contract: ContractPage, run: CourseRun) -> bool:
     """
     Close a contract run to new enrollments and take it out of the contract.
@@ -199,8 +235,15 @@ def _remove_run_from_contract(contract: ContractPage, run: CourseRun) -> bool:
     Enrollment codes left applying to no product, and never redeemed, are
     deleted.
 
+    A run that another contract also holds is only unlinked; see
+    _unlink_shared_run.
+
     Returns True if the run was unlinked.
     """
+
+    shared_unlinked = _unlink_shared_run(contract, run)
+    if shared_unlinked is not None:
+        return shared_unlinked
 
     unlinked = not CourseRunEnrollment.objects.filter(run=run).exists()
 
@@ -524,6 +567,108 @@ def get_contract_variant_coverage(contract: ContractPage) -> list[dict]:
         )
 
     return coverage
+
+
+def sync_contract_variants(contract: ContractPage, *, skip_edx: bool = False) -> dict:
+    """
+    Create the runs a contract's courses are missing for its variant sets.
+
+    Adding a variant set creates no runs, so courseware added before the set
+    has none for it. For each active set, this creates a run for every course
+    get_contract_variant_coverage lists with a source run and no contract run.
+    A course and variant that already has a run in the contract is left alone,
+    so repeating the call creates nothing more.
+
+    Only courses still in the contract get runs: those of its programs, and
+    those with a live run in it. A removed course whose closed run stays linked
+    for its enrolled learners is skipped, so a new set doesn't bring it back.
+
+    Returns a dict with `runs_created` (the new CourseRuns),
+    `missing_source_runs` (a `course` and `variant` for each one that supports
+    the set and has no source run to clone) and `failed` (the same pair for
+    each one whose run could not be created). Queueing the enrollment code
+    check is left to the caller.
+    """
+
+    runs_created = []
+    missing_source_runs = []
+    failed = []
+    current_course_ids = set(
+        Course.objects.filter(
+            Q(in_programs__program__contract_memberships__contract=contract)
+            | Q(courseruns__b2b_contracts=contract, courseruns__live=True)
+        ).values_list("id", flat=True)
+    )
+
+    for entry in get_contract_variant_coverage(contract):
+        variant = entry["variant"]
+        if not variant.active:
+            continue
+
+        for listed in entry["courses"]:
+            course = listed["course"]
+            if course.id not in current_course_ids or listed["contract_run"]:
+                continue
+
+            pair = {"course": course, "variant": variant}
+            if not listed["has_source_run"]:
+                missing_source_runs.append(pair)
+                continue
+
+            # Without a default variant create_contract_run ignores
+            # filter_variants and clones the course's primary-language source
+            # runs, whatever set was asked for.
+            if not course.default_variant_options:
+                log.warning(
+                    "Not creating a %s run of %s for contract %s: the course "
+                    "has no default variant set",
+                    _variant_fields(variant),
+                    course.readable_id,
+                    contract.id,
+                )
+                failed.append(pair)
+                continue
+
+            # One variant per call, so a failure belongs to one course and
+            # variant and leaves the others' runs in place.
+            try:
+                created = create_contract_run(
+                    contract,
+                    course,
+                    skip_edx=skip_edx,
+                    no_reruns=True,
+                    filter_variants=[variant],
+                )
+            except (SourceCourseIncompleteError, InvalidKeyError):
+                log.warning(
+                    "Could not create a %s run of %s for contract %s",
+                    _variant_fields(variant),
+                    course.readable_id,
+                    contract.id,
+                    exc_info=True,
+                )
+                failed.append(pair)
+                continue
+
+            # Nothing back means create_contract_run saw a run the coverage
+            # report didn't, e.g. one linked only by the old b2b_contract key.
+            if not created:
+                log.warning(
+                    "No %s run of %s was created for contract %s",
+                    _variant_fields(variant),
+                    course.readable_id,
+                    contract.id,
+                )
+                failed.append(pair)
+                continue
+
+            runs_created.extend(run for run, _ in created)
+
+    return {
+        "runs_created": runs_created,
+        "missing_source_runs": missing_source_runs,
+        "failed": failed,
+    }
 
 
 @transaction.atomic

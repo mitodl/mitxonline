@@ -1,6 +1,81 @@
 Release Notes
 =============
 
+Version 1.170.4
+---------------
+
+- Makes org reconciliation in user session more reliable (#4145)
+
+Version 1.170.3
+---------------
+
+- Remove line item sync call during unenrollment (#4117)
+- Yarn up for js deps with critical severity issues. (#4131)
+- Requirements editor: reorder groups, tracks and courses; unclip the course picker (#4146)
+
+Version 1.170.2
+---------------
+
+- Add a publication date to product page testimonials (#4137)
+- Fix OpenAPI spec partitioning (#4098)
+- chore(deps): move pytest-lazy-fixtures and datamodel-code-generator to dev (#4144)
+- Retry adding unconfirmed org members to Keycloak on a schedule (#4141)
+- Take the contract assignment lock in b2b_codes and in code redemption (#4096)
+- fix(docker): drop unused libcairo2-dev so the image runs on DHI Python (#4143)
+
+Version 1.170.1
+---------------
+
+- Retry rate-limited course list batches and sync with client credentials (#4076)
+- Make the provisioning API the only writer of an organization's name, description and Keycloak link (#4089)
+- If the product's purchasable object is not B2B, don't change its price (#4132)
+- Program tracks: track nodes, the learner's chosen track, and the admin editor (#4093)
+- Scope B2B enrollment codes to their contract (#4099)
+
+Version 1.170.0
+---------------
+
+- feat(scim): add --fill-only to remediate_keycloak_user_names (#3999)
+- fix: ask for missing profile fields at checkout instead of returning a 500 (#4136)
+- Update Django Zeal, add targeted suppressions for most new N+1 (#4126)
+- Add enrollment eligibility endpoints (#4020)
+
+Version 1.169.12
+----------------
+
+- Return display labels for variant industry and length (#4123)
+- Read credential metadata from the MIT Learn API (#4110)
+- Transfer audit and verified enrollments and sync with edx (#4116)
+- Show notifications on pages that hide header (including cart) (#4081)
+
+Version 1.169.11
+----------------
+
+- Copy only the compiled frontend into the production image (#4108)
+- Fix the two crash paths in picking a contract run's source run (#4073)
+- Upgrade eligible audit enrollments when a user joins a contract (#4114)
+- Terminate the enrollment error code sentence with a period (#4113)
+- Add staff API routes for a contract's variant sets (#4068)
+- Write Keycloak last when changing an existing provisioning resource (#4028)
+- Let staff edit an identity provider instead of deleting and recreating it (staff UI 5/5) (#4005)
+- Link unlinked organizations to their Keycloak org by alias (#3993)
+- Return a specific error code in the API error for compliance check failure (#3938)
+
+Version 1.169.10
+----------------
+
+- Allow purchasing B2B-associated runs as a non-B2B purchase (#4079)
+- Allow upgrades through the B2B one-click enrollment API (#4077)
+- Share one requirement-tree evaluator; validate requirement trees at every depth (#4067)
+- Update pytest-split test durations (#4094)
+- Serialize enrollment code assignment per contract (#4048)
+- Build the docs with uv and remove Pants (#4054)
+- Serializers and Filtering: Decide whether an enrollment is B2B from its own contract (#4084)
+- Add a CoursePage toggle for the Learn course outline section (#4090)
+- feat: add course run id search in courserungrade admin (#3986)
+- Update HubSpot line item sync for existing items (#4080)
+- Group verifiable-credential fields into their own CMS panel (#4071)
+
 Version 1.169.9
 ---------------
 
