@@ -20,6 +20,7 @@ from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
 from compliance.api import verify_user_with_exports
+from compliance.exceptions import ExportComplianceUnavailableError
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
@@ -72,6 +73,7 @@ from main.constants import (
     USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_ENROLL_UNAVAILABLE,
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
     USER_MSG_TYPE_PROFILE_INCOMPLETE,
@@ -1681,6 +1683,29 @@ def test_checkout_interstitial_incomplete_profile(
     assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
         {"type": USER_MSG_TYPE_PROFILE_INCOMPLETE}
     )
+    assert not PendingOrder.objects.filter(purchaser=user).exists()
+
+
+@pytest.mark.skip_nplusone_check
+def test_checkout_interstitial_export_compliance_unavailable(
+    mocker, mocked_export_compliance, user, user_client, products
+):
+    """
+    An unreachable CyberSource sends the learner back to the cart with their
+    basket intact. Without the branch this covers, the payload falls through
+    to checkout_payload["method"] and raises KeyError - a 500 at checkout.
+    """
+    mocked_export_compliance.side_effect = ExportComplianceUnavailableError(user, 2)
+    create_basket_with_product(user, products[0])
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_ENROLL_UNAVAILABLE}
+    )
+    # Fail closed: no money is taken when we have no compliance result.
     assert not PendingOrder.objects.filter(purchaser=user).exists()
 
 

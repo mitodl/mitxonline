@@ -1,15 +1,19 @@
 """Tests for compliance API helpers."""
 
 import json
+import logging
 import uuid
 from datetime import timedelta
 from types import SimpleNamespace
 
 import pytest
+from CyberSource.rest import ApiException
 from django.core.exceptions import ImproperlyConfigured
 from mitol.common.utils.datetime import now_in_utc
 
 from compliance.api import (
+    EXPORT_COMPLIANCE_MAX_ATTEMPTS,
+    EXPORT_COMPLIANCE_RETRYABLE_STATUSES,
     ExportComplianceResult,
     _build_export_payload,
     _normalize_administrative_area,
@@ -20,7 +24,10 @@ from compliance.api import (
     log_export_compliance_check,
     verify_user_with_exports,
 )
-from compliance.exceptions import ExportComplianceDataError
+from compliance.exceptions import (
+    ExportComplianceDataError,
+    ExportComplianceUnavailableError,
+)
 from compliance.factories import ExportComplianceLogFactory
 from compliance.models import ExportComplianceLog
 from courses.factories import CourseRunFactory
@@ -409,6 +416,156 @@ def test_verify_user_with_exports_uses_recent_accepted_log_for_other_run(
     assert result.decision == "COMPLETED"
     assert result.request_id == "cached-request-id"
     assert result.raw is None
+
+
+@pytest.fixture
+def no_backoff_sleep(mocker):
+    """Collapse backoff's inter-attempt wait so retry tests stay fast."""
+    return mocker.patch("backoff._sync.time.sleep")
+
+
+def _screenable_user():
+    """Build a user with a legal address complete enough to be screened."""
+    user = UserFactory.create(name="Ada Lovelace", email="ada@example.com")
+    user.legal_address.country = "US"
+    user.legal_address.street_address_1 = "77 Massachusetts Ave"
+    user.legal_address.city = "Cambridge"
+    user.legal_address.state = "US-MA"
+    user.legal_address.postal_code = "02139"
+    user.legal_address.save()
+    return user
+
+
+@pytest.mark.usefixtures("no_backoff_sleep")
+def test_verify_user_with_exports_retries_a_transient_failure(mocker, export_settings):
+    """A CyberSource 502 is retried, and the retry's answer is the result."""
+    user = _screenable_user()
+    run = CourseRunFactory.create()
+
+    response = SimpleNamespace(
+        status="COMPLETED",
+        id="abc123",
+        export_compliance_information=SimpleNamespace(info_codes=["MATCH-BCO"]),
+        error_information=None,
+        message=None,
+    )
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.side_effect = [
+        ApiException(status=502, reason="General system failure"),
+        response,
+    ]
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    result = verify_user_with_exports(user, run)
+
+    assert result.accepted is True
+    assert mock_client.validate_export_compliance.call_count == 2
+    # The successful attempt is logged exactly as an unretried one would be.
+    log_entry = get_latest_export_compliance_log(user, run)
+    assert log_entry is not None
+    assert log_entry.decision == "COMPLETED"
+
+
+@pytest.mark.usefixtures("no_backoff_sleep")
+@pytest.mark.parametrize("status", sorted(EXPORT_COMPLIANCE_RETRYABLE_STATUSES))
+def test_verify_user_with_exports_raises_unavailable_once_retries_are_spent(
+    mocker, export_settings, status
+):
+    """
+    Every retryable status gets the full allowance and then converts to a
+    handled error, so the enrollment endpoint answers 400 rather than 500.
+    """
+    user = _screenable_user()
+    run = CourseRunFactory.create()
+
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.side_effect = ApiException(
+        status=status, reason="General system failure"
+    )
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    with pytest.raises(ExportComplianceUnavailableError) as exc_info:
+        verify_user_with_exports(user, run)
+
+    assert exc_info.value.attempts == EXPORT_COMPLIANCE_MAX_ATTEMPTS
+    assert (
+        mock_client.validate_export_compliance.call_count
+        == EXPORT_COMPLIANCE_MAX_ATTEMPTS
+    )
+
+
+@pytest.mark.usefixtures("no_backoff_sleep")
+@pytest.mark.parametrize("status", [400, 401, 403])
+def test_verify_user_with_exports_does_not_retry_a_hopeless_status(
+    mocker, export_settings, status
+):
+    """A malformed request or bad credentials fails identically on a retry."""
+    user = _screenable_user()
+    run = CourseRunFactory.create()
+
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.side_effect = ApiException(
+        status=status, reason="Invalid request"
+    )
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    with pytest.raises(ExportComplianceUnavailableError) as exc_info:
+        verify_user_with_exports(user, run)
+
+    assert exc_info.value.attempts == 1
+    mock_client.validate_export_compliance.assert_called_once()
+
+
+@pytest.mark.usefixtures("no_backoff_sleep")
+def test_verify_user_with_exports_logs_nothing_when_cybersource_never_answers(
+    mocker, export_settings
+):
+    """
+    The decisive one. `get_latest_export_compliance_log` reuses a non-accepted
+    row for a user with NO time bound, so persisting this failure would turn a
+    transient CyberSource timeout into a block only staff could lift. Leaving
+    no row is what keeps the learner's next attempt a real attempt.
+    """
+    user = _screenable_user()
+    run = CourseRunFactory.create()
+
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.side_effect = ApiException(
+        status=502, reason="General system failure"
+    )
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    with pytest.raises(ExportComplianceUnavailableError):
+        verify_user_with_exports(user, run)
+
+    assert not ExportComplianceLog.objects.filter(user=user).exists()
+    assert get_latest_export_compliance_log(user, run) is None
+
+
+@pytest.mark.usefixtures("no_backoff_sleep")
+def test_an_unavailable_check_logs_exactly_one_error(mocker, export_settings, caplog):
+    """
+    sentry-sdk's LoggingIntegration files an event per ERROR record, so a
+    second ERROR here would double the failure rate this is measured on.
+    backoff's own give-up handler defaults to ERROR - it must not stay there.
+    """
+    user = _screenable_user()
+    run = CourseRunFactory.create()
+
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.side_effect = ApiException(
+        status=502, reason="General system failure"
+    )
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    with (
+        caplog.at_level(logging.DEBUG),
+        pytest.raises(ExportComplianceUnavailableError),
+    ):
+        verify_user_with_exports(user, run)
+
+    errors = [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert len(errors) == 1, [r.getMessage() for r in errors]
 
 
 def test_decrypt_export_compliance_log_round_trips(export_compliance_keypair):

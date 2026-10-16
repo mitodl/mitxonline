@@ -29,6 +29,7 @@ from zeal import zeal_context
 
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE
 from b2b.factories import ContractPageFactory
+from compliance.exceptions import ExportComplianceUnavailableError
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.factories import (
     CourseRunEnrollmentFactory,
@@ -140,6 +141,7 @@ from flexiblepricing.factories import (
     FlexiblePriceTierFactory,
     approve_flexible_price,
 )
+from main.constants import USER_MSG_TYPE_ENROLL_UNAVAILABLE
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.factories import OpenEdxUserFactory
 from users.factories import UserFactory
@@ -2701,6 +2703,31 @@ def test_process_stripe_refund_updated_wrong_event_type():
         process_stripe_refund_updated(
             _configure_refund_event(STRIPE_EVENT_CHECKOUT_SESSION_EXPIRED)
         )
+
+
+def test_generate_checkout_payload_export_compliance_unavailable(mocker):
+    """
+    An unreachable CyberSource fails checkout closed and BEFORE any money
+    moves, telling the learner to retry rather than that they are blocked.
+    """
+    user = UserFactory.create()
+    product = ProductFactory.create()
+    create_basket(user, [product])
+    mocker.patch(
+        "ecommerce.models.Basket.has_user_blocked_products",
+        side_effect=ExportComplianceUnavailableError(user, 2),
+    )
+
+    result = generate_checkout_payload(authed_request(user))
+
+    assert result == {
+        "enrollment_unavailable": True,
+        "error": USER_MSG_TYPE_ENROLL_UNAVAILABLE,
+    }
+    # The key is part of the response body, so it must stay as silent about
+    # the mechanism as the rendered message is.
+    assert "compliance" not in str(result).lower()
+    assert not Order.objects.filter(purchaser=user).exists()
 
 
 @pytest.mark.parametrize(
