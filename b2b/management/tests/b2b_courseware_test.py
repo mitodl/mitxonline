@@ -261,15 +261,10 @@ def test_add_courserun_existing_contract():
     )
 
     run.refresh_from_db()
-<<<<<<< HEAD
     assert (
         run.b2b_contracts.filter(id__in=[contract.id, existing_contract.id]).count()
         == 2
     )
-=======
-    assert run.contract_group_ids == {existing_contract.id}
-    assert not run.b2b_contracts.filter(id=contract.id).exists()
->>>>>>> a96f3c696 (no-verify commit: adding agent-developed changes)
 
 
 @pytest.mark.parametrize(
