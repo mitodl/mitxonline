@@ -2358,6 +2358,7 @@ def rerun_course_run(  # noqa: PLR0913
     is_self_paced: bool | None = None,
     live: bool | None = None,
     enrollment_modes: list[EnrollmentMode] | None = None,
+    skip_edx: bool = False,
 ) -> CourseRun:
     """
     Re-run an existing course run.
@@ -2392,6 +2393,7 @@ def rerun_course_run(  # noqa: PLR0913
     - is_self_paced (bool): course is self-paced
     - live (bool): course is live (in MITx Online)
     - enrollment_modes (list[EnrollmentMode]): modes to add to the new run
+    - skip_edx (bool): skip cloning the course run in edX (default False)
     Returns:
     - CourseRun, the created run
     """
@@ -2432,7 +2434,8 @@ def rerun_course_run(  # noqa: PLR0913
         ):
             new_run.enrollment_modes.add(mode)
 
-        process_course_run_clone(new_run, base_run.courseware_id)
+        if not skip_edx:
+            process_course_run_clone(new_run, base_run.courseware_id)
 
     return new_run
 
