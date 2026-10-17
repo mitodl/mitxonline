@@ -17,6 +17,7 @@ from courses.factories import (
     CourseRunGradeFactory,
 )
 from courses.models import (
+    CourseRunAccessRole,
     CourseRunCertificate,
     CourseRunEnrollment,
 )
@@ -204,7 +205,13 @@ class TestEdxEnrollmentWebhook:
         api_client,
         oauth_token,
     ):
-        """Test returns 500 when enrollment creation raises an exception"""
+        """
+        An unexpected enrollment failure answers 5xx, so the sender retries.
+
+        The plugin drops a non-transient 4xx without retrying, so answering 400
+        here would lose the grant on a transient failure such as a lock wait
+        timeout. Nothing on this path says the request was bad.
+        """
         user = UserFactory.create()
         course_run = CourseRunFactory.create()
 
@@ -214,8 +221,15 @@ class TestEdxEnrollmentWebhook:
             "role": "instructor",
         }
         response = self._post_webhook(api_client, payload, token=oauth_token.token)
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert "Failed to create enrollment" in response.data["error"]
+
+        # The role is recorded before the enrollment precisely so it survives
+        # this. They are independent facts, and Open edX has already granted
+        # the role whether or not we manage to mirror the enrollment.
+        assert CourseRunAccessRole.objects.filter(
+            user=user, run=course_run, role="instructor"
+        ).exists()
 
     def test_already_enrolled_user(self, api_client, oauth_token):
         """Test that webhook succeeds for an already-enrolled user (idempotent)"""
@@ -317,6 +331,136 @@ class TestEdxEnrollmentWebhook:
             HTTP_AUTHORIZATION=f"Bearer {oauth_token.token}",
         )
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+
+    @pytest.mark.parametrize("role", ["instructor", "staff"])
+    def test_course_staff_role_is_recorded(self, api_client, oauth_token, role):
+        """A course staff role in the payload is recorded against the run"""
+        user = UserFactory.create()
+        course_run = CourseRunFactory.create()
+
+        response = self._post_webhook(
+            api_client,
+            {
+                "email": user.email,
+                "course_id": course_run.courseware_id,
+                "role": role,
+            },
+            token=oauth_token.token,
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert CourseRunAccessRole.objects.filter(
+            user=user, run=course_run, role=role
+        ).exists()
+
+    def test_recording_a_role_twice_keeps_one_row(self, api_client, oauth_token):
+        """
+        The same role arriving twice leaves one row.
+
+        Open edX re-emits COURSE_ACCESS_ROLE_ADDED if a role is re-granted, and
+        the backfill command can overlap with live events, so the endpoint has
+        to be idempotent.
+        """
+        user = UserFactory.create()
+        course_run = CourseRunFactory.create()
+        payload = {
+            "email": user.email,
+            "course_id": course_run.courseware_id,
+            "role": "staff",
+        }
+
+        first = self._post_webhook(api_client, payload, token=oauth_token.token)
+        second = self._post_webhook(api_client, payload, token=oauth_token.token)
+
+        assert first.status_code == status.HTTP_201_CREATED
+        assert second.status_code == status.HTTP_200_OK
+        assert (
+            CourseRunAccessRole.objects.filter(
+                user=user, run=course_run, role="staff"
+            ).count()
+            == 1
+        )
+
+    def test_role_grant_does_not_reactivate_a_deactivated_enrollment(
+        self, api_client, oauth_token
+    ):
+        """
+        A role grant leaves a deactivated enrollment deactivated.
+
+        Someone unenrolling is a decision. Re-granting a role, or re-running
+        the backfill over rows that already existed, is not an enrollment event
+        and must not quietly reverse it. An enrollment event -- a payload with
+        a mode -- still reactivates, because that is Open edX telling us the
+        user really was enrolled again.
+        """
+        user = UserFactory.create()
+        course_run = CourseRunFactory.create()
+        enrollment = CourseRunEnrollment.all_objects.create(
+            user=user,
+            run=course_run,
+            edx_enrolled=True,
+            enrollment_mode="audit",
+            active=False,
+        )
+
+        role_only = self._post_webhook(
+            api_client,
+            {
+                "email": user.email,
+                "course_id": course_run.courseware_id,
+                "role": "staff",
+            },
+            token=oauth_token.token,
+        )
+
+        assert role_only.status_code == status.HTTP_200_OK
+        enrollment.refresh_from_db()
+        assert enrollment.active is False
+        # The role is still recorded -- that is the part a role grant is about.
+        assert CourseRunAccessRole.objects.filter(
+            user=user, run=course_run, role="staff"
+        ).exists()
+
+        # An actual enrollment event does reactivate.
+        self._post_webhook(
+            api_client,
+            {
+                "email": user.email,
+                "course_id": course_run.courseware_id,
+                "mode": EDX_ENROLLMENT_AUDIT_MODE,
+            },
+            token=oauth_token.token,
+        )
+        enrollment.refresh_from_db()
+        assert enrollment.active is True
+
+    @pytest.mark.parametrize("role", ["data_researcher", "beta_testers", ""])
+    def test_non_staff_role_is_not_recorded(self, api_client, oauth_token, role):
+        """
+        Roles outside OPENEDX_COURSE_STAFF_ROLES are not recorded, so they
+        cannot switch the dashboard's early access on.
+
+        Not the same as "roles Open edX keeps out before the start date" -
+        beta testers get in early too, via days_early_for_beta. We just do not
+        mirror that.
+        """
+        user = UserFactory.create()
+        course_run = CourseRunFactory.create()
+
+        response = self._post_webhook(
+            api_client,
+            {
+                "email": user.email,
+                "course_id": course_run.courseware_id,
+                "role": role,
+            },
+            token=oauth_token.token,
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert not CourseRunAccessRole.objects.filter(
+            user=user, run=course_run
+        ).exists()
 
 
 class TestEdxCertificateWebhook:

@@ -159,7 +159,9 @@ def get_user_relevant_program_course_run_qset(
     return enrollable_run_qset.order_by("enrollment_start")
 
 
-def create_local_enrollment(user, run, *, mode=EDX_DEFAULT_ENROLLMENT_MODE):
+def create_local_enrollment(
+    user, run, *, mode=EDX_DEFAULT_ENROLLMENT_MODE, reactivate=True
+):
     """
     Creates a local-only CourseRunEnrollment record without calling the edX API.
     Reactivates the enrollment if it already exists but is inactive, and ensures
@@ -172,6 +174,11 @@ def create_local_enrollment(user, run, *, mode=EDX_DEFAULT_ENROLLMENT_MODE):
         user (User): The user to enroll
         run (CourseRun): The course run to enroll in
         mode (str): The enrollment mode (default: audit)
+        reactivate (bool): Whether an existing inactive enrollment should be
+            brought back. Pass False when the caller is reacting to something
+            that is not an enrollment event -- a course access role grant, say
+            -- so that an enrollment somebody deliberately deactivated is left
+            alone instead of being resurrected.
 
     Returns:
         (CourseRunEnrollment, bool): The enrollment object and whether it was newly created
@@ -187,7 +194,7 @@ def create_local_enrollment(user, run, *, mode=EDX_DEFAULT_ENROLLMENT_MODE):
     )
     if created:
         enrollment.save_and_log(None)
-    if not created and not enrollment.active:
+    if not created and not enrollment.active and reactivate:
         enrollment.reactivate_and_save()
     if not enrollment.edx_enrolled:
         enrollment.edx_enrolled = True
