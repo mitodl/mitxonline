@@ -495,6 +495,26 @@ def get_order_from_cybersource_payment_response(request):
     return order
 
 
+def _record_processor_response(order, payment_data):
+    """
+    Save a payment processor response that didn't fulfill the order (a decline,
+    error or cancel) as a transaction on it, so the order shows why it ended up
+    in its state.
+
+    This runs after the state transition rather than inside it: a response
+    without a transaction ID can't be recorded, and that mustn't undo the
+    transition. Such responses are logged instead.
+    """
+    try:
+        order.get_object_flow().create_transaction(payment_data)
+    except ValidationError:
+        log.warning(
+            "Couldn't record the processor response for order %s: %s",
+            order.reference_number,
+            payment_data,
+        )
+
+
 def process_cybersource_payment_response(request, order):
     """
     Updates the order and basket based on the payment request from Cybersource.
@@ -539,6 +559,7 @@ def process_cybersource_payment_response(request, order):
         log.debug(f"Transaction declined: {processor_response.message}")  # noqa: G004
         order_flow = order.get_object_flow()
         order_flow.decline()
+        _record_processor_response(order, request.POST)
         return_message = order.state
     elif processor_response.state == ProcessorResponse.STATE_ERROR:
         # Error - something went wrong with the request
@@ -547,6 +568,7 @@ def process_cybersource_payment_response(request, order):
         )
         order_flow = order.get_object_flow()
         order_flow.errored()
+        _record_processor_response(order, request.POST)
         return_message = order.state
     elif processor_response.state in [
         ProcessorResponse.STATE_CANCELLED,
@@ -560,6 +582,7 @@ def process_cybersource_payment_response(request, order):
         log.debug(f"Transaction cancelled/reviewed: {processor_response.message}")  # noqa: G004
         order_flow = order.get_object_flow()
         order_flow.cancel()
+        _record_processor_response(order, request.POST)
         return_message = order.state
 
     elif (
@@ -584,6 +607,7 @@ def process_cybersource_payment_response(request, order):
         )
         order_flow = order.get_object_flow()
         order_flow.cancel()
+        _record_processor_response(order, request.POST)
         return_message = order.state
 
     sync_hubspot_deal(order)
@@ -1008,18 +1032,73 @@ def _retrieve_pending_stripe_orders(orders):
     )
 
 
+def _check_orders_with_processors(orders):
+    """
+    Look up the orders' payment status with their payment processors.
+
+    Declined and Canceled are already final answers for an unsuccessful
+    payment, so only Pending orders come back to be canceled.
+
+    Returns:
+    - Tuple of dicts, each mapping reference number to processor payload:
+      orders to fulfill, orders to cancel
+    """
+    cs_gateway_orders = [
+        pending_order
+        for pending_order in orders
+        if pending_order.gateway_type == MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+    ]
+    stripe_gateway_orders = [
+        pending_order
+        for pending_order in orders
+        if pending_order.gateway_type == MITOL_PAYMENT_GATEWAY_STRIPE
+    ]
+
+    cs_success, cs_cancel = _retrieve_pending_cybersource_orders(cs_gateway_orders)
+    stripe_success, stripe_cancel = _retrieve_pending_stripe_orders(
+        stripe_gateway_orders
+    )
+
+    success_orders = {**cs_success, **stripe_success}
+    cancel_orders = {**cs_cancel, **stripe_cancel}
+
+    settled_refnos = {
+        order.reference_number for order in orders if order.state != OrderStatus.PENDING
+    }
+    for refno in settled_refnos & cancel_orders.keys():
+        log.info("Order %s is still unsuccessful, leaving it as is.", refno)
+        del cancel_orders[refno]
+    return success_orders, cancel_orders
+
+
 def check_and_process_pending_orders_for_resolution(
-    refnos: list[str], *, check_status: bool = True, skip_fulfillment: bool = False
+    refnos: list[str] | None = None,
+    *,
+    check_status: bool = True,
+    skip_fulfillment: bool = False,
+    include_declined: bool = False,
+    include_canceled: bool = False,
 ):
     """
     Checks pending orders for resolution. By default, this will pull all the
     pending orders that are in the system.
 
+    With include_declined, Declined orders are checked too, and with
+    include_canceled, Canceled ones: if the payment processor reports the
+    payment as successful, the order is fulfilled (e.g. a CyberSource REVIEW
+    response cancels the order, and the payment may be accepted later). One the
+    processor still reports as unsuccessful is left in its state. Note that
+    declining an order deletes its discount redemptions, so a Declined order
+    fulfilled here has none.
+
     Args:
-    - refnos: list of reference numbers to check - empty list to check all Pending
+    - refnos: list of reference numbers to check - empty list or None to check
+      all Pending (and, with include_declined, all Declined) orders
     Keyword Args:
     - check_status: get the status of the order from the payment processor (default True)
     - skip_fulfillment: don't fulfill the order, just mark it as Fulfilled
+    - include_declined: also resolve Declined orders (default False)
+    - include_canceled: also resolve Canceled orders (default False)
     Returns:
     - Tuple of counts: fulfilled count, cancelled count, error count
 
@@ -1027,12 +1106,15 @@ def check_and_process_pending_orders_for_resolution(
 
     fulfilled_count = cancel_count = error_count = 0
 
-    if len(refnos) > 0:
-        pending_orders = PendingOrder.objects.filter(
-            state=OrderStatus.PENDING, reference_number__in=refnos
-        )
-    else:
-        pending_orders = PendingOrder.objects.filter(state=OrderStatus.PENDING)
+    states = [
+        OrderStatus.PENDING,
+        *([OrderStatus.DECLINED] * include_declined),
+        *([OrderStatus.CANCELED] * include_canceled),
+    ]
+
+    pending_orders = PendingOrder.objects.filter(state__in=states)
+    if refnos:
+        pending_orders = pending_orders.filter(reference_number__in=refnos)
 
     if len(pending_orders) == 0:
         return (0, 0, 0)
@@ -1040,24 +1122,7 @@ def check_and_process_pending_orders_for_resolution(
     log.info("Resolving %s orders", len(pending_orders))
 
     if check_status:
-        cs_gateway_orders = [
-            pending_order
-            for pending_order in pending_orders
-            if pending_order.gateway_type == MITOL_PAYMENT_GATEWAY_CYBERSOURCE
-        ]
-        stripe_gateway_orders = [
-            pending_order
-            for pending_order in pending_orders
-            if pending_order.gateway_type == MITOL_PAYMENT_GATEWAY_STRIPE
-        ]
-
-        cs_success, cs_cancel = _retrieve_pending_cybersource_orders(cs_gateway_orders)
-        stripe_success, stripe_cancel = _retrieve_pending_stripe_orders(
-            stripe_gateway_orders
-        )
-
-        success_orders = {**cs_success, **stripe_success}
-        cancel_orders = {**cs_cancel, **stripe_cancel}
+        success_orders, cancel_orders = _check_orders_with_processors(pending_orders)
     else:
         cancel_orders = {}
         success_orders = {}
@@ -1067,7 +1132,7 @@ def check_and_process_pending_orders_for_resolution(
     for refno, payload in success_orders.items():
         try:
             order = PendingOrder.objects.filter(
-                state=OrderStatus.PENDING,
+                state__in=states,
                 reference_number=refno,
             ).get()
             order_flow = order.get_object_flow()

@@ -803,6 +803,57 @@ def test_process_cybersource_payment_decline_response(
     assert order.discounts.count() == 0
 
 
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize(
+    ("decision", "expected_state"),
+    [
+        ("DECLINE", OrderStatus.DECLINED),
+        ("ERROR", OrderStatus.ERRORED),
+        ("CANCEL", OrderStatus.CANCELED),
+        ("REVIEW", OrderStatus.CANCELED),
+    ],
+)
+@pytest.mark.parametrize("has_transaction_id", [True, False])
+def test_process_cybersource_payment_unsuccessful_response_recorded(  # noqa: PLR0913
+    rf, mocker, user, products, decision, expected_state, has_transaction_id
+):
+    """
+    An unsuccessful CyberSource response is saved as a transaction on the
+    order, so the order shows why it ended up in its state. A response without
+    a transaction ID can't be saved, but the order still changes state.
+    """
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=True,
+    )
+    create_basket(user, products)
+    payload = {
+        **{
+            f"req_{key}": value
+            for key, value in create_pending_order(user)["payload"].items()
+        },
+        "decision": decision,
+        "message": "payment processor message",
+    }
+    if has_transaction_id:
+        payload["transaction_id"] = "12345"
+    order = Order.objects.get(state=OrderStatus.PENDING, purchaser=user)
+
+    result = process_cybersource_payment_response(
+        rf.post(reverse("checkout_result_api"), payload), order
+    )
+
+    assert result == expected_state
+    order.refresh_from_db()
+    assert order.state == expected_state
+    if has_transaction_id:
+        transaction = order.transactions.get()
+        assert transaction.transaction_id == "12345"
+        assert transaction.data["decision"] == decision
+    else:
+        assert not order.transactions.exists()
+
+
 @pytest.mark.parametrize("test_type", [None, "fail", "empty"])
 def test_check_and_process_pending_orders_for_resolution(mocker, test_type):
     """
@@ -904,6 +955,65 @@ def test_check_and_process_pending_orders_for_resolution(mocker, test_type):
         order.refresh_from_db()
         assert order.state == OrderStatus.FULFILLED
         assert (fulfilled, cancelled, errored) == (1, 0, 0)
+
+
+@pytest.mark.parametrize("state", [OrderStatus.DECLINED, OrderStatus.CANCELED])
+@pytest.mark.parametrize("include_state", [True, False])
+@pytest.mark.parametrize("payment_succeeded", [True, False])
+def test_check_and_process_pending_orders_declined_or_canceled(
+    mocker, state, include_state, payment_succeeded
+):
+    """
+    Declined and Canceled orders are only resolved with include_declined and
+    include_canceled. One the processor reports as paid (e.g. a REVIEW that was
+    accepted later) is fulfilled; one it still reports as unsuccessful is left
+    in its state.
+    """
+    order = OrderFactory.create(state=state)
+    mocker.patch("ecommerce.models.OrderFlow.create_enrollments", return_value=True)
+    payload = {
+        "reason_code": "100" if payment_succeeded else "481",
+        "req_reference_number": order.reference_number,
+        "transaction_id": "6759732112426719104003",
+        "req_amount": "10",
+    }
+    mocked_gateway_func = mocker.patch(
+        "mitol.payment_gateway.api.CyberSourcePaymentGateway.find_and_get_transactions",
+        return_value={order.reference_number: payload},
+    )
+
+    counts = check_and_process_pending_orders_for_resolution(
+        [],
+        include_declined=include_state and state == OrderStatus.DECLINED,
+        include_canceled=include_state and state == OrderStatus.CANCELED,
+    )
+
+    order.refresh_from_db()
+    if include_state and payment_succeeded:
+        assert order.state == OrderStatus.FULFILLED
+        assert counts == (1, 0, 0)
+    else:
+        assert order.state == state
+        assert counts == (0, 0, 0)
+    assert mocked_gateway_func.called is include_state
+
+
+def test_check_and_process_pending_orders_declined_no_check(mocker):
+    """With check_status=False, a Declined order is forced to Fulfilled."""
+    order = OrderFactory.create(state=OrderStatus.DECLINED)
+    mocked_gateway_func = mocker.patch(
+        "mitol.payment_gateway.api.CyberSourcePaymentGateway.find_and_get_transactions"
+    )
+    mocker.patch("ecommerce.models.OrderFlow.create_enrollments", return_value=True)
+
+    counts = check_and_process_pending_orders_for_resolution(
+        [order.reference_number], check_status=False, include_declined=True
+    )
+
+    order.refresh_from_db()
+    assert order.state == OrderStatus.FULFILLED
+    assert counts == (1, 0, 0)
+    mocked_gateway_func.assert_not_called()
 
 
 def test_check_and_process_pending_orders_options(mocker):

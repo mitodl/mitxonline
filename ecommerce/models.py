@@ -982,8 +982,12 @@ class OrderFlow:
         for line in self.order.lines.all():
             pm.hook.process_transaction_line(line=line)
 
+    # A declined or canceled order can still be fulfilled: the processor can
+    # report a charge as successful after we recorded a decline or cancel for
+    # it, e.g. a REVIEW that's accepted later (see
+    # check_and_process_pending_orders_for_resolution).
     @state.transition(
-        source=OrderStatus.PENDING,
+        source=[OrderStatus.PENDING, OrderStatus.DECLINED, OrderStatus.CANCELED],
         target=OrderStatus.FULFILLED,
     )
     def fulfill(
