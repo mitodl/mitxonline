@@ -1157,8 +1157,17 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         run_enrollment.refresh_from_db()
         assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
 
-    def test_preserves_b2b_run_enrollment(self, mocker, program_setup):
-        """A verified enrollment in a B2B-contracted run is left alone."""
+    @pytest.mark.parametrize(
+        "is_b2b_enrollment",
+        [
+            True,
+            False,
+        ],
+    )
+    def test_preserves_b2b_run_enrollment(
+        self, mocker, program_setup, is_b2b_enrollment
+    ):
+        """A verified enrollment in a B2B-contracted run is left alone if it's B2B."""
         contract = ContractPageFactory.create()
         program_setup.run.b2b_contracts.add(contract)
         run_enrollment = CourseRunEnrollmentFactory.create(
@@ -1166,6 +1175,7 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
             run=program_setup.run,
             enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
             active=True,
+            b2b_contract=contract if is_b2b_enrollment else None,
         )
         mocker.patch("courses.api.enroll_in_edx_course_runs")
 
@@ -1173,10 +1183,16 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
             program_setup.user, program_setup.program
         )
 
-        assert downgraded_runs == []
-        run_enrollment.refresh_from_db()
-        assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
-        assert run_enrollment.change_status is None
+        if is_b2b_enrollment:
+            assert downgraded_runs == []
+            run_enrollment.refresh_from_db()
+            assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+            assert run_enrollment.change_status is None
+        else:
+            assert run_enrollment in downgraded_runs
+            run_enrollment.refresh_from_db()
+            assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+            assert run_enrollment.change_status is not None
 
     def test_leaves_inactive_program_enrollment_alone(self, mocker, program_setup):
         """

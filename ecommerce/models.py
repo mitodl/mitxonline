@@ -1546,13 +1546,7 @@ def b2b_order_exists() -> Exists:
     an Order queryset under that same name.
     """
     return Exists(
-        Line.objects.filter(
-            order_id=OuterRef("pk"),
-            purchased_content_type=ContentType.objects.get_for_model(CourseRun),
-            purchased_object_id__in=CourseRun.b2b_contracts.through.objects.values(
-                "courserun_id"
-            ),
-        )
+        Line.objects.filter(order_id=OuterRef("pk"), b2b_contract__isnull=False)
     )
 
 
