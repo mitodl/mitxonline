@@ -1294,10 +1294,12 @@ class PendingOrder(Order):
         orders = (
             Order.objects.select_for_update()
             .prefetch_related("discounts")
+            .annotate(line_count=Count("lines"))
             .filter(
                 state=OrderStatus.PENDING,
                 purchaser=user,
                 gateway_type=gateway_type,
+                line_count=len(product_versions),
             )
         )
 
