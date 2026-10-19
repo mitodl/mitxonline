@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 1.170.6
+---------------
+
+- Bump anyio package (#4159)
+- fix(13891): B2b Code Redemption Fixes (#4158)
+- Report a contract's variant coverage from setup-status and check_contract_variant (#4115)
+- Re-check the code and the contract's seats under the lock when redeeming an enrollment code (#4102)
+- feat(notifications): proxy Open edX notification preferences (#3897)
+- Apply contract enrollment codes to baskets for B2B members (#4133)
+- Fix flaky test_create_edx_user by giving OpenEdxApiAuthFactory a fixed expiry (#4151)
+
 Version 1.170.5
 ---------------
 
