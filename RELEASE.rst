@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 1.170.5
+---------------
+
+- Add a staff API route that creates a contract's missing variant runs (#4112)
+- Add a contracts section to the staff dashboard (#4121)
+- Add updated pyjwt, remove unused mitol package, bump cybersource (#4101)
+- Update contract add/append logic; add a reconciliation function (#4125)
+- Clear the oasdiff ignore list now that its changes have shipped (#4149)
+
 Version 1.170.4
 ---------------
 
