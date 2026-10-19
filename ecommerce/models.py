@@ -1291,51 +1291,12 @@ class PendingOrder(Order):
             product_object_ids.append(product.object_id)
             product_content_types.append(product.content_type_id)
 
-        line_counts = (
-            Line.objects.filter(order_id=OuterRef("pk"))
-            .order_by()
-            .values("order_id")
-            .annotate(line_count=Count("pk"))
-            .values("line_count")
+        order = Order.objects.create(
+            state=OrderStatus.PENDING,
+            purchaser=user,
+            total_price_paid=0,
+            gateway_type=gateway_type,
         )
-
-        # Get or create a PendingOrder
-        orders = (
-            Order.objects.select_for_update()
-            .prefetch_related("discounts")
-            .annotate(line_count=Subquery(line_counts))
-            .filter(
-                state=OrderStatus.PENDING,
-                purchaser=user,
-                gateway_type=gateway_type,
-                line_count=len(product_versions),
-            )
-        )
-
-        for i, product_version in enumerate(product_versions):
-            orders = orders.filter(
-                lines__purchased_object_id=product_object_ids[i],
-                lines__purchased_content_type_id=product_content_types[i],
-                lines__product_version=product_version,
-            )
-
-        # Previously, multiple PendingOrders could be created for a single user
-        # for the same product, if multiple exist, grab the first.
-        if reuse_pending_order and orders:
-            order = orders.first()
-            # Clear discounts except for the most recent one
-            # If there aren't any discounts in the basket, clear them all
-            for old_discount in order.discounts.all():
-                old_discount.delete()
-
-            order.refresh_from_db()
-        else:
-            order = Order.objects.create(
-                state=OrderStatus.PENDING,
-                purchaser=user,
-                total_price_paid=0,
-                gateway_type=gateway_type,
-            )
 
         # Apply any discounts to the PendingOrder
         if discounts:
@@ -1357,31 +1318,17 @@ class PendingOrder(Order):
         total = 0
         for i, product_tuple in enumerate(products):
             product, contract = product_tuple
-            line, created = Line.objects.get_or_create(
+            line = Line.objects.create(
                 order=order,
                 purchased_object_id=product.object_id,
                 purchased_content_type_id=product.content_type_id,
-                defaults={
-                    "product_version": product_versions[i],
-                    "quantity": 1,
-                    # The column is non-null, so the price has to be in hand
-                    # before the INSERT. get_or_create resolves a callable in
-                    # `defaults` only when it creates, so the reuse path below
-                    # doesn't pay for a value it would discard.
-                    "discounted_unit_price": lambda i=i: (
-                        Line.compute_discounted_unit_price_for(
-                            order, product_versions[i]
-                        )
-                    ),
-                    "b2b_contract": contract,
-                },
+                product_version=product_versions[i],
+                quantity=1,
+                discounted_unit_price=Line.compute_discounted_unit_price_for(
+                    order, product_versions[i]
+                ),
+                b2b_contract=contract,
             )
-            if not created:
-                # get_or_create skips `defaults` on an existing line, so a reused
-                # pending order carries the contract and price from the last
-                # attempt until they're refreshed from this basket.
-                line.record_b2b_contract(contract)
-                line.record_discounted_unit_price()
             total += line.discounted_price
 
         order.total_price_paid = total
@@ -1422,7 +1369,6 @@ class PendingOrder(Order):
         discount: Discount | None = None,
         *,
         gateway_type: str = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
-        reuse_pending_order: bool = True,
     ):
         """
         Creates a new pending order from a product
@@ -1442,7 +1388,6 @@ class PendingOrder(Order):
             user,
             [discount],
             gateway_type,
-            reuse_pending_order=reuse_pending_order,
         )
 
         return order  # noqa: RET504
