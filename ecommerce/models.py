@@ -1257,6 +1257,7 @@ class PendingOrder(Order):
         user: User,
         discounts: List[Discount] | None = None,  # noqa: UP006
         gateway_type: str = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
+        reuse_pending_order: bool = True,
     ):
         """
         Returns an existing PendingOrder if one already exists with the same:
@@ -1290,45 +1291,48 @@ class PendingOrder(Order):
             product_object_ids.append(product.object_id)
             product_content_types.append(product.content_type_id)
 
-        line_counts = (
-            Line.objects.filter(order_id=OuterRef("pk"))
-            .order_by()
-            .values("order_id")
-            .annotate(line_count=Count("pk"))
-            .values("line_count")
-        )
-
-        # Get or create a PendingOrder
-        orders = (
-            Order.objects.select_for_update()
-            .prefetch_related("discounts")
-            .annotate(line_count=Subquery(line_counts))
-            .filter(
-                state=OrderStatus.PENDING,
-                purchaser=user,
-                gateway_type=gateway_type,
-                line_count=len(product_versions),
-            )
-        )
-
-        for i, product_version in enumerate(product_versions):
-            orders = orders.filter(
-                lines__purchased_object_id=product_object_ids[i],
-                lines__purchased_content_type_id=product_content_types[i],
-                lines__product_version=product_version,
+        order = None
+        if reuse_pending_order:
+            line_counts = (
+                Line.objects.filter(order_id=OuterRef("pk"))
+                .order_by()
+                .values("order_id")
+                .annotate(line_count=Count("pk"))
+                .values("line_count")
             )
 
-        # Previously, multiple PendingOrders could be created for a single user
-        # for the same product, if multiple exist, grab the first.
-        if orders:
-            order = orders.first()
-            # Clear discounts except for the most recent one
-            # If there aren't any discounts in the basket, clear them all
-            for old_discount in order.discounts.all():
-                old_discount.delete()
+            # Get or create a PendingOrder
+            orders = (
+                Order.objects.select_for_update()
+                .prefetch_related("discounts")
+                .annotate(line_count=Subquery(line_counts))
+                .filter(
+                    state=OrderStatus.PENDING,
+                    purchaser=user,
+                    gateway_type=gateway_type,
+                    line_count=len(product_versions),
+                )
+            )
 
-            order.refresh_from_db()
-        else:
+            for i, product_version in enumerate(product_versions):
+                orders = orders.filter(
+                    lines__purchased_object_id=product_object_ids[i],
+                    lines__purchased_content_type_id=product_content_types[i],
+                    lines__product_version=product_version,
+                )
+
+            # Previously, multiple PendingOrders could be created for a single user
+            # for the same product, if multiple exist, grab the first.
+            if orders:
+                order = orders.first()
+                # Clear discounts except for the most recent one
+                # If there aren't any discounts in the basket, clear them all
+                for old_discount in order.discounts.all():
+                    old_discount.delete()
+
+                order.refresh_from_db()
+
+        if order is None:
             order = Order.objects.create(
                 state=OrderStatus.PENDING,
                 purchaser=user,
@@ -1421,6 +1425,7 @@ class PendingOrder(Order):
         discount: Discount | None = None,
         *,
         gateway_type: str = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
+        reuse_pending_order: bool = True,
     ):
         """
         Creates a new pending order from a product
@@ -1435,7 +1440,12 @@ class PendingOrder(Order):
         """
 
         order = cls._get_or_create(
-            cls, [(product, None)], user, [discount], gateway_type
+            cls,
+            [(product, None)],
+            user,
+            [discount],
+            gateway_type,
+            reuse_pending_order=reuse_pending_order,
         )
 
         return order  # noqa: RET504
