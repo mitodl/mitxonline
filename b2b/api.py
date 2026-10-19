@@ -2546,7 +2546,9 @@ def process_add_org_membership(user, organization, *, keep_until_seen=False):
             if organization.attach_user(user):
                 obj.added_to_keycloak_at = now_in_utc()
                 obj.save(update_fields=["added_to_keycloak_at"])
-        except ConnectionError:
+        # requests' ConnectionError and Timeout are not the builtin
+        # ConnectionError, so Keycloak being unreachable needs the second one.
+        except (ConnectionError, requests.exceptions.RequestException):
             log.exception(
                 "Could not attach %s to Keycloak org for %s", user, organization
             )
