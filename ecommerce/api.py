@@ -1008,6 +1008,104 @@ def _retrieve_pending_stripe_orders(orders):
     )
 
 
+<<<<<<< Updated upstream
+=======
+def fulfill_order_from_cybersource_transaction(
+    refno: str, transaction_id: str, *, skip_fulfillment: bool = False
+):
+    """
+    Fulfill a Pending, Declined or Canceled CyberSource order from a specific
+    CyberSource transaction.
+
+    check_and_process_pending_orders_for_resolution finds an order's
+    transaction by searching CyberSource for its reference number. When that
+    search can't find it, the transaction ID (from the CyberSource Business
+    Center) can be used to fetch the transaction directly instead.
+
+    Args:
+    - refno: the order's reference number
+    - transaction_id: the CyberSource transaction (request) ID
+    Keyword Args:
+    - skip_fulfillment: don't fulfill the order, just mark it as Fulfilled
+    Returns:
+    - Order, the fulfilled order
+    Raises:
+    - Order.DoesNotExist if there's no Pending, Declined or Canceled
+      CyberSource order with that reference number
+    - ValueError if the transaction is for another order or wasn't successful
+    """
+    order = PendingOrder.objects.get(
+        reference_number=refno,
+        gateway_type=MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+        state__in=[OrderStatus.PENDING, OrderStatus.DECLINED, OrderStatus.CANCELED],
+    )
+
+    gateway = PaymentGateway.get_gateway_class(MITOL_PAYMENT_GATEWAY_CYBERSOURCE)
+    _, payload = gateway.get_transaction_details(transaction_id)
+
+    if payload["req_reference_number"] != order.reference_number:
+        msg = (
+            f"Transaction {transaction_id} is for order "
+            f"{payload['req_reference_number']}, not {order.reference_number}"
+        )
+        raise ValueError(msg)
+    if int(payload["reason_code"]) != 100:  # noqa: PLR2004
+        msg = (
+            f"Transaction {transaction_id} wasn't successful "
+            f"(reason code {payload['reason_code']})"
+        )
+        raise ValueError(msg)
+
+    order.get_object_flow().fulfill(payload, skip_fulfillment=skip_fulfillment)
+    sync_hubspot_deal(order)
+    log.info(
+        "Fulfilled order %s from transaction %s.",
+        order.reference_number,
+        transaction_id,
+    )
+    return order
+
+
+def _check_orders_with_processors(orders):
+    """
+    Look up the orders' payment status with their payment processors.
+
+    Declined and Canceled are already final answers for an unsuccessful
+    payment, so only Pending orders come back to be canceled.
+
+    Returns:
+    - Tuple of dicts, each mapping reference number to processor payload:
+      orders to fulfill, orders to cancel
+    """
+    cs_gateway_orders = [
+        pending_order
+        for pending_order in orders
+        if pending_order.gateway_type == MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+    ]
+    stripe_gateway_orders = [
+        pending_order
+        for pending_order in orders
+        if pending_order.gateway_type == MITOL_PAYMENT_GATEWAY_STRIPE
+    ]
+
+    cs_success, cs_cancel = _retrieve_pending_cybersource_orders(cs_gateway_orders)
+    stripe_success, stripe_cancel = _retrieve_pending_stripe_orders(
+        stripe_gateway_orders
+    )
+
+    success_orders = {**cs_success, **stripe_success}
+    cancel_orders = {**cs_cancel, **stripe_cancel}
+
+    settled_refnos = {
+        order.reference_number for order in orders if order.state != OrderStatus.PENDING
+    }
+    for refno in settled_refnos & cancel_orders.keys():
+        log.info("Order %s is still unsuccessful, leaving it as is.", refno)
+        del cancel_orders[refno]
+    return success_orders, cancel_orders
+
+
+>>>>>>> Stashed changes
 def check_and_process_pending_orders_for_resolution(
     refnos: list[str], *, check_status: bool = True, skip_fulfillment: bool = False
 ):
