@@ -1251,31 +1251,30 @@ class PendingOrder(Order):
     """An order that is pending payment"""
 
     @transaction.atomic
-    def _get_or_create(
+    def _create_with_data(
         self,
         products: List[Tuple[Product, ContractPage | None]],  # noqa: UP006
         user: User,
         discounts: List[Discount] | None = None,  # noqa: UP006
         gateway_type: str = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
-        reuse_pending_order: bool = True,
     ):
         """
-        Returns an existing PendingOrder if one already exists with the same:
-        Line purchased_object_id, purchased_content_type_id, and product_version,
-        as well as the same purchaser.  If a PendingOrder matching that criteria
-        does not exist, a new one is created.  The associated Line objects are either
-        retrieved if they exist for an existing PendingOrder, otherwise new Line objects
-        are created.
+        Creates a new PendingOrder with the supplied data.
+
+        The most current version of each Product passed in is selected, and the
+        contract is attached if it is also specified. Discounts will be applied
+        if they are also provided. Discount validation is not run at this point.
 
         Args:
-            products (List[Product]):  A list of Products associated with the PendingOrder.
-            user (User):  The user expected to be associated with the PendingOrder.
-            discounts (List[Discounts]):  A list of Discounts to apply to each Line assocaited
-                with the order.
+            products (List[Product, ContractPage|None]):  A list of Products to
+                add to the order, optionally with ContractPage for B2B orders.
+            user (User):  The purchasing user.
+            discounts (List[Discounts]):  A list of Discounts to apply to each
+                Line associated with the order.
             gateway_type (str): The PaymentGateway class for the order.
 
         Returns:
-            PendingOrder: the retrieved or created PendingOrder.
+            PendingOrder
         """
         # Get the details from each Product.
         product_versions, product_object_ids, product_content_types = [], [], []
@@ -1314,7 +1313,7 @@ class PendingOrder(Order):
                         ),
                     )
 
-        # Create or get Line for each product.  Calculate the Order total based on Lines and discount.
+        # Create Lines for each product.  Calculate the Order total based on Lines and discount.
         total = 0
         for i, product_tuple in enumerate(products):
             product, contract = product_tuple
@@ -1358,7 +1357,7 @@ class PendingOrder(Order):
             basket_discount.redeemed_discount
             for basket_discount in basket.discounts.all()
         ]
-        order = cls._get_or_create(cls, products, basket.user, discounts, gateway_type)
+        order = cls._create_with_data(cls, products, basket.user, discounts, gateway_type)
         return order  # noqa: RET504
 
     @classmethod
@@ -1382,7 +1381,7 @@ class PendingOrder(Order):
             PendingOrder: the created pending order
         """
 
-        order = cls._get_or_create(
+        order = cls._create_with_data(
             cls,
             [(product, None)],
             user,
