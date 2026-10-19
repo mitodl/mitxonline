@@ -21,7 +21,6 @@ class CertificatePageForm(WagtailAdminPageForm):
     def clean(self):
         cleaned_data = super().clean()
 
-        # Make sure that the event starts before it ends
         provisioning_enabled = cleaned_data["should_provision_verifiable_credential"]
         criteria = cleaned_data["verifiable_credential_criteria"]
         if provisioning_enabled and not criteria:
