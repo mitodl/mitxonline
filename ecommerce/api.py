@@ -1744,7 +1744,9 @@ def create_verified_program_course_run_order(user, courserun, program):
 
     with transaction.atomic():
         try:
-            order = PendingOrder.create_from_product(product, user, discount)
+            order = PendingOrder.create_from_product(
+                product, user, discount, reuse_pending_order=False
+            )
         except ValueError as exc:
             msg = f"Product {product} selected to upgrade enrollment for {user} is invalid"
             raise VerifiedProgramInvalidOrderError(msg) from exc
