@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable  # noqa: TC003
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, List, Tuple  # noqa: UP035
@@ -56,6 +57,7 @@ from users.models import User
 
 if TYPE_CHECKING:
     from b2b.models import ContractPage
+    from ecommerce.discount_sources import SourceResolution
 
 User = get_user_model()  # noqa: F811
 
@@ -378,6 +380,16 @@ def validate_program_child_purchase_product(*, redemption_type, product):
         raise ValidationError(PROGRAM_PRODUCTS_ONLY_ERROR)
 
 
+@dataclass(frozen=True)
+class RedemptionEligibility:
+    """
+    A user may redeem a discount. ``source`` is the qualifying prior purchase a
+    program-child-purchase discount resolved to, and None for any other type.
+    """
+
+    source: SourceResolution | None = None
+
+
 class Discount(TimestampedModel):
     """Discount model"""
 
@@ -527,14 +539,33 @@ class Discount(TimestampedModel):
 
     def is_redeemable_by(self, user: User, products: Iterable[Product] | None = None):
         """
-        Enforces the redemption rules for a given discount: whether its type is
-        learner-redeemable at all, how often it may be redeemed, whether it is
-        inside its date window, and — for a program-child-purchase redemption —
-        whether this user still holds an unconsumed qualifying purchase for one
-        of the products in hand.
+        Whether ``user`` may redeem this discount. See eligibility_for.
 
         Independent of check_validity_with_products (product scope and
         liveness); is_valid_for_basket composes the two.
+
+        Args:
+            - user (User): The user requesting the discount.
+            - products (Iterable[Product] or None): the products the discount is
+              being checked against — the basket's, or the one being priced.
+        Returns:
+            - boolean
+        """
+        return self.eligibility_for(user, products) is not None
+
+    def eligibility_for(  # noqa: PLR0911
+        self, user: User, products: Iterable[Product] | None
+    ) -> RedemptionEligibility | None:
+        """
+        Enforces the redemption rules for a given discount: whether its type is
+        learner-redeemable at all, whether it is inside its date window, whether
+        this user is in the contract the code belongs to (if it is one), how
+        often it may be redeemed, and — for a program-child-purchase redemption
+        — whether this user still holds an unconsumed qualifying purchase for
+        one of the products in hand.
+
+        Every redemption rule lives here, so that is_redeemable_by and
+        discount_product (and so quote_user_price) can't disagree.
 
         ``products`` is context for the program-child-purchase arm alone.
         Omitting it means no product is in hand (a code redemption, the CMS
@@ -546,30 +577,29 @@ class Discount(TimestampedModel):
             - products (Iterable[Product] or None): the products the discount is
               being checked against — the basket's, or the one being priced.
         Returns:
-            - boolean
+            - RedemptionEligibility, carrying the program-child-purchase source it resolved;
+              or None when ``user`` may not redeem this discount
         """
-        if self.redemption_type == REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE:
-            from ecommerce.discount_sources import resolve_for_discount  # noqa: PLC0415
+        from ecommerce.discount_sources import resolve_for_discount  # noqa: PLC0415
 
-            if products is None:
-                return False
-            if resolve_for_discount(self, user, products) is None:
-                return False
-
-        return self._within_redemption_limits(user)
-
-    def _within_redemption_limits(self, user: User) -> bool:
-        """
-        The redemption-type, redemption-count and date-window rules, without the
-        source check.
-        """
         # An internal discount is attached only by application code that has
-        # already decided eligibility (see REDEMPTION_TYPE_INTERNAL). The rule
-        # belongs at this depth rather than in is_redeemable_by because
-        # discount_product, and so quote_user_price, reaches the redemption
-        # rules through here.
+        # already decided eligibility (see REDEMPTION_TYPE_INTERNAL).
         if self.redemption_type == REDEMPTION_TYPE_INTERNAL:
-            return False
+            return None
+
+        if not self.valid_now():
+            return None
+
+        # A contract's codes are for its members. Holding one doesn't make
+        # someone a member: learners join a code contract through the attach
+        # endpoint, which the code-assignment email links to, and managed and
+        # auto contracts take members from their organization.
+        if self.b2b_contract_id and not (
+            user is not None
+            and user.is_authenticated
+            and user.b2b_contracts.filter(pk=self.b2b_contract_id).exists()
+        ):
+            return None
 
         if (
             self.redemption_type == REDEMPTION_TYPE_ONE_TIME
@@ -579,7 +609,7 @@ class Discount(TimestampedModel):
             ).count()
             > 0
         ):
-            return False
+            return None
 
         if (
             self.redemption_type == REDEMPTION_TYPE_ONE_TIME_PER_USER
@@ -590,15 +620,21 @@ class Discount(TimestampedModel):
             ).count()
             > 0
         ):
-            return False
+            return None
 
         if (self.max_redemptions or 0) > 0 and DiscountRedemption.objects.filter(
             redeemed_discount=self,
             redeemed_order__state=OrderStatus.FULFILLED,
         ).count() >= self.max_redemptions:
-            return False
+            return None
 
-        return self.valid_now()
+        if self.redemption_type != REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE:
+            return RedemptionEligibility()
+
+        if products is None:
+            return None
+        source = resolve_for_discount(self, user, products)
+        return RedemptionEligibility(source=source) if source else None
 
     def applies_to_products(self, products) -> bool:
         """True when the discount has no product links, or one of ``products`` is linked."""
@@ -706,10 +742,7 @@ class Discount(TimestampedModel):
             Decimal; the discounted price, or None when ``user`` may not redeem
             this discount for ``product``
         """
-        from ecommerce.discount_sources import (  # noqa: PLC0415
-            resolve_for_discount,
-            spends_source,
-        )
+        from ecommerce.discount_sources import spends_source  # noqa: PLC0415
         from ecommerce.discounts import DiscountType  # noqa: PLC0415
 
         resolved_amounts = {}
@@ -721,15 +754,12 @@ class Discount(TimestampedModel):
             if not self.valid_now():
                 return None
         else:
-            if not self._within_redemption_limits(user):
+            eligibility = self.eligibility_for(user, [product])
+            if eligibility is None:
                 return None
-            if self.redemption_type == REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE:
-                # One resolve serves both the eligibility check and the amount.
-                resolution = resolve_for_discount(self, user, [product])
-                if resolution is None:
-                    return None
-                if spends_source(self):
-                    resolved_amounts = {self.id: resolution.amount}
+            # One resolve serves both the eligibility check and the amount.
+            if eligibility.source and spends_source(self):
+                resolved_amounts = {self.id: eligibility.source.amount}
         return DiscountType.get_discounted_price(
             [self], product, resolved_amounts=resolved_amounts
         ).quantize(Decimal("0.01"))

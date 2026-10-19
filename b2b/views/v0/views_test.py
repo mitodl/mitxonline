@@ -13,6 +13,7 @@ from rest_framework.test import APIClient
 
 from b2b.api import create_contract_run, ensure_enrollment_codes_exist
 from b2b.constants import (
+    CONTRACT_MEMBERSHIP_AUTO,
     CONTRACT_MEMBERSHIP_CODE,
     CONTRACT_MEMBERSHIP_MANAGED,
 )
@@ -26,7 +27,11 @@ from compliance.api import verify_user_with_exports
 from courses.factories import CourseRunFactory
 from courses.models import CourseRunEnrollment
 from ecommerce.constants import DISCOUNT_TYPE_FIXED_PRICE
-from ecommerce.factories import ProductFactory, UnlimitedUseDiscountFactory
+from ecommerce.factories import (
+    OneTimeDiscountFactory,
+    ProductFactory,
+    UnlimitedUseDiscountFactory,
+)
 from ecommerce.models import DiscountProduct
 from main.constants import (
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
@@ -95,6 +100,44 @@ def test_b2b_contract_attachment_code_with_no_contracts(user):
     assert resp.status_code == 404
     assert resp.json()["detail"] == "No contracts found for this code."
     assert user.b2b_contracts.count() == 0
+
+
+@pytest.mark.parametrize(
+    "membership_type", [CONTRACT_MEMBERSHIP_MANAGED, CONTRACT_MEMBERSHIP_AUTO]
+)
+@pytest.mark.parametrize("code_spent", [False, True])
+def test_b2b_contract_attachment_refuses_non_code_contracts(
+    mocker, membership_type, code_spent
+):
+    """
+    Managed and auto contracts get their members from organization membership,
+    so their codes don't attach anyone. A spent code from a full one gets the
+    invalid-code 404 rather than the full-contract 409.
+    """
+    mocked_attach_user = mocker.patch(
+        "b2b.models.OrganizationPage.attach_user", return_value=True
+    )
+    user = UserFactory.create()
+    contract = ContractPageFactory.create(
+        membership_type=membership_type, max_learners=1
+    )
+    code = OneTimeDiscountFactory.create(b2b_contract=contract)
+    if code_spent:
+        member = UserFactory.create()
+        member.b2b_contracts.add(contract)
+        DiscountContractAttachmentRedemption.objects.create(
+            discount=code, user=member, contract=contract
+        )
+
+    client = APIClient()
+    client.force_login(user)
+    resp = client.post(
+        reverse("b2b:attach-user", kwargs={"enrollment_code": code.discount_code})
+    )
+
+    assert resp.status_code == 404
+    assert not user.b2b_contracts.filter(pk=contract.pk).exists()
+    mocked_attach_user.assert_not_called()
 
 
 @pytest.mark.parametrize(

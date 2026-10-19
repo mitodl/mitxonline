@@ -214,6 +214,24 @@ def test_set_limit_discount_multiple_users(users, set_limited_use_discount):
     assert set_limited_use_discount.is_redeemable_by(user) is False
 
 
+def test_contract_code_redemption_requires_membership(user):
+    """
+    A contract's code is redeemable, and prices a product, only for the
+    contract's members.
+    """
+    contract = ContractPageFactory.create()
+    discount = UnlimitedUseDiscountFactory.create(b2b_contract=contract)
+    product = ProductFactory.create()
+
+    assert discount.is_redeemable_by(user) is False
+    assert discount.discount_product(product, user) is None
+
+    user.b2b_contracts.add(contract)
+
+    assert discount.is_redeemable_by(user) is True
+    assert discount.discount_product(product, user) is not None
+
+
 def test_basket_discount_conversion(user, unlimited_discount):
     """
     Tests converting discounts applied to baskets to discounts applied to

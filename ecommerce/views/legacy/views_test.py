@@ -568,7 +568,13 @@ def test_start_checkout_with_discounts_and_b2b(
     product.refresh_from_db()
 
     if apply_discount:
-        discount = UnlimitedUseDiscountFactory.create(amount=1, b2b_contract=contract)
+        # Only members may redeem a contract's code, and the checkout's
+        # contract-pricing pass reuses the contract's own bulk code rather
+        # than minting another.
+        user.b2b_contracts.add(contract)
+        discount = UnlimitedUseDiscountFactory.create(
+            amount=1, b2b_contract=contract, is_bulk=True
+        )
         discount_product = DiscountProduct.objects.create(
             discount=discount, product=product
         )

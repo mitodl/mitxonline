@@ -25,6 +25,7 @@ from b2b.api import (
     lock_contract_for_code_assignment,
     process_add_org_membership,
 )
+from b2b.constants import CONTRACT_MEMBERSHIP_CODE
 from b2b.models import (
     ContractPage,
     ContractProgramItem,
@@ -256,10 +257,9 @@ class AttachContractApi(APIView):
             )
 
             for discount in fallback_discounts:
-                for contract in (
-                    discount.b2b_contracts()
-                    .filter(active=True)
-                    .exclude(Q(contract_start__gte=now) | Q(contract_end__lt=now))
+                for contract in ContractPage.active_objects.filter(
+                    pk=discount.b2b_contract_id,
+                    membership_type=CONTRACT_MEMBERSHIP_CODE,
                 ):
                     if contract.is_full():
                         log.error(  # noqa: TRY400
@@ -277,17 +277,20 @@ class AttachContractApi(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        # Only code contracts take members this way. Managed and auto contracts
+        # get theirs from organization membership, and their codes are for
+        # enrolling members, not for joining.
         b2b_contract_ids = list(
-            code.b2b_contracts()
-            .filter(active=True)
-            .exclude(Q(contract_start__gte=now) | Q(contract_end__lt=now))
-            .values_list("id", flat=True)
+            ContractPage.active_objects.filter(
+                pk=code.b2b_contract_id, membership_type=CONTRACT_MEMBERSHIP_CODE
+            ).values_list("id", flat=True)
         )
         if not b2b_contract_ids:
-            # Log an error here. We found a code, but it isn't associated with
-            # any active contracts, which is generally confusing for operators.
-            log.error(
-                "B2B attach: code %s is valid but not associated with any contracts",
+            # A valid code with no active code contract behind it: a managed or
+            # auto contract's code, which is refused on purpose, or a code whose
+            # contract has ended or been deactivated.
+            log.info(
+                "B2B attach: code %s is valid but not associated with any active code contract",
                 code,
             )
             return Response(
