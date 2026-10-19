@@ -74,7 +74,6 @@ yarn coverage          # With coverage report
 ```bash
 # From frontend/public directory
 yarn lint              # ESLint
-yarn scss_lint         # Sass linting
 yarn fmt               # Format with prettier-eslint
 yarn fmt:check         # Check formatting
 ```
