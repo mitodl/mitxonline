@@ -1743,7 +1743,11 @@ def create_verified_program_course_run_order(user, courserun, program):
     )
 
     with transaction.atomic():
-        order = PendingOrder.create_from_product(product, user, discount)
+        try:
+            order = PendingOrder.create_from_product(product, user, discount)
+        except ValueError as exc:
+            msg = f"Product {product} selected to upgrade enrollment for {user} is invalid"
+            raise VerifiedProgramInvalidOrderError(msg) from exc
 
         if order.total_price_paid > 0:
             msg = f"Order {order.reference_number} for {user} is not zero-value"
