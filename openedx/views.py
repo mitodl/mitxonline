@@ -161,14 +161,17 @@ def edx_enrollment_webhook(request):
             email,
             course_id,
         )
-        # 5xx rather than 400: nothing here says the request was bad, and the
-        # likely causes are transient. The sender drops a 4xx without retrying,
-        # so 400 would lose a grant a second attempt would have mirrored.
-        # Retrying is safe because both writes above are get_or_create.
-        return Response(
-            {"error": "Failed to create enrollment"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+        # Logged here for the webhook context -- which learner, which run --
+        # then re-raised rather than answered with a hand-built 500. Reaching
+        # this means something is broken rather than that the request was bad,
+        # so it belongs in the error tracker, and DRF turns it into the 5xx the
+        # sender needs in order to retry. A 400 would be worse than either: the
+        # sender drops a non-transient 4xx without retrying, losing a grant a
+        # second attempt would have mirrored.
+        #
+        # The role recorded above survives this. ATOMIC_REQUESTS is off, so it
+        # is already committed and is not rolled back by the exception.
+        raise
 
     log.info(
         "Webhook: Successfully enrolled user %s in course run %s (mode: %s, role: %s, created: %s)",

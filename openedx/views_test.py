@@ -210,11 +210,14 @@ class TestEdxEnrollmentWebhook:
         oauth_token,
     ):
         """
-        An unexpected enrollment failure answers 5xx, so the sender retries.
+        An unexpected enrollment failure propagates rather than being answered.
 
-        The plugin drops a non-transient 4xx without retrying, so answering 400
-        here would lose the grant on a transient failure such as a lock wait
-        timeout. Nothing on this path says the request was bad.
+        A 500 means something is broken, so it is not something this view hands
+        back deliberately: the exception is logged and re-raised, which puts it
+        in the error tracker and lets DRF render the 5xx the sender needs in
+        order to retry. Answering 400 instead would be worse than either, since
+        the sender drops a non-transient 4xx without retrying and would lose a
+        grant a second attempt would have mirrored.
         """
         user = UserFactory.create()
         course_run = CourseRunFactory.create()
@@ -224,13 +227,13 @@ class TestEdxEnrollmentWebhook:
             "course_id": course_run.courseware_id,
             "role": "instructor",
         }
-        response = self._post_webhook(api_client, payload, token=oauth_token.token)
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-        assert "Failed to create enrollment" in response.data["error"]
+        with pytest.raises(Exception, match="Unexpected error"):
+            self._post_webhook(api_client, payload, token=oauth_token.token)
 
         # The role is recorded before the enrollment precisely so it survives
         # this. They are independent facts, and Open edX has already granted
-        # the role whether or not we manage to mirror the enrollment.
+        # the role whether or not we manage to mirror the enrollment. It is not
+        # rolled back by the exception because ATOMIC_REQUESTS is off.
         assert CourseRunAccessRole.objects.filter(
             user=user, run=course_run, role="instructor"
         ).exists()
