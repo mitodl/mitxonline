@@ -678,8 +678,7 @@ def test_pending_orders_are_selected_properly_for_reuse():
         product_version=product_2_line.product_version,
         quantity=1,
         discounted_unit_price=product_2_line.discounted_unit_price,
-        purchased_content_type=product_2_line.purchased_content_type,
-        purchased_object_id=product_2_line.purchased_object_id,
+        purchased_object=product_2_line.purchased_object,
     )
 
     redo_product_2_order = PendingOrder.create_from_product(product_2, user)
