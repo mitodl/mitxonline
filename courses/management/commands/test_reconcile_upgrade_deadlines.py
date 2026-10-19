@@ -165,6 +165,38 @@ def test_fix_leaves_unfixable_runs_alone(mock_verified_mode, status_offsets):
     assert rows[0]["fixed"] == ""
 
 
+def test_fix_continues_past_a_run_that_fails_validation(mock_verified_mode):
+    """
+    CourseRun.save() runs clean(), which can reject a run for reasons unrelated
+    to its deadline. That run is reported as failed and the rest still get fixed.
+    """
+    now = now_in_utc().replace(microsecond=0)
+    edx_deadline = now + timedelta(days=30)
+    broken, valid = sorted(
+        CourseRunFactory.create_batch(2, live=True, upgrade_deadline=None),
+        key=lambda run: run.courseware_id,
+    )
+    # An expiration date before the end date fails clean(). update() skips it,
+    # the way older rows got into this state.
+    type(broken).objects.filter(pk=broken.pk).update(
+        expiration_date=broken.end_date - timedelta(days=1)
+    )
+    mock_verified_mode.return_value = _verified_mode(edx_deadline)
+
+    rows, err = _run_command(all=True, fix=True)
+
+    assert [(row["courseware_id"], row["fixed"]) for row in rows] == [
+        (broken.courseware_id, "failed"),
+        (valid.courseware_id, "yes"),
+    ]
+    assert f"{broken.courseware_id}: could not save" in err
+    assert "Fixed: 1, failed: 1" in err
+    broken.refresh_from_db()
+    valid.refresh_from_db()
+    assert broken.upgrade_deadline is None
+    assert valid.upgrade_deadline == edx_deadline
+
+
 def test_no_verified_mode(mock_verified_mode):
     """A run without a verified mode in edX is reported and not fixed."""
     run = CourseRunFactory.create()

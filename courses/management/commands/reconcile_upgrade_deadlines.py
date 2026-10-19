@@ -14,6 +14,7 @@ known to be wrong, and pushing them would overwrite correct dates in edX.
 import csv
 import time
 
+from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
 from mitol.common.utils.datetime import now_in_utc
@@ -140,6 +141,7 @@ class Command(BaseCommand):
         client = get_edx_api_service_client()
         counts = {}
         fixed_count = 0
+        failed_count = 0
 
         for index, run in enumerate(runs):
             if index and delay:
@@ -155,16 +157,26 @@ class Command(BaseCommand):
 
             counts[status] = counts.get(status, 0) + 1
             mxo_deadline = run.upgrade_deadline
-            fixed = False
+            fixed = ""
 
             if fix and status in FIXABLE_STATUSES:
                 run.upgrade_deadline = edx_deadline
                 # save() rather than update() so the Fastly purge runs and Learn
                 # picks up the new date. The push signal fires too, but edX
                 # already has this value, so the push makes no change.
-                run.save(update_fields=["upgrade_deadline"])
-                fixed = True
-                fixed_count += 1
+                try:
+                    run.save(update_fields=["upgrade_deadline"])
+                except ValidationError as exc:
+                    # save() runs clean(), which can reject a run for reasons
+                    # unrelated to its deadline. Report it and keep going.
+                    self.stderr.write(
+                        self.style.ERROR(f"{run.courseware_id}: could not save: {exc}")
+                    )
+                    fixed = "failed"
+                    failed_count += 1
+                else:
+                    fixed = "yes"
+                    fixed_count += 1
 
             writer.writerow(
                 [
@@ -172,7 +184,7 @@ class Command(BaseCommand):
                     _isoformat(mxo_deadline),
                     _isoformat(edx_deadline),
                     status,
-                    "yes" if fixed else "",
+                    fixed,
                 ]
             )
 
@@ -180,5 +192,6 @@ class Command(BaseCommand):
         self.stderr.write(
             f"Checked {len(runs)} run(s). {summary or 'nothing to check'}. "
             f"Fixed: {fixed_count}"
+            + (f", failed: {failed_count}" if failed_count else "")
             + ("" if fix else " (run with --fix to copy edX dates into MITx Online)")
         )
