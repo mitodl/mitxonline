@@ -38,7 +38,6 @@ from rest_framework.status import (
     HTTP_429_TOO_MANY_REQUESTS,
 )
 
-from b2b.api import process_add_org_membership
 from cms.api import create_default_courseware_page
 from compliance.api import verify_user_with_exports
 from compliance.exceptions import (
@@ -240,25 +239,6 @@ def _get_contract_for_user_run(user, run):
     return None
 
 
-def _add_user_to_run_contract(user, run, enrollment):
-    """
-    If the run is associated with a B2B contract, add the contract to the
-    user's contract list, update their org memberships, and record the contract
-    on the enrollment if it doesn't have one already.
-    """
-    contract = _get_contract_for_user_run(user, run)
-    if not contract:
-        return
-
-    process_add_org_membership(user, contract.organization, keep_until_seen=True)
-    user.b2b_contracts.add(contract)
-    user.save()
-
-    if not enrollment.b2b_contract_id:
-        enrollment.b2b_contract = contract
-        enrollment.save(update_fields=["b2b_contract"])
-
-
 def create_run_enrollments(  # noqa: C901, PLR0913
     user,
     runs,
@@ -364,8 +344,6 @@ def create_run_enrollments(  # noqa: C901, PLR0913
 
             if created:
                 enrollment.save_and_log(None)
-
-            _add_user_to_run_contract(user, run, enrollment)
 
             if not created:
                 enrollment_mode_changed = mode != enrollment.enrollment_mode

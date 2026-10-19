@@ -8,6 +8,7 @@ from django.contrib import admin, messages
 from django.contrib.admin.decorators import display
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.db import models
+from django.db.models import Prefetch
 from django.forms import TextInput
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
@@ -520,13 +521,22 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         )
         self.populate_verifiable_credentials_for_certificate(request, certificates)
 
-    def get_queryset(self, request):
+    def get_queryset(self, request):  # noqa: ARG002
         """Use the all_objects manager so we can see source runs."""
 
         # Imported here to avoid a circular dependency at module load time,
         # matching ProgramContractPageInline above.
+        from b2b.models import ContractPage  # noqa: PLC0415
 
-        return super().get_queryset(request)
+        # ContractPage.objects, not the default (active-only) manager, so runs
+        # parked in inactive contracts still show their contract.
+        return self.model.all_objects.prefetch_related(
+            Prefetch(
+                "b2b_contracts",
+                queryset=ContractPage.objects.order_by("id"),
+                to_attr="all_b2b_contracts",
+            )
+        )
 
     @admin.display(description="Primary?", ordering="is_primary_language")
     def primary(self, obj):

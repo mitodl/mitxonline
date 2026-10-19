@@ -280,7 +280,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
 
         A run can belong to several contracts. If the request was scoped to a
         contract or an organization, the matching contract is returned;
-        otherwise, the lowest-ID contract is used.
+        otherwise, returns None.
         """
         contracts = sorted(instance.b2b_contracts.all(), key=lambda c: c.id)
         if not contracts:

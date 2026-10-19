@@ -36,7 +36,9 @@ def restore_b2b_contract(apps, schema_editor):
         .distinct("courserun_id")
         .values_list("courserun_id", "contractpage_id")
     ):
-        CourseRun.all_objects.filter(id=run_id).update(b2b_contract_id=contract_id)
+        CourseRun.all_objects.filter(b2b_only=True, id=run_id).update(
+            b2b_contract_id=contract_id
+        )
 
 
 class Migration(migrations.Migration):
