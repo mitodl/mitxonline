@@ -1215,7 +1215,7 @@ def test_create_vpcro_no_product(bootstrapped_verified_program, user):
     ).exists()
 
 
-def test_create_vpcre_no_program(bootstrapped_verified_program, user):
+def test_create_vpcro_no_program(bootstrapped_verified_program, user):
     """
     Test that creating a verified course run enrollment for a program fails if
     there's no program enrollment.
@@ -1232,7 +1232,7 @@ def test_create_vpcre_no_program(bootstrapped_verified_program, user):
     assert "No verified enrollment" in str(exc.value)
 
 
-def test_create_vpcre_run_not_in_program(bootstrapped_verified_program, user):
+def test_create_vpcro_run_not_in_program(bootstrapped_verified_program, user):
     """
     The program's discount prices anything it is attached to, so a run whose
     course is outside the program's requirements is refused before a basket
@@ -1253,7 +1253,7 @@ def test_create_vpcre_run_not_in_program(bootstrapped_verified_program, user):
     assert not BasketDiscount.objects.filter(redeemed_by=user).exists()
 
 
-def test_create_vpcre_bad_basket(
+def test_create_vpcro_bad_basket(
     mocker,
     mock_hubspot_order,
     mock_create_run_enrollments,
