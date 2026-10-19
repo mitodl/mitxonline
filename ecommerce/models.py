@@ -14,7 +14,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import Count, Q, TextChoices
+from django.db.models import Count, OuterRef, Q, Subquery, TextChoices
 from django.utils.functional import cached_property
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
@@ -1290,11 +1290,19 @@ class PendingOrder(Order):
             product_object_ids.append(product.object_id)
             product_content_types.append(product.content_type_id)
 
+        line_counts = (
+            Line.objects.filter(order_id=OuterRef("pk"))
+            .order_by()
+            .values("order_id")
+            .annotate(line_count=Count("pk"))
+            .values("line_count")
+        )
+
         # Get or create a PendingOrder
         orders = (
             Order.objects.select_for_update()
             .prefetch_related("discounts")
-            .annotate(line_count=Count("lines"))
+            .annotate(line_count=Subquery(line_counts))
             .filter(
                 state=OrderStatus.PENDING,
                 purchaser=user,
