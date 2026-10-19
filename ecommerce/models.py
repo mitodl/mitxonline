@@ -1291,48 +1291,45 @@ class PendingOrder(Order):
             product_object_ids.append(product.object_id)
             product_content_types.append(product.content_type_id)
 
-        order = None
-        if reuse_pending_order:
-            line_counts = (
-                Line.objects.filter(order_id=OuterRef("pk"))
-                .order_by()
-                .values("order_id")
-                .annotate(line_count=Count("pk"))
-                .values("line_count")
+        line_counts = (
+            Line.objects.filter(order_id=OuterRef("pk"))
+            .order_by()
+            .values("order_id")
+            .annotate(line_count=Count("pk"))
+            .values("line_count")
+        )
+
+        # Get or create a PendingOrder
+        orders = (
+            Order.objects.select_for_update()
+            .prefetch_related("discounts")
+            .annotate(line_count=Subquery(line_counts))
+            .filter(
+                state=OrderStatus.PENDING,
+                purchaser=user,
+                gateway_type=gateway_type,
+                line_count=len(product_versions),
+            )
+        )
+
+        for i, product_version in enumerate(product_versions):
+            orders = orders.filter(
+                lines__purchased_object_id=product_object_ids[i],
+                lines__purchased_content_type_id=product_content_types[i],
+                lines__product_version=product_version,
             )
 
-            # Get or create a PendingOrder
-            orders = (
-                Order.objects.select_for_update()
-                .prefetch_related("discounts")
-                .annotate(line_count=Subquery(line_counts))
-                .filter(
-                    state=OrderStatus.PENDING,
-                    purchaser=user,
-                    gateway_type=gateway_type,
-                    line_count=len(product_versions),
-                )
-            )
+        # Previously, multiple PendingOrders could be created for a single user
+        # for the same product, if multiple exist, grab the first.
+        if reuse_pending_order and orders:
+            order = orders.first()
+            # Clear discounts except for the most recent one
+            # If there aren't any discounts in the basket, clear them all
+            for old_discount in order.discounts.all():
+                old_discount.delete()
 
-            for i, product_version in enumerate(product_versions):
-                orders = orders.filter(
-                    lines__purchased_object_id=product_object_ids[i],
-                    lines__purchased_content_type_id=product_content_types[i],
-                    lines__product_version=product_version,
-                )
-
-            # Previously, multiple PendingOrders could be created for a single user
-            # for the same product, if multiple exist, grab the first.
-            if orders:
-                order = orders.first()
-                # Clear discounts except for the most recent one
-                # If there aren't any discounts in the basket, clear them all
-                for old_discount in order.discounts.all():
-                    old_discount.delete()
-
-                order.refresh_from_db()
-
-        if order is None:
+            order.refresh_from_db()
+        else:
             order = Order.objects.create(
                 state=OrderStatus.PENDING,
                 purchaser=user,
