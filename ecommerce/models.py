@@ -15,7 +15,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import Count, OuterRef, Q, Subquery, TextChoices
+from django.db.models import Count, Q, TextChoices
 from django.utils.functional import cached_property
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
@@ -1387,7 +1387,9 @@ class PendingOrder(Order):
             basket_discount.redeemed_discount
             for basket_discount in basket.discounts.all()
         ]
-        order = cls._create_with_data(cls, products, basket.user, discounts, gateway_type)
+        order = cls._create_with_data(
+            cls, products, basket.user, discounts, gateway_type
+        )
         return order  # noqa: RET504
 
     @classmethod
