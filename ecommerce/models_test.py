@@ -644,6 +644,53 @@ def test_pending_order_is_reused(basket):
     assert Order.objects.filter(state=OrderStatus.PENDING).count() == 1
 
 
+def test_pending_orders_are_selected_properly_for_reuse():
+    """
+    Test that PendingOrder.create_from_product selects an appropriate PendingOrder.
+
+    If an order contains multiple lines, the PendingOrder._get_or_create method
+    should only return PendingOrders that match the supplied products, and not
+    a PendingOrder that simply contains the existing products.
+    """
+
+    with reversion.create_revision():
+        product_1, product_2 = ProductFactory.create_batch(2)
+    user = UserFactory.create()
+
+    starting_pending_order = PendingOrder.create_from_product(product_1, user)
+
+    assert starting_pending_order
+    assert Order.objects.filter(purchaser=user).count() == 1
+
+    product_2_order = PendingOrder.create_from_product(product_2, user)
+
+    assert starting_pending_order.id != product_2_order
+    assert Order.objects.filter(purchaser=user).count() == 2
+
+    redo_pending_order = PendingOrder.create_from_product(product_1, user)
+
+    assert redo_pending_order.id == starting_pending_order.id
+    assert Order.objects.filter(purchaser=user).count() == 2
+
+    product_2_line = product_2_order.lines.first()
+    LineFactory.create(
+        order=starting_pending_order,
+        product_version=product_2_line.product_version,
+        quantity=1,
+        discounted_unit_price=product_2_line.discounted_unit_price,
+        purchased_content_type=product_2_line.purchased_content_type,
+        purchased_object_id=product_2_line.purchased_object_id,
+    )
+
+    redo_product_2_order = PendingOrder.create_from_product(product_2, user)
+
+    assert redo_product_2_order.id == product_2_order.id
+    assert Order.objects.filter(purchaser=user).count() == 2
+    # Should still have 2 here - the first order with (now) 2 lines, and the
+    # second order with just one.
+    assert Order.objects.filter(purchaser=user, lines__product_version=product_2_line.product_version).count() == 2
+
+
 @pytest.mark.parametrize(
     "apply_discount", ["to_order", "to_basket", "to_second_basket"]
 )
