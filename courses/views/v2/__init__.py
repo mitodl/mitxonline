@@ -702,7 +702,7 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
     def filter_org_id(self, queryset, name, value):  # noqa: ARG002
         """Filter enrollments by B2B organization ID."""
         if value:
-            return queryset.filter(run__b2b_contracts__organization_id=value).distinct()
+            return queryset.filter(b2b_contract__organization_id=value)
         return queryset
 
 

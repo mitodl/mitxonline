@@ -335,12 +335,7 @@ def is_contract_order(order):
     Returns:
         bool: True if the order contains contract products, False otherwise
     """
-    for line in order.lines.all():
-        if hasattr(line.product, "purchasable_object"):
-            course_run = line.product.purchasable_object
-            if isinstance(course_run, CourseRun) and course_run.has_b2b_contracts:
-                return True
-    return False
+    return any(line.b2b_contract_id for line in order.lines.all())
 
 
 def get_approved_flexible_price_exists(instance, context):

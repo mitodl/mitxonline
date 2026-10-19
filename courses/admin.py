@@ -9,6 +9,7 @@ from django.contrib.admin.decorators import display
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.core.exceptions import PermissionDenied
 from django.db import models
+from django.db.models import Prefetch
 from django.forms import TextInput
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
@@ -586,6 +587,7 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
 
         # Imported here to avoid a circular dependency at module load time,
         # matching ProgramContractPageInline above.
+        from b2b.models import ContractPage  # noqa: PLC0415
 
         return self.model.all_objects
 
