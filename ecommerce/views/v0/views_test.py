@@ -443,8 +443,11 @@ def test_add_basket_item(user_drf_client, user):
 @pytest.mark.parametrize("add_discount", [True, False])
 @pytest.mark.parametrize("bad_product", [True, False])
 @override_settings(ENABLE_MULTIPLE_CART_ITEMS=True)
-@pytest.mark.zeal_allow("ecommerce.Product", "get()")
+# A multi-item basket pays per item: the update_or_create write, and a
+# purchasable_object read in both the flexible pricing lookup and the
+# response serializer, each of which reloads the products from basket_items.
 @pytest.mark.zeal_allow("ecommerce.BasketItem", "get()")
+@pytest.mark.zeal_allow("ecommerce.Product", "purchasable_object")
 def test_create_basket_with_products(
     user, user_client, existing_basket, add_discount, bad_product
 ):
