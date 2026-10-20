@@ -1354,9 +1354,9 @@ def enroll_in_edx_course_runs(
             msg = f"Failed to verify/create user {user.edx_username} in OpenEdX"
             raise OpenEdxUserMissingError(msg) from exc
 
-    if not user.openedx_user_exists:
-        msg = f"User {user.edx_username} does not exist in OpenEdX and could not be created"
-        raise OpenEdxUserMissingError(msg)
+        if not user.openedx_user_exists:
+            msg = f"User {user.edx_username} does not exist in OpenEdX and could not be created"
+            raise OpenEdxUserMissingError(msg)
 
     username = user.edx_username
     results = []
