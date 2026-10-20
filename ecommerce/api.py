@@ -191,7 +191,12 @@ def _validate_basket_steps_for_b2b(basket, request):
 
 
 def generate_checkout_payload(  # noqa: PLR0911, C901
-    request, *, skip_discount_check=False, skip_receipt=False, gateway_type=None
+    request,
+    *,
+    basket=None,
+    skip_discount_check=False,
+    skip_receipt=False,
+    gateway_type=None,
 ):
     """
     Generate the checkout payload for the current basket.
@@ -206,6 +211,7 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
     Args:
     - request: the incoming http request
     Kwargs:
+    - basket: the requester's basket, for a caller that already established it
     - skip_discount_check: skip checking discounts for validity (default False)
     - skip_receipt: skip sending order receipt email (default False)
     - gateway_type: specify specific gateway type (default None)
@@ -213,7 +219,8 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
 
     from b2b.api import apply_contract_discounts_to_basket  # noqa: PLC0415
 
-    basket = establish_basket(request)
+    if basket is None:
+        basket = establish_basket(request)
 
     if not gateway_type:
         global_id = request.user.global_id
@@ -263,10 +270,10 @@ def generate_checkout_payload(  # noqa: PLR0911, C901
         # the user's contracts, if it isn't there already.
         apply_contract_discounts_to_basket(basket)
 
-    if not skip_discount_check and not check_basket_discounts_for_validity(request):
+    if not skip_discount_check and not check_basket_discounts_for_validity(basket):
         # We only allow one discount per basket so clear all of them here.
         basket.discounts.all().delete()
-        apply_user_discounts(request)
+        apply_user_discounts(basket)
         return {
             "invalid_discounts": True,
             "error": USER_MSG_TYPE_DISCOUNT_INVALID,
@@ -370,7 +377,7 @@ def check_discount_for_products(discount, basket, products=None):
     return discount.check_validity_with_products(basket_products)
 
 
-def check_basket_discounts_for_validity(request):
+def check_basket_discounts_for_validity(basket):
     """
     Checks the validity of the discounts in the basket against the user and
     the products in the basket.
@@ -378,8 +385,6 @@ def check_basket_discounts_for_validity(request):
     Returns:
         boolean: True if all discounts are valid, False otherwise.
     """
-    basket = establish_basket(request)
-
     basket_products = basket.get_products()
 
     for basket_discount in basket.discounts.all():
@@ -393,9 +398,9 @@ def check_basket_discounts_for_validity(request):
     return True
 
 
-def apply_user_discounts(request):
+def apply_user_discounts(basket):
     """
-    Applies user discounts to the current cart. (If there are more than one for some
+    Applies user discounts to the basket. (If there are more than one for some
     reason, this will just do the first one. More logic needs to be added here
     if/when discounts apply to specific things.)
 
@@ -404,15 +409,14 @@ def apply_user_discounts(request):
     b2b.api.apply_contract_discounts_to_basket.
 
     Args:
-        - user (User): The currently authenticated user.
+        - basket (Basket): The basket of the user the discounts belong to.
 
     Returns:
         None
     """
     from b2b.api import apply_contract_discounts_to_basket  # noqa: PLC0415
 
-    basket = establish_basket(request)
-    _apply_user_discounts_to_basket(basket, request.user)
+    _apply_user_discounts_to_basket(basket, basket.user)
     apply_contract_discounts_to_basket(basket)
 
 
@@ -692,7 +696,7 @@ def claim_anonymous_basket(request):
         anon_basket.save(update_fields=["user", "anonymous_id"])
 
     del request.session[ANONYMOUS_BASKET_SESSION_KEY]
-    apply_user_discounts(request)
+    apply_user_discounts(anon_basket)
 
     return anon_basket
 
@@ -1754,7 +1758,7 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
         raise VerifiedProgramInvalidBasketError(msg)
 
     processed_order = generate_checkout_payload(
-        request, skip_discount_check=True, skip_receipt=True
+        request, basket=basket, skip_discount_check=True, skip_receipt=True
     )
 
     if "no_checkout" not in processed_order:

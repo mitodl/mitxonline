@@ -3891,7 +3891,7 @@ def test_apply_user_discounts_applies_contract_code(public_contract_run):
     user = _make_contract_user({"c": contract}, ["c"])
     basket = _basket_with(user, product)
 
-    apply_user_discounts(_b2b_request(user))
+    apply_user_discounts(basket)
 
     item = basket.basket_items.get()
     assert item.b2b_contract == contract
