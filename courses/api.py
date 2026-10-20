@@ -2252,7 +2252,7 @@ def get_verifiable_credentials_payload(
                 "achievementType": achievement_type,
                 "type": ["Achievement"],
                 "criteria": {
-                    # This will be a markdown list of constituent courses for program certs and the value of the `what_you_learn` field for courserun certs
+                    # The `verifiable_credential_criteria` field of the certificate page
                     "narrative": narrative
                 },
                 "description": f"{user_name} has successfully completed all modules and earned a {achievement_type} Certificate in {certificate_name}.",
