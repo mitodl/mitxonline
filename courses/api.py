@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from collections import Counter, namedtuple
+from collections import Counter, defaultdict, namedtuple
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -130,6 +130,15 @@ UserEnrollments = namedtuple(  # noqa: PYI024
         "past_non_program_runs",
     ],
 )
+
+# Enabled and has criteria
+VERIFIABLE_CREDENTIAL_STATUS_LIVE = "LIVE"
+# Disabled and has criteria
+VERIFIABLE_CREDENTIAL_STATUS_DISABLED = "DISABLED"
+# Enabled but has no criteria. This is an unusual state to be in and may indicate a misconfiguration
+VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA = "NO_CRITERIA"
+# Disabled and has no criteria. This is the standard state of certificates which are not supposed to have VCs
+VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA = "DISABLED_NO_CRITERIA"
 
 
 class InvalidCertificateError(Exception):
@@ -2349,6 +2358,39 @@ def create_verifiable_credential(
         )
         if raise_on_error:
             raise
+
+
+def summarize_verifiable_credential_certificate_statuses(
+    *, return_objects=False, ids=None
+):
+    from cms.models import CertificatePage  # noqa: PLC0415
+
+    certificate_pages = CertificatePage.objects.all()
+    if ids is not None:
+        certificate_pages = certificate_pages.filter(id__in=ids)
+    certificate_pages_by_status = defaultdict(list)
+    for page in certificate_pages:
+        is_enabled = page.should_provision_verifiable_credential
+        verifiable_credential_criteria = page.verifiable_credential_criteria
+        page_return_value = page if return_objects else f"{page.title} - {page.id}"
+        if is_enabled and verifiable_credential_criteria:
+            certificate_pages_by_status[VERIFIABLE_CREDENTIAL_STATUS_LIVE].append(
+                page_return_value
+            )
+        elif is_enabled and not verifiable_credential_criteria:
+            certificate_pages_by_status[
+                VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA
+            ].append(page_return_value)
+        elif not is_enabled and verifiable_credential_criteria:
+            certificate_pages_by_status[VERIFIABLE_CREDENTIAL_STATUS_DISABLED].append(
+                page_return_value
+            )
+        elif not is_enabled and not verifiable_credential_criteria:
+            certificate_pages_by_status[
+                VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA
+            ].append(page_return_value)
+
+    return certificate_pages_by_status
 
 
 def rerun_course_run(  # noqa: PLR0913
