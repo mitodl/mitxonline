@@ -253,7 +253,6 @@ def test_contract_description_keeps_only_rich_text_markup(admin_drf_client):
     assert created.json()["description"] == "alert(1)Plain &amp; simple"
 
 
-@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
 def test_add_courseware_and_follow_setup(admin_drf_client, mocked_tasks):
     """
     Adding a course creates its run before returning, and setup status tracks
@@ -563,7 +562,6 @@ def test_list_variant_sets(admin_drf_client):
     ]
 
 
-@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
 def test_sync_variants(admin_drf_client, mocked_tasks):
     """
     Syncing creates the run for a set added after the courseware, queues its
@@ -629,7 +627,6 @@ def test_sync_variants(admin_drf_client, mocked_tasks):
     mocked_tasks.code_check.assert_not_called()
 
 
-@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
 def test_sync_variants_without_codes(admin_drf_client, mocked_tasks):
     """A contract that doesn't use codes gets its runs and no code check."""
 
