@@ -1091,12 +1091,14 @@ def test_create_verified_program_discount():
     assert create_verified_program_discount(program) == discount
 
 
+@pytest.mark.parametrize("has_order", [True, False,])
 def test_create_verified_program_course_run_enrollment(
     mocker,
     mock_create_run_enrollments,
     mock_hubspot_order,
     bootstrapped_verified_program,
     user,
+    has_order,
 ):
     """Test that creating a verified course run enrollment for a program works
     and does not send a receipt email.
@@ -1107,11 +1109,19 @@ def test_create_verified_program_course_run_enrollment(
         "ecommerce.tasks.send_ecommerce_order_receipt.delay"
     )
 
-    (program, _, _, courserun, _) = bootstrapped_verified_program
+    (program, program_product, _, courserun, _) = bootstrapped_verified_program
 
     ProgramEnrollmentFactory.create(
         program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
+
+    if has_order:
+        product_version = reversion.models.Version.objects.get_for_object(program_product).first()
+        order = OrderFactory.create(purchaser=user)
+        LineFactory.create(product_version=product_version, purchased_object=program, order=order)
+
+        order.state = OrderStatus.FULFILLED
+        order.save()
 
     request = RequestFactory().get("/")
     request.user = user
@@ -1126,6 +1136,15 @@ def test_create_verified_program_course_run_enrollment(
             False,
         )
     )
+
+    if not has_order:
+        with pytest.raises(VerifiedProgramNoEnrollmentError) as exc:
+            cr_enrollment = create_verified_program_course_run_enrollment(
+                request, courserun, program
+            )
+
+        assert "No verified purchase" in str(exc)
+        return
 
     cr_enrollment = create_verified_program_course_run_enrollment(
         request, courserun, program
@@ -1189,11 +1208,19 @@ def test_create_vpcre_bad_basket(
     with reversion.create_revision():
         some_other_product = ProductFactory.create()
 
-    (program, _, _, courserun, _) = bootstrapped_verified_program
+    (program, program_product, _, courserun, _) = bootstrapped_verified_program
 
     prog_enrollment = ProgramEnrollmentFactory.create(
         program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
+    # Create and save an order for the enrollment, or we'll get an error because
+    # the course run enrollment isn't upgradable yet.
+    product_version = reversion.models.Version.objects.get_for_object(program_product).first()
+    order = OrderFactory.create(purchaser=prog_enrollment.user)
+    LineFactory.create(product_version=product_version, purchased_object=program, order=order)
+
+    order.state = OrderStatus.FULFILLED
+    order.save()
 
     request = RequestFactory().get("/")
     request.user = prog_enrollment.user

@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from urllib.parse import urljoin
 
+import reversion
 import stripe
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
@@ -1657,9 +1658,8 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
         msg = f"Course run {courserun} is not in program {program}"
         raise VerifiedProgramCourseNotInProgramError(msg)
 
-    discount = create_verified_program_discount(program)
-
     cr_ctype = ContentType.objects.get_for_model(courserun)
+    prog_ctype = ContentType.objects.get_for_model(program)
     try:
         product = Product.objects.filter(
             content_type=cr_ctype, object_id=courserun.id, is_active=True
@@ -1668,6 +1668,26 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
         msg = f"No active product for course run {courserun}"
         raise VerifiedProgramNoProductError(msg) from exc
 
+    # Check for a purchased program upgrade first. If the program doesn't have a
+    # product, or if the user never purchased that product, then we've automatically
+    # upgraded their program enrollment, and they don't get a freebie here.
+
+    try:
+        program_product = Product.objects.filter(
+            content_type=prog_ctype, object_id=program.id
+        ).get()
+    except Product.DoesNotExist as exc:
+        msg = f"No active product for program {program}"
+        raise VerifiedProgramNoProductError(msg) from exc
+
+    program_product_versions = reversion.models.Version.objects.get_for_object(program_product)
+    user_program_upgrade_qs = request.user.orders.filter(state=OrderStatus.FULFILLED, lines__product_version__in=program_product_versions)
+
+    if user_program_upgrade_qs.count() == 0:
+        msg = f"No verified purchased enrollment for {request.user} for program {program}"
+        raise VerifiedProgramNoEnrollmentError(msg)
+
+    discount = create_verified_program_discount(program)
     basket = establish_basket(request)
 
     if basket.basket_items.count() > 0:
