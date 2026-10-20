@@ -356,6 +356,22 @@ class Command(BaseCommand):
             try:
                 if edx_client is None:
                     edx_client = get_edx_api_service_client()
+                existing = next(
+                    (
+                        edx_enrollment
+                        for edx_enrollment in edx_client.enrollments.get_enrollments(
+                            course_id=courseware_id,
+                            usernames=[destination_user.edx_username],
+                        )
+                        if edx_enrollment.is_active
+                    ),
+                    None,
+                )
+                if existing:
+                    self.stdout.write(
+                        f"edX enrollment already exists for {destination_user.email} "
+                        f"in {courseware_id} (mode={existing.mode}), skipping edX sync."
+                    )
                 else:
                     enroll_in_edx_course_runs(
                         destination_user,
