@@ -1705,7 +1705,13 @@ def _get_verified_program_course_run_product_and_discount(user, courserun, progr
         msg = f"No active product for course run {courserun}"
         raise VerifiedProgramNoProductError(msg) from exc
 
-    return product, create_verified_program_discount(program)
+    try:
+        discount = create_verified_program_discount(program)
+    except Product.DoesNotExist as exc:
+        msg = f"No active product for program {program}"
+        raise VerifiedProgramNoProductError(msg) from exc
+
+    return product, discount
 
 
 def create_verified_program_course_run_order(user, courserun, program):
