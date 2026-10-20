@@ -1345,6 +1345,13 @@ def enroll_in_edx_course_runs(
     """
     edx_client = get_edx_api_service_client()
 
+    # The caller may have read user.edx_username before the OpenEdxUser row
+    # existed (establish_basket does, then queues create_user_from_id), and
+    # that read sticks in the openedx_user cached_property. The row may have
+    # been written since, by that task or by the repair below, so drop the
+    # cache here, where the username goes out to edX.
+    user.__dict__.pop("openedx_user", None)
+
     # repair_faulty_edx_user's own check re-verifies existence against edX
     # over HTTP even when we already know locally that the user is synced
     # (see create_edx_user's `has_been_synced and _edx_user_exists(user)`),
