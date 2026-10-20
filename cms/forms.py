@@ -21,8 +21,10 @@ class CertificatePageForm(WagtailAdminPageForm):
     def clean(self):
         cleaned_data = super().clean()
 
-        provisioning_enabled = cleaned_data["should_provision_verifiable_credential"]
-        criteria = cleaned_data["verifiable_credential_criteria"]
+        provisioning_enabled = cleaned_data.get(
+            "should_provision_verifiable_credential"
+        )
+        criteria = cleaned_data.get("verifiable_credential_criteria")
         if provisioning_enabled and not criteria:
             self.add_error(
                 "verifiable_credential_criteria",
