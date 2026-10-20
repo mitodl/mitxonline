@@ -2039,7 +2039,7 @@ def test_establish_basket_calls_create_user(mocker, no_delay):
 
     OpenEdxUserFactory.create(user=user)
     if not no_delay:
-        del user.openedx_user
+        user.clear_openedx_user_cache()
 
     basket.delete()
 

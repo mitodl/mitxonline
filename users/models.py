@@ -1,5 +1,6 @@
 """User models"""
 
+import contextlib
 import logging
 import uuid
 from datetime import timedelta
@@ -350,6 +351,13 @@ class User(
         # applies the same order it would have.
         openedx_users = sorted(self.openedx_users.all(), key=lambda user: user.pk)
         return openedx_users[0] if openedx_users else None
+
+    def clear_openedx_user_cache(self) -> None:
+        """Drop the cached OpenEdxUser so the next read re-queries."""
+        # hasattr() cannot guard this: it calls __get__ and populates the very
+        # cache being cleared, so suppress the miss on a cold cache instead.
+        with contextlib.suppress(AttributeError):
+            del self.openedx_user
 
     @property
     def edx_username(self) -> str | None:

@@ -612,8 +612,7 @@ def establish_basket(request, *, no_delay=False):
     if not user.edx_username:
         if no_delay:
             create_user(user)
-            # The openedx_user is a cached property, so delete the cached value
-            del user.openedx_user
+            user.clear_openedx_user_cache()
         else:
             create_user_from_id.delay(user.id)
 

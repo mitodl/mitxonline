@@ -89,7 +89,7 @@ class LearnUserAdapter(UserAdapter):
 
         self.openedx_user = self.obj.openedx_user
         if self.openedx_user is None:
-            del self.obj.openedx_user
+            self.obj.clear_openedx_user_cache()
             self.openedx_user = self.obj.openedx_user = OpenEdxUser()
 
         # __init__ runs before from_dict()/handle_replace() mutate the object and
