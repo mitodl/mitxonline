@@ -21,7 +21,6 @@ from courses.models import (
 )
 from ecommerce.models import DiscountRedemption, Order, OrderStatus, RefundRequest
 from flexiblepricing.models import FlexiblePrice
-from hubspot_sync.task_helpers import sync_hubspot_deal
 from openedx.api import enroll_in_edx_course_runs
 from openedx.constants import EDX_ENROLLMENTS_PAID_MODES
 from users.api import fetch_user
@@ -48,7 +47,7 @@ class Command(BaseCommand):
       PaidCourseRun records, discount redemptions and refund requests (its
       lines and transactions belong to the order), and the source user's
       flexible price (financial assistance) request for each course or
-      program the order bought. The orders are re-synced to HubSpot.
+      program the order bought.
 
     A record is skipped, not aborted, if the destination user already has a
     matching enrollment/grade/certificate/flexible price; transferred and
@@ -115,7 +114,6 @@ class Command(BaseCommand):
         self._print_result(
             source_user, destination_user, transfer_counts, skipped_counts
         )
-        self._sync_hubspot_deals(orders_to_transfer)
         self._sync_edx_enrollments(
             destination_user,
             to_transfer["course_run_enrollments"],
@@ -405,18 +403,6 @@ class Command(BaseCommand):
             for record in records:
                 setattr(record, user_field, destination_user)
                 record.save(update_fields=[user_field])
-
-    def _sync_hubspot_deals(self, orders):
-        """Re-sync the transferred orders to HubSpot under their new purchaser."""
-        for order in orders:
-            try:
-                sync_hubspot_deal(order)
-            except Exception as exc:  # noqa: BLE001, PERF203
-                self.stdout.write(
-                    self.style.ERROR(
-                        f"Could not sync order {order.reference_number} to HubSpot: {exc}"
-                    )
-                )
 
     def _print_result(
         self, source_user, destination_user, transfer_counts, skipped_counts
