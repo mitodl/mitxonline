@@ -1276,6 +1276,18 @@ class PendingOrder(Order):
         Returns:
             PendingOrder
         """
+        unique_products = {}
+        for product, contract in products:
+            product_key = (product.content_type_id, product.object_id)
+            existing_product = unique_products.get(product_key)
+            if existing_product:
+                if existing_product[1] != contract:
+                    msg = "Duplicate products cannot have conflicting contracts."
+                    raise ValidationError(msg)
+                continue
+            unique_products[product_key] = (product, contract)
+        products = list(unique_products.values())
+
         # Get the details from each Product.
         product_versions, product_object_ids, product_content_types = [], [], []
         for product, _ in products:

@@ -590,6 +590,98 @@ def test_pending_order_with_multiple_product_versions(basket, reuse):
         assert order.total_price_paid == 750
 
 
+def test_pending_orders_from_same_basket_are_fresh_snapshots(basket):
+    """Later basket changes do not modify an earlier order."""
+    contract = ContractPageFactory.create()
+    updated_contract = ContractPageFactory.create()
+    discount = DiscountFactory.create(
+        amount=Decimal("10"), discount_type=DISCOUNT_TYPE_DOLLARS_OFF
+    )
+    updated_discount = DiscountFactory.create(
+        amount=Decimal("20"), discount_type=DISCOUNT_TYPE_DOLLARS_OFF
+    )
+    with reversion.create_revision():
+        product = ProductFactory.create(price=Decimal("100.00"))
+    basket_item = BasketItemFactory.create(
+        basket=basket, product=product, b2b_contract=contract
+    )
+    BasketDiscount.objects.create(
+        redeemed_basket=basket,
+        redeemed_by=basket.user,
+        redeemed_discount=discount,
+        redemption_date=now_in_utc(),
+    )
+
+    first_order = PendingOrder.create_from_basket(basket)
+    first_line = first_order.lines.get()
+    first_reference_number = first_order.reference_number
+
+    BasketDiscount.objects.filter(redeemed_basket=basket).delete()
+    BasketDiscount.objects.create(
+        redeemed_basket=basket,
+        redeemed_by=basket.user,
+        redeemed_discount=updated_discount,
+        redemption_date=now_in_utc(),
+    )
+    basket_item.b2b_contract = updated_contract
+    basket_item.save()
+    second_order = PendingOrder.create_from_basket(basket)
+
+    first_order.refresh_from_db()
+    first_line.refresh_from_db()
+    assert first_order.id != second_order.id
+    assert first_order.reference_number != second_order.reference_number
+    assert first_order.reference_number == first_reference_number
+    assert first_line.b2b_contract == contract
+    assert first_line.discounted_unit_price == Decimal("90.00")
+    assert first_order.discounts.get().redeemed_discount == discount
+    assert second_order.lines.get().b2b_contract == updated_contract
+    assert second_order.lines.get().discounted_unit_price == Decimal("80.00")
+    assert second_order.discounts.get().redeemed_discount == updated_discount
+
+
+def test_pending_order_from_same_product_is_fresh():
+    """Repeated product checkouts create distinct orders and reference numbers."""
+    user = UserFactory.create()
+    with reversion.create_revision():
+        product = ProductFactory.create()
+
+    first_order = PendingOrder.create_from_product(product, user)
+    second_order = PendingOrder.create_from_product(product, user)
+
+    assert first_order.id != second_order.id
+    assert first_order.reference_number != second_order.reference_number
+
+
+def test_duplicate_basket_products_create_one_order_line(basket):
+    """A repeated basket item for one purchasable object is charged only once."""
+    with reversion.create_revision():
+        product = ProductFactory.create(price=Decimal("100.00"))
+    BasketItemFactory.create(basket=basket, product=product)
+    BasketItemFactory.create(basket=basket, product=product)
+
+    order = PendingOrder.create_from_basket(basket)
+
+    assert order.lines.count() == 1
+    assert order.total_price_paid == Decimal("100.00")
+
+
+def test_duplicate_basket_products_with_conflicting_contracts_are_rejected(basket):
+    """Duplicate basket entries must agree on their contract."""
+    product = ProductFactory.create()
+    BasketItemFactory.create(
+        basket=basket, product=product, b2b_contract=ContractPageFactory.create()
+    )
+    BasketItemFactory.create(
+        basket=basket, product=product, b2b_contract=ContractPageFactory.create()
+    )
+
+    with pytest.raises(ValidationError, match="conflicting contracts"):
+        PendingOrder.create_from_basket(basket)
+
+    assert not Order.objects.filter(purchaser=basket.user).exists()
+
+
 def test_pending_order_with_bad_product_versions(basket):
     """
     Test that creating a PendingOrder with a basket item for a product with
