@@ -633,6 +633,9 @@ def test_pending_orders_from_same_basket_are_fresh_snapshots(basket):
     first_order = PendingOrder.create_from_basket(basket)
     first_line = first_order.lines.get()
     first_reference_number = first_order.reference_number
+    identical_order = PendingOrder.create_from_basket(basket)
+    assert first_order.id != identical_order.id
+    assert first_order.reference_number != identical_order.reference_number
 
     BasketDiscount.objects.filter(redeemed_basket=basket).delete()
     BasketDiscount.objects.create(
