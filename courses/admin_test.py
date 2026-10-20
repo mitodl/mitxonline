@@ -5,6 +5,12 @@ from django.contrib import admin as django_admin
 from django.urls import reverse
 
 from courses.admin import CourseRunEnrollmentAdmin
+from courses.api import (
+    VERIFIABLE_CREDENTIAL_STATUS_DISABLED,
+    VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA,
+    VERIFIABLE_CREDENTIAL_STATUS_LIVE,
+    VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA,
+)
 from courses.factories import (
     CourseRunEnrollmentFactory,
     PartnerSchoolFactory,
@@ -95,3 +101,40 @@ def test_partner_school_admin_changelist_filters_by_program(admin_client):
     assert resp.status_code == 200
     assert b"SCM Only School" in resp.content
     assert b"DEDP Only School" not in resp.content
+
+
+def test_verifiable_credential_stats_view(mocker, admin_client):
+    """The stats page should render the certificate page status breakdown"""
+    page = mocker.Mock(id=123)
+    page.title = "Some Certificate"
+    mock_summary = mocker.patch(
+        "courses.admin.summarize_verifiable_credential_certificate_statuses",
+        return_value={VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA: [page]},
+    )
+
+    resp = admin_client.get(reverse("admin:courses_verifiablecredential_stats"))
+
+    assert resp.status_code == 200
+    mock_summary.assert_called_once_with(return_objects=True)
+    rows = {row["status"]: row["pages"] for row in resp.context["stats"]}
+    assert rows == {
+        VERIFIABLE_CREDENTIAL_STATUS_LIVE: [],
+        VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA: [page],
+        VERIFIABLE_CREDENTIAL_STATUS_DISABLED: [],
+        VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA: [],
+    }
+    assert "Some Certificate" in resp.content.decode()
+
+
+def test_verifiable_credential_stats_view_requires_staff(client, user):
+    """Non-staff users should not be able to see the stats page"""
+    client.force_login(user)
+    resp = client.get(reverse("admin:courses_verifiablecredential_stats"))
+    assert resp.status_code == 302
+
+
+def test_verifiable_credential_changelist_links_to_stats(admin_client):
+    """The changelist should link to the stats page"""
+    resp = admin_client.get(reverse("admin:courses_verifiablecredential_changelist"))
+    assert resp.status_code == 200
+    assert reverse("admin:courses_verifiablecredential_stats") in resp.content.decode()
