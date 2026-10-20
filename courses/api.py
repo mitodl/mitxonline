@@ -81,6 +81,7 @@ from courses.utils import (
     is_grade_valid,
     is_letter_grade_valid,
 )
+from ecommerce.constants import REDEMPTION_TYPE_INTERNAL
 from ecommerce.models import OrderStatus, Product
 from main import features
 from main.utils import get_learn_product_url
@@ -473,6 +474,34 @@ def get_program_and_ancestor_ids(program):
     return seen
 
 
+def get_program_entitlement_enrollments(user):
+    """
+    Return the user's course run enrollments that count against the program
+    entitlement's one verified run per course.
+
+    That's every verified enrollment, active or not, except a run the learner
+    bought separately: a fulfilled purchase of the run that didn't use the
+    program's internal 100%-off discount. (A run granted by the program is
+    also a fulfilled, zero-value order, but one that redeems that discount.)
+
+    Args:
+        user (User): The learner
+
+    Returns:
+        QuerySet of CourseRunEnrollment
+    """
+    separately_bought_run_ids = (
+        PaidCourseRun.objects.filter(user=user, order__state=OrderStatus.FULFILLED)
+        .exclude(
+            order__discounts__redeemed_discount__redemption_type=REDEMPTION_TYPE_INTERNAL
+        )
+        .values("course_run_id")
+    )
+    return CourseRunEnrollment.all_objects.filter(
+        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    ).exclude(run_id__in=separately_bought_run_ids)
+
+
 def has_program_course_entitlement(user, program, course):
     """
     Determine whether a verified program enrollment entitles the learner to a
@@ -484,8 +513,9 @@ def has_program_course_entitlement(user, program, course):
     A purchase of a program that requires this one (nested programs) counts.
 
     The entitlement covers a single verified run per course. Once the learner
-    has held a verified enrollment in any run of the course - active or not,
-    however it was obtained - it's used up, and further runs must be bought.
+    has held a verified enrollment in any run of the course - active or not -
+    it's used up, and further runs must be bought. A run the learner bought
+    separately doesn't use it (see get_program_entitlement_enrollments).
     Unenrolling doesn't give it back; a refund downgrades the enrollment to
     audit, so it no longer counts.
 
@@ -504,11 +534,11 @@ def has_program_course_entitlement(user, program, course):
     ).exists():
         return False
 
-    return not CourseRunEnrollment.all_objects.filter(
-        user=user,
-        run__course=course,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-    ).exists()
+    return (
+        not get_program_entitlement_enrollments(user)
+        .filter(run__course=course)
+        .exists()
+    )
 
 
 def upgrade_audit_run_enrollments_for_program_purchase(user, program):
@@ -521,10 +551,10 @@ def upgrade_audit_run_enrollments_for_program_purchase(user, program):
     has an active audit-track enrollment in it.
 
     The program grants one verified run per course (see
-    has_program_course_entitlement), so a course the user already holds a
-    verified enrollment in - active or not - is skipped, and if the user is
-    auditing several eligible runs of one course only the latest-starting one
-    is upgraded.
+    has_program_course_entitlement), so a course whose entitlement the user has
+    already used - a verified run, active or not, that they didn't buy
+    separately - is skipped, and if the user is auditing several eligible runs
+    of one course only the latest-starting one is upgraded.
 
     Args:
         user (User): The user who purchased the program
@@ -535,9 +565,9 @@ def upgrade_audit_run_enrollments_for_program_purchase(user, program):
     """
     now = now_in_utc()
 
-    verified_course_ids = CourseRunEnrollment.all_objects.filter(
-        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
-    ).values("run__course_id")
+    verified_course_ids = get_program_entitlement_enrollments(user).values(
+        "run__course_id"
+    )
 
     candidate_runs = (
         CourseRun.objects.filter(
