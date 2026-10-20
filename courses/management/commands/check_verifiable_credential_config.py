@@ -67,7 +67,7 @@ class Command(BaseCommand):
         for status, certificates in breakdown.items():
             self.stdout.write(f"{status}: {len(certificates)}")
         # Warn on the specific case of certificates with no criteria, since this is an atypical state and may indicate misconfiguration.
-        if breakdown[VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA]:
+        if breakdown.get(VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA):
             self.stdout.write(
                 self.style.WARNING(
                     f"{len(breakdown[VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA])} enabled certificates have no criteria and will not have verifiable credentials generated for them."
