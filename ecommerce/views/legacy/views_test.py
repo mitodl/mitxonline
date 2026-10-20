@@ -43,6 +43,7 @@ from ecommerce.factories import (
     BasketItemFactory,
     DiscountFactory,
     LineFactory,
+    OrderFactory,
     PaidAmountOffDiscountFactory,
     ProductFactory,
     UnlimitedUseDiscountFactory,
@@ -65,6 +66,7 @@ from ecommerce.serializers import (
     DiscountSerializer,
     ProductSerializer,
 )
+from ecommerce.test_utils import make_order_for_product
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from main import features
@@ -966,14 +968,14 @@ def test_checkout_product_with_verified_program_enrollment(user, user_client):
     """
     Verifies that /cart/add?course_id=? skips the cart and redirects straight
     to the dashboard, creating a verified enrollment directly, when the
-    learner already holds a verified enrollment in a program the course
+    learner already holds a _paid_ verified enrollment in a program the course
     belongs to.
     """
     program = ProgramFactory.create()
     course_run = CourseRunFactory.create()
     program.add_requirement(course_run.course)
     with reversion.create_revision():
-        ProductFactory.create(purchasable_object=program)
+        program_product = ProductFactory.create(purchasable_object=program)
         ProductFactory.create(purchasable_object=course_run)
 
     ProgramEnrollmentFactory.create(
@@ -982,6 +984,7 @@ def test_checkout_product_with_verified_program_enrollment(user, user_client):
         enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
         active=True,
     )
+    make_order_for_product(user, program_product)
 
     resp = user_client.get(
         reverse("checkout-product"), {"course_id": course_run.courseware_id}

@@ -409,6 +409,8 @@ def reconcile_verified_program_enrollments(
     Raises:
         EnrollmentError: if reconciliation failed
     """
+    from ecommerce.api import create_verified_program_enrollment_orders  # noqa: C415
+
     try:
         if len(verified_program_enrollments) == 0:
             # No verified enrollments, so it doesn't matter - the user will get an
@@ -425,6 +427,9 @@ def reconcile_verified_program_enrollments(
             # create a verified enrollment for the other program.
             create_program_enrollments(
                 user, programs, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+            )
+            create_verified_program_enrollment_orders(
+                user, root_program, programs
             )
         elif (
             len(verified_program_enrollments) == 1
