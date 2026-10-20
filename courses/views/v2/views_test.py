@@ -2383,7 +2383,7 @@ def test_add_verified_program_course_enrollment_export_compliance_blocked(
         EDX_ENROLLMENT_VERIFIED_MODE,
     ],
 )
-def test_add_nested_verified_program_course_enrollment(
+def test_add_nested_verified_program_course_enrollment(  # noqa: C901
     user,
     user_drf_client,
     base_program_enrollment_type,
@@ -2529,9 +2529,13 @@ def test_add_nested_verified_program_course_enrollment(
     ]:
         # We should have backfilled a verified enrollment and order for the
         # crogram too.
-        crogram_product_version = reversion.models.Version.objects.get_for_object(crogram_product).first()
+        crogram_product_version = reversion.models.Version.objects.get_for_object(
+            crogram_product
+        ).first()
 
-        assert user.orders.filter(state=OrderStatus.FULFILLED, lines__product_version=crogram_product_version).exists()
+        assert user.orders.filter(
+            state=OrderStatus.FULFILLED, lines__product_version=crogram_product_version
+        ).exists()
 
     if [base_program_enrollment_type, crogram_enrollment_type] == [
         EDX_ENROLLMENT_VERIFIED_MODE,

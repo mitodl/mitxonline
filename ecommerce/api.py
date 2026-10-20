@@ -1680,11 +1680,17 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
         msg = f"No active product for program {program}"
         raise VerifiedProgramNoProductError(msg) from exc
 
-    program_product_versions = reversion.models.Version.objects.get_for_object(program_product)
-    user_program_upgrade_qs = request.user.orders.filter(state=OrderStatus.FULFILLED, lines__product_version__in=program_product_versions)
+    program_product_versions = reversion.models.Version.objects.get_for_object(
+        program_product
+    )
+    user_program_upgrade_qs = request.user.orders.filter(
+        state=OrderStatus.FULFILLED, lines__product_version__in=program_product_versions
+    )
 
     if user_program_upgrade_qs.count() == 0:
-        msg = f"No verified purchased enrollment for {request.user} for program {program}"
+        msg = (
+            f"No verified purchased enrollment for {request.user} for program {program}"
+        )
         raise VerifiedProgramNoEnrollmentError(msg)
 
     discount = create_verified_program_discount(program)
@@ -1741,19 +1747,39 @@ def create_verified_program_enrollment_orders(user, root_program, programs):
 
     program_ct = ContentType.objects.get_for_model(Program)
     product_ct = ContentType.objects.get_for_model(Product)
-    root_program_products = Product.all_objects.filter(object_id=root_program.id, content_type=program_ct)
-    root_program_product_versions = reversion.models.Version.objects.filter(content_type=product_ct, object_id__in=list(root_program_products.values_list("id", flat=True)))
+    root_program_products = Product.all_objects.filter(
+        object_id=root_program.id, content_type=program_ct
+    )
+    root_program_product_versions = reversion.models.Version.objects.filter(
+        content_type=product_ct,
+        object_id__in=list(root_program_products.values_list("id", flat=True)),
+    )
 
-    if not user.orders.filter(lines__product_version__in=root_program_product_versions, state=OrderStatus.FULFILLED).exists():
-        return []
+    if not user.orders.filter(
+        lines__product_version__in=root_program_product_versions,
+        state=OrderStatus.FULFILLED,
+    ).exists():
+        return
 
     for program in programs:
-        if not program.enrollment_modes.filter(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE).exists():
-            log.debug("create_verified_program_enrollment_orders: nested program %s has no verified mode", program)
+        if not program.enrollment_modes.filter(
+            mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+        ).exists():
+            log.debug(
+                "create_verified_program_enrollment_orders: nested program %s has no verified mode",
+                program,
+            )
             continue
-        program_product = Product.objects.filter(object_id=program.id, content_type=program_ct).first()
+        program_product = Product.objects.filter(
+            object_id=program.id, content_type=program_ct
+        ).first()
         if not program_product:
-            log.warning("create_verified_program_enrollment_orders: program %s (under %s) has no products, so not creating verified enrollment for %s", program, root_program, user)
+            log.warning(
+                "create_verified_program_enrollment_orders: program %s (under %s) has no products, so not creating verified enrollment for %s",
+                program,
+                root_program,
+                user,
+            )
             continue
 
         discount = create_verified_program_discount(root_program)
@@ -1768,7 +1794,11 @@ def create_verified_program_enrollment_orders(user, root_program, programs):
 
         order = PendingOrder.create_from_product(program_product, user, discount)
 
-        fulfill_completed_order(order, payment_data=ZERO_PAYMENT_DATA, skip_receipt=True)
+        fulfill_completed_order(
+            order, payment_data=ZERO_PAYMENT_DATA, skip_receipt=True
+        )
+
+    return
 
 
 def log_stripe_event(event, *, order: Order | None = None):

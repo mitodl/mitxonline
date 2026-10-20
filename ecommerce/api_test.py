@@ -1094,8 +1094,14 @@ def test_create_verified_program_discount():
     assert create_verified_program_discount(program) == discount
 
 
-@pytest.mark.parametrize("has_order", [True, False,])
-def test_create_verified_program_course_run_enrollment(
+@pytest.mark.parametrize(
+    "has_order",
+    [
+        True,
+        False,
+    ],
+)
+def test_create_verified_program_course_run_enrollment(  # noqa: PLR0913
     mocker,
     mock_create_run_enrollments,
     mock_hubspot_order,
@@ -2807,18 +2813,40 @@ def test_generate_checkout_payload_b2b_optional_run(
 
 
 @pytest.mark.parametrize(
-    "has_order,crogram_upgradable,crogram_product",
     (
-        [False, False, False,],
-        [True, False, False,],
-        [True, True, False,],
-        [True, True, True,],
-    )
+        "has_order",
+        "crogram_upgradable",
+        "crogram_product",
+    ),
+    [
+        (
+            False,
+            False,
+            False,
+        ),
+        (
+            True,
+            False,
+            False,
+        ),
+        (
+            True,
+            True,
+            False,
+        ),
+        (
+            True,
+            True,
+            True,
+        ),
+    ],
 )
-def test_create_verified_program_enrollment_orders(bootstrapped_verified_program, has_order, crogram_upgradable, crogram_product):
+def test_create_verified_program_enrollment_orders(
+    bootstrapped_verified_program, has_order, crogram_upgradable, crogram_product
+):
     """
     Ensure the program enrollment backfill creates orders as expected.
-    
+
     This gets used for crogram enrollments - the root program has a purchased
     upgrade and the intermediate programs may not, so the app needs to create
     verified enrollments and orders for the intermediates.
@@ -2837,7 +2865,9 @@ def test_create_verified_program_enrollment_orders(bootstrapped_verified_program
 
     modes = [EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)]
     if crogram_upgradable:
-        modes.append(EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE))
+        modes.append(
+            EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
+        )
 
     crogram = ProgramFactory.create(display_mode="course", enrollment_modes=modes)
     crogram_run = CourseRunFactory.create()
@@ -2854,7 +2884,9 @@ def test_create_verified_program_enrollment_orders(bootstrapped_verified_program
 
     create_verified_program_enrollment_orders(user, program, [crogram])
 
-    crogram_order_qs = user.orders.filter(state=OrderStatus.FULFILLED, lines__purchased_object_id=crogram.id)
+    crogram_order_qs = user.orders.filter(
+        state=OrderStatus.FULFILLED, lines__purchased_object_id=crogram.id
+    )
 
     if has_order and crogram_upgradable and crogram_product:
         assert crogram_order_qs.exists()

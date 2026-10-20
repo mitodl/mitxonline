@@ -43,7 +43,6 @@ from ecommerce.factories import (
     BasketItemFactory,
     DiscountFactory,
     LineFactory,
-    OrderFactory,
     PaidAmountOffDiscountFactory,
     ProductFactory,
     UnlimitedUseDiscountFactory,
