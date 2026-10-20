@@ -16,7 +16,7 @@ from courses.models import (
     ProgramEnrollment,
 )
 from ecommerce.models import Order, OrderStatus
-from openedx.api import enroll_in_edx_course_runs, get_edx_api_service_client
+from openedx.api import enroll_in_edx_course_runs
 from openedx.constants import EDX_ENROLLMENTS_PAID_MODES
 from users.api import fetch_user
 
@@ -46,8 +46,8 @@ class Command(BaseCommand):
 
     After the transfer commits, each transferred active enrollment for a
     course run whose courseware_id contains "MITxT" is also created in edX
-    for the destination user, in the same mode. An enrollment that already
-    exists (in mitxonline or edX) is reported and skipped, and edX errors are
+    for the destination user, in the same mode. An enrollment the destination
+    user already had in mitxonline is reported and skipped, and edX errors are
     reported per course run without undoing the transfer.
 
     Example: transfer_user_course_records --from_email=old@example.com --to_email=new@example.com
@@ -330,13 +330,11 @@ class Command(BaseCommand):
     ):
         """
         Create edX enrollments for the destination user for transferred
-        enrollments in "MITxT" course runs. Enrollments that already exist -
-        skipped as duplicates in mitxonline, or already active in edX - and
-        inactive enrollments are reported and skipped. Any edX error is
-        reported and the next course run is tried.
+        enrollments in "MITxT" course runs. Enrollments skipped as duplicates
+        in mitxonline and inactive enrollments are reported and skipped. Any
+        edX error is reported and the next course run is tried.
         """
         transferred_ids = {enrollment.id for enrollment in transferred_enrollments}
-        edx_client = None
         for enrollment in source_enrollments:
             courseware_id = enrollment.run.courseware_id
             if EDX_SYNC_COURSEWARE_ID_MARKER not in courseware_id:
@@ -354,36 +352,17 @@ class Command(BaseCommand):
                 )
                 continue
             try:
-                if edx_client is None:
-                    edx_client = get_edx_api_service_client()
-                existing = next(
-                    (
-                        edx_enrollment
-                        for edx_enrollment in edx_client.enrollments.get_enrollments(
-                            course_id=courseware_id,
-                            usernames=[destination_user.edx_username],
-                        )
-                        if edx_enrollment.is_active
-                    ),
-                    None,
+                enroll_in_edx_course_runs(
+                    destination_user,
+                    [enrollment.run],
+                    mode=enrollment.enrollment_mode,
                 )
-                if existing:
-                    self.stdout.write(
-                        f"edX enrollment already exists for {destination_user.email} "
-                        f"in {courseware_id} (mode={existing.mode}), skipping edX sync."
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Created edX enrollment for {destination_user.email} "
+                        f"in {courseware_id} (mode={enrollment.enrollment_mode})."
                     )
-                else:
-                    enroll_in_edx_course_runs(
-                        destination_user,
-                        [enrollment.run],
-                        mode=enrollment.enrollment_mode,
-                    )
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f"Created edX enrollment for {destination_user.email} "
-                            f"in {courseware_id} (mode={enrollment.enrollment_mode})."
-                        )
-                    )
+                )
                 if not enrollment.edx_enrolled:
                     enrollment.edx_enrolled = True
                     enrollment.save(update_fields=["edx_enrolled"])
