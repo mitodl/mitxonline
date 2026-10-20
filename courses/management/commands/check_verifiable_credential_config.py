@@ -31,7 +31,7 @@ class Command(BaseCommand):
             "-r",
             "--readable-ids",
             type=str,
-            default=False,
+            default="",
             help="Comma-separated list of readable ids for courses or programs to check the verifiable credential status for",
         )
 
