@@ -131,13 +131,13 @@ UserEnrollments = namedtuple(  # noqa: PYI024
     ],
 )
 
-# Enabled and has criteria
+# Enabled and has criteria populated
 VERIFIABLE_CREDENTIAL_STATUS_LIVE = "LIVE"
-# Disabled and has criteria
+# Disabled and has criteria populated
 VERIFIABLE_CREDENTIAL_STATUS_DISABLED = "DISABLED"
-# Enabled but has no criteria. This is an unusual state to be in and may indicate a misconfiguration
+# Enabled but has no criteria populated. This is an unusual state to be in and may indicate a misconfiguration
 VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA = "NO_CRITERIA"
-# Disabled and has no criteria. This is the standard state of certificates which are not supposed to have VCs
+# Disabled and has no criteria populated. This is the standard state of certificates which are not supposed to have VCs
 VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA = "DISABLED_NO_CRITERIA"
 
 
