@@ -81,6 +81,24 @@
             }
         }
 
+        &__description {
+            width: 100%;
+            box-sizing: border-box;
+            resize: vertical;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 6px 8px;
+            background: var(--body-bg);
+            color: var(--body-fg);
+            font-size: 12.5px;
+            font-family: inherit;
+
+            &:focus {
+                outline: none;
+                border-color: var(--secondary);
+            }
+        }
+
         &__pill {
             font-size: 10.5px;
             font-weight: 700;
