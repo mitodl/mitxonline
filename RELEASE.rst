@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 1.170.7
+---------------
+
+- Nix sass-lint, update lockfile (#4162)
+- Report course staff roles on enrollments (#4074)
+- Add ability to run rerun_courserun without making a course run in edX (#4156)
+
 Version 1.170.6
 ---------------
 
