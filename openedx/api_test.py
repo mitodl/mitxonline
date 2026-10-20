@@ -1272,6 +1272,7 @@ def test_enroll_in_edx_course_runs_repairs_when_not_synced(mocker):
     genuinely faulty user is preserved.
     """
     user = UserFactory.create(no_openedx_user=True)
+    assert user.edx_username is None  # cached on the instance, as a caller would
     mock_client = mocker.MagicMock()
     mock_client.enrollments.create_student_enrollment = mocker.Mock(
         return_value=mocker.Mock(is_active=True)
@@ -1290,6 +1291,39 @@ def test_enroll_in_edx_course_runs_repairs_when_not_synced(mocker):
     enroll_in_edx_course_runs(user, [course_run])
 
     patched_repair.assert_called_once_with(user)
+    assert (
+        mock_client.enrollments.create_student_enrollment.call_args.kwargs["username"]
+        == user.openedx_users.get().edx_username
+    )
+
+
+def test_enroll_in_edx_course_runs_reads_a_username_written_since_the_caller_cached_it(
+    mocker,
+):
+    """
+    establish_basket reads user.edx_username before the OpenEdxUser row exists
+    and queues its creation; by the time the same instance reaches enrollment
+    the row is there, and the enrollment must carry its username.
+    """
+    user = UserFactory.create(no_openedx_user=True)
+    assert user.edx_username is None  # cached on the instance, as a caller would
+    OpenEdxUserFactory.create(user=user, has_been_synced=True)  # the task's write
+    mock_client = mocker.MagicMock()
+    mock_client.enrollments.create_student_enrollment = mocker.Mock(
+        return_value=mocker.Mock(is_active=True)
+    )
+    mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
+    mocker.patch("openedx.api.get_edx_api_service_client", return_value=mock_client)
+    patched_repair = mocker.patch("openedx.api.repair_faulty_edx_user")
+    course_run = CourseRunFactory.build()
+
+    enroll_in_edx_course_runs(user, [course_run])
+
+    patched_repair.assert_not_called()
+    assert (
+        mock_client.enrollments.create_student_enrollment.call_args.kwargs["username"]
+        == user.openedx_users.get().edx_username
+    )
 
 
 def test_enroll_api_fail(mocker, user):
