@@ -1008,6 +1008,61 @@ def _retrieve_pending_stripe_orders(orders):
     )
 
 
+def fulfill_order_from_cybersource_transaction(
+    refno: str, transaction_id: str, *, skip_fulfillment: bool = False
+):
+    """
+    Fulfill a Pending CyberSource order from a specific CyberSource transaction.
+
+    check_and_process_pending_orders_for_resolution finds an order's
+    transaction by searching CyberSource for its reference number. When that
+    search can't find it, the transaction ID (from the CyberSource Business
+    Center) can be used to fetch the transaction directly instead.
+
+    Args:
+    - refno: the order's reference number
+    - transaction_id: the CyberSource transaction (request) ID
+    Keyword Args:
+    - skip_fulfillment: don't fulfill the order, just mark it as Fulfilled
+    Returns:
+    - Order, the fulfilled order
+    Raises:
+    - Order.DoesNotExist if there's no Pending CyberSource order with that
+      reference number
+    - ValueError if the transaction is for another order or wasn't successful
+    """
+    order = PendingOrder.objects.get(
+        reference_number=refno,
+        gateway_type=MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+        state=OrderStatus.PENDING,
+    )
+
+    gateway = PaymentGateway.get_gateway_class(MITOL_PAYMENT_GATEWAY_CYBERSOURCE)
+    _, payload = gateway.get_transaction_details(transaction_id)
+
+    if payload["req_reference_number"] != order.reference_number:
+        msg = (
+            f"Transaction {transaction_id} is for order "
+            f"{payload['req_reference_number']}, not {order.reference_number}"
+        )
+        raise ValueError(msg)
+    if int(payload["reason_code"]) != 100:  # noqa: PLR2004
+        msg = (
+            f"Transaction {transaction_id} wasn't successful "
+            f"(reason code {payload['reason_code']})"
+        )
+        raise ValueError(msg)
+
+    order.get_object_flow().fulfill(payload, skip_fulfillment=skip_fulfillment)
+    sync_hubspot_deal(order)
+    log.info(
+        "Fulfilled order %s from transaction %s.",
+        order.reference_number,
+        transaction_id,
+    )
+    return order
+
+
 def check_and_process_pending_orders_for_resolution(
     refnos: list[str], *, check_status: bool = True, skip_fulfillment: bool = False
 ):

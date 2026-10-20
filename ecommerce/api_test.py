@@ -22,7 +22,10 @@ from django.urls import reverse
 from factory import Faker, fuzzy
 from mitol.common.utils.datetime import now_in_utc
 from mitol.payment_gateway.api import CartItem, PaymentGateway, ProcessorResponse
-from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_STRIPE
+from mitol.payment_gateway.constants import (
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+    MITOL_PAYMENT_GATEWAY_STRIPE,
+)
 from reversion.models import Version
 from stripe import convert_to_stripe_object
 from zeal import zeal_context
@@ -55,6 +58,7 @@ from ecommerce.api import (
     establish_basket_for_request,
     find_order_for_stripe_payment_intent,
     fulfill_completed_order,
+    fulfill_order_from_cybersource_transaction,
     generate_checkout_payload,
     get_anonymous_basket_id,
     get_auto_apply_discounts_for_basket,
@@ -904,6 +908,77 @@ def test_check_and_process_pending_orders_for_resolution(mocker, test_type):
         order.refresh_from_db()
         assert order.state == OrderStatus.FULFILLED
         assert (fulfilled, cancelled, errored) == (1, 0, 0)
+
+
+@pytest.mark.parametrize(
+    ("scenario", "error"),
+    [
+        ("success", None),
+        ("other_order", "is for order"),
+        ("unsuccessful", "wasn't successful"),
+    ],
+)
+def test_fulfill_order_from_cybersource_transaction(mocker, scenario, error):
+    """
+    The order is fulfilled from the transaction fetched by ID, but only if the
+    transaction is for this order and succeeded.
+    """
+    order = OrderFactory.create(state=OrderStatus.PENDING)
+    mocker.patch("ecommerce.models.OrderFlow.create_enrollments", return_value=True)
+    payload = {
+        "reason_code": "481" if scenario == "unsuccessful" else "100",
+        "req_reference_number": "mitxonline-other-1"
+        if scenario == "other_order"
+        else order.reference_number,
+        "transaction_id": "7895121780166965604127",
+        "req_amount": "10",
+    }
+    mocked_details = mocker.patch(
+        "mitol.payment_gateway.api.CyberSourcePaymentGateway.get_transaction_details",
+        return_value=(None, payload),
+    )
+
+    if error:
+        with pytest.raises(ValueError, match=error):
+            fulfill_order_from_cybersource_transaction(
+                order.reference_number, "7895121780166965604127"
+            )
+    else:
+        fulfill_order_from_cybersource_transaction(
+            order.reference_number, "7895121780166965604127"
+        )
+
+    mocked_details.assert_called_once_with("7895121780166965604127")
+    order.refresh_from_db()
+    if error:
+        assert order.state == OrderStatus.PENDING
+        assert not order.transactions.exists()
+    else:
+        assert order.state == OrderStatus.FULFILLED
+        assert order.transactions.get().transaction_id == "7895121780166965604127"
+
+
+@pytest.mark.parametrize(
+    ("state", "gateway_type"),
+    [
+        (OrderStatus.FULFILLED, MITOL_PAYMENT_GATEWAY_CYBERSOURCE),
+        (OrderStatus.CANCELED, MITOL_PAYMENT_GATEWAY_CYBERSOURCE),
+        (OrderStatus.PENDING, MITOL_PAYMENT_GATEWAY_STRIPE),
+    ],
+)
+def test_fulfill_order_from_cybersource_transaction_wrong_order(
+    mocker, state, gateway_type
+):
+    """Only Pending CyberSource orders can be fulfilled this way."""
+    order = OrderFactory.create(state=state, gateway_type=gateway_type)
+    mocked_details = mocker.patch(
+        "mitol.payment_gateway.api.CyberSourcePaymentGateway.get_transaction_details"
+    )
+
+    with pytest.raises(Order.DoesNotExist):
+        fulfill_order_from_cybersource_transaction(order.reference_number, "123")
+
+    mocked_details.assert_not_called()
 
 
 def test_check_and_process_pending_orders_options(mocker):
