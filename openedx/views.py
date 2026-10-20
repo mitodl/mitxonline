@@ -19,13 +19,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from courses.api import create_local_enrollment, generate_course_run_certificates
-from courses.models import CourseRun, CourseRunCertificate
+from courses.models import CourseRun, CourseRunAccessRole, CourseRunCertificate
 from main.versioning import NoVersioning, V0Versioning
 from openedx.api import (
     get_notification_preferences,
     update_notification_preference,
 )
-from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE
+from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, OPENEDX_COURSE_STAFF_ROLES
 from openedx.exceptions import (
     EdxApiNotificationPreferencesError,
     NoEdxApiAuthError,
@@ -56,6 +56,10 @@ def edx_enrollment_webhook(request):
     Open edX plugin POSTs to this endpoint so MITx Online can mirror the enrollment
     in the corresponding course run.
 
+    A payload carrying a course staff "role" also records that role locally, so
+    the dashboard can tell whether a user is on a run's course team. See
+    CourseRunAccessRole.
+
     Authentication: OAuth2 Bearer token (Django OAuth Toolkit access token).
 
     Expected payload:
@@ -73,7 +77,8 @@ def edx_enrollment_webhook(request):
     email = request.data.get("email")
     course_id = request.data.get("course_id")
     role = request.data.get("role", "")
-    mode = request.data.get("mode") or EDX_DEFAULT_ENROLLMENT_MODE
+    requested_mode = request.data.get("mode")
+    mode = requested_mode or EDX_DEFAULT_ENROLLMENT_MODE
 
     if not email or not course_id:
         return Response(
@@ -111,19 +116,62 @@ def edx_enrollment_webhook(request):
             status=status.HTTP_404_NOT_FOUND,
         )
 
+    # --- Record the course access role ---
+    # Done before the enrollment so a role grant is never silently dropped by a
+    # downstream enrollment failure; the two are independent facts.
+    if role in OPENEDX_COURSE_STAFF_ROLES:
+        _, role_created = CourseRunAccessRole.objects.get_or_create(
+            user=user, run=course_run, role=role
+        )
+        log.info(
+            "Webhook: Recorded course access role %s for user %s in course run %s (created: %s)",
+            role,
+            email,
+            course_id,
+            role_created,
+        )
+    elif role:
+        # The success log below prints the role either way, which would read as
+        # if it had been handled. Say so when it has not: a role arriving that
+        # we do not record means the plugin's allowed-role setting and
+        # OPENEDX_COURSE_STAFF_ROLES have drifted, or the casing differs.
+        log.warning(
+            "Webhook: Role %s for user %s in course run %s is not in "
+            "OPENEDX_COURSE_STAFF_ROLES, so it was not recorded.",
+            role,
+            email,
+            course_id,
+        )
+
     # --- Create local enrollment ---
+    # A payload carrying a role and no mode is a role grant rather than an
+    # enrollment event, so it must not resurrect an enrollment somebody
+    # deliberately deactivated. It still creates one when there is none: the
+    # dashboard is built from enrollments, so without one a course admin has no
+    # card to open, which is the whole reason the backfill exists.
+    is_role_grant = bool(role) and requested_mode is None
+
     try:
-        enrollment, created = create_local_enrollment(user, course_run, mode=mode)
+        enrollment, created = create_local_enrollment(
+            user, course_run, mode=mode, reactivate=not is_role_grant
+        )
     except Exception:
         log.exception(
             "Webhook: Error creating enrollment for user %s in course run %s",
             email,
             course_id,
         )
-        return Response(
-            {"error": "Failed to create enrollment"},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+        # Logged here for the webhook context -- which learner, which run --
+        # then re-raised rather than answered with a hand-built 500. Reaching
+        # this means something is broken rather than that the request was bad,
+        # so it belongs in the error tracker, and DRF turns it into the 5xx the
+        # sender needs in order to retry. A 400 would be worse than either: the
+        # sender drops a non-transient 4xx without retrying, losing a grant a
+        # second attempt would have mirrored.
+        #
+        # The role recorded above survives this. ATOMIC_REQUESTS is off, so it
+        # is already committed and is not rolled back by the exception.
+        raise
 
     log.info(
         "Webhook: Successfully enrolled user %s in course run %s (mode: %s, role: %s, created: %s)",
