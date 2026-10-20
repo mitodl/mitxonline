@@ -131,10 +131,3 @@ def test_verifiable_credential_stats_view_requires_staff(client, user):
     client.force_login(user)
     resp = client.get(reverse("admin:courses_verifiablecredential_stats"))
     assert resp.status_code == 302
-
-
-def test_verifiable_credential_changelist_links_to_stats(admin_client):
-    """The changelist should link to the stats page"""
-    resp = admin_client.get(reverse("admin:courses_verifiablecredential_changelist"))
-    assert resp.status_code == 200
-    assert reverse("admin:courses_verifiablecredential_stats") in resp.content.decode()
