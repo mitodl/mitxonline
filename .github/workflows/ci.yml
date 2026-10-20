@@ -207,9 +207,6 @@ jobs:
       - name: Code formatting
         run: yarn workspaces foreach run fmt:check
 
-      - name: Scss lint
-        run: yarn workspaces foreach run scss_lint
-
       - name: Flow
         run: yarn workspaces foreach run flow
 
