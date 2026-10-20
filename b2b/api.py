@@ -845,33 +845,29 @@ def is_product_program(product) -> bool:
     return isinstance(product.purchasable_object, Program)
 
 
-def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> bool:
+def is_discount_supplied_for_b2b_purchase(
+    basket: Basket, active_contracts=None
+) -> bool:
     """
     Check if a discount is supplied for B2B purchase.
 
     Args:
-        request: The HTTP request object containing the basket data.
+        basket: The basket being purchased, owned by the purchasing user.
         active_contracts: List of active contracts to check against.
 
     Returns:
         bool: True if discount is supplied or not needed, False otherwise.
     """
-    from ecommerce.api import establish_basket  # noqa: PLC0415
-
     if not active_contracts:
         # No contracts = nothing to validate
         return True
-
-    basket = establish_basket(request)
-    if not basket:
-        return False
 
     free_contracts, nonfree_contracts = get_free_and_nonfree_contracts(active_contracts)
 
     # Find free contracts the user is NOT associated with
     remaining_free_contract_qset = ContractPage.objects.filter(
         Q(pk__in=[c.pk for c in free_contracts])
-        & ~Q(pk__in=request.user.b2b_contracts.values_list("pk", flat=True))
+        & ~Q(pk__in=basket.user.b2b_contracts.values_list("pk", flat=True))
     )
 
     if not remaining_free_contract_qset.exists() and not nonfree_contracts:
@@ -911,7 +907,7 @@ def get_active_contracts_from_basket_items(basket: Basket):
     return []
 
 
-def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
+def validate_basket_for_b2b_purchase(basket: Basket, active_contracts=None) -> bool:
     """
     Validate the basket for a B2B purchase.
 
@@ -925,16 +921,11 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     linked to contracts the user's also associated with.
 
     Args:
-        request: The HTTP request object containing the basket data.
+        basket: The basket being purchased, owned by the purchasing user.
+        active_contracts: List of active contracts to check against.
 
     Returns: bool, True if the basket is valid for B2B purchase, False otherwise.
     """
-    from ecommerce.api import establish_basket  # noqa: PLC0415
-
-    basket = establish_basket(request)
-    if not basket:
-        return False
-
     if not active_contracts:
         active_contracts = []
 
@@ -943,7 +934,7 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     # Find free contracts the user is NOT associated with
     remaining_free_contract_qset = ContractPage.objects.filter(
         Q(pk__in=[c.pk for c in free_contracts])
-        & ~Q(pk__in=request.user.b2b_contracts.values_list("pk", flat=True))
+        & ~Q(pk__in=basket.user.b2b_contracts.values_list("pk", flat=True))
     )
 
     if not remaining_free_contract_qset.exists() and not nonfree_contracts:
@@ -1933,7 +1924,9 @@ def create_b2b_enrollment(
 
     if basket_price == 0:
         # This call should go ahead and fulfill the order.
-        response = generate_checkout_payload(request, raise_compliance_data_errors=True)
+        response = generate_checkout_payload(
+            request, basket=basket, raise_compliance_data_errors=True
+        )
 
         if "no_checkout" in response:
             # Course run enrollment succeeded - now handle program enrollment

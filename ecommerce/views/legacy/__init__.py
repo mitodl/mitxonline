@@ -790,7 +790,9 @@ class CheckoutApiViewSet(ViewSet):
         Returns the current cart, with the product info embedded.
         """
         if request.user.is_authenticated:
-            basket = Basket.objects.filter(user=request.user).first()
+            basket = (
+                Basket.objects.filter(user=request.user).select_related("user").first()
+            )
         else:
             anonymous_id = api.get_anonymous_basket_id(request, create=False)
             basket = (
@@ -808,7 +810,7 @@ class CheckoutApiViewSet(ViewSet):
             )
 
         if request.user.is_authenticated:
-            api.apply_user_discounts(request)
+            api.apply_user_discounts(basket)
 
         return Response(BasketWithProductSerializer(basket).data)
 

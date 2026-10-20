@@ -1545,7 +1545,6 @@ def test_start_checkout_with_discounts(user, user_drf_client, products, discount
     assert order.state == OrderStatus.PENDING
 
 
-@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 def test_start_checkout_with_no_lines(user, user_drf_client):
     """Test that checking out with an empty cart generates an error."""
 
