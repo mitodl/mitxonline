@@ -180,6 +180,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
                 .select_related("page")
                 .prefetch_related(
                     "departments",
+                    "courseruns__products",
                     Prefetch(
                         "courseruns__enrollment_modes",
                         to_attr="prefetched_enrollment_modes",
@@ -193,6 +194,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
                 .select_related("page")
                 .prefetch_related(
                     "courseruns",
+                    "courseruns__products",
                     "departments",
                     Prefetch(
                         "courseruns__enrollment_modes",
