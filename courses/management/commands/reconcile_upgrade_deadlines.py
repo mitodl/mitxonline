@@ -31,8 +31,9 @@ STATUS_OK = "ok"
 STATUS_MXO_MISSING = "mxo_missing"
 # Both have a deadline and they differ.
 STATUS_MISMATCH = "mismatch"
-# MITx Online has a deadline and edX doesn't. --fix can't help here: saving the
-# run's deadline in the MITx Online admin pushes it to edX.
+# MITx Online has a deadline and edX doesn't. --fix can't help here. Only a
+# change to the run's deadline in the MITx Online admin pushes it to edX;
+# saving the same value again doesn't.
 STATUS_EDX_MISSING = "edx_missing"
 STATUS_NO_VERIFIED_MODE = "no_verified_mode"
 STATUS_ERROR = "error"
@@ -162,8 +163,9 @@ class Command(BaseCommand):
             if fix and status in FIXABLE_STATUSES:
                 run.upgrade_deadline = edx_deadline
                 # save() rather than update() so the Fastly purge runs and Learn
-                # picks up the new date. The push signal fires too, but edX
-                # already has this value, so the push makes no change.
+                # picks up the new date. The push signal fires too and sends
+                # edX its own date back, which marks it explicit so Studio
+                # publishes stop recomputing it.
                 try:
                     run.save(update_fields=["upgrade_deadline"])
                 except ValidationError as exc:

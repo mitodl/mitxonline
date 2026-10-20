@@ -139,8 +139,8 @@ def test_fix_copies_edx_deadline(
     assert run.upgrade_deadline == edx_deadline
     assert rows[0]["fixed"] == "yes"
     mock_purge.assert_called_once()
-    # The push is queued because the deadline changed. edX already has this
-    # value, so it finds nothing to update.
+    # The push is queued because the deadline changed. It sends edX its own
+    # date back, which pins it.
     mock_push.assert_called_once_with(run.id)
 
 

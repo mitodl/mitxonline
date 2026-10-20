@@ -2781,11 +2781,16 @@ def test_sync_upgrade_deadline_pushes_new_deadline(mocker):
 
 
 def test_sync_upgrade_deadline_skips_when_already_matching(mocker):
-    """An identical deadline in edX should not produce a write."""
+    """An identical, explicitly set deadline in edX should not produce a write."""
     deadline = datetime(2030, 6, 1, tzinfo=UTC)
     mocker.patch(
         "openedx.api.get_edx_course_modes",
-        return_value=[_edx_mode(expiration_datetime="2030-06-01T00:00:00Z")],
+        return_value=[
+            _edx_mode(
+                expiration_datetime="2030-06-01T00:00:00Z",
+                expiration_datetime_is_explicit=True,
+            )
+        ],
     )
     mocked_update = mocker.patch("openedx.api.update_edx_course_mode")
     mocker.patch("openedx.api.get_edx_api_service_client")
@@ -2797,6 +2802,35 @@ def test_sync_upgrade_deadline_skips_when_already_matching(mocker):
         == UpgradeDeadlineSyncResult.UNCHANGED
     )
     mocked_update.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "explicit_flag", [{"expiration_datetime_is_explicit": False}, {}]
+)
+def test_sync_upgrade_deadline_pins_matching_default_deadline(mocker, explicit_flag):
+    """
+    A matching date that isn't marked explicit in edX is still pushed. Until the
+    flag is set, edX treats the date as its own default (course end minus a
+    window) and rewrites it on every Studio publish.
+    """
+    deadline = datetime(2030, 6, 1, tzinfo=UTC)
+    mocker.patch(
+        "openedx.api.get_edx_course_modes",
+        return_value=[
+            _edx_mode(expiration_datetime="2030-06-01T00:00:00Z", **explicit_flag)
+        ],
+    )
+    mocked_update = mocker.patch("openedx.api.update_edx_course_mode")
+    mocker.patch("openedx.api.get_edx_api_service_client")
+
+    run = CourseRunFactory.create(upgrade_deadline=deadline)
+
+    assert (
+        sync_courserun_upgrade_deadline_to_edx(run) == UpgradeDeadlineSyncResult.UPDATED
+    )
+    mocked_update.assert_called_once()
+    assert mocked_update.call_args.kwargs["expiration_datetime"] == deadline
+    assert mocked_update.call_args.kwargs["min_price"] == 100
 
 
 def test_sync_upgrade_deadline_cannot_clear_existing_edx_deadline(mocker, caplog):

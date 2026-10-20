@@ -58,7 +58,8 @@ class UpgradeDeadlineSyncResult(StrEnum):
 
     # The deadline was pushed to edX.
     UPDATED = "updated"
-    # edX already had this exact deadline, so no request was made.
+    # edX already had this exact deadline, marked explicit, so no request was
+    # made.
     UNCHANGED = "unchanged"
     # The run has no verified mode in edX, so there is nothing to set a deadline on.
     NO_VERIFIED_MODE = "no_verified_mode"

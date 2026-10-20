@@ -2389,7 +2389,13 @@ def sync_courserun_upgrade_deadline_to_edx(
         )
         return UpgradeDeadlineSyncResult.CLEAR_UNSUPPORTED
 
-    if edx_deadline == new_deadline:
+    # A matching date is only safe to skip once edX marks it explicit. Until
+    # then, edX treats it as its own default (course end minus a window) and
+    # rewrites it on every Studio publish. Sending the date sets the flag.
+    if (
+        edx_deadline == new_deadline
+        and verified_mode.json.get("expiration_datetime_is_explicit") is True
+    ):
         log.debug(
             "edX already has upgrade deadline %s for %s",
             new_deadline.isoformat(),
