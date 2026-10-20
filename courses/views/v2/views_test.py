@@ -2068,8 +2068,8 @@ def test_add_verified_program_course_enrollment_incomplete_profile(
     ).program
     course_run = CourseRunFactory.create()
     program.add_requirement(course_run.course)
-    with reversion.create_revision():
-        for courseware in (program, course_run):
+    for courseware in (program, course_run):
+        with reversion.create_revision():
             created_product = Product.objects.create(
                 price=10,
                 is_active=True,
@@ -2077,8 +2077,8 @@ def test_add_verified_program_course_enrollment_incomplete_profile(
                 content_type=ContentType.objects.get_for_model(courseware),
             )
 
-            if courseware == program:
-                make_order_for_product(user, created_product)
+        if courseware == program:
+            make_order_for_product(user, created_product)
 
     user.legal_address.street_address_1 = ""
     user.legal_address.save()
