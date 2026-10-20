@@ -6,16 +6,22 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import Q
 
 from courses.models import (
+    Course,
+    CourseRun,
     CourseRunCertificate,
     CourseRunEnrollment,
     CourseRunGrade,
     PaidCourseRun,
+    Program,
     ProgramCertificate,
     ProgramEnrollment,
 )
-from ecommerce.models import Order, OrderStatus
+from ecommerce.models import DiscountRedemption, Order, OrderStatus, RefundRequest
+from flexiblepricing.models import FlexiblePrice
+from hubspot_sync.task_helpers import sync_hubspot_deal
 from openedx.api import enroll_in_edx_course_runs
 from openedx.constants import EDX_ENROLLMENTS_PAID_MODES
 from users.api import fetch_user
@@ -35,14 +41,18 @@ class Command(BaseCommand):
     (verified or audit) and whether or not the course run has ended:
     - Course run enrollments, grades and certificates.
     - Program enrollments and certificates.
-    - The FULFILLED Order(s) and PaidCourseRun record(s) backing each
-      verified course run enrollment that transfers, so the payment record -
-      and the "already paid for this" check it drives - follows the
-      enrollment instead of staying attributed to the source user.
+    - The FULFILLED Order(s) backing each verified course run or program
+      enrollment that transfers, so the payment record - and the "already
+      paid for this" check it drives - follows the enrollment instead of
+      staying attributed to the source user. With each order go its
+      PaidCourseRun records, discount redemptions and refund requests (its
+      lines and transactions belong to the order), and the source user's
+      flexible price (financial assistance) request for each course or
+      program the order bought. The orders are re-synced to HubSpot.
 
     A record is skipped, not aborted, if the destination user already has a
-    matching enrollment/grade/certificate; transferred and skipped counts are
-    reported at the end.
+    matching enrollment/grade/certificate/flexible price; transferred and
+    skipped counts are reported at the end.
 
     After the transfer commits, each transferred active enrollment for a
     course run whose courseware_id contains "MITxT" is also created in edX
@@ -89,21 +99,23 @@ class Command(BaseCommand):
             source_records, destination_user
         )
         orders_to_transfer = self._verified_orders(source_user, to_transfer)
-        paid_course_runs_to_transfer = list(
-            PaidCourseRun.objects.filter(user=source_user, order__in=orders_to_transfer)
+        order_records, order_skipped_counts = self._order_records(
+            source_user, destination_user, orders_to_transfer
         )
+        skipped_counts.update(order_skipped_counts)
 
         with transaction.atomic():
             transfer_counts = self._transfer_records(
                 to_transfer,
                 orders_to_transfer,
-                paid_course_runs_to_transfer,
+                order_records,
                 destination_user,
             )
 
         self._print_result(
             source_user, destination_user, transfer_counts, skipped_counts
         )
+        self._sync_hubspot_deals(orders_to_transfer)
         self._sync_edx_enrollments(
             destination_user,
             to_transfer["course_run_enrollments"],
@@ -224,12 +236,13 @@ class Command(BaseCommand):
     def _verified_orders(self, source_user, to_transfer):
         """
         Find the FULFILLED ecommerce Order(s) backing the verified (paid)
-        course run enrollments that are actually transferring - i.e. the
-        ones that survived the duplicate-skip in _partition_conflicts. Audit
-        enrollments transfer without moving any order.
+        course run and program enrollments that are actually transferring -
+        i.e. the ones that survived the duplicate-skip in
+        _partition_conflicts. Audit enrollments transfer without moving any
+        order.
 
         A pending/canceled/declined/errored/refunded order for the same
-        course run is left with the source user.
+        course run or program is left with the source user.
 
         Note: if an order bundles a Line for something NOT being transferred
         alongside a Line for something that is, the whole order still moves
@@ -240,27 +253,114 @@ class Command(BaseCommand):
             for enrollment in to_transfer["course_run_enrollments"]
             if enrollment.enrollment_mode in EDX_ENROLLMENTS_PAID_MODES
         ]
-        if not run_ids:
+        program_ids = [
+            enrollment.program_id
+            for enrollment in to_transfer["program_enrollments"]
+            if enrollment.enrollment_mode in EDX_ENROLLMENTS_PAID_MODES
+        ]
+        if not run_ids and not program_ids:
             return []
 
-        course_run_content_type = ContentType.objects.get(
-            app_label="courses", model="courserun"
-        )
-
+        content_types = ContentType.objects.get_for_models(CourseRun, Program)
         return list(
             Order.objects.filter(
+                Q(
+                    lines__purchased_content_type=content_types[CourseRun],
+                    lines__purchased_object_id__in=run_ids,
+                )
+                | Q(
+                    lines__purchased_content_type=content_types[Program],
+                    lines__purchased_object_id__in=program_ids,
+                ),
                 purchaser=source_user,
                 state=OrderStatus.FULFILLED,
-                lines__purchased_content_type=course_run_content_type,
-                lines__purchased_object_id__in=run_ids,
             ).distinct()
         )
+
+    def _order_records(self, source_user, destination_user, orders):
+        """
+        Load the source user's records tied to the transferring orders: their
+        PaidCourseRuns, discount redemptions and refund requests, and the
+        flexible price for each course or program the orders bought.
+
+        A flexible price is skipped if the destination user already has one
+        for the same course or program (one per user per courseware object).
+
+        Returns (order_records, skipped_counts).
+        """
+        if not orders:
+            return {
+                "paid_course_runs": [],
+                "discount_redemptions": [],
+                "refund_requests": [],
+                "flexible_prices": [],
+            }, {}
+
+        content_types = ContentType.objects.get_for_models(CourseRun, Program, Course)
+        lines = [line for order in orders for line in order.lines.all()]
+        course_ids = set(
+            CourseRun.objects.filter(
+                id__in=[
+                    line.purchased_object_id
+                    for line in lines
+                    if line.purchased_content_type_id == content_types[CourseRun].id
+                ]
+            ).values_list("course_id", flat=True)
+        )
+        program_ids = {
+            line.purchased_object_id
+            for line in lines
+            if line.purchased_content_type_id == content_types[Program].id
+        }
+        courseware_filter = Q(
+            courseware_content_type=content_types[Course],
+            courseware_object_id__in=course_ids,
+        ) | Q(
+            courseware_content_type=content_types[Program],
+            courseware_object_id__in=program_ids,
+        )
+        flexible_prices = list(
+            FlexiblePrice.objects.filter(courseware_filter, user=source_user)
+        )
+        destination_courseware = set(
+            FlexiblePrice.objects.filter(
+                courseware_filter, user=destination_user
+            ).values_list("courseware_content_type_id", "courseware_object_id")
+        )
+        flexible_prices_to_transfer = [
+            flexible_price
+            for flexible_price in flexible_prices
+            if (
+                flexible_price.courseware_content_type_id,
+                flexible_price.courseware_object_id,
+            )
+            not in destination_courseware
+        ]
+
+        order_records = {
+            "paid_course_runs": list(
+                PaidCourseRun.objects.filter(user=source_user, order__in=orders)
+            ),
+            "discount_redemptions": list(
+                DiscountRedemption.objects.filter(
+                    redeemed_by=source_user, redeemed_order__in=orders
+                )
+            ),
+            "refund_requests": list(
+                RefundRequest.objects.filter(user=source_user, order__in=orders)
+            ),
+            "flexible_prices": flexible_prices_to_transfer,
+        }
+        skipped_counts = {
+            "flexible_prices": len(flexible_prices) - len(flexible_prices_to_transfer)
+        }
+        return order_records, skipped_counts
 
     def _transfer_records(
         self,
         to_transfer,
         orders_to_transfer,
-        paid_course_runs_to_transfer,
+        order_records,
         destination_user,
     ):
         """Transfer each record set and return counts by label."""
@@ -284,18 +384,39 @@ class Command(BaseCommand):
             certificate.user = destination_user
             certificate.save(update_fields=["user"])
 
-        for order in orders_to_transfer:
-            order.purchaser = destination_user
-            order.save(update_fields=["purchaser"])
-
-        for paid_course_run in paid_course_runs_to_transfer:
-            paid_course_run.user = destination_user
-            paid_course_run.save(update_fields=["user"])
+        self._transfer_order_records(
+            orders_to_transfer, order_records, destination_user
+        )
 
         counts = {label: len(records) for label, records in to_transfer.items()}
         counts["orders"] = len(orders_to_transfer)
-        counts["paid_course_runs"] = len(paid_course_runs_to_transfer)
+        counts.update({label: len(records) for label, records in order_records.items()})
         return counts
+
+    def _transfer_order_records(self, orders, order_records, destination_user):
+        """Move the orders and their related records to the destination user."""
+        for records, user_field in (
+            (orders, "purchaser"),
+            (order_records["paid_course_runs"], "user"),
+            (order_records["discount_redemptions"], "redeemed_by"),
+            (order_records["refund_requests"], "user"),
+            (order_records["flexible_prices"], "user"),
+        ):
+            for record in records:
+                setattr(record, user_field, destination_user)
+                record.save(update_fields=[user_field])
+
+    def _sync_hubspot_deals(self, orders):
+        """Re-sync the transferred orders to HubSpot under their new purchaser."""
+        for order in orders:
+            try:
+                sync_hubspot_deal(order)
+            except Exception as exc:  # noqa: BLE001, PERF203
+                self.stdout.write(
+                    self.style.ERROR(
+                        f"Could not sync order {order.reference_number} to HubSpot: {exc}"
+                    )
+                )
 
     def _print_result(
         self, source_user, destination_user, transfer_counts, skipped_counts
