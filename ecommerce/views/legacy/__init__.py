@@ -806,7 +806,7 @@ class CheckoutApiViewSet(ViewSet):
             )
 
         if request.user.is_authenticated:
-            api.apply_user_discounts(request)
+            api.apply_user_discounts(basket)
 
         return Response(BasketWithProductSerializer(basket).data)
 
