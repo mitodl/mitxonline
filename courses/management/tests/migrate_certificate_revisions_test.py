@@ -22,7 +22,7 @@ def _mock_hubspot(mocker):
 
 
 def _make_course_cert():
-    """Create a course with one certificate (which always has a revision)"""
+    """Create a course with one certificate"""
     course = CourseFactory.create(page__certificate_page__product_name="product")
     certificate_page = course.certificate_page
     run = CourseRunFactory.create(course=course)
@@ -114,32 +114,20 @@ def test_migrate_certificate_revisions_certificate_page_has_no_revisions():
 
 
 @pytest.mark.parametrize("kind", ["course", "courserun", "program"])
-def test_migrate_certificate_revisions_missing_only_leaves_existing_untouched(kind):
-    """By default, certificates that already have a revision are left untouched"""
-    certificate_page, cert, handle_kwargs = CERT_SETUPS[kind]()
-    old_revision = cert.certificate_page_revision
-    # A newer revision now exists on the page, but the cert isn't "missing" a
-    # revision, so the default (non --all) mode shouldn't touch it.
-    certificate_page.save_revision()
-
-    migrate_certificate_revisions.Command().handle(**handle_kwargs)
-
-    cert.refresh_from_db()
-    assert old_revision is not None
-    assert cert.certificate_page_revision == old_revision
-
-
-@pytest.mark.parametrize("kind", ["course", "courserun", "program"])
 @pytest.mark.parametrize("confirm_answer", ["y", "Y", "n", ""])
-def test_migrate_certificate_revisions_all_confirmation(mocker, kind, confirm_answer):
-    """--all should prompt for confirmation and only update when the user accepts"""
+def test_migrate_certificate_revisions_confirmation(mocker, kind, confirm_answer):
+    """
+    The command prompts for confirmation and, only when the user accepts,
+    moves every certificate - including ones already on an older revision -
+    to the latest revision.
+    """
     certificate_page, cert, handle_kwargs = CERT_SETUPS[kind]()
     old_revision = cert.certificate_page_revision
     new_revision = certificate_page.save_revision()
 
     mock_input = mocker.patch("builtins.input", return_value=confirm_answer)
 
-    migrate_certificate_revisions.Command().handle(update_all=True, **handle_kwargs)
+    migrate_certificate_revisions.Command().handle(**handle_kwargs)
 
     mock_input.assert_called_once()
     cert.refresh_from_db()
