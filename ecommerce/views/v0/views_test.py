@@ -1876,6 +1876,7 @@ def test_order_history_titles_follow_the_snapshotted_product(user, user_drf_clie
     LineFactory.create(
         order=order,
         product_version=Version.objects.get_for_object(product).last(),
+        purchased_object=CourseRunFactory.create(),
     )
 
     resp = user_drf_client.get(reverse("v0:orderhistory_api-list"))

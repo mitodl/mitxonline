@@ -133,7 +133,18 @@ class TransactionFactory(DjangoModelFactory):
 class LineFactory(DjangoModelFactory):
     quantity = 1
     order = SubFactory(OrderFactory)
-    purchased_object = SubFactory(CourseRunFactory)
+    # The app writes a Line with `purchased_object` copied off the product it
+    # snapshots; Line.product shares the line's object with the product it
+    # rebuilds only when the two agree. Read it off the snapshot, not
+    # `product_version.object`: that is the live Product row, which a test may
+    # have repointed or deleted after recording the version.
+    purchased_object = LazyAttribute(
+        lambda line: (
+            models._product_from_version(  # noqa: SLF001
+                line.product_version
+            ).purchasable_object
+        )
+    )
     # discounted_unit_price is non-null, so price the line the way the app does:
     # under whatever discounts the order carries when the line is built.
     discounted_unit_price = LazyAttribute(
