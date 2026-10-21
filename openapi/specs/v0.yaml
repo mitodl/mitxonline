@@ -6387,7 +6387,7 @@ components:
           type: integer
         product:
           allOf:
-          - $ref: '#/components/schemas/Product'
+          - $ref: '#/components/schemas/LineProduct'
           readOnly: true
       required:
       - id
@@ -6396,6 +6396,82 @@ components:
       - quantity
       - total_price
       - unit_price
+    LineProduct:
+      type: object
+      description: A line's product and the courseware it bought, without the CMS
+        page.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
+        purchasable_object:
+          oneOf:
+          - type: object
+            properties:
+              id:
+                type: integer
+              run_tag:
+                type: string
+              start_date:
+                type: string
+                format: date-time
+              end_date:
+                type: string
+                format: date-time
+          - type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              run_tag:
+                type: string
+              start_date:
+                type: string
+                format: date-time
+              end_date:
+                type: string
+                format: date-time
+              course:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  title:
+                    type: string
+              readable_id:
+                type: string
+              enrollment_start:
+                type: string
+                format: date-time
+              enrollment_end:
+                type: string
+                format: date-time
+              course_number:
+                type: string
+          - type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              readable_id:
+                type: string
+          readOnly: true
+      required:
+      - description
+      - id
+      - price
+      - purchasable_object
     ManagerContractDetail:
       type: object
       description: Serializer for detailed contract view with statistics.

@@ -1797,14 +1797,13 @@ def test_order_history_retrieve(user, user_drf_client):
     assert returned_order["lines"][0]["id"] == order_1_line.id
 
 
-# Each extra order on the page costs this many queries, all of them rooted in
+# Each extra order on the page costs this many queries, both rooted in
 # `LineSerializer.product`: `Line.product` rebuilds an unsaved Product from a
-# reversion Version, so its generic `purchasable_object` — and the course, course
-# page, feature image, instructors, flexible-pricing form and current price under
-# it — resolve per line. A prefetch on the view's Order queryset cannot reach
-# them; serializing `line.purchased_object`, which is already prefetched, instead
-# of `product.purchasable_object` could.
-QUERIES_PER_ADDITIONAL_ORDER = 10
+# reversion Version, so its generic `purchasable_object`, and the run's course
+# under it, resolve per line. A prefetch on the view's Order queryset cannot
+# reach them; handing the product the already-prefetched `line.purchased_object`
+# could.
+QUERIES_PER_ADDITIONAL_ORDER = 2
 
 # What one request costs before any order is serialized.
 FIXED_QUERIES_PER_PAGE = 6
@@ -1830,7 +1829,7 @@ def _order_history_query_count(user_drf_client):
 
 
 @pytest.mark.zeal_allow("ecommerce.Product", "purchasable_object")
-def test_order_history_query_count_grows_only_by_the_known_page_walk(
+def test_order_history_query_count_grows_only_by_the_product_walk(
     user, user_drf_client
 ):
     """
