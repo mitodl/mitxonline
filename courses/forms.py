@@ -1,10 +1,14 @@
+from django import forms
+from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import Q
 from django.forms import ModelForm, ValidationError
 from django.forms.fields import JSONField
 from webpack_loader import utils as webpack_loader_utils
 
 from courses.models import (
     Course,
+    CourseRun,
     Program,
     ProgramRequirement,
     ProgramRequirementNodeType,
@@ -12,6 +16,10 @@ from courses.models import (
 from courses.requirement_tree import programs_requiring, validate_requirement_tree
 from courses.serializers.v1.programs import ProgramRequirementTreeSerializer
 from courses.widgets import ProgramRequirementsInput
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+
+#: Courseware ID suffix of the runs offered by the admin "enroll in runs" page
+ADMIN_ENROLL_RUN_SUFFIX = "0T2026"
 
 
 def program_requirements_catalog():
@@ -186,3 +194,54 @@ class ProgramAdminForm(ModelForm):
             chunk["url"]
             for chunk in webpack_loader_utils.get_files("requirementsAdmin", "js")
         ]
+
+
+class AdminEnrollUserInRunsForm(forms.Form):
+    """
+    Admin form for enrolling one user in any of the course runs whose
+    courseware_id ends with ADMIN_ENROLL_RUN_SUFFIX.
+    """
+
+    user = forms.CharField(
+        help_text="Email, username, or ID of the user to enroll",
+        widget=forms.TextInput(attrs={"size": 60}),
+    )
+    runs = forms.ModelMultipleChoiceField(
+        queryset=CourseRun.objects.none(),
+        widget=forms.CheckboxSelectMultiple,
+        help_text=f"Course runs ending in {ADMIN_ENROLL_RUN_SUFFIX}",
+    )
+    mode = forms.ChoiceField(
+        choices=[
+            (EDX_ENROLLMENT_AUDIT_MODE, "Audit"),
+            (EDX_ENROLLMENT_VERIFIED_MODE, "Verified"),
+        ],
+        initial=EDX_ENROLLMENT_AUDIT_MODE,
+    )
+
+    def __init__(self, *args, **kwargs):
+        """Populate the run choices at form creation so new runs show up."""
+        super().__init__(*args, **kwargs)
+        self.fields["runs"].queryset = (
+            CourseRun.objects.filter(courseware_id__endswith=ADMIN_ENROLL_RUN_SUFFIX)
+            .select_related("course")
+            .order_by("courseware_id")
+        )
+        self.fields["runs"].label_from_instance = lambda run: (
+            f"{run.courseware_id} — {run.title}"
+        )
+
+    def clean_user(self):
+        """Resolve the entered email, username, or ID to a single User."""
+        value = self.cleaned_data["user"].strip()
+        query = Q(email__iexact=value) | Q(username=value)
+        if value.isdigit():
+            query |= Q(pk=int(value))
+        users = list(get_user_model().objects.filter(query)[:2])
+        if not users:
+            msg = f"No user found matching '{value}'"
+            raise ValidationError(msg)
+        if len(users) > 1:
+            msg = f"More than one user matches '{value}'; use the user ID instead"
+            raise ValidationError(msg)
+        return users[0]

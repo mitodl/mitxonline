@@ -7,16 +7,26 @@ import contextlib
 from django.contrib import admin, messages
 from django.contrib.admin.decorators import display
 from django.contrib.contenttypes.admin import GenericTabularInline
+from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.forms import TextInput
+from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils.html import format_html
 from mitol.common.admin import TimestampedModelAdmin
 
 import cms.admin  # noqa: F401
-from courses.api import create_verifiable_credential, downgrade_learner
-from courses.forms import ProgramAdminForm
+from courses.api import (
+    create_run_enrollments,
+    create_verifiable_credential,
+    downgrade_learner,
+)
+from courses.forms import (
+    ADMIN_ENROLL_RUN_SUFFIX,
+    AdminEnrollUserInRunsForm,
+    ProgramAdminForm,
+)
 from courses.models import (
     BlockedCountry,
     Course,
@@ -771,6 +781,77 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
         "downgrade_enrollment",
     ]
     run_for_all_actions = ["retry_all_failed_edx_enrollment"]
+    change_list_template = "admin/courses/courserunenrollment/change_list.html"
+
+    def get_urls(self):
+        """Add the enroll-in-runs page to this admin's URLs."""
+        custom = [
+            path(
+                "enroll-in-runs/",
+                self.admin_site.admin_view(self.enroll_in_runs_view),
+                name="courses_courserunenrollment_enroll_in_runs",
+            )
+        ]
+        return custom + super().get_urls()
+
+    def enroll_in_runs_view(self, request):
+        """
+        Enroll a single user in a staff-selected set of course runs whose
+        courseware_id ends with ADMIN_ENROLL_RUN_SUFFIX. Each run is enrolled
+        separately so one failure (or the compliance check) doesn't block the rest.
+        """
+        if not self.has_add_permission(request):
+            raise PermissionDenied
+
+        form = AdminEnrollUserInRunsForm(request.POST or None)
+        if request.method == "POST" and form.is_valid():
+            user = form.cleaned_data["user"]
+            mode = form.cleaned_data["mode"]
+            for run in form.cleaned_data["runs"]:
+                try:
+                    enrollments, edx_success = create_run_enrollments(
+                        user, [run], mode=mode
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    self.message_user(
+                        request,
+                        f"Failed to enroll {user.email} in {run.courseware_id}: {exc}",
+                        messages.ERROR,
+                    )
+                    continue
+                if not enrollments:
+                    self.message_user(
+                        request,
+                        f"Failed to enroll {user.email} in {run.courseware_id}",
+                        messages.ERROR,
+                    )
+                elif not edx_success:
+                    self.message_user(
+                        request,
+                        f"Enrolled {user.email} in {run.courseware_id} locally, "
+                        "but the edX enrollment failed (it will be retried)",
+                        messages.WARNING,
+                    )
+                else:
+                    self.message_user(
+                        request,
+                        f"Enrolled {user.email} in {run.courseware_id} ({mode})",
+                        messages.SUCCESS,
+                    )
+            return redirect(
+                reverse("admin:courses_courserunenrollment_changelist")
+                + f"?q={user.email}"
+            )
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": f"Enroll a user in {ADMIN_ENROLL_RUN_SUFFIX} course runs",
+            "opts": self.model._meta,  # noqa: SLF001
+            "form": form,
+        }
+        return TemplateResponse(
+            request, "admin/courses/courserunenrollment/enroll_in_runs.html", context
+        )
 
     @admin.display(
         description="Repair exhausted",
