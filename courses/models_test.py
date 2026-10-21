@@ -45,6 +45,7 @@ from courses.models import (
     PaidCourseRun,
     PartnerSchool,
     Program,
+    ProgramCertificate,
     ProgramRequirement,
     ProgramRequirementNodeType,
     limit_to_certificate_pages,
@@ -603,6 +604,28 @@ def test_course_run_certificate_save_without_course_page(mocker):
 
     with pytest.raises(IntegrityError):
         CourseRunCertificateFactory.create(user=user, course_run=course_run)
+
+
+@pytest.mark.parametrize(
+    "certificate_model", [CourseRunCertificate, ProgramCertificate]
+)
+@pytest.mark.parametrize("set_parent", [True, False])
+def test_certificate_full_clean_without_revision(certificate_model, set_parent):
+    """
+    A certificate with no revision (e.g. the admin add form left blank) fails
+    validation with a field error instead of raising RelatedObjectDoesNotExist.
+    """
+    certificate = certificate_model(user=UserFactory.create())
+    if set_parent:
+        if certificate_model is CourseRunCertificate:
+            certificate.course_run = CourseRunFactory.create()
+        else:
+            certificate.program = ProgramFactory.create()
+
+    with pytest.raises(ValidationError) as exc_info:
+        certificate.full_clean()
+
+    assert "certificate_page_revision" in exc_info.value.message_dict
 
 
 def test_certificate_page_with_issued_certificates_cannot_be_deleted(mocker):
