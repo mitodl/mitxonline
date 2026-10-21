@@ -17,7 +17,7 @@ import responses
 import reversion
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import connection
+from django.db import IntegrityError, connection
 from django.test import RequestFactory, override_settings
 from django.test.utils import CaptureQueriesContext
 from edx_api.course_detail import CourseDetail, CourseMode, CourseModes
@@ -34,7 +34,7 @@ from b2b.factories import (
     OrganizationPageFactory,
 )
 from cms.factories import CourseIndexPageFactory
-from cms.models import CoursePage, ProgramPage
+from cms.models import CertificatePage, CoursePage, ProgramPage
 from compliance.api import ExportComplianceResult, verify_user_with_exports
 from compliance.exceptions import (
     ExportComplianceCheckError,
@@ -2535,6 +2535,30 @@ def test_course_run_certificate_unpublished_certificate_page(
     assert not CourseRunCertificate.objects.exists()
 
 
+def test_course_run_certificate_uses_current_revision_despite_stale_cache(
+    passed_grade_with_enrollment, mocker
+):
+    """
+    A certificate gets the certificate page's current latest revision even if
+    the Course object (reused across a batch) has a stale cached
+    certificate_page from before a newer revision was saved.
+    """
+    mocker.patch("hubspot_sync.api.upsert_custom_properties")
+    course = passed_grade_with_enrollment.course_run.course
+    stale_certificate_page = course.certificate_page
+    new_revision = CertificatePage.objects.get(
+        pk=stale_certificate_page.pk
+    ).save_revision()
+    assert stale_certificate_page.get_latest_revision() != new_revision
+
+    certificate, created, _ = process_course_run_grade_certificate(
+        passed_grade_with_enrollment
+    )
+
+    assert created is True
+    assert certificate.certificate_page_revision == new_revision
+
+
 @pytest.mark.parametrize("should_force_create", [True, False])
 def test_course_run_certificate_certificates_disabled(
     passed_grade_with_enrollment, should_force_create
@@ -3543,6 +3567,54 @@ def test_generate_program_certificate_unpublished_certificate_page(
     )
     assert result == (None, False)
     assert not ProgramCertificate.all_objects.exists()
+
+
+def test_generate_program_certificate_uses_current_revision_despite_stale_cache(
+    user,
+    program_with_empty_requirements,  # noqa: F811
+    mocker,
+):
+    """
+    A program certificate gets the certificate page's current latest revision
+    even if the Program object has a stale cached certificate_page.
+    """
+    mocker.patch("hubspot_sync.api.upsert_custom_properties")
+    program = program_with_empty_requirements
+    stale_certificate_page = program.certificate_page
+    new_revision = CertificatePage.objects.get(
+        pk=stale_certificate_page.pk
+    ).save_revision()
+    assert stale_certificate_page.get_latest_revision() != new_revision
+
+    certificate, created = generate_program_certificate(
+        user=user, program=program, force_create=True
+    )
+
+    assert created is True
+    assert certificate.certificate_page_revision == new_revision
+
+
+def test_generate_program_certificate_integrity_error(
+    user,
+    program_with_empty_requirements,  # noqa: F811
+    mocker,
+):
+    """
+    An IntegrityError creating the certificate is logged and reported as
+    "not created" rather than raised, since this also runs from an on_commit
+    callback.
+    """
+    mocker.patch.object(
+        ProgramCertificate.all_objects, "get_or_create", side_effect=IntegrityError
+    )
+    patched_log = mocker.patch("courses.api.log")
+
+    result = generate_program_certificate(
+        user=user, program=program_with_empty_requirements, force_create=True
+    )
+
+    assert result == (None, False)
+    patched_log.exception.assert_called_once()
 
 
 @pytest.mark.parametrize("force_create", [True, False])
