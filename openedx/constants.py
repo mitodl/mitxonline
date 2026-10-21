@@ -58,8 +58,8 @@ class UpgradeDeadlineSyncResult(StrEnum):
 
     # The deadline was pushed to edX.
     UPDATED = "updated"
-    # edX already had this exact deadline, marked explicit, so no request was
-    # made.
+    # edX already matches (the same explicit date, or neither side has one), so
+    # no update was sent.
     UNCHANGED = "unchanged"
     # The run has no verified mode in edX, so there is nothing to set a deadline on.
     NO_VERIFIED_MODE = "no_verified_mode"
@@ -74,9 +74,13 @@ class UpgradeDeadlineSyncResult(StrEnum):
 # entirely, which means a cleared deadline is silently ignored rather than
 # erroring. Neither path can clear the deadline, so we detect the case and tell
 # the operator to do it by hand.
+# Shared by the task log and the admin warning, so the two don't drift apart.
+CANNOT_CLEAR_DEADLINE_HINT = (
+    "edX's course modes API cannot unset an existing deadline. Clear it by hand "
+    "in the edX Django admin under Course Modes."
+)
+
 CANNOT_CLEAR_DEADLINE_MSG = (
-    "The upgrade deadline for {courseware_id} was cleared in MITx Online, but "
-    "edX's course modes API cannot unset an existing expiration date. edX still "
-    "has {edx_deadline}. Clear it manually in the edX Django admin under Course "
-    "Modes if the run should have no deadline in edX."
+    "The upgrade deadline for {courseware_id} was cleared in MITx Online, but edX "
+    "still has {edx_deadline}. " + CANNOT_CLEAR_DEADLINE_HINT
 )

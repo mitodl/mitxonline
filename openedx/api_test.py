@@ -2159,37 +2159,42 @@ def test_push_edx_modes_from_run(mocker):
     mocked_edx_modes = mocker.patch("openedx.api.get_edx_course_modes", return_value=[])
     mocked_create_edx_mode = mocker.patch("openedx.api.create_edx_course_mode")
 
-    course_run = CourseRunFactory.create()
-    mxo_modes = EnrollmentModeFactory.create_batch(2)
-    calls = []
+    course_run = CourseRunFactory.create(upgrade_deadline=now_in_utc())
+    audit = EnrollmentModeFactory.create(
+        mode_slug=EDX_ENROLLMENT_AUDIT_MODE, requires_payment=False
+    )
+    verified = EnrollmentModeFactory.create(
+        mode_slug=EDX_ENROLLMENT_VERIFIED_MODE, requires_payment=True
+    )
+    course_run.enrollment_modes.add(audit, verified)
 
-    for mode in mxo_modes:
-        course_run.enrollment_modes.add(mode)
-        calls.append(
-            call(
-                course_id=course_run.courseware_id,
-                mode_slug=mode.mode_slug,
-                mode_display_name=mode.mode_display_name,
-                min_price=(1 if mode.requires_payment else 0),
-                expiration_datetime=(
-                    course_run.upgrade_deadline
-                    if mode.mode_slug == EDX_ENROLLMENT_VERIFIED_MODE
-                    else None
-                ),
-                client=ANY,
-            )
-        )
-
-    assert {mode.mode_slug for mode in mxo_modes} >= {EDX_ENROLLMENT_VERIFIED_MODE}
     assert course_run.edx_modes == []
-    assert course_run.enrollment_modes.count() == 2
     assert mocked_edx_modes.called
 
     created = push_edx_modes_from_run(course_run)
 
-    assert created == course_run.enrollment_modes.count()
-    assert mocked_create_edx_mode.called
-    mocked_create_edx_mode.assert_has_calls(calls, any_order=True)
+    assert created == 2
+    mocked_create_edx_mode.assert_has_calls(
+        [
+            call(
+                course_id=course_run.courseware_id,
+                mode_slug=EDX_ENROLLMENT_AUDIT_MODE,
+                mode_display_name=audit.mode_display_name,
+                min_price=0,
+                expiration_datetime=None,
+                client=ANY,
+            ),
+            call(
+                course_id=course_run.courseware_id,
+                mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+                mode_display_name=verified.mode_display_name,
+                min_price=1,
+                expiration_datetime=course_run.upgrade_deadline,
+                client=ANY,
+            ),
+        ],
+        any_order=True,
+    )
 
 
 def _course_run_api_error(status_code):
@@ -2853,7 +2858,7 @@ def test_sync_upgrade_deadline_cannot_clear_existing_edx_deadline(mocker, caplog
 
     assert result == UpgradeDeadlineSyncResult.CLEAR_UNSUPPORTED
     mocked_update.assert_not_called()
-    assert "cannot unset an existing expiration date" in caplog.text
+    assert "cannot unset an existing deadline" in caplog.text
     assert run.courseware_id in caplog.text
 
 

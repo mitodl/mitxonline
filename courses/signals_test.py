@@ -17,7 +17,10 @@ from courses.factories import (
     UserFactory,
 )
 from courses.models import CourseRun
-from courses.signals import capture_previous_upgrade_deadline
+from courses.signals import (
+    capture_previous_upgrade_deadline,
+    sync_upgrade_deadline_to_edx_on_save,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -286,3 +289,39 @@ def test_capture_previous_upgrade_deadline_skips_raw_saves(
 
     with django_assert_num_queries(0):
         capture_previous_upgrade_deadline(sender=CourseRun, instance=run, raw=True)
+
+
+def test_sync_upgrade_deadline_skips_raw_saves(mock_deadline_sync_task):
+    """
+    Fixture loading (raw saves) never queues a push. pre_save skips raw saves
+    too, so the previous value would read as None and look like a change.
+    """
+    run = CourseRunFactory.create(upgrade_deadline=now_in_utc() + timedelta(days=10))
+    mock_deadline_sync_task.reset_mock()
+
+    sync_upgrade_deadline_to_edx_on_save(
+        sender=CourseRun, instance=run, created=False, raw=True
+    )
+
+    mock_deadline_sync_task.assert_not_called()
+
+
+def test_save_without_deadline_in_update_fields_skips_lookup(
+    mock_deadline_sync_task, django_assert_num_queries
+):
+    """
+    A save limited to other fields can't change the deadline, so neither the
+    old-value lookup nor a push happens.
+    """
+    run = CourseRunFactory.create(upgrade_deadline=now_in_utc() + timedelta(days=10))
+    mock_deadline_sync_task.reset_mock()
+
+    with django_assert_num_queries(0):
+        capture_previous_upgrade_deadline(
+            sender=CourseRun, instance=run, update_fields=frozenset({"title"})
+        )
+
+    run.title = "A new title"
+    run.save(update_fields=["title"])
+
+    mock_deadline_sync_task.assert_not_called()

@@ -55,7 +55,8 @@ def sync_courserun_upgrade_deadline(course_run_id):
         course_run_id (int): pk of the CourseRun to sync.
 
     Returns:
-        str: the UpgradeDeadlineSyncResult value, for log/flower visibility.
+        str | None: the UpgradeDeadlineSyncResult value, for log/flower
+            visibility, or None when the run is gone or edX rejected the push.
     """
     from openedx.api import sync_courserun_upgrade_deadline_to_edx
 
@@ -74,10 +75,25 @@ def sync_courserun_upgrade_deadline(course_run_id):
         if status_code is None or status_code == 429 or status_code >= 500:  # noqa: PLR2004
             # Rate limited or an edX outage: autoretry_for retries these.
             raise
-        # Any other 4xx (e.g. the course isn't in edX) won't succeed on retry.
-        log.exception(
-            "edX rejected the upgrade deadline push for %s", run.courseware_id
-        )
+        # The rest won't succeed on retry. Keep edX's response body: it carries
+        # the validation message that str(exc) leaves out.
+        body = exc.response.text[:500]
+        if status_code in (401, 403):
+            # A credentials problem affects every run, not just this one.
+            log.error(  # noqa: TRY400
+                "edX rejected the service worker token (status %s) while pushing "
+                "the upgrade deadline for %s: %s",
+                status_code,
+                run.courseware_id,
+                body,
+            )
+        else:
+            log.exception(
+                "edX rejected the upgrade deadline push for %s (status %s): %s",
+                run.courseware_id,
+                status_code,
+                body,
+            )
         return None
 
 

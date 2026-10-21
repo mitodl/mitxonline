@@ -2082,7 +2082,7 @@ def update_edx_course_mode(  # noqa: PLR0913
 
     edx_client = client if client else get_edx_api_service_client()
 
-    return edx_client.course_mode.update_course_mode(
+    edx_client.course_mode.update_course_mode(
         course_id=course_id,
         mode_slug=mode_slug,
         mode_display_name=mode_display_name,
@@ -2344,20 +2344,20 @@ def sync_courserun_upgrade_deadline_to_edx(
     MITx Online's upgrade_deadline is what actually gates paid enrollment (it
     drives CourseRun.is_upgradable, which gates checkout), while edX keeps its
     own copy on the verified mode. Nothing synced the two, so edX's copy drifted
-    - it gets rewritten to `course.end - 10 days` on every Studio publish. This
-    makes MITx Online authoritative: whatever a staff member sets here is pushed
-    to edX, and setting expiration_datetime flips edX's
-    expiration_datetime_is_explicit flag, which stops the publish signal from
-    overwriting it again.
+    - it gets rewritten to the course end minus a configurable window on every
+    Studio publish. This makes MITx Online authoritative: whatever a staff
+    member sets here is pushed to edX, and setting expiration_datetime flips
+    edX's expiration_datetime_is_explicit flag, which stops the publish signal
+    from overwriting it again.
 
     Args:
         course_run (CourseRun): the run whose deadline should be pushed.
         client (EdxApi): optional edX client to reuse across calls.
 
     Returns:
-        UpgradeDeadlineSyncResult: what happened. Callers that care about
-            partial success (the management command, the admin) branch on this
-            rather than on an exception.
+        UpgradeDeadlineSyncResult: what happened. The task records it as its
+            result; reconcile_upgrade_deadlines --fix calls this directly to pin
+            unpinned runs.
 
     Raises:
         HTTPError: if the edX API rejects the read or the write.

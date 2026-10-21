@@ -181,9 +181,8 @@ def purge_fastly_cache_on_program_save(
 
 
 # Attribute used to hand the pre-save upgrade_deadline to the post_save
-# receiver. Read it with getattr(..., PREVIOUS_UPGRADE_DEADLINE_ATTR, None) -
-# post_save can also fire for instances that never went through pre_save
-# (loaddata with raw=True, for example).
+# receiver. Read it with getattr(..., PREVIOUS_UPGRADE_DEADLINE_ATTR, None): the
+# pre_save receiver doesn't always set it.
 PREVIOUS_UPGRADE_DEADLINE_ATTR = "_previous_upgrade_deadline"
 
 
@@ -210,6 +209,11 @@ def capture_previous_upgrade_deadline(
     if kwargs.get("raw", False):
         # Fixture loading: the DB may not be consistent, and post_save ignores
         # raw saves anyway.
+        return
+
+    update_fields = kwargs.get("update_fields")
+    if update_fields is not None and "upgrade_deadline" not in update_fields:
+        # This save can't change the deadline; post_save skips it too.
         return
 
     if instance.pk is None:
@@ -251,6 +255,11 @@ def sync_upgrade_deadline_to_edx_on_save(
     if kwargs.get("raw", False):
         # Fixture loading: the DB may not be in a consistent state and we
         # certainly do not want to call out to edX.
+        return
+
+    update_fields = kwargs.get("update_fields")
+    if update_fields is not None and "upgrade_deadline" not in update_fields:
+        # The deadline wasn't saved, and pre_save didn't record its old value.
         return
 
     if "upgrade_deadline" in instance.get_deferred_fields():

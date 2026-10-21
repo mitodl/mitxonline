@@ -378,7 +378,7 @@ def test_courserun_admin_warns_that_clearing_cannot_reach_edx(
     run.refresh_from_db()
     assert run.upgrade_deadline is None
     assert any(
-        "must clear it by hand in the edX Django admin" in message
+        "Clear it by hand in the edX Django admin" in message
         for message in _admin_messages(response)
     )
 
@@ -410,20 +410,23 @@ def test_courserun_admin_silent_when_deadline_untouched(client, admin_user, mock
     )
 
 
-def test_courserun_admin_add_does_not_report_queued_sync(rf, admin_user, mocker):
+@pytest.mark.parametrize("has_deadline", [True, False])
+def test_courserun_admin_add_warns_deadline_not_pushed(
+    rf, admin_user, mocker, has_deadline
+):
     """
-    Adding a run with a deadline doesn't queue a push (new runs are skipped), so
-    the admin mustn't say it did.
+    Adding a run doesn't push its deadline (new runs are skipped), so the admin
+    warns that edX keeps its own date, and never claims a sync was queued.
     """
     mocker.patch("courses.signals.transaction.on_commit")
     mock_messages = mocker.patch("courses.admin.messages")
     run = CourseRunFactory.build(
         course=CourseFactory.create(),
-        upgrade_deadline=now_in_utc() + timedelta(days=10),
+        upgrade_deadline=now_in_utc() + timedelta(days=10) if has_deadline else None,
     )
     request = rf.post("/")
     request.user = admin_user
-    form = mocker.Mock(changed_data=["upgrade_deadline"])
+    form = mocker.Mock(changed_data=["upgrade_deadline"] if has_deadline else [])
 
     CourseRunAdmin(CourseRun, django_admin.site).save_model(
         request, run, form, change=False
@@ -431,4 +434,8 @@ def test_courserun_admin_add_does_not_report_queued_sync(rf, admin_user, mocker)
 
     assert run.pk is not None
     mock_messages.info.assert_not_called()
-    mock_messages.warning.assert_not_called()
+    if has_deadline:
+        mock_messages.warning.assert_called_once()
+        assert "New runs aren't pushed to edX" in mock_messages.warning.call_args[0][1]
+    else:
+        mock_messages.warning.assert_not_called()

@@ -117,20 +117,24 @@ def test_sync_courserun_upgrade_deadline_finds_source_runs(mocker):
     sync_patch.assert_called_once_with(run)
 
 
-def _http_error(status_code):
+def _http_error(status_code, body=b""):
     """Build an HTTPError carrying a response with the given status."""
     response = Response()
     response.status_code = status_code
+    response._content = body  # noqa: SLF001
     return HTTPError(response=response)
 
 
-@pytest.mark.parametrize("status_code", [429, 503])
-def test_sync_courserun_upgrade_deadline_retries_transient_errors(mocker, status_code):
-    """Rate limiting and edX outages are scheduled for a retry."""
+@pytest.mark.parametrize(
+    "error",
+    [_http_error(429), _http_error(500), _http_error(503), HTTPError("no response")],
+)
+def test_sync_courserun_upgrade_deadline_retries_transient_errors(mocker, error):
+    """Rate limiting, edX outages and errors without a response are retried."""
     run = CourseRunFactory.create()
     sync_patch = mocker.patch(
         "openedx.api.sync_courserun_upgrade_deadline_to_edx",
-        side_effect=_http_error(status_code),
+        side_effect=error,
     )
 
     with pytest.raises(Retry):
@@ -143,11 +147,14 @@ def test_sync_courserun_upgrade_deadline_retries_transient_errors(mocker, status
 def test_sync_courserun_upgrade_deadline_does_not_retry_client_errors(
     mocker, caplog, status_code
 ):
-    """Other 4xx errors won't succeed on retry, so they're logged once."""
+    """
+    Other 4xx errors won't succeed on retry, so they're logged once, with the
+    status and edX's response body.
+    """
     run = CourseRunFactory.create()
     sync_patch = mocker.patch(
         "openedx.api.sync_courserun_upgrade_deadline_to_edx",
-        side_effect=_http_error(status_code),
+        side_effect=_http_error(status_code, b'{"expiration_datetime": ["bad"]}'),
     )
 
     result = sync_courserun_upgrade_deadline.delay(run.id)
@@ -157,6 +164,29 @@ def test_sync_courserun_upgrade_deadline_does_not_retry_client_errors(
     assert f"edX rejected the upgrade deadline push for {run.courseware_id}" in (
         caplog.text
     )
+    assert f"status {status_code}" in caplog.text
+    assert '{"expiration_datetime": ["bad"]}' in caplog.text
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+def test_sync_courserun_upgrade_deadline_reports_auth_errors(
+    mocker, caplog, status_code
+):
+    """
+    A rejected service token is a credentials problem, not a problem with this
+    run, so it gets its own message and isn't retried.
+    """
+    run = CourseRunFactory.create()
+    mocker.patch(
+        "openedx.api.sync_courserun_upgrade_deadline_to_edx",
+        side_effect=_http_error(status_code),
+    )
+
+    result = sync_courserun_upgrade_deadline.delay(run.id)
+
+    assert result.get() is None
+    assert "edX rejected the service worker token" in caplog.text
+    assert "edX rejected the upgrade deadline push" not in caplog.text
 
 
 def test_sync_courserun_upgrade_deadline_retries_read_timeouts(mocker):

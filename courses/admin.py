@@ -66,6 +66,7 @@ from main.admin import (
 from main.utils import get_field_names
 from openedx.api import get_edx_api_service_client, get_edx_course_modes
 from openedx.constants import (
+    CANNOT_CLEAR_DEADLINE_HINT,
     EDX_ENROLLMENT_AUDIT_MODE,
     EDX_ENROLLMENT_VERIFIED_MODE,
     OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES,
@@ -570,19 +571,29 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         deadline_changed = "upgrade_deadline" in (form.changed_data or [])
         super().save_model(request, obj, form, change)
 
-        if not change or not deadline_changed:
-            # New runs aren't pushed (see the CourseRun post_save receiver), so
-            # there's nothing to report.
+        if not change:
+            # New runs aren't pushed (see the CourseRun post_save receiver).
+            if obj.upgrade_deadline is not None:
+                messages.warning(
+                    request,
+                    (
+                        f"New runs aren't pushed to edX, so the upgrade deadline "
+                        f"for {obj.courseware_id} is saved in MITx Online only. If "
+                        f"this run already exists in edX, change the deadline here "
+                        f"to push it."
+                    ),
+                )
+            return
+
+        if not deadline_changed:
             return
 
         if obj.upgrade_deadline is None:
             messages.warning(
                 request,
                 (
-                    f"Upgrade deadline cleared for {obj.courseware_id}. edX cannot "
-                    f"unset an existing deadline through its API, so if edX still "
-                    f"has one you must clear it by hand in the edX Django admin "
-                    f"under Course Modes."
+                    f"Upgrade deadline cleared for {obj.courseware_id}; edX keeps "
+                    f"any deadline it already has. {CANNOT_CLEAR_DEADLINE_HINT}"
                 ),
             )
         else:
