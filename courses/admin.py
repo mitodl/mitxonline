@@ -19,7 +19,7 @@ import cms.admin  # noqa: F401
 from courses.api import (
     VERIFIABLE_CREDENTIAL_STATUS_DISABLED,
     VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA,
-    VERIFIABLE_CREDENTIAL_STATUS_LIVE,
+    VERIFIABLE_CREDENTIAL_STATUS_ENABLED,
     VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA,
     create_verifiable_credential,
     downgrade_learner,
@@ -67,7 +67,7 @@ from openedx.constants import (
 from openedx.tasks import retry_failed_edx_enrollments
 
 VERIFIABLE_CREDENTIAL_STATUS_DESCRIPTIONS = [
-    (VERIFIABLE_CREDENTIAL_STATUS_LIVE, "Enabled, with criteria populated"),
+    (VERIFIABLE_CREDENTIAL_STATUS_ENABLED, "Enabled, with criteria populated"),
     (
         VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA,
         "Enabled, but no criteria populated. No credentials will be issued until criteria is populated.",

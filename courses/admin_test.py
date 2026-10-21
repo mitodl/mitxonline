@@ -8,7 +8,7 @@ from courses.admin import CourseRunEnrollmentAdmin
 from courses.api import (
     VERIFIABLE_CREDENTIAL_STATUS_DISABLED,
     VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA,
-    VERIFIABLE_CREDENTIAL_STATUS_LIVE,
+    VERIFIABLE_CREDENTIAL_STATUS_ENABLED,
     VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA,
 )
 from courses.factories import (
@@ -118,7 +118,7 @@ def test_verifiable_credential_stats_view(mocker, admin_client):
     mock_summary.assert_called_once_with(return_objects=True)
     rows = {row["status"]: row["pages"] for row in resp.context["stats"]}
     assert rows == {
-        VERIFIABLE_CREDENTIAL_STATUS_LIVE: [],
+        VERIFIABLE_CREDENTIAL_STATUS_ENABLED: [],
         VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA: [page],
         VERIFIABLE_CREDENTIAL_STATUS_DISABLED: [],
         VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA: [],
