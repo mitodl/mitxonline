@@ -180,7 +180,7 @@ class Migration(migrations.Migration):
             name="certificate_page_revision",
             field=models.ForeignKey(
                 limit_choices_to=courses.models.limit_to_certificate_pages,
-                on_delete=django.db.models.deletion.CASCADE,
+                on_delete=django.db.models.deletion.PROTECT,
                 to="wagtailcore.revision",
             ),
         ),
@@ -189,7 +189,7 @@ class Migration(migrations.Migration):
             name="certificate_page_revision",
             field=models.ForeignKey(
                 limit_choices_to=courses.models.limit_to_certificate_pages,
-                on_delete=django.db.models.deletion.CASCADE,
+                on_delete=django.db.models.deletion.PROTECT,
                 to="wagtailcore.revision",
             ),
         ),

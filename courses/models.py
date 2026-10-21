@@ -2123,7 +2123,11 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
         Revision,
         null=False,
         blank=False,
-        on_delete=models.CASCADE,
+        # PROTECT, not CASCADE: every certificate now points at a revision,
+        # and Wagtail's purge_revisions (and deleting a certificate page)
+        # delete non-latest revisions, relying on ProtectedError to skip ones
+        # still referenced. CASCADE would silently delete issued certificates.
+        on_delete=models.PROTECT,
         limit_choices_to=limit_to_certificate_pages,
     )
 
@@ -2209,7 +2213,11 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
         Revision,
         null=False,
         blank=False,
-        on_delete=models.CASCADE,
+        # PROTECT, not CASCADE: every certificate now points at a revision,
+        # and Wagtail's purge_revisions (and deleting a certificate page)
+        # delete non-latest revisions, relying on ProtectedError to skip ones
+        # still referenced. CASCADE would silently delete issued certificates.
+        on_delete=models.PROTECT,
         limit_choices_to=limit_to_certificate_pages,
     )
 
