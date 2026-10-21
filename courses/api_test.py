@@ -5745,3 +5745,8 @@ def test_summarize_verifiable_credential_certificate_statuses_ids():
     assert summarize_verifiable_credential_certificate_statuses(
         return_objects=True, ids=[page.id]
     ) == {VERIFIABLE_CREDENTIAL_STATUS_LIVE: [page]}
+
+    # Should filter out pages that aren't in the ID list given
+    assert summarize_verifiable_credential_certificate_statuses(
+        return_objects=True, ids=["nonexistent-id"]
+    ) == {VERIFIABLE_CREDENTIAL_STATUS_LIVE: []}
