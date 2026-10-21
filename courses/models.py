@@ -366,6 +366,19 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         page = self.program_page
         return page.certificate_page if page else None
 
+    def get_certificate_page_revision(self):
+        """
+        Return the latest revision of this program's live certificate page, or
+        ``None``.
+
+        Unlike the certificate_page cached_property, this re-reads the page
+        on every call, so a batch that reuses the same Program object for
+        many users sees publish/unpublish changes made mid-batch.
+        """
+        page = self.program_page
+        certificate_page = page.certificate_page if page else None
+        return certificate_page.get_latest_revision() if certificate_page else None
+
     def get_requirements_root(self, *, for_update=False):
         """The root of the requirements tree"""
         query = ProgramRequirement.get_root_nodes().filter(program=self)
@@ -1146,6 +1159,19 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         """Return this course's certificate page, or ``None``."""
         page = self.course_page
         return page.certificate_page if page else None
+
+    def get_certificate_page_revision(self):
+        """
+        Return the latest revision of this course's live certificate page, or
+        ``None``.
+
+        Unlike the certificate_page cached_property, this re-reads the page
+        on every call, so a batch that reuses the same Course object for
+        many users sees publish/unpublish changes made mid-batch.
+        """
+        page = self.course_page
+        certificate_page = page.certificate_page if page else None
+        return certificate_page.get_latest_revision() if certificate_page else None
 
     @cached_property
     def course_number(self):
@@ -2121,9 +2147,13 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
     )
     certificate_page_revision = models.ForeignKey(
         Revision,
-        null=True,
-        blank=True,
-        on_delete=models.CASCADE,
+        null=False,
+        blank=False,
+        # PROTECT, not CASCADE: every certificate now points at a revision,
+        # and Wagtail's purge_revisions (and deleting a certificate page)
+        # delete non-latest revisions, relying on ProtectedError to skip ones
+        # still referenced. CASCADE would silently delete issued certificates.
+        on_delete=models.PROTECT,
         limit_choices_to=limit_to_certificate_pages,
     )
 
@@ -2163,8 +2193,11 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
     def clean(self):
         from cms.models import CertificatePage, CoursePage  # noqa: PLC0415
 
-        # Skip validation if certificate_page_revision is not set (e.g., when revoking)
-        if self.certificate_page_revision is None:
+        # Check the raw FK ids, as save() does: an unset FK raises
+        # RelatedObjectDoesNotExist through the descriptor rather than
+        # returning None. Field validation already reports the missing value
+        # as required, so there's nothing more to check here.
+        if not self.certificate_page_revision_id or not self.course_run_id:
             return
 
         certpage = CertificatePage.objects.filter(
@@ -2191,10 +2224,14 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
             )
 
     def save(self, *args, **kwargs):  # noqa: DJ012
-        if not self.certificate_page_revision:
-            certificate_page = self.course_run.course.certificate_page
-            if certificate_page:
-                self.certificate_page_revision = certificate_page.get_latest_revision()
+        # Check the raw FK id, not self.certificate_page_revision: now that
+        # the field is non-nullable, accessing an unset FK through the
+        # descriptor raises RelatedObjectDoesNotExist instead of returning
+        # None, which would break this exact "is it set yet?" check.
+        if not self.certificate_page_revision_id:
+            self.certificate_page_revision = (
+                self.course_run.course.get_certificate_page_revision()
+            )
 
         super(CourseRunCertificate, self).save(*args, **kwargs)  # noqa: UP008
 
@@ -2207,9 +2244,13 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
     program = models.ForeignKey(Program, null=False, on_delete=models.CASCADE)
     certificate_page_revision = models.ForeignKey(
         Revision,
-        null=True,
-        blank=True,
-        on_delete=models.CASCADE,
+        null=False,
+        blank=False,
+        # PROTECT, not CASCADE: every certificate now points at a revision,
+        # and Wagtail's purge_revisions (and deleting a certificate page)
+        # delete non-latest revisions, relying on ProtectedError to skip ones
+        # still referenced. CASCADE would silently delete issued certificates.
+        on_delete=models.PROTECT,
         limit_choices_to=limit_to_certificate_pages,
     )
 
@@ -2256,8 +2297,11 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
     def clean(self):
         from cms.models import CertificatePage, ProgramPage  # noqa: PLC0415
 
-        # Skip validation if certificate_page_revision is not set (e.g., when revoking)
-        if self.certificate_page_revision is None:
+        # Check the raw FK ids, as save() does: an unset FK raises
+        # RelatedObjectDoesNotExist through the descriptor rather than
+        # returning None. Field validation already reports the missing value
+        # as required, so there's nothing more to check here.
+        if not self.certificate_page_revision_id or not self.program_id:
             return
 
         certpage = CertificatePage.objects.filter(
@@ -2284,10 +2328,14 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
             )
 
     def save(self, *args, **kwargs):  # pylint: disable=signature-differs  # noqa: DJ012
-        if not self.certificate_page_revision:
-            certificate_page = self.program.certificate_page
-            if certificate_page:
-                self.certificate_page_revision = certificate_page.get_latest_revision()
+        # Check the raw FK id, not self.certificate_page_revision: now that
+        # the field is non-nullable, accessing an unset FK through the
+        # descriptor raises RelatedObjectDoesNotExist instead of returning
+        # None, which would break this exact "is it set yet?" check.
+        if not self.certificate_page_revision_id:
+            self.certificate_page_revision = (
+                self.program.get_certificate_page_revision()
+            )
 
         super().save(*args, **kwargs)
 
