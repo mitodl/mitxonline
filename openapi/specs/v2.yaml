@@ -1041,8 +1041,7 @@ components:
         what_you_learn:
           type: string
           nullable: true
-          description: '*Required for Verifiable Credential generation. What you will
-            learn from this course.'
+          description: What you will learn from this course.
         feature_image:
           $ref: '#/components/schemas/FeatureImage'
         video_url:
@@ -2344,8 +2343,7 @@ components:
         what_you_learn:
           type: string
           nullable: true
-          description: '*Required for Verifiable Credential generation. What you will
-            learn from this course.'
+          description: What you will learn from this course.
         feature_image:
           $ref: '#/components/schemas/FeatureImage'
         video_url:
