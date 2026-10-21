@@ -119,7 +119,7 @@ from ecommerce.factories import (
     OrderFactory,
     ProductFactory,
 )
-from ecommerce.models import Basket, OrderStatus
+from ecommerce.models import Basket, Order, OrderStatus
 from main import features
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
 from main.test_utils import MockHttpError
@@ -880,6 +880,93 @@ class TestUpgradeAuditRunEnrollmentsForProgramPurchase:
         assert result[0].run == audit_run
         verified_enrollment.refresh_from_db()
         assert verified_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+
+    @pytest.mark.parametrize("run_has_product", [True, False])
+    def test_upgrade_creates_program_order(
+        self, mocker, program_setup, run_has_product
+    ):
+        """
+        Each upgrade is backed by a fulfilled zero-value order redeeming the
+        program's discount, unless the run can't be purchased, in which case
+        the enrollment is upgraded without one.
+        """
+        mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+        with reversion.create_revision():
+            ProductFactory.create(purchasable_object=program_setup.program)
+            if run_has_product:
+                ProductFactory.create(purchasable_object=program_setup.run)
+        ProgramEnrollmentFactory.create(
+            user=program_setup.user,
+            program=program_setup.program,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+        enrollment = CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert result == [enrollment]
+        enrollment.refresh_from_db()
+        assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        paid_run = PaidCourseRun.objects.filter(
+            user=program_setup.user, course_run=program_setup.run
+        ).first()
+        if not run_has_product:
+            assert paid_run is None
+            return
+        assert paid_run.order.state == OrderStatus.FULFILLED
+        assert paid_run.order.total_price_paid == 0
+        assert (
+            paid_run.order.discounts.get().redeemed_discount.discount_code.startswith(
+                program_setup.program.readable_id
+            )
+        )
+
+    def test_inactive_program_product_does_not_interrupt_paid_order_fulfillment(
+        self, mocker, program_setup
+    ):
+        """An inactive program product falls back to the orderless enrollment upgrade."""
+        mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+        with reversion.create_revision():
+            program_product = ProductFactory.create(
+                purchasable_object=program_setup.program
+            )
+            ProductFactory.create(purchasable_object=program_setup.run)
+        program_product.is_active = False
+        program_product.save()
+        ProgramEnrollmentFactory.create(
+            user=program_setup.user,
+            program=program_setup.program,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+        enrollment = CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert result == [enrollment]
+        enrollment.refresh_from_db()
+        assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        assert not PaidCourseRun.objects.filter(
+            user=program_setup.user, course_run=program_setup.run
+        ).exists()
+        assert not Order.objects.filter(purchaser=program_setup.user).exists()
 
 
 class TestDowngradeProgramEnrollmentAndVerifiedRuns:
