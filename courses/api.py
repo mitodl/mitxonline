@@ -1382,9 +1382,26 @@ def process_course_run_grade_certificate(
                 create_verifiable_credential(certificate)
             return certificate, created, False  # noqa: TRY300
         except IntegrityError:
-            log.warning(
-                f"IntegrityError caught processing certificate for {course_run.courseware_id} for user {user} - certificate was likely already revoked."  # noqa: G004
-            )
+            # The expected case: a certificate already exists but the default
+            # manager hides it (revoked, or issue_date in the future), so
+            # get_or_create tried to insert a duplicate. Anything else (e.g. a
+            # NOT NULL or FK violation) is unexpected and logged as an error.
+            if CourseRunCertificate.all_objects.filter(
+                user=user, course_run=course_run
+            ).exists():
+                log.warning(
+                    "IntegrityError caught processing certificate for %s for "
+                    "user %s - an existing certificate is revoked or not yet "
+                    "issued.",
+                    course_run.courseware_id,
+                    user,
+                )
+            else:
+                log.exception(
+                    "IntegrityError creating certificate for user=%s run=%s",
+                    user.id,
+                    course_run.courseware_id,
+                )
     return None, False, False
 
 

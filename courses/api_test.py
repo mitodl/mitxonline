@@ -2559,6 +2559,39 @@ def test_course_run_certificate_uses_current_revision_despite_stale_cache(
     assert certificate.certificate_page_revision == new_revision
 
 
+@pytest.mark.parametrize("existing_hidden_certificate", [True, False])
+def test_course_run_certificate_integrity_error(
+    passed_grade_with_enrollment, mocker, existing_hidden_certificate
+):
+    """
+    An IntegrityError from a revoked (hidden) existing certificate is logged
+    as a warning; any other IntegrityError is logged as an error. Neither is
+    raised.
+    """
+    mocker.patch("hubspot_sync.api.upsert_custom_properties")
+    if existing_hidden_certificate:
+        CourseRunCertificateFactory.create(
+            user=passed_grade_with_enrollment.user,
+            course_run=passed_grade_with_enrollment.course_run,
+            is_revoked=True,
+        )
+    else:
+        mocker.patch.object(
+            CourseRunCertificate.objects, "get_or_create", side_effect=IntegrityError
+        )
+    patched_log = mocker.patch("courses.api.log")
+
+    result = process_course_run_grade_certificate(passed_grade_with_enrollment)
+
+    assert result == (None, False, False)
+    if existing_hidden_certificate:
+        patched_log.warning.assert_called_once()
+        patched_log.exception.assert_not_called()
+    else:
+        patched_log.exception.assert_called_once()
+        patched_log.warning.assert_not_called()
+
+
 @pytest.mark.parametrize("should_force_create", [True, False])
 def test_course_run_certificate_certificates_disabled(
     passed_grade_with_enrollment, should_force_create
