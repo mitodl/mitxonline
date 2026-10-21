@@ -11,6 +11,10 @@ from courses.models import (
 
 
 class Command(BaseCommand):
+    """
+    Prints status of verifiable credential configuration for certificate pages.
+    """
+
     help = __doc__
 
     def add_arguments(self, parser):
