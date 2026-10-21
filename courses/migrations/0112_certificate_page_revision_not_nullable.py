@@ -161,11 +161,14 @@ def backfill_certificate_page_revision(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ("courses", "0111_course_run_access_role"),
+        # The RunPython functions query through the real CoursePage/
+        # ProgramPage/CertificatePage (and Wagtail Page) classes, not
+        # historical models, so they SELECT every column those classes have
+        # today. Depend on the latest cms and wagtailcore migrations so those
+        # columns are guaranteed to exist. If this migration's RunPython
+        # steps are ever changed, bump these to the then-latest migrations.
         ("wagtailcore", "0097_baselogentry_uuid_action_timestamp_indexes"),
-        (
-            "cms",
-            "0023_certificateindexpage_certificatepage_signatoryindexpage_signatorypage",
-        ),
+        ("cms", "0072_add_testimonial_date_published"),
     ]
 
     operations = [
