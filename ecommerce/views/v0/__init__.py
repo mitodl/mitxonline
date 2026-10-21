@@ -8,6 +8,7 @@ import django_filters
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.contenttypes.prefetch import GenericPrefetch
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q
@@ -1049,9 +1050,11 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
                 # `refund_requests` feeds Order.latest_refund_request.
                 "refund_requests",
                 # `product_version` is read by Line.product and
-                # Line.item_description; `purchased_object` feeds
+                # Line.item_description. `purchased_object` feeds
                 # Order.purchased_runs, behind both is_b2b_order and
-                # refund_deadline. `purchased_object` is nested rather than a
+                # refund_deadline, and Line.product hands it to the rebuilt
+                # product as its `purchasable_object`, which the serializer
+                # walks into the run's course. It is nested rather than a
                 # sibling "lines__purchased_object" lookup, which is
                 # order-dependent: declared ahead of this Prefetch it raises
                 # "'lines' lookup was already seen with a different queryset".
@@ -1059,7 +1062,16 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
                     "lines",
                     queryset=Line.objects.select_related(
                         "product_version"
-                    ).prefetch_related("purchased_object"),
+                    ).prefetch_related(
+                        # all_objects: CourseRun.objects hides source runs, and
+                        # a run bought before it was flagged as one still has
+                        # to resolve, as Django's unfiltered default lookup
+                        # for the other content types does.
+                        GenericPrefetch(
+                            "purchased_object",
+                            [CourseRun.all_objects.select_related("course")],
+                        )
+                    ),
                 ),
             )
             # Read by Order.refund_status for every fulfilled row.

@@ -1692,7 +1692,22 @@ class Line(TimestampedModel):
 
     @cached_property
     def product(self):
-        return _product_from_version(self.product_version)
+        product = _product_from_version(self.product_version)
+        # The line's denormalized `purchased_object` names the row the product's
+        # `purchasable_object` resolves to (see Order.is_b2b_order), and a
+        # queryset can prefetch it where the rebuilt product's generic field is
+        # out of reach. Hand a loaded one across so readers of the product do
+        # not fetch it again. Null or disagreeing ids leave the product to
+        # resolve its own.
+        purchased_object_field = self._meta.get_field("purchased_object")
+        if (
+            purchased_object_field.is_cached(self)
+            and self.purchased_object is not None
+            and (self.purchased_content_type_id, self.purchased_object_id)
+            == (product.content_type_id, product.object_id)
+        ):
+            product.purchasable_object = self.purchased_object
+        return product
 
     @cached_property
     def product_content_type(self):
