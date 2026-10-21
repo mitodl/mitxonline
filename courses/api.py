@@ -2373,7 +2373,7 @@ def summarize_verifiable_credential_certificate_statuses(
         is_enabled = page.should_provision_verifiable_credential
         verifiable_credential_criteria = page.verifiable_credential_criteria
         page_return_value = page if return_objects else f"{page.title} - {page.id}"
-        if is_enabled and verifiable_credential_criteria:
+        if should_provision_verifiable_credential(page):
             certificate_pages_by_status[VERIFIABLE_CREDENTIAL_STATUS_LIVE].append(
                 page_return_value
             )
