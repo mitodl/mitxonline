@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.170.9
+---------------
+
+- Add form validation for Verifiable Credentials fields in Wagtail, management command to get status breakdown for all certificates. (#4161)
+- Remove stale verifiable-credential note from What you learn field (#4166)
+
 Version 1.170.8
 ---------------
 
