@@ -247,14 +247,17 @@ class InvalidPurchasableObjectTypeError(Exception):
 class ProductPurchasableObjectField(serializers.RelatedField):
     """Field for serializing purchasable objects (CourseRun, ProgramRun, or Program)"""
 
+    serializer_classes = {
+        ProgramRun: ProgramRunProductPurchasableObjectSerializer,
+        CourseRun: CourseRunProductPurchasableObjectSerializer,
+        Program: ProgramProductPurchasableObjectSerializer,
+    }
+
     def to_representation(self, value):
         """Serialize the purchasable object using appropriate serializer"""
-        if isinstance(value, ProgramRun):
-            return ProgramRunProductPurchasableObjectSerializer(instance=value).data
-        elif isinstance(value, CourseRun):
-            return CourseRunProductPurchasableObjectSerializer(instance=value).data
-        elif isinstance(value, Program):
-            return ProgramProductPurchasableObjectSerializer(instance=value).data
+        for model, serializer_class in self.serializer_classes.items():
+            if isinstance(value, model):
+                return serializer_class(instance=value).data
 
         error_message = (
             f"Unexpected type for Product.purchasable_object: {value.__class__}"
@@ -461,10 +464,107 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
         ]
 
 
+class LineCourseSerializer(serializers.ModelSerializer):
+    """The course of a purchased run, without its CMS page."""
+
+    class Meta:
+        model = Course
+        fields = ["id", "title"]
+
+
+class LineCourseRunSerializer(CourseRunProductPurchasableObjectSerializer):
+    """A purchased course run, with its course but not the course's CMS page."""
+
+    course = LineCourseSerializer(read_only=True)
+
+
+class LineProgramSerializer(serializers.ModelSerializer):
+    """A purchased program, without its CMS page."""
+
+    class Meta:
+        model = Program
+        fields = ["id", "title", "readable_id"]
+
+
+@extend_schema_field(
+    {
+        "oneOf": [
+            {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "run_tag": {"type": "string"},
+                    "start_date": {"type": "string", "format": "date-time"},
+                    "end_date": {"type": "string", "format": "date-time"},
+                },
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "title": {"type": "string"},
+                    "run_tag": {"type": "string"},
+                    "start_date": {"type": "string", "format": "date-time"},
+                    "end_date": {"type": "string", "format": "date-time"},
+                    "course": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "integer"},
+                            "title": {"type": "string"},
+                        },
+                    },
+                    "readable_id": {"type": "string"},
+                    "enrollment_start": {"type": "string", "format": "date-time"},
+                    "enrollment_end": {"type": "string", "format": "date-time"},
+                    "course_number": {"type": "string"},
+                },
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "title": {"type": "string"},
+                    "readable_id": {"type": "string"},
+                },
+            },
+        ]
+    }
+)
+class LinePurchasableObjectField(ProductPurchasableObjectField):
+    """
+    The courseware a line bought: a CourseRun, ProgramRun or Program.
+
+    Unlike ProductPurchasableObjectField this leaves out the course or program
+    CMS page. The page is catalog content (feature image, instructors,
+    financial-assistance form, current price) that no reader of an order's
+    lines uses, and serving it from a list of orders without a query per line
+    would mean carrying the course API's page prefetches into the order views.
+    """
+
+    serializer_classes = {
+        ProgramRun: ProgramRunProductPurchasableObjectSerializer,
+        CourseRun: LineCourseRunSerializer,
+        Program: LineProgramSerializer,
+    }
+
+
+class LineProductSerializer(BaseProductSerializer):
+    """A line's product and the courseware it bought, without the CMS page."""
+
+    purchasable_object = LinePurchasableObjectField(read_only=True)
+
+    class Meta:
+        fields = [
+            *BaseProductSerializer.Meta.fields,
+            "purchasable_object",
+        ]
+        model = models.Product
+
+
 class LineSerializer(serializers.ModelSerializer):
     """Serializes order lines."""
 
-    product = ProductSerializer(read_only=True)
+    product = LineProductSerializer(read_only=True)
     quantity = serializers.IntegerField()
     item_description = serializers.CharField()
     unit_price = serializers.DecimalField(max_digits=9, decimal_places=2)
