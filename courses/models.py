@@ -366,6 +366,19 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         page = self.program_page
         return page.certificate_page if page else None
 
+    def get_certificate_page_revision(self):
+        """
+        Return the latest revision of this program's live certificate page, or
+        ``None``.
+
+        Unlike the certificate_page cached_property, this re-reads the page
+        on every call, so a batch that reuses the same Program object for
+        many users sees publish/unpublish changes made mid-batch.
+        """
+        page = self.program_page
+        certificate_page = page.certificate_page if page else None
+        return certificate_page.get_latest_revision() if certificate_page else None
+
     def get_requirements_root(self, *, for_update=False):
         """The root of the requirements tree"""
         query = ProgramRequirement.get_root_nodes().filter(program=self)
@@ -1146,6 +1159,19 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         """Return this course's certificate page, or ``None``."""
         page = self.course_page
         return page.certificate_page if page else None
+
+    def get_certificate_page_revision(self):
+        """
+        Return the latest revision of this course's live certificate page, or
+        ``None``.
+
+        Unlike the certificate_page cached_property, this re-reads the page
+        on every call, so a batch that reuses the same Course object for
+        many users sees publish/unpublish changes made mid-batch.
+        """
+        page = self.course_page
+        certificate_page = page.certificate_page if page else None
+        return certificate_page.get_latest_revision() if certificate_page else None
 
     @cached_property
     def course_number(self):
@@ -2203,9 +2229,9 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
         # descriptor raises RelatedObjectDoesNotExist instead of returning
         # None, which would break this exact "is it set yet?" check.
         if not self.certificate_page_revision_id:
-            certificate_page = self.course_run.course.certificate_page
-            if certificate_page:
-                self.certificate_page_revision = certificate_page.get_latest_revision()
+            self.certificate_page_revision = (
+                self.course_run.course.get_certificate_page_revision()
+            )
 
         super(CourseRunCertificate, self).save(*args, **kwargs)  # noqa: UP008
 
@@ -2307,9 +2333,9 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
         # descriptor raises RelatedObjectDoesNotExist instead of returning
         # None, which would break this exact "is it set yet?" check.
         if not self.certificate_page_revision_id:
-            certificate_page = self.program.certificate_page
-            if certificate_page:
-                self.certificate_page_revision = certificate_page.get_latest_revision()
+            self.certificate_page_revision = (
+                self.program.get_certificate_page_revision()
+            )
 
         super().save(*args, **kwargs)
 
