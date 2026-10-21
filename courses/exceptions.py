@@ -45,3 +45,7 @@ class EnrollmentError(APIException):
 
 class EnrollmentCreationFailedError(EnrollmentError):
     """Error when the create_run_enrollments fails."""
+
+
+class CountryBlockedError(Exception):
+    """Raised when a user's country is blocked from enrolling in a course."""

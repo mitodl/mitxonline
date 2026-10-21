@@ -28,6 +28,7 @@ from rest_framework.views import APIView
 from reversion.models import Version
 
 from compliance.exceptions import ExportComplianceCheckError
+from courses.exceptions import CountryBlockedError
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -308,18 +309,6 @@ def _validate_enrollment_post_request(
             "Attempting to enroll in a non-existent run (id: %s)", str(run_id_str)
         )
         return HttpResponseRedirect(request.headers["Referer"]), None, None
-    if run.course.is_country_blocked(user):
-        resp = HttpResponseRedirect(request.headers["Referer"])
-        resp.set_cookie(
-            key=USER_MSG_COOKIE_NAME,
-            value=encode_json_cookie_value(
-                {
-                    "type": USER_MSG_TYPE_ENROLL_BLOCKED,
-                }
-            ),
-            max_age=USER_MSG_COOKIE_MAX_AGE,
-        )
-        return resp, None, None
     if (
         PaidCourseRun.fulfilled_paid_course_run_exists(user, run)
         or CourseRunEnrollment.objects.filter(
@@ -368,7 +357,7 @@ class CreateEnrollmentView(APIView):
                     features.IGNORE_EDX_FAILURES, False
                 ),
             )
-        except ExportComplianceCheckError:
+        except (CountryBlockedError, ExportComplianceCheckError):
             # Don't propagate the specifics of the compliance decision to the
             # client - the underlying cause is logged where it's raised.
             return redirect_with_user_message(
