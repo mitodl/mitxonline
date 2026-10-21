@@ -20,6 +20,7 @@ from ecommerce.factories import (
     BasketFactory,
     BasketItemFactory,
     DiscountFactory,
+    LineFactory,
     OrderFactory,
     PaidAmountOffDiscountFactory,
     ProductFactory,
@@ -34,6 +35,7 @@ from ecommerce.models import (
 )
 from ecommerce.serializers.v0 import (
     BasketWithProductSerializer,
+    LineSerializer,
     TransactionLineSerializer,
     V0DiscountSerializer,
 )
@@ -372,3 +374,46 @@ def test_basket_serializer_shows_a_discount_on_a_zero_price_product(user):
     data = BasketWithProductSerializer(instance=basket).data
 
     assert len(data["discounts"]) == 1
+
+
+def test_line_serializer_course_run_rows_carry_the_course_without_its_page():
+    """A course-run line names its run and the run's course, and no CMS page."""
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    line = LineFactory.create(
+        product_version=Version.objects.get_for_object(product).last()
+    )
+
+    purchasable_object = LineSerializer(instance=line).data["product"][
+        "purchasable_object"
+    ]
+
+    run = product.purchasable_object
+    assert purchasable_object["id"] == run.id
+    assert purchasable_object["course"] == {
+        "id": run.course.id,
+        "title": run.course.title,
+    }
+
+
+def test_line_serializer_program_rows_carry_neither_course_nor_page():
+    """
+    A program line names the program. A consumer tells it from a run by the
+    absent `course` and `run_tag`, so neither may appear.
+    """
+    with reversion.create_revision():
+        product = ProgramProductFactory.create()
+    line = LineFactory.create(
+        product_version=Version.objects.get_for_object(product).last()
+    )
+
+    purchasable_object = LineSerializer(instance=line).data["product"][
+        "purchasable_object"
+    ]
+
+    program = product.purchasable_object
+    assert purchasable_object == {
+        "id": program.id,
+        "title": program.title,
+        "readable_id": program.readable_id,
+    }
