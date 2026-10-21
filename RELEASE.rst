@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.170.8
+---------------
+
+- Resolve PENDING order using transaction id (#4163)
+- Transfer all orders and entitlements and Fix bug in transfer user course enrollment (#4164)
+
 Version 1.170.7
 ---------------
 
