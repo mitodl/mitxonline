@@ -1717,7 +1717,24 @@ class Line(TimestampedModel):
 
     @cached_property
     def product(self):
-        return _product_from_version(self.product_version)
+        product = _product_from_version(self.product_version)
+        # A line's `purchased_object` and its product's `purchasable_object`
+        # are expected to be the same row: the app copies the line's ids off
+        # the product. The product is rebuilt from a snapshot, so only the
+        # line's can be prefetched. If it has been, give it to the product so
+        # reading it there costs no query. The ids can differ when the
+        # snapshot is not the product's current state (a line re-pinned to an
+        # older Version, a product repointed without recording one), and
+        # assigning would overwrite the snapshot's ids, so those are skipped.
+        purchased_object_field = self._meta.get_field("purchased_object")
+        if (
+            purchased_object_field.is_cached(self)
+            and self.purchased_object is not None
+            and (self.purchased_content_type_id, self.purchased_object_id)
+            == (product.content_type_id, product.object_id)
+        ):
+            product.purchasable_object = self.purchased_object
+        return product
 
     @cached_property
     def product_content_type(self):
