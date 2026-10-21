@@ -2194,6 +2194,13 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
     def clean(self):
         from cms.models import CertificatePage, CoursePage  # noqa: PLC0415
 
+        # Check the raw FK ids, as save() does: an unset FK raises
+        # RelatedObjectDoesNotExist through the descriptor rather than
+        # returning None. Field validation already reports the missing value
+        # as required, so there's nothing more to check here.
+        if not self.certificate_page_revision_id or not self.course_run_id:
+            return
+
         certpage = CertificatePage.objects.filter(
             pk=int(self.certificate_page_revision.object_id),
         )
@@ -2290,6 +2297,13 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
 
     def clean(self):
         from cms.models import CertificatePage, ProgramPage  # noqa: PLC0415
+
+        # Check the raw FK ids, as save() does: an unset FK raises
+        # RelatedObjectDoesNotExist through the descriptor rather than
+        # returning None. Field validation already reports the missing value
+        # as required, so there's nothing more to check here.
+        if not self.certificate_page_revision_id or not self.program_id:
+            return
 
         certpage = CertificatePage.objects.filter(
             pk=int(self.certificate_page_revision.object_id),
