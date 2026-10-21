@@ -10,7 +10,7 @@ This is a targeted remediation/refresh tool for one course/run/program at a
 time (e.g. after publishing a new certificate page revision). Bulk backfill
 across every course and program happens automatically in the
 certificate_page_revision_not_nullable migration - see
-courses/migrations/0104_certificate_page_revision_not_nullable.py.
+courses/migrations/0112_certificate_page_revision_not_nullable.py.
 
 Check the usages of this command below:
 
