@@ -871,29 +871,34 @@ def test_sync_deal_line_hubspot_ids_to_hubspot_two_lines(
     """Matches should be made correctly for an order with 2 lines"""
     order = OrderFactory.create()
     with reversion.create_revision():
-        product = ProductFactory.create()
-    version = Version.objects.get_for_object(product).first()
+        products = ProductFactory.create_batch(2)
     hs_order = HubspotObjectFactory.create(
         content_object=order,
         content_type=ContentType.objects.get_for_model(order),
         object_id=order.id,
     )
-    hs_product = HubspotObjectFactory.create(
-        content_object=product,
-        content_type=ContentType.objects.get_for_model(Product),
-        object_id=product.id,
-    )
-    lines = (  # noqa: F841
-        LineFactory.create(order=order, product_version=version, quantity=1),
-        LineFactory.create(order=order, product_version=version, quantity=quantity),
-    )
+    hs_products = [
+        HubspotObjectFactory.create(
+            content_object=product,
+            content_type=ContentType.objects.get_for_model(Product),
+            object_id=product.id,
+        )
+        for product in products
+    ]
+    for product, line_quantity in zip(products, (1, quantity)):
+        LineFactory.create(
+            order=order,
+            product_version=Version.objects.get_for_object(product).first(),
+            quantity=line_quantity,
+        )
     lines_response = [
         SimplePublicObjectFactory(
-            properties={"hs_product_id": hs_product.hubspot_id, "quantity": 1},
-        ),
-        SimplePublicObjectFactory(
-            properties={"hs_product_id": hs_product.hubspot_id, "quantity": 2},
-        ),
+            properties={
+                "hs_product_id": hs_product.hubspot_id,
+                "quantity": hs_quantity,
+            },
+        )
+        for hs_product, hs_quantity in zip(hs_products, (1, 2))
     ]
     mocker.patch(
         "hubspot_sync.api.get_line_items_for_deal", return_value=lines_response
