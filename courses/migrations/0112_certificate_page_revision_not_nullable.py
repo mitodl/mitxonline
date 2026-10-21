@@ -160,7 +160,7 @@ def backfill_certificate_page_revision(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("courses", "0106_drop_courserun_b2b_contract_constraints"),
+        ("courses", "0111_course_run_access_role"),
         ("wagtailcore", "0097_baselogentry_uuid_action_timestamp_indexes"),
         (
             "cms",
