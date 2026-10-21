@@ -53,7 +53,7 @@ from courses.constants import (
     ENROLL_CHANGE_STATUS_UNENROLLED,
     PROGRAM_TEXT_ID_PREFIX,
 )
-from courses.exceptions import EnrollmentError
+from courses.exceptions import CountryBlockedError, EnrollmentError
 from courses.models import (
     BlockedCountry,
     Course,
@@ -255,6 +255,8 @@ def create_run_enrollments(  # noqa: C901, PLR0913
     # Pre-existing: only runs[0] is screened, so runs[1:] go unscreened for the
     # two multi-run callers (upgrade_audit_run_enrollments_for_program_purchase,
     # ecommerce.api.downgrade_learner_from_order).
+    if runs[0].course.is_country_blocked(user):
+        raise CountryBlockedError(user, runs[0].course)
     if skip_compliance_check:
         log.warning(
             "Skipping export compliance check for user=%s run=%s",
