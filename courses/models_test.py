@@ -7,10 +7,11 @@ from datetime import timedelta
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
-from django.db.models import F, Prefetch
+from django.db.models import F, Prefetch, ProtectedError
 from django.test.utils import CaptureQueriesContext
 from mitol.common.utils.datetime import now_in_utc
-from wagtail.models import Page
+from wagtail.management.commands.purge_revisions import purge_revisions
+from wagtail.models import Page, Revision
 
 from b2b.factories import ContractPageFactory
 from cms.factories import (
@@ -604,20 +605,49 @@ def test_course_run_certificate_save_without_course_page(mocker):
         CourseRunCertificateFactory.create(user=user, course_run=course_run)
 
 
-def test_course_run_certificate_deleted_when_certificate_page_is_deleted(mocker):
+def test_certificate_page_with_issued_certificates_cannot_be_deleted(mocker):
     """
-    Deleting a certificate page cascades to delete certificates issued
-    against one of its revisions: Wagtail deletes a page's Revision rows
-    along with the page, and certificate_page_revision is on_delete=CASCADE.
+    Deleting a certificate page is blocked while certificates reference one of
+    its revisions: Wagtail deletes a page's Revision rows along with the page,
+    and certificate_page_revision is on_delete=PROTECT.
     """
     mocker.patch(
         "hubspot_sync.api.upsert_custom_properties",
     )
     certificate = CourseRunCertificateFactory.create()
     course_page = certificate.course_run.course.page
-    CertificatePage.objects.descendant_of(course_page).delete()
 
-    assert not CourseRunCertificate.all_objects.filter(pk=certificate.pk).exists()
+    with pytest.raises(ProtectedError):
+        CertificatePage.objects.descendant_of(course_page).delete()
+
+    assert CourseRunCertificate.all_objects.filter(pk=certificate.pk).exists()
+
+
+@pytest.mark.parametrize("is_program", [True, False])
+def test_purge_revisions_keeps_revisions_referenced_by_certificates(mocker, is_program):
+    """
+    Wagtail's purge_revisions deletes every non-latest revision, skipping any
+    that raise ProtectedError. A certificate pinned to an older revision must
+    survive, along with that revision.
+    """
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    if is_program:
+        certificate = ProgramCertificateFactory.create()
+        certificate_page = certificate.program.page.certificate_page
+    else:
+        certificate = CourseRunCertificateFactory.create()
+        certificate_page = certificate.course_run.course.page.certificate_page
+    pinned_revision = certificate.certificate_page_revision
+    unreferenced_revision = certificate_page.save_revision()
+    certificate_page.save_revision()
+
+    purge_revisions()
+
+    certificate.refresh_from_db()
+    assert certificate.certificate_page_revision == pinned_revision
+    assert not Revision.objects.filter(pk=unreferenced_revision.pk).exists()
 
 
 def test_program_certificate_start_end_dates_and_page_revision(user, mocker):
