@@ -33,7 +33,11 @@ from b2b.factories import (
     OrganizationIndexPageFactory,
     OrganizationPageFactory,
 )
-from cms.factories import CourseIndexPageFactory
+from cms.factories import (
+    CertificatePageFactory,
+    CourseIndexPageFactory,
+    CoursePageFactory,
+)
 from cms.models import CoursePage, ProgramPage
 from compliance.api import ExportComplianceResult, verify_user_with_exports
 from compliance.exceptions import (
@@ -45,6 +49,10 @@ from compliance.factories import ExportComplianceLogFactory
 from compliance.models import ExportComplianceDecision
 from courses.api import (
     MISSING_COMPLIANCE_DATA_CODE,
+    VERIFIABLE_CREDENTIAL_STATUS_DISABLED,
+    VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA,
+    VERIFIABLE_CREDENTIAL_STATUS_ENABLED,
+    VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA,
     _has_earned_program_cert,
     check_course_modes,
     check_enrollment_eligibility,
@@ -69,6 +77,7 @@ from courses.api import (
     partner_schools_for_program,
     process_course_run_grade_certificate,
     pull_course_modes,
+    summarize_verifiable_credential_certificate_statuses,
     sync_course_mode,
     sync_course_runs,
     upgrade_audit_run_enrollments_for_program_purchase,
@@ -5689,3 +5698,58 @@ def test_has_earned_program_cert_with_tracks(
     _pass_courses(user, general if whole_track else general[:1] + methods[:1])
 
     assert _has_earned_program_cert(user, program_with_tracks.program) is whole_track
+
+
+def _create_certificate_page(*, enabled, criteria):
+    return CertificatePageFactory.create(
+        parent=CoursePageFactory.create(certificate_page=None),
+        should_provision_verifiable_credential=enabled,
+        verifiable_credential_criteria=criteria,
+    )
+
+
+@pytest.mark.parametrize(
+    ("enabled", "criteria", "expected_status"),
+    [
+        (True, "criteria", VERIFIABLE_CREDENTIAL_STATUS_ENABLED),
+        (True, None, VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA),
+        (False, "criteria", VERIFIABLE_CREDENTIAL_STATUS_DISABLED),
+        (False, None, VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA),
+    ],
+)
+def test_summarize_verifiable_credential_certificate_statuses(
+    enabled, criteria, expected_status
+):
+    """Each combination of enabled flag and criteria should map to the expected status"""
+    page = _create_certificate_page(enabled=enabled, criteria=criteria)
+
+    assert summarize_verifiable_credential_certificate_statuses() == {
+        expected_status: [f"{page.title} - {page.id}"]
+    }
+
+
+def test_summarize_verifiable_credential_certificate_statuses_return_objects():
+    """return_objects=True should return the pages themselves instead of strings"""
+    page = _create_certificate_page(enabled=True, criteria="criteria")
+
+    assert summarize_verifiable_credential_certificate_statuses(
+        return_objects=True
+    ) == {VERIFIABLE_CREDENTIAL_STATUS_ENABLED: [page]}
+
+
+def test_summarize_verifiable_credential_certificate_statuses_ids():
+    """Only pages matching the given ids should be included"""
+    page = _create_certificate_page(enabled=True, criteria="criteria")
+    _create_certificate_page(enabled=True, criteria="criteria")
+
+    assert summarize_verifiable_credential_certificate_statuses(
+        return_objects=True, ids=[page.id]
+    ) == {VERIFIABLE_CREDENTIAL_STATUS_ENABLED: [page]}
+
+    # Should filter out pages that aren't in the ID list given
+    assert (
+        summarize_verifiable_credential_certificate_statuses(
+            return_objects=True, ids=[]
+        )
+        == {}
+    )
