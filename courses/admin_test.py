@@ -3,6 +3,7 @@
 import pytest
 from django.contrib import admin as django_admin
 from django.urls import reverse
+from requests.exceptions import HTTPError
 
 from courses.admin import CourseRunEnrollmentAdmin
 from courses.factories import (
@@ -13,6 +14,7 @@ from courses.factories import (
     ProgramFactory,
 )
 from courses.models import CourseRunEnrollment
+from main.features import IGNORE_EDX_FAILURES
 from openedx.constants import (
     EDX_ENROLLMENT_VERIFIED_MODE,
     OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES,
@@ -183,3 +185,46 @@ def test_enroll_in_runs_unknown_user(mocker, admin_client):
     assert response.status_code == 200
     assert "user" in response.context["form"].errors
     mock_enroll.assert_not_called()
+
+
+def test_enroll_in_runs_enrolls_in_edx(mocker, admin_client):
+    """The enroll page should create the enrollment in Open edX as well as locally"""
+    mocker.patch("courses.api.mail_api")
+    mocker.patch("courses.api.subscribe_edx_course_emails")
+    mock_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+    user = UserFactory.create()
+    run = CourseRunFactory.create(courseware_id="course-v1:MITx+A+0T2026")
+
+    admin_client.post(
+        reverse(ENROLL_IN_RUNS_URL),
+        {"user": user.email, "runs": [run.id], "mode": EDX_ENROLLMENT_VERIFIED_MODE},
+    )
+
+    mock_edx_enroll.assert_called_once_with(
+        user, [run], mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    enrollment = CourseRunEnrollment.objects.get(user=user, run=run)
+    assert enrollment.edx_enrolled is True
+    assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+
+
+def test_enroll_in_runs_reports_edx_failure(mocker, admin_client, settings):
+    """An edX failure should be reported and leave no local enrollment behind"""
+    settings.FEATURES[IGNORE_EDX_FAILURES] = False
+    mocker.patch("courses.api.mail_api")
+    mocker.patch(
+        "courses.api.enroll_in_edx_course_runs",
+        side_effect=HTTPError("edX is down"),
+    )
+    user = UserFactory.create()
+    run = CourseRunFactory.create(courseware_id="course-v1:MITx+A+0T2026")
+
+    response = admin_client.post(
+        reverse(ENROLL_IN_RUNS_URL),
+        {"user": user.email, "runs": [run.id], "mode": "audit"},
+        follow=True,
+    )
+
+    message_texts = [str(m) for m in response.context["messages"]]
+    assert any("edX enrollment failed" in text for text in message_texts)
+    assert not CourseRunEnrollment.all_objects.filter(user=user, run=run).exists()

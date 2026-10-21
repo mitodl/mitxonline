@@ -820,9 +820,15 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
                     )
                     continue
                 if not enrollments:
+                    reason = (
+                        "the edX enrollment failed, so no enrollment was created"
+                        if not edx_success
+                        else "the enrollment record could not be saved"
+                    )
                     self.message_user(
                         request,
-                        f"Failed to enroll {user.email} in {run.courseware_id}",
+                        f"Failed to enroll {user.email} in {run.courseware_id}: "
+                        f"{reason}. Check the logs for details.",
                         messages.ERROR,
                     )
                 elif not edx_success:
