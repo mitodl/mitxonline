@@ -51,7 +51,7 @@ from courses.api import (
     MISSING_COMPLIANCE_DATA_CODE,
     VERIFIABLE_CREDENTIAL_STATUS_DISABLED,
     VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA,
-    VERIFIABLE_CREDENTIAL_STATUS_LIVE,
+    VERIFIABLE_CREDENTIAL_STATUS_ENABLED,
     VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA,
     _has_earned_program_cert,
     check_course_modes,
@@ -5711,7 +5711,7 @@ def _create_certificate_page(*, enabled, criteria):
 @pytest.mark.parametrize(
     ("enabled", "criteria", "expected_status"),
     [
-        (True, "criteria", VERIFIABLE_CREDENTIAL_STATUS_LIVE),
+        (True, "criteria", VERIFIABLE_CREDENTIAL_STATUS_ENABLED),
         (True, None, VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA),
         (False, "criteria", VERIFIABLE_CREDENTIAL_STATUS_DISABLED),
         (False, None, VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA),
@@ -5734,7 +5734,7 @@ def test_summarize_verifiable_credential_certificate_statuses_return_objects():
 
     assert summarize_verifiable_credential_certificate_statuses(
         return_objects=True
-    ) == {VERIFIABLE_CREDENTIAL_STATUS_LIVE: [page]}
+    ) == {VERIFIABLE_CREDENTIAL_STATUS_ENABLED: [page]}
 
 
 def test_summarize_verifiable_credential_certificate_statuses_ids():
@@ -5744,7 +5744,7 @@ def test_summarize_verifiable_credential_certificate_statuses_ids():
 
     assert summarize_verifiable_credential_certificate_statuses(
         return_objects=True, ids=[page.id]
-    ) == {VERIFIABLE_CREDENTIAL_STATUS_LIVE: [page]}
+    ) == {VERIFIABLE_CREDENTIAL_STATUS_ENABLED: [page]}
 
     # Should filter out pages that aren't in the ID list given
     assert (

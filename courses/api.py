@@ -132,7 +132,7 @@ UserEnrollments = namedtuple(  # noqa: PYI024
 )
 
 # Enabled and has criteria populated
-VERIFIABLE_CREDENTIAL_STATUS_LIVE = "LIVE"
+VERIFIABLE_CREDENTIAL_STATUS_ENABLED = "ENABLED"
 # Disabled and has criteria populated
 VERIFIABLE_CREDENTIAL_STATUS_DISABLED = "DISABLED"
 # Enabled but has no criteria populated. This is an unusual state to be in and may indicate a misconfiguration
@@ -2374,7 +2374,7 @@ def summarize_verifiable_credential_certificate_statuses(
         verifiable_credential_criteria = page.verifiable_credential_criteria
         page_return_value = page if return_objects else f"{page.title} - {page.id}"
         if should_provision_verifiable_credential(page):
-            certificate_pages_by_status[VERIFIABLE_CREDENTIAL_STATUS_LIVE].append(
+            certificate_pages_by_status[VERIFIABLE_CREDENTIAL_STATUS_ENABLED].append(
                 page_return_value
             )
         elif is_enabled and not verifiable_credential_criteria:
