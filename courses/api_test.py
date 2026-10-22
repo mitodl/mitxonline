@@ -1410,7 +1410,9 @@ def test_create_run_enrollments_allows_when_country_not_blocked(
     mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
 
     with django_capture_on_commit_callbacks(execute=True):
-        successful_enrollments, edx_request_success = create_run_enrollments(user, [run])
+        successful_enrollments, edx_request_success = create_run_enrollments(
+            user, [run]
+        )
 
     assert edx_request_success is True
     assert len(successful_enrollments) == 1

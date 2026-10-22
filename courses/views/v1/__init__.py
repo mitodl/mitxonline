@@ -28,7 +28,6 @@ from rest_framework.views import APIView
 from reversion.models import Version
 
 from compliance.exceptions import ExportComplianceCheckError
-from courses.exceptions import CountryBlockedError
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -37,6 +36,7 @@ from courses.api import (
     partner_schools_for_program,
 )
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
+from courses.exceptions import CountryBlockedError
 from courses.models import (
     Course,
     CourseRun,
