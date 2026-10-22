@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.170.10
+----------------
+
+- Enroll users in archived courses from the admin dashboard (#4174)
+- Requirements editor: description on requirement groups (#4171)
+
 Version 1.170.9
 ---------------
 
