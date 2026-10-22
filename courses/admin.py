@@ -22,14 +22,10 @@ from courses.api import (
     VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA,
     VERIFIABLE_CREDENTIAL_STATUS_ENABLED,
     VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA,
-    create_verifiable_credential,
-    downgrade_learner,
-    summarize_verifiable_credential_certificate_statuses,
-)
-from courses.forms import ProgramAdminForm
     create_run_enrollments,
     create_verifiable_credential,
     downgrade_learner,
+    summarize_verifiable_credential_certificate_statuses,
 )
 from courses.forms import (
     ADMIN_ENROLL_RUN_SUFFIX,
