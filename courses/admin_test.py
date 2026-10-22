@@ -110,6 +110,7 @@ def test_partner_school_admin_changelist_filters_by_program(admin_client):
     assert b"SCM Only School" in resp.content
     assert b"DEDP Only School" not in resp.content
 
+
 def test_verifiable_credential_stats_view(mocker, admin_client):
     """The stats page should render the certificate page status breakdown"""
     page = mocker.Mock(id=123)
@@ -138,6 +139,7 @@ def test_verifiable_credential_stats_view_requires_staff(client, user):
     client.force_login(user)
     resp = client.get(reverse("admin:courses_verifiablecredential_stats"))
     assert resp.status_code == 302
+
 
 ENROLL_IN_RUNS_URL = "admin:courses_courserunenrollment_enroll_in_runs"
 
@@ -276,4 +278,3 @@ def test_enroll_in_runs_reports_edx_failure(mocker, admin_client, settings):
     message_texts = [str(m) for m in response.context["messages"]]
     assert any("edX enrollment failed" in text for text in message_texts)
     assert not CourseRunEnrollment.all_objects.filter(user=user, run=run).exists()
-
