@@ -27,7 +27,6 @@ from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from compliance.exceptions import ExportComplianceDataError, ExportComplianceError
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
-    BlockedCountryFactory,
     CourseFactory,
     CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
