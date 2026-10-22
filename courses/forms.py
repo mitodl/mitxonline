@@ -16,7 +16,6 @@ from courses.models import (
 from courses.requirement_tree import programs_requiring, validate_requirement_tree
 from courses.serializers.v1.programs import ProgramRequirementTreeSerializer
 from courses.widgets import ProgramRequirementsInput
-from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 #: Courseware ID suffix of the runs offered by the admin "enroll in runs" page
 ADMIN_ENROLL_RUN_SUFFIX = "0T2026"
@@ -210,13 +209,6 @@ class AdminEnrollUserInRunsForm(forms.Form):
         queryset=CourseRun.objects.none(),
         widget=forms.CheckboxSelectMultiple,
         help_text=f"Course runs ending in {ADMIN_ENROLL_RUN_SUFFIX}",
-    )
-    mode = forms.ChoiceField(
-        choices=[
-            (EDX_ENROLLMENT_AUDIT_MODE, "Audit"),
-            (EDX_ENROLLMENT_VERIFIED_MODE, "Verified"),
-        ],
-        initial=EDX_ENROLLMENT_AUDIT_MODE,
     )
 
     def __init__(self, *args, **kwargs):

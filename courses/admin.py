@@ -796,9 +796,10 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
 
     def enroll_in_runs_view(self, request):
         """
-        Enroll a single user in a staff-selected set of course runs whose
-        courseware_id ends with ADMIN_ENROLL_RUN_SUFFIX. Each run is enrolled
-        separately so one failure (or the compliance check) doesn't block the rest.
+        Enroll a single user, in audit mode, in a staff-selected set of course
+        runs whose courseware_id ends with ADMIN_ENROLL_RUN_SUFFIX. Each run is
+        enrolled separately so one failure (or the compliance check) doesn't
+        block the rest.
         """
         if not self.has_add_permission(request):
             raise PermissionDenied
@@ -806,7 +807,7 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
         form = AdminEnrollUserInRunsForm(request.POST or None)
         if request.method == "POST" and form.is_valid():
             user = form.cleaned_data["user"]
-            mode = form.cleaned_data["mode"]
+            mode = EDX_ENROLLMENT_AUDIT_MODE
             for run in form.cleaned_data["runs"]:
                 try:
                     enrollments, edx_success = create_run_enrollments(

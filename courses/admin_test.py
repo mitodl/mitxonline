@@ -16,6 +16,7 @@ from courses.factories import (
 from courses.models import CourseRunEnrollment
 from main.features import IGNORE_EDX_FAILURES
 from openedx.constants import (
+    EDX_ENROLLMENT_AUDIT_MODE,
     EDX_ENROLLMENT_VERIFIED_MODE,
     OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES,
 )
@@ -138,14 +139,29 @@ def test_enroll_in_runs_enrolls_user_in_selected_runs(mocker, admin_client, look
         {
             "user": str(getattr(user, lookup)),
             "runs": [run_a.id, run_b.id],
-            "mode": EDX_ENROLLMENT_VERIFIED_MODE,
         },
     )
 
     assert response.status_code == 302
     assert mock_enroll.call_count == 2
-    mock_enroll.assert_any_call(user, [run_a], mode=EDX_ENROLLMENT_VERIFIED_MODE)
-    mock_enroll.assert_any_call(user, [run_b], mode=EDX_ENROLLMENT_VERIFIED_MODE)
+    mock_enroll.assert_any_call(user, [run_a], mode=EDX_ENROLLMENT_AUDIT_MODE)
+    mock_enroll.assert_any_call(user, [run_b], mode=EDX_ENROLLMENT_AUDIT_MODE)
+
+
+def test_enroll_in_runs_ignores_requested_mode(mocker, admin_client):
+    """The form has no mode choice, so a posted verified mode is ignored"""
+    user = UserFactory.create()
+    run = CourseRunFactory.create(courseware_id="course-v1:MITx+A+0T2026")
+    mock_enroll = mocker.patch(
+        "courses.admin.create_run_enrollments", return_value=([mocker.Mock()], True)
+    )
+
+    admin_client.post(
+        reverse(ENROLL_IN_RUNS_URL),
+        {"user": user.email, "runs": [run.id], "mode": EDX_ENROLLMENT_VERIFIED_MODE},
+    )
+
+    mock_enroll.assert_called_once_with(user, [run], mode=EDX_ENROLLMENT_AUDIT_MODE)
 
 
 def test_enroll_in_runs_continues_after_failure(mocker, admin_client):
@@ -160,7 +176,7 @@ def test_enroll_in_runs_continues_after_failure(mocker, admin_client):
 
     response = admin_client.post(
         reverse(ENROLL_IN_RUNS_URL),
-        {"user": user.email, "runs": [run_a.id, run_b.id], "mode": "audit"},
+        {"user": user.email, "runs": [run_a.id, run_b.id]},
         follow=True,
     )
 
@@ -179,7 +195,7 @@ def test_enroll_in_runs_unknown_user(mocker, admin_client):
 
     response = admin_client.post(
         reverse(ENROLL_IN_RUNS_URL),
-        {"user": "nobody@example.com", "runs": [run.id], "mode": "audit"},
+        {"user": "nobody@example.com", "runs": [run.id]},
     )
 
     assert response.status_code == 200
@@ -197,15 +213,13 @@ def test_enroll_in_runs_enrolls_in_edx(mocker, admin_client):
 
     admin_client.post(
         reverse(ENROLL_IN_RUNS_URL),
-        {"user": user.email, "runs": [run.id], "mode": EDX_ENROLLMENT_VERIFIED_MODE},
+        {"user": user.email, "runs": [run.id]},
     )
 
-    mock_edx_enroll.assert_called_once_with(
-        user, [run], mode=EDX_ENROLLMENT_VERIFIED_MODE
-    )
+    mock_edx_enroll.assert_called_once_with(user, [run], mode=EDX_ENROLLMENT_AUDIT_MODE)
     enrollment = CourseRunEnrollment.objects.get(user=user, run=run)
     assert enrollment.edx_enrolled is True
-    assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    assert enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
 
 
 def test_enroll_in_runs_reports_edx_failure(mocker, admin_client, settings):
@@ -221,7 +235,7 @@ def test_enroll_in_runs_reports_edx_failure(mocker, admin_client, settings):
 
     response = admin_client.post(
         reverse(ENROLL_IN_RUNS_URL),
-        {"user": user.email, "runs": [run.id], "mode": "audit"},
+        {"user": user.email, "runs": [run.id]},
         follow=True,
     )
 
