@@ -18,9 +18,14 @@ from mitol.common.admin import TimestampedModelAdmin
 
 import cms.admin  # noqa: F401
 from courses.api import (
+    VERIFIABLE_CREDENTIAL_STATUS_DISABLED,
+    VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA,
+    VERIFIABLE_CREDENTIAL_STATUS_ENABLED,
+    VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA,
     create_run_enrollments,
     create_verifiable_credential,
     downgrade_learner,
+    summarize_verifiable_credential_certificate_statuses,
 )
 from courses.forms import (
     ADMIN_ENROLL_RUN_SUFFIX,
@@ -66,6 +71,19 @@ from openedx.constants import (
     OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES,
 )
 from openedx.tasks import retry_failed_edx_enrollments
+
+VERIFIABLE_CREDENTIAL_STATUS_DESCRIPTIONS = [
+    (VERIFIABLE_CREDENTIAL_STATUS_ENABLED, "Enabled, with criteria populated"),
+    (
+        VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA,
+        "Enabled, but no criteria populated. No credentials will be issued until criteria is populated.",
+    ),
+    (VERIFIABLE_CREDENTIAL_STATUS_DISABLED, "Disabled, with criteria populated"),
+    (
+        VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA,
+        "Disabled, with no criteria populated",
+    ),
+]
 
 
 class VerifiableCredentialBackfillAdminMixin:
@@ -1322,6 +1340,43 @@ class VerifiableCredentialAdmin(TimestampedModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related("programcertificate", "courseruncertificate")
+
+    def get_urls(self):
+        custom = [
+            path(
+                "stats/",
+                self.admin_site.admin_view(self.stats_view),
+                name="courses_verifiablecredential_stats",
+            )
+        ]
+        return custom + super().get_urls()
+
+    def _get_stats(self):
+        breakdown = summarize_verifiable_credential_certificate_statuses(
+            return_objects=True
+        )
+        return [
+            {
+                "status": status,
+                "description": description,
+                "pages": breakdown.get(status, []),
+            }
+            for status, description in VERIFIABLE_CREDENTIAL_STATUS_DESCRIPTIONS
+        ]
+
+    def stats_view(self, request):
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Verifiable Credential Stats",
+            "opts": self.model._meta,  # noqa: SLF001
+            "stats": self._get_stats(),
+        }
+        return TemplateResponse(
+            request, "admin/courses/verifiablecredential/stats.html", context
+        )
 
 
 class PartnerSchoolProgramInline(admin.TabularInline):
