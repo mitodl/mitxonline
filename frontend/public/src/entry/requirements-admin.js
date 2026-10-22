@@ -300,6 +300,13 @@ function initRequirementsField(root) {
     el.dataset.mode = node.data.operator === OP.minNumberOf ? "choose" : "all"
 
     el.appendChild(renderGroupHead(node, path))
+    el.appendChild(
+      renderDescription(
+        node,
+        "req-group__description",
+        "Description shown to learners (optional)"
+      )
+    )
     el.appendChild(renderGroupSentence(node))
 
     if (holdsTracks(node)) {
@@ -390,15 +397,11 @@ function initRequirementsField(root) {
 
     head.append(renderMoveButtons(locate(path), "track"), pill, title, remove)
 
-    const description = document.createElement("textarea")
-    description.className = "req-track__description"
-    description.value = node.data.description || ""
-    description.placeholder = "Description shown to learners choosing a track"
-    description.rows = 2
-    description.addEventListener("input", event => {
-      node.data.description = event.target.value
-      writeInput()
-    })
+    const description = renderDescription(
+      node,
+      "req-track__description",
+      "Description shown to learners choosing a track"
+    )
 
     const groups = document.createElement("div")
     groups.className = "req-track__groups"
@@ -411,6 +414,19 @@ function initRequirementsField(root) {
 
     el.append(head, description, groups)
     return el
+  }
+
+  function renderDescription(node, className, placeholder) {
+    const description = document.createElement("textarea")
+    description.className = className
+    description.value = node.data.description || ""
+    description.placeholder = placeholder
+    description.rows = 2
+    description.addEventListener("input", event => {
+      node.data.description = event.target.value
+      writeInput()
+    })
+    return description
   }
 
   function renderGroupHead(node, path) {
