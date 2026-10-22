@@ -27,7 +27,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from reversion.models import Version
 
-from compliance.exceptions import ExportComplianceCheckError
+from compliance.exceptions import (
+    ExportComplianceCheckError,
+    ExportComplianceUnavailableError,
+)
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -74,6 +77,7 @@ from main.constants import (
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_ENROLL_FAILED,
+    USER_MSG_TYPE_ENROLL_UNAVAILABLE,
     USER_MSG_TYPE_ENROLLED,
 )
 from main.pagination import Pagination
@@ -367,6 +371,15 @@ class CreateEnrollmentView(APIView):
                 keep_failed_enrollments=settings.FEATURES.get(
                     features.IGNORE_EDX_FAILURES, False
                 ),
+            )
+        except ExportComplianceUnavailableError:
+            # Must precede the clause below: this is "we couldn't finish the
+            # enrollment, try again", not "you are blocked", and telling an
+            # unaffected learner their country is blocked during a CyberSource
+            # outage is both wrong and alarming.
+            return redirect_with_user_message(
+                reverse("user-dashboard"),
+                {"type": USER_MSG_TYPE_ENROLL_UNAVAILABLE},
             )
         except ExportComplianceCheckError:
             # Don't propagate the specifics of the compliance decision to the

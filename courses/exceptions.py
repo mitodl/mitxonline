@@ -10,9 +10,11 @@ class EnrollmentError(APIException):
 
     Deliberately excludes any specifics about *why* the enrollment failed (e.g.
     which export compliance decision came back) rather than surfacing that
-    detail to the client. The one thing that varies is an opaque support code
-    appended by ``from_cause`` for causes that declare one. The underlying cause
-    is logged server-side by the code that raises it (e.g. ``courses.api``).
+    detail to the client. What varies is an opaque support code appended by
+    ``from_cause`` for causes that declare one, and - for a cause that declares
+    ``enrollment_detail`` - the sentence it replaces ``default_detail`` with.
+    Neither may name the mechanism that failed. The underlying cause is logged
+    server-side by the code that raises it (e.g. ``courses.api``).
 
     Says nothing about contacting support either - clients already pair an
     enrollment failure with their own support copy, so a CTA here doubles up.
@@ -25,11 +27,15 @@ class EnrollmentError(APIException):
     @classmethod
     def from_cause(cls, exc: Exception) -> "EnrollmentError":
         """
-        Build an error for `exc`, appending the cause's support code when it
-        declares one (see ``compliance.exceptions.ExportComplianceError``).
+        Build an error for `exc` from the cause's own ``enrollment_detail``
+        when it declares one, appending its support code when it declares one
+        (see ``compliance.exceptions``).
 
-        A cause without an ``error_code`` yields the unchanged default detail,
-        so a new failure mode stays opaque unless it opts in.
+        A cause declaring neither yields the unchanged default detail, so a new
+        failure mode stays opaque unless it opts in. A cause that *does* opt in
+        still only gets to choose between opaque sentences: a retryable failure
+        wants "try again" where a terminal one does not, and that difference is
+        tellable without naming what went wrong.
 
         Args:
             exc (Exception): The underlying cause of the enrollment failure
@@ -37,10 +43,11 @@ class EnrollmentError(APIException):
         Returns:
             EnrollmentError: The error to raise from `exc`
         """
+        detail = getattr(exc, "enrollment_detail", None) or cls.default_detail
         error_code = getattr(exc, "error_code", None)
         if not error_code:
-            return cls()
-        return cls(f"{cls.default_detail} Error code: {error_code}.")
+            return cls(detail)
+        return cls(f"{detail} Error code: {error_code}.")
 
 
 class EnrollmentCreationFailedError(EnrollmentError):

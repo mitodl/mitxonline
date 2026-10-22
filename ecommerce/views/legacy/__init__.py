@@ -96,6 +96,7 @@ from main.constants import (
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_ENROLL_UNAVAILABLE,
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
     USER_MSG_TYPE_PAYMENT_CANCELLED,
@@ -1199,6 +1200,14 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             return redirect_with_user_message(
                 reverse("cart"),
                 {"type": USER_MSG_TYPE_PROFILE_INCOMPLETE},
+            )
+        # Back to the cart rather than the dashboard: the basket is intact and
+        # retrying is the whole point. Without this branch the payload falls
+        # through to checkout_payload["method"] below and 500s.
+        if "enrollment_unavailable" in checkout_payload:
+            return redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_ENROLL_UNAVAILABLE},
             )
         if "no_checkout" in checkout_payload:
             order = checkout_payload["order"]
