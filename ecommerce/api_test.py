@@ -33,7 +33,10 @@ from zeal import zeal_context
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE
 from b2b.factories import ContractPageFactory
 from compliance.exceptions import ExportComplianceDataError
-from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
+from courses.constants import (
+    ENROLL_CHANGE_STATUS_REFUNDED,
+    PROGRAM_ENROLLMENT_UPGRADE_MODE,
+)
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
@@ -1190,7 +1193,7 @@ def test_create_verified_program_course_run_enrollment(
     (program, _, _, courserun, _) = bootstrapped_verified_program
 
     ProgramEnrollmentFactory.create(
-        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        program=program, user=user, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
     )
 
     request = RequestFactory().get("/")
@@ -1306,7 +1309,7 @@ def test_create_vpcro_no_program(bootstrapped_verified_program, user):
     with pytest.raises(VerifiedProgramNoEnrollmentError) as exc:
         create_verified_program_course_run_enrollment(request, courserun, program)
 
-    assert "No verified enrollment" in str(exc.value)
+    assert "No upgraded enrollment" in str(exc.value)
 
 
 def test_create_vpcro_run_not_in_program(bootstrapped_verified_program, user):
@@ -1317,7 +1320,7 @@ def test_create_vpcro_run_not_in_program(bootstrapped_verified_program, user):
     """
     (program, _, _, _, _) = bootstrapped_verified_program
     ProgramEnrollmentFactory.create(
-        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        program=program, user=user, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
     )
     other_run = CourseRunFactory.create()
 
@@ -1347,7 +1350,7 @@ def test_create_vpcro_bad_basket(
     (program, _, _, courserun, _) = bootstrapped_verified_program
 
     prog_enrollment = ProgramEnrollmentFactory.create(
-        program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        program=program, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
     )
 
     request = RequestFactory().get("/")

@@ -37,7 +37,10 @@ from courses.api import (
     deactivate_run_enrollment,
     reconcile_verified_program_enrollments,
 )
-from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
+from courses.constants import (
+    ENROLL_CHANGE_STATUS_UNENROLLED,
+    PROGRAM_ENROLLMENT_UPGRADE_MODE,
+)
 from courses.exceptions import EnrollmentCreationFailedError, EnrollmentError
 from courses.models import (
     Course,
@@ -865,7 +868,7 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
     ]
 
     should_create_audit_enrollment = (
-        program_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        program_enrollment.enrollment_mode != PROGRAM_ENROLLMENT_UPGRADE_MODE
         or not in_program
         or not run.is_upgradable
     )
@@ -873,7 +876,7 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
     effective_enrollment_mode = (
         EDX_ENROLLMENT_AUDIT_MODE
         if should_create_audit_enrollment
-        else program_enrollment.enrollment_mode
+        else EDX_ENROLLMENT_VERIFIED_MODE
     )
 
     if CourseRunEnrollment.objects.filter(
@@ -1032,7 +1035,7 @@ def add_verified_program_course_enrollment(request, courserun_id: str):
     verified_program_enrollments = [
         enrollment
         for enrollment in program_enrollments
-        if enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        if enrollment.enrollment_mode == PROGRAM_ENROLLMENT_UPGRADE_MODE
     ]
 
     reconcile_verified_program_enrollments(
