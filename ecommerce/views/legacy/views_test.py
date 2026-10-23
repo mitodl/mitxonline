@@ -74,6 +74,7 @@ from main.constants import (
     USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_ENROLL_FAILED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
     USER_MSG_TYPE_PROFILE_INCOMPLETE,
@@ -1772,6 +1773,42 @@ def test_checkout_interstitial_incomplete_profile(
         {"type": USER_MSG_TYPE_PROFILE_INCOMPLETE}
     )
     assert not PendingOrder.objects.filter(purchaser=user).exists()
+
+
+@pytest.mark.parametrize(
+    ("missing_fields", "expected_url", "expected_message"),
+    [
+        (["email"], "/cart/", USER_MSG_TYPE_ENROLL_FAILED),
+        (
+            ["email", "last_name"],
+            "/cart/?profile_incomplete=last_name",
+            USER_MSG_TYPE_PROFILE_INCOMPLETE,
+        ),
+    ],
+)
+def test_checkout_interstitial_rejected_email(  # noqa: PLR0913
+    mocker, user, user_client, missing_fields, expected_url, expected_message
+):
+    """
+    The cart's profile dialog can't edit the email address, so a rejection of
+    only that sends the learner to support rather than to an empty dialog.
+    """
+    mocker.patch(
+        "ecommerce.views.legacy.api.generate_checkout_payload",
+        return_value={
+            "profile_incomplete": True,
+            "error": USER_MSG_TYPE_PROFILE_INCOMPLETE,
+            "missing_fields": missing_fields,
+        },
+    )
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+    assert resp.url == expected_url
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": expected_message}
+    )
 
 
 @pytest.mark.skip_nplusone_check
