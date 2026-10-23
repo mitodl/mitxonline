@@ -1714,6 +1714,7 @@ def test_defer_enrollment(  # noqa: PLR0913
                         change_status=None,
                         keep_failed_enrollments=keep_failed_enrollments,
                         mode=EDX_ENROLLMENT_VERIFIED_MODE,
+                        skip_compliance_check=True,
                     ),
                     call(
                         user=existing_enrollment.user,
@@ -1721,6 +1722,7 @@ def test_defer_enrollment(  # noqa: PLR0913
                         change_status=ENROLL_CHANGE_STATUS_DEFERRED,
                         keep_failed_enrollments=keep_failed_enrollments,
                         mode=EDX_ENROLLMENT_AUDIT_MODE,
+                        skip_compliance_check=True,
                     ),
                 ]
             )
@@ -1739,6 +1741,128 @@ def test_defer_enrollment(  # noqa: PLR0913
             assert patched_deactivate_run_enrollment.call_count == 1
         else:
             assert patched_deactivate_run_enrollment.call_count == 0
+
+
+def test_defer_enrollment_skips_live_compliance_check(settings, mocker, course):
+    """
+    A support-initiated deferral goes through for a learner whose profile can't
+    be screened yet, and never calls CyberSource (hq#13766).
+    """
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = True
+    from_run, to_run = CourseRunFactory.create_batch(2, course=course)
+    existing_enrollment = CourseRunEnrollmentFactory.create(
+        run=from_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    user = existing_enrollment.user
+    user.legal_address.street_address_1 = ""
+    user.legal_address.save()
+    patched_verify = mocker.patch("courses.api.verify_user_with_exports")
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    _, to_enrollment = defer_enrollment(
+        user, from_run.courseware_id, to_run.courseware_id, force=True
+    )
+
+    patched_verify.assert_not_called()
+    assert to_enrollment.run == to_run
+    assert to_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+
+
+def test_defer_enrollment_blocked_by_prior_decline(settings, mocker, course):
+    """A learner CyberSource declined can't be deferred into a new run."""
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = True
+    from_run, to_run = CourseRunFactory.create_batch(2, course=course)
+    existing_enrollment = CourseRunEnrollmentFactory.create(
+        run=from_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    user = existing_enrollment.user
+    audit_enrollment = CourseRunEnrollmentFactory.create(
+        user=user, run=to_run, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+    ExportComplianceLogFactory.create(
+        user=user, decision=ExportComplianceDecision.DECLINED
+    )
+    patched_verify = mocker.patch("courses.api.verify_user_with_exports")
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    with pytest.raises(ExportComplianceError):
+        defer_enrollment(user, from_run.courseware_id, to_run.courseware_id, force=True)
+
+    patched_verify.assert_not_called()
+    existing_enrollment.refresh_from_db()
+    assert existing_enrollment.active is True
+    assert existing_enrollment.change_status is None
+    audit_enrollment.refresh_from_db()
+    assert audit_enrollment.active is True
+
+
+@pytest.mark.parametrize("active", [True, False])
+def test_defer_enrollment_without_target_and_prior_decline(
+    settings, mocker, course, active
+):
+    """
+    With no target run, a declined learner's active enrollment is still
+    downgraded, but an inactive one isn't reactivated.
+    """
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = True
+    existing_enrollment = CourseRunEnrollmentFactory.create(
+        run=CourseRunFactory.create(course=course),
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=active,
+    )
+    user = existing_enrollment.user
+    ExportComplianceLogFactory.create(
+        user=user, decision=ExportComplianceDecision.DECLINED
+    )
+    patched_verify = mocker.patch("courses.api.verify_user_with_exports")
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    if active:
+        deferred_enrollment, _ = defer_enrollment(
+            user, existing_enrollment.run.courseware_id, None
+        )
+        assert deferred_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        assert deferred_enrollment.change_status == ENROLL_CHANGE_STATUS_DEFERRED
+    else:
+        with pytest.raises(ExportComplianceError):
+            defer_enrollment(user, existing_enrollment.run.courseware_id, None)
+        existing_enrollment.refresh_from_db()
+        assert existing_enrollment.active is False
+
+    patched_verify.assert_not_called()
+
+
+@pytest.mark.parametrize("compliance_enabled", [True, False])
+def test_defer_enrollment_compliance_flag(settings, mocker, course, compliance_enabled):
+    """With no decline on file the deferral proceeds, flag on or off."""
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = compliance_enabled
+    from_run, to_run = CourseRunFactory.create_batch(2, course=course)
+    existing_enrollment = CourseRunEnrollmentFactory.create(
+        run=from_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    ExportComplianceLogFactory.create(
+        user=existing_enrollment.user, decision=ExportComplianceDecision.INVALID_REQUEST
+    )
+    patched_verify = mocker.patch("courses.api.verify_user_with_exports")
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    _, to_enrollment = defer_enrollment(
+        existing_enrollment.user,
+        from_run.courseware_id,
+        to_run.courseware_id,
+        force=True,
+    )
+
+    patched_verify.assert_not_called()
+    assert to_enrollment.run == to_run
 
 
 def test_defer_enrollment_validation(mocker, user):
@@ -1809,6 +1933,7 @@ def test_defer_enrollment_validation(mocker, user):
                 change_status=None,
                 keep_failed_enrollments=True,
                 mode=EDX_ENROLLMENT_VERIFIED_MODE,
+                skip_compliance_check=True,
             ),
             call(
                 user=user,
@@ -1816,6 +1941,7 @@ def test_defer_enrollment_validation(mocker, user):
                 change_status=ENROLL_CHANGE_STATUS_DEFERRED,
                 keep_failed_enrollments=True,
                 mode=EDX_ENROLLMENT_AUDIT_MODE,
+                skip_compliance_check=True,
             ),
         ]
     )
