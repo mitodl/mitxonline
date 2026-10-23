@@ -203,8 +203,8 @@ def capture_previous_upgrade_deadline(
     Reads the value straight from the database rather than snapshotting on
     post_init, which keeps this correct for instances built with .only()/.defer(),
     reused across saves, or refreshed in place. That costs one extra small query
-    per CourseRun save; runs are saved by nightly syncs and staff edits, never in
-    a per-learner hot path.
+    per save that may change the deadline; runs are saved by nightly syncs and
+    staff edits, never in a per-learner hot path.
     """
     if kwargs.get("raw", False):
         # Fixture loading: the DB may not be consistent, and post_save ignores

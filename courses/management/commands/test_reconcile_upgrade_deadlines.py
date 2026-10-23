@@ -345,3 +345,26 @@ def test_delay_between_requests(mocker, mock_verified_mode):
 
     assert mock_sleep.call_count == 2
     mock_sleep.assert_called_with(1.5)
+
+
+@pytest.mark.parametrize(
+    "result",
+    [UpgradeDeadlineSyncResult.UNCHANGED, UpgradeDeadlineSyncResult.NO_VERIFIED_MODE],
+)
+def test_fix_only_counts_a_pin_that_sent_an_update(mocker, mock_verified_mode, result):
+    """
+    If edX changes between the report and the pin (a queued task pinned it, or
+    the mode was deleted), nothing is sent, and the row isn't marked fixed.
+    """
+    deadline = now_in_utc().replace(microsecond=0) + timedelta(days=10)
+    run = CourseRunFactory.create(upgrade_deadline=deadline)
+    mock_verified_mode.return_value = _verified_mode(deadline, is_explicit=False)
+    mocker.patch(
+        f"{MODULE}.sync_courserun_upgrade_deadline_to_edx", return_value=result
+    )
+
+    rows, err = _run_command(run=run.courseware_id, fix=True)
+
+    assert rows[0]["fixed"] == ""
+    assert f"{run.courseware_id}: not pinned: {result}" in err
+    assert "Fixed: 0" in err

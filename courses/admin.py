@@ -533,7 +533,10 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         models.TextField: {"widget": TextInput(attrs={"size": "100"})},
     }
 
-    actions = ["populate_verifiable_credentials_for_courserun"]
+    actions = [
+        "populate_verifiable_credentials_for_courserun",
+        "push_upgrade_deadline_to_edx",
+    ]
 
     inlines = [
         CourseRunContractPageInline,
@@ -552,6 +555,34 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
             )
         )
         self.populate_verifiable_credentials_for_certificate(request, certificates)
+
+    @admin.action(description="Push upgrade deadline to edX", permissions=["change"])
+    def push_upgrade_deadline_to_edx(self, request, queryset):
+        """
+        Queue a push of each selected run's upgrade deadline to edX.
+
+        Saving only pushes a deadline that changed, so this is the way to send
+        one that didn't: a run added after its edX course existed, an edx_missing
+        run, or a push that failed.
+        """
+        from courses.tasks import sync_courserun_upgrade_deadline  # noqa: PLC0415
+
+        run_ids = list(
+            queryset.filter(upgrade_deadline__isnull=False).values_list("id", flat=True)
+        )
+        for run_id in run_ids:
+            sync_courserun_upgrade_deadline.delay(run_id)
+
+        skipped = queryset.count() - len(run_ids)
+        messages.info(
+            request,
+            f"Queued an upgrade deadline push to edX for {len(run_ids)} run(s)."
+            + (
+                f" Skipped {skipped} run(s) with no upgrade deadline."
+                if skipped
+                else ""
+            ),
+        )
 
     def get_queryset(self, request):  # noqa: ARG002
         """Use the all_objects manager so we can see source runs."""
@@ -579,8 +610,9 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
                     (
                         f"New runs aren't pushed to edX, so the upgrade deadline "
                         f"for {obj.courseware_id} is saved in MITx Online only. If "
-                        f"this run already exists in edX, change the deadline here "
-                        f"to push it."
+                        f"this run already exists in edX, select it in the course "
+                        f'run list and run the "Push upgrade deadline to edX" '
+                        f"action."
                     ),
                 )
             return

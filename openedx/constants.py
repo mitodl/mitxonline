@@ -74,7 +74,8 @@ class UpgradeDeadlineSyncResult(StrEnum):
 # entirely, which means a cleared deadline is silently ignored rather than
 # erroring. Neither path can clear the deadline, so we detect the case and tell
 # the operator to do it by hand.
-# Shared by the task log and the admin warning, so the two don't drift apart.
+# Shared by the sync log (openedx.api.sync_courserun_upgrade_deadline_to_edx) and
+# the admin warning, so the two don't drift apart.
 CANNOT_CLEAR_DEADLINE_HINT = (
     "edX's course modes API cannot unset an existing deadline. Clear it by hand "
     "in the edX Django admin under Course Modes."

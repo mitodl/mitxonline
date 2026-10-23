@@ -8,9 +8,9 @@ here. This command lists those runs, and with --fix copies the edX date into
 MITx Online.
 
 Copying goes from edX to MITx Online, never the other way: some values here are
-known to be wrong, and pushing them would overwrite correct dates in edX. The
-one push --fix makes is for unpinned runs, where both sides already match: it
-sends edX its own date back so edX marks it explicit.
+known to be wrong, and pushing them would overwrite correct dates in edX. Every
+push --fix causes sends edX its own date back, so edX marks it explicit:
+directly for unpinned runs, and through the save signal for runs it fixes.
 """
 
 import csv
@@ -29,6 +29,7 @@ from openedx.api import (
     get_edx_verified_mode,
     sync_courserun_upgrade_deadline_to_edx,
 )
+from openedx.constants import UpgradeDeadlineSyncResult
 
 STATUS_OK = "ok"
 # Both have the same deadline, but edX hasn't marked it explicit, so every
@@ -165,7 +166,7 @@ class Command(BaseCommand):
 
         if status == STATUS_UNPINNED:
             try:
-                sync_courserun_upgrade_deadline_to_edx(run, client=client)
+                result = sync_courserun_upgrade_deadline_to_edx(run, client=client)
             except RequestException as exc:
                 self.stderr.write(
                     self.style.ERROR(
@@ -174,6 +175,11 @@ class Command(BaseCommand):
                     )
                 )
                 return "failed"
+            if result != UpgradeDeadlineSyncResult.UPDATED:
+                # edX changed since compare() (a queued task pinned it, or the
+                # mode was deleted), so nothing was sent.
+                self.stderr.write(f"{run.courseware_id}: not pinned: {result}")
+                return ""
             return "yes"
 
         return ""
@@ -202,8 +208,8 @@ class Command(BaseCommand):
             try:
                 status, edx_deadline = self.compare(run, client)
             except RequestException as exc:
-                # Keep going; one bad run (missing in edX, a 5xx) shouldn't stop
-                # the report.
+                # Keep going; one edX request failure (e.g. a 5xx or timeout)
+                # shouldn't stop the report.
                 self.stderr.write(
                     self.style.ERROR(
                         f"{run.courseware_id}: {type(exc).__name__}: {exc}"
@@ -237,7 +243,7 @@ class Command(BaseCommand):
             f"Checked {len(runs)} run(s). {summary or 'nothing to check'}. "
             f"Fixed: {fixed_count}"
             + (f", failed: {failed_count}" if failed_count else "")
-            + ("" if fix else " (run with --fix to copy edX dates into MITx Online)")
+            + ("" if fix else " (run with --fix to apply)")
         )
         if counts.get(STATUS_ERROR) or failed_count:
             # The CSV is already written; fail so a script running this can tell.

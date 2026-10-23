@@ -439,3 +439,48 @@ def test_courserun_admin_add_warns_deadline_not_pushed(
         assert "New runs aren't pushed to edX" in mock_messages.warning.call_args[0][1]
     else:
         mock_messages.warning.assert_not_called()
+
+
+def test_courserun_admin_push_upgrade_deadline_action(rf, admin_user, mocker):
+    """
+    The action queues a push for each selected run with a deadline, even when
+    the deadline hasn't changed, and skips runs without one.
+    """
+    mock_push = mocker.patch("courses.tasks.sync_courserun_upgrade_deadline.delay")
+    mock_messages = mocker.patch("courses.admin.messages")
+    with_deadline = CourseRunFactory.create(
+        upgrade_deadline=now_in_utc() + timedelta(days=10)
+    )
+    without_deadline = CourseRunFactory.create(upgrade_deadline=None)
+    request = rf.post("/")
+    request.user = admin_user
+
+    CourseRunAdmin(CourseRun, django_admin.site).push_upgrade_deadline_to_edx(
+        request,
+        CourseRun.all_objects.filter(id__in=[with_deadline.id, without_deadline.id]),
+    )
+
+    mock_push.assert_called_once_with(with_deadline.id)
+    message = mock_messages.info.call_args[0][1]
+    assert "Queued an upgrade deadline push to edX for 1 run(s)" in message
+    assert "Skipped 1 run(s) with no upgrade deadline" in message
+
+
+def test_courserun_admin_add_warning_points_to_push_action(rf, admin_user, mocker):
+    """The add warning tells staff how to push the deadline they just entered."""
+    mocker.patch("courses.signals.transaction.on_commit")
+    mock_messages = mocker.patch("courses.admin.messages")
+    run = CourseRunFactory.build(
+        course=CourseFactory.create(),
+        upgrade_deadline=now_in_utc() + timedelta(days=10),
+    )
+    request = rf.post("/")
+    request.user = admin_user
+
+    CourseRunAdmin(CourseRun, django_admin.site).save_model(
+        request, run, mocker.Mock(changed_data=["upgrade_deadline"]), change=False
+    )
+
+    message = mock_messages.warning.call_args[0][1]
+    assert '"Push upgrade deadline to edX"' in message
+    assert "change the deadline here" not in message
