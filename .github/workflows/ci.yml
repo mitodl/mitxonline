@@ -184,7 +184,7 @@ jobs:
       - name: Setup NodeJS
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version: "20.18"
+          node-version: "20.20"
 
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
