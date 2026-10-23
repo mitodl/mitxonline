@@ -55,7 +55,6 @@ from ecommerce.exceptions import (
     VerifiedProgramInvalidBasketError,
     VerifiedProgramInvalidOrderError,
     VerifiedProgramNoEnrollmentError,
-    VerifiedProgramNoEntitlementError,
     VerifiedProgramNoProductError,
 )
 from ecommerce.models import (
@@ -1120,27 +1119,16 @@ class CheckoutProductView(RedirectView):
             )
         except (
             VerifiedProgramNoEnrollmentError,
-            VerifiedProgramNoEntitlementError,
             VerifiedProgramCourseNotInProgramError,
             VerifiedProgramNoProductError,
             VerifiedProgramInvalidBasketError,
             VerifiedProgramInvalidOrderError,
-        ) as exc:
-            if isinstance(exc, VerifiedProgramNoEntitlementError):
-                # Expected when the program wasn't purchased or its one
-                # verified run for this course is used up - the learner pays
-                # for this run through the normal basket.
-                log.info(
-                    "No program entitlement for user id %s, run %s; using the basket",
-                    self.request.user.id,
-                    run.courseware_id,
-                )
-            else:
-                log.exception(
-                    "Failed to create verified program course enrollment for user id %s, run %s",
-                    self.request.user.id,
-                    run.courseware_id,
-                )
+        ):
+            log.exception(
+                "Failed to create verified program course enrollment for user id %s, run %s",
+                self.request.user.id,
+                run.courseware_id,
+            )
             return None
 
         return reverse("user-dashboard")

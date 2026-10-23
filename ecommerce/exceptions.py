@@ -55,12 +55,3 @@ class VerifiedProgramNoProductError(Exception):
     run that has no active Product to purchase (e.g. it was deactivated, or one
     was never created for individual purchase).
     """
-
-
-class VerifiedProgramNoEntitlementError(Exception):
-    """
-    Raised if a verified enrollment in a program's course run is requested but
-    the learner's program enrollment doesn't entitle them to a free one: they
-    didn't buy the program, or they've already used the program's single
-    verified run for that course.
-    """
