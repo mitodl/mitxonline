@@ -213,6 +213,12 @@ class UserAdmin(DjangoObjectActions, ContribUserAdmin, TimestampedModelAdmin):
 
     change_actions = ["debug_view_link", "clear_sync_errors"]
 
+    def get_change_actions(self, request, object_id, form_url):
+        actions = super().get_change_actions(request, object_id, form_url)
+        if not request.user.is_superuser:
+            actions = [name for name in actions if name != "debug_view_link"]
+        return actions
+
     def get_urls(self):
         custom = [
             path(
@@ -226,10 +232,12 @@ class UserAdmin(DjangoObjectActions, ContribUserAdmin, TimestampedModelAdmin):
     def debug_view(self, request, user_id):
         """Read-only view of the user's data from across the app"""
 
-        debug_user = get_object_or_404(User, pk=user_id)
-
-        if not self.has_view_permission(request, debug_user):
+        # This pulls together data from many models, so it's superuser-only
+        # rather than relying on the per-model view permissions.
+        if not request.user.is_superuser:
             raise PermissionDenied
+
+        debug_user = get_object_or_404(User, pk=user_id)
 
         context = {
             **self.admin_site.each_context(request),

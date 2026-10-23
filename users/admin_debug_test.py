@@ -2,6 +2,7 @@
 
 import pytest
 import reversion
+from django.contrib.auth.models import Permission
 from django.urls import reverse
 from reversion.models import Version
 
@@ -133,15 +134,35 @@ def test_debug_view_requires_staff(client, user):
     assert resp.status_code == 302
 
 
-def test_debug_view_requires_view_permission(client):
-    """Staff without permission to view users should be denied"""
+@pytest.mark.parametrize("grant_view_user", [False, True])
+def test_debug_view_requires_superuser(client, grant_view_user):
+    """Staff who aren't superusers should be denied, even with view_user"""
 
     staff = UserFactory.create(is_staff=True)
+    if grant_view_user:
+        staff.user_permissions.add(Permission.objects.get(codename="view_user"))
     client.force_login(staff)
 
     resp = client.get(_debug_url(staff))
 
     assert resp.status_code == 403
+
+
+def test_debug_view_link_hidden_for_non_superusers(client, admin_client):
+    """The debug view button should only be shown to superusers"""
+
+    user = UserFactory.create()
+    resp = admin_client.get(reverse("admin:users_user_change", args=[user.pk]))
+    assert "debug_view_link" in resp.content.decode()
+
+    staff = UserFactory.create(is_staff=True)
+    staff.user_permissions.add(Permission.objects.get(codename="view_user"))
+    client.force_login(staff)
+
+    resp = client.get(reverse("admin:users_user_change", args=[staff.pk]))
+
+    assert resp.status_code == 200
+    assert "debug_view_link" not in resp.content.decode()
 
 
 def test_debug_view_link_on_change_page(admin_client):
