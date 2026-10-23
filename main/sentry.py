@@ -109,6 +109,42 @@ def _scrub_node(node):
     return node
 
 
+# The export compliance check sends CyberSource the learner's name, address and
+# email (compliance.api._build_bill_to), and that payload sits in frame locals
+# all the way down the stack: as a dict and a JSON string in compliance.api, as
+# the SDK's body param through CyberSource.api_client and its signing code in
+# authenticationsdk, and in the callers holding the user and legal address.
+# Neither key-name scrubbing nor a value regex can follow it through every one
+# of those shapes (MITXONLINE-6ZY, 73F), so an event whose stack passes through
+# this code keeps its frames but none of their locals.
+EXPORT_COMPLIANCE_MODULES = ("compliance", "CyberSource", "authenticationsdk")
+
+
+def _iter_stacktrace_frames(event):
+    """Yield every stack frame in the event's exceptions and threads."""
+    for section in ("exception", "threads"):
+        for value in (event.get(section) or {}).get("values") or []:
+            yield from (value.get("stacktrace") or {}).get("frames") or []
+
+
+def _is_export_compliance_frame(frame):
+    """Return True for a frame in our compliance app or the CyberSource SDK."""
+    module = frame.get("module") or ""
+    return any(
+        module == name or module.startswith(f"{name}.")
+        for name in EXPORT_COMPLIANCE_MODULES
+    )
+
+
+def scrub_export_compliance_locals(event):
+    """Drop every frame's locals from an event raised through export compliance code."""
+    frames = list(_iter_stacktrace_frames(event))
+    if any(_is_export_compliance_frame(frame) for frame in frames):
+        for frame in frames:
+            frame.pop("vars", None)
+    return event
+
+
 def before_send(event, hint):
     """
     Filter or transform events before they're sent to Sentry
@@ -125,7 +161,7 @@ def before_send(event, hint):
         if isinstance(exc_value, SHUTDOWN_ERRORS):
             # so we don't want to report expected shutdown errors to sentry
             return None
-    return scrub_pg_details(event)
+    return scrub_pg_details(scrub_export_compliance_locals(event))
 
 
 def init_sentry(  # noqa: PLR0913

@@ -12,6 +12,7 @@ from sentry_sdk.transport import Transport
 from main.sentry import (
     before_send,
     build_event_scrubber,
+    scrub_export_compliance_locals,
     scrub_pg_detail,
     scrub_pg_details,
     scrub_secret_values,
@@ -316,3 +317,68 @@ def test_real_sdk_keeps_the_oidc_secret_out(scrubbing_sentry_transport):
     event_json = json.dumps(scrubbing_sentry_transport.events[0])
     assert OIDC_SECRET not in event_json
     assert "Keycloak said no" in event_json
+
+
+LEARNER_ADDRESS = "77 Massachusetts Ave"
+
+
+def _exception_event(*modules):
+    """Build an event whose stack has one frame per module, each with locals."""
+    return {
+        "exception": {
+            "values": [
+                {
+                    "value": "400 Bad Request",
+                    "stacktrace": {
+                        "frames": [
+                            {
+                                "module": module,
+                                "function": "f",
+                                "vars": {
+                                    "body": f'{{"address1": "{LEARNER_ADDRESS}"}}'
+                                },
+                            }
+                            for module in modules
+                        ]
+                    },
+                }
+            ]
+        }
+    }
+
+
+@pytest.mark.parametrize(
+    "module",
+    [
+        "compliance.api",
+        "CyberSource.api_client",
+        "CyberSource.rest",
+        "authenticationsdk.core.Authorization",
+    ],
+)
+def test_export_compliance_event_loses_every_frames_locals(module):
+    """One compliance or SDK frame strips locals from callers and urllib3 too."""
+    event = _exception_event("courses.api", module, "urllib3.connectionpool")
+    before_send(event, {})
+    frames = event["exception"]["values"][0]["stacktrace"]["frames"]
+    assert [frame["module"] for frame in frames] == [
+        "courses.api",
+        module,
+        "urllib3.connectionpool",
+    ]
+    assert all("vars" not in frame for frame in frames)
+
+
+@pytest.mark.parametrize("module", ["courses.api", "compliancefoo", "cybersource"])
+def test_other_events_keep_their_locals(module):
+    """Only the compliance app and the CyberSource SDK trigger the strip."""
+    event = _exception_event(module)
+    scrub_export_compliance_locals(event)
+    assert event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]
+
+
+def test_thread_stacktraces_are_covered():
+    """A logged message with attach_stacktrace puts frames under threads."""
+    event = {"threads": _exception_event("compliance.api", "main.views")["exception"]}
+    scrub_export_compliance_locals(event)
+    assert LEARNER_ADDRESS not in json.dumps(event)
