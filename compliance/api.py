@@ -31,7 +31,7 @@ from nacl.encoding import Base64Encoder
 from nacl.public import PublicKey, SealedBox
 
 from compliance.exceptions import ExportComplianceDataError
-from compliance.models import ExportComplianceLog
+from compliance.models import ExportComplianceDecision, ExportComplianceLog
 from main.sentry import EXPORT_COMPLIANCE_USER_TAG
 
 log = logging.getLogger(__name__)
@@ -359,6 +359,30 @@ def get_latest_export_compliance_log(user, run) -> ExportComplianceLog | None:
         .order_by("-created_on")
         .first()
     )
+
+
+def get_unresolved_export_compliance_decline(user) -> ExportComplianceLog | None:
+    """
+    Return the user's most recent DECLINED export compliance log, unless an
+    accepted log was recorded after it.
+
+    INVALID_REQUEST is a problem with the learner's profile data, not a
+    screening result, so it doesn't count here.
+    """
+    logs = ExportComplianceLog.objects.filter(user=user)
+    decline = (
+        logs.filter(decision=ExportComplianceDecision.DECLINED)
+        .order_by("-created_on")
+        .first()
+    )
+    if decline is None:
+        return None
+    if logs.filter(
+        decision__in=ExportComplianceLog.ACCEPTED_DECISIONS,
+        created_on__gt=decline.created_on,
+    ).exists():
+        return None
+    return decline
 
 
 def decrypt_export_compliance_log(
