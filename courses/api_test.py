@@ -1801,6 +1801,44 @@ def test_defer_enrollment_blocked_by_prior_decline(settings, mocker, course):
     assert audit_enrollment.active is True
 
 
+@pytest.mark.parametrize("active", [True, False])
+def test_defer_enrollment_without_target_and_prior_decline(
+    settings, mocker, course, active
+):
+    """
+    With no target run, a declined learner's active enrollment is still
+    downgraded, but an inactive one isn't reactivated.
+    """
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = True
+    existing_enrollment = CourseRunEnrollmentFactory.create(
+        run=CourseRunFactory.create(course=course),
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=active,
+    )
+    user = existing_enrollment.user
+    ExportComplianceLogFactory.create(
+        user=user, decision=ExportComplianceDecision.DECLINED
+    )
+    patched_verify = mocker.patch("courses.api.verify_user_with_exports")
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    if active:
+        deferred_enrollment, _ = defer_enrollment(
+            user, existing_enrollment.run.courseware_id, None
+        )
+        assert deferred_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        assert deferred_enrollment.change_status == ENROLL_CHANGE_STATUS_DEFERRED
+    else:
+        with pytest.raises(ExportComplianceError):
+            defer_enrollment(user, existing_enrollment.run.courseware_id, None)
+        existing_enrollment.refresh_from_db()
+        assert existing_enrollment.active is False
+
+    patched_verify.assert_not_called()
+
+
 @pytest.mark.parametrize("compliance_enabled", [True, False])
 def test_defer_enrollment_compliance_flag(settings, mocker, course, compliance_enabled):
     """With no decline on file the deferral proceeds, flag on or off."""
