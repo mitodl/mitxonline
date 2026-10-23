@@ -19,7 +19,10 @@ import Loader from "../../../components/Loader"
 import { CartItemCard } from "../../../components/CartItemCard"
 import { OrderSummaryCard } from "../../../components/OrderSummaryCard"
 import AddlProfileFieldsForm from "../../../components/forms/AddlProfileFieldsForm"
-import { needsComplianceInfo } from "../../../components/forms/ProfileFormFields"
+import {
+  findStates,
+  needsComplianceInfo
+} from "../../../components/forms/ProfileFormFields"
 
 import {
   cartQuery,
@@ -93,13 +96,24 @@ export class CartPage extends React.Component<Props, CartState> {
   }
 
   async saveProfile(values: Object, { setSubmitting, setErrors }: Object) {
-    const { currentUser, updateProfile } = this.props
+    const { currentUser, updateProfile, countries } = this.props
     const currentYearOfBirth = pathOr(
       null,
       ["user_profile", "year_of_birth"],
       currentUser
     )
-    const profileData: Object = { legal_address: values.legal_address }
+    const legalAddress = { ...values.legal_address }
+    // Only countries with a state list (the US and Canada) can hold a state.
+    // Clear one left over from before: the dialog can't show it to be
+    // corrected, and CyberSource may reject it.
+    if (
+      countries &&
+      legalAddress.state &&
+      !findStates(legalAddress.country, countries)
+    ) {
+      legalAddress.state = ""
+    }
+    const profileData: Object = { legal_address: legalAddress }
     // UserSerializer.update recomputes addl_field_flag from the user_profile
     // payload, so sending year_of_birth alone would clear it.
     if (

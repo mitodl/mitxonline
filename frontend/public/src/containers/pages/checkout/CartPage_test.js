@@ -221,6 +221,35 @@ describe("CartPage", () => {
       sinon.assert.calledWith(setSubmitting, false)
     })
 
+    it("clears a state left over for a country without a state list", async () => {
+      const { inner } = await renderPage({
+        entities: { currentUser: incompleteUser }
+      })
+      inner.find("OrderSummaryCard").prop("onCheckout")("/checkout/to_payment")
+      inner.setProps({
+        countries: [{ code: "GB", name: "United Kingdom", states: [] }]
+      })
+      const legalAddress = {
+        ...incompleteUser.legal_address,
+        country: "GB",
+        state:   "US-MA"
+      }
+
+      await inner
+        .instance()
+        .saveProfile(
+          {
+            legal_address: legalAddress,
+            user_profile:  { year_of_birth: 1990 }
+          },
+          { setSubmitting: sinon.stub() }
+        )
+
+      const { body } = helper.handleRequestStub.lastCall.args[2]
+      assert.equal(body.legal_address.country, "GB")
+      assert.equal(body.legal_address.state, "")
+    })
+
     it("sends year of birth when the form changed it", async () => {
       const { inner } = await renderPage({
         entities: { currentUser: incompleteUser }

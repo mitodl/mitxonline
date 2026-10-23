@@ -167,7 +167,7 @@ type AddlProfileFieldsProps = {
   requireAddlFields: ?boolean
 }
 
-const findStates = (country: string, countries: Array<Country>) => {
+export const findStates = (country: string, countries: Array<Country>) => {
   if (!countries) {
     return null
   }
