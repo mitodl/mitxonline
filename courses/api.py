@@ -909,6 +909,10 @@ def defer_enrollment(  # noqa: C901
     )
 
     if to_run is None:
+        if not from_enrollment.active:
+            # create_run_enrollments reactivates an inactive enrollment, so this
+            # grants access like enrolling in a new run would.
+            _verify_no_export_compliance_decline(user, from_enrollment.run)
         deferred_enrollments, _ = create_run_enrollments(
             user=user,
             runs=[from_enrollment.run],
