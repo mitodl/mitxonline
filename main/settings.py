@@ -1346,6 +1346,21 @@ OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET = get_string(
     description="OAuth2 client secret for retirement service worker",
 )
 
+OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_ID = get_string(
+    name="OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_ID",
+    default=None,
+    description=(
+        "OAuth2 client id whose client-credentials JWT manages enrollments through the "
+        "Open edX v2 enrollment API. The application's user must be global staff. When "
+        "unset, enrollments use the v1 API with OPENEDX_SERVICE_WORKER_API_TOKEN."
+    ),
+)
+OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_SECRET = get_string(
+    name="OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_SECRET",
+    default=None,
+    description="OAuth2 client secret for OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_ID",
+)
+
 EDX_API_CLIENT_TIMEOUT = get_int(
     name="EDX_API_CLIENT_TIMEOUT",
     default=60,

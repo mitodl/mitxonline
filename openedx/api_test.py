@@ -13,6 +13,7 @@ import pytest
 import requests
 import responses
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from edx_api.course_runs.exceptions import CourseRunAPIError
 from freezegun import freeze_time
@@ -34,6 +35,7 @@ from openedx.api import (
     OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS,
     OPENEDX_NOTIFICATION_PREFERENCES_PATH,
     OPENEDX_REGISTRATION_VALIDATION_PATH,
+    _is_permanent_enrollment_failure,
     bulk_retire_edx_users,
     create_edx_auth_token,
     create_edx_user,
@@ -43,6 +45,7 @@ from openedx.api import (
     generate_unique_username,
     get_edx_api_client,
     get_edx_api_course_list_client,
+    get_edx_api_enrollments_client,
     get_edx_course_outline,
     get_edx_retirement_service_client,
     get_notification_preferences,
@@ -69,6 +72,7 @@ from openedx.constants import (
     EDX_ENROLLMENT_AUDIT_MODE,
     EDX_ENROLLMENT_VERIFIED_MODE,
     OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES,
+    OPENEDX_JWT_EXPIRY_MARGIN_SECONDS,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
     OPENEDX_USERNAME_MAX_LEN,
     PLATFORM_EDX,
@@ -1119,6 +1123,132 @@ def test_get_edx_api_course_list_client(mocker, settings, has_client_credentials
         mock_post.assert_not_called()
 
 
+@pytest.fixture
+def enrollments_v2_settings(settings):
+    """Configure the enrollments service worker, which switches enrollments to v2"""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_ID = "enrollments_client_id"
+    settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_SECRET = (
+        "enrollments_client_secret"  # noqa: S105
+    )
+    cache.clear()
+    yield settings
+    cache.clear()
+
+
+def test_get_edx_api_enrollments_client_v1(mocker, settings):
+    """Without the enrollments service worker, enrollments use v1 and the static token"""
+    settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_ID = None
+    settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_SECRET = None
+    mock_post = mocker.patch("openedx.api.requests.post")
+    mock_service_client = mocker.patch("openedx.api.get_edx_api_service_client")
+
+    enrollments_client = get_edx_api_enrollments_client()
+
+    assert enrollments_client == mock_service_client.return_value.enrollments
+    mock_post.assert_not_called()
+
+
+def test_get_edx_api_enrollments_client_v2(mocker, enrollments_v2_settings):
+    """
+    With the enrollments service worker, enrollments use v2 with a
+    client-credentials JWT, which is reused until shortly before it expires
+    """
+    mock_resp = mocker.Mock()
+    mock_resp.json.return_value = {"access_token": "a_jwt", "expires_in": 3600}
+    mock_post = mocker.patch("openedx.api.requests.post", return_value=mock_resp)
+    # edx-api-client 1.14.0 predates EdxApi.enrollments_v2
+    mock_edx_api = mocker.patch("openedx.api.EdxApi")
+    mock_cache_set = mocker.spy(cache, "set")
+
+    first_client = get_edx_api_enrollments_client()
+    second_client = get_edx_api_enrollments_client()
+
+    mock_post.assert_called_once()
+    assert mock_post.call_args.kwargs["data"] == {
+        "grant_type": "client_credentials",
+        "client_id": "enrollments_client_id",
+        "client_secret": "enrollments_client_secret",
+        "token_type": "jwt",
+    }
+    assert mock_cache_set.call_args.args[1:] == (
+        "a_jwt",
+        3600 - OPENEDX_JWT_EXPIRY_MARGIN_SECONDS,
+    )
+    assert mock_edx_api.call_count == 2
+    for edx_api_call in mock_edx_api.call_args_list:
+        assert edx_api_call.args == ({"access_token": "a_jwt"}, "http://example.com")
+    assert first_client == second_client == mock_edx_api.return_value.enrollments_v2
+
+
+def test_enroll_in_edx_course_runs_v2(mocker, enrollments_v2_settings):
+    """enroll_in_edx_course_runs uses one enrollments client for all the runs"""
+    user = UserFactory.create()
+    patched_enrollments_client = mocker.patch(
+        "openedx.api.get_edx_api_enrollments_client"
+    )
+    enrollments_client = patched_enrollments_client.return_value
+    enrollments_client.get_enrollments.return_value = []
+    enrollments_client.create_student_enrollment.return_value = mocker.Mock(
+        is_active=True
+    )
+    course_runs = CourseRunFactory.build_batch(2)
+
+    enroll_in_edx_course_runs(user, course_runs)
+
+    patched_enrollments_client.assert_called_once_with()
+    assert enrollments_client.create_student_enrollment.call_args_list == [
+        call(
+            course_run.courseware_id,
+            mode=EDX_DEFAULT_ENROLLMENT_MODE,
+            username=user.edx_username,
+            force_enrollment=True,
+        )
+        for course_run in course_runs
+    ]
+
+
+@pytest.mark.parametrize(
+    "token_error",
+    [
+        requests.exceptions.ReadTimeout(),
+        HTTPError(response=MockResponse("", status_code=status.HTTP_401_UNAUTHORIZED)),
+        KeyError("access_token"),
+    ],
+)
+def test_enroll_in_edx_course_runs_v2_token_failure(
+    mocker, enrollments_v2_settings, token_error
+):
+    """
+    A failed JWT request is raised as UnknownEdxApiEnrollException, which
+    enrollment callers handle and which does not count against the retry cap
+    """
+    user = UserFactory.create()
+    mocker.patch("openedx.api.get_edx_api_enrollments_client", side_effect=token_error)
+
+    with pytest.raises(UnknownEdxApiEnrollException) as exc_info:
+        enroll_in_edx_course_runs(user, CourseRunFactory.build_batch(2))
+
+    assert exc_info.value.base_exc is token_error
+    assert _is_permanent_enrollment_failure(exc_info.value) is False
+
+
+def test_unenroll_edx_course_run_v2(mocker, enrollments_v2_settings):
+    """unenroll_edx_course_run deactivates through the enrollments client"""
+    run_enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
+    patched_enrollments_client = mocker.patch(
+        "openedx.api.get_edx_api_enrollments_client"
+    )
+
+    deactivated = unenroll_edx_course_run(run_enrollment)
+
+    deactivate = patched_enrollments_client.return_value.deactivate_enrollment
+    deactivate.assert_called_once_with(
+        run_enrollment.run.courseware_id, username=run_enrollment.user.edx_username
+    )
+    assert deactivated == deactivate.return_value
+
+
 @pytest.mark.parametrize(
     ("failure", "expected_level"),
     [
@@ -1856,6 +1986,67 @@ def test_sync_enrollments_with_edx_missing(mocker, user):
     results = sync_enrollments_with_edx(user)
     patched_log_error.assert_called_once()
     assert results == SyncResult()
+
+
+def test_sync_enrollments_with_edx_v2(mocker, enrollments_v2_settings, user):
+    """
+    With the v2 enrollment API, sync_enrollments_with_edx lists the user's
+    enrollments with the service worker's client instead of the user's own token
+    """
+    run = CourseRunFactory.create()
+    patched_user_client = mocker.patch("openedx.api.get_edx_api_client")
+    patched_enrollments_client = mocker.patch(
+        "openedx.api.get_edx_api_enrollments_client"
+    )
+    patched_enrollments_client.return_value.get_student_enrollments.return_value = (
+        mocker.Mock(enrollments={run.courseware_id: mocker.Mock(is_active=True)})
+    )
+
+    results = sync_enrollments_with_edx(user)
+
+    patched_user_client.assert_not_called()
+    patched_enrollments_client.return_value.get_student_enrollments.assert_called_once_with(
+        username=user.edx_username
+    )
+    assert [enrollment.run for enrollment in results.created] == [run]
+
+
+@pytest.mark.parametrize(
+    ("status_code", "skipped"),
+    [
+        (status.HTTP_429_TOO_MANY_REQUESTS, True),
+        (status.HTTP_503_SERVICE_UNAVAILABLE, False),
+    ],
+)
+def test_sync_enrollments_with_edx_v2_rate_limited(
+    mocker, enrollments_v2_settings, user, status_code, skipped
+):
+    """
+    With the v2 enrollment API, a rate-limited sync is skipped, since every
+    learner's sync shares the service user's throttle; other errors still raise
+    """
+    CourseRunEnrollmentFactory.create(user=user, active=True)
+    http_error = HTTPError(response=MockResponse("", status_code=status_code))
+    mocker.patch(
+        "openedx.api.get_edx_api_enrollments_client"
+    ).return_value.get_student_enrollments.side_effect = http_error
+
+    if skipped:
+        assert sync_enrollments_with_edx(user) == SyncResult()
+    else:
+        with pytest.raises(HTTPError):
+            sync_enrollments_with_edx(user)
+
+
+def test_sync_enrollments_with_edx_v2_not_synced(mocker, enrollments_v2_settings, user):
+    """With the v2 enrollment API, a user edX doesn't know yet is skipped without calling edX"""
+    user.openedx_users.update(has_been_synced=False)
+    patched_enrollments_client = mocker.patch(
+        "openedx.api.get_edx_api_enrollments_client"
+    )
+
+    assert sync_enrollments_with_edx(user) == SyncResult()
+    patched_enrollments_client.assert_not_called()
 
 
 def test_sync_enrollments_with_edx_not_synced(mocker, user):
