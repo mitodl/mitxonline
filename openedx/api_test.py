@@ -43,6 +43,7 @@ from openedx.api import (
     generate_unique_username,
     get_edx_api_client,
     get_edx_api_course_list_client,
+    get_edx_api_enrollments_client,
     get_edx_course_outline,
     get_edx_retirement_service_client,
     get_notification_preferences,
@@ -1119,6 +1120,35 @@ def test_get_edx_api_course_list_client(mocker, settings, has_client_credentials
         mock_post.assert_not_called()
 
 
+@pytest.mark.parametrize("has_client_credentials", [True, False])
+def test_get_edx_api_enrollments_client(mocker, settings, has_client_credentials):
+    """
+    get_edx_api_enrollments_client uses the v2 enrollment API with a
+    client-credentials JWT when the enrollments service worker is configured,
+    and the v1 API with the static service worker token otherwise
+    """
+    settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_ID = (
+        "enrollments_client_id" if has_client_credentials else None
+    )
+    settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_SECRET = (
+        "enrollments_client_secret" if has_client_credentials else None
+    )
+    mock_jwt_client = mocker.patch("openedx.api.get_edx_api_jwt_client")
+    mock_service_client = mocker.patch("openedx.api.get_edx_api_service_client")
+
+    enrollments_client = get_edx_api_enrollments_client()
+
+    if has_client_credentials:
+        mock_jwt_client.assert_called_once_with(
+            "enrollments_client_id", "enrollments_client_secret"
+        )
+        mock_service_client.assert_not_called()
+        assert enrollments_client == mock_jwt_client.return_value.enrollments_v2
+    else:
+        mock_jwt_client.assert_not_called()
+        assert enrollments_client == mock_service_client.return_value.enrollments
+
+
 @pytest.mark.parametrize(
     ("failure", "expected_level"),
     [
@@ -1856,6 +1886,48 @@ def test_sync_enrollments_with_edx_missing(mocker, user):
     results = sync_enrollments_with_edx(user)
     patched_log_error.assert_called_once()
     assert results == SyncResult()
+
+
+def test_sync_enrollments_with_edx_v2(mocker, settings, user):
+    """
+    With the v2 enrollment API, sync_enrollments_with_edx lists the user's
+    enrollments with the service worker's client instead of the user's own token
+    """
+    settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_ID = "enrollments_client_id"
+    settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_SECRET = (
+        "enrollments_client_secret"  # noqa: S105
+    )
+    run = CourseRunFactory.create()
+    patched_user_client = mocker.patch("openedx.api.get_edx_api_client")
+    patched_enrollments_client = mocker.patch(
+        "openedx.api.get_edx_api_enrollments_client"
+    )
+    patched_enrollments_client.return_value.get_student_enrollments.return_value = (
+        mocker.Mock(enrollments={run.courseware_id: mocker.Mock(is_active=True)})
+    )
+
+    results = sync_enrollments_with_edx(user)
+
+    patched_user_client.assert_not_called()
+    patched_enrollments_client.return_value.get_student_enrollments.assert_called_once_with(
+        username=user.edx_username
+    )
+    assert [enrollment.run for enrollment in results.created] == [run]
+
+
+def test_sync_enrollments_with_edx_v2_not_synced(mocker, settings, user):
+    """With the v2 enrollment API, a user edX doesn't know yet is skipped without calling edX"""
+    settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_ID = "enrollments_client_id"
+    settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_SECRET = (
+        "enrollments_client_secret"  # noqa: S105
+    )
+    user.openedx_users.update(has_been_synced=False)
+    patched_enrollments_client = mocker.patch(
+        "openedx.api.get_edx_api_enrollments_client"
+    )
+
+    assert sync_enrollments_with_edx(user) == SyncResult()
+    patched_enrollments_client.assert_not_called()
 
 
 def test_sync_enrollments_with_edx_not_synced(mocker, user):

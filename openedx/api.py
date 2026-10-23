@@ -1145,6 +1145,37 @@ def get_edx_course_management_service_client():
     )
 
 
+def use_edx_enrollments_v2():
+    """
+    Whether enrollments go through the Open edX v2 enrollment API.
+
+    The v1 API is deprecated (openedx/openedx-platform#39128) and v2 refuses the
+    static service worker token, because it only accepts JWT or session auth, so
+    v2 needs a client-credentials application of its own.
+    """
+    return bool(
+        settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_ID
+        and settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_SECRET
+    )
+
+
+def get_edx_api_enrollments_client():
+    """
+    Gets an edx api client for managing enrollments on behalf of the service worker
+
+    Returns:
+        CourseEnrollmentsV2 with a client-credentials JWT when
+        use_edx_enrollments_v2() is true, otherwise CourseEnrollments with the
+        static service worker token
+    """
+    if use_edx_enrollments_v2():
+        return get_edx_api_jwt_client(
+            settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_ID,
+            settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_SECRET,
+        ).enrollments_v2
+    return get_edx_api_service_client().enrollments
+
+
 def get_edx_api_course_detail_client():
     """
     Gets an edx api client instance for use with the grades api
@@ -1290,7 +1321,14 @@ def get_edx_grades_with_users(course_run, user=None):
                 yield edx_grade, user
 
 
-def existing_edx_enrollment(user, course_id, mode, is_active=True):  # noqa: FBT002
+def existing_edx_enrollment(
+    user,
+    course_id,
+    mode,
+    is_active=True,  # noqa: FBT002
+    *,
+    enrollments_client=None,
+):
     """
     Returns enrollment object if user is already enrolled in edx course run.
 
@@ -1299,13 +1337,16 @@ def existing_edx_enrollment(user, course_id, mode, is_active=True):  # noqa: FBT
         courseware_id : The course runs to enroll in
         mode (str): The course mode to enroll the user with
         is_active (boolean): Whether the expected course run enrollment is active.
+        enrollments_client (CourseEnrollments): The client to use, so a caller
+            checking several runs fetches one JWT instead of one per run.
+            Defaults to get_edx_api_enrollments_client().
 
     Returns:
         (edx_api.enrollments.models.Enrollment or None):
             The results of enrollments via the edx API client
     """
-    edx_client = get_edx_api_service_client()
-    edx_enrollments = edx_client.enrollments.get_enrollments(
+    enrollments_client = enrollments_client or get_edx_api_enrollments_client()
+    edx_enrollments = enrollments_client.get_enrollments(
         course_id=course_id, usernames=[user.edx_username]
     )
     for enrollment in edx_enrollments:
@@ -1340,7 +1381,7 @@ def enroll_in_edx_course_runs(
         EdxApiEnrollErrorException: Raised if the underlying edX API HTTP request fails
         UnknownEdxApiEnrollException: Raised if an unknown error was encountered during the edX API request
     """
-    edx_client = get_edx_api_service_client()
+    enrollments_client = get_edx_api_enrollments_client()
 
     # repair_faulty_edx_user's own check re-verifies existence against edX
     # over HTTP even when we already know locally that the user is synced
@@ -1363,17 +1404,20 @@ def enroll_in_edx_course_runs(
     for course_run in course_runs:
         try:
             enrollment = existing_edx_enrollment(
-                user, course_run.courseware_id, mode=mode
+                user,
+                course_run.courseware_id,
+                mode=mode,
+                enrollments_client=enrollments_client,
             )
             if enrollment is None:
-                enrollment = edx_client.enrollments.create_student_enrollment(
+                enrollment = enrollments_client.create_student_enrollment(
                     course_run.courseware_id,
                     mode=mode,
                     username=username,
                     force_enrollment=force_enrollment,
                 )
                 if not enrollment.is_active:
-                    enrollment = edx_client.enrollments.create_student_enrollment(
+                    enrollment = enrollments_client.create_student_enrollment(
                         course_run.courseware_id,
                         mode=mode,
                         username=username,
@@ -1517,9 +1561,8 @@ def unenroll_edx_course_run(run_enrollment):
         EdxApiEnrollErrorException: Raised if the underlying edX API HTTP request fails
         UnknownEdxApiEnrollException: Raised if an unknown error was encountered during the edX API request
     """
-    edx_client = get_edx_api_service_client()
     try:
-        deactivated_enrollment = edx_client.enrollments.deactivate_enrollment(
+        deactivated_enrollment = get_edx_api_enrollments_client().deactivate_enrollment(
             run_enrollment.run.courseware_id, username=run_enrollment.user.edx_username
         )
     except HTTPError as exc:
@@ -1559,10 +1602,18 @@ def sync_enrollments_with_edx(
     user: User,
 ) -> SyncResult[courses.models.CourseRunEnrollment]:
     """Syncs enrollment records so that local enrollments match the enrollment data in edX"""
-    client = get_edx_api_client(user)
-    if client is None:
-        return SyncResult()
-    edx_enrollments = client.enrollments.get_student_enrollments()
+    if use_edx_enrollments_v2():
+        # get_edx_api_client returns None for a user edX doesn't know yet.
+        if not user.openedx_user_exists:
+            return SyncResult()
+        edx_enrollments = get_edx_api_enrollments_client().get_student_enrollments(
+            username=user.edx_username
+        )
+    else:
+        client = get_edx_api_client(user)
+        if client is None:
+            return SyncResult()
+        edx_enrollments = client.enrollments.get_student_enrollments()
     local_enrollments = (
         user.courserunenrollment_set(manager="all_objects")
         .filter(user=user)
