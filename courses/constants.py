@@ -16,6 +16,13 @@ PROGRAM_DISPLAY_MODE_CHOICES = [
     (PROGRAM_DISPLAY_MODE_COURSE, PROGRAM_DISPLAY_MODE_COURSE)
 ]
 
+# Program enrollment modes. Program enrollments are either audit or upgraded;
+# an upgraded program enrollment means the learner purchased the program (or
+# was granted it through a B2B contract), which entitles them to verified
+# course run enrollments within it. This is deliberately not edX's "verified"
+# mode, which keeps its course run meaning, and must not be used for runs.
+PROGRAM_ENROLLMENT_UPGRADE_MODE = "upgrade"
+
 PROGRAM_TEXT_ID_PREFIX = "program-"
 ENROLLABLE_ITEM_ID_SEPARATOR = "+"
 TEXT_ID_RUN_TAG_PATTERN = rf"\{ENROLLABLE_ITEM_ID_SEPARATOR}(?P<run_tag>R\d+)$"

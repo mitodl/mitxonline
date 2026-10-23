@@ -20,6 +20,7 @@ from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
 from compliance.api import verify_user_with_exports
+from courses.constants import PROGRAM_ENROLLMENT_UPGRADE_MODE
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
@@ -947,7 +948,7 @@ def test_checkout_product_with_no_active_product_uses_cart(user, user_client):
     ProgramEnrollmentFactory.create(
         program=program,
         user=user,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
         active=True,
     )
 
@@ -979,7 +980,7 @@ def test_checkout_product_with_verified_program_enrollment(user, user_client):
     ProgramEnrollmentFactory.create(
         program=program,
         user=user,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
         active=True,
     )
 
@@ -1013,7 +1014,7 @@ def test_checkout_product_with_existing_verified_run_enrollment(user, user_clien
     ProgramEnrollmentFactory.create(
         program=program,
         user=user,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
         active=True,
     )
     CourseRunEnrollmentFactory.create(
@@ -2078,7 +2079,7 @@ def test_program_product_purchasing(user, user_drf_client):
     assert "no_checkout" in checkout_payload
 
     assert ProgramEnrollment.objects.filter(
-        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        user=user, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
     ).exists()
 
 

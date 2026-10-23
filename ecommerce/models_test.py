@@ -20,6 +20,7 @@ from reversion.models import Version
 from b2b.factories import ContractPageFactory
 from b2b.models import DiscountContractAttachmentRedemption
 from compliance.api import ExportComplianceResult
+from courses.constants import PROGRAM_ENROLLMENT_UPGRADE_MODE
 from courses.factories import (
     BlockedCountryFactory,
     CourseRunEnrollmentFactory,
@@ -2338,7 +2339,7 @@ def test_link_b2b_course_run_contracts_skips_programs(user):
     contract = ContractPageFactory.create()
     program = ProgramFactory.create(b2b_only=True)
     program_enrollment = ProgramEnrollmentFactory.create(
-        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        user=user, program=program, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
     )
 
     line = make_purchase(user, program, Decimal("0.00"))

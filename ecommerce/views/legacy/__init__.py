@@ -38,6 +38,7 @@ from rest_framework.viewsets import (
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.api import is_product_courserun, is_product_program
+from courses.constants import PROGRAM_ENROLLMENT_UPGRADE_MODE
 from courses.models import (
     Course,
     CourseRun,
@@ -1091,7 +1092,7 @@ class CheckoutProductView(RedirectView):
         program_enrollment = (
             ProgramEnrollment.objects.filter(
                 user=self.request.user,
-                enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+                enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
                 active=True,
                 program__all_requirements__course=run.course,
             )
