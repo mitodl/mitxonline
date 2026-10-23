@@ -384,6 +384,11 @@ def verify_user_with_exports(user, run) -> ExportComplianceResult:
     for the same courseware object, from the last 24 hours, or representing
     a prior failed check for this user.
     """
+    # Lets main.sentry identify the learner on an error event without the
+    # email and username send_default_pii would attach. Set before the cache
+    # lookup so a process checking many learners never reports the last one.
+    sentry_sdk.set_tag(EXPORT_COMPLIANCE_USER_TAG, user.global_id)
+
     cached_log = get_latest_export_compliance_log(user, run)
     if cached_log is not None:
         return ExportComplianceResult(
@@ -392,10 +397,6 @@ def verify_user_with_exports(user, run) -> ExportComplianceResult:
             request_id=cached_log.request_id,
             raw=None,
         )
-
-    # Lets main.sentry identify the learner on an error event without the
-    # email and username send_default_pii would attach.
-    sentry_sdk.set_tag(EXPORT_COMPLIANCE_USER_TAG, user.global_id)
 
     client = get_cybersource_client()
     request_payload = _serialize_export_payload(_build_export_payload(user))
