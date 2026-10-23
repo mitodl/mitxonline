@@ -39,7 +39,11 @@ from courses.api import (
     reconcile_verified_program_enrollments,
 )
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
-from courses.exceptions import EnrollmentCreationFailedError, EnrollmentError
+from courses.exceptions import (
+    EnrollmentCreationFailedError,
+    EnrollmentError,
+    ProgramEntitlementUnavailableError,
+)
 from courses.models import (
     Course,
     CourseRun,
@@ -80,7 +84,10 @@ from courses.utils import (
     verified_courserun_exists,
 )
 from ecommerce.api import create_verified_program_course_run_enrollment
-from ecommerce.exceptions import VerifiedProgramInvalidOrderError
+from ecommerce.exceptions import (
+    VerifiedProgramInvalidOrderError,
+    VerifiedProgramNoEntitlementError,
+)
 from ecommerce.models import Product
 from main import features
 from main.pagination import Pagination
@@ -919,6 +926,8 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
         # Checkout refused the order, e.g. an incomplete profile or a compliance
         # denial. The cause is logged where it's detected.
         raise EnrollmentError.from_cause(exc) from exc
+    except VerifiedProgramNoEntitlementError as exc:
+        raise ProgramEntitlementUnavailableError from exc
 
     return _created_enrollment_response(enrollment)
 
@@ -947,6 +956,7 @@ def _created_enrollment_response(enrollment):
         status.HTTP_201_CREATED: CourseRunEnrollmentSerializer,
         status.HTTP_204_NO_CONTENT: None,
         status.HTTP_400_BAD_REQUEST: None,
+        status.HTTP_402_PAYMENT_REQUIRED: None,
         status.HTTP_404_NOT_FOUND: None,
     },
 )
@@ -965,7 +975,8 @@ def add_verified_program_course_enrollment(request, courserun_id: str):
     Some special handling is needed for program-related course run enrollments
     when the learner has an enrollment in the program. The learner should get a
     course run enrollment that matches their program enrollment at no additional
-    charge.
+    charge - but only if they bought the program, and only for one run per
+    course. Otherwise this returns 402 and the run has to be purchased.
     """
 
     program_ids = request.data

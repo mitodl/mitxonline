@@ -87,7 +87,7 @@ from courses.views.test_utils import (
     num_queries_from_programs,
 )
 from courses.views.v2 import CourseViewSet, Pagination, ProgramFilterSet
-from ecommerce.factories import OrderFactory, ProductFactory
+from ecommerce.factories import OrderFactory, ProductFactory, make_paid_program
 from ecommerce.models import OrderStatus, Product
 from main import features
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
@@ -1998,6 +1998,7 @@ def test_add_verified_program_course_enrollment(
                     object_id=program.id,
                     content_type=program_content_type,
                 )
+            make_paid_program(user, program)
     else:
         program = ProgramFactory.create()
 
@@ -2063,6 +2064,7 @@ def test_add_verified_program_course_enrollment_incomplete_profile(
     program = ProgramEnrollmentFactory.create(
         user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
     ).program
+    make_paid_program(user, program)
     course_run = CourseRunFactory.create()
     program.add_requirement(course_run.course)
     with reversion.create_revision():
@@ -2086,6 +2088,50 @@ def test_add_verified_program_course_enrollment_incomplete_profile(
 
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
+
+
+@pytest.mark.skip_nplusone_check
+@responses.activate
+@pytest.mark.parametrize("scenario", ["not_purchased", "course_already_verified"])
+def test_add_verified_program_course_enrollment_no_entitlement(
+    user, user_drf_client, scenario
+):
+    """
+    A verified program enrollment that wasn't bought (e.g. it was upgraded
+    because every course was bought separately), or whose one verified run
+    for the course is used up, gets a 402 so the learner is sent to checkout.
+    Nothing is enrolled or ordered.
+    """
+    program = _verified_program_enrollment_with_product(user)
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        ProductFactory.create(purchasable_object=course_run, price=10)
+
+    if scenario == "course_already_verified":
+        make_paid_program(user, program)
+        CourseRunEnrollmentFactory.create(
+            user=user,
+            run=CourseRunFactory.create(course=course_run.course),
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=False,
+        )
+    initial_order_count = user.orders.count()
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={"courserun_id": course_run.courseware_id},
+        ),
+        data=[program.readable_id],
+    )
+
+    assert resp.status_code == status.HTTP_402_PAYMENT_REQUIRED
+    assert resp.json()["detail"] == "This course run must be purchased."
+    assert not CourseRunEnrollment.all_objects.filter(
+        user=user, run=course_run
+    ).exists()
+    assert user.orders.count() == initial_order_count
 
 
 @pytest.mark.skip_nplusone_check
@@ -2466,6 +2512,10 @@ def test_add_nested_verified_program_course_enrollment(
             user=user,
             enrollment_mode=base_program_enrollment_type,
         )
+        if base_program_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE:
+            # The free run comes from buying the base program; the crogram
+            # enrollment is reconciled from it.
+            make_paid_program(user, base_program)
 
     if crogram_enrollment_type:
         ProgramEnrollmentFactory.create(

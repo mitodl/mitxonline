@@ -70,6 +70,7 @@ from courses.api import (
     get_certificate_grade_eligible_runs,
     get_eligible_program_certificate_candidates,
     get_verifiable_credentials_payload,
+    has_program_course_entitlement,
     import_courserun_from_edx,
     manage_course_run_certificate_access,
     manage_program_certificate_access,
@@ -125,8 +126,10 @@ from courses.models import (
 from ecommerce.factories import (
     DiscountFactory,
     DiscountRedemptionFactory,
+    InternalDiscountFactory,
     OrderFactory,
     ProductFactory,
+    make_paid_program,
 )
 from ecommerce.models import Basket, OrderStatus
 from main import features
@@ -688,6 +691,33 @@ def test_create_program_enrollments_creation_fail(mocker, user):
     assert successful_enrollments == [enrollment]
 
 
+def _verified_run_enrollment(user, course, *, bought=None, active=True):
+    """
+    A verified enrollment in a new run of ``course``. ``bought`` records how
+    the learner got it: None (no purchase, e.g. upgraded by a program
+    purchase), "separately" (a fulfilled order for the run), or "program" (the
+    zero-value order the program entitlement creates, which redeems the
+    program's internal discount).
+    """
+    run = CourseRunFactory.create(course=course)
+    enrollment = CourseRunEnrollmentFactory.create(
+        user=user,
+        run=run,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=active,
+    )
+    if bought:
+        order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+        PaidCourseRun.objects.create(user=user, course_run=run, order=order)
+        if bought == "program":
+            DiscountRedemptionFactory.create(
+                redeemed_by=user,
+                redeemed_order=order,
+                redeemed_discount=InternalDiscountFactory.create(),
+            )
+    return enrollment
+
+
 class TestUpgradeAuditRunEnrollmentsForProgramPurchase:
     """Tests for upgrade_audit_run_enrollments_for_program_purchase"""
 
@@ -889,6 +919,188 @@ class TestUpgradeAuditRunEnrollmentsForProgramPurchase:
         assert result[0].run == audit_run
         verified_enrollment.refresh_from_db()
         assert verified_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+
+    def test_upgrades_one_run_per_course(self, mocker, program_setup, dates):
+        """
+        The program grants one verified run per course, so when the user audits
+        several runs of a course only the latest-starting one is upgraded.
+        """
+        older_run = program_setup.run
+        older_run.start_date = dates.past_10_days
+        older_run.save()
+        newer_run = CourseRunFactory.create(
+            course=older_run.course, start_date=dates.future_10_days
+        )
+        for run in (older_run, newer_run):
+            CourseRunEnrollmentFactory.create(
+                user=program_setup.user,
+                run=run,
+                enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+                active=True,
+            )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert [enrollment.run for enrollment in result] == [newer_run]
+
+    def test_skips_course_already_taken_verified(self, mocker, program_setup):
+        """
+        A course the user already held a verified run of - even one they've
+        unenrolled from - has used its entitlement, so its audit runs stay audit.
+        """
+        CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=CourseRunFactory.create(course=program_setup.run.course),
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=False,
+        )
+        CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert result == []
+
+    def test_upgrades_course_bought_separately(self, mocker, program_setup):
+        """
+        A verified run the user bought separately doesn't use the program's
+        entitlement, so an audit run of the same course is still upgraded.
+        """
+        _verified_run_enrollment(
+            program_setup.user, program_setup.run.course, bought="separately"
+        )
+        CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert [enrollment.run for enrollment in result] == [program_setup.run]
+
+
+class TestHasProgramCourseEntitlement:
+    """Tests for has_program_course_entitlement"""
+
+    @pytest.fixture
+    def program_setup(self, user, program_with_empty_requirements):  # noqa: F811
+        """Set up a program with one required course."""
+        program = program_with_empty_requirements
+        run = CourseRunFactory.create()
+        program.add_requirement(run.course)
+        return SimpleNamespace(program=program, run=run, user=user)
+
+    def test_purchased_program(self, program_setup):
+        """A bought program entitles the learner to a verified run."""
+        make_paid_program(program_setup.user, program_setup.program)
+
+        assert has_program_course_entitlement(
+            program_setup.user, program_setup.program, program_setup.run.course
+        )
+
+    @pytest.mark.parametrize(
+        "order_state", [None, OrderStatus.PENDING, OrderStatus.REFUNDED]
+    )
+    def test_program_not_purchased(self, program_setup, order_state):
+        """
+        Without a fulfilled program purchase - e.g. the program became verified
+        because every course was bought separately - there's no entitlement.
+        """
+        if order_state:
+            make_paid_program(
+                program_setup.user, program_setup.program, state=order_state
+            )
+
+        assert not has_program_course_entitlement(
+            program_setup.user, program_setup.program, program_setup.run.course
+        )
+
+    @pytest.mark.parametrize("active", [True, False])
+    def test_course_already_taken_verified(self, program_setup, active):
+        """
+        Any verified run of the course, active or unenrolled, uses up the
+        entitlement for that course.
+        """
+        make_paid_program(program_setup.user, program_setup.program)
+        CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=CourseRunFactory.create(course=program_setup.run.course),
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=active,
+        )
+
+        assert not has_program_course_entitlement(
+            program_setup.user, program_setup.program, program_setup.run.course
+        )
+
+    @pytest.mark.parametrize(
+        ("bought", "entitled"),
+        [(None, False), ("program", False), ("separately", True)],
+    )
+    def test_separately_bought_run_does_not_use_entitlement(
+        self, program_setup, bought, entitled
+    ):
+        """
+        A verified run the learner bought separately leaves the entitlement
+        unused. One granted by the program - a zero-value order redeeming the
+        program's internal discount - or with no purchase behind it uses it up.
+        """
+        make_paid_program(program_setup.user, program_setup.program)
+        _verified_run_enrollment(
+            program_setup.user, program_setup.run.course, bought=bought
+        )
+
+        assert (
+            has_program_course_entitlement(
+                program_setup.user, program_setup.program, program_setup.run.course
+            )
+            is entitled
+        )
+
+    def test_audit_run_does_not_use_entitlement(self, program_setup):
+        """
+        Audit runs - including verified runs downgraded by a refund - don't use
+        up the entitlement.
+        """
+        make_paid_program(program_setup.user, program_setup.program)
+        CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=CourseRunFactory.create(course=program_setup.run.course),
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        )
+
+        assert has_program_course_entitlement(
+            program_setup.user, program_setup.program, program_setup.run.course
+        )
+
+    def test_ancestor_program_purchase(self, program_setup):
+        """Buying a program that requires this one (nested) counts."""
+        parent = ProgramFactory.create()
+        grandparent = ProgramFactory.create()
+        parent.add_program_requirement(program_setup.program)
+        grandparent.add_program_requirement(parent)
+        make_paid_program(program_setup.user, grandparent)
+
+        assert has_program_course_entitlement(
+            program_setup.user, program_setup.program, program_setup.run.course
+        )
 
 
 class TestDowngradeProgramEnrollmentAndVerifiedRuns:

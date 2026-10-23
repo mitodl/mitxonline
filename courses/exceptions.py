@@ -45,3 +45,16 @@ class EnrollmentError(APIException):
 
 class EnrollmentCreationFailedError(EnrollmentError):
     """Error when the create_run_enrollments fails."""
+
+
+class ProgramEntitlementUnavailableError(APIException):
+    """
+    Raised when a verified program enrollment doesn't entitle the learner to a
+    free verified run of a course: they didn't buy the program, or they already
+    used its one verified run for that course. The learner has to buy the run,
+    so clients should send them to checkout.
+    """
+
+    status_code = status.HTTP_402_PAYMENT_REQUIRED
+    default_detail = "This course run must be purchased."
+    default_code = "program_entitlement_unavailable"
