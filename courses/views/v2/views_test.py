@@ -2090,6 +2090,10 @@ def test_add_verified_program_course_enrollment_incomplete_profile(
     )
 
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "missing_fields": ["street_address_1"],
+    }
     assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
 
 
