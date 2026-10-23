@@ -66,6 +66,7 @@ from main.admin import (
 from main.utils import get_field_names
 from openedx.api import get_edx_api_service_client, get_edx_course_modes
 from openedx.constants import (
+    CANNOT_CLEAR_DEADLINE_HINT,
     EDX_ENROLLMENT_AUDIT_MODE,
     EDX_ENROLLMENT_VERIFIED_MODE,
     OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES,
@@ -532,7 +533,10 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         models.TextField: {"widget": TextInput(attrs={"size": "100"})},
     }
 
-    actions = ["populate_verifiable_credentials_for_courserun"]
+    actions = [
+        "populate_verifiable_credentials_for_courserun",
+        "push_upgrade_deadline_to_edx",
+    ]
 
     inlines = [
         CourseRunContractPageInline,
@@ -552,10 +556,87 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         )
         self.populate_verifiable_credentials_for_certificate(request, certificates)
 
+    @admin.action(description="Push upgrade deadline to edX", permissions=["change"])
+    def push_upgrade_deadline_to_edx(self, request, queryset):
+        """
+        Queue a push of each selected run's upgrade deadline to edX.
+
+        Saving only pushes a deadline that changed, so this is the way to send
+        one that didn't: a run added after its edX course existed, an edx_missing
+        run, or a push that failed.
+        """
+        from courses.tasks import sync_courserun_upgrade_deadline  # noqa: PLC0415
+
+        run_ids = list(
+            queryset.filter(upgrade_deadline__isnull=False).values_list("id", flat=True)
+        )
+        for run_id in run_ids:
+            sync_courserun_upgrade_deadline.delay(run_id)
+
+        skipped = queryset.count() - len(run_ids)
+        messages.info(
+            request,
+            f"Queued an upgrade deadline push to edX for {len(run_ids)} run(s)."
+            + (
+                f" Skipped {skipped} run(s) with no upgrade deadline."
+                if skipped
+                else ""
+            ),
+        )
+
     def get_queryset(self, request):  # noqa: ARG002
         """Use the all_objects manager so we can see source runs."""
 
         return self.model.all_objects
+
+    def save_model(self, request, obj, form, change):
+        """
+        Save the run, then tell the operator what we did about the edX side.
+
+        The push itself is queued by the CourseRun post_save signal so that
+        every write path gets it. This only adds the admin feedback, because a
+        cleared deadline cannot be propagated (edX's course modes API has no way
+        to unset an existing expiration date) and a warning buried in the celery
+        log would never be seen by the person who made the change.
+        """
+        deadline_changed = "upgrade_deadline" in (form.changed_data or [])
+        super().save_model(request, obj, form, change)
+
+        if not change:
+            # New runs aren't pushed (see the CourseRun post_save receiver).
+            if obj.upgrade_deadline is not None:
+                messages.warning(
+                    request,
+                    (
+                        f"New runs aren't pushed to edX, so the upgrade deadline "
+                        f"for {obj.courseware_id} is saved in MITx Online only. If "
+                        f"this run already exists in edX, select it in the course "
+                        f'run list and run the "Push upgrade deadline to edX" '
+                        f"action."
+                    ),
+                )
+            return
+
+        if not deadline_changed:
+            return
+
+        if obj.upgrade_deadline is None:
+            messages.warning(
+                request,
+                (
+                    f"Upgrade deadline cleared for {obj.courseware_id}; edX keeps "
+                    f"any deadline it already has. {CANNOT_CLEAR_DEADLINE_HINT}"
+                ),
+            )
+        else:
+            messages.info(
+                request,
+                (
+                    f"Queued a sync to push the upgrade deadline "
+                    f"{obj.upgrade_deadline} to the edX verified mode of "
+                    f"{obj.courseware_id}."
+                ),
+            )
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """

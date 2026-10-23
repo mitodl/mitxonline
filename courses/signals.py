@@ -4,7 +4,7 @@ Signals for mitxonline course certificates
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models.signals import m2m_changed, post_save
+from django.db.models.signals import m2m_changed, post_save, pre_save
 from django.dispatch import receiver
 
 from courses.api import generate_multiple_programs_certificate
@@ -178,3 +178,107 @@ def purge_fastly_cache_on_program_save(
             surrogate_key, settings.MIT_LEARN_FASTLY_SERVICE_ID
         )
     )
+
+
+# Attribute used to hand the pre-save upgrade_deadline to the post_save
+# receiver. Read it with getattr(..., PREVIOUS_UPGRADE_DEADLINE_ATTR, None): the
+# pre_save receiver doesn't always set it.
+PREVIOUS_UPGRADE_DEADLINE_ATTR = "_previous_upgrade_deadline"
+
+
+@receiver(
+    pre_save,
+    sender=CourseRun,
+    dispatch_uid="courserun_pre_save_capture_upgrade_deadline",
+)
+def capture_previous_upgrade_deadline(
+    sender,  # noqa: ARG001
+    instance,
+    **kwargs,
+):
+    """
+    Stash the currently-persisted upgrade_deadline so post_save can tell whether
+    it actually changed.
+
+    Reads the value straight from the database rather than snapshotting on
+    post_init, which keeps this correct for instances built with .only()/.defer(),
+    reused across saves, or refreshed in place. That costs one extra small query
+    per save that may change the deadline; runs are saved by nightly syncs and
+    staff edits, never in a per-learner hot path.
+    """
+    if kwargs.get("raw", False):
+        # Fixture loading: the DB may not be consistent, and post_save ignores
+        # raw saves anyway.
+        return
+
+    update_fields = kwargs.get("update_fields")
+    if update_fields is not None and "upgrade_deadline" not in update_fields:
+        # This save can't change the deadline; post_save skips it too.
+        return
+
+    if instance.pk is None:
+        # A brand new run has no previous value; post_save keys off `created`.
+        setattr(instance, PREVIOUS_UPGRADE_DEADLINE_ATTR, None)
+        return
+
+    setattr(
+        instance,
+        PREVIOUS_UPGRADE_DEADLINE_ATTR,
+        CourseRun.all_objects.filter(pk=instance.pk)
+        .values_list("upgrade_deadline", flat=True)
+        .first(),
+    )
+
+
+@receiver(
+    post_save,
+    sender=CourseRun,
+    dispatch_uid="courserun_post_save_sync_upgrade_deadline",
+)
+def sync_upgrade_deadline_to_edx_on_save(
+    sender,  # noqa: ARG001
+    instance,
+    created,
+    **kwargs,
+):
+    """
+    Push upgrade_deadline into the run's edX verified mode whenever it changes.
+
+    MITx Online owns this date - it gates checkout via CourseRun.is_upgradable -
+    but edX keeps a separate copy on the verified course mode that nothing was
+    updating. Queueing the push here means the Django admin, management commands
+    and the shell all propagate the change without each needing to remember to.
+
+    Note that queryset.update() does not emit signals, so bulk edits are not
+    pushed to edX. Save each run instead.
+    """
+    if kwargs.get("raw", False):
+        # Fixture loading: the DB may not be in a consistent state and we
+        # certainly do not want to call out to edX.
+        return
+
+    update_fields = kwargs.get("update_fields")
+    if update_fields is not None and "upgrade_deadline" not in update_fields:
+        # The deadline wasn't saved, and pre_save didn't record its old value.
+        return
+
+    if "upgrade_deadline" in instance.get_deferred_fields():
+        # The field was deferred, so instance.upgrade_deadline would trigger a
+        # refetch and we have nothing meaningful to compare against anyway.
+        return
+
+    if created:
+        # A new run usually has no edX course yet - rerun_course_run creates the
+        # CourseRun first and clones it in edX afterwards - so there is no
+        # verified mode to update. push_edx_modes_from_run sets the deadline
+        # when it creates the modes for a rerun.
+        return
+
+    previous = getattr(instance, PREVIOUS_UPGRADE_DEADLINE_ATTR, None)
+    if previous == instance.upgrade_deadline:
+        return
+
+    from courses.tasks import sync_courserun_upgrade_deadline  # noqa: PLC0415
+
+    run_id = instance.id
+    transaction.on_commit(lambda: sync_courserun_upgrade_deadline.delay(run_id))
