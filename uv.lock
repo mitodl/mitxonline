@@ -54,6 +54,9 @@ ol-openedx-course-export = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 mitol-django-openedx = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 mitol-django-scim = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 
+[manifest]
+constraints = [{ name = "certifi", specifier = ">=2026.10.19" }]
+
 [[package]]
 name = "alabaster"
 version = "1.0.0"
