@@ -866,6 +866,7 @@ def downgrade_learner_from_order(order_id):
         keep_failed_enrollments=True,
         mode=EDX_ENROLLMENT_AUDIT_MODE,
         change_status=ENROLL_CHANGE_STATUS_REFUNDED,
+        skip_country_block_check=True,
     )
 
 

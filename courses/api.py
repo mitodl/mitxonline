@@ -220,6 +220,7 @@ def create_run_enrollments(  # noqa: C901, PLR0913
     keep_failed_enrollments=None,
     mode=EDX_DEFAULT_ENROLLMENT_MODE,
     skip_compliance_check=False,
+    skip_country_block_check=False,
     skip_enrollment_emails=False,
 ):
     """
@@ -242,6 +243,8 @@ def create_run_enrollments(  # noqa: C901, PLR0913
         mode (str): The course mode
         skip_compliance_check (bool): If True, bypass the export compliance
             check. Operator-run management commands only.
+        skip_country_block_check (bool): If True, bypass the country block check.
+            Refund downgrade callers only — never bypass for new enrollments.
         skip_enrollment_emails (bool): If True, don't send the learner the
             enrollment confirmation email. Operator-run management commands only.
 
@@ -250,11 +253,10 @@ def create_run_enrollments(  # noqa: C901, PLR0913
             created in mitxonline, paired with a boolean indicating whether or not the edX enrollment API call was successful
             for all of the given course runs
     """
-    # Pre-existing: only runs[0] is screened, so runs[1:] go unscreened for the
-    # two multi-run callers (upgrade_audit_run_enrollments_for_program_purchase,
-    # ecommerce.api.downgrade_learner_from_order).
-    if runs[0].course.is_country_blocked(user):
-        raise CountryBlockedError(user, runs[0].course)
+    if not skip_country_block_check:
+        for run in runs:
+            if run.course.is_country_blocked(user):
+                raise CountryBlockedError(user, run.course)
     if skip_compliance_check:
         log.warning(
             "Skipping export compliance check for user=%s run=%s",
@@ -682,6 +684,7 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
         mode=EDX_ENROLLMENT_AUDIT_MODE,
         change_status=ENROLL_CHANGE_STATUS_REFUNDED,
         keep_failed_enrollments=True,
+        skip_country_block_check=True,
     )
     return downgraded_program_enrollment, downgraded_run_enrollments
 

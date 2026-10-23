@@ -15,6 +15,7 @@ from django.conf import settings
 from django.core.management import BaseCommand
 
 from courses.api import create_run_enrollments
+from courses.exceptions import CountryBlockedError
 from courses.models import CourseRun, CourseRunEnrollment
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
@@ -78,12 +79,20 @@ class Command(BaseCommand):
                         )
                     )
                 elif enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE:
-                    (
-                        _,
-                        edx_request_success,
-                    ) = create_run_enrollments(
-                        user, [course_run], mode=EDX_ENROLLMENT_VERIFIED_MODE
-                    )
+                    try:
+                        (
+                            _,
+                            edx_request_success,
+                        ) = create_run_enrollments(
+                            user, [course_run], mode=EDX_ENROLLMENT_VERIFIED_MODE
+                        )
+                    except CountryBlockedError:
+                        self.stdout.write(
+                            self.style.ERROR(
+                                f"Enrollment for user {user} is blocked due to country restrictions."
+                            )
+                        )
+                        continue
                     if edx_request_success is False:
                         self.stdout.write(
                             self.style.ERROR(f"Enrollment for user {user} has failed.")

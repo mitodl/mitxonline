@@ -39,7 +39,11 @@ from courses.api import (
     reconcile_verified_program_enrollments,
 )
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
-from courses.exceptions import EnrollmentCreationFailedError, EnrollmentError
+from courses.exceptions import (
+    CountryBlockedError,
+    EnrollmentCreationFailedError,
+    EnrollmentError,
+)
 from courses.models import (
     Course,
     CourseRun,
@@ -899,7 +903,7 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
                 mode=EDX_ENROLLMENT_AUDIT_MODE,
                 keep_failed_enrollments=True,
             )
-        except ExportComplianceCheckError as exc:
+        except (CountryBlockedError, ExportComplianceCheckError) as exc:
             # Don't propagate the specifics of the compliance decision to the
             # client - only an opaque support code, if the cause declares one.
             # The underlying cause is logged where it's raised.
