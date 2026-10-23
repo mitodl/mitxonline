@@ -48,7 +48,6 @@ from compliance.exceptions import (
 from compliance.factories import ExportComplianceLogFactory
 from compliance.models import ExportComplianceDecision
 from courses.api import (
-    MISSING_COMPLIANCE_DATA_CODE,
     VERIFIABLE_CREDENTIAL_STATUS_DISABLED,
     VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA,
     VERIFIABLE_CREDENTIAL_STATUS_ENABLED,
@@ -1721,14 +1720,17 @@ def test_check_enrollment_eligibility_missing_profile_data(mocker, user):
     run = CourseRunFactory.create()
     mocker.patch(
         "courses.api.verify_user_with_exports",
-        side_effect=ExportComplianceDataError(user, ["postal_code", "state"]),
+        side_effect=ExportComplianceDataError(
+            user, ["postal_code", "administrative_area"]
+        ),
     )
 
     eligibility = check_enrollment_eligibility(user, run)
 
     assert eligibility.enrollable is False
-    assert eligibility.reason_code == MISSING_COMPLIANCE_DATA_CODE
+    assert eligibility.reason_code == ExportComplianceDataError.error_code
     assert eligibility.reason_code == "CS_701"
+    assert eligibility.missing_fields == ["postal_code", "state"]
 
 
 def test_check_enrollment_eligibility_unrecognized_failure_fails_closed(mocker, user):

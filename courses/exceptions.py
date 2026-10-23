@@ -31,6 +31,10 @@ class EnrollmentError(APIException):
         A cause without an ``error_code`` yields the unchanged default detail,
         so a new failure mode stays opaque unless it opts in.
 
+        A cause that names the user's own profile fields to fix (see
+        ``compliance.exceptions.ExportComplianceDataError.profile_fields``)
+        has them added as ``missing_fields``, so the client can ask for them.
+
         Args:
             exc (Exception): The underlying cause of the enrollment failure
 
@@ -40,7 +44,11 @@ class EnrollmentError(APIException):
         error_code = getattr(exc, "error_code", None)
         if not error_code:
             return cls()
-        return cls(f"{cls.default_detail} Error code: {error_code}.")
+        detail = f"{cls.default_detail} Error code: {error_code}."
+        profile_fields = getattr(exc, "profile_fields", None)
+        if profile_fields:
+            return cls({"detail": detail, "missing_fields": profile_fields})
+        return cls(detail)
 
 
 class EnrollmentCreationFailedError(EnrollmentError):

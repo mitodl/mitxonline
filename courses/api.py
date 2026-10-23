@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import re
 import time
@@ -115,12 +116,6 @@ if TYPE_CHECKING:
 
 
 log = logging.getLogger(__name__)
-
-#: Support-facing code for a learner whose profile is missing the fields
-#: required to run an export compliance check at all. Unlike
-#: ``ExportComplianceError.error_code`` this is not set on the exception, so
-#: that the existing enrollment endpoints keep their bare error detail.
-MISSING_COMPLIANCE_DATA_CODE = "CS_701"
 
 UserEnrollments = namedtuple(  # noqa: PYI024
     "UserEnrollments",
@@ -419,42 +414,37 @@ def reconcile_verified_program_enrollments(
 
     Raises:
         EnrollmentError: if reconciliation failed
+        ExportComplianceCheckError: if the export compliance check failed
     """
-    try:
-        if len(verified_program_enrollments) == 0:
-            # No verified enrollments, so it doesn't matter - the user will get an
-            # audit one. (But make the audit enrollment to not confuse the course run
-            # process later.)
-            create_program_enrollments(
-                user, programs, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
-            )
-        elif (
-            len(verified_program_enrollments) == 1
-            and verified_program_enrollments[0].program == root_program
-        ):
-            # The verified enrollment that's here is for the root program, so we can
-            # create a verified enrollment for the other program.
-            create_program_enrollments(
-                user, programs, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
-            )
-        elif (
-            len(verified_program_enrollments) == 1
-            and verified_program_enrollments[0].program != root_program
-        ):
-            # The verified enrollment that's here is _not_ for the root program, so
-            # we should stop.
-            log.error(
-                "reconcile_verified_program_enrollments: user %s enrolling in %s has no verified enrollment in %s",
-                user,
-                courserun_id,
-                root_program,
-            )
-            raise EnrollmentError
-    except ExportComplianceCheckError as exc:
-        # Don't propagate the specifics of the compliance decision to the
-        # client - only an opaque support code, if the cause declares one.
-        # The underlying cause is logged where it's raised.
-        raise EnrollmentError.from_cause(exc) from exc
+    if len(verified_program_enrollments) == 0:
+        # No verified enrollments, so it doesn't matter - the user will get an
+        # audit one. (But make the audit enrollment to not confuse the course run
+        # process later.)
+        create_program_enrollments(
+            user, programs, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+        )
+    elif (
+        len(verified_program_enrollments) == 1
+        and verified_program_enrollments[0].program == root_program
+    ):
+        # The verified enrollment that's here is for the root program, so we can
+        # create a verified enrollment for the other program.
+        create_program_enrollments(
+            user, programs, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        )
+    elif (
+        len(verified_program_enrollments) == 1
+        and verified_program_enrollments[0].program != root_program
+    ):
+        # The verified enrollment that's here is _not_ for the root program, so
+        # we should stop.
+        log.error(
+            "reconcile_verified_program_enrollments: user %s enrolling in %s has no verified enrollment in %s",
+            user,
+            courserun_id,
+            root_program,
+        )
+        raise EnrollmentError
 
 
 def get_program_and_ancestor_ids(program):
@@ -641,6 +631,7 @@ class EnrollmentEligibility:
 
     enrollable: bool
     reason_code: str | None = None
+    missing_fields: list[str] = dataclasses.field(default_factory=list)
 
 
 def check_enrollment_eligibility(user, courseware_object) -> EnrollmentEligibility:
@@ -664,13 +655,13 @@ def check_enrollment_eligibility(user, courseware_object) -> EnrollmentEligibili
     """
     try:
         _verify_exports_compliance_for_enrollment(user, courseware_object)
-    except ExportComplianceError as exc:
-        return EnrollmentEligibility(enrollable=False, reason_code=exc.error_code)
-    except ExportComplianceDataError:
-        # The user's profile is missing fields we need to even run the check.
-        # Distinct from a rejection: they can fix this themselves.
+    except (ExportComplianceError, ExportComplianceDataError) as exc:
+        # CS_700 for a rejection; CS_701 for profile data the learner can fix,
+        # along with the profile fields to fix.
         return EnrollmentEligibility(
-            enrollable=False, reason_code=MISSING_COMPLIANCE_DATA_CODE
+            enrollable=False,
+            reason_code=exc.error_code,
+            missing_fields=getattr(exc, "profile_fields", []),
         )
     except ExportComplianceCheckError:
         # A compliance failure mode this endpoint has no code for yet. Fail

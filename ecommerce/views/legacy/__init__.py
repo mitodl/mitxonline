@@ -4,6 +4,7 @@ MITxOnline ecommerce views
 
 import logging
 from distutils.util import strtobool  # noqa: F401
+from urllib.parse import urlencode
 
 import django_filters
 from django.conf import settings
@@ -97,6 +98,7 @@ from main.constants import (
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_ENROLL_FAILED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
     USER_MSG_TYPE_PAYMENT_CANCELLED,
@@ -1208,8 +1210,20 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
                 {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
             )
         if "profile_incomplete" in checkout_payload:
+            # The cart opens its profile dialog on these fields. It can't edit
+            # the email address, so a rejection of only that goes to support.
+            missing_fields = [
+                field
+                for field in checkout_payload["missing_fields"]
+                if field != "email"
+            ]
+            if not missing_fields:
+                return redirect_with_user_message(
+                    reverse("cart"), {"type": USER_MSG_TYPE_ENROLL_FAILED}
+                )
+            params = urlencode({"profile_incomplete": ",".join(missing_fields)})
             return redirect_with_user_message(
-                reverse("cart"),
+                f"{reverse('cart')}?{params}",
                 {"type": USER_MSG_TYPE_PROFILE_INCOMPLETE},
             )
         if "no_checkout" in checkout_payload:
