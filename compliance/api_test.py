@@ -464,9 +464,14 @@ def test_failed_check_does_not_send_learner_data_to_sentry(mocker, export_settin
         default_integrations=False,
     )
     try:
-        with pytest.raises(ApiException) as excinfo:
-            verify_user_with_exports(user, run)
-        sentry_sdk.capture_exception(excinfo.value)
+        with sentry_sdk.isolation_scope():
+            # What DjangoIntegration attaches for the request user
+            sentry_sdk.set_user(
+                {"id": str(user.pk), "email": user.email, "username": user.username}
+            )
+            with pytest.raises(ApiException) as excinfo:
+                verify_user_with_exports(user, run)
+            sentry_sdk.capture_exception(excinfo.value)
         sentry_sdk.flush()
     finally:
         sentry_sdk.get_global_scope().set_client(None)
@@ -474,5 +479,12 @@ def test_failed_check_does_not_send_learner_data_to_sentry(mocker, export_settin
     assert len(events) == 1
     event_json = json.dumps(events[0])
     assert "verify_user_with_exports" in event_json
-    for value in ["ada@example.com", "Lovelace", "77 Massachusetts Ave", "02139"]:
+    assert events[0]["user"] == {"id": user.global_id}
+    for value in [
+        "ada@example.com",
+        user.username,
+        "Lovelace",
+        "77 Massachusetts Ave",
+        "02139",
+    ]:
         assert value not in event_json
