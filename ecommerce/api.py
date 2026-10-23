@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from urllib.parse import urljoin
 
+import reversion
 import stripe
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
@@ -36,7 +37,7 @@ from courses.api import (
     downgrade_program_enrollment_and_verified_runs,
 )
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
-from courses.models import CourseRunEnrollment
+from courses.models import CourseRunEnrollment, Program
 from courses.utils import is_uai_course_run, is_xpro_course_run
 from ecommerce.constants import (
     ADMIN_FULFILLED_PAYMENT_DATA,
@@ -1712,9 +1713,8 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
         msg = f"Course run {courserun} is not in program {program}"
         raise VerifiedProgramCourseNotInProgramError(msg)
 
-    discount = create_verified_program_discount(program)
-
     cr_ctype = ContentType.objects.get_for_model(courserun)
+    prog_ctype = ContentType.objects.get_for_model(program)
     try:
         product = Product.objects.filter(
             content_type=cr_ctype, object_id=courserun.id, is_active=True
@@ -1723,6 +1723,32 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
         msg = f"No active product for course run {courserun}"
         raise VerifiedProgramNoProductError(msg) from exc
 
+    # Check for a purchased program upgrade first. If the program doesn't have a
+    # product, or if the user never purchased that product, then we've automatically
+    # upgraded their program enrollment, and they don't get a freebie here.
+
+    try:
+        program_product = Product.objects.filter(
+            content_type=prog_ctype, object_id=program.id
+        ).get()
+    except Product.DoesNotExist as exc:
+        msg = f"No active product for program {program}"
+        raise VerifiedProgramNoProductError(msg) from exc
+
+    program_product_versions = reversion.models.Version.objects.get_for_object(
+        program_product
+    )
+    user_program_upgrade_qs = request.user.orders.filter(
+        state=OrderStatus.FULFILLED, lines__product_version__in=program_product_versions
+    )
+
+    if user_program_upgrade_qs.count() == 0:
+        msg = (
+            f"No verified purchased enrollment for {request.user} for program {program}"
+        )
+        raise VerifiedProgramNoEnrollmentError(msg)
+
+    discount = create_verified_program_discount(program)
     basket = establish_basket(request)
 
     if basket.basket_items.count() > 0:
@@ -1762,6 +1788,72 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
         raise VerifiedProgramInvalidOrderError
 
     return courserun.enrollments.filter(user=request.user).get()
+
+
+def create_verified_program_enrollment_orders(user, root_program, programs):
+    """
+    Create orders for nested verified program enrollments, if eligible.
+
+    If the user has a purchased verified enrollment in the root program, then
+    they should have verified enrollments in nested programs (if eligible). These
+    should also have orders attached to them so the course runs get the upgrades
+    that the user's expecting.
+    """
+
+    program_ct = ContentType.objects.get_for_model(Program)
+    product_ct = ContentType.objects.get_for_model(Product)
+    root_program_products = Product.all_objects.filter(
+        object_id=root_program.id, content_type=program_ct
+    )
+    root_program_product_versions = reversion.models.Version.objects.filter(
+        content_type=product_ct,
+        object_id__in=list(root_program_products.values_list("id", flat=True)),
+    )
+
+    if not user.orders.filter(
+        lines__product_version__in=root_program_product_versions,
+        state=OrderStatus.FULFILLED,
+    ).exists():
+        return
+
+    for program in programs:
+        if not program.enrollment_modes.filter(
+            mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+        ).exists():
+            log.debug(
+                "create_verified_program_enrollment_orders: nested program %s has no verified mode",
+                program,
+            )
+            continue
+        program_product = Product.objects.filter(
+            object_id=program.id, content_type=program_ct
+        ).first()
+        if not program_product:
+            log.warning(
+                "create_verified_program_enrollment_orders: program %s (under %s) has no products, so not creating verified enrollment for %s",
+                program,
+                root_program,
+                user,
+            )
+            continue
+
+        discount = create_verified_program_discount(root_program)
+
+        # Sync with HubSpot for CourseRun and Program products
+        sync_hubspot_cart_add(
+            user,
+            program_product,
+            is_uai=False,
+            is_xpro=False,
+        )
+
+        order = PendingOrder.create_from_product(program_product, user, discount)
+
+        fulfill_completed_order(
+            order, payment_data=ZERO_PAYMENT_DATA, skip_receipt=True
+        )
+
+    return
 
 
 def log_stripe_event(event, *, order: Order | None = None):
