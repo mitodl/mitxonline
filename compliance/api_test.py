@@ -17,12 +17,13 @@ from compliance.api import (
     get_cybersource_client,
     get_latest_export_compliance_log,
     get_missing_export_compliance_fields,
+    get_unresolved_export_compliance_decline,
     log_export_compliance_check,
     verify_user_with_exports,
 )
 from compliance.exceptions import ExportComplianceDataError
 from compliance.factories import ExportComplianceLogFactory
-from compliance.models import ExportComplianceLog
+from compliance.models import ExportComplianceDecision, ExportComplianceLog
 from courses.factories import CourseRunFactory
 from users.factories import UserFactory
 from users.models import User
@@ -433,3 +434,39 @@ def test_decrypt_export_compliance_log_round_trips(export_compliance_keypair):
     decrypted = decrypt_export_compliance_log(log_entry, export_compliance_keypair)
     assert decrypted.request == '{"hello": "world"}'
     assert json.loads(decrypted.response) == response
+
+
+COMPLETED = ExportComplianceDecision.COMPLETED
+DECLINED = ExportComplianceDecision.DECLINED
+INVALID_REQUEST = ExportComplianceDecision.INVALID_REQUEST
+
+
+@pytest.mark.parametrize(
+    ("decisions", "blocking_index"),
+    [
+        ([], None),
+        ([COMPLETED], None),
+        ([INVALID_REQUEST], None),
+        ([DECLINED], 0),
+        ([DECLINED, COMPLETED], None),
+        ([COMPLETED, DECLINED], 1),
+        ([DECLINED, INVALID_REQUEST], 0),
+        ([DECLINED, COMPLETED, DECLINED], 2),
+    ],
+)
+def test_get_unresolved_export_compliance_decline(decisions, blocking_index):
+    """Only a DECLINED log with no later accepted log counts, oldest first."""
+    user = UserFactory.create()
+    other_user = UserFactory.create()
+    ExportComplianceLogFactory.create(user=other_user, decision=DECLINED)
+    start = now_in_utc() - timedelta(days=len(decisions) + 1)
+    logs = []
+    for index, decision in enumerate(decisions):
+        log_entry = ExportComplianceLogFactory.create(user=user, decision=decision)
+        ExportComplianceLog.objects.filter(pk=log_entry.pk).update(
+            created_on=start + timedelta(days=index)
+        )
+        logs.append(log_entry)
+
+    expected = None if blocking_index is None else logs[blocking_index]
+    assert get_unresolved_export_compliance_decline(user) == expected
