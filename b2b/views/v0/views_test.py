@@ -524,7 +524,7 @@ def test_b2b_contract_attachment_full_contract_with_used_code(mocker):
 
 @pytest.mark.skip_nplusone_check
 def test_b2b_enroll_incomplete_profile(mocker, settings, mocked_export_compliance):
-    """A free B2B enrollment should say the profile is incomplete, not just that checkout is required."""
+    """A free B2B enrollment with an incomplete profile names the fields to fix."""
     mocked_export_compliance.side_effect = verify_user_with_exports
     mocker.patch("compliance.api.get_cybersource_client")
     mocker.patch("hubspot_sync.tasks.sync_cart_add_event_with_hubspot.apply_async")
@@ -553,7 +553,10 @@ def test_b2b_enroll_incomplete_profile(mocker, settings, mocked_export_complianc
     )
 
     assert resp.status_code == 400
-    assert resp.json()["checkout_result"]["profile_incomplete"] is True
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "missing_fields": ["street_address_1"],
+    }
 
 
 @pytest.mark.skip_nplusone_check
