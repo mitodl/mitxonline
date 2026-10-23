@@ -20,8 +20,8 @@ from django.core.management import BaseCommand
 from django.db.models import Q
 
 from courses.api import create_program_enrollments
+from courses.constants import PROGRAM_ENROLLMENT_UPGRADE_MODE
 from courses.models import CourseRunEnrollment, Program, ProgramEnrollment
-from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 
 log = logging.getLogger(__name__)
 
@@ -131,7 +131,7 @@ matches are reported and skipped."""
 
             if commit:
                 create_program_enrollments(
-                    user, [program], enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+                    user, [program], enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
                 )
             created_count += 1
 

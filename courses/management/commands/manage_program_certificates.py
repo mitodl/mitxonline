@@ -187,7 +187,7 @@ class Command(BaseCommand):
             message += (
                 " Use -f or --force to create the certificate anyway.\nRequirements:"
             )
-        elif result.skip_reason == ProgramCertificateSkipReason.NO_VERIFIED_ENROLLMENT:
+        elif result.skip_reason == ProgramCertificateSkipReason.NO_ACTIVE_ENROLLMENT:
             message += " Use -f or --force to create the certificate anyway."
         self.stdout.write(self.style.ERROR(message))
         if result.skip_reason == ProgramCertificateSkipReason.REQUIREMENTS_NOT_MET:
