@@ -718,8 +718,7 @@ paths:
         Some special handling is needed for program-related course run enrollments
         when the learner has an enrollment in the program. The learner should get a
         course run enrollment that matches their program enrollment at no additional
-        charge - but only if they bought the program, and only for one run per
-        course. Otherwise this returns 402 and the run has to be purchased.
+        charge.
       parameters:
       - in: path
         name: courserun_id
@@ -755,8 +754,6 @@ paths:
         '204':
           description: No response body
         '400':
-          description: No response body
-        '402':
           description: No response body
         '404':
           description: No response body

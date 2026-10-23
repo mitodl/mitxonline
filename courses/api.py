@@ -19,7 +19,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Exists, F, OuterRef, Prefetch, Q
+from django.db.models import Exists, OuterRef, Prefetch, Q
 from django_countries import countries
 from edx_api.course_list.constants import BATCH_SIZE as COURSE_LIST_BATCH_SIZE
 from mitol.common.utils import now_in_utc
@@ -64,7 +64,6 @@ from courses.models import (
     Department,
     EnrollmentMode,
     PaidCourseRun,
-    PaidProgram,
     PartnerSchool,
     Program,
     ProgramCertificate,
@@ -81,7 +80,6 @@ from courses.utils import (
     is_grade_valid,
     is_letter_grade_valid,
 )
-from ecommerce.constants import REDEMPTION_TYPE_INTERNAL
 from ecommerce.models import OrderStatus, Product
 from main import features
 from main.utils import get_learn_product_url
@@ -457,99 +455,6 @@ def reconcile_verified_program_enrollments(
         raise EnrollmentError.from_cause(exc) from exc
 
 
-def get_program_and_ancestor_ids(program):
-    """
-    Return the ids of the program and of every program that requires it,
-    directly or through nested program requirements.
-
-    Args:
-        program (Program): The program to start from
-
-    Returns:
-        set of int: The program's id plus the ids of its ancestor programs
-    """
-    seen = {program.id}
-    frontier = {program.id}
-    while frontier:
-        frontier = (
-            set(
-                ProgramRequirement.objects.filter(
-                    required_program_id__in=frontier
-                ).values_list("program_id", flat=True)
-            )
-            - seen
-        )
-        seen |= frontier
-    return seen
-
-
-def get_program_entitlement_enrollments(user):
-    """
-    Return the user's course run enrollments that count against the program
-    entitlement's one verified run per course.
-
-    That's every verified enrollment, active or not, except a run the learner
-    bought separately: a fulfilled purchase of the run that didn't use the
-    program's internal 100%-off discount. (A run granted by the program is
-    also a fulfilled, zero-value order, but one that redeems that discount.)
-
-    Args:
-        user (User): The learner
-
-    Returns:
-        QuerySet of CourseRunEnrollment
-    """
-    separately_bought_run_ids = (
-        PaidCourseRun.objects.filter(user=user, order__state=OrderStatus.FULFILLED)
-        .exclude(
-            order__discounts__redeemed_discount__redemption_type=REDEMPTION_TYPE_INTERNAL
-        )
-        .values("course_run_id")
-    )
-    return CourseRunEnrollment.all_objects.filter(
-        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
-    ).exclude(run_id__in=separately_bought_run_ids)
-
-
-def has_program_course_entitlement(user, program, course):
-    """
-    Determine whether a verified program enrollment entitles the learner to a
-    free verified enrollment in a run of the given course.
-
-    The entitlement only comes from buying the program: a program enrollment
-    that became verified because the learner bought each of its courses
-    separately (see upgrade_program_enrollment_if_eligible) doesn't carry one.
-    A purchase of a program that requires this one (nested programs) counts.
-
-    The entitlement covers a single verified run per course. Once the learner
-    has held a verified enrollment in any run of the course - active or not -
-    it's used up, and further runs must be bought. A run the learner bought
-    separately doesn't use it (see get_program_entitlement_enrollments).
-    Unenrolling doesn't give it back; a refund downgrades the enrollment to
-    audit, so it no longer counts.
-
-    Args:
-        user (User): The learner
-        program (Program): The program the learner holds a verified enrollment in
-        course (Course): The course the learner wants a verified run in
-
-    Returns:
-        bool: True if the learner may get a free verified run of the course
-    """
-    if not PaidProgram.objects.filter(
-        user=user,
-        program_id__in=get_program_and_ancestor_ids(program),
-        order__state=OrderStatus.FULFILLED,
-    ).exists():
-        return False
-
-    return (
-        not get_program_entitlement_enrollments(user)
-        .filter(run__course=course)
-        .exists()
-    )
-
-
 def upgrade_audit_run_enrollments_for_program_purchase(user, program):
     """
     When a user purchases a program, upgrade any eligible audit-track course run
@@ -559,11 +464,8 @@ def upgrade_audit_run_enrollments_for_program_purchase(user, program):
     upgrade deadline has not passed (or there is no deadline), and the user
     has an active audit-track enrollment in it.
 
-    The program grants one verified run per course (see
-    has_program_course_entitlement), so a course whose entitlement the user has
-    already used - a verified run, active or not, that they didn't buy
-    separately - is skipped, and if the user is auditing several eligible runs
-    of one course only the latest-starting one is upgraded.
+    Verified-track enrollments are left unchanged. If the user has a mix of
+    verified and audit enrollments, only the audit-track ones are upgraded.
 
     Args:
         user (User): The user who purchased the program
@@ -574,11 +476,7 @@ def upgrade_audit_run_enrollments_for_program_purchase(user, program):
     """
     now = now_in_utc()
 
-    verified_course_ids = get_program_entitlement_enrollments(user).values(
-        "run__course_id"
-    )
-
-    candidate_runs = (
+    eligible_runs = list(
         CourseRun.objects.filter(
             course__in_programs__program=program,
             live=True,
@@ -588,17 +486,8 @@ def upgrade_audit_run_enrollments_for_program_purchase(user, program):
             enrollments__active=True,
         )
         .filter(Q(upgrade_deadline__isnull=True) | Q(upgrade_deadline__gt=now))
-        .exclude(course_id__in=verified_course_ids)
         .distinct()
-        .order_by(F("start_date").desc(nulls_last=True), "-id")
     )
-
-    eligible_runs = []
-    upgraded_course_ids = set()
-    for run in candidate_runs:
-        if run.course_id not in upgraded_course_ids:
-            upgraded_course_ids.add(run.course_id)
-            eligible_runs.append(run)
 
     if not eligible_runs:
         return []
