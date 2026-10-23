@@ -22,7 +22,11 @@ from reversion.models import Version
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE, CONTRACT_MEMBERSHIP_MANAGED
 from b2b.factories import ContractPageFactory
 from compliance.api import verify_user_with_exports
-from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
+from courses.constants import (
+    CONTENT_TYPE_MODEL_COURSE,
+    CONTENT_TYPE_MODEL_PROGRAM,
+    PROGRAM_ENROLLMENT_UPGRADE_MODE,
+)
 from courses.factories import (
     BlockedCountryFactory,
     CourseRunEnrollmentFactory,
@@ -97,7 +101,6 @@ from main.constants import (
 )
 from main.settings import TIME_ZONE
 from main.test_utils import assert_drf_json_equal
-from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 
 pytestmark = pytest.mark.django_db
 
@@ -1924,7 +1927,7 @@ def test_program_product_purchasing(user, user_drf_client):
     assert "no_checkout" in resp.json()
 
     assert ProgramEnrollment.objects.filter(
-        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        user=user, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
     ).exists()
 
 

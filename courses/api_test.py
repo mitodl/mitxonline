@@ -17,9 +17,7 @@ import responses
 import reversion
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import connection
 from django.test import RequestFactory, override_settings
-from django.test.utils import CaptureQueriesContext
 from edx_api.course_detail import CourseDetail, CourseMode, CourseModes
 from mitol.common.utils.datetime import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
@@ -66,7 +64,6 @@ from courses.api import (
     generate_missing_program_certificates,
     generate_openedx_course_url,
     generate_program_certificate,
-    get_audit_program_enrollments_for_upgrade,
     get_certificate_grade_eligible_runs,
     get_eligible_program_certificate_candidates,
     get_verifiable_credentials_payload,
@@ -81,7 +78,6 @@ from courses.api import (
     sync_course_mode,
     sync_course_runs,
     upgrade_audit_run_enrollments_for_program_purchase,
-    upgrade_program_enrollment_if_eligible,
 )
 from courses.constants import (
     ALL_ENROLL_CHANGE_STATUSES,
@@ -90,6 +86,7 @@ from courses.constants import (
     ENROLL_CHANGE_STATUS_DEFERRED,
     ENROLL_CHANGE_STATUS_REFUNDED,
     ENROLL_CHANGE_STATUS_UNENROLLED,
+    PROGRAM_ENROLLMENT_UPGRADE_MODE,
 )
 from courses.factories import (
     CourseFactory,
@@ -903,7 +900,7 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         program_enrollment = ProgramEnrollmentFactory.create(
             user=user,
             program=program,
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
         )
         return SimpleNamespace(
             program=program,
@@ -1111,7 +1108,7 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         assert program_setup.program_enrollment.active is False
         assert (
             program_setup.program_enrollment.enrollment_mode
-            == EDX_ENROLLMENT_VERIFIED_MODE
+            == PROGRAM_ENROLLMENT_UPGRADE_MODE
         )
         assert (
             program_setup.program_enrollment.change_status
@@ -1159,7 +1156,7 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         program.add_requirement(free_run.course)
         program.add_requirement(zero_value_run.course)
         ProgramEnrollmentFactory.create(
-            user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+            user=user, program=program, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
         )
 
         paid_enrollment = CourseRunEnrollmentFactory.create(
@@ -1400,7 +1397,7 @@ def test_create_program_enrollments_verifies_exports_for_verified_mode(mocker, u
     successful_enrollments = create_program_enrollments(
         user,
         [program],
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
     )
 
     patched_verify.assert_called_once_with(user, program)
@@ -1450,7 +1447,7 @@ def test_create_program_enrollments_rejects_nonaccepted_exports(mocker, user):
         create_program_enrollments(
             user,
             [program],
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
         )
 
     patched_verify.assert_called_once_with(user, program)
@@ -3122,38 +3119,55 @@ def test_create_run_enrollments_upgrade_edx_request_failure(mocker, user):
 
 
 @pytest.mark.parametrize(
-    "has_enrollment",
+    ("enrollment_mode", "active", "expect_cert"),
     [
-        True,
-        False,
+        (None, None, False),
+        (EDX_ENROLLMENT_AUDIT_MODE, False, False),
+        (EDX_ENROLLMENT_AUDIT_MODE, True, True),
+        (PROGRAM_ENROLLMENT_UPGRADE_MODE, True, True),
     ],
 )
-def test_generate_program_certificate_not_verified(
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_program_certificate_enrollment_mode_not_required(  # noqa: PLR0913
+    mock_upsert_custom_properties,
     user,
-    program_with_requirements,  # noqa: F811
-    has_enrollment,
-    caplog,
+    mocker,
+    default_mode_records,
+    enrollment_mode,
+    active,
+    expect_cert,
 ):
-    """Test that certificate generation fails if the user doesn't have a verified enrollment."""
+    """
+    A program certificate needs an active program enrollment in any mode: the
+    mode records a purchase, not certificate eligibility.
+    """
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_user")
+    course = CourseFactory.create()
+    program = ProgramFactory.create()
+    program.requirements_root.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    program.add_requirement(course)
+    course_run = CourseRunFactory.create(course=course)
+    course_run.enrollment_modes.set(default_mode_records)
+    CourseRunEnrollmentFactory.create(
+        run=course_run, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    CourseRunCertificateFactory.create(user=user, course_run=course_run)
+    # The course certificate's signal may already have generated one
+    ProgramCertificate.all_objects.filter(user=user, program=program).delete()
 
-    # This should fail early - before the check for course enrollments.
-
-    assert not program_with_requirements.program.enrollments.filter(user=user).exists()
-
-    if has_enrollment:
-        ProgramEnrollment.objects.create(
-            program=program_with_requirements.program,
-            user=user,
-            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+    if enrollment_mode:
+        ProgramEnrollmentFactory.create(
+            user=user, program=program, enrollment_mode=enrollment_mode, active=active
         )
 
-    result = generate_program_certificate(
-        user=user,
-        program=program_with_requirements.program,
-    )
+    certificate, created = generate_program_certificate(user=user, program=program)
 
-    assert result == (None, False)
-    assert "Skipping program enrollment certificate" not in caplog.messages
+    assert created is expect_cert
+    assert isinstance(certificate, ProgramCertificate) is expect_cert
 
 
 def test_generate_program_certificate_failure_missing_certificates(
@@ -3199,7 +3213,7 @@ def test_generate_program_certificate_failure_not_all_passed(  # noqa: PLR0913
     ProgramEnrollment.objects.create(
         user=user,
         program=program_with_requirements.program,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
     )
     courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
@@ -3239,7 +3253,7 @@ def test_generate_program_certificate_success_single_requirement_course(
     ProgramEnrollment.objects.create(
         user=user,
         program=program,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
     )
     root_node = program.requirements_root
 
@@ -3284,7 +3298,7 @@ def test_generate_program_certificate_success_multiple_required_courses(
     ProgramEnrollment.objects.create(
         user=user,
         program=program,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
     )
     root_node = program.requirements_root
 
@@ -3334,7 +3348,7 @@ def test_generate_program_certificate_success_minimum_electives_not_met(
     ProgramEnrollment.objects.create(
         user=user,
         program=program,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
     )
     root_node = program.requirements_root
 
@@ -3411,7 +3425,7 @@ def test_force_generate_program_certificate_success(  # noqa: PLR0913
         ProgramEnrollment.objects.create(
             user=user,
             program=program_with_requirements.program,
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
         )
 
     courses = CourseFactory.create_batch(3)
@@ -3447,7 +3461,7 @@ def test_generate_program_certificate_already_exist(
     ProgramEnrollment.objects.create(
         user=user,
         program=program_with_empty_requirements,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
     )
     program_certificate = ProgramCertificateFactory.create(
         program=program_with_empty_requirements, user=user
@@ -3467,7 +3481,7 @@ def test_generate_program_certificate_existing_revoked_returns_existing(
     ProgramEnrollment.objects.create(
         user=user,
         program=program_with_empty_requirements,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
     )
     program_certificate = ProgramCertificateFactory.create(
         program=program_with_empty_requirements,
@@ -3498,7 +3512,7 @@ def test_generate_program_certificate_no_program_page(
     """No program certificate should be created when the program has no CMS page at all."""
     program = program_with_empty_requirements
     ProgramEnrollment.objects.create(
-        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        user=user, program=program, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
     )
     # Deleted via a queryset, not `program.page`, so we don't leave a stale
     # cached reverse-OneToOne reference on the `program` instance that the
@@ -3521,7 +3535,7 @@ def test_generate_program_certificate_no_certificate_child_page(
     """No program certificate should be created when the program page has no certificate child page."""
     program = program_with_empty_requirements
     ProgramEnrollment.objects.create(
-        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        user=user, program=program, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
     )
     program.program_page.certificate_page.delete()
 
@@ -3541,7 +3555,7 @@ def test_generate_program_certificate_unpublished_certificate_page(
     """No program certificate should be created when the certificate page exists but is unpublished."""
     program = program_with_empty_requirements
     ProgramEnrollment.objects.create(
-        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        user=user, program=program, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
     )
     certificate_page = program.program_page.certificate_page
     certificate_page.live = False
@@ -3563,7 +3577,7 @@ def test_generate_program_certificate_certificates_disabled(
     """No program certificate should be created when certificates are disabled for the program."""
     program = program_with_empty_requirements
     ProgramEnrollment.objects.create(
-        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        user=user, program=program, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
     )
     program.certificates_disabled = True
     program.save()
@@ -3581,7 +3595,7 @@ def test_program_certificates_access():
     ProgramEnrollment.objects.create(
         user=test_certificate.user,
         program=test_certificate.program,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
     )
 
     # Revoke a program certificate
@@ -3628,7 +3642,7 @@ def test_generate_program_certificate_failure_not_all_passed_nested_elective_sti
     ProgramEnrollment.objects.create(
         user=user,
         program=program,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
     )
     root_node = program.requirements_root
 
@@ -3766,7 +3780,7 @@ def test_generate_program_certificate_with_subprogram_requirement(  # noqa: PLR0
             program=sub_program,
             enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
             if sub_is_audit_only
-            else EDX_ENROLLMENT_VERIFIED_MODE,
+            else PROGRAM_ENROLLMENT_UPGRADE_MODE,
         )
 
     # Create the main program that requires the sub-program
@@ -3774,10 +3788,11 @@ def test_generate_program_certificate_with_subprogram_requirement(  # noqa: PLR0
     main_program.add_program_requirement(sub_program)
 
     if has_main_enroll:
+        # The enrollment mode doesn't gate the certificate, so audit is enough
         ProgramEnrollment.objects.create(
             user=user,
             program=main_program,
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
         )
 
     # User completes the sub-program course and gets a certificate
@@ -3797,11 +3812,10 @@ def test_generate_program_certificate_with_subprogram_requirement(  # noqa: PLR0
         user=user, program=sub_program
     )
     if has_sub_enroll:
-        if sub_is_audit_only:
-            assert sub_created is False
-        else:
-            assert sub_created is True
-            assert isinstance(sub_certificate, ProgramCertificate)
+        # Neither the sub-program's enrollment mode nor its offered modes gate
+        # its certificate
+        assert sub_created is True
+        assert isinstance(sub_certificate, ProgramCertificate)
 
     # Now try to generate main program certificate
     # It should succeed if the user has a certificate for the required sub-program
@@ -3813,12 +3827,7 @@ def test_generate_program_certificate_with_subprogram_requirement(  # noqa: PLR0
         # in the sub. So, we'd have to have been enrolled there, too.
         assert main_created is True
         assert isinstance(main_certificate, ProgramCertificate)
-        if sub_is_audit_only:
-            # No certificate for sub if it's not eligible for one
-            # But we should still get one for the root course
-            assert len(ProgramCertificate.objects.all()) == 1
-        else:
-            assert len(ProgramCertificate.objects.all()) == 2
+        assert len(ProgramCertificate.objects.all()) == 2
         patched_sync_hubspot_user.assert_called()
 
     if not has_main_enroll or not has_sub_enroll:
@@ -3850,7 +3859,7 @@ def test_generate_program_certificate_with_revoked_subprogram_certificate(
     ProgramEnrollment.objects.create(
         user=user,
         program=sub_program,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
     )
 
     # Create the main program that requires the sub-program
@@ -3860,7 +3869,7 @@ def test_generate_program_certificate_with_revoked_subprogram_certificate(
     ProgramEnrollment.objects.create(
         user=user,
         program=main_program,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
     )
 
     # User completes the sub-program and gets a certificate, but it gets revoked
@@ -3936,7 +3945,7 @@ def test_generate_program_certificate_audit_courses(user, default_mode_records):
     ProgramEnrollment.objects.create(
         user=user,
         program=program,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
     )
     CourseRunEnrollment.objects.create(
         user=user,
@@ -5233,275 +5242,38 @@ def test_pull_course_modes(mocker, no_initial_modes):
     assert len(expected_modes) == 3
 
 
-def test_upgrade_program_enrollment_if_eligible_upgrades_when_requirements_met(
-    user,
-    program_with_requirements,  # noqa: F811
-):
-    """Upgrade succeeds when all required courses and enough electives are verified."""
-    program = program_with_requirements.program
-    program_enrollment = ProgramEnrollmentFactory.create(
-        user=user,
-        program=program,
-        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
-    )
-
-    for course in program.required_courses:
-        run = CourseRunFactory.create(course=course)
-        CourseRunEnrollmentFactory.create(
-            user=user,
-            run=run,
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            active=True,
-        )
-
-    for course in program_with_requirements.elective_courses[:2]:
-        run = CourseRunFactory.create(course=course)
-        CourseRunEnrollmentFactory.create(
-            user=user,
-            run=run,
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            active=True,
-        )
-
-    _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
-
-    program_enrollment.refresh_from_db()
-    assert upgraded is True
-    assert program_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
-
-
-def _verify_courses(user, courses):
-    """Give the user an active verified run enrollment in each course."""
-    for course in courses:
-        CourseRunEnrollmentFactory.create(
-            user=user,
-            run=CourseRunFactory.create(course=course),
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            active=True,
-        )
-
-
-@pytest.mark.parametrize("with_required_program", [False, True])
-def test_upgrade_program_enrollment_if_eligible_query_count(
-    user,
-    program_with_requirements,  # noqa: F811
-    with_required_program,
-):
-    """The upgrade path uses a fixed number of queries, however the tree is nested."""
-    program = program_with_requirements.program
-    program_enrollment = ProgramEnrollmentFactory.create(
-        user=user,
-        program=program,
-        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
-    )
-    _verify_courses(user, program_with_requirements.required_courses)
-    _verify_courses(user, program_with_requirements.elective_courses[:2])
-
-    if with_required_program:
-        required_program = ProgramFactory.create()
-        required_program_course = CourseFactory.create()
-        required_program.add_requirement(required_program_course)
-        program.add_program_requirement(required_program)
-        _verify_courses(user, [required_program_course])
-
-    program_enrollment = get_audit_program_enrollments_for_upgrade().get(
-        pk=program_enrollment.pk
-    )
-
-    with CaptureQueriesContext(connection) as context:
-        _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
-
-    assert len(context) == 13
-    assert upgraded is True
-
-
-@pytest.mark.parametrize("verify_whole_group", [False, True])
-def test_upgrade_program_enrollment_if_eligible_requires_whole_nested_group(
-    user, verify_whole_group
-):
-    """
-    A course inside a nested all-of group under the elective operator does not
-    count on its own; the whole group has to be verified.
-    """
-    program = ProgramFactory.create()
-    core_course = CourseFactory.create()
-    program.add_requirement(core_course)
-    groups_node = program.requirements_root.add_child(
-        node_type=ProgramRequirementNodeType.OPERATOR,
-        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
-        operator_value=1,
-        title="Choose a group",
-        elective_flag=True,
-    )
-    group_courses = []
-    for title in ("Group A", "Group B"):
-        group_node = groups_node.add_child(
-            node_type=ProgramRequirementNodeType.OPERATOR,
-            operator=ProgramRequirement.Operator.ALL_OF,
-            title=title,
-        )
-        courses = CourseFactory.create_batch(2)
-        for course in courses:
-            group_node.add_child(
-                node_type=ProgramRequirementNodeType.COURSE, course=course
-            )
-        group_courses.append(courses)
-    program_enrollment = ProgramEnrollmentFactory.create(
-        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
-    )
-    _verify_courses(user, [core_course])
-    _verify_courses(
-        user, group_courses[0] if verify_whole_group else group_courses[0][:1]
-    )
-
-    _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
-
-    assert upgraded is verify_whole_group
-
-
-@pytest.mark.parametrize("required_program_satisfied", [False, True])
-def test_upgrade_program_enrollment_if_eligible_requires_required_program(
-    user, required_program_satisfied
-):
-    """A required program node counts only when its own tree is satisfied."""
-    required_program = ProgramFactory.create()
-    required_program_course = CourseFactory.create()
-    required_program.add_requirement(required_program_course)
-    program = ProgramFactory.create()
-    program_course = CourseFactory.create()
-    program.add_requirement(program_course)
-    program.add_program_requirement(required_program)
-    program_enrollment = ProgramEnrollmentFactory.create(
-        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
-    )
-    _verify_courses(user, [program_course])
-    if required_program_satisfied:
-        _verify_courses(user, [required_program_course])
-
-    _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
-
-    assert upgraded is required_program_satisfied
-
-
-@pytest.mark.parametrize("verified_per_group", [1, 2])
-def test_upgrade_program_enrollment_if_eligible_checks_each_elective_group(
-    user, verified_per_group
-):
-    """
-    Each elective group has to reach its own minimum; verified courses in one
-    group do not count towards another.
-    """
-    program = ProgramFactory.create()
-    required_courses = CourseFactory.create_batch(2)
-    for course in required_courses:
-        program.add_requirement(course)
-    elective_groups = []
-    for _ in range(2):
-        group_node = program.requirements_root.add_child(
-            node_type=ProgramRequirementNodeType.OPERATOR,
-            operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
-            operator_value=2,
-            elective_flag=True,
-        )
-        courses = CourseFactory.create_batch(3)
-        for course in courses:
-            group_node.add_child(
-                node_type=ProgramRequirementNodeType.COURSE, course=course
-            )
-        elective_groups.append(courses)
-    program_enrollment = ProgramEnrollmentFactory.create(
-        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
-    )
-    _verify_courses(user, required_courses)
-    for courses in elective_groups:
-        _verify_courses(user, courses[:verified_per_group])
-
-    _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
-
-    assert upgraded is (verified_per_group == 2)
-
-
-def test_upgrade_program_enrollment_if_eligible_returns_false_when_electives_missing(
-    user,
-    program_with_requirements,  # noqa: F811
-):
-    """Upgrade should return False (without crashing) if elective minimum is not met."""
-    program = program_with_requirements.program
-    program_enrollment = ProgramEnrollmentFactory.create(
-        user=user,
-        program=program,
-        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
-    )
-
-    for course in program.required_courses:
-        run = CourseRunFactory.create(course=course)
-        CourseRunEnrollmentFactory.create(
-            user=user,
-            run=run,
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            active=True,
-        )
-
-    if program.elective_courses:
-        run = CourseRunFactory.create(course=program.elective_courses[0])
-        CourseRunEnrollmentFactory.create(
-            user=user,
-            run=run,
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            active=True,
-        )
-
-    _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
-
-    program_enrollment.refresh_from_db()
-    assert upgraded is False
-    assert program_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
-
-
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     ("scenario", "should_include"),
     [
-        ("verified_only", True),
-        ("audit_mode", False),
+        ("upgrade_mode", True),
+        ("audit_mode", True),
+        ("inactive", False),
         ("has_certificate", False),
         ("non_live_program", False),
+        ("certificates_disabled", False),
     ],
 )
 def test_get_eligible_program_certificate_candidates(scenario, should_include):
     """Test various filter scenarios for eligible program certificate candidates."""
     qs = get_eligible_program_certificate_candidates()
+    program = ProgramFactory.create(
+        live=scenario != "non_live_program",
+        certificates_disabled=scenario == "certificates_disabled",
+    )
 
-    if scenario == "verified_only":
-        # Verified enrollment should be included
-        enrollment = ProgramEnrollmentFactory.create(
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            active=True,
-            program=ProgramFactory.create(live=True),
-        )
-    elif scenario == "audit_mode":
-        # Audit enrollments must not appear
-        enrollment = ProgramEnrollmentFactory.create(
-            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
-            active=True,
-            program=ProgramFactory.create(live=True),
-        )
-    elif scenario == "has_certificate":
-        # Enrollments with existing certificate must be excluded
-        program = ProgramFactory.create(live=True)
-        enrollment = ProgramEnrollmentFactory.create(
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            active=True,
-            program=program,
-        )
+    # The enrollment mode doesn't matter: it records a purchase, not eligibility
+    enrollment = ProgramEnrollmentFactory.create(
+        enrollment_mode=(
+            PROGRAM_ENROLLMENT_UPGRADE_MODE
+            if scenario == "upgrade_mode"
+            else EDX_ENROLLMENT_AUDIT_MODE
+        ),
+        active=scenario != "inactive",
+        program=program,
+    )
+    if scenario == "has_certificate":
         ProgramCertificateFactory.create(user=enrollment.user, program=program)
-    elif scenario == "non_live_program":
-        # Enrollments in non-live programs must not appear
-        enrollment = ProgramEnrollmentFactory.create(
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            active=True,
-            program=ProgramFactory.create(live=False),
-        )
 
     ids = list(qs.values_list("id", flat=True))
     if should_include:
@@ -5535,7 +5307,7 @@ def test_generate_missing_program_certificates_creates_cert(
     )
 
     ProgramEnrollment.objects.create(
-        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        user=user, program=program, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
     )
     CourseRunCertificateFactory.create(user=user, course_run=course_run)
 
@@ -5570,7 +5342,7 @@ def test_generate_missing_program_certificates_idempotent(
     )
 
     ProgramEnrollment.objects.create(
-        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        user=user, program=program, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
     )
     CourseRunCertificateFactory.create(user=user, course_run=course_run)
 
@@ -5591,12 +5363,12 @@ def test_generate_missing_program_certificates_failure_isolation(mock_upsert, mo
     mocker.patch("hubspot_sync.task_helpers.sync_hubspot_user")
 
     ProgramEnrollmentFactory.create(
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
         active=True,
         program=ProgramFactory.create(live=True),
     )
     ProgramEnrollmentFactory.create(
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
         active=True,
         program=ProgramFactory.create(live=True),
     )

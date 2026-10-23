@@ -935,16 +935,6 @@ CRON_COURSE_CERTIFICATES_DAYS = get_string(
     default="*",
     description="'day_of_week' value for 'generate-course-certificate' scheduled task (default will run once a day).",
 )
-CRON_UPGRADE_PROGRAM_ENROLLMENTS_HOURS = get_string(
-    name="CRON_UPGRADE_PROGRAM_ENROLLMENTS_HOURS",
-    default="1",
-    description="'hours' value for the 'upgrade-eligible-program-enrollments' scheduled task (default runs at 1 AM).",
-)
-CRON_UPGRADE_PROGRAM_ENROLLMENTS_DAYS = get_string(
-    name="CRON_UPGRADE_PROGRAM_ENROLLMENTS_DAYS",
-    default="*",
-    description="'day_of_week' value for 'upgrade-eligible-program-enrollments' scheduled task (default runs daily).",
-)
 CRON_MISSING_PROGRAM_CERTIFICATES_HOURS = get_string(
     name="CRON_MISSING_PROGRAM_CERTIFICATES_HOURS",
     default="2",
@@ -1080,16 +1070,6 @@ CELERY_BEAT_SCHEDULE = {
     "clear-expired-tokens": {
         "task": "main.tasks.run_clear_tokens",
         "schedule": crontab(minute=0, hour=9, day_of_week=1),  # every week
-    },
-    "upgrade-eligible-program-enrollments": {
-        "task": "courses.tasks.upgrade_eligible_program_enrollments",
-        "schedule": crontab(
-            minute=0,
-            hour=CRON_UPGRADE_PROGRAM_ENROLLMENTS_HOURS,
-            day_of_week=CRON_UPGRADE_PROGRAM_ENROLLMENTS_DAYS,
-            day_of_month="*",
-            month_of_year="*",
-        ),
     },
     "generate-missing-program-certificates": {
         "task": "courses.tasks.generate_program_certificates",

@@ -92,16 +92,3 @@ def generate_program_certificates(batch_size=500):
         "generate_program_certificates task finished: %s",
         results,
     )
-
-
-@app.task
-def upgrade_eligible_program_enrollments():
-    """Upgrade eligible learners for all audit-mode program enrollments."""
-    from courses.api import (
-        get_audit_program_enrollments_for_upgrade,
-        upgrade_program_enrollment_if_eligible,
-    )
-
-    enrollments = get_audit_program_enrollments_for_upgrade()
-    for enrollment in enrollments:
-        upgrade_program_enrollment_if_eligible(enrollment)

@@ -38,7 +38,10 @@ from cms.models import CoursePage
 from cms.serializers import ProgramPageSerializer
 from compliance.api import verify_user_with_exports
 from compliance.exceptions import ExportComplianceDataError, ExportComplianceError
-from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
+from courses.constants import (
+    ENROLL_CHANGE_STATUS_UNENROLLED,
+    PROGRAM_ENROLLMENT_UPGRADE_MODE,
+)
 from courses.factories import (
     CourseFactory,
     CourseRunCertificateFactory,
@@ -1941,7 +1944,7 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
             "requirement",
         ),
         (
-            EDX_ENROLLMENT_VERIFIED_MODE,
+            PROGRAM_ENROLLMENT_UPGRADE_MODE,
             "requirement",
         ),
         (
@@ -1949,7 +1952,7 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
             "elective",
         ),
         (
-            EDX_ENROLLMENT_VERIFIED_MODE,
+            PROGRAM_ENROLLMENT_UPGRADE_MODE,
             "elective",
         ),
         (
@@ -1957,8 +1960,13 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
             "elective-extra",
         ),
         (
-            EDX_ENROLLMENT_VERIFIED_MODE,
+            PROGRAM_ENROLLMENT_UPGRADE_MODE,
             "elective-extra",
+        ),
+        # A program enrollment left in edX's verified mode isn't upgraded
+        (
+            EDX_ENROLLMENT_VERIFIED_MODE,
+            "requirement",
         ),
     ],
 )
@@ -1977,7 +1985,12 @@ def test_add_verified_program_course_enrollment(
         f"{settings.OPENEDX_API_BASE_URL}/api/enrollment/v1/enrollments",
         json={
             "results": [
-                {"mode": program_enrollment_type, "is_active": True},
+                {
+                    "mode": EDX_ENROLLMENT_VERIFIED_MODE
+                    if program_enrollment_type == PROGRAM_ENROLLMENT_UPGRADE_MODE
+                    else program_enrollment_type,
+                    "is_active": True,
+                },
             ],
         },
         status=status.HTTP_200_OK,
@@ -1989,7 +2002,7 @@ def test_add_verified_program_course_enrollment(
         )
         program = prog_enrollment.program
 
-        if program_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE:
+        if program_enrollment_type == PROGRAM_ENROLLMENT_UPGRADE_MODE:
             program_content_type = ContentType.objects.get_for_model(program)
             with reversion.create_revision():
                 Product.objects.create(
@@ -2006,7 +2019,7 @@ def test_add_verified_program_course_enrollment(
         course_run.course
     ) if requirement_type == "requirement" else program.add_elective(course_run.course)
 
-    if program_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE:
+    if program_enrollment_type == PROGRAM_ENROLLMENT_UPGRADE_MODE:
         course_run_content_type = ContentType.objects.get_for_model(course_run)
         with reversion.create_revision():
             Product.objects.create(
@@ -2046,11 +2059,14 @@ def test_add_verified_program_course_enrollment(
         assert resp.status_code == status.HTTP_201_CREATED
         assert resp.json()["run"]["id"] == course_run.id
 
-        if program_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE:
+        if program_enrollment_type == PROGRAM_ENROLLMENT_UPGRADE_MODE:
             order = user.orders.last()
             line = order.lines.last()
             assert course_run == line.purchased_object
             assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_VERIFIED_MODE
+        else:
+            assert not user.orders.exists()
+            assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_AUDIT_MODE
 
 
 @pytest.mark.skip_nplusone_check
@@ -2061,7 +2077,7 @@ def test_add_verified_program_course_enrollment_incomplete_profile(
     mocked_export_compliance.side_effect = verify_user_with_exports
     mocker.patch("compliance.api.get_cybersource_client")
     program = ProgramEnrollmentFactory.create(
-        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        user=user, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
     ).program
     course_run = CourseRunFactory.create()
     program.add_requirement(course_run.course)
@@ -2107,7 +2123,7 @@ def test_add_verified_program_course_enrollment_audit_only_run_falls_back_to_aud
     )
 
     prog_enrollment = ProgramEnrollmentFactory.create(
-        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        user=user, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
     )
     program = prog_enrollment.program
 
@@ -2150,7 +2166,7 @@ def _verified_program_enrollment_with_product(user):
     """Set up a verified program enrollment whose program has a product."""
 
     prog_enrollment = ProgramEnrollmentFactory.create(
-        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        user=user, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
     )
     program = prog_enrollment.program
 
@@ -2365,7 +2381,7 @@ def test_add_verified_program_course_enrollment_export_compliance_blocked(
     [
         None,
         EDX_ENROLLMENT_AUDIT_MODE,
-        EDX_ENROLLMENT_VERIFIED_MODE,
+        PROGRAM_ENROLLMENT_UPGRADE_MODE,
     ],
 )
 @pytest.mark.parametrize(
@@ -2373,7 +2389,7 @@ def test_add_verified_program_course_enrollment_export_compliance_blocked(
     [
         None,
         EDX_ENROLLMENT_AUDIT_MODE,
-        EDX_ENROLLMENT_VERIFIED_MODE,
+        PROGRAM_ENROLLMENT_UPGRADE_MODE,
     ],
 )
 def test_add_nested_verified_program_course_enrollment(
@@ -2399,7 +2415,7 @@ def test_add_nested_verified_program_course_enrollment(
 
     expected_enrollment = (
         EDX_ENROLLMENT_VERIFIED_MODE
-        if EDX_ENROLLMENT_VERIFIED_MODE
+        if PROGRAM_ENROLLMENT_UPGRADE_MODE
         in [base_program_enrollment_type, crogram_enrollment_type]
         else EDX_ENROLLMENT_AUDIT_MODE
     )
@@ -2504,8 +2520,8 @@ def test_add_nested_verified_program_course_enrollment(
         return
 
     if (
-        crogram_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE
-        and base_program_enrollment_type != EDX_ENROLLMENT_VERIFIED_MODE
+        crogram_enrollment_type == PROGRAM_ENROLLMENT_UPGRADE_MODE
+        and base_program_enrollment_type != PROGRAM_ENROLLMENT_UPGRADE_MODE
     ):
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
         return
@@ -2513,8 +2529,8 @@ def test_add_nested_verified_program_course_enrollment(
     assert resp.status_code == status.HTTP_201_CREATED
 
     if [base_program_enrollment_type, crogram_enrollment_type] == [
-        EDX_ENROLLMENT_VERIFIED_MODE,
-        EDX_ENROLLMENT_VERIFIED_MODE,
+        PROGRAM_ENROLLMENT_UPGRADE_MODE,
+        PROGRAM_ENROLLMENT_UPGRADE_MODE,
     ]:
         # If we were making verified enrollments, then we should have verified
         # enrollments for both programs too.
@@ -2523,7 +2539,7 @@ def test_add_nested_verified_program_course_enrollment(
             ProgramEnrollment.objects.filter(
                 user=user,
                 program__in=[base_program, crogram],
-                enrollment_mode=expected_enrollment,
+                enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
             ).count()
             == 2
         )
