@@ -2439,3 +2439,49 @@ def test_backfill_discount_b2b_contract():
     ):
         discount.refresh_from_db()
         assert discount.b2b_contract == contract
+
+
+def test_line_product_shares_a_prefetched_purchased_object(
+    django_assert_num_queries,
+):
+    """
+    A line hands its prefetched `purchased_object` to the product it rebuilds,
+    so reading the product's courseware costs no further query.
+    """
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    line = LineFactory.create(
+        product_version=Version.objects.get_for_object(product).last()
+    )
+    line = (
+        Line.objects.select_related("product_version")
+        .prefetch_related("purchased_object")
+        .get(pk=line.pk)
+    )
+
+    with django_assert_num_queries(0):
+        assert line.product.purchasable_object is line.purchased_object
+
+
+def test_line_product_resolves_its_own_courseware_when_the_ids_disagree(
+    django_assert_num_queries,
+):
+    """
+    A line whose denormalized ids name something other than the snapshotted
+    product's courseware leaves the product to resolve the snapshot's.
+    """
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    line = LineFactory.create(
+        product_version=Version.objects.get_for_object(product).last(),
+        purchased_object=CourseRunFactory.create(),
+    )
+    line = (
+        Line.objects.select_related("product_version")
+        .prefetch_related("purchased_object")
+        .get(pk=line.pk)
+    )
+    snapshotted = product.purchasable_object
+
+    with django_assert_num_queries(1):
+        assert line.product.purchasable_object == snapshotted
