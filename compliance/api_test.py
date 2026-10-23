@@ -619,6 +619,23 @@ def _invalid_request(details, status=400, body_status="INVALID_REQUEST"):
     )
 
 
+REQUIRED_BILL_TO_FIELDS = sorted(
+    [
+        "first_name",
+        "last_name",
+        "email",
+        "address1",
+        "locality",
+        "country",
+        "administrative_area",
+        "postal_code",
+    ]
+)
+REQUIRED_PROFILE_FIELDS = sorted(
+    BILL_TO_FIELD_TO_PROFILE_FIELD[f] for f in REQUIRED_BILL_TO_FIELDS
+)
+
+
 @pytest.mark.parametrize(
     ("details", "expected_fields", "expected_profile_fields"),
     [
@@ -638,16 +655,17 @@ def _invalid_request(details, status=400, body_status="INVALID_REQUEST"):
             ["address1", "postal_code"],
             ["postal_code", "street_address_1"],
         ),
-        # No usable field named - ask the user to review all of them
         (
-            [],
-            sorted(BILL_TO_FIELD_TO_PROFILE_FIELD),
-            sorted(BILL_TO_FIELD_TO_PROFILE_FIELD.values()),
+            [{"field": "orderInformation.billTo.address2", "reason": "INVALID_DATA"}],
+            ["address2"],
+            ["street_address_2"],
         ),
+        # No usable field named - ask the user to review all the required ones
+        ([], REQUIRED_BILL_TO_FIELDS, REQUIRED_PROFILE_FIELDS),
         (
             [{"field": "orderInformation.somethingElse", "reason": "MISSING_FIELD"}],
-            sorted(BILL_TO_FIELD_TO_PROFILE_FIELD),
-            sorted(BILL_TO_FIELD_TO_PROFILE_FIELD.values()),
+            REQUIRED_BILL_TO_FIELDS,
+            REQUIRED_PROFILE_FIELDS,
         ),
     ],
 )

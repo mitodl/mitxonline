@@ -119,6 +119,7 @@ REQUEST_FIELD_TO_BILL_TO_FIELD = {
     "orderInformation.billTo.lastName": "last_name",
     "orderInformation.billTo.email": "email",
     "orderInformation.billTo.address1": "address1",
+    "orderInformation.billTo.address2": "address2",
     "orderInformation.billTo.locality": "locality",
     "orderInformation.billTo.country": "country",
     "orderInformation.billTo.administrativeArea": "administrative_area",
@@ -326,7 +327,8 @@ def _get_invalid_request_fields(exc: ApiException) -> list[str] | None:
         if isinstance(detail, dict)
         and detail.get("field") in REQUEST_FIELD_TO_BILL_TO_FIELD
     ]
-    return fields or list(BILL_TO_FIELD_TO_PROFILE_FIELD)
+    # address2 is optional, so it isn't one of the fields to review.
+    return fields or [f for f in BILL_TO_FIELD_TO_PROFILE_FIELD if f != "address2"]
 
 
 def _get_raw_response_text(response: Any) -> str:

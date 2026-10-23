@@ -383,6 +383,14 @@ const COMPLIANCE_TEXT_FIELDS = [
     autoComplete: "address-line1",
     maxLength:    255
   },
+  // Optional, so only shown when checkout rejected it.
+  {
+    name:         "street_address_2",
+    label:        "Address Line 2",
+    autoComplete: "address-line2",
+    maxLength:    255,
+    optional:     true
+  },
   {
     name:         "city",
     label:        "City",
@@ -416,7 +424,8 @@ export const LegalAddressComplianceFields = ({
   const addressErrors = (errors && errors.legal_address) || {}
   const [emptyOnOpen] = React.useState(() =>
     COMPLIANCE_TEXT_FIELDS.filter(
-      field => !(values.legal_address[field.name] || "").trim()
+      field =>
+        !field.optional && !(values.legal_address[field.name] || "").trim()
     ).map(field => field.name)
   )
   const showsPostalCode = SUBDIVISION_COUNTRIES.includes(
@@ -442,7 +451,7 @@ export const LegalAddressComplianceFields = ({
           <div className="form-group" key={field.name}>
             <CardLabel
               htmlFor={fieldName}
-              isRequired={true}
+              isRequired={!field.optional}
               label={field.label}
             />
             <Field
@@ -458,7 +467,7 @@ export const LegalAddressComplianceFields = ({
               aria-describedby={
                 addressErrors[field.name] || rejected ? errorId : null
               }
-              required
+              required={!field.optional}
             />
             {rejected ? (
               <FormError id={errorId}>

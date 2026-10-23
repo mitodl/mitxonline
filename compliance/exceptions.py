@@ -7,6 +7,7 @@ BILL_TO_FIELD_TO_PROFILE_FIELD = {
     "last_name": "last_name",
     "email": "email",
     "address1": "street_address_1",
+    "address2": "street_address_2",
     "locality": "city",
     "country": "country",
     "administrative_area": "state",

@@ -224,6 +224,30 @@ describe("ProfileFormFields", () => {
       assert.deepEqual(shownFields(wrapper), ["legal_address.street_address_1"])
     })
 
+    it("shows the optional address line 2 only when checkout rejected it", () => {
+      const legalAddress = {
+        country:          "GB",
+        first_name:       "Test",
+        last_name:        "User",
+        street_address_1: "1 Main St",
+        street_address_2: "",
+        city:             "London",
+        postal_code:      ""
+      }
+      assert.deepEqual(shownFields(renderFields(legalAddress)), [])
+
+      const wrapper = renderFields({ ...legalAddress, street_address_2: "." }, [
+        "street_address_2"
+      ])
+      assert.deepEqual(shownFields(wrapper), ["legal_address.street_address_2"])
+      const input = wrapper.find('input[name="legal_address.street_address_2"]')
+      assert.isFalse(input.prop("required"))
+      assert.equal(
+        wrapper.find("#street_address_2-error").last().text(),
+        "Please enter a valid address line 2."
+      )
+    })
+
     it("still shows a rejected postal code outside US/CA", () => {
       const wrapper = renderFields(
         {
