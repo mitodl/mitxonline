@@ -235,15 +235,13 @@ describe("CartPage", () => {
         state:   "US-MA"
       }
 
-      await inner
-        .instance()
-        .saveProfile(
-          {
-            legal_address: legalAddress,
-            user_profile:  { year_of_birth: 1990 }
-          },
-          { setSubmitting: sinon.stub() }
-        )
+      await inner.instance().saveProfile(
+        {
+          legal_address: legalAddress,
+          user_profile:  { year_of_birth: 1990 }
+        },
+        { setSubmitting: sinon.stub() }
+      )
 
       const { body } = helper.handleRequestStub.lastCall.args[2]
       assert.equal(body.legal_address.country, "GB")
