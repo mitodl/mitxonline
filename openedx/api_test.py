@@ -2011,6 +2011,33 @@ def test_sync_enrollments_with_edx_v2(mocker, enrollments_v2_settings, user):
     assert [enrollment.run for enrollment in results.created] == [run]
 
 
+@pytest.mark.parametrize(
+    ("status_code", "skipped"),
+    [
+        (status.HTTP_429_TOO_MANY_REQUESTS, True),
+        (status.HTTP_503_SERVICE_UNAVAILABLE, False),
+    ],
+)
+def test_sync_enrollments_with_edx_v2_rate_limited(
+    mocker, enrollments_v2_settings, user, status_code, skipped
+):
+    """
+    With the v2 enrollment API, a rate-limited sync is skipped, since every
+    learner's sync shares the service user's throttle; other errors still raise
+    """
+    CourseRunEnrollmentFactory.create(user=user, active=True)
+    http_error = HTTPError(response=MockResponse("", status_code=status_code))
+    mocker.patch(
+        "openedx.api.get_edx_api_enrollments_client"
+    ).return_value.get_student_enrollments.side_effect = http_error
+
+    if skipped:
+        assert sync_enrollments_with_edx(user) == SyncResult()
+    else:
+        with pytest.raises(HTTPError):
+            sync_enrollments_with_edx(user)
+
+
 def test_sync_enrollments_with_edx_v2_not_synced(mocker, enrollments_v2_settings, user):
     """With the v2 enrollment API, a user edX doesn't know yet is skipped without calling edX"""
     user.openedx_users.update(has_been_synced=False)

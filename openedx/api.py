@@ -1648,22 +1648,51 @@ def update_edx_user_name(user):
         )
 
 
+def _get_edx_enrollments_to_sync(user):
+    """
+    Get the user's enrollments from edX for sync_enrollments_with_edx
+
+    Args:
+        user (users.models.User): The user whose enrollments to get
+
+    Returns:
+        edx_api.enrollments.models.Enrollments or None: None when there is
+            nothing to sync against
+    """
+    if not use_edx_enrollments_v2():
+        client = get_edx_api_client(user)
+        if client is None:
+            return None
+        return client.enrollments.get_student_enrollments()
+
+    # get_edx_api_client returns None for a user edX doesn't know yet.
+    if not user.openedx_user_exists:
+        return None
+    try:
+        return get_edx_api_enrollments_client().get_student_enrollments(
+            username=user.edx_username
+        )
+    except HTTPError as exc:
+        # Every learner's sync now shares the service user's throttle, so
+        # a busy minute shouldn't fail the dashboard load that triggered it.
+        if (
+            exc.response is None
+            or exc.response.status_code != status.HTTP_429_TOO_MANY_REQUESTS
+        ):
+            raise
+        log.warning(
+            "Skipped edX enrollment sync for %s: rate limited", user.edx_username
+        )
+        return None
+
+
 def sync_enrollments_with_edx(
     user: User,
 ) -> SyncResult[courses.models.CourseRunEnrollment]:
     """Syncs enrollment records so that local enrollments match the enrollment data in edX"""
-    if use_edx_enrollments_v2():
-        # get_edx_api_client returns None for a user edX doesn't know yet.
-        if not user.openedx_user_exists:
-            return SyncResult()
-        edx_enrollments = get_edx_api_enrollments_client().get_student_enrollments(
-            username=user.edx_username
-        )
-    else:
-        client = get_edx_api_client(user)
-        if client is None:
-            return SyncResult()
-        edx_enrollments = client.enrollments.get_student_enrollments()
+    edx_enrollments = _get_edx_enrollments_to_sync(user)
+    if edx_enrollments is None:
+        return SyncResult()
     local_enrollments = (
         user.courserunenrollment_set(manager="all_objects")
         .filter(user=user)
