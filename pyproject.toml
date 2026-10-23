@@ -131,6 +131,7 @@ exclude-newer = "7d"
 required-version = ">=0.9.17"
 
 [tool.uv.exclude-newer-package]
+certifi = "0d"  # eMudhra CA compromise fix (2026.10.19), skip 7d cooldown
 ol-concourse = "0d"
 django-aqueduct = "0d"
 edx-sysadmin = "0d"
