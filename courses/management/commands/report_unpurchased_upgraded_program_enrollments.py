@@ -8,15 +8,18 @@ own, and the 0112 migration carried those over as upgraded. This lists them so
 they can be reviewed; it changes nothing.
 
 An enrollment counts as backed when the learner has a fulfilled order for the
-program (PaidProgram), the enrollment is tied to a B2B contract, or the learner
-belongs to a B2B contract that includes the program.
+program or for a program that requires it (PaidProgram), the enrollment is tied
+to a B2B contract, or the learner belongs to a B2B contract that includes the
+program. The parent case covers a nested program: enrolling in a run through it
+upgrades the nested program's enrollment, but only the purchased parent gets a
+PaidProgram.
 """
 
 import csv
 from collections import Counter
 
 from django.core.management.base import BaseCommand
-from django.db.models import Exists, OuterRef
+from django.db.models import Exists, OuterRef, Q
 
 from b2b.models import UserB2BContract
 from courses.constants import PROGRAM_ENROLLMENT_UPGRADE_MODE
@@ -32,8 +35,9 @@ def get_unpurchased_upgraded_program_enrollments():
         QuerySet[ProgramEnrollment]: annotated with has_program_cert
     """
     paid_program = PaidProgram.objects.filter(
+        Q(program_id=OuterRef("program_id"))
+        | Q(program__all_requirements__required_program_id=OuterRef("program_id")),
         user_id=OuterRef("user_id"),
-        program_id=OuterRef("program_id"),
         order__state=OrderStatus.FULFILLED,
     )
     contract_with_program = UserB2BContract.objects.filter(
