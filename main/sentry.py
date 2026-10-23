@@ -119,6 +119,11 @@ def _scrub_node(node):
 # this code keeps its frames but none of their locals.
 EXPORT_COMPLIANCE_MODULES = ("compliance", "CyberSource", "authenticationsdk")
 
+# send_default_pii also puts the request user's email and username on the
+# event (DjangoIntegration's _set_user_info). compliance.api tags the scope with
+# the checked learner's global_id, which replaces the user on those events.
+EXPORT_COMPLIANCE_USER_TAG = "export_compliance_user"
+
 
 def _iter_stacktrace_frames(event):
     """Yield every stack frame in the event's exceptions and threads."""
@@ -136,12 +141,22 @@ def _is_export_compliance_frame(frame):
     )
 
 
-def scrub_export_compliance_locals(event):
-    """Drop every frame's locals from an event raised through export compliance code."""
+def scrub_export_compliance_event(event):
+    """Drop frame locals and user details from an event raised through export compliance code.
+
+    The user is reduced to the learner's global_id when compliance.api tagged
+    it, and removed otherwise.
+    """
     frames = list(_iter_stacktrace_frames(event))
-    if any(_is_export_compliance_frame(frame) for frame in frames):
-        for frame in frames:
-            frame.pop("vars", None)
+    if not any(_is_export_compliance_frame(frame) for frame in frames):
+        return event
+    for frame in frames:
+        frame.pop("vars", None)
+    global_id = (event.get("tags") or {}).get(EXPORT_COMPLIANCE_USER_TAG)
+    if global_id:
+        event["user"] = {"id": global_id}
+    else:
+        event.pop("user", None)
     return event
 
 
@@ -161,7 +176,7 @@ def before_send(event, hint):
         if isinstance(exc_value, SHUTDOWN_ERRORS):
             # so we don't want to report expected shutdown errors to sentry
             return None
-    return scrub_pg_details(scrub_export_compliance_locals(event))
+    return scrub_pg_details(scrub_export_compliance_event(event))
 
 
 def init_sentry(  # noqa: PLR0913

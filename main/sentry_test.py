@@ -10,9 +10,10 @@ from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.transport import Transport
 
 from main.sentry import (
+    EXPORT_COMPLIANCE_USER_TAG,
     before_send,
     build_event_scrubber,
-    scrub_export_compliance_locals,
+    scrub_export_compliance_event,
     scrub_pg_detail,
     scrub_pg_details,
     scrub_secret_values,
@@ -373,12 +374,41 @@ def test_export_compliance_event_loses_every_frames_locals(module):
 def test_other_events_keep_their_locals(module):
     """Only the compliance app and the CyberSource SDK trigger the strip."""
     event = _exception_event(module)
-    scrub_export_compliance_locals(event)
+    scrub_export_compliance_event(event)
     assert event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]
 
 
 def test_thread_stacktraces_are_covered():
     """A logged message with attach_stacktrace puts frames under threads."""
     event = {"threads": _exception_event("compliance.api", "main.views")["exception"]}
-    scrub_export_compliance_locals(event)
+    scrub_export_compliance_event(event)
     assert LEARNER_ADDRESS not in json.dumps(event)
+
+
+LEARNER_USER = {"id": "42", "email": "learner@example.invalid", "username": "ada"}
+
+
+def test_export_compliance_user_becomes_the_tagged_global_id():
+    """The tag compliance.api sets replaces the request user's email and username."""
+    event = _exception_event("compliance.api")
+    event["user"] = dict(LEARNER_USER)
+    event["tags"] = {EXPORT_COMPLIANCE_USER_TAG: "kc-uuid"}
+    scrub_export_compliance_event(event)
+    assert event["user"] == {"id": "kc-uuid"}
+
+
+def test_export_compliance_user_without_tag_is_dropped():
+    """With no global_id to fall back on, the user is removed rather than kept."""
+    event = _exception_event("CyberSource.rest")
+    event["user"] = dict(LEARNER_USER)
+    scrub_export_compliance_event(event)
+    assert "user" not in event
+
+
+def test_other_events_keep_their_user():
+    """Events outside export compliance keep what send_default_pii attached."""
+    event = _exception_event("courses.api")
+    event["user"] = dict(LEARNER_USER)
+    event["tags"] = {EXPORT_COMPLIANCE_USER_TAG: "kc-uuid"}
+    scrub_export_compliance_event(event)
+    assert event["user"] == LEARNER_USER
