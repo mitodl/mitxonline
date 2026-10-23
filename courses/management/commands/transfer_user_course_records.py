@@ -8,6 +8,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.db.models import Q
 
+from courses.constants import PROGRAM_ENROLLMENT_UPGRADE_MODE
 from courses.models import (
     Course,
     CourseRun,
@@ -254,7 +255,7 @@ class Command(BaseCommand):
         program_ids = [
             enrollment.program_id
             for enrollment in to_transfer["program_enrollments"]
-            if enrollment.enrollment_mode in EDX_ENROLLMENTS_PAID_MODES
+            if enrollment.enrollment_mode == PROGRAM_ENROLLMENT_UPGRADE_MODE
         ]
         if not run_ids and not program_ids:
             return []

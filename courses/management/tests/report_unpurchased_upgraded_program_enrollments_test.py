@@ -77,6 +77,28 @@ def test_report_unpurchased_upgraded_program_enrollments():
     contract_member = _upgraded_enrollment(program)
     contract_member.user.b2b_contracts.add(program_contract)
 
+    # Buying a parent program that requires this one backs it too
+    parent_program = ProgramFactory.create()
+    parent_program.add_program_requirement(program)
+    parent_buyer = _upgraded_enrollment(program)
+    PaidProgram.objects.create(
+        user=parent_buyer.user,
+        program=parent_program,
+        order=OrderFactory.create(
+            purchaser=parent_buyer.user, state=OrderStatus.FULFILLED
+        ),
+    )
+
+    # A purchase of an unrelated program doesn't
+    other_buyer = _upgraded_enrollment(program)
+    PaidProgram.objects.create(
+        user=other_buyer.user,
+        program=ProgramFactory.create(),
+        order=OrderFactory.create(
+            purchaser=other_buyer.user, state=OrderStatus.FULFILLED
+        ),
+    )
+
     report = report_unpurchased_upgraded_program_enrollments
     reported = set(
         report.get_unpurchased_upgraded_program_enrollments().values_list(
@@ -88,11 +110,12 @@ def test_report_unpurchased_upgraded_program_enrollments():
         unbacked_inactive.id,
         pending.id,
         wrong_contract.id,
+        other_buyer.id,
     }
 
     output = _run_command(list_rows=True)
-    assert f"{program.readable_id}: 4" in output
-    assert "4 upgraded program enrollments across 1 programs" in output
+    assert f"{program.readable_id}: 5" in output
+    assert "5 upgraded program enrollments across 1 programs" in output
     assert f"{unbacked.id},{unbacked.user_id},{program.readable_id},True," in output
     # Learner PII stays out of the report
     assert unbacked.user.email not in output
