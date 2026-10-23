@@ -1282,16 +1282,25 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         run_enrollment.refresh_from_db()
         assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
 
-    def test_preserves_b2b_run_enrollment(self, mocker, program_setup):
-        """A verified enrollment in a B2B-contracted run is left alone."""
+    @pytest.mark.parametrize(
+        "is_b2b_enrollment",
+        [
+            True,
+            False,
+        ],
+    )
+    def test_preserves_b2b_run_enrollment(
+        self, mocker, program_setup, is_b2b_enrollment
+    ):
+        """A verified enrollment in a B2B-contracted run is left alone if it's B2B."""
         contract = ContractPageFactory.create()
-        program_setup.run.b2b_contract = contract
-        program_setup.run.save()
+        program_setup.run.b2b_contracts.add(contract)
         run_enrollment = CourseRunEnrollmentFactory.create(
             user=program_setup.user,
             run=program_setup.run,
             enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
             active=True,
+            b2b_contract=contract if is_b2b_enrollment else None,
         )
         mocker.patch("courses.api.enroll_in_edx_course_runs")
 
@@ -1299,10 +1308,16 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
             program_setup.user, program_setup.program
         )
 
-        assert downgraded_runs == []
-        run_enrollment.refresh_from_db()
-        assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
-        assert run_enrollment.change_status is None
+        if is_b2b_enrollment:
+            assert downgraded_runs == []
+            run_enrollment.refresh_from_db()
+            assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+            assert run_enrollment.change_status is None
+        else:
+            assert run_enrollment in downgraded_runs
+            run_enrollment.refresh_from_db()
+            assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+            assert run_enrollment.change_status is not None
 
     def test_leaves_inactive_program_enrollment_alone(self, mocker, program_setup):
         """
@@ -4371,7 +4386,7 @@ def test_b2b_re_enrollment_after_multiple_unenrollments(mocker, user):
         enrollment_fixed_price=Decimal("0.00"),
         membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
-    course_run = CourseRunFactory.create(b2b_contract=contract)
+    course_run = CourseRunFactory.create(b2b_contracts=[contract])
     with reversion.create_revision():
         product = ProductFactory.create(
             purchasable_object=course_run, price=contract.enrollment_fixed_price
@@ -4536,7 +4551,7 @@ def test_get_certificate_grade_eligible_runs(has_live, has_b2b, has_b2b_live):
         b2b_contract = ContractPageFactory.create()
         b2b_run = CourseRunFactory.create(
             certificate_available_date=None,
-            b2b_contract=b2b_contract,
+            b2b_contracts=[b2b_contract],
             live=has_b2b_live,
         )
 

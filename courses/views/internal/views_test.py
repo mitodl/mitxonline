@@ -158,7 +158,7 @@ def test_get_ingestible_courses(b2b_courses, use_api_key):
             language=variant_source_1.language,
             variant_industry=variant_source_1.variant_industry,
             variant_length=variant_source_1.variant_length,
-            b2b_contract=contract,
+            b2b_contracts=[contract],
         )
         variant_contract_2 = CourseRunFactory(
             course=course,
@@ -167,7 +167,7 @@ def test_get_ingestible_courses(b2b_courses, use_api_key):
             language=variant_source_2.language,
             variant_industry=variant_source_2.variant_industry,
             variant_length=variant_source_2.variant_length,
-            b2b_contract=contract,
+            b2b_contracts=[contract],
         )
 
         variant_runs.extend(
