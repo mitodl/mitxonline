@@ -6,6 +6,8 @@ from datetime import timedelta
 from types import SimpleNamespace
 
 import pytest
+import sentry_sdk
+from CyberSource.rest import ApiException
 from django.core.exceptions import ImproperlyConfigured
 from mitol.common.utils.datetime import now_in_utc
 
@@ -24,6 +26,7 @@ from compliance.exceptions import ExportComplianceDataError
 from compliance.factories import ExportComplianceLogFactory
 from compliance.models import ExportComplianceLog
 from courses.factories import CourseRunFactory
+from main.sentry import before_send
 from users.factories import UserFactory
 from users.models import User
 
@@ -433,3 +436,55 @@ def test_decrypt_export_compliance_log_round_trips(export_compliance_keypair):
     decrypted = decrypt_export_compliance_log(log_entry, export_compliance_keypair)
     assert decrypted.request == '{"hello": "world"}'
     assert json.loads(decrypted.response) == response
+
+
+def test_failed_check_does_not_send_learner_data_to_sentry(mocker, export_settings):
+    """A CyberSource error raised through the real SDK keeps the bill-to out of Sentry."""
+    user = UserFactory.create(name="Ada Lovelace", email="ada@example.com")
+    user.legal_address.first_name = "Ada"
+    user.legal_address.last_name = "Lovelace"
+    user.legal_address.country = "US"
+    user.legal_address.street_address_1 = "77 Massachusetts Ave"
+    user.legal_address.city = "Cambridge"
+    user.legal_address.state = "US-MA"
+    user.legal_address.postal_code = "02139"
+    user.legal_address.save()
+    run = CourseRunFactory.create()
+
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.side_effect = ApiException(
+        status=400, reason="Bad Request"
+    )
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    events = []
+    sentry_sdk.init(
+        dsn="https://k@o0.ingest.sentry.io/0",
+        before_send=lambda event, hint: events.append(before_send(event, hint)),
+        default_integrations=False,
+    )
+    try:
+        with sentry_sdk.isolation_scope():
+            # What DjangoIntegration attaches for the request user
+            sentry_sdk.set_user(
+                {"id": str(user.pk), "email": user.email, "username": user.username}
+            )
+            with pytest.raises(ApiException) as excinfo:
+                verify_user_with_exports(user, run)
+            sentry_sdk.capture_exception(excinfo.value)
+        sentry_sdk.flush()
+    finally:
+        sentry_sdk.get_global_scope().set_client(None)
+
+    assert len(events) == 1
+    event_json = json.dumps(events[0])
+    assert "verify_user_with_exports" in event_json
+    assert events[0]["user"] == {"id": user.global_id}
+    for value in [
+        "ada@example.com",
+        user.username,
+        "Lovelace",
+        "77 Massachusetts Ave",
+        "02139",
+    ]:
+        assert value not in event_json

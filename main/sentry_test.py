@@ -10,8 +10,10 @@ from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.transport import Transport
 
 from main.sentry import (
+    EXPORT_COMPLIANCE_USER_TAG,
     before_send,
     build_event_scrubber,
+    scrub_export_compliance_event,
     scrub_pg_detail,
     scrub_pg_details,
     scrub_secret_values,
@@ -316,3 +318,97 @@ def test_real_sdk_keeps_the_oidc_secret_out(scrubbing_sentry_transport):
     event_json = json.dumps(scrubbing_sentry_transport.events[0])
     assert OIDC_SECRET not in event_json
     assert "Keycloak said no" in event_json
+
+
+LEARNER_ADDRESS = "77 Massachusetts Ave"
+
+
+def _exception_event(*modules):
+    """Build an event whose stack has one frame per module, each with locals."""
+    return {
+        "exception": {
+            "values": [
+                {
+                    "value": "400 Bad Request",
+                    "stacktrace": {
+                        "frames": [
+                            {
+                                "module": module,
+                                "function": "f",
+                                "vars": {
+                                    "body": f'{{"address1": "{LEARNER_ADDRESS}"}}'
+                                },
+                            }
+                            for module in modules
+                        ]
+                    },
+                }
+            ]
+        }
+    }
+
+
+@pytest.mark.parametrize(
+    "module",
+    [
+        "compliance.api",
+        "CyberSource.api_client",
+        "CyberSource.rest",
+        "authenticationsdk.core.Authorization",
+    ],
+)
+def test_export_compliance_event_loses_every_frames_locals(module):
+    """One compliance or SDK frame strips locals from callers and urllib3 too."""
+    event = _exception_event("courses.api", module, "urllib3.connectionpool")
+    before_send(event, {})
+    frames = event["exception"]["values"][0]["stacktrace"]["frames"]
+    assert [frame["module"] for frame in frames] == [
+        "courses.api",
+        module,
+        "urllib3.connectionpool",
+    ]
+    assert all("vars" not in frame for frame in frames)
+
+
+@pytest.mark.parametrize("module", ["courses.api", "compliancefoo", "cybersource"])
+def test_other_events_keep_their_locals(module):
+    """Only the compliance app and the CyberSource SDK trigger the strip."""
+    event = _exception_event(module)
+    scrub_export_compliance_event(event)
+    assert event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]
+
+
+def test_thread_stacktraces_are_covered():
+    """A logged message with attach_stacktrace puts frames under threads."""
+    event = {"threads": _exception_event("compliance.api", "main.views")["exception"]}
+    scrub_export_compliance_event(event)
+    assert LEARNER_ADDRESS not in json.dumps(event)
+
+
+LEARNER_USER = {"id": "42", "email": "learner@example.invalid", "username": "ada"}
+
+
+def test_export_compliance_user_becomes_the_tagged_global_id():
+    """The tag compliance.api sets replaces the request user's email and username."""
+    event = _exception_event("compliance.api")
+    event["user"] = dict(LEARNER_USER)
+    event["tags"] = {EXPORT_COMPLIANCE_USER_TAG: "kc-uuid"}
+    scrub_export_compliance_event(event)
+    assert event["user"] == {"id": "kc-uuid"}
+
+
+def test_export_compliance_user_without_tag_is_dropped():
+    """With no global_id to fall back on, the user is removed rather than kept."""
+    event = _exception_event("CyberSource.rest")
+    event["user"] = dict(LEARNER_USER)
+    scrub_export_compliance_event(event)
+    assert "user" not in event
+
+
+def test_other_events_keep_their_user():
+    """Events outside export compliance keep what send_default_pii attached."""
+    event = _exception_event("courses.api")
+    event["user"] = dict(LEARNER_USER)
+    event["tags"] = {EXPORT_COMPLIANCE_USER_TAG: "kc-uuid"}
+    scrub_export_compliance_event(event)
+    assert event["user"] == LEARNER_USER

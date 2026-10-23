@@ -10,6 +10,7 @@ from datetime import timedelta
 from typing import Any
 from uuid import uuid4
 
+import sentry_sdk
 from CyberSource import RiskV1DecisionsPost201ResponseClientReferenceInformation
 from CyberSource.api.verification_api import VerificationApi
 from CyberSource.models.riskv1exportcomplianceinquiries_order_information import (
@@ -31,6 +32,7 @@ from nacl.public import PublicKey, SealedBox
 
 from compliance.exceptions import ExportComplianceDataError
 from compliance.models import ExportComplianceLog
+from main.sentry import EXPORT_COMPLIANCE_USER_TAG
 
 log = logging.getLogger(__name__)
 
@@ -382,6 +384,11 @@ def verify_user_with_exports(user, run) -> ExportComplianceResult:
     for the same courseware object, from the last 24 hours, or representing
     a prior failed check for this user.
     """
+    # Lets main.sentry identify the learner on an error event without the
+    # email and username send_default_pii would attach. Set before the cache
+    # lookup so a process checking many learners never reports the last one.
+    sentry_sdk.set_tag(EXPORT_COMPLIANCE_USER_TAG, user.global_id)
+
     cached_log = get_latest_export_compliance_log(user, run)
     if cached_log is not None:
         return ExportComplianceResult(
