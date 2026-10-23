@@ -92,7 +92,9 @@ from courses.constants import (
     ENROLL_CHANGE_STATUS_REFUNDED,
     ENROLL_CHANGE_STATUS_UNENROLLED,
 )
+from courses.exceptions import CountryBlockedError
 from courses.factories import (
+    BlockedCountryFactory,
     CourseFactory,
     CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
@@ -1594,6 +1596,37 @@ def test_create_run_enrollments_skip_enrollment_emails(
     assert len(successful_enrollments) == 2
     patched_send_enrollment_email.assert_not_called()
     patched_subscribe_emails.assert_not_called()
+
+
+def test_create_run_enrollments_raises_for_blocked_country(mocker, user):
+    """create_run_enrollments should raise CountryBlockedError before calling edX when the user's country is blocked."""
+    run = CourseRunFactory.create()
+    BlockedCountryFactory.create(course=run.course, country=user.legal_address.country)
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+    with pytest.raises(CountryBlockedError):
+        create_run_enrollments(user, [run])
+
+    patched_edx_enroll.assert_not_called()
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+def test_create_run_enrollments_allows_when_country_not_blocked(
+    mocker, user, django_capture_on_commit_callbacks
+):
+    """create_run_enrollments should proceed normally when no countries are blocked for the course."""
+    run = CourseRunFactory.create()
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    with django_capture_on_commit_callbacks(execute=True):
+        successful_enrollments, edx_request_success = create_run_enrollments(
+            user, [run]
+        )
+
+    assert edx_request_success is True
+    assert len(successful_enrollments) == 1
 
 
 def test_create_program_enrollments_verifies_exports_for_verified_mode(mocker, user):

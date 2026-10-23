@@ -27,7 +27,6 @@ from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from compliance.exceptions import ExportComplianceDataError, ExportComplianceError
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
-    BlockedCountryFactory,
     CourseFactory,
     CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
@@ -776,19 +775,26 @@ def test_create_enrollments_no_run(mocker, user_client):
     assert resp.url == EXAMPLE_URL
 
 
-def test_create_enrollments_blocked_country(user_client, user):
+def test_create_enrollments_blocked_country(mocker, user_client, user):
     """
-    Create enrollment view should redirect with a user message in a cookie if the attempted enrollment is blocked
+    Create enrollment view should redirect to the dashboard with a blocked message when
+    create_run_enrollments raises CountryBlockedError.
     """
+    from courses.exceptions import CountryBlockedError  # noqa: PLC0415
+
     run = CourseRunFactory.create()
-    BlockedCountryFactory.create(course=run.course, country=user.legal_address.country)
+    mocker.patch("courses.views.v1.create_user")
+    mocker.patch(
+        "courses.views.v1.create_run_enrollments",
+        side_effect=CountryBlockedError(user, run.course),
+    )
     resp = user_client.post(
         reverse("create-enrollment-via-form"),
         data={"run": str(run.id)},
         HTTP_REFERER=EXAMPLE_URL,
     )
     assert resp.status_code == status.HTTP_302_FOUND
-    assert resp.url == EXAMPLE_URL
+    assert resp.url == reverse("user-dashboard")
     assert USER_MSG_COOKIE_NAME in resp.cookies
     assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
         {

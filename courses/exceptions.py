@@ -58,3 +58,7 @@ class ProgramEntitlementUnavailableError(APIException):
     status_code = status.HTTP_402_PAYMENT_REQUIRED
     default_detail = "This course run must be purchased."
     default_code = "program_entitlement_unavailable"
+
+
+class CountryBlockedError(Exception):
+    """Raised when a user's country is blocked from enrolling in a course."""
