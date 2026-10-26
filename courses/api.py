@@ -39,7 +39,10 @@ from rest_framework.status import (
 )
 
 from cms.api import create_default_courseware_page
-from compliance.api import verify_user_with_exports
+from compliance.api import (
+    get_unresolved_export_compliance_decline,
+    verify_user_with_exports,
+)
 from compliance.exceptions import (
     ExportComplianceCheckError,
     ExportComplianceDataError,
@@ -241,7 +244,8 @@ def create_run_enrollments(  # noqa: C901, PLR0913
             If None, defaults to the value of the IGNORE_EDX_FAILURES feature flag.
         mode (str): The course mode
         skip_compliance_check (bool): If True, bypass the export compliance
-            check. Operator-run management commands only.
+            check. Operator-run management commands and support-initiated
+            flows such as defer_enrollment only.
         skip_enrollment_emails (bool): If True, don't send the learner the
             enrollment confirmation email. Operator-run management commands only.
 
@@ -565,6 +569,27 @@ def _verify_exports_compliance_for_enrollment(user, courseware_object) -> None:
     raise ExportComplianceError(user, result.decision, result.reason_code)
 
 
+def _verify_no_export_compliance_decline(user, courseware_object) -> None:
+    """Refuse a user CyberSource declined, without running a new check."""
+    if not is_enabled(
+        features.EXPORT_COMPLIANCE_CHECK_ENABLED,
+        default=False,
+        opt_unique_id=user.global_id,
+    ):
+        return
+
+    decline = get_unresolved_export_compliance_decline(user)
+    if decline is not None:
+        log.warning(
+            "Prior export compliance decline blocks enrollment for user=%s "
+            "courseware_object=%s: reason_code=%r",
+            user.id,
+            courseware_object,
+            decline.reason_code,
+        )
+        raise ExportComplianceError(user, decline.decision, decline.reason_code)
+
+
 @dataclass(frozen=True)
 class EnrollmentEligibility:
     """Whether a user may enroll in a courseware object, and why not if they can't."""
@@ -814,12 +839,17 @@ def defer_enrollment(  # noqa: C901
     )
 
     if to_run is None:
+        if not from_enrollment.active:
+            # create_run_enrollments reactivates an inactive enrollment, so this
+            # grants access like enrolling in a new run would.
+            _verify_no_export_compliance_decline(user, from_enrollment.run)
         deferred_enrollments, _ = create_run_enrollments(
             user=user,
             runs=[from_enrollment.run],
             change_status=ENROLL_CHANGE_STATUS_DEFERRED,
             keep_failed_enrollments=keep_failed_enrollments,
             mode=EDX_ENROLLMENT_AUDIT_MODE,
+            skip_compliance_check=True,
         )
         return first_or_none(deferred_enrollments), None
 
@@ -846,6 +876,13 @@ def defer_enrollment(  # noqa: C901
             f"Cannot defer to a course run of a different course ('{from_enrollment.run.course.title}' -> '{to_run.course.title}'). "  # noqa: EM102
             "Set force=True to defer anyway."
         )
+
+    # Support-initiated, so the learner isn't there to complete their profile:
+    # skip the live check (hq#13766). Their next self-service enrollment goes
+    # through the normal check (possibly using a cached result). This happens
+    # before the existing deferment check so even if the learner already has a
+    # deferment we catch that they failed the export check.
+    _verify_no_export_compliance_decline(user, to_run)
 
     if already_deferred_from:
         # check if user was already enrolled in verified track
@@ -877,6 +914,7 @@ def defer_enrollment(  # noqa: C901
         change_status=None,
         keep_failed_enrollments=keep_failed_enrollments,
         mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        skip_compliance_check=True,
     )
     if not enroll_success and not keep_failed_enrollments:
         raise Exception(  # noqa: TRY002
@@ -889,6 +927,7 @@ def defer_enrollment(  # noqa: C901
             change_status=ENROLL_CHANGE_STATUS_DEFERRED,
             keep_failed_enrollments=keep_failed_enrollments,
             mode=EDX_ENROLLMENT_AUDIT_MODE,
+            skip_compliance_check=True,
         )
         if not enroll_success and not keep_failed_enrollments:
             raise Exception(  # noqa: TRY002

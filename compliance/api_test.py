@@ -19,12 +19,13 @@ from compliance.api import (
     get_cybersource_client,
     get_latest_export_compliance_log,
     get_missing_export_compliance_fields,
+    get_unresolved_export_compliance_decline,
     log_export_compliance_check,
     verify_user_with_exports,
 )
 from compliance.exceptions import ExportComplianceDataError
 from compliance.factories import ExportComplianceLogFactory
-from compliance.models import ExportComplianceLog
+from compliance.models import ExportComplianceDecision, ExportComplianceLog
 from courses.factories import CourseRunFactory
 from main.sentry import EXPORT_COMPLIANCE_USER_TAG, before_send
 from users.factories import UserFactory
@@ -531,3 +532,47 @@ def test_cached_check_tags_the_current_learner(mocker, export_settings):
 
         mock_client.validate_export_compliance.assert_called_once()
         assert scope._tags[EXPORT_COMPLIANCE_USER_TAG] == cached_user.global_id  # noqa: SLF001
+
+
+COMPLETED = ExportComplianceDecision.COMPLETED
+DECLINED = ExportComplianceDecision.DECLINED
+INVALID_REQUEST = ExportComplianceDecision.INVALID_REQUEST
+MANUALLY_APPROVED = ExportComplianceDecision.MANUALLY_APPROVED
+
+
+@pytest.mark.parametrize(
+    ("decisions", "blocking_index"),
+    [
+        ([], None),
+        ([COMPLETED], None),
+        ([INVALID_REQUEST], None),
+        ([DECLINED], 0),
+        ([DECLINED, COMPLETED], None),
+        ([COMPLETED, DECLINED], 1),
+        ([DECLINED, INVALID_REQUEST], 0),
+        ([DECLINED, COMPLETED, DECLINED], 2),
+        ([DECLINED, MANUALLY_APPROVED], None),
+    ],
+)
+def test_get_unresolved_export_compliance_decline(decisions, blocking_index):
+    """Only the most recent DECLINED log with no later accepted log counts"""
+    user = UserFactory.create()
+    other_user = UserFactory.create()
+    ExportComplianceLogFactory.create(user=other_user, decision=DECLINED)
+    start = now_in_utc() - timedelta(days=len(decisions) + 1)
+    logs = []
+    for index, decision in enumerate(decisions):
+        extra_log_kwargs = {}
+        if decision == MANUALLY_APPROVED:
+            extra_log_kwargs["approved_by"] = UserFactory.create()
+            extra_log_kwargs["approved_on"] = start + timedelta(days=index)
+        log_entry = ExportComplianceLogFactory.create(
+            user=user, decision=decision, **extra_log_kwargs
+        )
+        ExportComplianceLog.objects.filter(pk=log_entry.pk).update(
+            created_on=start + timedelta(days=index)
+        )
+        logs.append(log_entry)
+
+    expected = None if blocking_index is None else logs[blocking_index]
+    assert get_unresolved_export_compliance_decline(user) == expected
