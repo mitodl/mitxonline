@@ -1841,7 +1841,10 @@ def test_defer_enrollment_without_target_and_prior_decline(
 
 @pytest.mark.parametrize("compliance_enabled", [True, False])
 def test_defer_enrollment_compliance_flag_skipped(
-    settings, mocker, course, compliance_enabled, compliance_pass
+    settings,
+    mocker,
+    course,
+    compliance_enabled,
 ):
     """With no decline on file the deferral proceeds, flag on or off."""
     settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = compliance_enabled
