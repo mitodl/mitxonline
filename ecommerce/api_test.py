@@ -39,6 +39,7 @@ from courses.factories import (
     ProgramEnrollmentFactory,
     ProgramFactory,
 )
+from courses.models import PaidCourseRun
 from ecommerce.api import (
     ANONYMOUS_BASKET_SESSION_KEY,
     _retrieve_pending_cybersource_orders,
@@ -50,6 +51,7 @@ from ecommerce.api import (
     check_for_duplicate_discount_redemptions,
     claim_anonymous_basket,
     create_verified_program_course_run_enrollment,
+    create_verified_program_course_run_order,
     create_verified_program_discount,
     cull_anonymous_baskets,
     downgrade_enrollments_from_order,
@@ -103,6 +105,7 @@ from ecommerce.constants import (
 from ecommerce.exceptions import (
     VerifiedProgramCourseNotInProgramError,
     VerifiedProgramNoEnrollmentError,
+    VerifiedProgramNoProductError,
 )
 from ecommerce.factories import (
     DiscountRedemptionFactory,
@@ -1212,7 +1215,82 @@ def test_create_verified_program_course_run_enrollment(
     mock_create_run_enrollments.side_effect = mock_cre_side_effect
 
 
-def test_create_vpcre_no_program(bootstrapped_verified_program, user):
+def test_create_verified_program_course_run_order(
+    mocker,
+    mock_create_run_enrollments,
+    mock_hubspot_order,
+    bootstrapped_verified_program,
+    user,
+):
+    """
+    A program-verified learner gets a run enrollment backed by a fulfilled,
+    zero-value order redeeming the program's discount. The user's basket is
+    left alone and no receipt is sent.
+    """
+
+    mock_send_receipt = mocker.patch(
+        "ecommerce.tasks.send_ecommerce_order_receipt.delay"
+    )
+    (program, prog_product, _, courserun, cr_product) = bootstrapped_verified_program
+    ProgramEnrollmentFactory.create(
+        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    basket = Basket.objects.create(user=user)
+    BasketItem.objects.create(basket=basket, product=prog_product, quantity=1)
+    mock_create_run_enrollments.side_effect = (
+        lambda user, runs, *, mode=EDX_ENROLLMENT_VERIFIED_MODE, **kwargs: (  # noqa: ARG005
+            [
+                CourseRunEnrollmentFactory.create(
+                    run=runs[0], user=user, enrollment_mode=mode
+                )
+            ],
+            True,
+        )
+    )
+
+    enrollment = create_verified_program_course_run_order(user, courserun, program)
+
+    assert enrollment.run == courserun
+    assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    order = Order.objects.get(purchaser=user, lines__purchased_object_id=courserun.id)
+    assert order.state == OrderStatus.FULFILLED
+    assert order.total_price_paid == 0
+    assert order.lines.get().product_version.object_id == str(cr_product.id)
+    assert order.discounts.get().redeemed_discount == create_verified_program_discount(
+        program
+    )
+    assert PaidCourseRun.objects.filter(
+        user=user, course_run=courserun, order=order
+    ).exists()
+    assert list(basket.basket_items.values_list("product", flat=True)) == [
+        prog_product.id
+    ]
+    mock_send_receipt.assert_not_called()
+
+
+def test_create_vpcro_no_product(bootstrapped_verified_program, user):
+    """
+    A run with no active product is refused before an order or the program's
+    discount is created.
+    """
+
+    (program, _, _, courserun, cr_product) = bootstrapped_verified_program
+    ProgramEnrollmentFactory.create(
+        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    cr_product.is_active = False
+    cr_product.save()
+
+    with pytest.raises(VerifiedProgramNoProductError):
+        create_verified_program_course_run_order(user, courserun, program)
+
+    assert not Order.objects.filter(purchaser=user).exists()
+    assert not DiscountProduct.objects.filter(
+        discount__redemption_type=REDEMPTION_TYPE_INTERNAL
+    ).exists()
+
+
+def test_create_vpcro_no_program(bootstrapped_verified_program, user):
     """
     Test that creating a verified course run enrollment for a program fails if
     there's no program enrollment.
@@ -1229,7 +1307,7 @@ def test_create_vpcre_no_program(bootstrapped_verified_program, user):
     assert "No verified enrollment" in str(exc.value)
 
 
-def test_create_vpcre_run_not_in_program(bootstrapped_verified_program, user):
+def test_create_vpcro_run_not_in_program(bootstrapped_verified_program, user):
     """
     The program's discount prices anything it is attached to, so a run whose
     course is outside the program's requirements is refused before a basket
@@ -1250,7 +1328,7 @@ def test_create_vpcre_run_not_in_program(bootstrapped_verified_program, user):
     assert not BasketDiscount.objects.filter(redeemed_by=user).exists()
 
 
-def test_create_vpcre_bad_basket(
+def test_create_vpcro_bad_basket(
     mocker,
     mock_hubspot_order,
     mock_create_run_enrollments,
