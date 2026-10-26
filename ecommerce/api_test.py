@@ -85,6 +85,7 @@ from ecommerce.constants import (
     STRIPE_EVENT_CHARGE_REFUND_UPDATED,
     STRIPE_EVENT_CHECKOUT_SESSION_EXPIRED,
     STRIPE_EVENT_REFUND_UPDATED,
+    STRIPE_OBJECT_CHECKOUT_SESSION,
     STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
     STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
     STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
@@ -2250,12 +2251,6 @@ def test_cull_stale_pending_orders(settings, user):
     stale_line = make_pending_line()
     stale = stale_line.order
     stale_redemption = DiscountRedemptionFactory.create(redeemed_order=stale)
-    abandoned_stripe_checkout = make_order()
-    TransactionFactory.create(
-        order=abandoned_stripe_checkout,
-        transaction_id="cs_test_abandoned",
-        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
-    )
     recent = make_order(created_on=now_in_utc() - timedelta(days=59))
     old_fulfilled = make_order(OrderStatus.FULFILLED)
     old_canceled = make_order(OrderStatus.CANCELED)
@@ -2273,7 +2268,6 @@ def test_cull_stale_pending_orders(settings, user):
     assert not Order.objects.filter(pk=stale.pk).exists()
     assert not Line.objects.filter(pk=stale_line.pk).exists()
     assert not DiscountRedemption.objects.filter(pk=stale_redemption.pk).exists()
-    assert not Order.objects.filter(pk=abandoned_stripe_checkout.pk).exists()
     for kept in [
         recent,
         old_fulfilled,
@@ -2283,6 +2277,56 @@ def test_cull_stale_pending_orders(settings, user):
         funding_line.order,
     ]:
         assert Order.objects.filter(pk=kept.pk).exists()
+
+
+@pytest.mark.parametrize(
+    "stripe_status",
+    [
+        STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
+        STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+        STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+        None,
+    ],
+)
+def test_cull_stale_pending_orders_checks_stripe(mocker, settings, user, stripe_status):
+    """
+    Stale Stripe orders should be checked with Stripe first: only cancelled
+    sessions are culled, paid ones are resolved, and the rest are kept. A
+    status of None means the Stripe lookup failed.
+    """
+    settings.PENDING_ORDER_CULL_AGE_DAYS = 60
+    mock_status = mocker.patch(
+        "ecommerce.api.process_stripe_checkout_session_status",
+        return_value={"status": stripe_status},
+        side_effect=None if stripe_status else ConnectionError("Stripe is down"),
+    )
+    mock_resolve = mocker.patch(
+        "ecommerce.api.check_and_process_pending_orders_for_resolution"
+    )
+
+    order = OrderFactory.create(
+        purchaser=user, gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE
+    )
+    TransactionFactory.create(
+        order=order,
+        transaction_id="cs_test_stale",
+        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+        data={"object": STRIPE_OBJECT_CHECKOUT_SESSION, "id": "cs_test_stale"},
+    )
+    Order.objects.filter(pk=order.pk).update(
+        created_on=now_in_utc() - timedelta(days=61)
+    )
+
+    cull_stale_pending_orders()
+
+    mock_status.assert_called_once_with("cs_test_stale")
+    assert Order.objects.filter(pk=order.pk).exists() is not (
+        stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED
+    )
+    if stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
+        mock_resolve.assert_called_once_with([order.reference_number])
+    else:
+        mock_resolve.assert_not_called()
 
 
 def test_log_stripe_event():
