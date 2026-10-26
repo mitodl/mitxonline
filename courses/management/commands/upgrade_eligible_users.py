@@ -17,7 +17,7 @@ from django.core.management import BaseCommand
 from courses.api import create_run_enrollments
 from courses.exceptions import CountryBlockedError
 from courses.models import CourseRun, CourseRunEnrollment
-from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
 
 
