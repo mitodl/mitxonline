@@ -99,6 +99,7 @@ from ecommerce.constants import (
     STRIPE_PAYMENT_STATUS_NPR,
     STRIPE_PAYMENT_STATUS_PAID,
     STRIPE_PAYMENT_STATUS_UNPAID,
+    STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
     TRANSACTION_TYPE_PAYMENT,
     TRANSACTION_TYPE_REFUND,
     ZERO_PAYMENT_DATA,
@@ -2249,11 +2250,17 @@ def test_cull_stale_pending_orders(settings, user):
     stale_line = make_pending_line()
     stale = stale_line.order
     stale_redemption = DiscountRedemptionFactory.create(redeemed_order=stale)
+    abandoned_stripe_checkout = make_order()
+    TransactionFactory.create(
+        order=abandoned_stripe_checkout,
+        transaction_id="cs_test_abandoned",
+        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+    )
     recent = make_order(created_on=now_in_utc() - timedelta(days=59))
     old_fulfilled = make_order(OrderStatus.FULFILLED)
     old_canceled = make_order(OrderStatus.CANCELED)
     with_transaction = make_order()
-    TransactionFactory.create(order=with_transaction)
+    TransactionFactory.create(order=with_transaction, transaction_id="paid")
     with_stripe_event = make_order()
     StripeEventLog.objects.create(
         event_id="evt_test", event_data={}, related_order=with_stripe_event
@@ -2266,6 +2273,7 @@ def test_cull_stale_pending_orders(settings, user):
     assert not Order.objects.filter(pk=stale.pk).exists()
     assert not Line.objects.filter(pk=stale_line.pk).exists()
     assert not DiscountRedemption.objects.filter(pk=stale_redemption.pk).exists()
+    assert not Order.objects.filter(pk=abandoned_stripe_checkout.pk).exists()
     for kept in [
         recent,
         old_fulfilled,

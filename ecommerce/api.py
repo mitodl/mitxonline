@@ -12,7 +12,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Q, QuerySet
+from django.db.models import Exists, OuterRef, Q, QuerySet
 from django.urls import reverse
 from ipware import get_client_ip
 from mitol.common.utils.datetime import now_in_utc
@@ -717,16 +717,25 @@ def cull_stale_pending_orders():
 
     Orders with any record of payment activity (transactions, Stripe events)
     are kept so they can still be resolved and audited, as are orders whose
-    lines fund a discount redemption (those are protected).
+    lines fund a discount redemption (those are protected). The transaction
+    Stripe checkout records for its CheckoutSession before the learner pays
+    doesn't count as payment activity.
     """
     cutoff = now_in_utc() - timedelta(days=settings.PENDING_ORDER_CULL_AGE_DAYS)
 
-    stale_orders = PendingOrder.objects.filter(
-        state=OrderStatus.PENDING,
-        created_on__lt=cutoff,
-        transactions__isnull=True,
-        stripeeventlog__isnull=True,
-    ).exclude(lines__funded_redemptions__isnull=False)
+    payment_transactions = Transaction.objects.filter(order=OuterRef("pk")).exclude(
+        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION
+    )
+
+    stale_orders = (
+        PendingOrder.objects.filter(
+            state=OrderStatus.PENDING,
+            created_on__lt=cutoff,
+            stripeeventlog__isnull=True,
+        )
+        .exclude(Exists(payment_transactions))
+        .exclude(lines__funded_redemptions__isnull=False)
+    )
 
     _, deleted = stale_orders.delete()
     log.info("Culled stale pending orders: %s", deleted)
