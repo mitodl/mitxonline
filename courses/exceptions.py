@@ -10,9 +10,10 @@ class EnrollmentError(APIException):
 
     Deliberately excludes any specifics about *why* the enrollment failed (e.g.
     which export compliance decision came back) rather than surfacing that
-    detail to the client. The one thing that varies is an opaque support code
-    appended by ``from_cause`` for causes that declare one. The underlying cause
-    is logged server-side by the code that raises it (e.g. ``courses.api``).
+    detail to the client. What varies is an opaque support code appended by
+    ``from_cause`` for causes that declare one, plus, for a profile the learner
+    can fix, the profile fields to fix (``missing_fields``). The underlying
+    cause is logged server-side by the code that raises it (e.g. ``courses.api``).
 
     Says nothing about contacting support either - clients already pair an
     enrollment failure with their own support copy, so a CTA here doubles up.

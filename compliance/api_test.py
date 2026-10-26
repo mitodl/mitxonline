@@ -688,6 +688,36 @@ def test_verify_user_with_exports_maps_invalid_request_to_data_error(
 
 
 @pytest.mark.parametrize(
+    ("details", "logs_error"),
+    [
+        (
+            [{"field": "orderInformation.billTo.lastName", "reason": "INVALID_DATA"}],
+            False,
+        ),
+        (
+            [{"field": "orderInformation.somethingElse", "reason": "MISSING_FIELD"}],
+            True,
+        ),
+    ],
+)
+def test_verify_user_with_exports_logs_unattributable_rejections(
+    mocker, export_settings, caplog, details, logs_error
+):
+    """A rejection naming no field we know is logged as an error, to be noticed."""
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.side_effect = _invalid_request(details)
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    with pytest.raises(ExportComplianceDataError):
+        verify_user_with_exports(_complete_user(), CourseRunFactory.create())
+
+    errors = [r for r in caplog.records if r.levelname == "ERROR"]
+    assert bool(errors) is logs_error
+    if logs_error:
+        assert "orderInformation.somethingElse" in errors[0].getMessage()
+
+
+@pytest.mark.parametrize(
     ("status", "body_status"),
     [(401, "INVALID_REQUEST"), (500, "SERVER_ERROR"), (400, "DECLINED")],
 )

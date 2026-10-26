@@ -327,8 +327,18 @@ def _get_invalid_request_fields(exc: ApiException) -> list[str] | None:
         if isinstance(detail, dict)
         and detail.get("field") in REQUEST_FIELD_TO_BILL_TO_FIELD
     ]
+    if fields:
+        return fields
+    # Nothing to attribute to a profile field (e.g. a field CyberSource renamed,
+    # or one we don't send), so the learner can only review them all, and may
+    # not be able to fix it. details holds field names and reason codes only.
+    log.error(
+        "CyberSource INVALID_REQUEST named no known bill-to field: reason=%s details=%s",
+        body.get("reason"),
+        body.get("details"),
+    )
     # address2 is optional, so it isn't one of the fields to review.
-    return fields or [f for f in BILL_TO_FIELD_TO_PROFILE_FIELD if f != "address2"]
+    return [f for f in BILL_TO_FIELD_TO_PROFILE_FIELD if f != "address2"]
 
 
 def _get_raw_response_text(response: Any) -> str:

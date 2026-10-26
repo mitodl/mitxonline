@@ -76,15 +76,16 @@ class ExportComplianceDataError(ExportComplianceCheckError):
         Sets exception properties and adds a default message
 
         Args:
-            user (users.models.User): The user missing required profile data
-            missing_fields (list of str): The billTo fields that could not be populated
+            user (users.models.User): The user whose profile data can't be used
+            missing_fields (list of str): The billTo fields that are empty, or
+                that CyberSource rejected
         """
         self.user = user
         self.missing_fields = sorted(set(missing_fields))
         if msg is None:
             msg = (
-                f"Unable to verify export compliance for user={user.id}: missing "
-                f"required profile information ({', '.join(self.missing_fields)}). "
+                f"Unable to verify export compliance for user={user.id}: missing or "
+                f"invalid profile information ({', '.join(self.missing_fields)}). "
                 "Please update your profile or contact support."
             )
         super().__init__(msg)
