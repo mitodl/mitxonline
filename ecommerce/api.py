@@ -752,9 +752,9 @@ def _check_stale_stripe_orders(orders):
     paid order whose webhook never got processed isn't deleted.
 
     Only orders whose session was cancelled (or that have no session to check)
-    can be deleted. Paid orders are fulfilled. Orders that are still pending
-    in Stripe, or whose session couldn't be retrieved, are kept for the next
-    run.
+    can be deleted. Paid orders are fulfilled. Orders in any other state, or
+    whose session couldn't be retrieved, are kept and checked again on the
+    next run.
 
     Returns:
     - set of IDs of the orders to keep
@@ -769,7 +769,6 @@ def _check_stale_stripe_orders(orders):
     }
 
     keep_ids = set()
-    paid_refnos = []
 
     for order in orders:
         session_id = session_ids.get(order.id)
@@ -778,7 +777,7 @@ def _check_stale_stripe_orders(orders):
             continue
 
         try:
-            status = process_stripe_checkout_session_status(session_id)["status"]
+            session = process_stripe_checkout_session_status(session_id)
         except Exception:
             log.exception(
                 "Couldn't check CheckoutSession %s for stale order %s, keeping it",
@@ -788,17 +787,29 @@ def _check_stale_stripe_orders(orders):
             keep_ids.add(order.id)
             continue
 
-        if status == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED:
+        if session["status"] == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED:
             continue
 
         keep_ids.add(order.id)
 
-        if status == STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
-            paid_refnos.append(order.reference_number)
+        if session["status"] != STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
+            log.info(
+                "Keeping stale order %s: CheckoutSession %s is %s",
+                order.reference_number,
+                session_id,
+                session["status"],
+            )
+            continue
 
-    if paid_refnos:
-        log.warning("Stale pending orders were paid in Stripe: %s", paid_refnos)
-        check_and_process_pending_orders_for_resolution(paid_refnos)
+        log.warning(
+            "Stale order %s was paid in Stripe, fulfilling it",
+            order.reference_number,
+        )
+        try:
+            order.get_object_flow().fulfill(session["transaction"])
+            sync_hubspot_deal(order)
+        except Exception:
+            log.exception("Couldn't fulfill stale order %s", order.reference_number)
 
     return keep_ids
 

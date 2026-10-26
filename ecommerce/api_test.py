@@ -2297,12 +2297,11 @@ def test_cull_stale_pending_orders_checks_stripe(mocker, settings, user, stripe_
     settings.PENDING_ORDER_CULL_AGE_DAYS = 60
     mock_status = mocker.patch(
         "ecommerce.api.process_stripe_checkout_session_status",
-        return_value={"status": stripe_status},
+        return_value={"status": stripe_status, "transaction": {"id": "cs_test"}},
         side_effect=None if stripe_status else ConnectionError("Stripe is down"),
     )
-    mock_resolve = mocker.patch(
-        "ecommerce.api.check_and_process_pending_orders_for_resolution"
-    )
+    mock_fulfill = mocker.patch("ecommerce.models.OrderFlow.fulfill")
+    mocker.patch("ecommerce.api.sync_hubspot_deal")
 
     order = OrderFactory.create(
         purchaser=user, gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE
@@ -2324,9 +2323,9 @@ def test_cull_stale_pending_orders_checks_stripe(mocker, settings, user, stripe_
         stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED
     )
     if stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
-        mock_resolve.assert_called_once_with([order.reference_number])
+        mock_fulfill.assert_called_once_with({"id": "cs_test"})
     else:
-        mock_resolve.assert_not_called()
+        mock_fulfill.assert_not_called()
 
 
 def test_log_stripe_event():
