@@ -36,6 +36,7 @@ from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
+    EnrollmentModeFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
 )
@@ -51,6 +52,7 @@ from ecommerce.api import (
     claim_anonymous_basket,
     create_verified_program_course_run_enrollment,
     create_verified_program_discount,
+    create_verified_program_enrollment_orders,
     cull_anonymous_baskets,
     downgrade_enrollments_from_order,
     downgrade_learner_from_order,
@@ -138,6 +140,7 @@ from ecommerce.models import (
     Transaction,
     UserDiscount,
 )
+from ecommerce.test_utils import make_order_for_product
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import (
     FlexiblePriceFactory,
@@ -1166,12 +1169,20 @@ def test_create_verified_program_discount():
     assert create_verified_program_discount(program) == discount
 
 
-def test_create_verified_program_course_run_enrollment(
+@pytest.mark.parametrize(
+    "has_order",
+    [
+        True,
+        False,
+    ],
+)
+def test_create_verified_program_course_run_enrollment(  # noqa: PLR0913
     mocker,
     mock_create_run_enrollments,
     mock_hubspot_order,
     bootstrapped_verified_program,
     user,
+    has_order,
 ):
     """Test that creating a verified course run enrollment for a program works
     and does not send a receipt email.
@@ -1182,11 +1193,14 @@ def test_create_verified_program_course_run_enrollment(
         "ecommerce.tasks.send_ecommerce_order_receipt.delay"
     )
 
-    (program, _, _, courserun, _) = bootstrapped_verified_program
+    (program, program_product, _, courserun, _) = bootstrapped_verified_program
 
     ProgramEnrollmentFactory.create(
         program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
+
+    if has_order:
+        make_order_for_product(user, program_product)
 
     request = RequestFactory().get("/")
     request.user = user
@@ -1201,6 +1215,15 @@ def test_create_verified_program_course_run_enrollment(
             False,
         )
     )
+
+    if not has_order:
+        with pytest.raises(VerifiedProgramNoEnrollmentError) as exc:
+            cr_enrollment = create_verified_program_course_run_enrollment(
+                request, courserun, program
+            )
+
+        assert "No verified purchase" in str(exc)
+        return
 
     cr_enrollment = create_verified_program_course_run_enrollment(
         request, courserun, program
@@ -1264,11 +1287,14 @@ def test_create_vpcre_bad_basket(
     with reversion.create_revision():
         some_other_product = ProductFactory.create()
 
-    (program, _, _, courserun, _) = bootstrapped_verified_program
+    (program, program_product, _, courserun, _) = bootstrapped_verified_program
 
     prog_enrollment = ProgramEnrollmentFactory.create(
         program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
+    # Create and save an order for the enrollment, or we'll get an error because
+    # the course run enrollment isn't upgradable yet.
+    make_order_for_product(prog_enrollment.user, program_product)
 
     request = RequestFactory().get("/")
     request.user = prog_enrollment.user
@@ -2859,3 +2885,85 @@ def test_generate_checkout_payload_b2b_optional_run(
         assert "error" in result
     else:
         assert "error" not in result
+
+
+@pytest.mark.parametrize(
+    (
+        "has_order",
+        "crogram_upgradable",
+        "crogram_product",
+    ),
+    [
+        (
+            False,
+            False,
+            False,
+        ),
+        (
+            True,
+            False,
+            False,
+        ),
+        (
+            True,
+            True,
+            False,
+        ),
+        (
+            True,
+            True,
+            True,
+        ),
+    ],
+)
+def test_create_verified_program_enrollment_orders(
+    bootstrapped_verified_program, has_order, crogram_upgradable, crogram_product
+):
+    """
+    Ensure the program enrollment backfill creates orders as expected.
+
+    This gets used for crogram enrollments - the root program has a purchased
+    upgrade and the intermediate programs may not, so the app needs to create
+    verified enrollments and orders for the intermediates.
+    """
+
+    user = UserFactory.create()
+
+    (program, program_product, _, _, _) = bootstrapped_verified_program
+
+    ProgramEnrollmentFactory.create(
+        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    if has_order:
+        make_order_for_product(user, program_product)
+
+    modes = [EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)]
+    if crogram_upgradable:
+        modes.append(
+            EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
+        )
+
+    crogram = ProgramFactory.create(display_mode="course", enrollment_modes=modes)
+    crogram_run = CourseRunFactory.create()
+    crogram.add_requirement(crogram_run.course)
+
+    if crogram_product:
+        prog_ctype = ContentType.objects.get_for_model(crogram)
+        with reversion.create_revision():
+            Product.objects.create(
+                content_type=prog_ctype,
+                object_id=crogram.id,
+                price=10,
+            )
+
+    create_verified_program_enrollment_orders(user, program, [crogram])
+
+    crogram_order_qs = user.orders.filter(
+        state=OrderStatus.FULFILLED, lines__purchased_object_id=crogram.id
+    )
+
+    if has_order and crogram_upgradable and crogram_product:
+        assert crogram_order_qs.exists()
+    else:
+        assert not crogram_order_qs.exists()

@@ -89,6 +89,7 @@ from courses.views.test_utils import (
 from courses.views.v2 import CourseViewSet, Pagination, ProgramFilterSet
 from ecommerce.factories import OrderFactory, ProductFactory
 from ecommerce.models import OrderStatus, Product
+from ecommerce.test_utils import make_order_for_product
 from main import features
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
@@ -1992,12 +1993,14 @@ def test_add_verified_program_course_enrollment(
         if program_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE:
             program_content_type = ContentType.objects.get_for_model(program)
             with reversion.create_revision():
-                Product.objects.create(
+                program_product = Product.objects.create(
                     price=10,
                     is_active=True,
                     object_id=program.id,
                     content_type=program_content_type,
                 )
+
+            make_order_for_product(user, program_product)
     else:
         program = ProgramFactory.create()
 
@@ -2065,14 +2068,18 @@ def test_add_verified_program_course_enrollment_incomplete_profile(
     ).program
     course_run = CourseRunFactory.create()
     program.add_requirement(course_run.course)
-    with reversion.create_revision():
-        for courseware in (program, course_run):
-            Product.objects.create(
+    for courseware in (program, course_run):
+        with reversion.create_revision():
+            created_product = Product.objects.create(
                 price=10,
                 is_active=True,
                 object_id=courseware.id,
                 content_type=ContentType.objects.get_for_model(courseware),
             )
+
+        if courseware == program:
+            make_order_for_product(user, created_product)
+
     user.legal_address.street_address_1 = ""
     user.legal_address.save()
 
@@ -2376,7 +2383,7 @@ def test_add_verified_program_course_enrollment_export_compliance_blocked(
         EDX_ENROLLMENT_VERIFIED_MODE,
     ],
 )
-def test_add_nested_verified_program_course_enrollment(
+def test_add_nested_verified_program_course_enrollment(  # noqa: C901
     user,
     user_drf_client,
     base_program_enrollment_type,
@@ -2436,7 +2443,7 @@ def test_add_nested_verified_program_course_enrollment(
         )
 
     with reversion.create_revision():
-        Product.objects.create(
+        base_program_product = Product.objects.create(
             price=10,
             is_active=True,
             object_id=base_program.id,
@@ -2444,7 +2451,7 @@ def test_add_nested_verified_program_course_enrollment(
         )
 
     with reversion.create_revision():
-        Product.objects.create(
+        crogram_product = Product.objects.create(
             price=10,
             is_active=True,
             object_id=crogram.id,
@@ -2466,6 +2473,8 @@ def test_add_nested_verified_program_course_enrollment(
             user=user,
             enrollment_mode=base_program_enrollment_type,
         )
+    if base_program_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE:
+        make_order_for_product(user, base_program_product)
 
     if crogram_enrollment_type:
         ProgramEnrollmentFactory.create(
@@ -2473,6 +2482,8 @@ def test_add_nested_verified_program_course_enrollment(
             user=user,
             enrollment_mode=crogram_enrollment_type,
         )
+    if crogram_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE:
+        make_order_for_product(user, crogram_product)
 
     resp = user_drf_client.post(
         reverse(
@@ -2511,6 +2522,20 @@ def test_add_nested_verified_program_course_enrollment(
         return
 
     assert resp.status_code == status.HTTP_201_CREATED
+
+    if [base_program_enrollment_type, crogram_enrollment_type] == [
+        EDX_ENROLLMENT_VERIFIED_MODE,
+        EDX_ENROLLMENT_AUDIT_MODE,
+    ]:
+        # We should have backfilled a verified enrollment and order for the
+        # crogram too.
+        crogram_product_version = reversion.models.Version.objects.get_for_object(
+            crogram_product
+        ).first()
+
+        assert user.orders.filter(
+            state=OrderStatus.FULFILLED, lines__product_version=crogram_product_version
+        ).exists()
 
     if [base_program_enrollment_type, crogram_enrollment_type] == [
         EDX_ENROLLMENT_VERIFIED_MODE,
