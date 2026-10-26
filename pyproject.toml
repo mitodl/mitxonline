@@ -344,7 +344,9 @@ filterwarnings = [
     # factoryboy
     "ignore:.*\\._after_postgeneration will stop saving the instance after postgeneration hooks in the next major release",
     "ignore:authlib\\.jose module is deprecated, please use joserfc instead:authlib.deprecate.AuthlibDeprecationWarning",
-    "ignore:Failed to load HostKeys"
+    "ignore:Failed to load HostKeys",
+    # google-api-core warns from 2026-10-24 that it drops Python 3.11 on 2027-10-24
+    "ignore:You are using a Python version .* which Google will stop supporting:FutureWarning",
 ]
 env = [
   "AWS_ACCESS_KEY_ID=",
