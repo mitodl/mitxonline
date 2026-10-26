@@ -1839,12 +1839,20 @@ def test_defer_enrollment_without_target_and_prior_decline(
     patched_verify.assert_not_called()
 
 
-@pytest.mark.parametrize("compliance_enabled", [True, False])
+@pytest.mark.parametrize(
+    ("compliance_enabled", "compliance_decision"),
+    [
+        (True, ExportComplianceDecision.INVALID_REQUEST),
+        (False, ExportComplianceDecision.INVALID_REQUEST),
+        (False, ExportComplianceDecision.DECLINED),
+    ],
+)
 def test_defer_enrollment_compliance_flag_skipped(
     settings,
     mocker,
     course,
     compliance_enabled,
+    compliance_decision,
 ):
     """With no decline on file the deferral proceeds, flag on or off."""
     settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = compliance_enabled
@@ -1853,7 +1861,7 @@ def test_defer_enrollment_compliance_flag_skipped(
         run=from_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
     ExportComplianceLogFactory.create(
-        user=existing_enrollment.user, decision=ExportComplianceDecision.INVALID_REQUEST
+        user=existing_enrollment.user, decision=compliance_decision
     )
     patched_verify = mocker.patch("courses.api.verify_user_with_exports")
     mocker.patch("courses.api.enroll_in_edx_course_runs")
@@ -1872,7 +1880,7 @@ def test_defer_enrollment_compliance_flag_skipped(
 
 
 def test_defer_enrollment_compliance_flag_enabled(settings, mocker, course):
-    """If the learner has a denial on file, then decline the deferrment."""
+    """If the learner has a denial on file, then decline the deferement."""
     settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = True
     from_run, to_run = CourseRunFactory.create_batch(2, course=course)
     existing_enrollment = CourseRunEnrollmentFactory.create(

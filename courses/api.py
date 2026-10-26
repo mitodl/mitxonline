@@ -839,8 +839,8 @@ def defer_enrollment(  # noqa: C901
     # Support-initiated, so the learner isn't there to complete their profile:
     # skip the live check (hq#13766). Their next self-service enrollment goes
     # through the normal check (possibly using a cached result). This happens
-    # before the existing deferrment check so even if the learner already has a
-    # deferrment we catch that they failed the export check.
+    # before the existing deferment check so even if the learner already has a
+    # deferment we catch that they failed the export check.
     _verify_no_export_compliance_decline(user, to_run)
 
     if already_deferred_from:
