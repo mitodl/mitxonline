@@ -341,6 +341,12 @@ ANONYMOUS_BASKET_CULL_AGE = get_int(
     description="Seconds of inactivity after which an anonymous (unclaimed) basket is deleted",
 )
 
+PENDING_ORDER_CULL_AGE_DAYS = get_int(
+    name="PENDING_ORDER_CULL_AGE_DAYS",
+    default=60,
+    description="Age in days after which an unresolved PendingOrder is deleted",
+)
+
 B2B_USER_LATEST_SESSION_CACHE_TIMEOUT = get_int(
     name="B2B_USER_LATEST_SESSION_CACHE_TIMEOUT",
     default=60 * 60 * 24 * 30,
@@ -1111,6 +1117,10 @@ CELERY_BEAT_SCHEDULE = {
     "cull-anonymous-baskets": {
         "task": "ecommerce.tasks.perform_cull_anonymous_baskets",
         "schedule": crontab(minute=0, hour=4),
+    },
+    "cull-stale-pending-orders": {
+        "task": "ecommerce.tasks.perform_cull_stale_pending_orders",
+        "schedule": crontab(minute=30, hour=4),
     },
 }
 

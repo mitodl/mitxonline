@@ -54,6 +54,7 @@ from ecommerce.api import (
     create_verified_program_course_run_order,
     create_verified_program_discount,
     cull_anonymous_baskets,
+    cull_stale_pending_orders,
     downgrade_enrollments_from_order,
     downgrade_learner_from_order,
     establish_basket,
@@ -133,6 +134,7 @@ from ecommerce.models import (
     DiscountProduct,
     DiscountRedemption,
     FulfilledOrder,
+    Line,
     Order,
     OrderStatus,
     PendingOrder,
@@ -2220,6 +2222,59 @@ def test_cull_anonymous_baskets(settings, user):
     assert not Basket.objects.filter(pk=old_anon_basket.pk).exists()
     assert Basket.objects.filter(pk=recent_anon_basket.pk).exists()
     assert Basket.objects.filter(pk=old_user_basket.pk).exists()
+
+
+def test_cull_stale_pending_orders(settings, user):
+    """
+    Only pending orders older than the cutoff with no payment activity or
+    funded redemptions should be removed.
+    """
+    settings.PENDING_ORDER_CULL_AGE_DAYS = 60
+    old = now_in_utc() - timedelta(days=61)
+
+    def age_order(order, created_on=old):
+        Order.objects.filter(pk=order.pk).update(created_on=created_on)
+        return order
+
+    def make_order(state=OrderStatus.PENDING, *, created_on=old):
+        return age_order(OrderFactory.create(purchaser=user, state=state), created_on)
+
+    def make_pending_line():
+        line = make_purchase(
+            user, CourseRunFactory.create(), Decimal(100), state=OrderStatus.PENDING
+        )
+        age_order(line.order)
+        return line
+
+    stale_line = make_pending_line()
+    stale = stale_line.order
+    stale_redemption = DiscountRedemptionFactory.create(redeemed_order=stale)
+    recent = make_order(created_on=now_in_utc() - timedelta(days=59))
+    old_fulfilled = make_order(OrderStatus.FULFILLED)
+    old_canceled = make_order(OrderStatus.CANCELED)
+    with_transaction = make_order()
+    TransactionFactory.create(order=with_transaction)
+    with_stripe_event = make_order()
+    StripeEventLog.objects.create(
+        event_id="evt_test", event_data={}, related_order=with_stripe_event
+    )
+    funding_line = make_pending_line()
+    DiscountRedemptionFactory.create(source_line=funding_line)
+
+    cull_stale_pending_orders()
+
+    assert not Order.objects.filter(pk=stale.pk).exists()
+    assert not Line.objects.filter(pk=stale_line.pk).exists()
+    assert not DiscountRedemption.objects.filter(pk=stale_redemption.pk).exists()
+    for kept in [
+        recent,
+        old_fulfilled,
+        old_canceled,
+        with_transaction,
+        with_stripe_event,
+        funding_line.order,
+    ]:
+        assert Order.objects.filter(pk=kept.pk).exists()
 
 
 def test_log_stripe_event():

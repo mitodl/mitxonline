@@ -709,6 +709,29 @@ def cull_anonymous_baskets():
     Basket.objects.filter(anonymous_id__isnull=False, updated_on__lt=cutoff).delete()
 
 
+def cull_stale_pending_orders():
+    """
+    Delete PendingOrders that are older than PENDING_ORDER_CULL_AGE_DAYS.
+    Checkout creates a new PendingOrder each time, so abandoned checkouts
+    leave these behind.
+
+    Orders with any record of payment activity (transactions, Stripe events)
+    are kept so they can still be resolved and audited, as are orders whose
+    lines fund a discount redemption (those are protected).
+    """
+    cutoff = now_in_utc() - timedelta(days=settings.PENDING_ORDER_CULL_AGE_DAYS)
+
+    stale_orders = PendingOrder.objects.filter(
+        state=OrderStatus.PENDING,
+        created_on__lt=cutoff,
+        transactions__isnull=True,
+        stripeeventlog__isnull=True,
+    ).exclude(lines__funded_redemptions__isnull=False)
+
+    _, deleted = stale_orders.delete()
+    log.info("Culled stale pending orders: %s", deleted)
+
+
 def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs):  # noqa: RUF013
     """
     A function that performs refund for a given order id
