@@ -51,6 +51,7 @@ from wagtail.search import index
 from wagtail.snippets.models import register_snippet
 from wagtailmetadata.models import MetadataPageMixin
 
+from cms import credential_metadata
 from cms import utils as cms_utils
 from cms.blocks import (
     CourseRunCertificateOverrides,
@@ -326,33 +327,63 @@ class CourseProgramChildPage(Page):
         raise Http404
 
 
-class FeatureFlaggedFieldPanel(FieldPanel):
-    """A FieldPanel that is only rendered while its feature flag is enabled.
+class GenerateWithAIFieldPanel(FieldPanel):
+    """A FieldPanel with a "Generate with AI" button that fills it from MIT Learn.
 
-    Lets a field ship (and accumulate a migration) ahead of the functionality
-    that consumes it, without exposing a field that does nothing to CMS authors.
+    The button only renders while MIT Learn is configured and the credential
+    metadata authoring flag is on. The field itself renders regardless, unless
+    hide_without_flag is set: that lets a field ship (and accumulate a
+    migration) ahead of the functionality that consumes it, without exposing a
+    field that does nothing to CMS authors.
     """
 
-    def __init__(self, field_name, feature_flag, **kwargs):
+    def __init__(
+        self, field_name, metadata_field, *, hide_without_flag=False, **kwargs
+    ):
         super().__init__(field_name, **kwargs)
-        self.feature_flag = feature_flag
+        self.metadata_field = metadata_field
+        self.hide_without_flag = hide_without_flag
 
     def clone_kwargs(self):
-        """Carry the flag across clones.
+        """Carry our kwargs across clones.
 
         Wagtail clones panels when binding them to a model/instance, so without
-        this the flag is lost and the panel reverts to always rendering.
+        this they are lost and the panel reverts to a plain FieldPanel.
         """
         kwargs = super().clone_kwargs()
-        kwargs["feature_flag"] = self.feature_flag
+        kwargs["metadata_field"] = self.metadata_field
+        kwargs["hide_without_flag"] = self.hide_without_flag
         return kwargs
 
     class BoundPanel(FieldPanel.BoundPanel):
-        """Bound panel that also consults the feature flag."""
+        """Bound panel that adds the button and consults the feature flag."""
+
+        template_name = "cms/panels/generate_with_ai_field_panel.html"
+
+        @cached_property
+        def flag_enabled(self):
+            """Whether credential metadata authoring is switched on"""
+            return is_enabled(features.ENABLE_CREDENTIAL_METADATA_AUTHORING)
 
         def is_shown(self):
-            """Hide the panel entirely while the feature flag is disabled."""
-            return is_enabled(self.panel.feature_flag) and super().is_shown()
+            """Hide the panel entirely if it is flag-gated and the flag is off."""
+            if self.panel.hide_without_flag and not self.flag_enabled:
+                return False
+            return super().is_shown()
+
+        def get_context_data(self, parent_context=None):
+            """Add the URL the button reads MIT Learn's draft from."""
+            context = super().get_context_data(parent_context)
+            parent_page = getattr(self.form, "parent_page", None)
+            context["metadata_field"] = self.panel.metadata_field
+            context["metadata_url"] = (
+                reverse("cms_credential_metadata", args=[parent_page.id])
+                if parent_page
+                and self.flag_enabled
+                and credential_metadata.is_configured()
+                else None
+            )
+            return context
 
 
 class CertificatePage(CourseProgramChildPage):
@@ -430,16 +461,18 @@ class CertificatePage(CourseProgramChildPage):
         MultiFieldPanel(
             [
                 FieldPanel("should_provision_verifiable_credential"),
-                FeatureFlaggedFieldPanel(
+                GenerateWithAIFieldPanel(
                     "verifiable_credential_description",
-                    feature_flag=features.ENABLE_CREDENTIAL_METADATA_AUTHORING,
+                    metadata_field="description",
+                    hide_without_flag=True,
                     widget=Textarea,
                 ),
                 # Set on the panel, not the field: panel help text carries
                 # markup and isn't migration-tracked, so this copy can be
                 # revised without one.
-                FieldPanel(
+                GenerateWithAIFieldPanel(
                     "verifiable_credential_criteria",
+                    metadata_field="criteria",
                     widget=Textarea,
                     help_text=mark_safe(
                         "Describe what the learner did in order to earn the "
