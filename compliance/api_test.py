@@ -537,6 +537,7 @@ def test_cached_check_tags_the_current_learner(mocker, export_settings):
 COMPLETED = ExportComplianceDecision.COMPLETED
 DECLINED = ExportComplianceDecision.DECLINED
 INVALID_REQUEST = ExportComplianceDecision.INVALID_REQUEST
+MANUALLY_APPROVED = ExportComplianceDecision.MANUALLY_APPROVED
 
 
 @pytest.mark.parametrize(
@@ -550,6 +551,7 @@ INVALID_REQUEST = ExportComplianceDecision.INVALID_REQUEST
         ([COMPLETED, DECLINED], 1),
         ([DECLINED, INVALID_REQUEST], 0),
         ([DECLINED, COMPLETED, DECLINED], 2),
+        ([DECLINED, MANUALLY_APPROVED], None),
     ],
 )
 def test_get_unresolved_export_compliance_decline(decisions, blocking_index):
@@ -560,7 +562,13 @@ def test_get_unresolved_export_compliance_decline(decisions, blocking_index):
     start = now_in_utc() - timedelta(days=len(decisions) + 1)
     logs = []
     for index, decision in enumerate(decisions):
-        log_entry = ExportComplianceLogFactory.create(user=user, decision=decision)
+        extra_log_kwargs = {}
+        if decision == MANUALLY_APPROVED:
+            extra_log_kwargs["approved_by"] = UserFactory.create()
+            extra_log_kwargs["approved_on"] = start + timedelta(days=index)
+        log_entry = ExportComplianceLogFactory.create(
+            user=user, decision=decision, **extra_log_kwargs
+        )
         ExportComplianceLog.objects.filter(pk=log_entry.pk).update(
             created_on=start + timedelta(days=index)
         )
