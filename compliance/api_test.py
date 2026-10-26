@@ -26,7 +26,7 @@ from compliance.exceptions import ExportComplianceDataError
 from compliance.factories import ExportComplianceLogFactory
 from compliance.models import ExportComplianceLog
 from courses.factories import CourseRunFactory
-from main.sentry import before_send
+from main.sentry import EXPORT_COMPLIANCE_USER_TAG, before_send
 from users.factories import UserFactory
 from users.models import User
 
@@ -438,9 +438,8 @@ def test_decrypt_export_compliance_log_round_trips(export_compliance_keypair):
     assert json.loads(decrypted.response) == response
 
 
-def test_failed_check_does_not_send_learner_data_to_sentry(mocker, export_settings):
-    """A CyberSource error raised through the real SDK keeps the bill-to out of Sentry."""
-    user = UserFactory.create(name="Ada Lovelace", email="ada@example.com")
+def _set_us_legal_address(user):
+    """Give the user the legal address a live CyberSource check needs."""
     user.legal_address.first_name = "Ada"
     user.legal_address.last_name = "Lovelace"
     user.legal_address.country = "US"
@@ -449,6 +448,12 @@ def test_failed_check_does_not_send_learner_data_to_sentry(mocker, export_settin
     user.legal_address.state = "US-MA"
     user.legal_address.postal_code = "02139"
     user.legal_address.save()
+
+
+def test_failed_check_does_not_send_learner_data_to_sentry(mocker, export_settings):
+    """A CyberSource error captured by the real Sentry SDK keeps the bill-to out of Sentry."""
+    user = UserFactory.create(name="Ada Lovelace", email="ada@example.com")
+    _set_us_legal_address(user)
     run = CourseRunFactory.create()
 
     mock_client = mocker.Mock()
@@ -460,7 +465,8 @@ def test_failed_check_does_not_send_learner_data_to_sentry(mocker, export_settin
     events = []
     sentry_sdk.init(
         dsn="https://k@o0.ingest.sentry.io/0",
-        before_send=lambda event, hint: events.append(before_send(event, hint)),
+        # Keep the unscrubbed event; before_send runs on it below
+        before_send=lambda event, _hint: events.append(event),
         default_integrations=False,
     )
     try:
@@ -477,9 +483,19 @@ def test_failed_check_does_not_send_learner_data_to_sentry(mocker, export_settin
         sentry_sdk.get_global_scope().set_client(None)
 
     assert len(events) == 1
-    event_json = json.dumps(events[0])
+    # This test's own frame and ApiException's module (CyberSource.rest) would
+    # each trigger the strip, so drop both: the compliance.api frame must be
+    # enough on its own.
+    exception = events[0]["exception"]["values"][0]
+    frames = exception["stacktrace"]["frames"]
+    frames[:] = [frame for frame in frames if frame.get("module") != __name__]
+    assert "compliance.api" in [frame.get("module") for frame in frames]
+    exception.pop("module")
+
+    event = before_send(events[0], {})
+    event_json = json.dumps(event)
     assert "verify_user_with_exports" in event_json
-    assert events[0]["user"] == {"id": user.global_id}
+    assert event["user"] == {"id": user.global_id}
     for value in [
         "ada@example.com",
         user.username,
@@ -488,3 +504,30 @@ def test_failed_check_does_not_send_learner_data_to_sentry(mocker, export_settin
         "02139",
     ]:
         assert value not in event_json
+
+
+def test_cached_check_tags_the_current_learner(mocker, export_settings):
+    """A cache hit after a live check reports the learner being checked, not the last one."""
+    live_user = UserFactory.create()
+    _set_us_legal_address(live_user)
+    cached_user = UserFactory.create()
+    run = CourseRunFactory.create()
+    ExportComplianceLogFactory.create(
+        user=cached_user, courseware_object=run, decision="COMPLETED"
+    )
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.return_value = SimpleNamespace(
+        status="COMPLETED",
+        id="abc123",
+        export_compliance_information=SimpleNamespace(info_codes=[]),
+        error_information=None,
+        message=None,
+    )
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    with sentry_sdk.isolation_scope() as scope:
+        verify_user_with_exports(live_user, run)
+        verify_user_with_exports(cached_user, run)
+
+        mock_client.validate_export_compliance.assert_called_once()
+        assert scope._tags[EXPORT_COMPLIANCE_USER_TAG] == cached_user.global_id  # noqa: SLF001
