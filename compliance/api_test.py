@@ -6,6 +6,8 @@ from datetime import timedelta
 from types import SimpleNamespace
 
 import pytest
+import sentry_sdk
+from CyberSource.rest import ApiException
 from django.core.exceptions import ImproperlyConfigured
 from mitol.common.utils.datetime import now_in_utc
 
@@ -24,6 +26,7 @@ from compliance.exceptions import ExportComplianceDataError
 from compliance.factories import ExportComplianceLogFactory
 from compliance.models import ExportComplianceLog
 from courses.factories import CourseRunFactory
+from main.sentry import EXPORT_COMPLIANCE_USER_TAG, before_send
 from users.factories import UserFactory
 from users.models import User
 
@@ -433,3 +436,98 @@ def test_decrypt_export_compliance_log_round_trips(export_compliance_keypair):
     decrypted = decrypt_export_compliance_log(log_entry, export_compliance_keypair)
     assert decrypted.request == '{"hello": "world"}'
     assert json.loads(decrypted.response) == response
+
+
+def _set_us_legal_address(user):
+    """Give the user the legal address a live CyberSource check needs."""
+    user.legal_address.first_name = "Ada"
+    user.legal_address.last_name = "Lovelace"
+    user.legal_address.country = "US"
+    user.legal_address.street_address_1 = "77 Massachusetts Ave"
+    user.legal_address.city = "Cambridge"
+    user.legal_address.state = "US-MA"
+    user.legal_address.postal_code = "02139"
+    user.legal_address.save()
+
+
+def test_failed_check_does_not_send_learner_data_to_sentry(mocker, export_settings):
+    """A CyberSource error captured by the real Sentry SDK keeps the bill-to out of Sentry."""
+    user = UserFactory.create(name="Ada Lovelace", email="ada@example.com")
+    _set_us_legal_address(user)
+    run = CourseRunFactory.create()
+
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.side_effect = ApiException(
+        status=400, reason="Bad Request"
+    )
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    events = []
+    sentry_sdk.init(
+        dsn="https://k@o0.ingest.sentry.io/0",
+        # Keep the unscrubbed event; before_send runs on it below
+        before_send=lambda event, _hint: events.append(event),
+        default_integrations=False,
+    )
+    try:
+        with sentry_sdk.isolation_scope():
+            # What DjangoIntegration attaches for the request user
+            sentry_sdk.set_user(
+                {"id": str(user.pk), "email": user.email, "username": user.username}
+            )
+            with pytest.raises(ApiException) as excinfo:
+                verify_user_with_exports(user, run)
+            sentry_sdk.capture_exception(excinfo.value)
+        sentry_sdk.flush()
+    finally:
+        sentry_sdk.get_global_scope().set_client(None)
+
+    assert len(events) == 1
+    # This test's own frame and ApiException's module (CyberSource.rest) would
+    # each trigger the strip, so drop both: the compliance.api frame must be
+    # enough on its own.
+    exception = events[0]["exception"]["values"][0]
+    frames = exception["stacktrace"]["frames"]
+    frames[:] = [frame for frame in frames if frame.get("module") != __name__]
+    assert "compliance.api" in [frame.get("module") for frame in frames]
+    exception.pop("module")
+
+    event = before_send(events[0], {})
+    event_json = json.dumps(event)
+    assert "verify_user_with_exports" in event_json
+    assert event["user"] == {"id": user.global_id}
+    for value in [
+        "ada@example.com",
+        user.username,
+        "Lovelace",
+        "77 Massachusetts Ave",
+        "02139",
+    ]:
+        assert value not in event_json
+
+
+def test_cached_check_tags_the_current_learner(mocker, export_settings):
+    """A cache hit after a live check reports the learner being checked, not the last one."""
+    live_user = UserFactory.create()
+    _set_us_legal_address(live_user)
+    cached_user = UserFactory.create()
+    run = CourseRunFactory.create()
+    ExportComplianceLogFactory.create(
+        user=cached_user, courseware_object=run, decision="COMPLETED"
+    )
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.return_value = SimpleNamespace(
+        status="COMPLETED",
+        id="abc123",
+        export_compliance_information=SimpleNamespace(info_codes=[]),
+        error_information=None,
+        message=None,
+    )
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    with sentry_sdk.isolation_scope() as scope:
+        verify_user_with_exports(live_user, run)
+        verify_user_with_exports(cached_user, run)
+
+        mock_client.validate_export_compliance.assert_called_once()
+        assert scope._tags[EXPORT_COMPLIANCE_USER_TAG] == cached_user.global_id  # noqa: SLF001
