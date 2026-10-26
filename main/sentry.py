@@ -132,13 +132,27 @@ def _iter_stacktrace_frames(event):
             yield from (value.get("stacktrace") or {}).get("frames") or []
 
 
-def _is_export_compliance_frame(frame):
-    """Return True for a frame in our compliance app or the CyberSource SDK."""
-    module = frame.get("module") or ""
+def _is_export_compliance_module(module):
+    """Return True for a module in our compliance app or the CyberSource SDK."""
+    module = module or ""
     return any(
         module == name or module.startswith(f"{name}.")
         for name in EXPORT_COMPLIANCE_MODULES
     )
+
+
+def _is_export_compliance_event(event, frames):
+    """Return True when a frame or a raised exception's class is compliance code.
+
+    The exception's own module catches ExportComplianceError, which
+    courses.api raises after verify_user_with_exports has returned, so none of
+    its frames are in compliance code while its caller still holds the result
+    (and the raw CyberSource response) in its locals.
+    """
+    exceptions = (event.get("exception") or {}).get("values") or []
+    return any(
+        _is_export_compliance_module(frame.get("module")) for frame in frames
+    ) or any(_is_export_compliance_module(value.get("module")) for value in exceptions)
 
 
 def scrub_export_compliance_event(event):
@@ -148,7 +162,7 @@ def scrub_export_compliance_event(event):
     it, and removed otherwise.
     """
     frames = list(_iter_stacktrace_frames(event))
-    if not any(_is_export_compliance_frame(frame) for frame in frames):
+    if not _is_export_compliance_event(event, frames):
         return event
     for frame in frames:
         frame.pop("vars", None)

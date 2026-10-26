@@ -378,6 +378,15 @@ def test_other_events_keep_their_locals(module):
     assert event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]
 
 
+@pytest.mark.parametrize("module", ["compliance.exceptions", "CyberSource.rest"])
+def test_export_compliance_exception_outside_compliance_frames(module):
+    """An ExportComplianceError raised by its caller is caught by its own module."""
+    event = _exception_event("courses.api", "courses.views.v1")
+    event["exception"]["values"][0]["module"] = module
+    before_send(event, {})
+    assert LEARNER_ADDRESS not in json.dumps(event)
+
+
 def test_thread_stacktraces_are_covered():
     """A logged message with attach_stacktrace puts frames under threads."""
     event = {"threads": _exception_event("compliance.api", "main.views")["exception"]}
