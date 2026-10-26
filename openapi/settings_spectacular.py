@@ -41,6 +41,11 @@ open_spectacular_settings = {
         "IdentityProviderLifecycleStateEnum": "b2b.constants.IDP_LIFECYCLE_CHOICES",
         "IdentityProviderProtocolEnum": "b2b.constants.IDP_PROTOCOL_CHOICES",
         "DiscountSourceTypeEnum": "ecommerce.constants.DISCOUNT_SOURCE_TYPES",
+        # `enrollment_mode` on course run and program enrollments. Program
+        # enrollments add the program-only "upgrade" mode; EnrollmentModeEnum
+        # is pinned to the course run modes it was first published with.
+        "EnrollmentModeEnum": "openedx.constants.EDX_ENROLLMENT_MODES",
+        "ProgramEnrollmentModeEnum": "courses.constants.PROGRAM_ENROLLMENT_MODES",
         # `status` and `clone_status` on the staff contract API's setup status.
         # Unpinned they publish as StatusEnum and CloneStatusEnum, and the next
         # `status` choice set would hash-suffix StatusEnum.
