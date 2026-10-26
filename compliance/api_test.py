@@ -553,7 +553,7 @@ INVALID_REQUEST = ExportComplianceDecision.INVALID_REQUEST
     ],
 )
 def test_get_unresolved_export_compliance_decline(decisions, blocking_index):
-    """Only a DECLINED log with no later accepted log counts, oldest first."""
+    """Only the most recent DECLINED log with no later accepted log counts"""
     user = UserFactory.create()
     other_user = UserFactory.create()
     ExportComplianceLogFactory.create(user=other_user, decision=DECLINED)

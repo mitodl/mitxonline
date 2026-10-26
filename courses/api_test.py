@@ -1840,7 +1840,9 @@ def test_defer_enrollment_without_target_and_prior_decline(
 
 
 @pytest.mark.parametrize("compliance_enabled", [True, False])
-def test_defer_enrollment_compliance_flag(settings, mocker, course, compliance_enabled):
+def test_defer_enrollment_compliance_flag_skipped(
+    settings, mocker, course, compliance_enabled, compliance_pass
+):
     """With no decline on file the deferral proceeds, flag on or off."""
     settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = compliance_enabled
     from_run, to_run = CourseRunFactory.create_batch(2, course=course)
@@ -1864,6 +1866,32 @@ def test_defer_enrollment_compliance_flag(settings, mocker, course, compliance_e
 
     patched_verify.assert_not_called()
     assert to_enrollment.run == to_run
+
+
+def test_defer_enrollment_compliance_flag_enabled(settings, mocker, course):
+    """If the learner has a denial on file, then decline the deferrment."""
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = True
+    from_run, to_run = CourseRunFactory.create_batch(2, course=course)
+    existing_enrollment = CourseRunEnrollmentFactory.create(
+        run=from_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    ExportComplianceLogFactory.create(
+        user=existing_enrollment.user, decision=ExportComplianceDecision.DECLINED
+    )
+    mocker.patch("courses.api.verify_user_with_exports")
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    with pytest.raises(ExportComplianceError) as exc:
+        defer_enrollment(
+            existing_enrollment.user,
+            from_run.courseware_id,
+            to_run.courseware_id,
+            force=True,
+        )
+
+    assert "did not accept enrollment" in str(exc)
 
 
 def test_defer_enrollment_validation(mocker, user):
