@@ -7,7 +7,6 @@ exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for 
 exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
-certifi = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 django-aqueduct = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 edx-sysadmin = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 edx-username-changer = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
