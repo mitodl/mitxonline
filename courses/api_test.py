@@ -1914,6 +1914,7 @@ def test_defer_enrollment(  # noqa: PLR0913
                         keep_failed_enrollments=keep_failed_enrollments,
                         mode=EDX_ENROLLMENT_VERIFIED_MODE,
                         skip_compliance_check=True,
+                        skip_country_block_check=True,
                     ),
                     call(
                         user=existing_enrollment.user,
@@ -1922,6 +1923,7 @@ def test_defer_enrollment(  # noqa: PLR0913
                         keep_failed_enrollments=keep_failed_enrollments,
                         mode=EDX_ENROLLMENT_AUDIT_MODE,
                         skip_compliance_check=True,
+                        skip_country_block_check=True,
                     ),
                 ]
             )
@@ -2172,6 +2174,7 @@ def test_defer_enrollment_validation(mocker, user):
                 keep_failed_enrollments=True,
                 mode=EDX_ENROLLMENT_VERIFIED_MODE,
                 skip_compliance_check=True,
+                skip_country_block_check=True,
             ),
             call(
                 user=user,
@@ -2180,6 +2183,7 @@ def test_defer_enrollment_validation(mocker, user):
                 keep_failed_enrollments=True,
                 mode=EDX_ENROLLMENT_AUDIT_MODE,
                 skip_compliance_check=True,
+                skip_country_block_check=True,
             ),
         ]
     )
