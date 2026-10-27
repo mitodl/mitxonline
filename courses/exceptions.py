@@ -30,7 +30,9 @@ class EnrollmentError(APIException):
         declares one (see ``compliance.exceptions.ExportComplianceError``).
 
         A cause without an ``error_code`` yields the unchanged default detail,
-        so a new failure mode stays opaque unless it opts in.
+        so a new failure mode stays opaque unless it opts in. The code is also
+        returned on its own as ``reason_code``, like the eligibility endpoint's,
+        so clients match it exactly rather than parsing ``detail``.
 
         A cause that names the user's own profile fields to fix (see
         ``compliance.exceptions.ExportComplianceDataError.profile_fields``)
@@ -45,11 +47,14 @@ class EnrollmentError(APIException):
         error_code = getattr(exc, "error_code", None)
         if not error_code:
             return cls()
-        detail = f"{cls.default_detail} Error code: {error_code}."
+        body = {
+            "detail": f"{cls.default_detail} Error code: {error_code}.",
+            "reason_code": error_code,
+        }
         profile_fields = getattr(exc, "profile_fields", None)
         if profile_fields:
-            return cls({"detail": detail, "missing_fields": profile_fields})
-        return cls(detail)
+            body["missing_fields"] = profile_fields
+        return cls(body)
 
 
 class EnrollmentCreationFailedError(EnrollmentError):

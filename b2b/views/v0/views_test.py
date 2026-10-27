@@ -555,6 +555,7 @@ def test_b2b_enroll_incomplete_profile(mocker, settings, mocked_export_complianc
     assert resp.status_code == 400
     assert resp.json() == {
         "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
         "missing_fields": ["street_address_1"],
     }
 
@@ -723,6 +724,7 @@ def test_b2b_enroll_cybersource_invalid_request(mocker, settings):
     assert resp.status_code == 400
     assert resp.json() == {
         "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
         "missing_fields": ["postal_code"],
     }
     assert not CourseRunEnrollment.objects.filter(user=user, run=courserun).exists()

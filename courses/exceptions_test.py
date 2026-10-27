@@ -9,12 +9,15 @@ from courses.exceptions import EnrollmentCreationFailedError, EnrollmentError
 
 
 def test_from_cause_appends_the_causes_error_code(user):
-    """A CyberSource rejection contributes its support code to the detail."""
+    """A CyberSource rejection contributes its support code, in the detail and on its own."""
     exc = ExportComplianceError(user, "REJECT", "102")
 
     error = EnrollmentError.from_cause(exc)
 
-    assert str(error.detail) == "Unable to complete enrollment. Error code: CS_700."
+    assert error.detail == {
+        "detail": "Unable to complete enrollment. Error code: CS_700.",
+        "reason_code": "CS_700",
+    }
 
 
 def test_from_cause_without_an_error_code_keeps_the_default_detail(user):
@@ -39,6 +42,7 @@ def test_from_cause_adds_the_profile_fields_to_fix(user):
 
     assert error.detail == {
         "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
         "missing_fields": ["city", "last_name", "street_address_1"],
     }
 
@@ -50,4 +54,4 @@ def test_from_cause_preserves_the_subclass(user):
     )
 
     assert isinstance(error, EnrollmentCreationFailedError)
-    assert str(error.detail).endswith("Error code: CS_700.")
+    assert error.detail["reason_code"] == "CS_700"

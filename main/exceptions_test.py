@@ -16,12 +16,16 @@ from main.exceptions import exception_handler
     [
         (
             lambda user: ExportComplianceError(user, "REJECT", "102"),
-            {"detail": "Unable to complete enrollment. Error code: CS_700."},
+            {
+                "detail": "Unable to complete enrollment. Error code: CS_700.",
+                "reason_code": "CS_700",
+            },
         ),
         (
             lambda user: ExportComplianceDataError(user, ["postal_code"]),
             {
                 "detail": "Unable to complete enrollment. Error code: CS_701.",
+                "reason_code": "CS_701",
                 "missing_fields": ["postal_code"],
             },
         ),

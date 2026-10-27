@@ -1259,7 +1259,8 @@ def test_user_enrollments_create_export_compliance_blocked_v2(
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
-        "detail": "Unable to complete enrollment. Error code: CS_700."
+        "detail": "Unable to complete enrollment. Error code: CS_700.",
+        "reason_code": "CS_700",
     }
     assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
 
@@ -1280,6 +1281,7 @@ def test_user_enrollments_create_export_compliance_missing_data_v2(
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
         "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
         "missing_fields": ["country"],
     }
     assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
@@ -2092,6 +2094,7 @@ def test_add_verified_program_course_enrollment_incomplete_profile(
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
         "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
         "missing_fields": ["street_address_1"],
     }
     assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
@@ -2355,7 +2358,8 @@ def test_add_verified_program_course_enrollment_export_compliance_blocked(
 
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
-        "detail": "Unable to complete enrollment. Error code: CS_700."
+        "detail": "Unable to complete enrollment. Error code: CS_700.",
+        "reason_code": "CS_700",
     }
     assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
 
@@ -2580,7 +2584,8 @@ def test_add_nested_verified_program_course_enrollment_export_compliance_blocked
 
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
-        "detail": "Unable to complete enrollment. Error code: CS_700."
+        "detail": "Unable to complete enrollment. Error code: CS_700.",
+        "reason_code": "CS_700",
     }
     assert not ProgramEnrollment.objects.filter(user=user, program=crogram).exists()
 

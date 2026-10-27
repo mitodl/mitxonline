@@ -212,8 +212,8 @@ class EnrollmentEligibilitySerializer(serializers.Serializer):
         allow_null=True,
         help_text=(
             "Null when enrollable. CS_700 when an export compliance check "
-            "rejected the learner; CS_701 when their profile is missing the "
-            "information needed to run that check."
+            "rejected the learner; CS_701 when their profile is missing "
+            "information the check needs, or has values CyberSource rejected."
         ),
     )
     missing_fields = serializers.ListField(

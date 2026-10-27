@@ -581,22 +581,11 @@ def test_get_unresolved_export_compliance_decline(decisions, blocking_index):
     assert get_unresolved_export_compliance_decline(user) == expected
 
 
-def _complete_user(**address):
-    """Return a user with a complete legal address, with overrides."""
-    user = UserFactory.create(email="ada@example.com")
-    values = {
-        "first_name": "Ada",
-        "last_name": "Lovelace",
-        "country": "US",
-        "street_address_1": "77 Massachusetts Ave",
-        "street_address_2": "",
-        "city": "Cambridge",
-        "state": "US-MA",
-        "postal_code": "02139",
-        **address,
-    }
-    for field, value in values.items():
-        setattr(user.legal_address, field, value)
+def _complete_user():
+    """Return a user whose legal address passes the pre-request field check."""
+    user = UserFactory.create()
+    user.legal_address.country = "US"
+    user.legal_address.state = "US-MA"
     user.legal_address.save()
     return user
 
