@@ -27,7 +27,7 @@ from mitol.payment_gateway.constants import (
     MITOL_PAYMENT_GATEWAY_STRIPE,
 )
 from reversion.models import Version
-from stripe import convert_to_stripe_object
+from stripe import APIConnectionError, convert_to_stripe_object
 from zeal import zeal_context
 
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE
@@ -2298,7 +2298,7 @@ def test_cull_stale_pending_orders_checks_stripe(mocker, settings, user, stripe_
     mock_status = mocker.patch(
         "ecommerce.api.process_stripe_checkout_session_status",
         return_value={"status": stripe_status, "transaction": {"id": "cs_test"}},
-        side_effect=None if stripe_status else ConnectionError("Stripe is down"),
+        side_effect=None if stripe_status else APIConnectionError("Stripe is down"),
     )
     mock_fulfill = mocker.patch("ecommerce.models.OrderFlow.fulfill")
     mocker.patch("ecommerce.api.sync_hubspot_deal")
@@ -2316,14 +2316,20 @@ def test_cull_stale_pending_orders_checks_stripe(mocker, settings, user, stripe_
         created_on=now_in_utc() - timedelta(days=61)
     )
 
-    cull_stale_pending_orders()
+    if stripe_status:
+        cull_stale_pending_orders()
+    else:
+        with pytest.raises(APIConnectionError):
+            cull_stale_pending_orders()
 
     mock_status.assert_called_once_with("cs_test_stale")
     assert Order.objects.filter(pk=order.pk).exists() is not (
         stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED
     )
     if stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
-        mock_fulfill.assert_called_once_with({"id": "cs_test"})
+        mock_fulfill.assert_called_once_with(
+            {"id": "cs_test"}, already_enrolled=False, skip_receipt=False
+        )
     else:
         mock_fulfill.assert_not_called()
 

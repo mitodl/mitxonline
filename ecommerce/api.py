@@ -746,7 +746,7 @@ def cull_stale_pending_orders():
     log.info("Culled stale pending orders: %s", deleted)
 
 
-def _check_stale_stripe_orders(orders):
+def _check_stale_stripe_orders(orders):  # noqa: C901
     """
     Check the CheckoutSession of each stale Stripe order with Stripe, so a
     paid order whose webhook never got processed isn't deleted.
@@ -778,14 +778,37 @@ def _check_stale_stripe_orders(orders):
 
         try:
             session = process_stripe_checkout_session_status(session_id)
-        except Exception:
+        except stripe.APIConnectionError:
             log.exception(
-                "Couldn't check CheckoutSession %s for stale order %s, keeping it",
+                "Stripe API connection error encountered checking order %s, can't continue.",
+                order.reference_number,
+            )
+            raise
+        except stripe.AuthenticationError:
+            log.exception(
+                "Stripe API authentication error encountered checking order %s, can't continue.",
+                order.reference_number,
+            )
+            raise
+        except stripe.PermissionError:
+            log.exception(
+                "Stripe API permission error encountered checking order %s, can't continue.",
+                order.reference_number,
+            )
+            raise
+        except stripe.RateLimitError:
+            log.exception(
+                "Hit Stripe rate limit checking order %s, can't continue.",
+                order.reference_number,
+            )
+            raise
+        except stripe.StripeError:
+            log.exception(
+                "StripeError encountered checking checkout session %s for stale order %s, can't continue",
                 session_id,
                 order.reference_number,
             )
-            keep_ids.add(order.id)
-            continue
+            raise
 
         if session["status"] == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED:
             continue
@@ -801,15 +824,23 @@ def _check_stale_stripe_orders(orders):
             )
             continue
 
-        log.warning(
+        locked_order = Order.objects.select_for_update().get(pk=order.id)
+        if locked_order.state in [
+            OrderStatus.FULFILLED,
+            OrderStatus.CANCELED,
+            OrderStatus.ERRORED,
+            OrderStatus.REFUNDED,
+            OrderStatus.DECLINED,
+        ]:
+            continue
+
+        log.debug(
             "Stale order %s was paid in Stripe, fulfilling it",
-            order.reference_number,
+            locked_order.reference_number,
         )
-        try:
-            order.get_object_flow().fulfill(session["transaction"])
-            sync_hubspot_deal(order)
-        except Exception:
-            log.exception("Couldn't fulfill stale order %s", order.reference_number)
+
+        with transaction.atomic():
+            fulfill_completed_order(locked_order, session["transaction"])
 
     return keep_ids
 
