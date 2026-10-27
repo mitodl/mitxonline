@@ -1281,7 +1281,7 @@ class PendingOrder(Order):
     """An order that is pending payment"""
 
     @transaction.atomic
-    def _get_or_create(
+    def _create_with_data(
         self,
         products: List[Tuple[Product, ContractPage | None]],  # noqa: UP006
         user: User,
@@ -1289,23 +1289,35 @@ class PendingOrder(Order):
         gateway_type: str = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
     ):
         """
-        Returns an existing PendingOrder if one already exists with the same:
-        Line purchased_object_id, purchased_content_type_id, and product_version,
-        as well as the same purchaser.  If a PendingOrder matching that criteria
-        does not exist, a new one is created.  The associated Line objects are either
-        retrieved if they exist for an existing PendingOrder, otherwise new Line objects
-        are created.
+        Creates a new PendingOrder with the supplied data.
+
+        The most current version of each Product passed in is selected, and the
+        contract is attached if it is also specified. Discounts will be applied
+        if they are also provided. Discount validation is not run at this point.
 
         Args:
-            products (List[Product]):  A list of Products associated with the PendingOrder.
-            user (User):  The user expected to be associated with the PendingOrder.
-            discounts (List[Discounts]):  A list of Discounts to apply to each Line assocaited
-                with the order.
+            products (List[Product, ContractPage|None]):  A list of Products to
+                add to the order, optionally with ContractPage for B2B orders.
+            user (User):  The purchasing user.
+            discounts (List[Discounts]):  A list of Discounts to apply to each
+                Line associated with the order.
             gateway_type (str): The PaymentGateway class for the order.
 
         Returns:
-            PendingOrder: the retrieved or created PendingOrder.
+            PendingOrder
         """
+        unique_products = {}
+        for product, contract in products:
+            product_key = (product.content_type_id, product.object_id)
+            existing_product = unique_products.get(product_key)
+            if existing_product:
+                if existing_product[1] != contract:
+                    msg = "Duplicate products cannot have conflicting contracts."
+                    raise ValidationError(msg)
+                continue
+            unique_products[product_key] = (product, contract)
+        products = list(unique_products.values())
+
         # Get the details from each Product.
         product_versions, product_object_ids, product_content_types = [], [], []
         for product, _ in products:
@@ -1320,36 +1332,12 @@ class PendingOrder(Order):
             product_object_ids.append(product.object_id)
             product_content_types.append(product.content_type_id)
 
-        # Get or create a PendingOrder
-        orders = (
-            Order.objects.select_for_update()
-            .prefetch_related("discounts")
-            .filter(
-                lines__purchased_object_id__in=product_object_ids,
-                lines__purchased_content_type_id__in=product_content_types,
-                lines__product_version__in=product_versions,
-                state=OrderStatus.PENDING,
-                purchaser=user,
-                gateway_type=gateway_type,
-            )
+        order = Order.objects.create(
+            state=OrderStatus.PENDING,
+            purchaser=user,
+            total_price_paid=0,
+            gateway_type=gateway_type,
         )
-        # Previously, multiple PendingOrders could be created for a single user
-        # for the same product, if multiple exist, grab the first.
-        if orders:
-            order = orders.first()
-            # Clear discounts except for the most recent one
-            # If there aren't any discounts in the basket, clear them all
-            for old_discount in order.discounts.all():
-                old_discount.delete()
-
-            order.refresh_from_db()
-        else:
-            order = Order.objects.create(
-                state=OrderStatus.PENDING,
-                purchaser=user,
-                total_price_paid=0,
-                gateway_type=gateway_type,
-            )
 
         # Apply any discounts to the PendingOrder
         if discounts:
@@ -1367,35 +1355,21 @@ class PendingOrder(Order):
                         ),
                     )
 
-        # Create or get Line for each product.  Calculate the Order total based on Lines and discount.
+        # Create Lines for each product.  Calculate the Order total based on Lines and discount.
         total = 0
         for i, product_tuple in enumerate(products):
             product, contract = product_tuple
-            line, created = Line.objects.get_or_create(
+            line = Line.objects.create(
                 order=order,
                 purchased_object_id=product.object_id,
                 purchased_content_type_id=product.content_type_id,
-                defaults={
-                    "product_version": product_versions[i],
-                    "quantity": 1,
-                    # The column is non-null, so the price has to be in hand
-                    # before the INSERT. get_or_create resolves a callable in
-                    # `defaults` only when it creates, so the reuse path below
-                    # doesn't pay for a value it would discard.
-                    "discounted_unit_price": lambda i=i: (
-                        Line.compute_discounted_unit_price_for(
-                            order, product_versions[i]
-                        )
-                    ),
-                    "b2b_contract": contract,
-                },
+                product_version=product_versions[i],
+                quantity=1,
+                discounted_unit_price=Line.compute_discounted_unit_price_for(
+                    order, product_versions[i]
+                ),
+                b2b_contract=contract,
             )
-            if not created:
-                # get_or_create skips `defaults` on an existing line, so a reused
-                # pending order carries the contract and price from the last
-                # attempt until they're refreshed from this basket.
-                line.record_b2b_contract(contract)
-                line.record_discounted_unit_price()
             total += line.discounted_price
 
         order.total_price_paid = total
@@ -1425,7 +1399,9 @@ class PendingOrder(Order):
             basket_discount.redeemed_discount
             for basket_discount in basket.discounts.all()
         ]
-        order = cls._get_or_create(cls, products, basket.user, discounts, gateway_type)
+        order = cls._create_with_data(
+            cls, products, basket.user, discounts, gateway_type
+        )
         return order  # noqa: RET504
 
     @classmethod
@@ -1449,8 +1425,12 @@ class PendingOrder(Order):
             PendingOrder: the created pending order
         """
 
-        order = cls._get_or_create(
-            cls, [(product, None)], user, [discount], gateway_type
+        order = cls._create_with_data(
+            cls,
+            [(product, None)],
+            user,
+            [discount],
+            gateway_type,
         )
 
         return order  # noqa: RET504

@@ -7,16 +7,31 @@ import contextlib
 from django.contrib import admin, messages
 from django.contrib.admin.decorators import display
 from django.contrib.contenttypes.admin import GenericTabularInline
+from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.forms import TextInput
+from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils.html import format_html
 from mitol.common.admin import TimestampedModelAdmin
 
 import cms.admin  # noqa: F401
-from courses.api import create_verifiable_credential, downgrade_learner
-from courses.forms import ProgramAdminForm
+from courses.api import (
+    VERIFIABLE_CREDENTIAL_STATUS_DISABLED,
+    VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA,
+    VERIFIABLE_CREDENTIAL_STATUS_ENABLED,
+    VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA,
+    create_run_enrollments,
+    create_verifiable_credential,
+    downgrade_learner,
+    summarize_verifiable_credential_certificate_statuses,
+)
+from courses.forms import (
+    ADMIN_ENROLL_RUN_SUFFIX,
+    AdminEnrollUserInRunsForm,
+    ProgramAdminForm,
+)
 from courses.models import (
     BlockedCountry,
     Course,
@@ -51,11 +66,25 @@ from main.admin import (
 from main.utils import get_field_names
 from openedx.api import get_edx_api_service_client, get_edx_course_modes
 from openedx.constants import (
+    CANNOT_CLEAR_DEADLINE_HINT,
     EDX_ENROLLMENT_AUDIT_MODE,
     EDX_ENROLLMENT_VERIFIED_MODE,
     OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES,
 )
 from openedx.tasks import retry_failed_edx_enrollments
+
+VERIFIABLE_CREDENTIAL_STATUS_DESCRIPTIONS = [
+    (VERIFIABLE_CREDENTIAL_STATUS_ENABLED, "Enabled, with criteria populated"),
+    (
+        VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA,
+        "Enabled, but no criteria populated. No credentials will be issued until criteria is populated.",
+    ),
+    (VERIFIABLE_CREDENTIAL_STATUS_DISABLED, "Disabled, with criteria populated"),
+    (
+        VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA,
+        "Disabled, with no criteria populated",
+    ),
+]
 
 
 class VerifiableCredentialBackfillAdminMixin:
@@ -504,7 +533,10 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         models.TextField: {"widget": TextInput(attrs={"size": "100"})},
     }
 
-    actions = ["populate_verifiable_credentials_for_courserun"]
+    actions = [
+        "populate_verifiable_credentials_for_courserun",
+        "push_upgrade_deadline_to_edx",
+    ]
 
     inlines = [
         CourseRunContractPageInline,
@@ -524,10 +556,87 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         )
         self.populate_verifiable_credentials_for_certificate(request, certificates)
 
+    @admin.action(description="Push upgrade deadline to edX", permissions=["change"])
+    def push_upgrade_deadline_to_edx(self, request, queryset):
+        """
+        Queue a push of each selected run's upgrade deadline to edX.
+
+        Saving only pushes a deadline that changed, so this is the way to send
+        one that didn't: a run added after its edX course existed, an edx_missing
+        run, or a push that failed.
+        """
+        from courses.tasks import sync_courserun_upgrade_deadline  # noqa: PLC0415
+
+        run_ids = list(
+            queryset.filter(upgrade_deadline__isnull=False).values_list("id", flat=True)
+        )
+        for run_id in run_ids:
+            sync_courserun_upgrade_deadline.delay(run_id)
+
+        skipped = queryset.count() - len(run_ids)
+        messages.info(
+            request,
+            f"Queued an upgrade deadline push to edX for {len(run_ids)} run(s)."
+            + (
+                f" Skipped {skipped} run(s) with no upgrade deadline."
+                if skipped
+                else ""
+            ),
+        )
+
     def get_queryset(self, request):  # noqa: ARG002
         """Use the all_objects manager so we can see source runs."""
 
         return self.model.all_objects
+
+    def save_model(self, request, obj, form, change):
+        """
+        Save the run, then tell the operator what we did about the edX side.
+
+        The push itself is queued by the CourseRun post_save signal so that
+        every write path gets it. This only adds the admin feedback, because a
+        cleared deadline cannot be propagated (edX's course modes API has no way
+        to unset an existing expiration date) and a warning buried in the celery
+        log would never be seen by the person who made the change.
+        """
+        deadline_changed = "upgrade_deadline" in (form.changed_data or [])
+        super().save_model(request, obj, form, change)
+
+        if not change:
+            # New runs aren't pushed (see the CourseRun post_save receiver).
+            if obj.upgrade_deadline is not None:
+                messages.warning(
+                    request,
+                    (
+                        f"New runs aren't pushed to edX, so the upgrade deadline "
+                        f"for {obj.courseware_id} is saved in MITx Online only. If "
+                        f"this run already exists in edX, select it in the course "
+                        f'run list and run the "Push upgrade deadline to edX" '
+                        f"action."
+                    ),
+                )
+            return
+
+        if not deadline_changed:
+            return
+
+        if obj.upgrade_deadline is None:
+            messages.warning(
+                request,
+                (
+                    f"Upgrade deadline cleared for {obj.courseware_id}; edX keeps "
+                    f"any deadline it already has. {CANNOT_CLEAR_DEADLINE_HINT}"
+                ),
+            )
+        else:
+            messages.info(
+                request,
+                (
+                    f"Queued a sync to push the upgrade deadline "
+                    f"{obj.upgrade_deadline} to the edX verified mode of "
+                    f"{obj.courseware_id}."
+                ),
+            )
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """
@@ -771,6 +880,84 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
         "downgrade_enrollment",
     ]
     run_for_all_actions = ["retry_all_failed_edx_enrollment"]
+    change_list_template = "admin/courses/courserunenrollment/change_list.html"
+
+    def get_urls(self):
+        """Add the enroll-in-runs page to this admin's URLs."""
+        custom = [
+            path(
+                "enroll-in-runs/",
+                self.admin_site.admin_view(self.enroll_in_runs_view),
+                name="courses_courserunenrollment_enroll_in_runs",
+            )
+        ]
+        return custom + super().get_urls()
+
+    def enroll_in_runs_view(self, request):
+        """
+        Enroll a single user, in audit mode, in a staff-selected set of course
+        runs whose courseware_id ends with ADMIN_ENROLL_RUN_SUFFIX. Each run is
+        enrolled separately so one failure (or the compliance check) doesn't
+        block the rest.
+        """
+        if not self.has_add_permission(request):
+            raise PermissionDenied
+
+        form = AdminEnrollUserInRunsForm(request.POST or None)
+        if request.method == "POST" and form.is_valid():
+            user = form.cleaned_data["user"]
+            mode = EDX_ENROLLMENT_AUDIT_MODE
+            for run in form.cleaned_data["runs"]:
+                try:
+                    enrollments, edx_success = create_run_enrollments(
+                        user, [run], mode=mode
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    self.message_user(
+                        request,
+                        f"Failed to enroll {user.email} in {run.courseware_id}: {exc}",
+                        messages.ERROR,
+                    )
+                    continue
+                if not enrollments:
+                    reason = (
+                        "the edX enrollment failed, so no enrollment was created"
+                        if not edx_success
+                        else "the enrollment record could not be saved"
+                    )
+                    self.message_user(
+                        request,
+                        f"Failed to enroll {user.email} in {run.courseware_id}: "
+                        f"{reason}. Check the logs for details.",
+                        messages.ERROR,
+                    )
+                elif not edx_success:
+                    self.message_user(
+                        request,
+                        f"Enrolled {user.email} in {run.courseware_id} locally, "
+                        "but the edX enrollment failed (it will be retried)",
+                        messages.WARNING,
+                    )
+                else:
+                    self.message_user(
+                        request,
+                        f"Enrolled {user.email} in {run.courseware_id} ({mode})",
+                        messages.SUCCESS,
+                    )
+            return redirect(
+                reverse("admin:courses_courserunenrollment_changelist")
+                + f"?q={user.email}"
+            )
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": f"Enroll a user in {ADMIN_ENROLL_RUN_SUFFIX} course runs",
+            "opts": self.model._meta,  # noqa: SLF001
+            "form": form,
+        }
+        return TemplateResponse(
+            request, "admin/courses/courserunenrollment/enroll_in_runs.html", context
+        )
 
     @admin.display(
         description="Repair exhausted",
@@ -1234,6 +1421,43 @@ class VerifiableCredentialAdmin(TimestampedModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related("programcertificate", "courseruncertificate")
+
+    def get_urls(self):
+        custom = [
+            path(
+                "stats/",
+                self.admin_site.admin_view(self.stats_view),
+                name="courses_verifiablecredential_stats",
+            )
+        ]
+        return custom + super().get_urls()
+
+    def _get_stats(self):
+        breakdown = summarize_verifiable_credential_certificate_statuses(
+            return_objects=True
+        )
+        return [
+            {
+                "status": status,
+                "description": description,
+                "pages": breakdown.get(status, []),
+            }
+            for status, description in VERIFIABLE_CREDENTIAL_STATUS_DESCRIPTIONS
+        ]
+
+    def stats_view(self, request):
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Verifiable Credential Stats",
+            "opts": self.model._meta,  # noqa: SLF001
+            "stats": self._get_stats(),
+        }
+        return TemplateResponse(
+            request, "admin/courses/verifiablecredential/stats.html", context
+        )
 
 
 class PartnerSchoolProgramInline(admin.TabularInline):

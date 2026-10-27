@@ -1664,6 +1664,113 @@ def create_verified_program_discount(program):
     return discount
 
 
+def _get_verified_program_course_run_product_and_discount(user, courserun, program):
+    """
+    Validate a program-verified course run enrollment and return what's needed
+    to make its zero-value order.
+
+    Args:
+    - user: The learner.
+    - courserun: The course run to purchase.
+    - program: The program the learner has a verified enrollment in.
+    Returns:
+    - tuple of (Product, Discount): the run's active product and the program's
+      internal discount
+    Raises:
+    - VerifiedProgramNoEnrollmentError if the learner doesn't have a program
+      enrollment
+    - VerifiedProgramCourseNotInProgramError if the run's course is not in the
+      program's requirements
+    - VerifiedProgramNoProductError if the run has no active Product to purchase
+    """
+
+    if not program.enrollments.filter(
+        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE, active=True
+    ).exists():
+        msg = f"No verified enrollment for {user} for program {program}"
+        raise VerifiedProgramNoEnrollmentError(msg)
+
+    # The program's internal discount prices whatever it is attached to, so
+    # membership is decided here, against the current requirements tree.
+    if not program.courses_qset.filter(courseruns=courserun).exists():
+        msg = f"Course run {courserun} is not in program {program}"
+        raise VerifiedProgramCourseNotInProgramError(msg)
+
+    cr_ctype = ContentType.objects.get_for_model(courserun)
+    try:
+        product = Product.objects.filter(
+            content_type=cr_ctype, object_id=courserun.id, is_active=True
+        ).get()
+    except Product.DoesNotExist as exc:
+        msg = f"No active product for course run {courserun}"
+        raise VerifiedProgramNoProductError(msg) from exc
+
+    try:
+        discount = create_verified_program_discount(program)
+    except Product.DoesNotExist as exc:
+        msg = f"No active product for program {program}"
+        raise VerifiedProgramNoProductError(msg) from exc
+
+    return product, discount
+
+
+def create_verified_program_course_run_order(user, courserun, program):
+    """
+    Create a verified course run enrollment, backed by a zero-value order, for
+    a learner with a verified enrollment in the program.
+
+    This is the same order create_verified_program_course_run_enrollment makes,
+    but built straight from the run's product rather than through the user's
+    basket and checkout, so it needs no request and leaves the basket alone.
+    That makes it safe to call while another order is being fulfilled (e.g.
+    from the process_transaction_line hook when the program is purchased).
+
+    Fulfilling the order runs the usual line hooks, which create the verified
+    enrollment and the PaidCourseRun.
+
+    Args:
+    - user: The learner.
+    - courserun: The course run to purchase.
+    - program: The program to use.
+    Returns:
+    - CourseRunEnrollment
+    Raises:
+    - VerifiedProgramNoEnrollmentError if the learner doesn't have a program
+      enrollment
+    - VerifiedProgramCourseNotInProgramError if the run's course is not in the
+      program's requirements
+    - VerifiedProgramNoProductError if the run has no active Product to purchase
+    - VerifiedProgramInvalidOrderError if the order isn't zero value, or doesn't
+      get fulfilled
+    """
+
+    product, discount = _get_verified_program_course_run_product_and_discount(
+        user, courserun, program
+    )
+
+    with transaction.atomic():
+        try:
+            order = PendingOrder.create_from_product(product, user, discount)
+        except ValueError as exc:
+            msg = f"Product {product} selected to upgrade enrollment for {user} is invalid"
+            raise VerifiedProgramInvalidOrderError(msg) from exc
+
+        if order.total_price_paid > 0:
+            msg = f"Order {order.reference_number} for {user} is not zero-value"
+            raise VerifiedProgramInvalidOrderError(msg)
+
+        fulfill_completed_order(
+            order, payment_data=ZERO_PAYMENT_DATA, skip_receipt=True
+        )
+
+        order.refresh_from_db()
+        if order.state != OrderStatus.FULFILLED:
+            msg = f"Order {order.reference_number} for {user} was not fulfilled"
+            raise VerifiedProgramInvalidOrderError(msg)
+
+    return courserun.enrollments.filter(user=user).get()
+
+
 def create_verified_program_course_run_enrollment(request, courserun, program):
     """
     Create a verified course run enrollment in a course that is associated with
@@ -1700,28 +1807,9 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
     - VerifiedProgramInvalidOrderError if the order doesn't get processed through
     """
 
-    if not program.enrollments.filter(
-        user=request.user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE, active=True
-    ).exists():
-        msg = f"No verified enrollment for {request.user} for program {program}"
-        raise VerifiedProgramNoEnrollmentError(msg)
-
-    # The program's internal discount prices whatever it is attached to, so
-    # membership is decided here, against the current requirements tree.
-    if not program.courses_qset.filter(courseruns=courserun).exists():
-        msg = f"Course run {courserun} is not in program {program}"
-        raise VerifiedProgramCourseNotInProgramError(msg)
-
-    discount = create_verified_program_discount(program)
-
-    cr_ctype = ContentType.objects.get_for_model(courserun)
-    try:
-        product = Product.objects.filter(
-            content_type=cr_ctype, object_id=courserun.id, is_active=True
-        ).get()
-    except Product.DoesNotExist as exc:
-        msg = f"No active product for course run {courserun}"
-        raise VerifiedProgramNoProductError(msg) from exc
+    product, discount = _get_verified_program_course_run_product_and_discount(
+        request.user, courserun, program
+    )
 
     basket = establish_basket(request)
 

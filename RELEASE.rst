@@ -1,6 +1,33 @@
 Release Notes
 =============
 
+Version 1.171.0
+---------------
+
+- Skip the live export compliance check on support deferrals (#4184)
+- Back program-purchase run upgrades with zero-value orders (#4155)
+- Keep learner PII out of Sentry for export checks (#4182)
+- fix: ignore google-api-core's Python 3.11 deprecation warning in tests (#4189)
+- feat: push CourseRun.upgrade_deadline into the edX verified course mode (#3814)
+- fix: update dependency djangorestframework to v3.18.3 [SECURITY] (#4178)
+- Revert "Program Entitlement bug fix" (#4180)
+- Add certifi>=2026.10.19 constraint (eMudhra CA compromise) (#4181)
+- Bump certifi to 2026.10.19 (eMudhra CA compromise) (#4179)
+- Program Entitlement bug fix (#4154)
+- Add quick and dirty status breakdown on verifiable creds (#4169)
+
+Version 1.170.10
+----------------
+
+- Enroll users in archived courses from the admin dashboard (#4174)
+- Requirements editor: description on requirement groups (#4171)
+
+Version 1.170.9
+---------------
+
+- Add form validation for Verifiable Credentials fields in Wagtail, management command to get status breakdown for all certificates. (#4161)
+- Remove stale verifiable-credential note from What you learn field (#4166)
+
 Version 1.170.8
 ---------------
 

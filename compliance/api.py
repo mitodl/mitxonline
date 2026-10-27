@@ -10,6 +10,7 @@ from datetime import timedelta
 from typing import Any
 from uuid import uuid4
 
+import sentry_sdk
 from CyberSource import RiskV1DecisionsPost201ResponseClientReferenceInformation
 from CyberSource.api.verification_api import VerificationApi
 from CyberSource.models.riskv1exportcomplianceinquiries_order_information import (
@@ -30,7 +31,8 @@ from nacl.encoding import Base64Encoder
 from nacl.public import PublicKey, SealedBox
 
 from compliance.exceptions import ExportComplianceDataError
-from compliance.models import ExportComplianceLog
+from compliance.models import ExportComplianceDecision, ExportComplianceLog
+from main.sentry import EXPORT_COMPLIANCE_USER_TAG
 
 log = logging.getLogger(__name__)
 
@@ -359,6 +361,30 @@ def get_latest_export_compliance_log(user, run) -> ExportComplianceLog | None:
     )
 
 
+def get_unresolved_export_compliance_decline(user) -> ExportComplianceLog | None:
+    """
+    Return the user's most recent DECLINED export compliance log, unless an
+    accepted log was recorded after it.
+
+    INVALID_REQUEST is a problem with the learner's profile data, not a
+    screening result, so it doesn't count here.
+    """
+    logs = ExportComplianceLog.objects.filter(user=user)
+    decline = (
+        logs.filter(decision=ExportComplianceDecision.DECLINED)
+        .order_by("-created_on")
+        .first()
+    )
+    if decline is None:
+        return None
+    if logs.filter(
+        decision__in=ExportComplianceLog.ACCEPTED_DECISIONS,
+        created_on__gt=decline.created_on,
+    ).exists():
+        return None
+    return decline
+
+
 def decrypt_export_compliance_log(
     export_compliance_log: ExportComplianceLog, private_key
 ) -> DecryptedExportComplianceLog:
@@ -382,6 +408,11 @@ def verify_user_with_exports(user, run) -> ExportComplianceResult:
     for the same courseware object, from the last 24 hours, or representing
     a prior failed check for this user.
     """
+    # Lets main.sentry identify the learner on an error event without the
+    # email and username send_default_pii would attach. Set before the cache
+    # lookup so a process checking many learners never reports the last one.
+    sentry_sdk.set_tag(EXPORT_COMPLIANCE_USER_TAG, user.global_id)
+
     cached_log = get_latest_export_compliance_log(user, run)
     if cached_log is not None:
         return ExportComplianceResult(

@@ -608,6 +608,101 @@ def test_pending_order_with_multiple_product_versions(basket, reuse):
         assert order.total_price_paid == 750
 
 
+def test_pending_orders_from_same_basket_are_fresh_snapshots(basket):
+    """Later basket changes do not modify an earlier order."""
+    contract = ContractPageFactory.create()
+    updated_contract = ContractPageFactory.create()
+    discount = DiscountFactory.create(
+        amount=Decimal("10"), discount_type=DISCOUNT_TYPE_DOLLARS_OFF
+    )
+    updated_discount = DiscountFactory.create(
+        amount=Decimal("20"), discount_type=DISCOUNT_TYPE_DOLLARS_OFF
+    )
+    with reversion.create_revision():
+        product = ProductFactory.create(price=Decimal("100.00"))
+    basket_item = BasketItemFactory.create(
+        basket=basket, product=product, b2b_contract=contract
+    )
+    BasketDiscount.objects.create(
+        redeemed_basket=basket,
+        redeemed_by=basket.user,
+        redeemed_discount=discount,
+        redemption_date=now_in_utc(),
+    )
+
+    first_order = PendingOrder.create_from_basket(basket)
+    first_line = first_order.lines.get()
+    first_reference_number = first_order.reference_number
+    identical_order = PendingOrder.create_from_basket(basket)
+    assert first_order.id != identical_order.id
+    assert first_order.reference_number != identical_order.reference_number
+
+    BasketDiscount.objects.filter(redeemed_basket=basket).delete()
+    BasketDiscount.objects.create(
+        redeemed_basket=basket,
+        redeemed_by=basket.user,
+        redeemed_discount=updated_discount,
+        redemption_date=now_in_utc(),
+    )
+    basket_item.b2b_contract = updated_contract
+    basket_item.save()
+    second_order = PendingOrder.create_from_basket(basket)
+
+    first_order.refresh_from_db()
+    first_line.refresh_from_db()
+    assert first_order.id != second_order.id
+    assert first_order.reference_number != second_order.reference_number
+    assert first_order.reference_number == first_reference_number
+    assert first_line.b2b_contract == contract
+    assert first_line.discounted_unit_price == Decimal("90.00")
+    assert first_order.discounts.get().redeemed_discount == discount
+    assert second_order.lines.get().b2b_contract == updated_contract
+    assert second_order.lines.get().discounted_unit_price == Decimal("80.00")
+    assert second_order.discounts.get().redeemed_discount == updated_discount
+
+
+def test_pending_order_from_same_product_is_fresh():
+    """Repeated product checkouts create distinct orders and reference numbers."""
+    user = UserFactory.create()
+    with reversion.create_revision():
+        product = ProductFactory.create()
+
+    first_order = PendingOrder.create_from_product(product, user)
+    second_order = PendingOrder.create_from_product(product, user)
+
+    assert first_order.id != second_order.id
+    assert first_order.reference_number != second_order.reference_number
+
+
+def test_duplicate_basket_products_create_one_order_line(basket):
+    """A repeated basket item for one purchasable object is charged only once."""
+    with reversion.create_revision():
+        product = ProductFactory.create(price=Decimal("100.00"))
+    BasketItemFactory.create(basket=basket, product=product)
+    BasketItemFactory.create(basket=basket, product=product)
+
+    order = PendingOrder.create_from_basket(basket)
+
+    assert order.lines.count() == 1
+    assert order.total_price_paid == Decimal("100.00")
+
+
+def test_duplicate_basket_products_with_conflicting_contracts_are_rejected(basket):
+    """Duplicate basket entries must agree on their contract."""
+    product = ProductFactory.create()
+    BasketItemFactory.create(
+        basket=basket, product=product, b2b_contract=ContractPageFactory.create()
+    )
+    BasketItemFactory.create(
+        basket=basket, product=product, b2b_contract=ContractPageFactory.create()
+    )
+
+    with pytest.raises(ValidationError, match="conflicting contracts"):
+        PendingOrder.create_from_basket(basket)
+
+    assert not Order.objects.filter(purchaser=basket.user).exists()
+
+
 def test_pending_order_with_bad_product_versions(basket):
     """
     Test that creating a PendingOrder with a basket item for a product with
@@ -621,177 +716,6 @@ def test_pending_order_with_bad_product_versions(basket):
     basket_item.save()
     with pytest.raises(ValueError, match=r".*is improperly constructed: no versions"):
         PendingOrder.create_from_basket(basket)
-
-
-def test_pending_order_is_reused(basket):
-    """
-    Test that creating a second PendingOrder's with the same associated Product is
-    not possible, the existing PendingOrder is reused.
-    """
-
-    with reversion.create_revision():
-        product = ProductFactory.create()
-
-    basket_item = BasketItem(product=product, basket=basket, quantity=1)
-    basket_item.save()
-    order = PendingOrder.create_from_basket(basket)
-    order.save()
-    assert Order.objects.filter(state=OrderStatus.PENDING).count() == 1
-    order = PendingOrder.create_from_basket(basket)
-    order.save()
-    # Verify that the existing PendingOrder is reused and a duplicate is not created.
-    # This is to ensure that we also reuse the HubSpot Deal associated with Orders.
-    assert Order.objects.filter(state=OrderStatus.PENDING).count() == 1
-
-
-@pytest.mark.parametrize(
-    "apply_discount", ["to_order", "to_basket", "to_second_basket"]
-)
-def test_pending_order_is_reused_but_discounts_cleared(
-    basket, unlimited_discount, apply_discount
-):
-    """
-    If a pending order is reused and had discounts, then we want those discounts
-    to clear.
-    """
-
-    with reversion.create_revision():
-        product = ProductFactory.create()
-
-    basket_item = BasketItem(product=product, basket=basket, quantity=1)
-    basket_item.save()
-
-    if apply_discount == "to_basket":
-        basket_discount = BasketDiscount(
-            redemption_date=now_in_utc(),
-            redeemed_by=basket.user,
-            redeemed_discount=unlimited_discount,
-            redeemed_basket=basket,
-        )
-        basket_discount.save()
-        basket.refresh_from_db()
-
-    order = PendingOrder.create_from_basket(basket)
-    order.save()
-    assert Order.objects.filter(state=OrderStatus.PENDING).count() == 1
-
-    if apply_discount == "to_order":
-        redemption = DiscountRedemption(
-            redeemed_discount=unlimited_discount,
-            redemption_date=now_in_utc(),
-            redeemed_order=order,
-            redeemed_by=order.purchaser,
-        )
-        redemption.save()
-
-    order.refresh_from_db()
-    if apply_discount != "to_second_basket":
-        assert order.discounts.count() == 1
-    else:
-        assert order.discounts.count() == 0
-
-    if apply_discount == "to_second_basket":
-        a_different_discount = UnlimitedUseDiscountFactory.create()
-
-        basket_discount = BasketDiscount(
-            redemption_date=now_in_utc(),
-            redeemed_by=basket.user,
-            redeemed_discount=a_different_discount,
-            redeemed_basket=basket,
-        )
-        basket_discount.save()
-
-    order = PendingOrder.create_from_basket(basket)
-    order.save()
-    order.refresh_from_db()
-
-    # Verify that the existing PendingOrder is reused and a duplicate is not created.
-    # This is to ensure that we also reuse the HubSpot Deal associated with Orders.
-    # Also ensure the discounts aren't reattached to the order if we just attached
-    # the discount to the order - if it's in the basket, it should be reattached, but we should only get one
-    assert Order.objects.filter(state=OrderStatus.PENDING).count() == 1
-    if apply_discount == "to_order":
-        assert order.discounts.count() == 0
-    else:
-        order.discounts.count() == 1  # noqa: B015
-
-        # A different discount gets attached if there's a second basket so make
-        # sure the right one is there
-        if apply_discount == "to_second_basket":
-            assert order.discounts.first().redeemed_discount == a_different_discount
-        else:
-            assert order.discounts.first().redeemed_discount == unlimited_discount
-
-
-def test_new_pending_order_is_created_if_product_is_different():
-    """
-    Test that creating a second PendingOrder with a different associated Product
-    results in the creation of a new PendingOrder instead of reusing the existing
-    PendingOrder.
-    """
-    with reversion.create_revision():
-        products = ProductFactory.create_batch(2)
-
-    user = UserFactory.create()
-    order = PendingOrder.create_from_product(product=products[0], user=user)
-    order.save()
-    assert order.lines.count() == 1
-
-    order = PendingOrder.create_from_product(product=products[1], user=user)
-    order.save()
-    assert order.lines.count() == 1
-    assert Order.objects.filter(state=OrderStatus.PENDING).count() == 2
-
-
-def test_pending_order_is_reused_if_multiple_exist(basket, settings):
-    """
-    Test that an existing PendingOrder is reused even if there are
-    multiple existing PendingOrders which match the current PendingOrder.
-    """
-
-    with reversion.create_revision():
-        product = ProductFactory.create()
-    product_version = Version.objects.get_for_object(product).first()
-
-    # Create 2 PendingOrders
-    order1 = Order.objects.create(
-        state=OrderStatus.PENDING,
-        purchaser=basket.user,
-        total_price_paid=0,
-        gateway_type=settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
-    )
-    Line.objects.create(
-        order=order1,
-        purchased_object_id=product.object_id,
-        purchased_content_type_id=product.content_type_id,
-        product_version=product_version,
-        quantity=1,
-        discounted_unit_price=product.price,
-    )
-    order2 = Order.objects.create(
-        state=OrderStatus.PENDING,
-        purchaser=basket.user,
-        total_price_paid=0,
-        gateway_type=settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
-    )
-    Line.objects.create(
-        order=order2,
-        purchased_object_id=product.object_id,
-        purchased_content_type_id=product.content_type_id,
-        product_version=product_version,
-        quantity=1,
-        discounted_unit_price=product.price,
-    )
-
-    basket_item = BasketItem(product=product, basket=basket, quantity=1)
-    basket_item.save()
-    order = PendingOrder.create_from_basket(
-        basket, gateway_type=settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
-    )
-    order.save()
-    # Verify that one of the existing PendingOrder's is reused insteading of
-    # creating a third.
-    assert Order.objects.filter(state=OrderStatus.PENDING).count() == 2
 
 
 def test_discount_expires_in_past(unlimited_discount):
@@ -1257,45 +1181,6 @@ def test_pricing_reads_the_line_product_version_not_the_live_product(user):
     )
 
     assert line.record_discounted_unit_price() == Decimal("100.00")
-
-
-def test_repricing_a_pending_order_refreshes_the_recorded_price(basket):
-    """A reused pending order re-prices its existing lines."""
-    with reversion.create_revision():
-        product = ProductFactory.create(price=Decimal("100.00"))
-    BasketItem.objects.create(product=product, basket=basket, quantity=1)
-
-    first = PendingOrder.create_from_basket(basket)
-    first.lines.update(discounted_unit_price=Decimal("1.00"))
-
-    second = PendingOrder.create_from_basket(basket)
-
-    assert second.pk == first.pk
-    assert second.lines.get().discounted_unit_price == Decimal("100.00")
-
-
-def test_repricing_a_pending_order_applies_a_newly_added_discount(basket):
-    """A discount added before a second checkout is what the line records."""
-    with reversion.create_revision():
-        product = ProductFactory.create(price=Decimal("100.00"))
-    BasketItem.objects.create(product=product, basket=basket, quantity=1)
-    order = PendingOrder.create_from_basket(basket)
-    assert order.lines.get().discounted_unit_price == Decimal("100.00")
-
-    BasketDiscount.objects.create(
-        redemption_date=now_in_utc(),
-        redeemed_by=basket.user,
-        redeemed_discount=DiscountFactory.create(
-            amount=Decimal("25"), discount_type=DISCOUNT_TYPE_PERCENT_OFF
-        ),
-        redeemed_basket=basket,
-    )
-
-    reprised = PendingOrder.create_from_basket(basket)
-
-    assert reprised.pk == order.pk
-    assert reprised.lines.get().discounted_unit_price == Decimal("75.00")
-    assert reprised.total_price_paid == Decimal("75.00")
 
 
 def _add_purchased_run(order, start_date):
@@ -2041,38 +1926,6 @@ def test_pending_order_records_a_source_only_for_paid_amount_off(
     assert order.total_price_paid == Decimal("799.20")
 
 
-def test_reused_pending_order_re_resolves_the_source(paid_amount_off_source):
-    """Redemptions are deleted and recreated on reuse, so a source consumed in
-    the meantime drops away and the order re-prices to full.
-    """
-    first = PendingOrder.create_from_product(
-        paid_amount_off_source.program_product,
-        paid_amount_off_source.user,
-        paid_amount_off_source.discount,
-    )
-    assert first.discounts.get().source_line == paid_amount_off_source.source_line
-
-    # Another order consumes the source before this checkout completes.
-    DiscountRedemptionFactory.create(
-        redeemed_by=paid_amount_off_source.user,
-        redeemed_discount=PaidAmountOffDiscountFactory.create(),
-        redeemed_order=OrderFactory.create(
-            purchaser=paid_amount_off_source.user, state=OrderStatus.FULFILLED
-        ),
-        source_line=paid_amount_off_source.source_line,
-    )
-
-    second = PendingOrder.create_from_product(
-        paid_amount_off_source.program_product,
-        paid_amount_off_source.user,
-        paid_amount_off_source.discount,
-    )
-
-    assert second.pk == first.pk
-    assert second.discounts.get().source_line is None
-    assert second.total_price_paid == Decimal("999.00")
-
-
 def test_a_non_fulfilled_program_order_re_arms_the_source(paid_amount_off_source):
     """Emergent but intended: a redemption on a refunded order stops counting,
     so the source funds a fresh purchase.
@@ -2213,33 +2066,6 @@ def test_create_from_basket_copies_b2b_contract_to_lines(user):
         order.lines.get(purchased_object_id=regular_product.object_id).b2b_contract
         is None
     )
-
-
-@pytest.mark.parametrize("contract_on_first_attempt", [False, True])
-def test_reused_pending_order_line_takes_the_basket_contract(
-    user, contract_on_first_attempt
-):
-    """A reused pending order's line should get the contract of the current basket item."""
-
-    contract = ContractPageFactory.create()
-    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
-    with reversion.create_revision():
-        product = ProductFactory.create(purchasable_object=run)
-
-    basket = BasketFactory.create(user=user)
-    item = BasketItem.objects.create(
-        basket=basket,
-        product=product,
-        b2b_contract=contract if contract_on_first_attempt else None,
-    )
-    first_order = PendingOrder.create_from_basket(basket)
-
-    item.b2b_contract = None if contract_on_first_attempt else contract
-    item.save()
-    order = PendingOrder.create_from_basket(basket)
-
-    assert order.id == first_order.id
-    assert order.lines.get().b2b_contract == item.b2b_contract
 
 
 @pytest.mark.parametrize("line_has_contract", [True, False])
