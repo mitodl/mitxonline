@@ -2701,9 +2701,9 @@ def process_mailgun_webhook_for_enrollment_code_emails(payload):
     # Save it to the row corresponding to the event we just got and move on with our lives
     message_id = event_data["message"]["headers"]["message-id"]
     message_timestamp = datetime.fromtimestamp(event_data["timestamp"], tz=UTC)
-    assignment = DiscountContractAttachmentRedemption.objects.first(
+    assignment = DiscountContractAttachmentRedemption.objects.filter(
         email_message_id=message_id
-    )
+    ).first()
 
     # This can happen if a user was sent a reminder and then later clicks on the original email.
     # The DCAR currently only tracks the most recently sent email, so if the user clicks on an older one,
