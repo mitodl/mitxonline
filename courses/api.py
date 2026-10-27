@@ -39,7 +39,10 @@ from rest_framework.status import (
 )
 
 from cms.api import create_default_courseware_page
-from compliance.api import verify_user_with_exports
+from compliance.api import (
+    get_unresolved_export_compliance_decline,
+    verify_user_with_exports,
+)
 from compliance.exceptions import (
     ExportComplianceCheckError,
     ExportComplianceDataError,
@@ -242,7 +245,8 @@ def create_run_enrollments(  # noqa: C901, PLR0913
             If None, defaults to the value of the IGNORE_EDX_FAILURES feature flag.
         mode (str): The course mode
         skip_compliance_check (bool): If True, bypass the export compliance
-            check. Operator-run management commands only.
+            check. Operator-run management commands and support-initiated
+            flows such as defer_enrollment only.
         skip_country_block_check (bool): If True, bypass the country block check.
             Refund downgrade callers only — never bypass for new enrollments.
         skip_enrollment_emails (bool): If True, don't send the learner the
@@ -471,6 +475,13 @@ def upgrade_audit_run_enrollments_for_program_purchase(user, program):
     Verified-track enrollments are left unchanged. If the user has a mix of
     verified and audit enrollments, only the audit-track ones are upgraded.
 
+    Each upgrade is backed by a zero-value order that redeems the program's
+    internal discount, the same as if the learner had enrolled in the run
+    after buying the program (see
+    ecommerce.api.create_verified_program_course_run_order). If that order
+    can't be made - most commonly because the run has no active product - the
+    enrollment is upgraded without one.
+
     Args:
         user (User): The user who purchased the program
         program (Program): The program that was purchased
@@ -496,12 +507,46 @@ def upgrade_audit_run_enrollments_for_program_purchase(user, program):
     if not eligible_runs:
         return []
 
-    upgraded_enrollments, _ = create_run_enrollments(
-        user,
-        eligible_runs,
-        mode=EDX_ENROLLMENT_VERIFIED_MODE,
-        keep_failed_enrollments=True,
+    from ecommerce.api import create_verified_program_course_run_order  # noqa: PLC0415
+    from ecommerce.exceptions import (  # noqa: PLC0415
+        VerifiedProgramCourseNotInProgramError,
+        VerifiedProgramInvalidOrderError,
+        VerifiedProgramNoEnrollmentError,
+        VerifiedProgramNoProductError,
     )
+
+    upgraded_enrollments = []
+    runs_without_orders = []
+
+    for run in eligible_runs:
+        try:
+            upgraded_enrollments.append(
+                create_verified_program_course_run_order(user, run, program)
+            )
+        except (  # noqa: PERF203
+            VerifiedProgramCourseNotInProgramError,
+            VerifiedProgramInvalidOrderError,
+            VerifiedProgramNoEnrollmentError,
+            VerifiedProgramNoProductError,
+        ):
+            log.exception(
+                "Couldn't create a program order for user %s, run %s, program %s; "
+                "upgrading the enrollment without one",
+                user.id,
+                run.courseware_id,
+                program.readable_id,
+            )
+            runs_without_orders.append(run)
+
+    if runs_without_orders:
+        orderless_enrollments, _ = create_run_enrollments(
+            user,
+            runs_without_orders,
+            mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            keep_failed_enrollments=True,
+        )
+        upgraded_enrollments.extend(orderless_enrollments)
+
     return upgraded_enrollments
 
 
@@ -526,6 +571,27 @@ def _verify_exports_compliance_for_enrollment(user, courseware_object) -> None:
         result.reason_code,
     )
     raise ExportComplianceError(user, result.decision, result.reason_code)
+
+
+def _verify_no_export_compliance_decline(user, courseware_object) -> None:
+    """Refuse a user CyberSource declined, without running a new check."""
+    if not is_enabled(
+        features.EXPORT_COMPLIANCE_CHECK_ENABLED,
+        default=False,
+        opt_unique_id=user.global_id,
+    ):
+        return
+
+    decline = get_unresolved_export_compliance_decline(user)
+    if decline is not None:
+        log.warning(
+            "Prior export compliance decline blocks enrollment for user=%s "
+            "courseware_object=%s: reason_code=%r",
+            user.id,
+            courseware_object,
+            decline.reason_code,
+        )
+        raise ExportComplianceError(user, decline.decision, decline.reason_code)
 
 
 @dataclass(frozen=True)
@@ -778,12 +844,17 @@ def defer_enrollment(  # noqa: C901
     )
 
     if to_run is None:
+        if not from_enrollment.active:
+            # create_run_enrollments reactivates an inactive enrollment, so this
+            # grants access like enrolling in a new run would.
+            _verify_no_export_compliance_decline(user, from_enrollment.run)
         deferred_enrollments, _ = create_run_enrollments(
             user=user,
             runs=[from_enrollment.run],
             change_status=ENROLL_CHANGE_STATUS_DEFERRED,
             keep_failed_enrollments=keep_failed_enrollments,
             mode=EDX_ENROLLMENT_AUDIT_MODE,
+            skip_compliance_check=True,
         )
         return first_or_none(deferred_enrollments), None
 
@@ -810,6 +881,13 @@ def defer_enrollment(  # noqa: C901
             f"Cannot defer to a course run of a different course ('{from_enrollment.run.course.title}' -> '{to_run.course.title}'). "  # noqa: EM102
             "Set force=True to defer anyway."
         )
+
+    # Support-initiated, so the learner isn't there to complete their profile:
+    # skip the live check (hq#13766). Their next self-service enrollment goes
+    # through the normal check (possibly using a cached result). This happens
+    # before the existing deferment check so even if the learner already has a
+    # deferment we catch that they failed the export check.
+    _verify_no_export_compliance_decline(user, to_run)
 
     if already_deferred_from:
         # check if user was already enrolled in verified track
@@ -841,6 +919,7 @@ def defer_enrollment(  # noqa: C901
         change_status=None,
         keep_failed_enrollments=keep_failed_enrollments,
         mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        skip_compliance_check=True,
     )
     if not enroll_success and not keep_failed_enrollments:
         raise Exception(  # noqa: TRY002
@@ -853,6 +932,7 @@ def defer_enrollment(  # noqa: C901
             change_status=ENROLL_CHANGE_STATUS_DEFERRED,
             keep_failed_enrollments=keep_failed_enrollments,
             mode=EDX_ENROLLMENT_AUDIT_MODE,
+            skip_compliance_check=True,
         )
         if not enroll_success and not keep_failed_enrollments:
             raise Exception(  # noqa: TRY002

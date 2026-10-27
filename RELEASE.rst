@@ -1,6 +1,21 @@
 Release Notes
 =============
 
+Version 1.171.0
+---------------
+
+- Skip the live export compliance check on support deferrals (#4184)
+- Back program-purchase run upgrades with zero-value orders (#4155)
+- Keep learner PII out of Sentry for export checks (#4182)
+- fix: ignore google-api-core's Python 3.11 deprecation warning in tests (#4189)
+- feat: push CourseRun.upgrade_deadline into the edX verified course mode (#3814)
+- fix: update dependency djangorestframework to v3.18.3 [SECURITY] (#4178)
+- Revert "Program Entitlement bug fix" (#4180)
+- Add certifi>=2026.10.19 constraint (eMudhra CA compromise) (#4181)
+- Bump certifi to 2026.10.19 (eMudhra CA compromise) (#4179)
+- Program Entitlement bug fix (#4154)
+- Add quick and dirty status breakdown on verifiable creds (#4169)
+
 Version 1.170.10
 ----------------
 
