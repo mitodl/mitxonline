@@ -26,6 +26,7 @@ from courses.api import (
     create_verifiable_credential,
     downgrade_learner,
     summarize_verifiable_credential_certificate_statuses,
+    undo_program_course_run_verification,
 )
 from courses.forms import (
     ADMIN_ENROLL_RUN_SUFFIX,
@@ -878,6 +879,7 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
         "retry_all_failed_edx_enrollment",
         "reset_edx_enrollment_retry_count",
         "downgrade_enrollment",
+        "undo_program_entitlement_verification",
     ]
     run_for_all_actions = ["retry_all_failed_edx_enrollment"]
     change_list_template = "admin/courses/courserunenrollment/change_list.html"
@@ -1049,6 +1051,36 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
                 request,
                 f"Successfully downgraded users enrollment from verified to audit: {enrollment.user.email}.",
             )
+
+    @admin.action(description="Undo verification from program entitlement")
+    def undo_program_entitlement_verification(self, request, queryset):
+        """
+        Admin action to undo the selected enrollments' verification that came
+        from a program entitlement: cancel the zero-value program orders for
+        the run and downgrade the enrollment to audit.
+        """
+        for enrollment in queryset.select_related("user", "run"):
+            try:
+                orders, edx_success = undo_program_course_run_verification(enrollment)
+            except ValueError as exc:
+                self.message_user(request, f"Skipped: {exc}", messages.ERROR)
+                continue
+            references = ", ".join(order.reference_number for order in orders)
+            if edx_success:
+                self.message_user(
+                    request,
+                    f"Downgraded {enrollment.user.email} to audit in "
+                    f"{enrollment.run.courseware_id} and canceled order(s) {references}.",
+                    messages.SUCCESS,
+                )
+            else:
+                self.message_user(
+                    request,
+                    f"Downgraded {enrollment.user.email} to audit in "
+                    f"{enrollment.run.courseware_id} and canceled order(s) {references}, "
+                    "but the edX downgrade failed. Check the logs for details.",
+                    messages.WARNING,
+                )
 
 
 @admin.register(CourseRunEnrollmentAudit)

@@ -80,6 +80,7 @@ from courses.api import (
     summarize_verifiable_credential_certificate_statuses,
     sync_course_mode,
     sync_course_runs,
+    undo_program_course_run_verification,
     upgrade_audit_run_enrollments_for_program_purchase,
     upgrade_program_enrollment_if_eligible,
 )
@@ -122,9 +123,11 @@ from courses.models import (
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
+from ecommerce.constants import REDEMPTION_TYPE_INTERNAL
 from ecommerce.factories import (
     DiscountFactory,
     DiscountRedemptionFactory,
+    LineFactory,
     OrderFactory,
     ProductFactory,
 )
@@ -6024,3 +6027,129 @@ def test_rerun_course_run_upgrade_deadline(mocker, upgrade_deadline):
     new_run.refresh_from_db()
     assert new_run.upgrade_deadline == upgrade_deadline
     mocked_clone.assert_called_once_with(new_run, base_run.courseware_id)
+
+
+class TestUndoProgramCourseRunVerification:
+    """Tests for undo_program_course_run_verification"""
+
+    @pytest.fixture
+    def mock_edx(self, mocker):
+        """Mock the edX enrollment call made by the downgrade."""
+        return mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+    @pytest.fixture
+    def enrollment(self, user):
+        """An active verified course run enrollment."""
+        return CourseRunEnrollmentFactory.create(
+            user=user,
+            run=CourseRunFactory.create(),
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+
+    @staticmethod
+    def _run_order(enrollment, *, total_price_paid=0, redemption_type=None):
+        """
+        Create a fulfilled order with a line for the enrollment's run and its
+        PaidCourseRun, redeeming a discount of redemption_type if given.
+        """
+        product = enrollment.run.products.first()
+        if product is None:
+            with reversion.create_revision():
+                product = ProductFactory.create(purchasable_object=enrollment.run)
+        order = OrderFactory.create(
+            purchaser=enrollment.user,
+            state=OrderStatus.FULFILLED,
+            total_price_paid=total_price_paid,
+        )
+        LineFactory.create(
+            order=order,
+            product_version=reversion.models.Version.objects.get_for_object(
+                product
+            ).last(),
+            purchased_object=enrollment.run,
+        )
+        if redemption_type is not None:
+            DiscountRedemptionFactory.create(
+                redeemed_by=enrollment.user,
+                redeemed_discount=DiscountFactory.create(
+                    redemption_type=redemption_type
+                ),
+                redeemed_order=order,
+            )
+        PaidCourseRun.objects.create(
+            user=enrollment.user, course_run=enrollment.run, order=order
+        )
+        return order
+
+    def test_cancels_entitlement_order_and_downgrades(self, mock_edx, enrollment):
+        """The program entitlement order is canceled and the enrollment downgraded"""
+        order = self._run_order(enrollment, redemption_type=REDEMPTION_TYPE_INTERNAL)
+
+        orders, edx_success = undo_program_course_run_verification(enrollment)
+
+        assert orders == [order]
+        assert edx_success is True
+        order.refresh_from_db()
+        enrollment.refresh_from_db()
+        assert order.state == OrderStatus.CANCELED
+        assert enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        assert enrollment.active is True
+        assert not PaidCourseRun.objects.filter(order=order).exists()
+        mock_edx.assert_called_once()
+        assert mock_edx.call_args.kwargs["mode"] == EDX_ENROLLMENT_AUDIT_MODE
+
+    @pytest.mark.parametrize(
+        ("mode", "active"),
+        [(EDX_ENROLLMENT_AUDIT_MODE, True), (EDX_ENROLLMENT_VERIFIED_MODE, False)],
+    )
+    def test_refuses_non_verified_or_inactive_enrollment(
+        self, mock_edx, enrollment, mode, active
+    ):
+        """Only an active verified enrollment can be undone"""
+        order = self._run_order(enrollment, redemption_type=REDEMPTION_TYPE_INTERNAL)
+        enrollment.enrollment_mode = mode
+        enrollment.active = active
+        enrollment.save()
+
+        with pytest.raises(ValueError, match="not an active verified enrollment"):
+            undo_program_course_run_verification(enrollment)
+
+        order.refresh_from_db()
+        assert order.state == OrderStatus.FULFILLED
+        mock_edx.assert_not_called()
+
+    def test_refuses_without_entitlement_order(self, mock_edx, enrollment):
+        """An enrollment with no program entitlement order is refused"""
+        self._run_order(enrollment, total_price_paid=0, redemption_type="one-time")
+
+        with pytest.raises(ValueError, match="no program entitlement order"):
+            undo_program_course_run_verification(enrollment)
+
+        mock_edx.assert_not_called()
+
+    def test_refuses_when_also_backed_by_a_real_purchase(self, mock_edx, enrollment):
+        """An enrollment also backed by a paid order is left verified"""
+        entitlement_order = self._run_order(
+            enrollment, redemption_type=REDEMPTION_TYPE_INTERNAL
+        )
+        paid_order = self._run_order(enrollment, total_price_paid=Decimal("100.00"))
+
+        with pytest.raises(ValueError, match=paid_order.reference_number):
+            undo_program_course_run_verification(enrollment)
+
+        entitlement_order.refresh_from_db()
+        enrollment.refresh_from_db()
+        assert entitlement_order.state == OrderStatus.FULFILLED
+        assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        mock_edx.assert_not_called()
+
+    def test_refuses_b2b_enrollment(self, mock_edx, enrollment):
+        """A B2B-provisioned enrollment is refused"""
+        self._run_order(enrollment, redemption_type=REDEMPTION_TYPE_INTERNAL)
+        enrollment.b2b_contract = ContractPageFactory.create()
+        enrollment.save()
+
+        with pytest.raises(ValueError, match="B2B-provisioned"):
+            undo_program_course_run_verification(enrollment)
+
+        mock_edx.assert_not_called()

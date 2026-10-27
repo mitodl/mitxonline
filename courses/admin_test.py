@@ -484,3 +484,37 @@ def test_courserun_admin_add_warning_points_to_push_action(rf, admin_user, mocke
     message = mock_messages.warning.call_args[0][1]
     assert '"Push upgrade deadline to edX"' in message
     assert "change the deadline here" not in message
+
+
+@pytest.mark.parametrize("edx_success", [True, False])
+def test_undo_program_entitlement_verification_action(
+    mocker, admin_client, edx_success
+):
+    """The undo action reports each enrollment's outcome without stopping on errors"""
+    undone = CourseRunEnrollmentFactory.create()
+    refused = CourseRunEnrollmentFactory.create()
+    order = mocker.Mock(reference_number="mitxonline-test-1")
+    mock_undo = mocker.patch(
+        "courses.admin.undo_program_course_run_verification",
+        side_effect=lambda enrollment: (
+            ([order], edx_success)
+            if enrollment == undone
+            else (_ for _ in ()).throw(ValueError("not verified"))
+        ),
+    )
+
+    response = admin_client.post(
+        reverse("admin:courses_courserunenrollment_changelist"),
+        {
+            "action": "undo_program_entitlement_verification",
+            "_selected_action": [str(undone.id), str(refused.id)],
+        },
+        follow=True,
+    )
+
+    assert mock_undo.call_count == 2
+    message_texts = [str(m) for m in response.context["messages"]]
+    assert "Skipped: not verified" in message_texts
+    undone_message = next(t for t in message_texts if undone.user.email in t)
+    assert "mitxonline-test-1" in undone_message
+    assert ("edX downgrade failed" in undone_message) is not edx_success
