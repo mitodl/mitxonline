@@ -345,6 +345,14 @@ class CreateEnrollmentView(APIView):
         if resp is not None:
             return resp
 
+        # Check early so a blocked learner isn't provisioned an edX account.
+        # create_run_enrollments remains the authoritative check.
+        if run.course.is_country_blocked(user):
+            return redirect_with_user_message(
+                reverse("user-dashboard"),
+                {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
+            )
+
         if not user.openedx_user_exists:
             create_user(user)
             user.refresh_from_db()

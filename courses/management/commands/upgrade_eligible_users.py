@@ -17,7 +17,7 @@ from django.core.management import BaseCommand
 from courses.api import create_run_enrollments
 from courses.exceptions import CountryBlockedError
 from courses.models import CourseRun, CourseRunEnrollment
-from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
 
 
@@ -101,6 +101,8 @@ class Command(BaseCommand):
                 self.style.ERROR(f"User {user} has already verified enrollment.")
             )
             return 0
+        if enrollment.enrollment_mode != EDX_ENROLLMENT_AUDIT_MODE:
+            return None
         try:
             _, edx_request_success = create_run_enrollments(
                 user, [course_run], mode=EDX_ENROLLMENT_VERIFIED_MODE
