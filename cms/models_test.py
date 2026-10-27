@@ -1710,3 +1710,14 @@ def test_generate_with_ai_buttons_need_flag(mocker, settings):
     assert "Generate with AI" not in html
     assert 'name="verifiable_credential_description"' not in html
     assert 'name="verifiable_credential_criteria"' in html
+
+
+def test_generate_with_ai_panel_loads_script():
+    """The panel pulls in the script that makes its buttons work"""
+    panel = CertificatePage.get_edit_handler()
+    form = panel.get_form_class()(
+        instance=CertificatePage(), parent_page=CoursePageFactory.create()
+    )
+    bound = panel.get_bound_panel(instance=CertificatePage(), form=form)
+
+    assert "js/credential_metadata_admin.js" in str(bound.media)

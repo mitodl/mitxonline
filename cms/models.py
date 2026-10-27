@@ -360,6 +360,9 @@ class GenerateWithAIFieldPanel(FieldPanel):
 
         template_name = "cms/panels/generate_with_ai_field_panel.html"
 
+        class Media:
+            js = ["js/credential_metadata_admin.js"]
+
         @cached_property
         def flag_enabled(self):
             """Whether credential metadata authoring is switched on"""
