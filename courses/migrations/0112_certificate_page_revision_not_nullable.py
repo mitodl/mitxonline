@@ -129,6 +129,7 @@ class Migration(migrations.Migration):
             model_name="courseruncertificate",
             name="certificate_page_revision",
             field=models.ForeignKey(
+                blank=True,
                 limit_choices_to=courses.models.limit_to_certificate_pages,
                 on_delete=django.db.models.deletion.PROTECT,
                 to="wagtailcore.revision",
@@ -138,6 +139,7 @@ class Migration(migrations.Migration):
             model_name="programcertificate",
             name="certificate_page_revision",
             field=models.ForeignKey(
+                blank=True,
                 limit_choices_to=courses.models.limit_to_certificate_pages,
                 on_delete=django.db.models.deletion.PROTECT,
                 to="wagtailcore.revision",

@@ -2148,7 +2148,9 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
     certificate_page_revision = models.ForeignKey(
         Revision,
         null=False,
-        blank=False,
+        # blank=True so the admin form can be left empty: clean()/save() then
+        # fill in the certificate page's latest revision.
+        blank=True,
         # PROTECT, not CASCADE: every certificate now points at a revision,
         # and Wagtail's purge_revisions (and deleting a certificate page)
         # delete non-latest revisions, relying on ProtectedError to skip ones
@@ -2195,10 +2197,21 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
 
         # Check the raw FK ids, as save() does: an unset FK raises
         # RelatedObjectDoesNotExist through the descriptor rather than
-        # returning None. Field validation already reports the missing value
-        # as required, so there's nothing more to check here.
-        if not self.certificate_page_revision_id or not self.course_run_id:
+        # returning None.
+        if not self.course_run_id:
             return
+
+        # Left blank (e.g. in the admin): use the latest revision, or fail if
+        # there isn't one rather than hitting the NOT NULL constraint on save.
+        if not self.certificate_page_revision_id:
+            revision = self.course_run.course.get_certificate_page_revision()
+            if not revision:
+                raise ValidationError(
+                    {
+                        "certificate_page_revision": "This course has no live certificate page with a saved revision."
+                    }
+                )
+            self.certificate_page_revision = revision
 
         certpage = CertificatePage.objects.filter(
             pk=int(self.certificate_page_revision.object_id),
@@ -2245,7 +2258,9 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
     certificate_page_revision = models.ForeignKey(
         Revision,
         null=False,
-        blank=False,
+        # blank=True so the admin form can be left empty: clean()/save() then
+        # fill in the certificate page's latest revision.
+        blank=True,
         # PROTECT, not CASCADE: every certificate now points at a revision,
         # and Wagtail's purge_revisions (and deleting a certificate page)
         # delete non-latest revisions, relying on ProtectedError to skip ones
@@ -2299,10 +2314,21 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
 
         # Check the raw FK ids, as save() does: an unset FK raises
         # RelatedObjectDoesNotExist through the descriptor rather than
-        # returning None. Field validation already reports the missing value
-        # as required, so there's nothing more to check here.
-        if not self.certificate_page_revision_id or not self.program_id:
+        # returning None.
+        if not self.program_id:
             return
+
+        # Left blank (e.g. in the admin): use the latest revision, or fail if
+        # there isn't one rather than hitting the NOT NULL constraint on save.
+        if not self.certificate_page_revision_id:
+            revision = self.program.get_certificate_page_revision()
+            if not revision:
+                raise ValidationError(
+                    {
+                        "certificate_page_revision": "This program has no live certificate page with a saved revision."
+                    }
+                )
+            self.certificate_page_revision = revision
 
         certpage = CertificatePage.objects.filter(
             pk=int(self.certificate_page_revision.object_id),

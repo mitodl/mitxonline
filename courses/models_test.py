@@ -609,23 +609,52 @@ def test_course_run_certificate_save_without_course_page(mocker):
 @pytest.mark.parametrize(
     "certificate_model", [CourseRunCertificate, ProgramCertificate]
 )
-@pytest.mark.parametrize("set_parent", [True, False])
-def test_certificate_full_clean_without_revision(certificate_model, set_parent):
+@pytest.mark.parametrize("has_certificate_page", [True, False])
+def test_certificate_full_clean_without_revision(
+    certificate_model, has_certificate_page
+):
     """
-    A certificate with no revision (e.g. the admin add form left blank) fails
-    validation with a field error instead of raising RelatedObjectDoesNotExist.
+    A certificate left without a revision (e.g. the admin add form left blank)
+    gets the certificate page's latest revision in full_clean(), or fails
+    validation with a field error if there is no revision to use.
     """
+    page_kwargs = {} if has_certificate_page else {"page": None}
     certificate = certificate_model(user=UserFactory.create())
-    if set_parent:
-        if certificate_model is CourseRunCertificate:
-            certificate.course_run = CourseRunFactory.create()
-        else:
-            certificate.program = ProgramFactory.create()
+    if certificate_model is CourseRunCertificate:
+        certificate.course_run = CourseRunFactory.create(
+            **{f"course__{key}": value for key, value in page_kwargs.items()}
+        )
+        certified_object = certificate.course_run.course
+    else:
+        certificate.program = ProgramFactory.create(**page_kwargs)
+        certified_object = certificate.program
+
+    if has_certificate_page:
+        certificate.full_clean()
+        assert (
+            certificate.certificate_page_revision
+            == certified_object.certificate_page.get_latest_revision()
+        )
+    else:
+        with pytest.raises(ValidationError) as exc_info:
+            certificate.full_clean()
+        assert "certificate_page_revision" in exc_info.value.message_dict
+
+
+@pytest.mark.parametrize(
+    "certificate_model", [CourseRunCertificate, ProgramCertificate]
+)
+def test_certificate_full_clean_without_parent(certificate_model):
+    """A certificate with no course run/program fails on that field, not with RelatedObjectDoesNotExist."""
+    certificate = certificate_model(user=UserFactory.create())
 
     with pytest.raises(ValidationError) as exc_info:
         certificate.full_clean()
 
-    assert "certificate_page_revision" in exc_info.value.message_dict
+    parent_field = (
+        "course_run" if certificate_model is CourseRunCertificate else "program"
+    )
+    assert parent_field in exc_info.value.message_dict
 
 
 def test_certificate_page_with_issued_certificates_cannot_be_deleted(mocker):
