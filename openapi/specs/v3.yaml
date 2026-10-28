@@ -1204,10 +1204,17 @@ components:
           type: string
           nullable: true
           description: Null when enrollable. CS_700 when an export compliance check
-            rejected the learner; CS_701 when their profile is missing the information
-            needed to run that check.
+            rejected the learner; CS_701 when their profile is missing information
+            the check needs, or has values CyberSource rejected.
+        missing_fields:
+          type: array
+          items:
+            type: string
+          description: 'With CS_701, the profile fields to fix: empty ones, or ones
+            CyberSource rejected as invalid.'
       required:
       - enrollable
+      - missing_fields
       - reason_code
     EnrollmentEligibilityNotFound:
       type: object
@@ -1375,6 +1382,20 @@ components:
         track:
           type: integer
           nullable: true
+    ProgramEnrollmentModeEnum:
+      enum:
+      - audit
+      - verified
+      - upgrade
+      type: string
+      description: |-
+        * `audit` - audit
+        * `verified` - verified
+        * `upgrade` - upgrade
+      x-enum-descriptions:
+      - audit
+      - verified
+      - upgrade
     V3CourseRunCertificate:
       type: object
       description: CourseRunCertificate model serializer
@@ -1482,8 +1503,9 @@ components:
           readOnly: true
           nullable: true
         enrollment_mode:
-          type: string
-          maxLength: 20
+          allOf:
+          - $ref: '#/components/schemas/ProgramEnrollmentModeEnum'
+          readOnly: true
         track:
           allOf:
           - $ref: '#/components/schemas/V3ProgramTrack'
@@ -1491,6 +1513,7 @@ components:
           nullable: true
       required:
       - certificate
+      - enrollment_mode
       - program
       - track
     VariantIndustryEnum:

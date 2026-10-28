@@ -9,10 +9,9 @@ from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from compliance.exceptions import ExportComplianceCheckError
 from courses import models
 from courses.api import create_run_enrollments
-from courses.exceptions import CountryBlockedError, EnrollmentError
+from courses.exceptions import EnrollmentError
 from courses.serializers.v1.base import (
     BaseCourseRunEnrollmentSerializer,
     BaseCourseRunSerializer,
@@ -135,19 +134,13 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
         if run is None or run.b2b_contract_id is not None:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
 
-        try:
-            successful_enrollments, _ = create_run_enrollments(
-                user,
-                [run],
-                keep_failed_enrollments=settings.FEATURES.get(
-                    features.IGNORE_EDX_FAILURES, False
-                ),
-            )
-        except (CountryBlockedError, ExportComplianceCheckError) as exc:
-            # Don't propagate the specifics of the compliance decision to the
-            # client - only an opaque support code, if the cause declares one.
-            # The underlying cause is logged where it's raised.
-            raise EnrollmentError.from_cause(exc) from exc
+        successful_enrollments, _ = create_run_enrollments(
+            user,
+            [run],
+            keep_failed_enrollments=settings.FEATURES.get(
+                features.IGNORE_EDX_FAILURES, False
+            ),
+        )
 
         if not successful_enrollments:
             log.error(
@@ -219,7 +212,14 @@ class EnrollmentEligibilitySerializer(serializers.Serializer):
         allow_null=True,
         help_text=(
             "Null when enrollable. CS_700 when an export compliance check "
-            "rejected the learner; CS_701 when their profile is missing the "
-            "information needed to run that check."
+            "rejected the learner; CS_701 when their profile is missing "
+            "information the check needs, or has values CyberSource rejected."
+        ),
+    )
+    missing_fields = serializers.ListField(
+        child=serializers.CharField(),
+        help_text=(
+            "With CS_701, the profile fields to fix: empty ones, or ones "
+            "CyberSource rejected as invalid."
         ),
     )

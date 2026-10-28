@@ -10,10 +10,8 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from cms.serializers import CoursePageSerializer
-from compliance.exceptions import ExportComplianceCheckError
 from courses import models
 from courses.api import create_run_enrollments
-from courses.exceptions import CountryBlockedError, EnrollmentError
 from courses.serializers.v1.base import (
     BaseCourseRunEnrollmentWithFlexiblePriceSerializer,
     BaseCourseRunSerializer,
@@ -190,19 +188,13 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSeri
                 {"run_id": f"Course run is not open for enrollment: {run_id}"}
             )
 
-        try:
-            successful_enrollments, _ = create_run_enrollments(
-                user,
-                [run],
-                keep_failed_enrollments=settings.FEATURES.get(
-                    features.IGNORE_EDX_FAILURES, False
-                ),
-            )
-        except (CountryBlockedError, ExportComplianceCheckError) as exc:
-            # Don't propagate the specifics of the compliance decision to the
-            # client - only an opaque support code, if the cause declares one.
-            # The underlying cause is logged where it's raised.
-            raise EnrollmentError.from_cause(exc) from exc
+        successful_enrollments, _ = create_run_enrollments(
+            user,
+            [run],
+            keep_failed_enrollments=settings.FEATURES.get(
+                features.IGNORE_EDX_FAILURES, False
+            ),
+        )
 
         return successful_enrollments[0] if successful_enrollments else None
 

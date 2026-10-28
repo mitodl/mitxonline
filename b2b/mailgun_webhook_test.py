@@ -289,15 +289,18 @@ class TestProcessMailgunWebhookForEnrollmentCodeEmails:
         MAILGUN_WEBHOOK_VALIDATE_SIGNATURE=True,
         MAILGUN_WEBHOOK_SIGNING_SECRET=SIGNING_SECRET,
     )
-    def test_raises_when_no_assignment_matches_message_id(self, assignment):  # noqa: ARG002
+    def test_returns_none_when_no_assignment_matches_message_id(self, assignment):
         """
-        There's no record with this message ID, so the lookup should raise.
-        This isn't handled specially - it's expected to surface as a task failure.
+        There's no record with this message ID, e.g. the user clicked an older email
+        after a reminder replaced the stored message ID. The event should be ignored
+        and leave the existing assignment untouched.
         """
         payload = _build_payload(message_id="some-unknown-message-id")
 
-        with pytest.raises(DiscountContractAttachmentRedemption.DoesNotExist):
-            process_mailgun_webhook_for_enrollment_code_emails(payload)
+        assert process_mailgun_webhook_for_enrollment_code_emails(payload) is None
+        assignment.refresh_from_db()
+        assert assignment.email_status == ""
+        assert assignment.email_status_event_timestamp is None
 
 
 class TestProcessMailgunWebhookEventOrdering:

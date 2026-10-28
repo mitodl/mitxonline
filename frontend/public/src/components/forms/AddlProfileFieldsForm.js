@@ -16,7 +16,9 @@ type Props = {
   onSubmit: Function,
   user: User,
   countries: Array<Country>,
-  requireComplianceFields?: boolean
+  requireComplianceFields?: boolean,
+  // Fields checkout rejected, shown and flagged even when filled in
+  rejectedFields?: Array<string>
 }
 
 const getInitialValues = (user: User) => ({
@@ -32,7 +34,8 @@ const AddlProfileFieldsForm = ({
   onSubmit,
   user,
   countries,
-  requireComplianceFields
+  requireComplianceFields,
+  rejectedFields
 }: Props) => {
   const validation = requireComplianceFields ?
     complianceAddressValidation :
@@ -54,9 +57,14 @@ const AddlProfileFieldsForm = ({
               errors={errors}
               countries={countries}
               values={values}
+              rejectedFields={rejectedFields}
             />
             {requireComplianceFields ? (
-              <LegalAddressComplianceFields errors={errors} values={values} />
+              <LegalAddressComplianceFields
+                errors={errors}
+                values={values}
+                rejectedFields={rejectedFields}
+              />
             ) : null}
             <div className="row submit-row no-gutters">
               <div className="col d-flex justify-content-end">

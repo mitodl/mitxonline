@@ -25,7 +25,6 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from b2b.models import ContractPage
-from compliance.exceptions import ExportComplianceCheckError
 from courses.api import (
     check_enrollment_eligibility,
     create_program_enrollments,
@@ -292,13 +291,7 @@ class UserProgramEnrollmentsViewSet(
             return Response(response_serializer.data, status=status.HTTP_200_OK)
 
         # Create the enrollment using default enrollment mode (audit)
-        try:
-            enrollments = create_program_enrollments(request.user, [program])
-        except ExportComplianceCheckError as exc:
-            # Don't propagate the specifics of the compliance decision to the
-            # client - only an opaque support code, if the cause declares one.
-            # The underlying cause is logged where it's raised.
-            raise EnrollmentError.from_cause(exc) from exc
+        enrollments = create_program_enrollments(request.user, [program])
 
         if not enrollments:
             log.error(
