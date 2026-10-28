@@ -114,6 +114,10 @@ class Command(BaseCommand):
                 create_page=True,
                 set_courserun_dates_automatically=True,
                 price=COURSE_PRICE,
+                # Without a verified mode a run is not upgradable, so the
+                # product above could never be bought.
+                mode_audit=True,
+                mode_verified=True,
             )
 
     def _seed_superuser(self, email, global_id):

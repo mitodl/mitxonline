@@ -84,6 +84,11 @@ def assert_courseware_seeded():
         run = CourseRun.objects.get(course=course)
         assert run.courseware_id == run_id
         assert run.is_enrollable
+        assert run.is_upgradable
+        assert sorted(run.enrollment_modes.values_list("mode_slug", flat=True)) == [
+            "audit",
+            "verified",
+        ]
         assert [product.price for product in run.products.all()] == [999]
 
     assert [course.readable_id for course in program.required_courses] == [
