@@ -2,9 +2,18 @@
 
 from rest_framework import exceptions, views
 
+from compliance.exceptions import ExportComplianceCheckError
+from courses.exceptions import EnrollmentError
+
 
 def exception_handler(exc, context):
     """Override DRF exception_handler to slightly change format of error response"""
+    if isinstance(exc, ExportComplianceCheckError):
+        # Don't propagate the specifics of the compliance decision to the
+        # client - only an opaque support code and the profile fields to fix,
+        # if the cause declares them. The underlying cause is logged where
+        # it's raised.
+        exc = EnrollmentError.from_cause(exc)
     if isinstance(exc, exceptions.ValidationError) and isinstance(
         exc.detail, list | dict
     ):

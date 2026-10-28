@@ -4856,9 +4856,16 @@ components:
             * `b2b-invalid-basket` - b2b-invalid-basket
             * `basket-empty` - basket-empty
             * `profile-incomplete` - profile-incomplete
+        missing_fields:
+          type: array
+          items:
+            type: string
+          readOnly: true
+          description: With a profile-incomplete error, the profile fields to fix.
       required:
       - error
       - method
+      - missing_fields
       - no_checkout
       - order_id
       - payload
@@ -6059,10 +6066,6 @@ components:
         purposes.
       properties:
         country_blocked:
-          type: boolean
-          nullable: true
-          default: false
-        profile_incomplete:
           type: boolean
           nullable: true
           default: false

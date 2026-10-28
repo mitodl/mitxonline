@@ -3,14 +3,17 @@ Tests for course views
 """
 
 # pylint: disable=unused-argument, redefined-outer-name, too-many-arguments
+import json
 import operator as op
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from urllib.parse import quote
 
 import pytest
 import reversion
 from anys import ANY_STR
+from CyberSource.rest import ApiException
 from django.db.models import Count, Q
 from django.test import Client, RequestFactory
 from django.urls import reverse
@@ -24,6 +27,7 @@ from reversion.models import Version
 from b2b.factories import ContractPageFactory
 from cms.factories import ProgramPageFactory
 from cms.serializers import CoursePageSerializer, ProgramPageSerializer
+from compliance.api import verify_user_with_exports
 from compliance.exceptions import ExportComplianceDataError, ExportComplianceError
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
@@ -562,7 +566,8 @@ def test_user_enrollments_create_export_compliance_blocked(
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
-        "detail": "Unable to complete enrollment. Error code: CS_700."
+        "detail": "Unable to complete enrollment. Error code: CS_700.",
+        "reason_code": "CS_700",
     }
     assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
 
@@ -570,9 +575,9 @@ def test_user_enrollments_create_export_compliance_blocked(
 def test_user_enrollments_create_export_compliance_missing_data(
     mocker, user_drf_client, user
 ):
-    """Missing profile data is not a CyberSource rejection, so it carries no error code."""
+    """Missing profile data carries the fixable-data code and the fields to fix."""
     run = CourseRunFactory.create()
-    exc = ExportComplianceDataError(user, ["bill_to_country"])
+    exc = ExportComplianceDataError(user, ["country"])
     mocker.patch(
         "courses.serializers.v1.courses.create_run_enrollments",
         side_effect=exc,
@@ -581,7 +586,64 @@ def test_user_enrollments_create_export_compliance_missing_data(
         reverse("v1:user-enrollments-api-list"), data={"run_id": run.id}
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
-    assert resp.json() == {"detail": "Unable to complete enrollment."}
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
+        "missing_fields": ["country"],
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+def test_user_enrollments_create_cybersource_invalid_request(
+    mocker, user_drf_client, user
+):
+    """
+    Profile data CyberSource rejects as INVALID_REQUEST comes back as a 400
+    naming the field, not a 500 (mitodl/hq#13724).
+    """
+    mocker.patch("courses.api.verify_user_with_exports", verify_user_with_exports)
+    client = mocker.Mock()
+    # Body as returned by CyberSource in production for a last name of "."
+    client.validate_export_compliance.side_effect = ApiException(
+        http_resp=SimpleNamespace(
+            status=400,
+            reason="Bad Request",
+            data=json.dumps(
+                {
+                    "id": "7915649045806763404884",
+                    "status": "INVALID_REQUEST",
+                    "reason": "INVALID_DATA",
+                    "message": "Declined - One or more fields in the request contains invalid data",
+                    "details": [
+                        {
+                            "field": "orderInformation.billTo.lastName",
+                            "reason": "INVALID_DATA",
+                        }
+                    ],
+                }
+            ),
+            getheaders=dict,
+        )
+    )
+    mocker.patch("compliance.api.get_cybersource_client", return_value=client)
+    user.legal_address.first_name = "David"
+    user.legal_address.last_name = "Cohen"
+    user.legal_address.country = "IL"
+    user.legal_address.street_address_1 = "1 Rothschild Blvd"
+    user.legal_address.city = "Tel Aviv"
+    user.legal_address.save()
+    run = CourseRunFactory.create()
+
+    resp = user_drf_client.post(
+        reverse("v1:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
+        "missing_fields": ["last_name"],
+    }
     assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
 
 
@@ -828,7 +890,7 @@ def test_create_enrollments_export_compliance_missing_data(mocker, user_client, 
     when the export compliance check can't run due to incomplete profile data.
     """
     run = CourseRunFactory.create()
-    exc = ExportComplianceDataError(user, ["postal_code", "state"])
+    exc = ExportComplianceDataError(user, ["postal_code", "administrative_area"])
     mocker.patch(
         "courses.views.v1.create_run_enrollments",
         side_effect=exc,

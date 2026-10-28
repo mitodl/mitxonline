@@ -153,7 +153,13 @@ class Basket(TimestampedModel):
         return self.user_id is None
 
     def has_user_blocked_products(self, user):
-        """Return true if any of the courses in the basket block user's country"""
+        """
+        Return true if any of the courses in the basket block user's country,
+        or the user failed the export compliance check.
+
+        Raises:
+            ExportComplianceDataError: if the user's profile can't be checked
+        """
         basket_items = self.basket_items.prefetch_related("product")
 
         if basket_items.count() == 0:

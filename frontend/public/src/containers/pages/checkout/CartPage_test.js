@@ -139,6 +139,33 @@ describe("CartPage", () => {
       assert.notInclude(queryKeys(loggedInUser), "countries")
     })
 
+    it("loads countries when checkout sent the learner back with fields to fix", () => {
+      const queryKeys = mapPropsToConfig({
+        currentUser: loggedInUser,
+        location:    { search: "?profile_incomplete=state" }
+      }).map(config => config.queryKey)
+
+      assert.include(queryKeys, "countries")
+    })
+
+    it("opens the dialog on the fields checkout rejected", async () => {
+      const { inner } = await renderPage(
+        {},
+        { location: { search: "?profile_incomplete=last_name,postal_code" } }
+      )
+      inner.update()
+
+      assert.isTrue(inner.find("Modal").prop("isOpen"))
+      assert.deepEqual(
+        inner.find("AddlProfileFieldsForm").prop("rejectedFields"),
+        ["last_name", "postal_code"]
+      )
+      assert.include(
+        inner.find("ModalBody").find("p").text(),
+        "We couldn't verify some of your details."
+      )
+    })
+
     it("goes straight to checkout when nothing is missing", async () => {
       const { inner } = await renderPage()
       inner.find("OrderSummaryCard").prop("onCheckout")("/checkout/to_payment")
@@ -192,6 +219,33 @@ describe("CartPage", () => {
       assert.notProperty(body, "user_profile")
       assert.equal(window.location, "/checkout/to_payment")
       sinon.assert.calledWith(setSubmitting, false)
+    })
+
+    it("clears a state left over for a country without a state list", async () => {
+      const { inner } = await renderPage({
+        entities: { currentUser: incompleteUser }
+      })
+      inner.find("OrderSummaryCard").prop("onCheckout")("/checkout/to_payment")
+      inner.setProps({
+        countries: [{ code: "GB", name: "United Kingdom", states: [] }]
+      })
+      const legalAddress = {
+        ...incompleteUser.legal_address,
+        country: "GB",
+        state:   "US-MA"
+      }
+
+      await inner.instance().saveProfile(
+        {
+          legal_address: legalAddress,
+          user_profile:  { year_of_birth: 1990 }
+        },
+        { setSubmitting: sinon.stub() }
+      )
+
+      const { body } = helper.handleRequestStub.lastCall.args[2]
+      assert.equal(body.legal_address.country, "GB")
+      assert.equal(body.legal_address.state, "")
     })
 
     it("sends year of birth when the form changed it", async () => {

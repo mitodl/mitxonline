@@ -6,6 +6,7 @@ import { Formik } from "formik"
 
 import {
   LegalAddressComplianceFields,
+  LegalAddressCountryFields,
   NAME_REGEX,
   complianceAddressValidation,
   needsComplianceInfo
@@ -137,12 +138,16 @@ describe("ProfileFormFields", () => {
   })
 
   describe("LegalAddressComplianceFields", () => {
-    const renderFields = legalAddress => {
+    const renderFields = (legalAddress, rejectedFields) => {
       const values = { legal_address: legalAddress }
       return mount(
         <Formik initialValues={values} onSubmit={() => undefined}>
           {({ errors, values }) => (
-            <LegalAddressComplianceFields errors={errors} values={values} />
+            <LegalAddressComplianceFields
+              errors={errors}
+              values={values}
+              rejectedFields={rejectedFields}
+            />
           )}
         </Formik>
       )
@@ -164,6 +169,32 @@ describe("ProfileFormFields", () => {
         "legal_address.city",
         "legal_address.postal_code"
       ])
+    })
+
+    it("also shows and flags fields checkout rejected, even when filled in", () => {
+      const wrapper = renderFields(
+        {
+          country:          "US",
+          first_name:       "Test",
+          last_name:        ".",
+          street_address_1: "1 Main St",
+          city:             "",
+          postal_code:      "02139"
+        },
+        ["last_name"]
+      )
+
+      assert.deepEqual(shownFields(wrapper), [
+        "legal_address.last_name",
+        "legal_address.city"
+      ])
+      const lastName = wrapper.find('input[name="legal_address.last_name"]')
+      assert.equal(lastName.prop("aria-invalid"), "true")
+      assert.equal(lastName.prop("aria-describedby"), "last_name-error")
+      assert.equal(
+        wrapper.find("#last_name-error").last().text(),
+        "Please enter a valid last name."
+      )
     })
 
     it("limits each input to the length the server accepts", () => {
@@ -191,6 +222,97 @@ describe("ProfileFormFields", () => {
         postal_code:      ""
       })
       assert.deepEqual(shownFields(wrapper), ["legal_address.street_address_1"])
+    })
+
+    it("shows the optional address line 2 only when checkout rejected it", () => {
+      const legalAddress = {
+        country:          "GB",
+        first_name:       "Test",
+        last_name:        "User",
+        street_address_1: "1 Main St",
+        street_address_2: "",
+        city:             "London",
+        postal_code:      ""
+      }
+      assert.deepEqual(shownFields(renderFields(legalAddress)), [])
+
+      const wrapper = renderFields({ ...legalAddress, street_address_2: "." }, [
+        "street_address_2"
+      ])
+      assert.deepEqual(shownFields(wrapper), ["legal_address.street_address_2"])
+      const input = wrapper.find('input[name="legal_address.street_address_2"]')
+      assert.isFalse(input.prop("required"))
+      assert.equal(
+        wrapper.find("#street_address_2-error").last().text(),
+        "Please enter a valid address line 2."
+      )
+    })
+
+    it("still shows a rejected postal code outside US/CA", () => {
+      const wrapper = renderFields(
+        {
+          country:          "FR",
+          first_name:       "Test",
+          last_name:        "User",
+          street_address_1: "1 Rue",
+          city:             "Paris",
+          postal_code:      "_"
+        },
+        ["postal_code"]
+      )
+      assert.deepEqual(shownFields(wrapper), ["legal_address.postal_code"])
+      assert.equal(
+        wrapper.find("#postal_code-error").last().text(),
+        "Please enter a valid postal code."
+      )
+    })
+  })
+
+  describe("LegalAddressCountryFields", () => {
+    const countries = [
+      {
+        code:   "US",
+        name:   "United States",
+        states: [{ code: "US-MA", name: "Massachusetts" }]
+      }
+    ]
+    const renderFields = (legalAddress, rejectedFields) => {
+      const values = {
+        legal_address: legalAddress,
+        user_profile:  { year_of_birth: 1990 }
+      }
+      return mount(
+        <Formik initialValues={values} onSubmit={() => undefined}>
+          {({ errors, values }) => (
+            <LegalAddressCountryFields
+              errors={errors}
+              values={values}
+              countries={countries}
+              rejectedFields={rejectedFields}
+            />
+          )}
+        </Formik>
+      )
+    }
+
+    it("hides country and state when both are set", () => {
+      const wrapper = renderFields({ country: "US", state: "US-MA" })
+      assert.isFalse(wrapper.exists('select[name="legal_address.state"]'))
+    })
+
+    it("shows and flags a state checkout rejected, even when set", () => {
+      const wrapper = renderFields({ country: "US", state: "US-MA" }, ["state"])
+
+      const state = wrapper.find('select[name="legal_address.state"]')
+      assert.equal(state.prop("aria-invalid"), "true")
+      assert.equal(state.prop("aria-describedby"), "state-error")
+      assert.equal(
+        wrapper.find("#state-error").last().text(),
+        "Please enter a valid state."
+      )
+      // Only the rejected field is flagged.
+      const country = wrapper.find('select[name="legal_address.country"]')
+      assert.isNull(country.prop("aria-invalid"))
     })
   })
 })

@@ -9,27 +9,42 @@ from courses.exceptions import EnrollmentCreationFailedError, EnrollmentError
 
 
 def test_from_cause_appends_the_causes_error_code(user):
-    """A CyberSource rejection contributes its support code to the detail."""
+    """A CyberSource rejection contributes its support code, in the detail and on its own."""
     exc = ExportComplianceError(user, "REJECT", "102")
 
     error = EnrollmentError.from_cause(exc)
 
-    assert str(error.detail) == "Unable to complete enrollment. Error code: CS_700."
+    assert error.detail == {
+        "detail": "Unable to complete enrollment. Error code: CS_700.",
+        "reason_code": "CS_700",
+    }
 
 
 def test_from_cause_without_an_error_code_keeps_the_default_detail(user):
-    """
-    Causes that declare no code stay opaque - notably the missing-profile-data
-    case, which never reached CyberSource and so has no CyberSource code.
-    """
+    """Causes that declare no code stay opaque."""
     for exc in (
-        ExportComplianceDataError(user, ["bill_to_country"]),
         ExportComplianceCheckError("something else"),
         ValueError("not a compliance failure at all"),
     ):
         error = EnrollmentError.from_cause(exc)
 
         assert str(error.detail) == EnrollmentError.default_detail
+
+
+def test_from_cause_adds_the_profile_fields_to_fix(user):
+    """
+    A profile data problem carries its code and the profile fields to fix, so
+    the client can ask the learner for them.
+    """
+    exc = ExportComplianceDataError(user, ["locality", "address1", "last_name"])
+
+    error = EnrollmentError.from_cause(exc)
+
+    assert error.detail == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
+        "missing_fields": ["city", "last_name", "street_address_1"],
+    }
 
 
 def test_from_cause_preserves_the_subclass(user):
@@ -39,4 +54,4 @@ def test_from_cause_preserves_the_subclass(user):
     )
 
     assert isinstance(error, EnrollmentCreationFailedError)
-    assert str(error.detail).endswith("Error code: CS_700.")
+    assert error.detail["reason_code"] == "CS_700"

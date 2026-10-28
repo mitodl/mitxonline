@@ -23,7 +23,10 @@ from compliance.api import (
     log_export_compliance_check,
     verify_user_with_exports,
 )
-from compliance.exceptions import ExportComplianceDataError
+from compliance.exceptions import (
+    BILL_TO_FIELD_TO_PROFILE_FIELD,
+    ExportComplianceDataError,
+)
 from compliance.factories import ExportComplianceLogFactory
 from compliance.models import ExportComplianceDecision, ExportComplianceLog
 from courses.factories import CourseRunFactory
@@ -576,3 +579,148 @@ def test_get_unresolved_export_compliance_decline(decisions, blocking_index):
 
     expected = None if blocking_index is None else logs[blocking_index]
     assert get_unresolved_export_compliance_decline(user) == expected
+
+
+def _complete_user():
+    """Return a user whose legal address passes the pre-request field check."""
+    user = UserFactory.create()
+    user.legal_address.country = "US"
+    user.legal_address.state = "US-MA"
+    user.legal_address.save()
+    return user
+
+
+def _invalid_request(details, status=400, body_status="INVALID_REQUEST"):
+    """Build the ApiException the CyberSource SDK raises for a rejected request."""
+    body = json.dumps(
+        {
+            "id": "7915649045806763404884",
+            "status": body_status,
+            "reason": "INVALID_DATA",
+            "message": "Declined - One or more fields in the request contains invalid data",
+            "details": details,
+        }
+    )
+    return ApiException(
+        http_resp=SimpleNamespace(
+            status=status, reason="Bad Request", data=body, getheaders=dict
+        )
+    )
+
+
+REQUIRED_BILL_TO_FIELDS = sorted(
+    [
+        "first_name",
+        "last_name",
+        "email",
+        "address1",
+        "locality",
+        "country",
+        "administrative_area",
+        "postal_code",
+    ]
+)
+REQUIRED_PROFILE_FIELDS = sorted(
+    BILL_TO_FIELD_TO_PROFILE_FIELD[f] for f in REQUIRED_BILL_TO_FIELDS
+)
+
+
+@pytest.mark.parametrize(
+    ("details", "expected_fields", "expected_profile_fields"),
+    [
+        (
+            [{"field": "orderInformation.billTo.lastName", "reason": "INVALID_DATA"}],
+            ["last_name"],
+            ["last_name"],
+        ),
+        (
+            [
+                {
+                    "field": "orderInformation.billTo.postalCode",
+                    "reason": "MISSING_FIELD",
+                },
+                {"field": "orderInformation.billTo.address1", "reason": "INVALID_DATA"},
+            ],
+            ["address1", "postal_code"],
+            ["postal_code", "street_address_1"],
+        ),
+        (
+            [{"field": "orderInformation.billTo.address2", "reason": "INVALID_DATA"}],
+            ["address2"],
+            ["street_address_2"],
+        ),
+        # No usable field named - ask the user to review all the required ones
+        ([], REQUIRED_BILL_TO_FIELDS, REQUIRED_PROFILE_FIELDS),
+        (
+            [{"field": "orderInformation.somethingElse", "reason": "MISSING_FIELD"}],
+            REQUIRED_BILL_TO_FIELDS,
+            REQUIRED_PROFILE_FIELDS,
+        ),
+    ],
+)
+def test_verify_user_with_exports_maps_invalid_request_to_data_error(
+    mocker, export_settings, details, expected_fields, expected_profile_fields
+):
+    """A 400 INVALID_REQUEST names the profile fields to fix and caches nothing."""
+    user = _complete_user()
+    run = CourseRunFactory.create()
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.side_effect = _invalid_request(details)
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    with pytest.raises(ExportComplianceDataError) as exc_info:
+        verify_user_with_exports(user, run)
+
+    assert exc_info.value.missing_fields == expected_fields
+    assert exc_info.value.profile_fields == expected_profile_fields
+    assert not ExportComplianceLog.objects.filter(user=user).exists()
+
+
+@pytest.mark.parametrize(
+    ("details", "logs_error"),
+    [
+        (
+            [{"field": "orderInformation.billTo.lastName", "reason": "INVALID_DATA"}],
+            False,
+        ),
+        (
+            [{"field": "orderInformation.somethingElse", "reason": "MISSING_FIELD"}],
+            True,
+        ),
+    ],
+)
+def test_verify_user_with_exports_logs_unattributable_rejections(
+    mocker, export_settings, caplog, details, logs_error
+):
+    """A rejection naming no field we know is logged as an error, to be noticed."""
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.side_effect = _invalid_request(details)
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    with pytest.raises(ExportComplianceDataError):
+        verify_user_with_exports(_complete_user(), CourseRunFactory.create())
+
+    errors = [r for r in caplog.records if r.levelname == "ERROR"]
+    assert bool(errors) is logs_error
+    if logs_error:
+        assert "orderInformation.somethingElse" in errors[0].getMessage()
+
+
+@pytest.mark.parametrize(
+    ("status", "body_status"),
+    [(401, "INVALID_REQUEST"), (500, "SERVER_ERROR"), (400, "DECLINED")],
+)
+def test_verify_user_with_exports_reraises_other_api_errors(
+    mocker, export_settings, status, body_status
+):
+    """Auth failures and outages are not the user's to fix, so they still raise."""
+    user = _complete_user()
+    run = CourseRunFactory.create()
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.side_effect = _invalid_request(
+        [], status=status, body_status=body_status
+    )
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    with pytest.raises(ApiException):
+        verify_user_with_exports(user, run)
