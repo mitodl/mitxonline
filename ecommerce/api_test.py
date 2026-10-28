@@ -1238,7 +1238,7 @@ def test_create_verified_program_course_run_order(
     )
     (program, prog_product, _, courserun, cr_product) = bootstrapped_verified_program
     ProgramEnrollmentFactory.create(
-        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        program=program, user=user, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
     )
     basket = Basket.objects.create(user=user)
     BasketItem.objects.create(basket=basket, product=prog_product, quantity=1)
@@ -1281,7 +1281,7 @@ def test_create_vpcro_no_product(bootstrapped_verified_program, user):
 
     (program, _, _, courserun, cr_product) = bootstrapped_verified_program
     ProgramEnrollmentFactory.create(
-        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        program=program, user=user, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
     )
     cr_product.is_active = False
     cr_product.save()
