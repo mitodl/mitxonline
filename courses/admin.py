@@ -897,8 +897,10 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
         """
         Enroll a single user, in audit mode, in a staff-selected set of course
         runs whose courseware_id ends with ADMIN_ENROLL_RUN_SUFFIX. Each run is
-        enrolled separately so one failure (or the compliance check) doesn't
-        block the rest.
+        enrolled separately so one failure doesn't block the rest.
+
+        These are archived runs enrolled by staff, so the export compliance
+        check is skipped.
         """
         if not self.has_add_permission(request):
             raise PermissionDenied
@@ -910,7 +912,7 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
             for run in form.cleaned_data["runs"]:
                 try:
                     enrollments, edx_success = create_run_enrollments(
-                        user, [run], mode=mode
+                        user, [run], mode=mode, skip_compliance_check=True
                     )
                 except Exception as exc:  # noqa: BLE001
                     self.message_user(
