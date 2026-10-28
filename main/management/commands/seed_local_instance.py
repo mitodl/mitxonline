@@ -17,17 +17,24 @@ if no user has it, so that the user's first login through the API gateway
 finds this row: the gateway backend looks users up by global_id, and a row
 without it would collide with the login on email.
 
-Each object is created only if it's missing, so running this again creates
-nothing. (configure_tiers works on the current year's discounts, so in a new
-year it creates that year's discounts and expires the old ones.) The
-courseware and the superuser are separate transactions; if the superuser step
-fails, the courseware stays.
+The program and each course are created only if nothing has their readable
+ID, so running this again creates nothing. An existing program or course is
+skipped whole: its page, financial assistance form, run and product aren't
+checked or repaired. configure_tiers runs every time; it works on the current
+year's discounts, so in a new year it creates that year's discounts and
+expires the old ones. The courseware and the superuser are separate
+transactions; if the superuser step fails, the courseware stays.
+
+It only runs when MITX_ONLINE_ENVIRONMENT is local (ol-infrastructure
+local-dev) or dev (the default, e.g. docker compose). Deployed environments
+have the real DEDP program, and configure_tiers would replace its tiers.
 
 This expects migrations and configure_wagtail to have run. It doesn't create
 the edX OAuth2 application, the test learner, or anything in edX; use
 configure_instance for those.
 """
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management import BaseCommand, CommandError, call_command
 from django.db import transaction
@@ -39,6 +46,7 @@ PROGRAM_ID = "program-v1:MITx+DEDP"
 PROGRAM_TITLE = "Data, Economics and Development Policy"
 PROGRAM_DEPARTMENT = "Economics"
 COURSE_PRICE = 999
+LOCAL_ENVIRONMENTS = ("local", "dev")
 
 # readable ID, title, run tag, department, required course of the program
 COURSES = [
@@ -110,11 +118,22 @@ class Command(BaseCommand):
 
     def _seed_superuser(self, email, global_id):
         User = get_user_model()
+        user = User.objects.filter(global_id=global_id).first()
 
-        if not User.objects.filter(global_id=global_id).exists():
+        if user is None:
             stale = User.objects.filter(
                 Q(email__iexact=email) | Q(username=email)
             ).first()
+
+            if stale is not None and stale.global_id is None:
+                msg = (
+                    f"User {stale.id} ({email}) has no global_id (e.g. it was "
+                    "made by createsuperuser), so it would collide with the "
+                    "user's first login through the API gateway. Set its "
+                    f"global_id to {global_id}, or delete it, and run this "
+                    "command again. The courseware is already seeded."
+                )
+                raise CommandError(msg)
 
             if stale is not None:
                 msg = (
@@ -126,12 +145,27 @@ class Command(BaseCommand):
                 )
                 raise CommandError(msg)
 
-            User.objects.create(global_id=global_id, username=email, email=email)
+            user = User.objects.create(global_id=global_id, username=email, email=email)
             self.stdout.write(f"Created user {email} with global_id {global_id}.")
+        elif user.email.lower() != email.lower():
+            msg = (
+                f"User {user.id} has global_id {global_id} but its email is "
+                f"{user.email}, not {email}. Check that {global_id} is "
+                f"{email}'s Keycloak ID. The courseware is already seeded."
+            )
+            raise CommandError(msg)
 
-        self._call("promote_user", "promote", "--superuser", "--email", email)
+        # promote_user looks the user up by exact email, so pass the stored one.
+        self._call("promote_user", "promote", "--superuser", "--email", user.email)
 
     def handle(self, *args, **kwargs):  # noqa: ARG002
+        if settings.ENVIRONMENT not in LOCAL_ENVIRONMENTS:
+            msg = (
+                "seed_local_instance only runs when MITX_ONLINE_ENVIRONMENT is "
+                f"one of {', '.join(LOCAL_ENVIRONMENTS)}, not {settings.ENVIRONMENT}."
+            )
+            raise CommandError(msg)
+
         email = kwargs["superuser_email"]
         global_id = kwargs["superuser_global_id"]
 

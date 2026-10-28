@@ -8,6 +8,7 @@ from django.core.management import CommandError, call_command
 from wagtail.models import Page
 
 from cms.models import FlexiblePricingRequestForm
+from courses.factories import ProgramFactory
 from courses.models import Course, CourseRun, Department, Program
 from ecommerce.models import Discount, Product
 from flexiblepricing.models import FlexiblePriceTier
@@ -34,8 +35,9 @@ SEEDED_MODELS = [
 
 
 @pytest.fixture(autouse=True)
-def wagtail_site():
-    """Set up Wagtail the way a local instance has it before seeding."""
+def local_instance(settings):
+    """Set up a local instance the way it is before seeding."""
+    settings.ENVIRONMENT = "local"
     call_command("configure_wagtail")
 
 
@@ -89,8 +91,11 @@ def assert_courseware_seeded():
     ]
 
 
-def test_seed_courseware():
+@pytest.mark.parametrize("environment", ["local", "dev"])
+def test_seed_courseware(settings, environment):
     """Without superuser options, only the courseware is seeded."""
+    settings.ENVIRONMENT = environment
+
     seed()
 
     assert_courseware_seeded()
@@ -123,9 +128,13 @@ def test_seed_superuser():
     assert f"Successfully promoted user {EMAIL} to superuser." in output
 
 
-def test_seed_superuser_promotes_existing_user():
-    """A user who already has the global_id is promoted, not recreated."""
-    existing = UserFactory.create(email=EMAIL, global_id=GLOBAL_ID)
+@pytest.mark.parametrize("stored_email", [EMAIL, EMAIL.title()])
+def test_seed_superuser_promotes_existing_user(stored_email):
+    """
+    A user who already has the global_id is promoted, not recreated, when its
+    email matches regardless of case.
+    """
+    existing = UserFactory.create(email=stored_email, global_id=GLOBAL_ID)
 
     seed("--superuser-email", EMAIL, "--superuser-global-id", GLOBAL_ID)
 
@@ -163,6 +172,61 @@ def test_seed_superuser_stale_global_id(match_on):
     assert list(User.objects.values_list("id", flat=True)) == [stale.id]
     stale.refresh_from_db()
     assert not stale.is_superuser
+
+
+def test_seed_superuser_without_global_id():
+    """A user with the email and no global_id gets its own message."""
+    stale = UserFactory.create(email=EMAIL, global_id=None)
+
+    with pytest.raises(CommandError) as exc:
+        seed("--superuser-email", EMAIL, "--superuser-global-id", GLOBAL_ID)
+
+    message = str(exc.value)
+    assert f"User {stale.id} ({EMAIL}) has no global_id" in message
+    assert "Keycloak realm" not in message
+    assert "courseware is already seeded" in message
+    assert_courseware_seeded()
+    stale.refresh_from_db()
+    assert stale.global_id is None
+    assert not stale.is_superuser
+
+
+def test_seed_superuser_global_id_of_another_user():
+    """
+    A global_id that belongs to a user with another email fails, and neither
+    that user nor a user with the given email is promoted.
+    """
+    other = UserFactory.create(email="someone-else@example.com", global_id=GLOBAL_ID)
+    stale = UserFactory.create(email=EMAIL, global_id=OLD_GLOBAL_ID)
+
+    with pytest.raises(CommandError) as exc:
+        seed("--superuser-email", EMAIL, "--superuser-global-id", GLOBAL_ID)
+
+    message = str(exc.value)
+    assert f"User {other.id} has global_id {GLOBAL_ID}" in message
+    assert "someone-else@example.com" in message
+    assert "courseware is already seeded" in message
+    assert_courseware_seeded()
+    for user in (other, stale):
+        user.refresh_from_db()
+        assert not user.is_superuser
+        assert not user.is_staff
+
+
+@pytest.mark.parametrize("environment", ["production", "rc", "ci", "pytest"])
+def test_seed_refuses_outside_local_environments(settings, environment):
+    """Outside local and dev, the command refuses before touching anything."""
+    settings.ENVIRONMENT = environment
+    program = ProgramFactory.create(readable_id=PROGRAM_ID)
+
+    with pytest.raises(CommandError, match="only runs when MITX_ONLINE_ENVIRONMENT"):
+        seed("--superuser-email", EMAIL, "--superuser-global-id", GLOBAL_ID)
+
+    assert list(Program.objects.values_list("id", flat=True)) == [program.id]
+    assert not Course.objects.exists()
+    assert not FlexiblePriceTier.objects.exists()
+    assert not Discount.objects.exists()
+    assert not User.objects.exists()
 
 
 @pytest.mark.parametrize(
