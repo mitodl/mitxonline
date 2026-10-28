@@ -1017,7 +1017,7 @@ def test_checkout_product_verified_program_shortcut_with_unusable_profile(
     ProgramEnrollmentFactory.create(
         program=program,
         user=user,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
         active=True,
     )
     mocked_export_compliance.side_effect = ExportComplianceDataError(

@@ -931,7 +931,7 @@ class TestUpgradeAuditRunEnrollmentsForProgramPurchase:
         ProgramEnrollmentFactory.create(
             user=program_setup.user,
             program=program_setup.program,
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
         )
         enrollment = CourseRunEnrollmentFactory.create(
             user=program_setup.user,
@@ -978,7 +978,7 @@ class TestUpgradeAuditRunEnrollmentsForProgramPurchase:
         ProgramEnrollmentFactory.create(
             user=program_setup.user,
             program=program_setup.program,
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
         )
         enrollment = CourseRunEnrollmentFactory.create(
             user=program_setup.user,
