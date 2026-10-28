@@ -2,10 +2,13 @@
 Tests for B2B views.
 """
 
+import json
 from datetime import timedelta
+from types import SimpleNamespace
 
 import pytest
 import reversion
+from CyberSource.rest import ApiException
 from django.urls import reverse
 from freezegun import freeze_time
 from mitol.common.utils.datetime import now_in_utc
@@ -521,7 +524,7 @@ def test_b2b_contract_attachment_full_contract_with_used_code(mocker):
 
 @pytest.mark.skip_nplusone_check
 def test_b2b_enroll_incomplete_profile(mocker, settings, mocked_export_compliance):
-    """A free B2B enrollment should say the profile is incomplete, not just that checkout is required."""
+    """A free B2B enrollment with an incomplete profile names the fields to fix."""
     mocked_export_compliance.side_effect = verify_user_with_exports
     mocker.patch("compliance.api.get_cybersource_client")
     mocker.patch("hubspot_sync.tasks.sync_cart_add_event_with_hubspot.apply_async")
@@ -538,6 +541,8 @@ def test_b2b_enroll_incomplete_profile(mocker, settings, mocked_export_complianc
     )
     user = UserFactory.create()
     user.b2b_contracts.add(contract)
+    # A country that doesn't require state/postal code, so only this is missing
+    user.legal_address.country = "GB"
     user.legal_address.street_address_1 = ""
     user.legal_address.save()
     client = APIClient()
@@ -548,7 +553,11 @@ def test_b2b_enroll_incomplete_profile(mocker, settings, mocked_export_complianc
     )
 
     assert resp.status_code == 400
-    assert resp.json()["checkout_result"]["profile_incomplete"] is True
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
+        "missing_fields": ["street_address_1"],
+    }
 
 
 @pytest.mark.skip_nplusone_check
@@ -652,6 +661,73 @@ def test_b2b_enroll(  # noqa: PLR0915, PLR0913, C901
     del user.openedx_user
     assert user.edx_username
     assert CourseRunEnrollment.objects.filter(user=user, run=courserun).exists()
+
+
+@pytest.mark.skip_nplusone_check
+def test_b2b_enroll_cybersource_invalid_request(mocker, settings):
+    """
+    Profile data CyberSource rejects as INVALID_REQUEST comes back as a 400
+    naming the field, not a 500 (mitodl/hq#13724, Sentry MITXONLINE-73F).
+    """
+    mocker.patch("hubspot_sync.tasks.sync_cart_add_event_with_hubspot.apply_async")
+    mocker.patch("openedx.tasks.create_user_from_id")
+    mocker.patch("openedx.tasks.clone_courserun.delay")
+    mocker.patch("openedx.api._create_edx_user_request")
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "a token"  # noqa: S105
+    mocker.patch("courses.api.verify_user_with_exports", verify_user_with_exports)
+    cybersource = mocker.Mock()
+    # Body as returned by CyberSource in production for a postal code of "_"
+    cybersource.validate_export_compliance.side_effect = ApiException(
+        http_resp=SimpleNamespace(
+            status=400,
+            reason="Bad Request",
+            data=json.dumps(
+                {
+                    "status": "INVALID_REQUEST",
+                    "reason": "MISSING_FIELD",
+                    "message": "Declined - The request is missing one or more fields",
+                    "details": [
+                        {
+                            "field": "orderInformation.billTo.postalCode",
+                            "reason": "MISSING_FIELD",
+                        }
+                    ],
+                }
+            ),
+            getheaders=dict,
+        )
+    )
+    mocker.patch("compliance.api.get_cybersource_client", return_value=cybersource)
+
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED, enrollment_fixed_price=0
+    )
+    source_courserun = CourseRunFactory.create(
+        is_source_run=True, language="en", is_primary_language=True
+    )
+    [(courserun, _)] = create_contract_run(
+        contract, source_courserun.course, queue_codes=True
+    )
+    user = UserFactory.create()
+    user.b2b_contracts.add(contract)
+    # A country that doesn't require state/postal code, so the local checks pass
+    # and the request reaches the mocked CyberSource response
+    user.legal_address.country = "GB"
+    user.legal_address.save()
+
+    client = APIClient()
+    client.force_login(user)
+    resp = client.post(
+        reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
+    )
+
+    assert resp.status_code == 400
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
+        "missing_fields": ["postal_code"],
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=courserun).exists()
 
 
 def test_b2b_contract_attachment_requires_authentication():

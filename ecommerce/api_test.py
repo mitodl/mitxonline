@@ -32,6 +32,7 @@ from zeal import zeal_context
 
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE
 from b2b.factories import ContractPageFactory
+from compliance.exceptions import ExportComplianceDataError
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.factories import (
     CourseRunEnrollmentFactory,
@@ -147,6 +148,7 @@ from flexiblepricing.factories import (
     FlexiblePriceTierFactory,
     approve_flexible_price,
 )
+from main.constants import USER_MSG_TYPE_PROFILE_INCOMPLETE
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.factories import OpenEdxUserFactory
 from users.factories import UserFactory
@@ -2937,3 +2939,31 @@ def test_generate_checkout_payload_b2b_optional_run(
         assert "error" in result
     else:
         assert "error" not in result
+
+
+@pytest.mark.parametrize("raise_compliance_data_errors", [False, True])
+def test_generate_checkout_payload_compliance_data_error(
+    mocker, user, products, raise_compliance_data_errors
+):
+    """
+    Profile data the export compliance check can't use comes back as a
+    profile_incomplete payload naming the fields (for the cart), or is raised
+    (for callers whose errors the API exception handler turns into CS_701).
+    """
+    create_basket(user, products)
+    mocker.patch(
+        "ecommerce.models.Basket.has_user_blocked_products",
+        side_effect=ExportComplianceDataError(user, ["last_name"]),
+    )
+    request = authed_request(user)
+
+    if raise_compliance_data_errors:
+        with pytest.raises(ExportComplianceDataError):
+            generate_checkout_payload(request, raise_compliance_data_errors=True)
+    else:
+        assert generate_checkout_payload(request) == {
+            "profile_incomplete": True,
+            "error": USER_MSG_TYPE_PROFILE_INCOMPLETE,
+            "missing_fields": ["last_name"],
+        }
+    assert not PendingOrder.objects.filter(purchaser=user).exists()

@@ -1639,6 +1639,8 @@ def test_start_checkout_with_incomplete_profile(
         product = ProductFactory.create(purchasable_object=courserun)
     basket = BasketFactory.create(user=user)
     BasketItemFactory.create(basket=basket, product=product)
+    # A country that doesn't require state/postal code, so only these are missing
+    user.legal_address.country = "GB"
     user.legal_address.street_address_1 = ""
     user.legal_address.city = ""
     user.legal_address.save()
@@ -1648,6 +1650,7 @@ def test_start_checkout_with_incomplete_profile(
     assert resp.status_code == 400
     resp_body = resp.json()
     assert resp_body["error"] == USER_MSG_TYPE_PROFILE_INCOMPLETE
+    assert resp_body["missing_fields"] == ["city", "street_address_1"]
     mock_client.return_value.validate_export_compliance.assert_not_called()
 
 

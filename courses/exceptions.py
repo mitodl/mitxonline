@@ -10,9 +10,10 @@ class EnrollmentError(APIException):
 
     Deliberately excludes any specifics about *why* the enrollment failed (e.g.
     which export compliance decision came back) rather than surfacing that
-    detail to the client. The one thing that varies is an opaque support code
-    appended by ``from_cause`` for causes that declare one. The underlying cause
-    is logged server-side by the code that raises it (e.g. ``courses.api``).
+    detail to the client. What varies is an opaque support code appended by
+    ``from_cause`` for causes that declare one, plus, for a profile the learner
+    can fix, the profile fields to fix (``missing_fields``). The underlying
+    cause is logged server-side by the code that raises it (e.g. ``courses.api``).
 
     Says nothing about contacting support either - clients already pair an
     enrollment failure with their own support copy, so a CTA here doubles up.
@@ -29,7 +30,13 @@ class EnrollmentError(APIException):
         declares one (see ``compliance.exceptions.ExportComplianceError``).
 
         A cause without an ``error_code`` yields the unchanged default detail,
-        so a new failure mode stays opaque unless it opts in.
+        so a new failure mode stays opaque unless it opts in. The code is also
+        returned on its own as ``reason_code``, like the eligibility endpoint's,
+        so clients match it exactly rather than parsing ``detail``.
+
+        A cause that names the user's own profile fields to fix (see
+        ``compliance.exceptions.ExportComplianceDataError.profile_fields``)
+        has them added as ``missing_fields``, so the client can ask for them.
 
         Args:
             exc (Exception): The underlying cause of the enrollment failure
@@ -40,7 +47,14 @@ class EnrollmentError(APIException):
         error_code = getattr(exc, "error_code", None)
         if not error_code:
             return cls()
-        return cls(f"{cls.default_detail} Error code: {error_code}.")
+        body = {
+            "detail": f"{cls.default_detail} Error code: {error_code}.",
+            "reason_code": error_code,
+        }
+        profile_fields = getattr(exc, "profile_fields", None)
+        if profile_fields:
+            body["missing_fields"] = profile_fields
+        return cls(body)
 
 
 class EnrollmentCreationFailedError(EnrollmentError):

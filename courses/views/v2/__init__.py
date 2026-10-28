@@ -32,7 +32,6 @@ from rest_framework.response import Response
 
 from b2b.models import ContractPage
 from cms.models import CoursePage
-from compliance.exceptions import ExportComplianceCheckError
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -892,18 +891,12 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
     if should_create_audit_enrollment:
         # Audit enrollments just get created, regardless of whether or not
         # the course is an elective.
-        try:
-            enrollments, _ = create_run_enrollments(
-                request.user,
-                [run],
-                mode=EDX_ENROLLMENT_AUDIT_MODE,
-                keep_failed_enrollments=True,
-            )
-        except ExportComplianceCheckError as exc:
-            # Don't propagate the specifics of the compliance decision to the
-            # client - only an opaque support code, if the cause declares one.
-            # The underlying cause is logged where it's raised.
-            raise EnrollmentError.from_cause(exc) from exc
+        enrollments, _ = create_run_enrollments(
+            request.user,
+            [run],
+            mode=EDX_ENROLLMENT_AUDIT_MODE,
+            keep_failed_enrollments=True,
+        )
         if len(enrollments) == 0:
             raise EnrollmentCreationFailedError
         return _created_enrollment_response(enrollments[0])
@@ -916,8 +909,9 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
             request, run, program_enrollment.program
         )
     except VerifiedProgramInvalidOrderError as exc:
-        # Checkout refused the order, e.g. an incomplete profile or a compliance
-        # denial. The cause is logged where it's detected.
+        # Checkout refused the order, e.g. a compliance denial. (Profile data the
+        # check can't use is raised before this, as ExportComplianceDataError.)
+        # The cause is logged where it's detected.
         raise EnrollmentError.from_cause(exc) from exc
 
     return _created_enrollment_response(enrollment)

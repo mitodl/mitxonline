@@ -22,6 +22,7 @@ from CyberSource.models.riskv1exportcomplianceinquiries_order_information_bill_t
 from CyberSource.models.validate_export_compliance_request import (
     ValidateExportComplianceRequest,
 )
+from CyberSource.rest import ApiException
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
@@ -30,7 +31,10 @@ from mitol.common.utils.datetime import now_in_utc
 from nacl.encoding import Base64Encoder
 from nacl.public import PublicKey, SealedBox
 
-from compliance.exceptions import ExportComplianceDataError
+from compliance.exceptions import (
+    BILL_TO_FIELD_TO_PROFILE_FIELD,
+    ExportComplianceDataError,
+)
 from compliance.models import ExportComplianceDecision, ExportComplianceLog
 from main.sentry import EXPORT_COMPLIANCE_USER_TAG
 
@@ -108,17 +112,18 @@ def _normalize_administrative_area(
     return normalized_state
 
 
-# Maps CyberSource bill-to field names to the profile field names an API
-# consumer should show the user as missing.
-BILL_TO_FIELD_TO_PROFILE_FIELD = {
-    "first_name": "first_name",
-    "last_name": "last_name",
-    "email": "email",
-    "address1": "street_address_1",
-    "locality": "city",
-    "country": "country",
-    "administrative_area": "state",
-    "postal_code": "postal_code",
+# Maps the request field names CyberSource reports in an INVALID_REQUEST
+# response's details[].field to our bill-to field names.
+REQUEST_FIELD_TO_BILL_TO_FIELD = {
+    "orderInformation.billTo.firstName": "first_name",
+    "orderInformation.billTo.lastName": "last_name",
+    "orderInformation.billTo.email": "email",
+    "orderInformation.billTo.address1": "address1",
+    "orderInformation.billTo.address2": "address2",
+    "orderInformation.billTo.locality": "locality",
+    "orderInformation.billTo.country": "country",
+    "orderInformation.billTo.administrativeArea": "administrative_area",
+    "orderInformation.billTo.postalCode": "postal_code",
 }
 
 
@@ -295,6 +300,47 @@ def _get_reason_code(response) -> str | None:
     )
 
 
+def _get_invalid_request_fields(exc: ApiException) -> list[str] | None:
+    """
+    Return the bill-to fields CyberSource rejected, if `exc` is an INVALID_REQUEST.
+
+    CyberSource answers data it won't screen (e.g. a last name of ".") with a
+    400 INVALID_REQUEST whose details[].field names the offending request
+    field. When no detail names a field we know, every required bill-to field
+    is returned so the user can review them all.
+
+    Returns:
+        list of str, or None if `exc` is any other API failure
+    """
+    if exc.status != 400:  # noqa: PLR2004
+        return None
+    try:
+        body = json.loads(exc.body)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(body, dict) or body.get("status") != "INVALID_REQUEST":
+        return None
+
+    fields = [
+        REQUEST_FIELD_TO_BILL_TO_FIELD[detail["field"]]
+        for detail in body.get("details") or []
+        if isinstance(detail, dict)
+        and detail.get("field") in REQUEST_FIELD_TO_BILL_TO_FIELD
+    ]
+    if fields:
+        return fields
+    # Nothing to attribute to a profile field (e.g. a field CyberSource renamed,
+    # or one we don't send), so the learner can only review them all, and may
+    # not be able to fix it. details holds field names and reason codes only.
+    log.error(
+        "CyberSource INVALID_REQUEST named no known bill-to field: reason=%s details=%s",
+        body.get("reason"),
+        body.get("details"),
+    )
+    # address2 is optional, so it isn't one of the fields to review.
+    return [f for f in BILL_TO_FIELD_TO_PROFILE_FIELD if f != "address2"]
+
+
 def _get_raw_response_text(response: Any) -> str:
     """Return the raw wire-format text of a CyberSource REST response."""
     if isinstance(response, tuple) and len(response) > 2 and response[2]:  # noqa: PLR2004
@@ -430,7 +476,22 @@ def verify_user_with_exports(user, run) -> ExportComplianceResult:
         user.id,
         run.id,
     )
-    response = client.validate_export_compliance(request_payload)
+    try:
+        response = client.validate_export_compliance(request_payload)
+    except ApiException as exc:
+        invalid_fields = _get_invalid_request_fields(exc)
+        if invalid_fields is None:
+            raise
+        # Not a screening decision, so nothing is cached: the user can fix
+        # their profile and retry straight away.
+        log.warning(
+            "CyberSource rejected export compliance request data for user=%s "
+            "run=%s: fields=%s",
+            user.id,
+            run.id,
+            invalid_fields,
+        )
+        raise ExportComplianceDataError(user, invalid_fields) from exc
 
     result = ExportComplianceResult(
         decision=_get_response_value(response, "status"),

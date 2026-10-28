@@ -1929,7 +1929,7 @@ def create_b2b_enrollment(
 
     if basket_price == 0:
         # This call should go ahead and fulfill the order.
-        response = generate_checkout_payload(request)
+        response = generate_checkout_payload(request, raise_compliance_data_errors=True)
 
         if "no_checkout" in response:
             # Course run enrollment succeeded - now handle program enrollment
@@ -2701,9 +2701,15 @@ def process_mailgun_webhook_for_enrollment_code_emails(payload):
     # Save it to the row corresponding to the event we just got and move on with our lives
     message_id = event_data["message"]["headers"]["message-id"]
     message_timestamp = datetime.fromtimestamp(event_data["timestamp"], tz=UTC)
-    assignment = DiscountContractAttachmentRedemption.objects.get(
+    assignment = DiscountContractAttachmentRedemption.objects.filter(
         email_message_id=message_id
-    )
+    ).first()
+
+    # This can happen if a user was sent a reminder and then later clicks on the original email.
+    # The DCAR currently only tracks the most recently sent email, so if the user clicks on an older one,
+    # we won't have a record of it. In that case, we just ignore the event.
+    if not assignment:
+        return None
 
     # We want to store event with the most recent timestamp we get from mailgun.
     # Event receipt/processing is not guaranteed to be chronologically ordered, so this prevents older events from
