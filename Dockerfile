@@ -7,15 +7,25 @@ LABEL maintainer="ODL DevOps <mitx-devops@mit.edu>"
 # App-specific apt extras; common-core packages are in mitodl/ol-python-base:3.11.
 # Operator tooling (htop, ngrep, screen, etc.) is also kept here for parity
 # with the production image; trim this list if the production image diverges.
+#
+# The DHI base ships a stripped /etc/group and no update-rc.d, and screen's
+# postinst needs both: it creates /run/screen as group `utmp` and registers
+# its init script. Create the group (guarded, in case the base restores it)
+# and install init-system-helpers so the postinst succeeds.
+#
+# Don't add -dev packages that depend on `python3` (e.g. libcairo2-dev via
+# libglib2.0-dev-bin): DHI's python3 is 3.13, so apt replaces the base
+# image's 3.11 interpreter and `uv sync` fails with "No interpreter found".
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    (getent group utmp >/dev/null || groupadd --system utmp) && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
       dnsutils \
       htop \
+      init-system-helpers \
       iputils-ping \
       less \
-      libcairo2-dev \
       lsof \
       nano \
       ngrep \
@@ -26,8 +36,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 FROM base AS deps
 
 # Trusted certs (org PKI + local-dev mkcert root injected at deploy time).
-COPY --chmod=644 certs/ /usr/local/share/ca-certificates/
-RUN update-ca-certificates
+# No COPY --chmod here: BuildKit applies it to directories too, leaving
+# /usr/local/share untraversable by mitodl (perl, and so pg_config, then fails).
+COPY certs/ /usr/local/share/ca-certificates/
+RUN find /usr/local/share/ca-certificates -type f -exec chmod 644 {} + && \
+    update-ca-certificates
 
 # Install Python dependencies before copying source.
 # mitol_*.gz are local wheels that uv resolves from the lock file.
