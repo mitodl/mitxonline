@@ -1,4 +1,5 @@
 import pytest
+from django_scim import exceptions
 from mitol.scim.requests import InMemoryHttpRequest
 
 from users.adapters import (
@@ -117,7 +118,7 @@ def test_learn_user_adapter_from_dict_writes_legal_address():
         {
             "active": True,
             "userName": "jsmith",
-            "externalId": "1",
+            "externalId": user.global_id,
             "name": {"givenName": "New", "familyName": "Name"},
         }
     )
@@ -144,7 +145,7 @@ def test_learn_user_adapter_from_dict_explicit_null_name_does_not_blank_out():
         {
             "active": True,
             "userName": "jsmith",
-            "externalId": "1",
+            "externalId": user.global_id,
             "name": {"givenName": None, "familyName": None},
         }
     )
@@ -171,7 +172,7 @@ def test_learn_user_adapter_from_dict_blank_name_does_not_blank_out():
         {
             "active": True,
             "userName": "jsmith",
-            "externalId": "1",
+            "externalId": user.global_id,
             "name": {"givenName": "", "familyName": "   "},
         }
     )
@@ -195,7 +196,7 @@ def test_learn_user_adapter_blank_fields():
         {
             "active": True,
             "userName": "jsmith",
-            "externalId": "1",
+            "externalId": user.global_id,
         }
     )
     adapter.save()
@@ -232,7 +233,7 @@ def _unchanged_payload(user, **overrides):
     return {
         "active": user.is_active,
         "userName": user.username,
-        "externalId": user.scim_external_id or "1",
+        "externalId": user.global_id,
         "fullName": user.name,
         **overrides,
     }
@@ -467,3 +468,34 @@ def test_scim_save_survives_broker_failure(mocker, caplog):
     user.refresh_from_db()
     assert user.name == "Joseph Smith"
     assert "Failed to queue edX profile update" in caplog.text
+
+
+def _put_external_id(user, external_id):
+    """Run a full from_dict() for the user with the given externalId"""
+    adapter = LearnUserAdapter(user)
+    adapter.from_dict(
+        {"active": True, "userName": user.username, "externalId": external_id}
+    )
+    adapter.save()
+
+
+def test_from_dict_refuses_rebinding_global_id():
+    """A PUT can't move a user to a different Keycloak identity"""
+    user = UserFactory.create(global_id="keycloak-1", scim_external_id="keycloak-1")
+
+    with pytest.raises(exceptions.IntegrityError):
+        _put_external_id(user, "keycloak-2")
+
+    user.refresh_from_db()
+    assert (user.global_id, user.scim_external_id) == ("keycloak-1", "keycloak-1")
+
+
+@pytest.mark.parametrize("global_id", ["", "keycloak-1"])
+def test_from_dict_binds_matching_or_unset_global_id(global_id):
+    """A PUT with the user's own id, or to a user with no id yet, applies"""
+    user = UserFactory.create(global_id=global_id)
+
+    _put_external_id(user, "keycloak-1")
+
+    user.refresh_from_db()
+    assert (user.global_id, user.scim_external_id) == ("keycloak-1", "keycloak-1")
