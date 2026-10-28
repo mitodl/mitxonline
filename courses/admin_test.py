@@ -518,3 +518,24 @@ def test_undo_program_entitlement_verification_action(
     undone_message = next(t for t in message_texts if undone.user.email in t)
     assert "mitxonline-test-1" in undone_message
     assert ("edX downgrade failed" in undone_message) is not edx_success
+
+
+def test_undo_program_entitlement_verification_action_inactive(mocker, admin_client):
+    """An inactive enrollment is reported as downgraded locally and left inactive"""
+    enrollment = CourseRunEnrollmentFactory.create(active=False)
+    mocker.patch(
+        "courses.admin.undo_program_course_run_verification",
+        return_value=([mocker.Mock(reference_number="mitxonline-test-2")], True),
+    )
+
+    response = admin_client.post(
+        reverse("admin:courses_courserunenrollment_changelist"),
+        {
+            "action": "undo_program_entitlement_verification",
+            "_selected_action": [str(enrollment.id)],
+        },
+        follow=True,
+    )
+
+    message_texts = [str(m) for m in response.context["messages"]]
+    assert any("left inactive" in t and "mitxonline-test-2" in t for t in message_texts)

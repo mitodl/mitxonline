@@ -1066,7 +1066,15 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
                 self.message_user(request, f"Skipped: {exc}", messages.ERROR)
                 continue
             references = ", ".join(order.reference_number for order in orders)
-            if edx_success:
+            if not enrollment.active:
+                self.message_user(
+                    request,
+                    f"Set {enrollment.user.email}'s inactive enrollment in "
+                    f"{enrollment.run.courseware_id} to audit (left inactive, "
+                    f"edX unchanged) and canceled order(s) {references}.",
+                    messages.SUCCESS,
+                )
+            elif edx_success:
                 self.message_user(
                     request,
                     f"Downgraded {enrollment.user.email} to audit in "

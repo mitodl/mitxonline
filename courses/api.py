@@ -659,25 +659,28 @@ def undo_program_course_run_verification(enrollment):
     those orders for the enrollment's run, deletes their PaidCourseRun rows,
     and downgrades the enrollment to audit, locally and in edX.
 
+    An inactive enrollment (e.g. the learner unenrolled, which already removed
+    the edX enrollment and the PaidCourseRun but left the order fulfilled) has
+    its orders canceled and its mode set to audit locally only - it stays
+    inactive and edX isn't called, so the learner isn't re-enrolled.
+
     Args:
         enrollment (CourseRunEnrollment): the verified enrollment to undo
 
     Returns:
         tuple[list of Order, bool]: the canceled orders, and whether the edX
-        downgrade succeeded (the local downgrade stands either way)
+        downgrade succeeded (the local downgrade stands either way; always
+        True for an inactive enrollment, since edX isn't called)
 
     Raises:
-        ValueError: if the enrollment isn't an active verified one, is
+        ValueError: if the enrollment isn't verified, is
             B2B-provisioned, isn't backed by a program entitlement order, or is
             also backed by some other fulfilled order (e.g. a real purchase of
             the run)
     """
     user, run = enrollment.user, enrollment.run
-    if (
-        not enrollment.active
-        or enrollment.enrollment_mode != EDX_ENROLLMENT_VERIFIED_MODE
-    ):
-        msg = f"{user.email}'s enrollment in {run.courseware_id} is not an active verified enrollment"
+    if enrollment.enrollment_mode != EDX_ENROLLMENT_VERIFIED_MODE:
+        msg = f"{user.email}'s enrollment in {run.courseware_id} is not verified"
         raise ValueError(msg)
     if enrollment.b2b_contract_id or run.b2b_contract_id or run.b2b_contracts.exists():
         msg = f"{run.courseware_id} is B2B-provisioned; its verification comes from the contract"
@@ -713,7 +716,11 @@ def undo_program_course_run_verification(enrollment):
         PaidCourseRun.objects.filter(
             user=user, course_run=run, order__in=entitlement_orders
         ).delete()
-        _, edx_success = downgrade_learner(enrollment)
+        if enrollment.active:
+            _, edx_success = downgrade_learner(enrollment)
+        else:
+            enrollment.update_mode_and_save(EDX_ENROLLMENT_AUDIT_MODE, no_user=True)
+            edx_success = True
 
     return entitlement_orders, edx_success
 

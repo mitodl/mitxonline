@@ -6098,20 +6098,39 @@ class TestUndoProgramCourseRunVerification:
         mock_edx.assert_called_once()
         assert mock_edx.call_args.kwargs["mode"] == EDX_ENROLLMENT_AUDIT_MODE
 
-    @pytest.mark.parametrize(
-        ("mode", "active"),
-        [(EDX_ENROLLMENT_AUDIT_MODE, True), (EDX_ENROLLMENT_VERIFIED_MODE, False)],
-    )
-    def test_refuses_non_verified_or_inactive_enrollment(
-        self, mock_edx, enrollment, mode, active
+    def test_unenrolled_enrollment_is_downgraded_locally_only(
+        self, mocker, mock_edx, enrollment
     ):
-        """Only an active verified enrollment can be undone"""
+        """
+        After the learner unenrolled, the order is still canceled and the mode
+        set to audit, but the enrollment stays inactive and edX isn't called.
+        """
         order = self._run_order(enrollment, redemption_type=REDEMPTION_TYPE_INTERNAL)
-        enrollment.enrollment_mode = mode
-        enrollment.active = active
+        mocker.patch("courses.api.unenroll_edx_course_run")
+        mocker.patch("courses.api.mail_api.send_course_run_unenrollment_email")
+        deactivate_run_enrollment(
+            enrollment, change_status=ENROLL_CHANGE_STATUS_UNENROLLED
+        )
+
+        orders, edx_success = undo_program_course_run_verification(enrollment)
+
+        assert orders == [order]
+        assert edx_success is True
+        order.refresh_from_db()
+        enrollment.refresh_from_db()
+        assert order.state == OrderStatus.CANCELED
+        assert enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        assert enrollment.active is False
+        assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
+        mock_edx.assert_not_called()
+
+    def test_refuses_non_verified_enrollment(self, mock_edx, enrollment):
+        """Only a verified enrollment can be undone"""
+        order = self._run_order(enrollment, redemption_type=REDEMPTION_TYPE_INTERNAL)
+        enrollment.enrollment_mode = EDX_ENROLLMENT_AUDIT_MODE
         enrollment.save()
 
-        with pytest.raises(ValueError, match="not an active verified enrollment"):
+        with pytest.raises(ValueError, match="is not verified"):
             undo_program_course_run_verification(enrollment)
 
         order.refresh_from_db()
