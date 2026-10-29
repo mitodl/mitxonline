@@ -143,7 +143,7 @@ by the course, which may include variant options that the contract does not incl
         if contract_obj:
             runs_qs = runs_qs.filter(b2b_contracts=contract_obj)
         else:
-            runs_qs = runs_qs.filter(b2b_contracts__isnull=True)
+            runs_qs = runs_qs.filter(b2b_only=False)
 
         if b2b_flag:
             runs_qs = runs_qs.filter(is_source_run=True)

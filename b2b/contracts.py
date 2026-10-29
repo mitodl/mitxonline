@@ -243,7 +243,9 @@ def _remove_run_from_contract(contract: ContractPage, run: CourseRun) -> bool:
         run.enrollment_end = now
 
     if unlinked:
-        run.b2b_contracts.remove(contract)
+        CourseRun.b2b_contracts.through.objects.filter(
+            courserun_id=run.pk, contractpage_id=contract.pk
+        ).delete()
 
     run.save()
 

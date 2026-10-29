@@ -14,6 +14,7 @@ from b2b.constants import (
     PROVISIONING_ACTION_CONTRACT_VARIANT_UPDATED,
 )
 from b2b.contracts import (
+    _remove_run_from_contract,
     add_contract_variant_set,
     add_courseware_to_contract,
     create_contract,
@@ -173,6 +174,22 @@ def test_remove_course(has_enrollments):
     assert removed_run.live is False
     assert contract.get_course_runs().filter(id=run.id).exists() is has_enrollments
     assert not contract.get_products().exists()
+
+
+@pytest.mark.parametrize("active", [True, False])
+def test_remove_run_from_contract_removes_association(active):
+    """Unenrolled runs are unlinked even when the contract is inactive."""
+
+    contract = ContractPageFactory.create(active=active)
+    run = CourseRunFactory.create(b2b_contracts=[contract])
+    memberships = CourseRun.b2b_contracts.through.objects.filter(
+        courserun=run, contractpage=contract
+    )
+    assert memberships.exists()
+
+    assert _remove_run_from_contract(contract, run) is True
+
+    assert not memberships.exists()
 
 
 @pytest.mark.parametrize("other_contract_active", [True, False])

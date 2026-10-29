@@ -248,7 +248,7 @@ class Command(BaseCommand):
     def _handle_contract(self, run, *, keep_contract):
         """Move the run to the holding contract, if it's a contract run."""
 
-        if keep_contract or not run.has_b2b_contracts:
+        if keep_contract or not run.b2b_only:
             return
 
         previous = self._describe_contracts(run)
