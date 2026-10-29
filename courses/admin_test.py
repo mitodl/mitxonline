@@ -165,7 +165,10 @@ def test_enroll_in_runs_lists_only_matching_runs(admin_client):
 
 @pytest.mark.parametrize("lookup", ["email", "username", "id"])
 def test_enroll_in_runs_enrolls_user_in_selected_runs(mocker, admin_client, lookup):
-    """Posting the form should enroll the user in each selected run individually"""
+    """
+    Posting the form should enroll the user in each selected run individually,
+    skipping the export compliance check
+    """
     user = UserFactory.create()
     run_a = CourseRunFactory.create(courseware_id="course-v1:MITx+A+0T2026")
     run_b = CourseRunFactory.create(courseware_id="course-v1:MITx+B+0T2026")
@@ -184,8 +187,12 @@ def test_enroll_in_runs_enrolls_user_in_selected_runs(mocker, admin_client, look
 
     assert response.status_code == 302
     assert mock_enroll.call_count == 2
-    mock_enroll.assert_any_call(user, [run_a], mode=EDX_ENROLLMENT_AUDIT_MODE)
-    mock_enroll.assert_any_call(user, [run_b], mode=EDX_ENROLLMENT_AUDIT_MODE)
+    mock_enroll.assert_any_call(
+        user, [run_a], mode=EDX_ENROLLMENT_AUDIT_MODE, skip_compliance_check=True
+    )
+    mock_enroll.assert_any_call(
+        user, [run_b], mode=EDX_ENROLLMENT_AUDIT_MODE, skip_compliance_check=True
+    )
 
 
 def test_enroll_in_runs_ignores_requested_mode(mocker, admin_client):
@@ -201,7 +208,9 @@ def test_enroll_in_runs_ignores_requested_mode(mocker, admin_client):
         {"user": user.email, "runs": [run.id], "mode": EDX_ENROLLMENT_VERIFIED_MODE},
     )
 
-    mock_enroll.assert_called_once_with(user, [run], mode=EDX_ENROLLMENT_AUDIT_MODE)
+    mock_enroll.assert_called_once_with(
+        user, [run], mode=EDX_ENROLLMENT_AUDIT_MODE, skip_compliance_check=True
+    )
 
 
 def test_enroll_in_runs_continues_after_failure(mocker, admin_client):
