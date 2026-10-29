@@ -2,6 +2,7 @@ from functools import partial
 from typing import TYPE_CHECKING
 
 from django.db import transaction
+from django_scim import exceptions
 from mitol.scim.adapters import UserAdapter
 from mitol.scim.constants import SchemaURI
 
@@ -189,8 +190,7 @@ class LearnUserAdapter(UserAdapter):
         self.obj.is_active = d.get("active", True)
         self.obj.username = d.get("userName")
         self.obj.scim_username = d.get("userName")
-        self.obj.scim_external_id = d.get("externalId")
-        self.obj.global_id = self.obj.scim_external_id or ""
+        self._set_external_id(d.get("externalId"))
         self.obj.name = d.get("fullName", self.obj.name)
 
         # Inbound name.givenName/familyName always writes to legal_address
@@ -208,6 +208,33 @@ class LearnUserAdapter(UserAdapter):
         family_name = (name.get("familyName") or "").strip()
         if family_name:
             self.legal_address.last_name = family_name
+
+    def _set_external_id(self, external_id: str | None):
+        """
+        Apply an inbound externalId, refusing to rebind an existing identity.
+
+        externalId becomes global_id, which is what SSO logs the user in by.
+        scim-for-keycloak resolves a user it has no stored id for with a
+        userName lookup and then PUTs the full resource, so a lookup that lands
+        on the wrong user (e.g. one whose email here is stale) would otherwise
+        hand this account to another Keycloak identity. Binding a user with no
+        global_id yet, or re-sending the same id, applies as before. A payload
+        without an externalId leaves a bound user's id alone, since clearing
+        it would let a second PUT bind any id.
+
+        :param external_id: the externalId from the SCIM payload
+        :raises IntegrityError: the user is already bound to a different id
+        """
+        if not self.is_new_user and self.obj.global_id:
+            if not external_id:
+                return
+            if external_id != self.obj.global_id:
+                msg = "externalId does not match the existing user's externalId"
+                raise exceptions.IntegrityError(msg, scim_type="mutability")
+
+        self.obj.scim_external_id = external_id
+        # None, not "": global_id is unique and only NULLs don't collide.
+        self.obj.global_id = external_id or None
 
     def _save_related(self):
         self.user_profile.user = self.obj
