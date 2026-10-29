@@ -29,7 +29,6 @@ from b2b.api import (
     get_active_contracts_from_basket_items,
     is_discount_supplied_for_b2b_purchase,
 )
-from compliance.exceptions import ExportComplianceDataError
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
