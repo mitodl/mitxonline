@@ -39,6 +39,7 @@ from b2b.api import (
     get_contract_runs_without_products,
     get_user_b2b_organizations,
     import_and_create_contract_run,
+    move_run_to_retirement_contract,
     process_add_org_membership,
     process_remove_org_membership,
     reconcile_keycloak_orgs,
@@ -3896,3 +3897,28 @@ def test_apply_user_discounts_applies_contract_code(public_contract_run):
     item = basket.basket_items.get()
     assert item.b2b_contract == contract
     assert item.discounted_price == Decimal(10)
+
+
+@pytest.mark.parametrize("old_contract_state", ["expired", "inactive"])
+def test_move_run_to_retirement_contract_removes_old_contract(old_contract_state):
+    """Retirement removes old associations even when related managers hide them."""
+    old_contract = ContractPageFactory.create(
+        active=old_contract_state != "inactive",
+        contract_end=(
+            now_in_utc() - timedelta(days=1)
+            if old_contract_state == "expired"
+            else None
+        ),
+    )
+    run = CourseRunFactory.create()
+    run.b2b_contracts.add(old_contract)
+    memberships = run.b2b_contracts.through.objects.filter(courserun_id=run.pk)
+
+    assert memberships.filter(contractpage_id=old_contract.pk).exists()
+    assert not run.b2b_contracts.filter(pk=old_contract.pk).exists()
+
+    retirement_contract = move_run_to_retirement_contract(run)
+
+    assert set(memberships.values_list("contractpage_id", flat=True)) == {
+        retirement_contract.pk
+    }

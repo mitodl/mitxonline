@@ -43,7 +43,7 @@ def restore_b2b_contract(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("courses", "0110_program_tracks"),
+        ("courses", "0111_course_run_access_role"),
         ("ecommerce", "0058_backfill_discount_b2b_contract"),
     ]
 

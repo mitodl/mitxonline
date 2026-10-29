@@ -315,7 +315,9 @@ def move_run_to_retirement_contract(run: CourseRun) -> ContractPage:
 
     other_contract_ids = current_contract_ids - {contract.pk}
     if other_contract_ids:
-        run.b2b_contracts.remove(*other_contract_ids)
+        CourseRun.b2b_contracts.through.objects.filter(courserun_id=run.pk).exclude(
+            contractpage_id=contract.pk
+        ).delete()
     run.b2b_contracts.add(contract)
 
     log.info("Moved course run %s to %s", run.courseware_id, contract)
