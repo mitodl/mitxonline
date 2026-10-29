@@ -1189,12 +1189,13 @@ def test_user_enrollments_b2b_organization_filter(user_drf_client, user):
     assert len(resp.json()) == 0
 
 
-def test_user_enrollments_create_b2b_run_invalid_v2(user_drf_client, user):
+@pytest.mark.parametrize("b2b_only", [True, False])
+def test_user_enrollments_create_b2b_run_invalid_v2(user_drf_client, user, b2b_only):
     """v2 enrollments API should reject creating enrollments for B2B course runs."""
     contract = ContractPageFactory.create()
     course = CourseFactory.create()
     run = CourseRunFactory.create(
-        course=course, b2b_only=True, b2b_contracts=[contract]
+        course=course, b2b_only=b2b_only, b2b_contracts=[contract]
     )
 
     resp = user_drf_client.post(
