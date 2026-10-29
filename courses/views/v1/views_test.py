@@ -647,12 +647,13 @@ def test_user_enrollments_create_cybersource_invalid_request(
     assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
 
 
-def test_user_enrollments_create_b2b_run_invalid(user_drf_client, user):
+@pytest.mark.parametrize("b2b_only", [True, False])
+def test_user_enrollments_create_b2b_run_invalid(user_drf_client, user, b2b_only):
     """Creating an enrollment for a B2B course run via the public API should be rejected."""
     contract = ContractPageFactory.create()
     course = CourseFactory.create()
     run = CourseRunFactory.create(
-        course=course, b2b_only=True, b2b_contracts=[contract]
+        course=course, b2b_only=b2b_only, b2b_contracts=[contract]
     )
 
     resp = user_drf_client.post(
