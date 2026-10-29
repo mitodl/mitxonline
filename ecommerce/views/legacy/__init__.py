@@ -9,6 +9,7 @@ from urllib.parse import urlencode
 import django_filters
 from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Count, Q
@@ -1071,16 +1072,27 @@ class CheckoutProductView(RedirectView):
         paid for it via the program) and return the dashboard URL to redirect
         to instead of the cart.
 
+        The run can be requested by courseware id (external checkout) or by
+        the id of its product (in-app "Add to Cart" buttons).
+
         Returns None if the request doesn't qualify for the shortcut, so the
         caller falls back to the normal basket flow.
         """
-        if product_ids or program_ids or not self.request.user.is_authenticated:
+        if program_ids or not self.request.user.is_authenticated:
+            return None
+
+        products = Product.objects.filter(id__in=product_ids)
+        if products.exclude(
+            content_type=ContentType.objects.get_for_model(CourseRun)
+        ).exists():
+            # A program (or anything else that isn't a run) is in the request.
             return None
 
         runs = list(
             CourseRun.objects.filter(
                 Q(courseware_id__in=course_run_ids)
                 | Q(courseware_id__in=courseware_ids)
+                | Q(id__in=products.values_list("object_id", flat=True))
             )
         )
         if len(runs) != 1:
