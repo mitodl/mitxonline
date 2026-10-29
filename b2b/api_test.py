@@ -65,6 +65,7 @@ from b2b.models import (
 from courses.constants import (
     ENROLL_CHANGE_STATUS_DEFERRED,
     ENROLL_CHANGE_STATUS_UNENROLLED,
+    PROGRAM_ENROLLMENT_UPGRADE_MODE,
 )
 from courses.factories import (
     CourseFactory,
@@ -3583,7 +3584,7 @@ def test_attach_upgrades_audit_enrollments(
     assert run_enrollment.b2b_contract == contract
     # Left for the async task (or the retry job) to push into edX
     assert run_enrollment.edx_enrolled is False
-    assert program_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    assert program_enrollment.enrollment_mode == PROGRAM_ENROLLMENT_UPGRADE_MODE
     assert program_enrollment.b2b_contract == contract
 
     assert other_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE

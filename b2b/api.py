@@ -65,7 +65,10 @@ from b2b.tasks import (
     queue_enrollment_code_check,
 )
 from cms.api import get_home_page
-from courses.constants import ALL_ENROLL_CHANGE_STATUSES
+from courses.constants import (
+    ALL_ENROLL_CHANGE_STATUSES,
+    PROGRAM_ENROLLMENT_UPGRADE_MODE,
+)
 from courses.models import (
     Course,
     CourseRun,
@@ -1609,6 +1612,12 @@ def _validate_b2b_enrollment_prerequisites(  # noqa: PLR0911
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
 
+    paid_enrollment_mode = (
+        PROGRAM_ENROLLMENT_UPGRADE_MODE
+        if isinstance(purchasable_object, Program)
+        else EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
     if (
         isinstance(
             purchasable_object,
@@ -1620,7 +1629,7 @@ def _validate_b2b_enrollment_prerequisites(  # noqa: PLR0911
         and purchasable_object.enrollments.filter(
             user=user,
             active=True,
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            enrollment_mode=paid_enrollment_mode,
         )
         .exclude(
             change_status__in=ALL_ENROLL_CHANGE_STATUSES,
@@ -1969,7 +1978,6 @@ def _enroll_in_program_for_b2b(
     - program_id: The readable_id of the program to enroll in.
     """
     from courses.api import create_program_enrollments  # noqa: PLC0415
-    from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE  # noqa: PLC0415
 
     purchasable_object = product.purchasable_object
 
@@ -1998,7 +2006,7 @@ def _enroll_in_program_for_b2b(
         return
 
     created_enrollments = create_program_enrollments(
-        user, [program], enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        user, [program], enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
     )
 
     if contract:
@@ -2439,7 +2447,7 @@ def upgrade_user_enrollments_for_contracts(user, contracts):
         )
 
         for enrollment in program_enrollments:
-            enrollment.enrollment_mode = EDX_ENROLLMENT_VERIFIED_MODE
+            enrollment.enrollment_mode = PROGRAM_ENROLLMENT_UPGRADE_MODE
             if enrollment.b2b_contract_id is None:
                 enrollment.b2b_contract = contract
             enrollment.save_and_log(None)
