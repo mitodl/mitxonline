@@ -218,22 +218,23 @@ class LearnUserAdapter(UserAdapter):
         userName lookup and then PUTs the full resource, so a lookup that lands
         on the wrong user (e.g. one whose email here is stale) would otherwise
         hand this account to another Keycloak identity. Binding a user with no
-        global_id yet, or re-sending the same id, applies as before.
+        global_id yet, or re-sending the same id, applies as before. A payload
+        without an externalId leaves a bound user's id alone, since clearing
+        it would let a second PUT bind any id.
 
         :param external_id: the externalId from the SCIM payload
         :raises IntegrityError: the user is already bound to a different id
         """
-        if (
-            not self.is_new_user
-            and self.obj.global_id
-            and external_id
-            and external_id != self.obj.global_id
-        ):
-            msg = "externalId does not match the existing user's externalId"
-            raise exceptions.IntegrityError(msg, scim_type="mutability")
+        if not self.is_new_user and self.obj.global_id:
+            if not external_id:
+                return
+            if external_id != self.obj.global_id:
+                msg = "externalId does not match the existing user's externalId"
+                raise exceptions.IntegrityError(msg, scim_type="mutability")
 
         self.obj.scim_external_id = external_id
-        self.obj.global_id = external_id or ""
+        # None, not "": global_id is unique and only NULLs don't collide.
+        self.obj.global_id = external_id or None
 
     def _save_related(self):
         self.user_profile.user = self.obj

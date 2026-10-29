@@ -499,3 +499,27 @@ def test_from_dict_binds_matching_or_unset_global_id(global_id):
 
     user.refresh_from_db()
     assert (user.global_id, user.scim_external_id) == ("keycloak-1", "keycloak-1")
+
+
+@pytest.mark.parametrize("external_id", [None, ""])
+def test_from_dict_without_external_id_keeps_global_id(external_id):
+    """A PUT with no externalId can't unbind a user, so a later PUT can't rebind"""
+    user = UserFactory.create(global_id="keycloak-1", scim_external_id="keycloak-1")
+
+    _put_external_id(user, external_id)
+
+    user.refresh_from_db()
+    assert (user.global_id, user.scim_external_id) == ("keycloak-1", "keycloak-1")
+    with pytest.raises(exceptions.IntegrityError):
+        _put_external_id(user, "keycloak-2")
+
+
+def test_from_dict_without_external_id_stores_null_global_id():
+    """An unbound user gets NULL, not "", which the unique column would collide on"""
+    UserFactory.create(global_id="")
+    user = UserFactory.create(global_id=None)
+
+    _put_external_id(user, None)
+
+    user.refresh_from_db()
+    assert user.global_id is None
