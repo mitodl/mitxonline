@@ -964,19 +964,22 @@ def test_checkout_product_with_no_active_product_uses_cart(user, user_client):
 
 @pytest.mark.dont_mock_enrollments
 @pytest.mark.zeal_allow("ecommerce.Basket", "get()")
-def test_checkout_product_with_verified_program_enrollment(user, user_client):
+@pytest.mark.parametrize("by_product_id", [True, False])
+def test_checkout_product_with_verified_program_enrollment(
+    user, user_client, by_product_id
+):
     """
-    Verifies that /cart/add?course_id=? skips the cart and redirects straight
-    to the dashboard, creating a verified enrollment directly, when the
-    learner already holds a verified enrollment in a program the course
-    belongs to.
+    Verifies that /cart/add?course_id=? and /cart/add?product_id=? skip the
+    cart and redirect straight to the dashboard, creating a verified
+    enrollment directly, when the learner already holds a verified enrollment
+    in a program the course belongs to.
     """
     program = ProgramFactory.create()
     course_run = CourseRunFactory.create()
     program.add_requirement(course_run.course)
     with reversion.create_revision():
         ProductFactory.create(purchasable_object=program)
-        ProductFactory.create(purchasable_object=course_run)
+        run_product = ProductFactory.create(purchasable_object=course_run)
 
     ProgramEnrollmentFactory.create(
         program=program,
@@ -986,7 +989,10 @@ def test_checkout_product_with_verified_program_enrollment(user, user_client):
     )
 
     resp = user_client.get(
-        reverse("checkout-product"), {"course_id": course_run.courseware_id}
+        reverse("checkout-product"),
+        {"product_id": run_product.id}
+        if by_product_id
+        else {"course_id": course_run.courseware_id},
     )
 
     assert resp.status_code == 302
@@ -1067,10 +1073,14 @@ def test_checkout_product_with_existing_verified_run_enrollment(user, user_clien
     assert not Basket.objects.filter(user=user).exists()
 
 
-def test_checkout_product_with_audit_program_enrollment_uses_cart(user, user_client):
+@pytest.mark.parametrize("by_product_id", [True, False])
+def test_checkout_product_with_audit_program_enrollment_uses_cart(
+    user, user_client, by_product_id
+):
     """
-    Verifies that /cart/add?course_id=? still falls back to the normal cart
-    flow when the learner's program enrollment isn't verified.
+    Verifies that /cart/add?course_id=? and /cart/add?product_id=? still fall
+    back to the normal cart flow when the learner's program enrollment isn't
+    verified.
     """
     program = ProgramFactory.create()
     course_run = CourseRunFactory.create()
@@ -1082,7 +1092,10 @@ def test_checkout_product_with_audit_program_enrollment_uses_cart(user, user_cli
     )
 
     resp = user_client.get(
-        reverse("checkout-product"), {"course_id": course_run.courseware_id}
+        reverse("checkout-product"),
+        {"product_id": product.id}
+        if by_product_id
+        else {"course_id": course_run.courseware_id},
     )
 
     assert resp.status_code == 302
@@ -1090,6 +1103,36 @@ def test_checkout_product_with_audit_program_enrollment_uses_cart(user, user_cli
 
     basket = Basket.objects.get(user=user)
     assert [item.product for item in basket.basket_items.all()] == [product]
+
+
+def test_checkout_product_with_program_product_id_uses_cart(user, user_client):
+    """
+    Verifies that /cart/add?product_id=? for a program's product uses the
+    normal cart flow, even with a verified enrollment in that program: the
+    shortcut only covers course runs.
+    """
+    program = ProgramFactory.create()
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        program_product = ProductFactory.create(purchasable_object=program)
+        ProductFactory.create(purchasable_object=course_run)
+    ProgramEnrollmentFactory.create(
+        program=program,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+    )
+
+    resp = user_client.get(
+        reverse("checkout-product"), {"product_id": program_product.id}
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+    basket = Basket.objects.get(user=user)
+    assert [item.product for item in basket.basket_items.all()] == [program_product]
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
 
 
 @pytest.mark.parametrize(
