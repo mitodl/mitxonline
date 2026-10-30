@@ -8,6 +8,8 @@ from compliance.exceptions import (
     ExportComplianceDataError,
     ExportComplianceError,
 )
+from courses.exceptions import CountryBlockedError
+from courses.factories import CourseFactory
 from main.exceptions import exception_handler
 
 
@@ -30,11 +32,16 @@ from main.exceptions import exception_handler
             },
         ),
         (
+            lambda user: CountryBlockedError(user, CourseFactory.create()),
+            {"detail": "Unable to complete enrollment."},
+        ),
+        (
             lambda user: ExportComplianceCheckError("something else"),  # noqa: ARG005
             {"detail": "Unable to complete enrollment."},
         ),
     ],
 )
+@pytest.mark.django_db
 def test_exception_handler_converts_compliance_errors(user, exc_factory, expected):
     """Compliance failures from any API view become an opaque 400."""
     response = exception_handler(exc_factory(user), {})

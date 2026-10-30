@@ -57,7 +57,7 @@ from courses.constants import (
     ENROLL_CHANGE_STATUS_UNENROLLED,
     PROGRAM_TEXT_ID_PREFIX,
 )
-from courses.exceptions import EnrollmentError
+from courses.exceptions import CountryBlockedError, EnrollmentError
 from courses.models import (
     BlockedCountry,
     Course,
@@ -218,6 +218,7 @@ def create_run_enrollments(  # noqa: C901, PLR0913
     keep_failed_enrollments=None,
     mode=EDX_DEFAULT_ENROLLMENT_MODE,
     skip_compliance_check=False,
+    skip_country_block_check=False,
     skip_enrollment_emails=False,
 ):
     """
@@ -241,6 +242,9 @@ def create_run_enrollments(  # noqa: C901, PLR0913
         skip_compliance_check (bool): If True, bypass the export compliance
             check. Operator-run management commands and support-initiated
             flows such as defer_enrollment only.
+        skip_country_block_check (bool): If True, bypass the country block check.
+            Refund downgrade callers and support-initiated deferrals only —
+            never bypass for new enrollments.
         skip_enrollment_emails (bool): If True, don't send the learner the
             enrollment confirmation email. Operator-run management commands only.
 
@@ -249,9 +253,16 @@ def create_run_enrollments(  # noqa: C901, PLR0913
             created in mitxonline, paired with a boolean indicating whether or not the edX enrollment API call was successful
             for all of the given course runs
     """
-    # Pre-existing: only runs[0] is screened, so runs[1:] go unscreened for the
-    # two multi-run callers (upgrade_audit_run_enrollments_for_program_purchase,
-    # ecommerce.api.downgrade_learner_from_order).
+    if not skip_country_block_check:
+        for run in runs:
+            if run.course.is_country_blocked(user):
+                log.warning(
+                    "Country block prevents enrollment for user=%s run=%s",
+                    user.id,
+                    run.courseware_id,
+                )
+                raise CountryBlockedError(user, run.course)
+    # Unlike the country check above, the compliance check only screens runs[0].
     if skip_compliance_check:
         log.warning(
             "Skipping export compliance check for user=%s run=%s",
@@ -490,6 +501,20 @@ def upgrade_audit_run_enrollments_for_program_purchase(user, program):
         .distinct()
     )
 
+    # The learner has already paid, so a blocked course must not fail the whole
+    # upgrade (or the order fulfillment); leave those runs on the audit track.
+    unblocked_runs = []
+    for run in eligible_runs:
+        if run.course.is_country_blocked(user):
+            log.warning(
+                "Not upgrading user=%s run=%s after program purchase: country blocked",
+                user.id,
+                run.courseware_id,
+            )
+        else:
+            unblocked_runs.append(run)
+    eligible_runs = unblocked_runs
+
     if not eligible_runs:
         return []
 
@@ -643,6 +668,7 @@ def downgrade_learner(enrollment):
         runs=[enrollment.run],
         keep_failed_enrollments=True,
         mode=EDX_ENROLLMENT_AUDIT_MODE,
+        skip_country_block_check=True,
     )
 
 
@@ -737,6 +763,7 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
         mode=EDX_ENROLLMENT_AUDIT_MODE,
         change_status=ENROLL_CHANGE_STATUS_REFUNDED,
         keep_failed_enrollments=True,
+        skip_country_block_check=True,
     )
     return downgraded_program_enrollment, downgraded_run_enrollments
 
@@ -841,6 +868,7 @@ def defer_enrollment(  # noqa: C901
             keep_failed_enrollments=keep_failed_enrollments,
             mode=EDX_ENROLLMENT_AUDIT_MODE,
             skip_compliance_check=True,
+            skip_country_block_check=True,
         )
         return first_or_none(deferred_enrollments), None
 
@@ -906,6 +934,7 @@ def defer_enrollment(  # noqa: C901
         keep_failed_enrollments=keep_failed_enrollments,
         mode=EDX_ENROLLMENT_VERIFIED_MODE,
         skip_compliance_check=True,
+        skip_country_block_check=True,
     )
     if not enroll_success and not keep_failed_enrollments:
         raise Exception(  # noqa: TRY002
@@ -919,6 +948,7 @@ def defer_enrollment(  # noqa: C901
             keep_failed_enrollments=keep_failed_enrollments,
             mode=EDX_ENROLLMENT_AUDIT_MODE,
             skip_compliance_check=True,
+            skip_country_block_check=True,
         )
         if not enroll_success and not keep_failed_enrollments:
             raise Exception(  # noqa: TRY002

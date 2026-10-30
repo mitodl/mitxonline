@@ -59,3 +59,15 @@ class EnrollmentError(APIException):
 
 class EnrollmentCreationFailedError(EnrollmentError):
     """Error when the create_run_enrollments fails."""
+
+
+class CountryBlockedError(Exception):
+    """Raised when a user's country is blocked from enrolling in a course."""
+
+    def __init__(self, user, course):
+        self.user = user
+        self.course = course
+        super().__init__(
+            f"Enrollment in course {course.readable_id} is blocked for user {user.id} "
+            "due to country restrictions"
+        )

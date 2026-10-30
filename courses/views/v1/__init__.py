@@ -36,6 +36,7 @@ from courses.api import (
     partner_schools_for_program,
 )
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
+from courses.exceptions import CountryBlockedError
 from courses.models import (
     Course,
     CourseRun,
@@ -308,18 +309,6 @@ def _validate_enrollment_post_request(
             "Attempting to enroll in a non-existent run (id: %s)", str(run_id_str)
         )
         return HttpResponseRedirect(request.headers["Referer"]), None, None
-    if run.course.is_country_blocked(user):
-        resp = HttpResponseRedirect(request.headers["Referer"])
-        resp.set_cookie(
-            key=USER_MSG_COOKIE_NAME,
-            value=encode_json_cookie_value(
-                {
-                    "type": USER_MSG_TYPE_ENROLL_BLOCKED,
-                }
-            ),
-            max_age=USER_MSG_COOKIE_MAX_AGE,
-        )
-        return resp, None, None
     if (
         PaidCourseRun.fulfilled_paid_course_run_exists(user, run)
         or CourseRunEnrollment.objects.filter(
@@ -356,6 +345,14 @@ class CreateEnrollmentView(APIView):
         if resp is not None:
             return resp
 
+        # Check early so a blocked learner isn't provisioned an edX account.
+        # create_run_enrollments remains the authoritative check.
+        if run.course.is_country_blocked(user):
+            return redirect_with_user_message(
+                reverse("user-dashboard"),
+                {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
+            )
+
         if not user.openedx_user_exists:
             create_user(user)
             user.refresh_from_db()
@@ -368,7 +365,7 @@ class CreateEnrollmentView(APIView):
                     features.IGNORE_EDX_FAILURES, False
                 ),
             )
-        except ExportComplianceCheckError:
+        except (CountryBlockedError, ExportComplianceCheckError):
             # Don't propagate the specifics of the compliance decision to the
             # client - the underlying cause is logged where it's raised.
             return redirect_with_user_message(

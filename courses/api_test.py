@@ -60,6 +60,7 @@ from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
     defer_enrollment,
+    downgrade_learner,
     downgrade_program_enrollment_and_verified_runs,
     generate_course_run_certificates,
     generate_missing_program_certificates,
@@ -91,7 +92,9 @@ from courses.constants import (
     ENROLL_CHANGE_STATUS_REFUNDED,
     ENROLL_CHANGE_STATUS_UNENROLLED,
 )
+from courses.exceptions import CountryBlockedError
 from courses.factories import (
+    BlockedCountryFactory,
     CourseFactory,
     CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
@@ -718,6 +721,28 @@ class TestUpgradeAuditRunEnrollmentsForProgramPurchase:
         enrollment = result[0]
         enrollment.refresh_from_db()
         assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+
+    def test_skips_country_blocked_run(self, mocker, program_setup):
+        """A blocked course is left on audit instead of failing the whole upgrade."""
+        BlockedCountryFactory.create(
+            course=program_setup.run.course,
+            country=program_setup.user.legal_address.country,
+        )
+        enrollment = CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert result == []
+        enrollment.refresh_from_db()
+        assert enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
 
     def test_skips_verified_enrollment(self, mocker, program_setup):
         """Existing verified-track enrollments are left unchanged."""
@@ -1471,6 +1496,92 @@ def test_create_run_enrollments_skip_enrollment_emails(
     patched_subscribe_emails.assert_not_called()
 
 
+def test_create_run_enrollments_raises_for_blocked_country(mocker, user):
+    """create_run_enrollments should raise CountryBlockedError before calling edX when the user's country is blocked."""
+    run = CourseRunFactory.create()
+    BlockedCountryFactory.create(course=run.course, country=user.legal_address.country)
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+    with pytest.raises(CountryBlockedError):
+        create_run_enrollments(user, [run])
+
+    patched_edx_enroll.assert_not_called()
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+def test_create_run_enrollments_raises_when_later_run_blocked(mocker, user):
+    """Every run is screened, not just the first one."""
+    run1, run2 = CourseRunFactory.create_batch(2)
+    BlockedCountryFactory.create(course=run2.course, country=user.legal_address.country)
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+    with pytest.raises(CountryBlockedError):
+        create_run_enrollments(user, [run1, run2])
+
+    patched_edx_enroll.assert_not_called()
+    assert not CourseRunEnrollment.objects.filter(user=user).exists()
+
+
+def test_create_run_enrollments_skips_country_check_when_requested(
+    mocker, user, django_capture_on_commit_callbacks
+):
+    """skip_country_block_check bypasses the country block."""
+    run = CourseRunFactory.create()
+    BlockedCountryFactory.create(course=run.course, country=user.legal_address.country)
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    with django_capture_on_commit_callbacks(execute=True):
+        successful_enrollments, _ = create_run_enrollments(
+            user, [run], skip_country_block_check=True
+        )
+
+    assert len(successful_enrollments) == 1
+
+
+def test_downgrade_learner_skips_country_block(mocker, user):
+    """Refund downgrades must still work for a learner whose country is blocked."""
+    run = CourseRunFactory.create()
+    BlockedCountryFactory.create(course=run.course, country=user.legal_address.country)
+    enrollment = CourseRunEnrollmentFactory.create(
+        user=user, run=run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    patched_create = mocker.patch(
+        "courses.api.create_run_enrollments", return_value=([enrollment], True)
+    )
+
+    downgrade_learner(enrollment)
+
+    assert patched_create.call_args.kwargs["skip_country_block_check"] is True
+
+
+def test_country_blocked_error_message(user):
+    """The exception stringifies to a readable message."""
+    course = CourseFactory.create()
+    message = str(CountryBlockedError(user, course))
+    assert course.readable_id in message
+    assert str(user.id) in message
+
+
+def test_create_run_enrollments_allows_when_country_not_blocked(
+    mocker, user, django_capture_on_commit_callbacks
+):
+    """create_run_enrollments should proceed normally when no countries are blocked for the course."""
+    run = CourseRunFactory.create()
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    with django_capture_on_commit_callbacks(execute=True):
+        successful_enrollments, edx_request_success = create_run_enrollments(
+            user, [run]
+        )
+
+    assert edx_request_success is True
+    assert len(successful_enrollments) == 1
+
+
 def test_create_program_enrollments_verifies_exports_for_verified_mode(mocker, user):
     """Verified program enrollments should require an accepted export check."""
     program = ProgramFactory.create()
@@ -1805,6 +1916,7 @@ def test_defer_enrollment(  # noqa: PLR0913
                         keep_failed_enrollments=keep_failed_enrollments,
                         mode=EDX_ENROLLMENT_VERIFIED_MODE,
                         skip_compliance_check=True,
+                        skip_country_block_check=True,
                     ),
                     call(
                         user=existing_enrollment.user,
@@ -1813,6 +1925,7 @@ def test_defer_enrollment(  # noqa: PLR0913
                         keep_failed_enrollments=keep_failed_enrollments,
                         mode=EDX_ENROLLMENT_AUDIT_MODE,
                         skip_compliance_check=True,
+                        skip_country_block_check=True,
                     ),
                 ]
             )
@@ -2063,6 +2176,7 @@ def test_defer_enrollment_validation(mocker, user):
                 keep_failed_enrollments=True,
                 mode=EDX_ENROLLMENT_VERIFIED_MODE,
                 skip_compliance_check=True,
+                skip_country_block_check=True,
             ),
             call(
                 user=user,
@@ -2071,6 +2185,7 @@ def test_defer_enrollment_validation(mocker, user):
                 keep_failed_enrollments=True,
                 mode=EDX_ENROLLMENT_AUDIT_MODE,
                 skip_compliance_check=True,
+                skip_country_block_check=True,
             ),
         ]
     )
