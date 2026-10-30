@@ -2313,7 +2313,11 @@ def get_verifiable_credentials_payload(
         raise InvalidCertificateError
 
     narrative = certificate_page.verifiable_credential_criteria
-    cert_page_description = certificate_page.verifiable_credential_description
+    cert_page_description = ""
+
+    if is_enabled(features.ENABLE_CREDENTIAL_METADATA_AUTHORING):
+        cert_page_description = certificate_page.verifiable_credential_description
+
     achievement_type = ACHIEVEMENT_TYPE_MAP[cert_type]
     user_name = certificate.user.name
     valid_from = (
