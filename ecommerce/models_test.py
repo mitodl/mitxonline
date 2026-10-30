@@ -2020,11 +2020,16 @@ def test_has_user_blocked_products(mocker, blocked_country, compliance):
     basket_item = BasketItemFactory.create(product=product)
     user = basket_item.basket.user
 
-    blocked_country_record = BlockedCountryFactory.create(course=courserun.course)
+    # Pin both countries: the factories pick them at random and occasionally
+    # collide, which blocks the user in the not-blocked cases.
+    blocked_country_record = BlockedCountryFactory.create(
+        course=courserun.course, country="IR"
+    )
 
-    if blocked_country:
-        user.legal_address.country = blocked_country_record.country
-        user.save()
+    user.legal_address.country = (
+        blocked_country_record.country if blocked_country else "FR"
+    )
+    user.save()
 
     assert basket_item.basket.has_user_blocked_products(user) == (
         blocked_country or compliance
