@@ -329,6 +329,9 @@ if ZEAL_ENABLE or ENVIRONMENT == "pytest":
 ZEAL_RAISE = False
 ZEAL_ALLOWLIST = []
 
+# django-object-actions 5.1 warns that its default changes to POST; pin today's behaviour
+DJANGO_OBJECT_ACTIONS_DEFAULT_HTTP_METHOD = "GET"
+
 # use a fast, insecure password hasher under pytest - tests don't need real hashing strength
 if ENVIRONMENT == "pytest":
     PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
