@@ -443,8 +443,11 @@ def test_add_basket_item(user_drf_client, user):
 @pytest.mark.parametrize("add_discount", [True, False])
 @pytest.mark.parametrize("bad_product", [True, False])
 @override_settings(ENABLE_MULTIPLE_CART_ITEMS=True)
-@pytest.mark.zeal_allow("ecommerce.Product", "get()")
+# A multi-item basket pays per item: the update_or_create write, and a
+# purchasable_object read in both the flexible pricing lookup and the
+# response serializer, each of which reloads the products from basket_items.
 @pytest.mark.zeal_allow("ecommerce.BasketItem", "get()")
+@pytest.mark.zeal_allow("ecommerce.Product", "purchasable_object")
 def test_create_basket_with_products(
     user, user_client, existing_basket, add_discount, bad_product
 ):
@@ -453,14 +456,22 @@ def test_create_basket_with_products(
     products = ProductFactory.create_batch(size=2)
 
     basket = BasketFactory(user=user) if existing_basket else None
+    if bad_product and basket:
+        BasketItemFactory(basket=basket, product=products[0], quantity=2)
+    original_items = list(
+        BasketItem.objects.filter(basket__user=user).values_list(
+            "id", "product_id", "quantity"
+        )
+    )
 
     url = reverse("v0:baskets_api-create_with_products")
     payload = {
         "product_ids": [
-            {"product_id": -3 if bad_product else product.id, "quantity": 1}
-            for product in products
+            {"product_id": product.id, "quantity": 1} for product in products
         ],
     }
+    if bad_product:
+        payload["product_ids"][1]["product_id"] = -3
 
     if add_discount:
         discount = DiscountFactory(discount_type="fixed-price", amount=100)
@@ -474,6 +485,14 @@ def test_create_basket_with_products(
 
     if bad_product:
         assert response.status_code == 404
+        assert (
+            list(
+                BasketItem.objects.filter(basket__user=user).values_list(
+                    "id", "product_id", "quantity"
+                )
+            )
+            == original_items
+        )
         return
 
     assert response.status_code == 200
@@ -1542,7 +1561,6 @@ def test_start_checkout_with_discounts(user, user_drf_client, products, discount
     assert order.state == OrderStatus.PENDING
 
 
-@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 def test_start_checkout_with_no_lines(user, user_drf_client):
     """Test that checking out with an empty cart generates an error."""
 
