@@ -304,7 +304,8 @@ def remove_courseware_from_contract(
 
     A program is unlinked from the contract, and its contract runs (including
     those of programs nested in it) are removed too only if remove_program_runs
-    is set. A course has no link of its own, so
+    is set. Runs of courses another of the contract's programs still includes
+    are kept. A course has no link of its own, so
     removing it removes its contract runs. Only runs in this contract are
     touched.
 
@@ -314,14 +315,21 @@ def remove_courseware_from_contract(
     contract_runs = CourseRun.objects.filter(b2b_contracts=contract)
 
     if courseware.is_program:
-        runs = (
-            list(contract_runs.filter(course__in=courseware.courses_qset_recursive))
-            if remove_program_runs
-            else []
-        )
         ContractProgramItem.objects.filter(
             contract=contract, program=courseware
         ).delete()
+        # A course the contract's remaining programs still reach keeps its runs.
+        runs = (
+            list(
+                contract_runs.filter(
+                    course__in=courseware.courses_qset_recursive
+                ).exclude(
+                    course__in_programs__program_id__in=_contract_program_ids(contract)
+                )
+            )
+            if remove_program_runs
+            else []
+        )
     elif courseware.is_run:
         runs = list(contract_runs.filter(id=courseware.id))
     else:
