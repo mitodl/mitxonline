@@ -170,39 +170,20 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = CourseFilterSet
 
     def get_queryset(self):
-        courserun_is_enrollable = self.request.query_params.get(
-            "courserun_is_enrollable", None
+        # Filtering by courserun_is_enrollable is CourseFilterSet's job; the
+        # queryset is the same either way.
+        return (
+            Course.objects.select_related("page")
+            .prefetch_related(
+                "departments",
+                "courseruns__products",
+                Prefetch(
+                    "courseruns__enrollment_modes",
+                    to_attr="prefetched_enrollment_modes",
+                ),
+            )
+            .all()
         )
-
-        if courserun_is_enrollable:
-            queryset = (
-                Course.objects.filter()
-                .select_related("page")
-                .prefetch_related(
-                    "departments",
-                    Prefetch(
-                        "courseruns__enrollment_modes",
-                        to_attr="prefetched_enrollment_modes",
-                    ),
-                )
-                .all()
-            )
-        else:
-            queryset = (
-                Course.objects.filter()
-                .select_related("page")
-                .prefetch_related(
-                    "courseruns",
-                    "departments",
-                    Prefetch(
-                        "courseruns__enrollment_modes",
-                        to_attr="prefetched_enrollment_modes",
-                    ),
-                )
-                .all()
-            )
-
-        return queryset
 
     def get_serializer_context(self):
         added_context = {}

@@ -939,11 +939,6 @@ class HomePage(VideoPlayerConfigMixin):
         "ProgramPage",
     ]
 
-    def _get_child_page_of_type(self, cls):
-        """Gets the first child page of the given type if it exists"""
-        child = self.get_children().type(cls).live().first()
-        return child.specific if child else None
-
     @property
     def get_cached_featured_products(self):
         """
@@ -1495,9 +1490,8 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         return super().save(clean=clean, user=user, log_action=log_action, **kwargs)
 
     def _get_child_page_of_type(self, cls):
-        """Gets the first child page of the given type if it exists"""
-        child = self.get_children().type(cls).live().first()
-        return child.specific if child else None
+        """Gets the first live child page of the given type, or None."""
+        return cls.objects.child_of(self).live().first()
 
     @property
     def certificate_page(self):
