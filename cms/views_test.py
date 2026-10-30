@@ -18,6 +18,12 @@ def _url(page):
     return reverse("cms_credential_metadata", args=[page.id])
 
 
+@pytest.fixture(autouse=True)
+def mock_flag(mocker):
+    """Turn credential metadata authoring on unless a test says otherwise"""
+    return mocker.patch("cms.views.is_enabled", return_value=True)
+
+
 @pytest.fixture
 def mock_fetch(mocker):
     """Mock the MIT Learn client as seen by the view"""
@@ -68,6 +74,17 @@ def test_credential_metadata_unavailable(client, admin_user, mock_fetch):
 
     assert resp.status_code == 503
     assert resp.json() == {"status": "unavailable"}
+
+
+def test_credential_metadata_flag_off(client, admin_user, mock_fetch, mock_flag):
+    """With the feature flag off the endpoint doesn't exist, buttons or not"""
+    mock_flag.return_value = False
+    client.force_login(admin_user)
+
+    resp = client.get(_url(CoursePageFactory.create()))
+
+    assert resp.status_code == 404
+    mock_fetch.assert_not_called()
 
 
 def test_credential_metadata_wrong_page_type(client, admin_user, mock_fetch):

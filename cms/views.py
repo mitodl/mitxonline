@@ -3,6 +3,7 @@ import logging
 from django.http import Http404, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_GET
+from mitol.olposthog.features import is_enabled
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from wagtail.models import Page
@@ -14,6 +15,7 @@ from cms.credential_metadata import (
 )
 from cms.models import CoursePage, InstructorPage, ProgramPage
 from cms.serializers import InstructorPageSerializer
+from main import features
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +42,11 @@ def credential_metadata(request, parent_page_id):
     the certificate's parent page: that page exists even while the certificate
     itself is still being created.
     """
+    # The flag hides the buttons, but also refuse here, so that turning it off
+    # switches the feature off entirely rather than only hiding it.
+    if not is_enabled(features.ENABLE_CREDENTIAL_METADATA_AUTHORING):
+        raise Http404
+
     parent = get_object_or_404(Page, id=parent_page_id).specific
     if not isinstance(parent, (CoursePage, ProgramPage)):
         raise Http404
