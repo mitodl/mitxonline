@@ -1431,22 +1431,30 @@ def process_course_run_grade_certificate(
                 course.readable_id,
             )
             return None, False, False
-        course_page = course.course_page
-        if not course_page or not course_page.certificate_page:
-            # course_page.certificate_page is a plain (uncached) property, so
-            # this re-checks live status on every call instead of trusting
-            # the Course.certificate_page cached_property, which would go
-            # stale across a batch that reuses the same Course/CourseRun
-            # object for many users (e.g. the certificate generation cron).
+        # get_certificate_page_revision() re-checks live status on every call
+        # instead of trusting the Course.certificate_page cached_property,
+        # which would go stale across a batch that reuses the same
+        # Course/CourseRun object for many users (e.g. the certificate
+        # generation cron).
+        certificate_page_revision = course.get_certificate_page_revision()
+        if not certificate_page_revision:
+            # certificate_page_revision is non-nullable, so a certificate can
+            # only be created once the certificate page has a saved revision
+            # to point to - a live page alone isn't enough.
             log.warning(
-                "Skipping certificate creation for user=%s run=%s: no live certificate page",
+                "Skipping certificate creation for user=%s run=%s: no live, "
+                "revisioned certificate page",
                 user.id,
                 course_run.courseware_id,
             )
             return None, False, False
         try:
+            # Pass the revision checked above rather than letting save()
+            # look it up again, so the check and the write can't disagree.
             certificate, created = CourseRunCertificate.objects.get_or_create(
-                user=user, course_run=course_run
+                user=user,
+                course_run=course_run,
+                defaults={"certificate_page_revision": certificate_page_revision},
             )
             if created and not defer_hubspot_sync:
                 sync_hubspot_user(user)
@@ -1454,9 +1462,26 @@ def process_course_run_grade_certificate(
                 create_verifiable_credential(certificate)
             return certificate, created, False  # noqa: TRY300
         except IntegrityError:
-            log.warning(
-                f"IntegrityError caught processing certificate for {course_run.courseware_id} for user {user} - certificate was likely already revoked."  # noqa: G004
-            )
+            # The expected case: a certificate already exists but the default
+            # manager hides it (revoked, or issue_date in the future), so
+            # get_or_create tried to insert a duplicate. Anything else (e.g. a
+            # NOT NULL or FK violation) is unexpected and logged as an error.
+            if CourseRunCertificate.all_objects.filter(
+                user=user, course_run=course_run
+            ).exists():
+                log.warning(
+                    "IntegrityError caught processing certificate for %s for "
+                    "user %s - an existing certificate is revoked or not yet "
+                    "issued.",
+                    course_run.courseware_id,
+                    user,
+                )
+            else:
+                log.exception(
+                    "IntegrityError creating certificate for user=%s run=%s",
+                    user.id,
+                    course_run.courseware_id,
+                )
     return None, False, False
 
 
@@ -1731,7 +1756,7 @@ def _has_earned_program_cert(user, program):
     )
 
 
-def generate_program_certificate(user, program, force_create=False):  # noqa: FBT002
+def generate_program_certificate(user, program, force_create=False):  # noqa: FBT002, PLR0911
     """
     Create a program certificate if the user has a verified enrollment in the
     program and certificates or passing grades in the program's required courses.
@@ -1782,25 +1807,42 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
             program.readable_id,
         )
         return None, False
-    program_page = program.program_page
-    if not program_page or not program_page.certificate_page:
-        # program_page.certificate_page is a plain (uncached) property, so
-        # this re-checks live status on every call instead of trusting the
-        # Program.certificate_page cached_property, which would go stale
-        # across a batch that reuses the same Program object for many users
-        # (e.g. manage_program_certificates bulk mode).
+    # get_certificate_page_revision() re-checks live status on every call
+    # instead of trusting the Program.certificate_page cached_property, which
+    # would go stale across a batch that reuses the same Program object for
+    # many users (e.g. manage_program_certificates bulk mode).
+    certificate_page_revision = program.get_certificate_page_revision()
+    if not certificate_page_revision:
+        # certificate_page_revision is non-nullable, so a certificate can
+        # only be created once the certificate page has a saved revision to
+        # point to - a live page alone isn't enough.
         log.warning(
             "Skipping program certificate creation for user=%s program=%s: "
-            "no live certificate page",
+            "no live, revisioned certificate page",
             user.id,
             program.readable_id,
         )
         return None, False
 
-    program_cert, created = ProgramCertificate.all_objects.get_or_create(
-        user=user,
-        program=program,
-    )
+    # This also runs from a transaction.on_commit() callback (see
+    # courses/signals.py), where an uncaught error would surface in whatever
+    # request or task created the course run certificate - so handle it here,
+    # as process_course_run_grade_certificate does.
+    try:
+        # Pass the revision checked above rather than letting save() look it
+        # up again, so the check and the write can't disagree.
+        program_cert, created = ProgramCertificate.all_objects.get_or_create(
+            user=user,
+            program=program,
+            defaults={"certificate_page_revision": certificate_page_revision},
+        )
+    except IntegrityError:
+        log.exception(
+            "IntegrityError creating program certificate for user=%s program=%s",
+            user.id,
+            program.readable_id,
+        )
+        return None, False
     if created:
         log.info(
             "Program certificate for [%s] in program [%s] is created.",
