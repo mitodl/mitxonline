@@ -92,6 +92,7 @@ def test_contract_routes_require_staff(user_drf_client):
     )
 
 
+@pytest.mark.zeal_allow("b2b.ContractPage", "get()")
 def test_create_contract(admin_drf_client, mocked_tasks):
     """A created contract has a default variant set and no codes yet."""
 
@@ -204,6 +205,7 @@ def test_deactivated_contract_can_be_edited_and_reactivated(admin_drf_client):
 
 
 @pytest.mark.zeal_allow("wagtailcore.Page", "get()")
+@pytest.mark.zeal_allow("b2b.ContractPage", "get()")
 def test_contract_description_keeps_only_rich_text_markup(admin_drf_client):
     """A description is stored with nothing Wagtail's editor would not store."""
 

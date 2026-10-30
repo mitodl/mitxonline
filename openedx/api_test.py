@@ -568,7 +568,7 @@ def test_generate_unique_username(base_username, expected_prefix):
 @responses.activate
 @pytest.mark.parametrize(
     "open_edx_user_record_exists,open_edx_user_record_has_been_synced",  # noqa: PT006
-    itertools.product([True, False], [True, False]),
+    list(itertools.product([True, False], [True, False])),
 )
 def test_create_edx_user_for_user_not_synced_with_edx(
     mocker,
@@ -1546,7 +1546,7 @@ def test_retry_failed_edx_enrollments_dead_letters_at_max_retries(mocker):
 
 @pytest.mark.parametrize(
     "no_openedx_user,no_edx_auth",  # noqa: PT006
-    itertools.product([True, False], [True, False]),
+    list(itertools.product([True, False], [True, False])),
 )
 def test_repair_faulty_edx_user(mocker, no_openedx_user, no_edx_auth):
     """
