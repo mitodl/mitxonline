@@ -2292,7 +2292,6 @@ def get_verifiable_credentials_payload(
             if course_page and course_page.feature_image
             else ""
         )
-        narrative = certificate_page.verifiable_credential_criteria
 
     elif isinstance(certificate, ProgramCertificate):
         cert_type = "program"
@@ -2310,9 +2309,14 @@ def get_verifiable_credentials_payload(
             if program_page and program_page.feature_image
             else ""
         )
-        narrative = certificate_page.verifiable_credential_criteria
     else:
         raise InvalidCertificateError
+
+    narrative = certificate_page.verifiable_credential_criteria
+    cert_page_description = ""
+
+    if is_enabled(features.ENABLE_CREDENTIAL_METADATA_AUTHORING):
+        cert_page_description = certificate_page.verifiable_credential_description
 
     achievement_type = ACHIEVEMENT_TYPE_MAP[cert_type]
     user_name = certificate.user.name
@@ -2365,7 +2369,8 @@ def get_verifiable_credentials_payload(
                     # The `verifiable_credential_criteria` field of the certificate page
                     "narrative": narrative
                 },
-                "description": f"{user_name} has successfully completed all modules and earned a {achievement_type} Certificate in {certificate_name}.",
+                "description": cert_page_description
+                or f"{user_name} has successfully completed all modules and earned a {achievement_type} Certificate in {certificate_name}.",
                 "name": certificate_name,
             },
         },

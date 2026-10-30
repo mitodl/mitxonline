@@ -5426,6 +5426,71 @@ def test_program_verifiable_credential_name_falls_back_to_program_title(
     assert "Data Science MicroMasters" in achievement["description"]
 
 
+@pytest.mark.parametrize("is_program", [True, False])
+@pytest.mark.parametrize(
+    ("flag_enabled", "description", "expect_custom_description"),
+    [
+        (True, "A custom credential description.", True),
+        (True, "", False),
+        (False, "", False),
+        (False, "A custom credential description.", False),
+    ],
+)
+def test_verifiable_credentials_payload_description(  # noqa: PLR0913
+    mocker, settings, is_program, flag_enabled, description, expect_custom_description
+):
+    """
+    The achievement description should come from the certificate page's
+    verifiable_credential_description when the feature flag is enabled and the
+    field is populated, and fall back to the generated description otherwise.
+    """
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_user")
+    mocker.patch("hubspot_sync.api.upsert_custom_properties")
+    mock_enrollment = Mock()
+    mock_enrollment.created_on = datetime(
+        2024, 1, 15, 10, 30, 0, tzinfo=ZoneInfo("UTC")
+    )
+    mocker.patch(
+        "courses.api.CourseRunEnrollment.all_objects.get",
+        return_value=mock_enrollment,
+    )
+    mocker.patch(
+        "courses.api.ProgramEnrollment.all_objects.get",
+        return_value=mock_enrollment,
+    )
+    mocker.patch("courses.api.get_thumbnail_url", return_value="")
+    settings.ENVIRONMENT = "production"
+
+    if is_program:
+        certificate = ProgramCertificateFactory.create()
+        certificate_name = certificate.program.title
+        achievement_type = "Program"
+    else:
+        certificate = CourseRunCertificateFactory.create()
+        certificate_name = certificate.course_run.title
+        achievement_type = "Course"
+
+    mock_certificate_page = Mock()
+    mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
+    mock_certificate_page.verifiable_credential_description = description
+    mock_certificate_page.product_name = ""
+
+    mock_is_enabled = mocker.patch("courses.api.is_enabled", return_value=flag_enabled)
+
+    payload = get_verifiable_credentials_payload(certificate, mock_certificate_page)
+
+    mock_is_enabled.assert_any_call(features.ENABLE_CREDENTIAL_METADATA_AUTHORING)
+    expected_description = (
+        description
+        if expect_custom_description
+        else f"{certificate.user.name} has successfully completed all modules and earned a {achievement_type} Certificate in {certificate_name}."
+    )
+    assert (
+        payload["credentialSubject"]["achievement"]["description"]
+        == expected_description
+    )
+
+
 @pytest.mark.parametrize(
     "keep_failed_enrollments,flag_enabled,expected_behavior",  # noqa: PT006
     [
