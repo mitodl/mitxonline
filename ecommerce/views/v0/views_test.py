@@ -1739,7 +1739,6 @@ def test_start_checkout_with_bad_discount(user, user_drf_client):
     assert resp.status_code == 400
 
 
-@pytest.mark.zeal_allow("ecommerce.Product", "purchasable_object")
 def test_order_history_list(user, user_drf_client):
     """Test that we can get a user's order history."""
     with reversion.create_revision():
@@ -1800,23 +1799,20 @@ def test_order_history_retrieve(user, user_drf_client):
     assert returned_order["lines"][0]["id"] == order_1_line.id
 
 
-# Each extra order on the page costs this many queries, all of them rooted in
-# `LineSerializer.product`: `Line.product` rebuilds an unsaved Product from a
-# reversion Version, so its generic `purchasable_object` — and the course, course
-# page, feature image, instructors, flexible-pricing form and current price under
-# it — resolve per line. A prefetch on the view's Order queryset cannot reach
-# them; serializing `line.purchased_object`, which is already prefetched, instead
-# of `product.purchasable_object` could.
-QUERIES_PER_ADDITIONAL_ORDER = 10
+# What an extra order on the page costs. No per-row read queries: `Line.product`
+# rebuilds an unsaved Product from a reversion Version, out of reach of any
+# prefetch, but hands it the line's prefetched `purchased_object`, and the row's
+# serializer reads the run and its course, both of which that prefetch loads.
+QUERIES_PER_ADDITIONAL_ORDER = 0
 
 # What one request costs before any order is serialized.
 FIXED_QUERIES_PER_PAGE = 6
 
 
-def _create_order_with_line(user):
-    """Create one fulfilled order carrying a single course-run line."""
+def _create_order_with_line(user, product_factory=ProductFactory):
+    """Create one fulfilled order carrying a single line of the given product kind."""
     with reversion.create_revision():
-        product = ProductFactory.create()
+        product = product_factory.create()
     order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
     LineFactory.create(
         order=order,
@@ -1832,9 +1828,9 @@ def _order_history_query_count(user_drf_client):
     return len(queries.captured_queries)
 
 
-@pytest.mark.zeal_allow("ecommerce.Product", "purchasable_object")
-def test_order_history_query_count_grows_only_by_the_known_page_walk(
-    user, user_drf_client
+@pytest.mark.parametrize("product_factory", [ProductFactory, ProgramProductFactory])
+def test_order_history_query_count_does_not_grow_with_orders(
+    user, user_drf_client, product_factory
 ):
     """
     Pin what a page of order history costs in queries, and what a row adds.
@@ -1843,22 +1839,56 @@ def test_order_history_query_count_grows_only_by_the_known_page_walk(
     regression, which an absolute count alone cannot distinguish from a rise in
     fixed cost, and the totals catch a regression that runs once per request,
     which the difference alone cancels out. Any drop here is welcome and means
-    lowering a constant.
+    lowering a constant. Course-run and program lines serialize through
+    different branches, so each kind is pinned.
     """
     for _ in range(2):
-        _create_order_with_line(user)
+        _create_order_with_line(user, product_factory)
     # The ContentType and Site caches are process-wide, so the first request in
     # a process pays their misses. Warm them ahead of both measurements.
     _order_history_query_count(user_drf_client)
     two_orders = _order_history_query_count(user_drf_client)
 
     for _ in range(4):
-        _create_order_with_line(user)
+        _create_order_with_line(user, product_factory)
     six_orders = _order_history_query_count(user_drf_client)
 
     assert six_orders - two_orders == 4 * QUERIES_PER_ADDITIONAL_ORDER
     assert two_orders == FIXED_QUERIES_PER_PAGE + 2 * QUERIES_PER_ADDITIONAL_ORDER
     assert six_orders == FIXED_QUERIES_PER_PAGE + 6 * QUERIES_PER_ADDITIONAL_ORDER
+
+
+def test_order_history_serves_a_source_run_line_from_the_prefetch(
+    user, user_drf_client
+):
+    """
+    A line on a run flagged as a source run costs no more than any other.
+
+    `CourseRun.objects` hides source runs, so a prefetch built on it would
+    leave such a line's `purchased_object` empty and send the row back to
+    per-line queries.
+    """
+    run = CourseRunFactory.create(is_source_run=True)
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run)
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    LineFactory.create(
+        order=order, product_version=Version.objects.get_for_object(product).last()
+    )
+    _order_history_query_count(user_drf_client)
+
+    with CaptureQueriesContext(connection) as queries:
+        resp = user_drf_client.get(reverse("v0:orderhistory_api-list"))
+
+    assert resp.status_code == 200
+    purchasable_object = resp.json()["results"][0]["lines"][0]["product"][
+        "purchasable_object"
+    ]
+    assert purchasable_object["id"] == run.id
+    assert (
+        len(queries.captured_queries)
+        == FIXED_QUERIES_PER_PAGE + QUERIES_PER_ADDITIONAL_ORDER
+    )
 
 
 def test_order_history_titles_follow_the_snapshotted_product(user, user_drf_client):
@@ -1876,6 +1906,7 @@ def test_order_history_titles_follow_the_snapshotted_product(user, user_drf_clie
     LineFactory.create(
         order=order,
         product_version=Version.objects.get_for_object(product).last(),
+        purchased_object=CourseRunFactory.create(),
     )
 
     resp = user_drf_client.get(reverse("v0:orderhistory_api-list"))
