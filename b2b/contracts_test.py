@@ -196,6 +196,42 @@ def test_remove_program_removes_nested_program_runs():
     assert not contract.programs.exists()
 
 
+@pytest.mark.parametrize("shared_as", ["nested", "linked", "direct"])
+def test_remove_program_keeps_runs_other_programs_include(shared_as):
+    """
+    Removing a program with its runs keeps the runs of courses that another of
+    the contract's programs still includes, whether nested in it, linked to the
+    contract itself, or as one of its own courses.
+    """
+
+    contract = ContractPageFactory.create()
+    program = ProgramFactory.create()
+    other_program = ProgramFactory.create()
+    shared_course = _source_run().course
+    own_course = _source_run().course
+    program.add_requirement(own_course)
+    if shared_as == "direct":
+        program.add_requirement(shared_course)
+        other_program.add_requirement(shared_course)
+    else:
+        module = ProgramFactory.create()
+        module.add_requirement(shared_course)
+        program.add_program_requirement(module)
+        if shared_as == "nested":
+            other_program.add_program_requirement(module)
+        else:
+            other_program = module
+    add_courseware_to_contract(contract, program, skip_edx=True)
+    add_courseware_to_contract(contract, other_program, skip_edx=True)
+
+    removed = remove_courseware_from_contract(
+        contract, program, remove_program_runs=True
+    )
+
+    assert [run.course for run, _ in removed] == [own_course]
+    assert [run.course for run in contract.get_course_runs()] == [shared_course]
+
+
 @pytest.mark.parametrize("other_contract_active", [True, False])
 @pytest.mark.parametrize("has_enrollments", [True, False])
 def test_remove_run_another_contract_holds(other_contract_active, has_enrollments):
