@@ -12,7 +12,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Q, QuerySet
+from django.db.models import Exists, OuterRef, Q, QuerySet
 from django.urls import reverse
 from ipware import get_client_ip
 from mitol.common.utils.datetime import now_in_utc
@@ -717,6 +717,142 @@ def cull_anonymous_baskets():
     cutoff = now_in_utc() - timedelta(seconds=settings.ANONYMOUS_BASKET_CULL_AGE)
 
     Basket.objects.filter(anonymous_id__isnull=False, updated_on__lt=cutoff).delete()
+
+
+def cull_stale_pending_orders():
+    """
+    Delete PendingOrders that are older than PENDING_ORDER_CULL_AGE_DAYS.
+    Checkout creates a new PendingOrder each time, so abandoned checkouts
+    leave these behind.
+
+    Orders with any record of payment activity (transactions, Stripe events)
+    are kept so they can still be resolved and audited, as are orders whose
+    lines fund a discount redemption (those are protected). The transaction
+    Stripe checkout records for its CheckoutSession before the learner pays
+    doesn't count as payment activity, but that session is checked with Stripe
+    before the order is deleted (see _check_stale_stripe_orders).
+    """
+    cutoff = now_in_utc() - timedelta(days=settings.PENDING_ORDER_CULL_AGE_DAYS)
+
+    payment_transactions = Transaction.objects.filter(order=OuterRef("pk")).exclude(
+        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION
+    )
+
+    stale_orders = (
+        PendingOrder.objects.filter(
+            state=OrderStatus.PENDING,
+            created_on__lt=cutoff,
+            stripeeventlog__isnull=True,
+        )
+        .exclude(Exists(payment_transactions))
+        .exclude(lines__funded_redemptions__isnull=False)
+    )
+
+    keep_ids = _check_stale_stripe_orders(
+        stale_orders.filter(gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE)
+    )
+
+    _, deleted = stale_orders.exclude(id__in=keep_ids).delete()
+    log.info("Culled stale pending orders: %s", deleted)
+
+
+def _check_stale_stripe_orders(orders):  # noqa: C901
+    """
+    Check the CheckoutSession of each stale Stripe order with Stripe, so a
+    paid order whose webhook never got processed isn't deleted.
+
+    Only orders whose session was cancelled (or that have no session to check)
+    can be deleted. Paid orders are fulfilled. Orders in any other state, or
+    whose session couldn't be retrieved, are kept and checked again on the
+    next run.
+
+    Returns:
+    - set of IDs of the orders to keep
+    """
+    session_ids = {
+        txn.order_id: txn.data.get("id")
+        for txn in Transaction.objects.filter(
+            order__in=orders,
+            reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+            data__object=STRIPE_OBJECT_CHECKOUT_SESSION,
+        )
+    }
+
+    keep_ids = set()
+
+    for order in orders:
+        session_id = session_ids.get(order.id)
+
+        if not session_id:
+            continue
+
+        try:
+            session = process_stripe_checkout_session_status(session_id)
+        except stripe.APIConnectionError:
+            log.exception(
+                "Stripe API connection error encountered checking order %s, can't continue.",
+                order.reference_number,
+            )
+            raise
+        except stripe.AuthenticationError:
+            log.exception(
+                "Stripe API authentication error encountered checking order %s, can't continue.",
+                order.reference_number,
+            )
+            raise
+        except stripe.PermissionError:
+            log.exception(
+                "Stripe API permission error encountered checking order %s, can't continue.",
+                order.reference_number,
+            )
+            raise
+        except stripe.RateLimitError:
+            log.exception(
+                "Hit Stripe rate limit checking order %s, can't continue.",
+                order.reference_number,
+            )
+            raise
+        except stripe.StripeError:
+            log.exception(
+                "StripeError encountered checking checkout session %s for stale order %s, can't continue",
+                session_id,
+                order.reference_number,
+            )
+            raise
+
+        if session["status"] == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED:
+            continue
+
+        keep_ids.add(order.id)
+
+        if session["status"] != STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
+            log.info(
+                "Keeping stale order %s: CheckoutSession %s is %s",
+                order.reference_number,
+                session_id,
+                session["status"],
+            )
+            continue
+
+        locked_order = Order.objects.select_for_update().get(pk=order.id)
+        if locked_order.state in [
+            OrderStatus.FULFILLED,
+            OrderStatus.CANCELED,
+            OrderStatus.ERRORED,
+            OrderStatus.REFUNDED,
+            OrderStatus.DECLINED,
+        ]:
+            continue
+
+        log.debug(
+            "Stale order %s was paid in Stripe, fulfilling it",
+            locked_order.reference_number,
+        )
+
+        with transaction.atomic():
+            fulfill_completed_order(locked_order, session["transaction"])
+
+    return keep_ids
 
 
 def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs):  # noqa: RUF013

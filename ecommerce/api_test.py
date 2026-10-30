@@ -27,7 +27,7 @@ from mitol.payment_gateway.constants import (
     MITOL_PAYMENT_GATEWAY_STRIPE,
 )
 from reversion.models import Version
-from stripe import convert_to_stripe_object
+from stripe import APIConnectionError, convert_to_stripe_object
 from zeal import zeal_context
 
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE
@@ -55,6 +55,7 @@ from ecommerce.api import (
     create_verified_program_course_run_order,
     create_verified_program_discount,
     cull_anonymous_baskets,
+    cull_stale_pending_orders,
     downgrade_enrollments_from_order,
     downgrade_learner_from_order,
     establish_basket,
@@ -85,6 +86,7 @@ from ecommerce.constants import (
     STRIPE_EVENT_CHARGE_REFUND_UPDATED,
     STRIPE_EVENT_CHECKOUT_SESSION_EXPIRED,
     STRIPE_EVENT_REFUND_UPDATED,
+    STRIPE_OBJECT_CHECKOUT_SESSION,
     STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
     STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
     STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
@@ -99,6 +101,7 @@ from ecommerce.constants import (
     STRIPE_PAYMENT_STATUS_NPR,
     STRIPE_PAYMENT_STATUS_PAID,
     STRIPE_PAYMENT_STATUS_UNPAID,
+    STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
     TRANSACTION_TYPE_PAYMENT,
     TRANSACTION_TYPE_REFUND,
     ZERO_PAYMENT_DATA,
@@ -134,6 +137,7 @@ from ecommerce.models import (
     DiscountProduct,
     DiscountRedemption,
     FulfilledOrder,
+    Line,
     Order,
     OrderStatus,
     PendingOrder,
@@ -2222,6 +2226,114 @@ def test_cull_anonymous_baskets(settings, user):
     assert not Basket.objects.filter(pk=old_anon_basket.pk).exists()
     assert Basket.objects.filter(pk=recent_anon_basket.pk).exists()
     assert Basket.objects.filter(pk=old_user_basket.pk).exists()
+
+
+def test_cull_stale_pending_orders(settings, user):
+    """
+    Only pending orders older than the cutoff with no payment activity or
+    funded redemptions should be removed.
+    """
+    settings.PENDING_ORDER_CULL_AGE_DAYS = 60
+    old = now_in_utc() - timedelta(days=61)
+
+    def age_order(order, created_on=old):
+        Order.objects.filter(pk=order.pk).update(created_on=created_on)
+        return order
+
+    def make_order(state=OrderStatus.PENDING, *, created_on=old):
+        return age_order(OrderFactory.create(purchaser=user, state=state), created_on)
+
+    def make_pending_line():
+        line = make_purchase(
+            user, CourseRunFactory.create(), Decimal(100), state=OrderStatus.PENDING
+        )
+        age_order(line.order)
+        return line
+
+    stale_line = make_pending_line()
+    stale = stale_line.order
+    stale_redemption = DiscountRedemptionFactory.create(redeemed_order=stale)
+    recent = make_order(created_on=now_in_utc() - timedelta(days=59))
+    old_fulfilled = make_order(OrderStatus.FULFILLED)
+    old_canceled = make_order(OrderStatus.CANCELED)
+    with_transaction = make_order()
+    TransactionFactory.create(order=with_transaction, transaction_id="paid")
+    with_stripe_event = make_order()
+    StripeEventLog.objects.create(
+        event_id="evt_test", event_data={}, related_order=with_stripe_event
+    )
+    funding_line = make_pending_line()
+    DiscountRedemptionFactory.create(source_line=funding_line)
+
+    cull_stale_pending_orders()
+
+    assert not Order.objects.filter(pk=stale.pk).exists()
+    assert not Line.objects.filter(pk=stale_line.pk).exists()
+    assert not DiscountRedemption.objects.filter(pk=stale_redemption.pk).exists()
+    for kept in [
+        recent,
+        old_fulfilled,
+        old_canceled,
+        with_transaction,
+        with_stripe_event,
+        funding_line.order,
+    ]:
+        assert Order.objects.filter(pk=kept.pk).exists()
+
+
+@pytest.mark.parametrize(
+    "stripe_status",
+    [
+        STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
+        STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+        STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+        None,
+    ],
+)
+def test_cull_stale_pending_orders_checks_stripe(mocker, settings, user, stripe_status):
+    """
+    Stale Stripe orders should be checked with Stripe first: only cancelled
+    sessions are culled, paid ones are resolved, and the rest are kept. A
+    status of None means the Stripe lookup failed.
+    """
+    settings.PENDING_ORDER_CULL_AGE_DAYS = 60
+    mock_status = mocker.patch(
+        "ecommerce.api.process_stripe_checkout_session_status",
+        return_value={"status": stripe_status, "transaction": {"id": "cs_test"}},
+        side_effect=None if stripe_status else APIConnectionError("Stripe is down"),
+    )
+    mock_fulfill = mocker.patch("ecommerce.models.OrderFlow.fulfill")
+    mocker.patch("ecommerce.api.sync_hubspot_deal")
+
+    order = OrderFactory.create(
+        purchaser=user, gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE
+    )
+    TransactionFactory.create(
+        order=order,
+        transaction_id="cs_test_stale",
+        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+        data={"object": STRIPE_OBJECT_CHECKOUT_SESSION, "id": "cs_test_stale"},
+    )
+    Order.objects.filter(pk=order.pk).update(
+        created_on=now_in_utc() - timedelta(days=61)
+    )
+
+    if stripe_status:
+        cull_stale_pending_orders()
+    else:
+        with pytest.raises(APIConnectionError):
+            cull_stale_pending_orders()
+
+    mock_status.assert_called_once_with("cs_test_stale")
+    assert Order.objects.filter(pk=order.pk).exists() is not (
+        stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED
+    )
+    if stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
+        mock_fulfill.assert_called_once_with(
+            {"id": "cs_test"}, already_enrolled=False, skip_receipt=False
+        )
+    else:
+        mock_fulfill.assert_not_called()
 
 
 def test_log_stripe_event():
