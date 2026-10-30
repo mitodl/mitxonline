@@ -456,14 +456,22 @@ def test_create_basket_with_products(
     products = ProductFactory.create_batch(size=2)
 
     basket = BasketFactory(user=user) if existing_basket else None
+    if bad_product and basket:
+        BasketItemFactory(basket=basket, product=products[0], quantity=2)
+    original_items = list(
+        BasketItem.objects.filter(basket__user=user).values_list(
+            "id", "product_id", "quantity"
+        )
+    )
 
     url = reverse("v0:baskets_api-create_with_products")
     payload = {
         "product_ids": [
-            {"product_id": -3 if bad_product else product.id, "quantity": 1}
-            for product in products
+            {"product_id": product.id, "quantity": 1} for product in products
         ],
     }
+    if bad_product:
+        payload["product_ids"][1]["product_id"] = -3
 
     if add_discount:
         discount = DiscountFactory(discount_type="fixed-price", amount=100)
@@ -477,6 +485,14 @@ def test_create_basket_with_products(
 
     if bad_product:
         assert response.status_code == 404
+        assert (
+            list(
+                BasketItem.objects.filter(basket__user=user).values_list(
+                    "id", "product_id", "quantity"
+                )
+            )
+            == original_items
+        )
         return
 
     assert response.status_code == 200
