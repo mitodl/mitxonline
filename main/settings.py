@@ -513,13 +513,6 @@ KEYCLOAK_ADMIN_CLIENT_NO_VERIFY_SSL = get_bool(
 
 # Serve static files with dj-static
 STATIC_URL = "/static/"
-CLOUDFRONT_DIST = get_string(
-    name="CLOUDFRONT_DIST",
-    default=None,
-    description="The Cloundfront distribution to use for static assets",
-)
-if CLOUDFRONT_DIST:
-    STATIC_URL = urljoin(f"https://{CLOUDFRONT_DIST}.cloudfront.net", STATIC_URL)
 
 STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.FileSystemFinder",
@@ -818,6 +811,14 @@ AWS_SECRET_ACCESS_KEY = get_string(
 AWS_STORAGE_BUCKET_NAME = get_string(
     name="AWS_STORAGE_BUCKET_NAME", default=None, description="S3 Bucket name."
 )
+AWS_S3_CUSTOM_DOMAIN = get_string(
+    name="AWS_S3_CUSTOM_DOMAIN",
+    default=None,
+    description=(
+        "Host (and optional path) that media URLs are built on instead of the bucket's "
+        "S3 hostname, e.g. mitxonline.mit.edu/media to serve them through the CDN."
+    ),
+)
 AWS_QUERYSTRING_AUTH = get_bool(
     name="AWS_QUERYSTRING_AUTH",
     default=False,
@@ -843,8 +844,6 @@ if MITX_ONLINE_USE_S3 and (
         "AWS_STORAGE_BUCKET_NAME"
     )
 if MITX_ONLINE_USE_S3:
-    if CLOUDFRONT_DIST:
-        AWS_S3_CUSTOM_DOMAIN = f"{CLOUDFRONT_DIST}.cloudfront.net"
     # Override default storage backend to use S3 (Django 5.0+)
     STORAGES = global_settings.STORAGES.copy()
     STORAGES["default"]["BACKEND"] = "storages.backends.s3boto3.S3Boto3Storage"
