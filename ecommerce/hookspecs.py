@@ -100,6 +100,11 @@ def checkout_validate_basket(request, basket):
     Returns:
     - dict|None: an error payload (with an "error" key) to stop checkout, or
       None to continue
+
+    Raises:
+    - ExportComplianceDataError: if the user's profile can't be checked for
+      export compliance. generate_checkout_payload turns this into a
+      profile_incomplete payload, or re-raises it if asked to.
     """
 
 
