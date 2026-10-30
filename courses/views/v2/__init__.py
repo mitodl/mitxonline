@@ -30,7 +30,7 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
-from b2b.models import ContractPage
+from b2b.models import ContractPage, ContractProgramItem
 from cms.models import CoursePage
 from courses.api import (
     create_run_enrollments,
@@ -162,16 +162,26 @@ class ProgramFilterSet(django_filters.FilterSet):
         return base_qs
 
     def filter_by_org_id(self, queryset, _, org_id):
-        """Filter according to org_id. If the user is in org_id, return only related programs."""
+        """
+        Filter according to org_id. If the user is in org_id, return only the
+        programs in its contracts, and the programs nested in those.
+        """
         if self.request and user_has_org_access(self.request.user, org_id):
             return queryset.filter(
-                contract_memberships__contract__organization__id=org_id
+                id__in=Program.expand_nested_program_ids(
+                    ContractProgramItem.objects.filter(
+                        contract__organization__id=org_id
+                    ).values_list("program_id", flat=True)
+                )
             )
         else:
             return queryset.filter(b2b_only=False)
 
     def filter_by_contract_id(self, queryset, _, contract_id):
-        """Filter according to contract_id. If the user has access to the contract, return only related programs."""
+        """
+        Filter according to contract_id. If the user has access to the contract,
+        return only its programs, and the programs nested in those.
+        """
         user = self.request.user if self.request else None
         if (
             user
@@ -179,7 +189,13 @@ class ProgramFilterSet(django_filters.FilterSet):
             and contract_id
             and user.b2b_contracts.filter(id=contract_id).exists()
         ):
-            return queryset.filter(contract_memberships__contract__id=contract_id)
+            return queryset.filter(
+                id__in=Program.expand_nested_program_ids(
+                    ContractProgramItem.objects.filter(
+                        contract__id=contract_id
+                    ).values_list("program_id", flat=True)
+                )
+            )
         return queryset.filter(b2b_only=False)
 
 
