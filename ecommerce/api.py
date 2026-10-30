@@ -29,6 +29,7 @@ from b2b.api import (
     get_active_contracts_from_basket_items,
     is_discount_supplied_for_b2b_purchase,
 )
+from compliance.exceptions import ExportComplianceDataError
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -109,6 +110,7 @@ from main import features
 from main.constants import (
     USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
     USER_MSG_TYPE_B2B_INVALID_BASKET,
+    USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 from main.plugin_manager import get_plugin_manager
 from main.utils import parse_supplied_date
@@ -212,7 +214,12 @@ def _run_checkout_preflight(request, basket, *, skip_discount_check=False):
 
 
 def generate_checkout_payload(
-    request, *, skip_discount_check=False, skip_receipt=False, gateway_type=None
+    request,
+    *,
+    skip_discount_check=False,
+    skip_receipt=False,
+    gateway_type=None,
+    raise_compliance_data_errors=False,
 ):
     """
     Generate the checkout payload for the current basket.
@@ -247,9 +254,24 @@ def generate_checkout_payload(
         else:
             gateway_type = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 
-    preflight_error = _run_checkout_preflight(
-        request, basket, skip_discount_check=skip_discount_check
-    )
+    try:
+        preflight_error = _run_checkout_preflight(
+            request, basket, skip_discount_check=skip_discount_check
+        )
+    except ExportComplianceDataError as exc:
+        if raise_compliance_data_errors:
+            raise
+        # The learner can fix this themselves, unlike a compliance denial.
+        log.info(
+            "Checkout blocked on incomplete profile for user=%s: missing %s",
+            request.user.id,
+            exc.missing_fields,
+        )
+        return {
+            "profile_incomplete": True,
+            "error": USER_MSG_TYPE_PROFILE_INCOMPLETE,
+            "missing_fields": exc.profile_fields,
+        }
 
     if preflight_error:
         return preflight_error
