@@ -5,6 +5,7 @@ import json
 import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
 from courses.factories import CourseFactory, CourseRunFactory, ProgramFactory
@@ -16,6 +17,8 @@ from courses.management.commands.courseware_json import (
 from courses.models import Course, CourseRun, Program, ProgramRequirement
 from ecommerce.factories import ProductFactory, ProgramProductFactory
 from ecommerce.models import Product
+from variants.factories import CourseSupportedVariantFactory
+from variants.models import SupportedVariant
 
 pytestmark = pytest.mark.django_db
 
@@ -141,6 +144,8 @@ def test_import_with_org_and_title_suffix(tmp_path, program_tree):
     product = Product.objects.get(courserunproducts=run)
     assert str(product.price) == "100.00"
     assert product.description == run.courseware_id
+    # Checkout reads the price from the product's latest version.
+    assert Version.objects.get_for_object(product).exists()
     assert str(Product.objects.get(programs=imported).price) == "500.00"
 
     # The tree matches the source's, with the remapped IDs.
@@ -203,7 +208,38 @@ def test_import_updates_existing(tmp_path):
 
     run.refresh_from_db()
     assert run.title == "Original"
-    assert str(Product.objects.get(courserunproducts=run).price) == "10.00"
+    product = Product.objects.get(courserunproducts=run)
+    assert str(product.price) == "10.00"
+    assert (
+        Version.objects.get_for_object(product).first().field_dict["price"]
+        == product.price
+    )
+
+
+def test_import_moves_default_variant(tmp_path):
+    """The file's default variant replaces a different existing default."""
+    # CourseFactory makes an "en" default variant.
+    course = CourseFactory.create()
+    CourseSupportedVariantFactory.create(
+        variant_object=course,
+        language="zh",
+        variant_industry="",
+        variant_length="",
+        default_variant=False,
+        b2b_only=False,
+    )
+    path = _write_export(tmp_path, course.readable_id)
+
+    SupportedVariant.objects.filter(language="en").update(default_variant=False)
+    SupportedVariant.objects.filter(language="zh").update(default_variant=True)
+
+    call_command("courseware_json", "import", str(path), "--commit")
+
+    assert list(
+        SupportedVariant.objects.filter(default_variant=True).values_list(
+            "language", flat=True
+        )
+    ) == ["en"]
 
 
 def test_import_dry_run(tmp_path):

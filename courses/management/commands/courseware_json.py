@@ -29,6 +29,7 @@ import re
 import sys
 from decimal import Decimal
 
+import reversion
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand, CommandError
 from django.db import transaction
@@ -461,25 +462,49 @@ class Command(BaseCommand):
         ]
 
     def _import_product(self, obj, product_data):
-        """Create or update the product for obj. A missing product is left alone."""
+        """
+        Create or update the product for obj. A missing product is left alone.
+
+        Checkout reads the price from the product's latest version, so the save
+        has to happen inside a revision.
+        """
         if product_data is None:
             return False
-        _, created, changed = self._upsert(
-            Product,
-            {
-                "content_type": ContentType.objects.get_for_model(obj),
-                "object_id": obj.id,
-            },
-            {
-                "price": Decimal(product_data["price"]),
-                "description": product_data["description"],
-                "is_active": product_data["is_active"],
-            },
-        )
+        with reversion.create_revision():
+            _, created, changed = self._upsert(
+                Product,
+                {
+                    "content_type": ContentType.objects.get_for_model(obj),
+                    "object_id": obj.id,
+                },
+                {
+                    "price": Decimal(product_data["price"]),
+                    "description": product_data["description"],
+                    "is_active": product_data["is_active"],
+                },
+            )
         return created or changed
 
     def _import_variant_options(self, course, variants_data):
+        course_variants = SupportedVariant.objects.filter(
+            content_type=ContentType.objects.get_for_model(Course),
+            object_id=course.id,
+        )
+        # Only one default variant is allowed per course, so clear any default
+        # the file doesn't name before upserting the file's.
         changed = False
+        for variant in variants_data:
+            if variant["default_variant"]:
+                changed = bool(
+                    course_variants.filter(default_variant=True)
+                    .exclude(
+                        language=variant["language"],
+                        variant_industry=variant["variant_industry"],
+                        variant_length=variant["variant_length"],
+                    )
+                    .update(default_variant=False)
+                )
+
         for variant in variants_data:
             _, created, updated = self._upsert(
                 SupportedVariant,
