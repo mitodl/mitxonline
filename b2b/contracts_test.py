@@ -175,6 +175,27 @@ def test_remove_course(has_enrollments):
     assert not contract.get_products().exists()
 
 
+def test_remove_program_removes_nested_program_runs():
+    """Removing a program with its runs also removes the runs of courses in programs nested in it."""
+
+    contract = ContractPageFactory.create()
+    program = ProgramFactory.create()
+    nested_program = ProgramFactory.create()
+    program.add_program_requirement(nested_program)
+    nested_program.add_requirement(_source_run().course)
+    add_courseware_to_contract(contract, program, skip_edx=True)
+    [run] = contract.get_course_runs()
+
+    [(removed_run, unlinked)] = remove_courseware_from_contract(
+        contract, program, remove_program_runs=True
+    )
+
+    assert removed_run == run
+    assert unlinked is True
+    assert not contract.get_course_runs().exists()
+    assert not contract.programs.exists()
+
+
 @pytest.mark.parametrize("other_contract_active", [True, False])
 @pytest.mark.parametrize("has_enrollments", [True, False])
 def test_remove_run_another_contract_holds(other_contract_active, has_enrollments):
@@ -417,6 +438,41 @@ def test_sync_contract_variants_covers_program_courses():
 
     assert sync_contract_variants(contract, skip_edx=True)["runs_created"] == []
     assert contract.get_course_runs().count() == 4
+
+
+def test_sync_contract_variants_covers_nested_program_courses():
+    """
+    The courses of a program nested in a contract program get the new set's
+    runs, including one with no runs yet, and one with no source run is reported.
+    """
+
+    contract = ContractPageFactory.create()
+    program = ProgramFactory.create()
+    nested_program = ProgramFactory.create()
+    program.add_program_requirement(nested_program)
+    course = _bilingual_source_course()
+    nested_program.add_requirement(course)
+    add_courseware_to_contract(contract, program, skip_edx=True)
+    late_course = _bilingual_source_course()
+    nested_program.add_requirement(late_course)
+    sourceless_course = CourseRunFactory.create().course
+    CourseSupportedVariantFactory.create(
+        variant_object=sourceless_course,
+        language="fr",
+        variant_length="",
+        variant_industry="",
+    )
+    nested_program.add_requirement(sourceless_course)
+    french = add_contract_variant_set(contract, language="fr")
+
+    synced = sync_contract_variants(contract, skip_edx=True)
+
+    assert sorted(
+        (run.course_id, run.language) for run in synced["runs_created"]
+    ) == sorted([(course.id, "fr"), (late_course.id, "en"), (late_course.id, "fr")])
+    assert {"course": sourceless_course, "variant": french} in synced[
+        "missing_source_runs"
+    ]
 
 
 def test_sync_contract_variants_skips_removed_course():

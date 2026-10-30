@@ -27,7 +27,7 @@ from b2b.exceptions import ContractVariantError, SourceCourseIncompleteError
 from b2b.models import ContractPage, ContractProgramItem, OrganizationPage
 from b2b.provisioning import _audit
 from b2b.tasks import queue_enrollment_code_check
-from courses.models import Course, CourseRun, CourseRunEnrollment
+from courses.models import Course, CourseRun, CourseRunEnrollment, Program
 from courses.retirement import (
     deactivate_run_products,
     get_run_products,
@@ -302,8 +302,9 @@ def remove_courseware_from_contract(
     """
     Remove a program, course or course run from a contract.
 
-    A program is unlinked from the contract, and its contract runs are removed
-    too only if remove_program_runs is set. A course has no link of its own, so
+    A program is unlinked from the contract, and its contract runs (including
+    those of programs nested in it) are removed too only if remove_program_runs
+    is set. A course has no link of its own, so
     removing it removes its contract runs. Only runs in this contract are
     touched.
 
@@ -314,11 +315,7 @@ def remove_courseware_from_contract(
 
     if courseware.is_program:
         runs = (
-            list(
-                contract_runs.filter(
-                    course__in=[course for course, _ in courseware.courses]
-                )
-            )
+            list(contract_runs.filter(course__in=courseware.courses_qset_recursive))
             if remove_program_runs
             else []
         )
@@ -507,6 +504,14 @@ def _lock_contract_variant_sets(contract: ContractPage) -> None:
     ContractPage.objects.select_for_update(of=("self",)).get(pk=contract.pk)
 
 
+def _contract_program_ids(contract: ContractPage) -> set[int]:
+    """The ids of the contract's programs and of every program nested in them."""
+
+    return Program.expand_nested_program_ids(
+        contract.contract_programs.values_list("program_id", flat=True)
+    )
+
+
 def _variant_fields(variant) -> tuple[str, str, str]:
     return (variant.language, variant.variant_length, variant.variant_industry)
 
@@ -515,7 +520,8 @@ def get_contract_variant_coverage(contract: ContractPage) -> list[dict]:
     """
     Report what each of the contract's variant sets matches.
 
-    The contract's courses are those of its runs and of its programs. For each
+    The contract's courses are those of its runs and of its programs, including
+    programs nested in them. For each
     variant set, a course is listed if one of its own active variant sets has
     the same language, length and industry. That is the condition
     add_courseware_to_contract uses to pick source runs, so a listed course
@@ -534,7 +540,7 @@ def get_contract_variant_coverage(contract: ContractPage) -> list[dict]:
 
     courses = list(
         Course.objects.filter(
-            Q(in_programs__program__contract_memberships__contract=contract)
+            Q(in_programs__program_id__in=_contract_program_ids(contract))
             | Q(courseruns__b2b_contracts=contract)
         )
         .distinct()
@@ -598,8 +604,8 @@ def sync_contract_variants(contract: ContractPage, *, skip_edx: bool = False) ->
     A course and variant that already has a run in the contract is left alone,
     so repeating the call creates nothing more.
 
-    Only courses still in the contract get runs: those of its programs, and
-    those with a live run in it. A removed course whose closed run stays linked
+    Only courses still in the contract get runs: those of its programs
+    (including programs nested in them), and those with a live run in it. A removed course whose closed run stays linked
     for its enrolled learners is skipped, so a new set doesn't bring it back.
 
     Returns a dict with `runs_created` (the new CourseRuns),
@@ -614,7 +620,7 @@ def sync_contract_variants(contract: ContractPage, *, skip_edx: bool = False) ->
     failed = []
     current_course_ids = set(
         Course.objects.filter(
-            Q(in_programs__program__contract_memberships__contract=contract)
+            Q(in_programs__program_id__in=_contract_program_ids(contract))
             | Q(courseruns__b2b_contracts=contract, courseruns__live=True)
         ).values_list("id", flat=True)
     )
