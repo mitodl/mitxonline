@@ -2,8 +2,11 @@
 
 from typing import List  # noqa: UP035
 
+from django.urls import path
 from wagtail import hooks
 from wagtail.admin.api.views import PagesAdminAPIViewSet
+
+from cms.views import credential_metadata
 
 DEFAULT_ORDER = (
     "{prefix}coursepage__course__readable_id".format(prefix=""),
@@ -49,3 +52,15 @@ class OrderedPagesAPIEndpoint(PagesAdminAPIViewSet):
 def configure_admin_api_default_order(router):
     """Swap admin pages API for our own flavor that orders results by title"""
     router.register_endpoint("pages", OrderedPagesAPIEndpoint)
+
+
+@hooks.register("register_admin_urls")
+def register_credential_metadata_url():
+    """Mount the endpoint behind the CertificatePage "Generate with AI" buttons"""
+    return [
+        path(
+            "credential-metadata/<int:parent_page_id>/",
+            credential_metadata,
+            name="cms_credential_metadata",
+        ),
+    ]
