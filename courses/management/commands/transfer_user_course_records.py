@@ -7,7 +7,6 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from courses.constants import PROGRAM_ENROLLMENT_UPGRADE_MODE
 from courses.models import (
     CourseRunCertificate,
     CourseRunEnrollment,
