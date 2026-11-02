@@ -84,7 +84,8 @@ from courses.utils import (
     is_grade_valid,
     is_letter_grade_valid,
 )
-from ecommerce.models import OrderStatus, Product
+from ecommerce.constants import REDEMPTION_TYPE_INTERNAL
+from ecommerce.models import Order, OrderStatus, Product
 from main import features
 from main.utils import get_learn_product_url
 from openedx.api import (
@@ -670,6 +671,84 @@ def downgrade_learner(enrollment):
         mode=EDX_ENROLLMENT_AUDIT_MODE,
         skip_country_block_check=True,
     )
+
+
+def undo_program_course_run_verification(enrollment):
+    """
+    Undo a course run enrollment's verification that came from a program
+    entitlement.
+
+    A learner with a verified program enrollment gets verified in the
+    program's course runs through a zero-value order that redeems the
+    program's internal discount (see
+    ecommerce.api.create_verified_program_course_run_order). This cancels
+    those orders for the enrollment's run, deletes their PaidCourseRun rows,
+    and downgrades the enrollment to audit, locally and in edX.
+
+    An inactive enrollment (e.g. the learner unenrolled, which already removed
+    the edX enrollment and the PaidCourseRun but left the order fulfilled) has
+    its orders canceled and its mode set to audit locally only - it stays
+    inactive and edX isn't called, so the learner isn't re-enrolled.
+
+    Args:
+        enrollment (CourseRunEnrollment): the verified enrollment to undo
+
+    Returns:
+        tuple[list of Order, bool]: the canceled orders, and whether the edX
+        downgrade succeeded (the local downgrade stands either way; always
+        True for an inactive enrollment, since edX isn't called)
+
+    Raises:
+        ValueError: if the enrollment isn't verified, is
+            B2B-provisioned, isn't backed by a program entitlement order, or is
+            also backed by some other fulfilled order (e.g. a real purchase of
+            the run)
+    """
+    user, run = enrollment.user, enrollment.run
+    if enrollment.enrollment_mode != EDX_ENROLLMENT_VERIFIED_MODE:
+        msg = f"{user.email}'s enrollment in {run.courseware_id} is not verified"
+        raise ValueError(msg)
+    if enrollment.b2b_contract_id or run.b2b_contract_id or run.b2b_contracts.exists():
+        msg = f"{run.courseware_id} is B2B-provisioned; its verification comes from the contract"
+        raise ValueError(msg)
+
+    run_orders = Order.objects.filter(
+        purchaser=user,
+        state=OrderStatus.FULFILLED,
+        lines__purchased_content_type=ContentType.objects.get_for_model(CourseRun),
+        lines__purchased_object_id=run.id,
+    ).distinct()
+    entitlement_orders = list(
+        run_orders.filter(
+            total_price_paid=0,
+            discounts__redeemed_discount__redemption_type=REDEMPTION_TYPE_INTERNAL,
+        )
+    )
+    if not entitlement_orders:
+        msg = f"{user.email}'s enrollment in {run.courseware_id} has no program entitlement order"
+        raise ValueError(msg)
+    other_orders = run_orders.exclude(id__in=[order.id for order in entitlement_orders])
+    if other_orders.exists():
+        references = ", ".join(order.reference_number for order in other_orders)
+        msg = (
+            f"{user.email}'s enrollment in {run.courseware_id} is also backed by "
+            f"order(s) {references}, which aren't program entitlements"
+        )
+        raise ValueError(msg)
+
+    with transaction.atomic():
+        for order in entitlement_orders:
+            order.get_object_flow().cancel()
+        PaidCourseRun.objects.filter(
+            user=user, course_run=run, order__in=entitlement_orders
+        ).delete()
+        if enrollment.active:
+            _, edx_success = downgrade_learner(enrollment)
+        else:
+            enrollment.update_mode_and_save(EDX_ENROLLMENT_AUDIT_MODE, no_user=True)
+            edx_success = True
+
+    return entitlement_orders, edx_success
 
 
 def downgrade_program_enrollment_and_verified_runs(user, program):
