@@ -16,7 +16,6 @@ from b2b.constants import (
     CONTRACT_MEMBERSHIP_TYPE_CHOICES,
 )
 from b2b.contracts import create_contract
-from b2b.exceptions import SourceCourseIncompleteError
 from b2b.management.utils import get_contract_by_id_or_slug
 from b2b.models import (
     ContractPage,
@@ -844,30 +843,13 @@ class Command(BaseCommand):
 
         for program, sort_order in programs_with_order:
             self.stdout.write(f"  Program: {program.readable_id}")
-            try:
-                created, no_source = contract.add_program_courses(
-                    program,
-                    order=sort_order,
-                    skip_edx=True,
-                    no_reruns=True,
-                    filter_variants=filter_variants,
-                )
-            except SourceCourseIncompleteError as exc:
-                self.stdout.write(
-                    self.style.WARNING(f"    Skipped (no source run): {exc}")
-                )
-                # Still attach the program so the contract structure is complete.
-                exists = ContractProgramItem.objects.filter(
-                    contract=contract, program=program
-                ).exists()
-                if not exists:
-                    ContractProgramItem(
-                        contract=contract,
-                        program=program,
-                        sort_order=sort_order,
-                    ).save(skip_run_creation=True)
-                continue
-
+            created, no_source = contract.add_program_courses(
+                program,
+                order=sort_order,
+                skip_edx=True,
+                no_reruns=True,
+                filter_variants=filter_variants,
+            )
             total_created += created
             total_no_source += no_source
             if no_source:
