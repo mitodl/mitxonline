@@ -295,7 +295,6 @@ def test_course_page_detail_exposes_hubspot_form_id(user_drf_client):
     assert "show_stay_updated" not in body
 
 
-@pytest.mark.zeal_allow("cms.CertificatePage", "get()")
 def test_program_page_detail_exposes_hubspot_form_id(user_drf_client):
     """ProgramPage detail returns hubspot_form_id and no longer returns show_stay_updated."""
     page = ProgramPageFactory.create(hubspot_form_id="program-form-456")
@@ -338,7 +337,6 @@ def test_course_page_detail_exposes_faqs_in_order(user_drf_client):
     assert all(isinstance(faq["id"], int) for faq in faqs)
 
 
-@pytest.mark.zeal_allow("cms.CertificatePage", "get()")
 def test_program_page_detail_exposes_faqs(user_drf_client):
     """ProgramPage detail returns authored FAQs (question + answer)."""
     page = ProgramPageFactory.create()
@@ -420,7 +418,6 @@ def test_course_page_detail_exposes_testimonials_in_order(user_drf_client):
     assert all(isinstance(t["id"], int) for t in testimonials)
 
 
-@pytest.mark.zeal_allow("cms.CertificatePage", "get()")
 def test_program_page_detail_exposes_testimonials(user_drf_client):
     """ProgramPage detail returns authored testimonials."""
     page = ProgramPageFactory.create()
