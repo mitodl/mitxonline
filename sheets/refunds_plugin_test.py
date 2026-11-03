@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 from mitol.google_sheets.utils import ResultType
 
-from courses.factories import CourseRunFactory, ProgramFactory
+from courses.factories import CourseRunFactory
 from ecommerce.factories import make_purchase
 from ecommerce.models import OrderStatus
 from sheets.refunds_plugin import RefundPlugin
@@ -21,7 +21,7 @@ def mock_refund_order(mocker):
     return mocker.patch("sheets.refunds_plugin.refund_order", return_value=(True, ""))
 
 
-def _row(order_ref_num, learner_email, product_id):
+def _row(order_ref_num, learner_email, product_id=""):
     """The refund sheet row fields the plugin reads"""
     return SimpleNamespace(
         order_ref_num=order_ref_num,
@@ -34,27 +34,21 @@ def _process(row):
     return RefundPlugin().refunds_process_request(refund_request_row=row)
 
 
-@pytest.mark.parametrize("product_id_kind", ["product_id", "readable_id"])
-@pytest.mark.parametrize("is_program", [False, True])
-def test_refund_row_matching_order_is_refunded(
-    mock_refund_order, product_id_kind, is_program
-):
+def test_refund_row_matching_learner_is_refunded(mock_refund_order):
     """
-    A row whose learner and product match its order is refunded, with the
-    product given as either the product id or the run/program readable id.
-    The email match ignores case.
+    A row whose learner placed its order is refunded. The email match ignores
+    case, and the row's product isn't checked.
     """
     user = UserFactory.create(email="Learner@Example.com")
-    purchasable = ProgramFactory.create() if is_program else CourseRunFactory.create()
-    line = make_purchase(user, purchasable, Decimal("100.00"))
-    order = line.order
-    product_id = (
-        line.product_version.object_id
-        if product_id_kind == "product_id"
-        else (purchasable.readable_id if is_program else purchasable.courseware_id)
-    )
+    order = make_purchase(user, CourseRunFactory.create(), Decimal("100.00")).order
 
-    result = _process(_row(order.reference_number, "learner@example.com", product_id))
+    result = _process(
+        _row(
+            order.reference_number,
+            " learner@example.com ",
+            product_id=CourseRunFactory.create().courseware_id,
+        )
+    )
 
     assert result.result_type == ResultType.PROCESSED
     mock_refund_order.assert_called_once_with(
@@ -69,40 +63,30 @@ def test_refund_row_matching_order_is_refunded(
         ("unfulfilled_order", "No fulfilled order with reference number"),
         ("other_learner", "does not match the purchaser"),
         ("blank_learner", "does not match the purchaser"),
-        ("other_product", "is not in order"),
-        ("blank_product", "is not in order"),
     ],
 )
 def test_refund_row_mismatch_fails_without_refunding(
     mock_refund_order, mismatch, expected_message
 ):
-    """Any mismatch between the row and its order fails the row and refunds nothing"""
+    """A row that doesn't match its order fails and refunds nothing"""
     user = UserFactory.create()
-    run = CourseRunFactory.create()
-    line = make_purchase(
+    order = make_purchase(
         user,
-        run,
+        CourseRunFactory.create(),
         Decimal("100.00"),
         state=(
             OrderStatus.REFUNDED
             if mismatch == "unfulfilled_order"
             else OrderStatus.FULFILLED
         ),
-    )
-    other_run = CourseRunFactory.create()
+    ).order
 
     row = _row(
-        "not-a-real-order"
-        if mismatch == "unknown_order"
-        else line.order.reference_number,
+        "not-a-real-order" if mismatch == "unknown_order" else order.reference_number,
         {
             "other_learner": UserFactory.create().email,
             "blank_learner": "",
         }.get(mismatch, user.email),
-        {
-            "other_product": other_run.courseware_id,
-            "blank_product": "",
-        }.get(mismatch, run.courseware_id),
     )
 
     result = _process(row)
@@ -115,11 +99,10 @@ def test_refund_row_mismatch_fails_without_refunding(
 def test_refund_row_failed_refund_fails_the_row(mock_refund_order):
     """A matching row whose refund fails is reported as failed with the reason"""
     user = UserFactory.create()
-    run = CourseRunFactory.create()
-    line = make_purchase(user, run, Decimal("100.00"))
+    order = make_purchase(user, CourseRunFactory.create(), Decimal("100.00")).order
     mock_refund_order.return_value = (False, "gateway said no")
 
-    result = _process(_row(line.order.reference_number, user.email, run.courseware_id))
+    result = _process(_row(order.reference_number, user.email))
 
     assert result.result_type == ResultType.FAILED
     assert result.message == "gateway said no"
