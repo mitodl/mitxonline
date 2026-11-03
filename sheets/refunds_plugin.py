@@ -3,7 +3,7 @@ from mitol.google_sheets_refunds.hooks import RefundResult, hookimpl
 from mitol.google_sheets_refunds.utils import RefundRequestRow
 
 from ecommerce.api import refund_order
-from ecommerce.models import FulfilledOrder, OrderStatus
+from ecommerce.models import Order, OrderStatus
 
 
 def _refund_row_mismatch(refund_request_row):
@@ -12,9 +12,8 @@ def _refund_row_mismatch(refund_request_row):
     Return a reason to fail the row, or None if it matches.
     """
     reference_number = refund_request_row.order_ref_num
-    # FulfilledOrder is a plain proxy - its manager doesn't filter on state.
     order = (
-        FulfilledOrder.objects.filter(
+        Order.objects.filter(
             reference_number=reference_number, state=OrderStatus.FULFILLED
         )
         .select_related("purchaser")
