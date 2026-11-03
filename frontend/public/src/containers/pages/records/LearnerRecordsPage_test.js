@@ -39,7 +39,6 @@ describe("LearnerRecordsPage", () => {
 
   afterEach(() => {
     helper.cleanup()
-    delete global.SETTINGS
   })
 
   it("keeps the records page title banner", async () => {
