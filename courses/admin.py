@@ -589,8 +589,8 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         # matching ProgramContractPageInline above.
         from b2b.models import ContractPage  # noqa: PLC0415
 
-        # ContractPage.objects, not the default (active-only) manager, so runs
-        # parked in inactive contracts still show their contract.
+        # Prefetch through ContractPage.objects, since the b2b_contracts related
+        # manager hides inactive contracts.
         return self.model.all_objects.prefetch_related(
             Prefetch(
                 "b2b_contracts",
