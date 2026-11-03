@@ -246,9 +246,9 @@ class Command(BaseCommand):
         )
 
     def _handle_contract(self, run, *, keep_contract):
-        """Move the run to the holding contract, if it's a contract run."""
+        """Move the run to the holding contract, if it's a B2B-only run."""
 
-        if keep_contract or not run.has_b2b_contracts:
+        if keep_contract or not run.b2b_only:
             return
 
         previous = self._describe_contracts(run)
@@ -337,11 +337,7 @@ class Command(BaseCommand):
         # `b2b_codes validate` sweep would treat it as a free SSO contract and
         # delete its discounts. Deactivating the products keeps the contract
         # inert, because ContractPage.get_products() filters on is_active.
-        if (
-            options["keep_products"]
-            and run.has_b2b_contracts
-            and not options["keep_contract"]
-        ):
+        if options["keep_products"] and run.b2b_only and not options["keep_contract"]:
             msg = (
                 "--keep-products cannot be combined with moving the run to the "
                 "retirement holding contract. Leaving an active product on a run "

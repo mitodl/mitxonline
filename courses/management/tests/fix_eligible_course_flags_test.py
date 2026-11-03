@@ -67,6 +67,7 @@ def test_b2b_course(page_published, include_regular_run):
     contract = ContractPageFactory.create()
 
     run = CourseRunFactory.create(
+        b2b_only=True,
         b2b_contracts=[contract],
     )
     run.course.page.live = page_published
@@ -89,6 +90,17 @@ def test_b2b_course(page_published, include_regular_run):
     )
     # this should _always_ be true if there's a B2B run
     assert run.course.ingest_content_files_for_ai
+
+
+def test_public_run_in_a_contract_is_regular():
+    """A run that's in a contract but not B2B-only puts its course in the catalog."""
+
+    run = CourseRunFactory.create(b2b_contracts=[ContractPageFactory.create()])
+
+    fix_eligible_course_flags.Command().handle(dry_run=False)
+
+    run.refresh_from_db()
+    assert run.course.include_in_learn_catalog
 
 
 @pytest.mark.parametrize(

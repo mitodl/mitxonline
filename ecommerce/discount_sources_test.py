@@ -260,12 +260,13 @@ def test_grandchild_courses_do_not_qualify(user, program, program_product):
     assert resolve_program_child_purchase(user, program_product) is None
 
 
-def test_b2b_run_sources_do_not_qualify(user, program, program_product):
+def test_paid_contract_run_sources_qualify(user, program, program_product):
+    """A paid purchase of a run that's also in a contract still funds the offer."""
     run = CourseRunFactory.create(b2b_contracts=[ContractPageFactory.create()])
     program.add_requirement(run.course)
-    make_purchase(user, run, Decimal("100.00"))
+    line = make_purchase(user, run, Decimal("100.00"))
 
-    assert resolve_program_child_purchase(user, program_product) is None
+    assert resolve_program_child_purchase(user, program_product).source_line == line
 
 
 @pytest.mark.parametrize("field", ["b2b_only", "contract"])

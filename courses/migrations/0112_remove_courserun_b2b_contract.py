@@ -33,7 +33,7 @@ def restore_b2b_contract(apps, schema_editor):
 
     for run_id, contract_id in (
         Through.objects.order_by("courserun_id", "contractpage_id")
-        .filter(b2b_only=True)
+        .filter(courserun__b2b_only=True)
         .distinct("courserun_id")
         .values_list("courserun_id", "contractpage_id")
     ):
@@ -50,7 +50,7 @@ class Migration(migrations.Migration):
         migrations.RunPython(backfill_b2b_contracts, restore_b2b_contract),
         migrations.SeparateDatabaseAndState(
             # The previous release still selects b2b_contract_id while pods roll,
-            # so the column stays; a future enrollment will drop it once no
+            # so the column stays; a future migration will drop it once no
             # deployed code reads it.
             database_operations=[
                 # New code never clears this column, so a stale value would make

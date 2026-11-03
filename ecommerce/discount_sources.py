@@ -145,11 +145,12 @@ def resolve_program_child_purchase(
         required_program__isnull=False,
     ).values_list("required_program_id", flat=True)
 
-    # B2B purchases never fund the offer. A run is B2B through its contract;
-    # a program through either marker, the same test _program_for_product
-    # applies to the target.
+    # B2B programs never fund the offer: a program is B2B through either
+    # marker, the same test _program_for_product applies to the target. Any
+    # child run can, contract runs included: only what was paid counts, and
+    # $0 lines drop out below.
     source_run_ids = CourseRun.objects.filter(
-        course_id__in=child_course_ids, b2b_contracts__isnull=True
+        course_id__in=child_course_ids,
     ).values_list("id", flat=True)
     source_program_ids = Program.objects.filter(
         id__in=child_program_ids, b2b_only=False, contract_memberships__isnull=True

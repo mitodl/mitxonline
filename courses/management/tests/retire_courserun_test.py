@@ -374,7 +374,9 @@ class TestContractHandling:
         """A retired B2B run is parked, never orphaned."""
 
         contract = ContractPageFactory.create()
-        course_run = CourseRunFactory.create(live=True, b2b_contracts=[contract])
+        course_run = CourseRunFactory.create(
+            live=True, b2b_only=True, b2b_contracts=[contract]
+        )
 
         _run_command(course_run, tmp_path, commit=True)
 
@@ -389,8 +391,12 @@ class TestContractHandling:
         """The holding contract is created once and reused."""
 
         contract = ContractPageFactory.create()
-        first = CourseRunFactory.create(live=True, b2b_contracts=[contract])
-        second = CourseRunFactory.create(live=True, b2b_contracts=[contract])
+        first = CourseRunFactory.create(
+            live=True, b2b_only=True, b2b_contracts=[contract]
+        )
+        second = CourseRunFactory.create(
+            live=True, b2b_only=True, b2b_contracts=[contract]
+        )
 
         _run_command(first, tmp_path, commit=True)
         _run_command(second, tmp_path, commit=True)
@@ -403,12 +409,26 @@ class TestContractHandling:
         """Keep contract."""
 
         contract = ContractPageFactory.create()
-        course_run = CourseRunFactory.create(live=True, b2b_contracts=[contract])
+        course_run = CourseRunFactory.create(
+            live=True, b2b_only=True, b2b_contracts=[contract]
+        )
 
         _run_command(course_run, tmp_path, commit=True, keep_contract=True)
 
         course_run.refresh_from_db()
         assert course_run.contract_group_ids == {contract.id}
+
+    def test_public_run_in_a_contract_stays_put(self, tmp_path, mock_edx):  # noqa: ARG002
+        """A run that's in a contract but not B2B-only isn't parked."""
+
+        contract = ContractPageFactory.create()
+        course_run = CourseRunFactory.create(live=True, b2b_contracts=[contract])
+
+        _run_command(course_run, tmp_path, commit=True)
+
+        course_run.refresh_from_db()
+        assert course_run.contract_group_ids == {contract.id}
+        assert course_run.live is False
 
     def test_non_b2b_run_needs_no_contract(self, run, tmp_path, mock_edx):  # noqa: ARG002
         """A non-B2B run retires fine with no contract step."""
@@ -423,7 +443,9 @@ class TestContractHandling:
         """--keep-products can't be combined with the contract move."""
 
         contract = ContractPageFactory.create()
-        course_run = CourseRunFactory.create(live=True, b2b_contracts=[contract])
+        course_run = CourseRunFactory.create(
+            live=True, b2b_only=True, b2b_contracts=[contract]
+        )
         ProductFactory.create(purchasable_object=course_run, is_active=True)
 
         with pytest.raises(CommandError, match="--keep-products cannot be combined"):
@@ -437,7 +459,9 @@ class TestContractHandling:
         """--keep-contract makes --keep-products safe again."""
 
         contract = ContractPageFactory.create()
-        course_run = CourseRunFactory.create(live=True, b2b_contracts=[contract])
+        course_run = CourseRunFactory.create(
+            live=True, b2b_only=True, b2b_contracts=[contract]
+        )
         ProductFactory.create(purchasable_object=course_run, is_active=True)
 
         _run_command(
