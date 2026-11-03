@@ -1,0 +1,43 @@
+name: JS flake repro
+on:
+  push:
+    branches: ["cc/js-flake-repro-*"]
+permissions:
+  contents: read
+jobs:
+  repro:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup NodeJS
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "20.18"
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      # Same mocha command the Tests step runs; a cold babel cache on every run
+      # matches CI, where the Tests step is the suite's first run.
+      - name: Run the suite 50 times
+        working-directory: frontend/public
+        env:
+          NODE_ENV: test
+          BABEL_DISABLE_CACHE: "1"
+        run: |
+          failed=0; settings=0
+          for i in $(seq 1 50); do
+            if ! npx mocha "src/**/*/*_test.js" --exit > run.log 2>&1; then
+              failed=$((failed + 1))
+              grep -q "SETTINGS is not defined" run.log && settings=$((settings + 1))
+              echo "run $i failed:"; grep -m2 -E "hook in|Error:" run.log
+            fi
+          done
+          echo "shard ${{ matrix.shard }}: 50 runs, $failed failed, $settings with SETTINGS is not defined" | tee -a "$GITHUB_STEP_SUMMARY"
