@@ -42,11 +42,11 @@ from courses.factories import (
 )
 from courses.models import PaidCourseRun
 from ecommerce.api import (
-    auto_refund_request,
     ANONYMOUS_BASKET_SESSION_KEY,
     _retrieve_pending_cybersource_orders,
     apply_discount_to_basket,
     apply_user_discounts,
+    auto_refund_request,
     check_and_process_pending_orders_for_resolution,
     check_basket_discounts_for_validity,
     check_for_double_spent_sources,

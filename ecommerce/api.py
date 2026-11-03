@@ -983,7 +983,7 @@ def auto_refund_request(refund_request_id: int) -> tuple[bool, str]:
 
             refund_request.status = RefundRequestStatus.APPROVED
             refund_request.save(update_fields=["status", "updated_on"])
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.exception(
             "Automatic refund failed for refund request %s; leaving it pending",
             refund_request_id,
