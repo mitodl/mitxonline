@@ -26,6 +26,7 @@ from b2b.api import (
     _get_source_runs_for_course,
     _handle_extra_enrollment_codes,
     _validate_b2b_enrollment_prerequisites,
+    add_user_org_membership,
     apply_contract_discounts_to_basket,
     create_b2b_enrollment,
     create_contract_run,
@@ -56,6 +57,7 @@ from b2b.constants import (
 )
 from b2b.exceptions import SourceCourseIncompleteError
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
+from b2b.keycloak_admin_api import MEMBERSHIP_CREDENTIALS
 from b2b.models import (
     ContractPage,
     ContractProgramItem,
@@ -3922,3 +3924,22 @@ def test_move_run_to_retirement_contract_removes_old_contract(old_contract_state
     assert set(memberships.values_list("contractpage_id", flat=True)) == {
         retirement_contract.pk
     }
+
+
+def test_add_user_org_membership_uses_the_membership_client(mocker, user):
+    """Enrollment adds the member as the membership service account."""
+
+    org = OrganizationPageFactory.create()
+    bootstrap = mocker.patch("b2b.api.bootstrap_client")
+    get_model = mocker.patch("b2b.api.get_keycloak_model")
+    org_model = get_model.return_value
+
+    assert add_user_org_membership(org, user) == org_model.associate.return_value
+
+    bootstrap.assert_called_once_with(
+        verify_realm=True, credentials=MEMBERSHIP_CREDENTIALS
+    )
+    assert get_model.call_args.kwargs["client"] is bootstrap.return_value
+    org_model.associate.assert_called_once_with(
+        "members", org.sso_organization_id, user.global_id
+    )
