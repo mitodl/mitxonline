@@ -150,6 +150,7 @@ from ecommerce.models import (
     Transaction,
     UserDiscount,
 )
+from ecommerce.tasks import process_refund_request
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import (
     FlexiblePriceFactory,
@@ -733,8 +734,6 @@ def test_auto_refund_request_ineligible_orders_stay_manual(
 @pytest.mark.parametrize("auto_refunded", [True, False])
 def test_process_refund_request_task_notifies_support(mocker, auto_refunded):
     """Support's email says whether the request was auto-refunded."""
-    from ecommerce.tasks import process_refund_request
-
     request = _refund_request(OrderFactory.create(state=OrderStatus.FULFILLED))
     mocker.patch(
         "ecommerce.api.auto_refund_request", return_value=(auto_refunded, "boom")

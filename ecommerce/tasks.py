@@ -83,7 +83,7 @@ def perform_cull_stale_pending_orders():
 
 @app.task
 def send_refund_request_notification_email(
-    refund_request_id, auto_refunded=False, auto_refund_error=""
+    refund_request_id, *, auto_refunded=False, auto_refund_error=""
 ):
     from ecommerce.mail_api import send_refund_request_notification
     from ecommerce.models import RefundRequest
