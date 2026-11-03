@@ -370,16 +370,33 @@ class TestCommit:
 class TestContractHandling:
     """Retired B2B runs get parked, not orphaned."""
 
-    def test_moved_to_holding_contract(self, tmp_path, mock_edx):  # noqa: ARG002
+    @pytest.mark.parametrize(
+        "run_b2b_only",
+        [
+            True,
+            False,
+        ],
+    )
+    def test_moved_to_holding_contract(self, tmp_path, mock_edx, run_b2b_only):  # noqa: ARG002
         """A retired B2B run is parked, never orphaned."""
 
         contract = ContractPageFactory.create()
-        course_run = CourseRunFactory.create(live=True, b2b_contracts=[contract])
+        course_run = CourseRunFactory.create(
+            live=True, b2b_only=run_b2b_only, b2b_contracts=[contract]
+        )
 
         _run_command(course_run, tmp_path, commit=True)
 
         course_run.refresh_from_db()
         holding = get_or_create_retirement_contract()
+
+        if not run_b2b_only:
+            # _handle_contract will only move the run if it's explicitly B2B.
+            # Just having B2B contracts doesn't count.
+            assert holding.id not in course_run.contract_group_ids
+            assert contract.id in course_run.contract_group_ids
+            return
+
         # Moved out of the original contract, but never left without one.
         assert course_run.contract_group_ids == {holding.id}
         assert holding.active is False
@@ -389,15 +406,21 @@ class TestContractHandling:
         """The holding contract is created once and reused."""
 
         contract = ContractPageFactory.create()
-        first = CourseRunFactory.create(live=True, b2b_contracts=[contract])
-        second = CourseRunFactory.create(live=True, b2b_contracts=[contract])
+        first = CourseRunFactory.create(
+            live=True, b2b_only=True, b2b_contracts=[contract]
+        )
+        second = CourseRunFactory.create(
+            live=True, b2b_only=True, b2b_contracts=[contract]
+        )
 
         _run_command(first, tmp_path, commit=True)
         _run_command(second, tmp_path, commit=True)
 
         first.refresh_from_db()
         second.refresh_from_db()
+        holding = get_or_create_retirement_contract()
         assert first.contract_group_ids == second.contract_group_ids
+        assert holding.id in first.contract_group_ids
 
     def test_keep_contract(self, tmp_path, mock_edx):  # noqa: ARG002
         """Keep contract."""
