@@ -211,49 +211,6 @@ def create_local_enrollment(
     return enrollment, created
 
 
-def _get_contract_for_user_run(user, run):
-    """
-    Figure out which B2B contract a user's enrollment in the run applies to.
-
-    A run can belong to several contracts. If the user is already in exactly
-    one of them, that's the one. If the user isn't in any of them and the run
-    only has one contract, use that. Otherwise, the contract is ambiguous (or
-    there isn't one) and this returns None.
-
-    Args:
-        user (User): the user enrolling
-        run (CourseRun): the run being enrolled in
-
-    Returns:
-        ContractPage | None: the contract that applies, if one can be determined
-    """
-    run_contracts = list(run.b2b_contracts.select_related("organization").all())
-    if not run_contracts:
-        return None
-
-    user_contract_ids = set(
-        user.b2b_contracts.filter(
-            pk__in=[contract.pk for contract in run_contracts]
-        ).values_list("pk", flat=True)
-    )
-    matching = [c for c in run_contracts if c.pk in user_contract_ids]
-
-    if len(matching) == 1:
-        return matching[0]
-
-    if not matching and len(run_contracts) == 1:
-        return run_contracts[0]
-
-    if not matching:
-        log.warning(
-            "Can't determine B2B contract for user %s in run %s: run has multiple contracts and the user is in none of them",
-            user,
-            run,
-        )
-
-    return None
-
-
 def create_run_enrollments(  # noqa: C901, PLR0913
     user,
     runs,

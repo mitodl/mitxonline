@@ -211,7 +211,9 @@ def _unlink_shared_run(contract: ContractPage, run: CourseRun) -> bool | None:
     if CourseRunEnrollment.objects.filter(run=run, b2b_contract=contract).exists():
         return False
 
-    run.b2b_contracts.remove(contract)
+    CourseRun.b2b_contracts.through.objects.filter(
+        courserun_id=run.pk, contractpage_id=contract.pk
+    ).delete()
 
     return True
 
