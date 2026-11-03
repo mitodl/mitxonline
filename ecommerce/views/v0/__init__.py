@@ -92,7 +92,7 @@ from ecommerce.serializers.v0 import (
     V0DiscountSerializer,
     requests,
 )
-from ecommerce.tasks import send_refund_request_notification_email
+from ecommerce.tasks import process_refund_request
 from ecommerce.views.utils import AttachDiscountProductMixin
 from flexiblepricing.models import FlexiblePriceTier
 from flexiblepricing.serializers import FlexiblePriceTierSerializer
@@ -1172,4 +1172,4 @@ class RefundRequestView(CreateAPIView):
 
     def perform_create(self, serializer):
         instance = serializer.save()
-        send_refund_request_notification_email.delay(instance.id)
+        process_refund_request.delay(instance.id)

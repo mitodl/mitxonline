@@ -82,9 +82,30 @@ def perform_cull_stale_pending_orders():
 
 
 @app.task
-def send_refund_request_notification_email(refund_request_id):
+def send_refund_request_notification_email(
+    refund_request_id, auto_refunded=False, auto_refund_error=""
+):
     from ecommerce.mail_api import send_refund_request_notification
     from ecommerce.models import RefundRequest
 
     refund_request = RefundRequest.objects.get(pk=refund_request_id)
-    send_refund_request_notification(refund_request)
+    send_refund_request_notification(
+        refund_request,
+        auto_refunded=auto_refunded,
+        auto_refund_error=auto_refund_error,
+    )
+
+
+@app.task(acks_late=True)
+def process_refund_request(refund_request_id):
+    """
+    Refund a pending refund request without staff action when its order
+    qualifies (`Order.is_auto_refund_eligible`), then tell support what
+    happened. Anything else, or a failed refund, stays pending for review.
+    """
+    from ecommerce.api import auto_refund_request
+
+    auto_refunded, error = auto_refund_request(refund_request_id)
+    send_refund_request_notification_email.delay(
+        refund_request_id, auto_refunded=auto_refunded, auto_refund_error=error
+    )
