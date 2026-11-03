@@ -1,4 +1,5 @@
 import pytest
+from rest_framework.exceptions import ValidationError
 
 from b2b.factories import (
     ContractPageFactory,
@@ -6,11 +7,14 @@ from b2b.factories import (
 )
 from courses.factories import (
     CourseRunEnrollmentFactory,
+    CourseRunFactory,
 )
+from courses.models import CourseRunEnrollment
 from courses.serializers.v3.courses import (
     CourseRunEnrollmentSerializer,
 )
 from ecommerce.factories import ProductFactory
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -117,3 +121,27 @@ class TestCourseRunEnrollmentSerializerV3:
         assert serialized_data["run"]["upgrade_product_id"] is None
         assert serialized_data["run"]["upgrade_product_price"] is None
         assert serialized_data["run"]["upgrade_product_is_active"] is None
+
+
+@pytest.mark.parametrize("b2b_only", [True, False])
+def test_create_enrollment_b2b_run(mocker, b2b_only):
+    """
+    B2B-only course runs are rejected, but a run that is attached to a contract
+    and not B2B-only is still publicly enrollable.
+    """
+    mock_edx_client = mocker.patch("openedx.api.get_edx_api_service_client")
+    mock_edx_client.return_value.enrollments.create_student_enrollment.return_value.is_active = True
+    user = UserFactory.create()
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(b2b_only=b2b_only, b2b_contracts=[contract])
+    serializer = CourseRunEnrollmentSerializer(context={"user": user})
+
+    if b2b_only:
+        with pytest.raises(ValidationError):
+            serializer.create({"run_id": run.id})
+        assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+    else:
+        enrollment = serializer.create({"run_id": run.id})
+        assert enrollment.user == user
+        assert enrollment.run == run
+        assert enrollment.active is True
