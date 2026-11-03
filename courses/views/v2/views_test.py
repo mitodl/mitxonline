@@ -1221,8 +1221,13 @@ def test_user_enrollments_b2b_organization_filter(user_drf_client, user):
 
 
 @pytest.mark.parametrize("b2b_only", [True, False])
-def test_user_enrollments_create_b2b_run_invalid_v2(user_drf_client, user, b2b_only):
-    """v2 enrollments API should reject creating enrollments for B2B course runs."""
+def test_user_enrollments_create_b2b_run_v2(mocker, user_drf_client, user, b2b_only):
+    """
+    v2 enrollments API should reject B2B-only course runs, but a run that is
+    attached to a contract and not B2B-only is still publicly enrollable.
+    """
+    mock_edx_client = mocker.patch("openedx.api.get_edx_api_service_client")
+    mock_edx_client.return_value.enrollments.create_student_enrollment.return_value.is_active = True
     contract = ContractPageFactory.create()
     course = CourseFactory.create()
     run = CourseRunFactory.create(
@@ -1233,8 +1238,15 @@ def test_user_enrollments_create_b2b_run_invalid_v2(user_drf_client, user, b2b_o
         reverse("v2:user-enrollments-api-list"), data={"run_id": run.id}
     )
 
-    assert resp.status_code == status.HTTP_400_BAD_REQUEST
-    assert resp.json() == {"errors": {"run_id": f"Invalid course run id: {run.id}"}}
+    if b2b_only:
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.json() == {"errors": {"run_id": f"Invalid course run id: {run.id}"}}
+        assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+    else:
+        assert resp.status_code == status.HTTP_201_CREATED
+        assert CourseRunEnrollment.objects.filter(
+            user=user, run=run, active=True
+        ).exists()
 
 
 def test_user_enrollments_create_closed_run_invalid_v2(user_drf_client, user):
