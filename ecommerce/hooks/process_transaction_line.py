@@ -4,6 +4,7 @@ import logging
 
 import pluggy
 
+from courses.constants import PROGRAM_ENROLLMENT_UPGRADE_MODE
 from courses.models import (
     CourseRun,
     CourseRunEnrollment,
@@ -117,7 +118,7 @@ def _create_program_enrollment(line) -> str | None:
     create_program_enrollments(
         line.order.purchaser,
         [purchased_program],
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
     )
 
     PaidProgram.objects.create(

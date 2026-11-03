@@ -40,7 +40,10 @@ from mitol.hubspot_api.exceptions import TooManyRequestsException
 from mitol.hubspot_api.models import HubspotObject
 from reversion.models import Version
 
-from courses.constants import ALL_ENROLL_CHANGE_STATUSES
+from courses.constants import (
+    ALL_ENROLL_CHANGE_STATUSES,
+    PROGRAM_ENROLLMENT_UPGRADE_MODE,
+)
 from ecommerce import models
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
@@ -753,6 +756,12 @@ CUSTOM_ECOMMERCE_PROPERTIES = {
                         "value": EDX_ENROLLMENT_VERIFIED_MODE,
                         "label": EDX_ENROLLMENT_VERIFIED_MODE,
                         "displayOrder": 1,
+                        "hidden": False,
+                    },
+                    {
+                        "value": PROGRAM_ENROLLMENT_UPGRADE_MODE,
+                        "label": PROGRAM_ENROLLMENT_UPGRADE_MODE,
+                        "displayOrder": 2,
                         "hidden": False,
                     },
                 ],

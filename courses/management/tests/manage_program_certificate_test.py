@@ -4,6 +4,7 @@ import factory
 import pytest
 from django.core.management.base import CommandError
 
+from courses.constants import PROGRAM_ENROLLMENT_UPGRADE_MODE
 from courses.factories import (
     CourseFactory,
     CourseRunCertificateFactory,
@@ -150,7 +151,7 @@ def test_program_certificate_management_create(
     ProgramEnrollment.objects.create(
         user=user,
         program=program_with_empty_requirements,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
     )
 
     mocker.patch(
