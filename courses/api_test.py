@@ -5082,6 +5082,7 @@ def test_course_run_certificate_verifiable_credentials(
     mock_certificate_page = Mock()
     mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
     mock_certificate_page.should_provision_verifiable_credential = True
+    mock_certificate_page.verifiable_credential_description = None
     mocker.patch("courses.api.get_certificate_page", return_value=mock_certificate_page)
     passed_grade_with_enrollment.course_run.course.page.what_you_learn = (
         "Some learning content"
@@ -5120,6 +5121,7 @@ def test_program_certificate_verifiable_credentials(
     mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
     mock_certificate_page.should_provision_verifiable_credential = True
     mock_certificate_page.product_name = "Test Program Certificate"
+    mock_certificate_page.verifiable_credential_description = None
     mocker.patch("courses.api.get_certificate_page", return_value=mock_certificate_page)
     courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
@@ -5222,6 +5224,7 @@ def test_course_run_certificate_verifiable_credentials_signing_payload(
 
     mock_certificate_page = Mock()
     mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
+    mock_certificate_page.verifiable_credential_description = None
     payload = get_verifiable_credentials_payload(course_run_cert, mock_certificate_page)
 
     # Assert the expected payload structure
@@ -5333,6 +5336,7 @@ def test_program_certificate_verifiable_credentials_signing_payload(
 
     mock_certificate_page = Mock()
     mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
+    mock_certificate_page.verifiable_credential_description = None
     # The verifiable credential name should come from the CMS "Certificate Title"
     # (product_name), not the program title.
     mock_certificate_page.product_name = "Universal AI"
@@ -5417,6 +5421,7 @@ def test_program_verifiable_credential_name_falls_back_to_program_title(
 
     mock_certificate_page = Mock()
     mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
+    mock_certificate_page.verifiable_credential_description = None
     mock_certificate_page.product_name = product_name
 
     payload = get_verifiable_credentials_payload(program_cert, mock_certificate_page)
