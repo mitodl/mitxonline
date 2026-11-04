@@ -161,7 +161,10 @@ class BaseCertificateSerializer(serializers.ModelSerializer):
         definition itself is slightly different.)
         """
 
-        if hasattr(instance, "certificate_page_revision"):
+        if (
+            hasattr(instance, "certificate_page_revision")
+            and instance.certificate_page_revision
+        ):
             cert = instance.certificate_page_revision.as_object()
 
             return CertificatePageModelSerializer(cert).data
