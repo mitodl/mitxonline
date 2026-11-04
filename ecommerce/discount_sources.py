@@ -145,9 +145,6 @@ def resolve_program_child_purchase(
         required_program__isnull=False,
     ).values_list("required_program_id", flat=True)
 
-    # B2B purchases never fund the offer. A run is B2B through its contract;
-    # a program through either marker, the same test _program_for_product
-    # applies to the target.
     source_run_ids = CourseRun.objects.filter(
         course_id__in=child_course_ids,
     ).values_list("id", flat=True)

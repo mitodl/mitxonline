@@ -260,24 +260,7 @@ def test_grandchild_courses_do_not_qualify(user, program, program_product):
     assert resolve_program_child_purchase(user, program_product) is None
 
 
-def test_b2b_run_sources_do_not_qualify(user, program, program_product):
-    """
-    Test that the purchase is not resolved if they got it for free. B2B purchases
-    are usually $0 - but we don't gate on the run being B2B; we gate on the
-    purchase having had a value. (This is called "b2b" because that's usually
-    the use case for this.)
-
-    See https://github.com/mitodl/mitxonline/pull/4066#discussion_r4414409268
-    for more context.
-    """
-    run = CourseRunFactory.create()
-    program.add_requirement(run.course)
-    make_purchase(user, run, Decimal("0.00"))
-
-    assert resolve_program_child_purchase(user, program_product) is None
-
-
-def test_b2b_run_sources_do_not_qualify_unless_paid(user, program, program_product):
+def test_b2b_run_sources_qualify_if_paid(user, program, program_product):
     """
     Test that the purchase _is_ resolved if this is a B2B purchase and the user
     _did_ pay for it. They paid money for the enrollment, so it should count.
