@@ -32,9 +32,6 @@ pytestmark = [pytest.mark.django_db]
 
 @pytest.mark.parametrize("is_anonymous", [True, False])
 @pytest.mark.parametrize(
-    "certificate_type", ["MicroMasters Credential", "Certificate of Completion"]
-)
-@pytest.mark.parametrize(
     "cert_available",
     [
         True,
@@ -44,7 +41,6 @@ pytestmark = [pytest.mark.django_db]
 def test_serialize_course(
     mock_context,
     is_anonymous,
-    certificate_type,
     cert_available,
 ):
     """Test Course serialization"""
@@ -74,11 +70,9 @@ def test_serialize_course(
     course.page.topics.set([topics[0], topics[1], topics[2]])
     department = "a course departments"
     course.departments.set([Department.objects.create(name=department)])
-    program = ProgramFactory.create(program_type="Series")
-    if certificate_type == "MicroMasters Credential":
-        program.program_type = "MicroMasters®"
+    # Only the program awards the MicroMasters credential, not its courses
+    program = ProgramFactory.create(program_type="MicroMasters®")
     program.add_requirement(course)
-    program.save()
 
     CourseRunEnrollmentFactory.create(
         run=courseRun1, **({} if is_anonymous else {"user": user})
@@ -108,7 +102,7 @@ def test_serialize_course(
             "min_weekly_hours": course.page.min_weekly_hours,
             "departments": [{"name": department}],
             "page": CoursePageSerializer(course.page).data,
-            "certificate_type": certificate_type,
+            "certificate_type": "Certificate of Completion",
             "certificate_available": cert_available,
             "availability": "dated",
             "topics": [{"name": topic.name} for topic in topics],

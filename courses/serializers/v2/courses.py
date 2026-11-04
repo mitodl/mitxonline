@@ -152,14 +152,11 @@ class CourseSerializer(BaseCourseSerializer):
         return []
 
     @extend_schema_field(str)
-    def get_certificate_type(self, instance):
+    def get_certificate_type(self, instance):  # noqa: ARG002
         """Return the certificate type."""
-
-        if instance.programs:
-            program = instance.programs[0]
-            if "MicroMasters" in program.program_type:
-                return "MicroMasters Credential"
-
+        # A course certificate is a certificate of completion even when the
+        # course belongs to a MicroMasters program; only the program itself
+        # awards the MicroMasters credential.
         return "Certificate of Completion"
 
     @extend_schema_field(bool)
