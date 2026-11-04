@@ -34,6 +34,16 @@ IDENTITY_PROVIDER_IMPORT_CONFIG_ENDPOINT = "identity-provider/import-config"
 KEYCLOAK_LIST_PAGE_SIZE = 100
 KEYCLOAK_ADMIN_REQUEST_TIMEOUT_SECONDS = 60
 
+# Names of the settings holding a service account's client ID and secret.
+# The admin pair can provision organizations and identity providers. The
+# membership pair can only manage organizations and users, and is what the
+# enrollment request path uses to add a user to an organization.
+ADMIN_CREDENTIALS = ("KEYCLOAK_ADMIN_CLIENT_ID", "KEYCLOAK_ADMIN_CLIENT_SECRET")
+MEMBERSHIP_CREDENTIALS = (
+    "KEYCLOAK_MEMBERSHIP_CLIENT_ID",
+    "KEYCLOAK_MEMBERSHIP_CLIENT_SECRET",
+)
+
 
 class KeycloakAdminClient:
     """Client for the Keycloak admin API."""
@@ -43,22 +53,26 @@ class KeycloakAdminClient:
     oauth_session = None
     skip_verify = False
 
-    def __init__(self):
+    def __init__(self, *, credentials=ADMIN_CREDENTIALS):
         """
         Configure the client so we can use it.
 
         These settings must be in place:
         - KEYCLOAK_BASE_URL: The base URL for the Keycloak instance.
         - KEYCLOAK_DISCOVERY_URL: The OpenID discovery URL for the realm.
-        - KEYCLOAK_ADMIN_CLIENT_ID: The client ID to use for the admin client.
-        - KEYCLOAK_ADMIN_CLIENT_SECRET: The client secret to use for the admin client.
         - KEYCLOAK_REALM_NAME: The realm we are working with.
+        - The two settings named by credentials: the client ID and secret of
+          the service account to authenticate as (KEYCLOAK_ADMIN_CLIENT_ID and
+          KEYCLOAK_ADMIN_CLIENT_SECRET by default).
 
         If any of these are incorrect or missing, you'll get an
         KeycloakAdminImproperlyConfiguredError.
 
         The client should be one that has the ability to use the admin API. The
         regular authentication client may not have this permission.
+
+        Args:
+        - credentials: ADMIN_CREDENTIALS or MEMBERSHIP_CREDENTIALS.
         """
 
         self.base_url = settings.KEYCLOAK_BASE_URL
@@ -75,13 +89,14 @@ class KeycloakAdminClient:
         if not realm_discovery:
             msg = "KEYCLOAK_DISCOVERY_URL setting is not configured."
             raise KeycloakAdminImproperlyConfiguredError(msg)
-        client_id = settings.KEYCLOAK_ADMIN_CLIENT_ID
+        client_id_setting, client_secret_setting = credentials
+        client_id = getattr(settings, client_id_setting)
         if not client_id:
-            msg = "KEYCLOAK_ADMIN_CLIENT_ID setting is not configured."
+            msg = f"{client_id_setting} setting is not configured."
             raise KeycloakAdminImproperlyConfiguredError(msg)
-        client_secret = settings.KEYCLOAK_ADMIN_CLIENT_SECRET
+        client_secret = getattr(settings, client_secret_setting)
         if not client_secret:
-            msg = "KEYCLOAK_ADMIN_CLIENT_SECRET setting is not configured."
+            msg = f"{client_secret_setting} setting is not configured."
             raise KeycloakAdminImproperlyConfiguredError(msg)
 
         self.skip_verify = settings.KEYCLOAK_ADMIN_CLIENT_NO_VERIFY_SSL or False
@@ -572,10 +587,10 @@ class KeycloakAdminModel:
         )
 
 
-def bootstrap_client(*, verify_realm=False):
+def bootstrap_client(*, verify_realm=False, credentials=ADMIN_CREDENTIALS):
     """Bootstrap a KeycloakAdminClient instance."""
 
-    client = KeycloakAdminClient()
+    client = KeycloakAdminClient(credentials=credentials)
     target_realm = settings.KEYCLOAK_REALM_NAME
 
     if verify_realm:

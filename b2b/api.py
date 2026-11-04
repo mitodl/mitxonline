@@ -39,7 +39,12 @@ from b2b.constants import (
     RETIREMENT_ORG_NAME,
 )
 from b2b.exceptions import SourceCourseIncompleteError
-from b2b.keycloak_admin_api import KCAM_ORGANIZATIONS, get_keycloak_model
+from b2b.keycloak_admin_api import (
+    KCAM_ORGANIZATIONS,
+    MEMBERSHIP_CREDENTIALS,
+    bootstrap_client,
+    get_keycloak_model,
+)
 from b2b.keycloak_admin_dataclasses import OrganizationRepresentation
 from b2b.mail import ENROLLMENT_CODE_ASSINGMENT_TAG
 from b2b.models import (
@@ -2483,7 +2488,12 @@ def add_user_org_membership(org, user):
     if not org.sso_organization_id:
         return False
 
-    org_model = get_keycloak_model(OrganizationRepresentation, "organizations")
+    # This runs on enrollment requests, so it authenticates as the membership
+    # service account rather than the one that can provision identity providers.
+    org_model = get_keycloak_model(
+        *KCAM_ORGANIZATIONS,
+        client=bootstrap_client(verify_realm=True, credentials=MEMBERSHIP_CREDENTIALS),
+    )
 
     kc_org = org_model.get(org.sso_organization_id)
 

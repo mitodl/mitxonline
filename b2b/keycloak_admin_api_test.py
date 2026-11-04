@@ -13,6 +13,7 @@ from b2b.exceptions import KeycloakAdminImproperlyConfiguredError
 from b2b.factories import RealmRepresentationFactory
 from b2b.keycloak_admin_api import (
     KEYCLOAK_ADMIN_REQUEST_TIMEOUT_SECONDS,
+    MEMBERSHIP_CREDENTIALS,
     KeycloakAdminClient,
     KeycloakAdminModel,
     bootstrap_client,
@@ -271,6 +272,37 @@ def test_client_init_empty_client_secret(settings):
         match=r"KEYCLOAK_ADMIN_CLIENT_SECRET setting is not configured\.",
     ):
         KeycloakAdminClient()
+
+
+def test_client_init_membership_credentials(settings, mocker):
+    """The membership credentials authenticate as the membership client."""
+    _mocked_admin_client(settings, mocker)
+    settings.KEYCLOAK_ADMIN_CLIENT_ID = "admin-client"
+    settings.KEYCLOAK_ADMIN_CLIENT_SECRET = "admin-secret"  # noqa: S105
+    settings.KEYCLOAK_MEMBERSHIP_CLIENT_ID = "membership-client"
+    settings.KEYCLOAK_MEMBERSHIP_CLIENT_SECRET = "membership-secret"  # noqa: S105
+    oauth_session = mocker.patch("b2b.keycloak_admin_api.OAuth2Session")
+
+    KeycloakAdminClient(credentials=MEMBERSHIP_CREDENTIALS)
+
+    kwargs = oauth_session.call_args.kwargs
+    assert kwargs["client_id"] == "membership-client"
+    assert kwargs["client_secret"] == "membership-secret"  # noqa: S105
+
+
+@pytest.mark.parametrize("missing", MEMBERSHIP_CREDENTIALS)
+def test_client_init_membership_credentials_missing(settings, mocker, missing):
+    """Missing membership credentials fail instead of using the admin pair."""
+    _mocked_admin_client(settings, mocker)
+    settings.KEYCLOAK_MEMBERSHIP_CLIENT_ID = FAKE.word()
+    settings.KEYCLOAK_MEMBERSHIP_CLIENT_SECRET = FAKE.word()
+    setattr(settings, missing, None)
+
+    with pytest.raises(
+        KeycloakAdminImproperlyConfiguredError,
+        match=rf"{missing} setting is not configured\.",
+    ):
+        KeycloakAdminClient(credentials=MEMBERSHIP_CREDENTIALS)
 
 
 def test_client_init_ssl_verification_handling(settings, mocker):
