@@ -496,6 +496,51 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             .prefetch_related("courseruns", "departments")
         )
 
+    @property
+    def courses_qset_recursive(self):
+        """
+        Returns a QuerySet of the related courses for this program and for every
+        program nested in its requirements tree, at any depth, required or
+        elective.
+        """
+
+        return (
+            Course.objects.filter(
+                in_programs__program_id__in=Program.expand_nested_program_ids([self.id])
+            )
+            .distinct()
+            .prefetch_related("courseruns", "departments")
+        )
+
+    @staticmethod
+    def expand_nested_program_ids(program_ids):
+        """
+        Returns the given program ids plus the ids of every program nested in
+        their requirements trees, at any depth, required or elective.
+
+        Args:
+        - program_ids (iterable of int): the programs to start from
+        Returns:
+        - set of int: the program ids
+        """
+
+        program_ids = set(program_ids)
+        frontier = set(program_ids)
+        while frontier:
+            frontier = (
+                set(
+                    ProgramRequirement.objects.filter(
+                        program_id__in=frontier,
+                        node_type=ProgramRequirementNodeType.PROGRAM,
+                        required_program__isnull=False,
+                    ).values_list("required_program_id", flat=True)
+                )
+                - program_ids
+            )
+            program_ids |= frontier
+
+        return program_ids
+
     def _get_operator_course_requirements(self, main_ops):
         """
         Helper method to fetch all course requirements under operator nodes.

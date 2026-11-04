@@ -434,6 +434,41 @@ def test_sync_contract_variants_covers_program_courses():
     assert contract.get_course_runs().count() == 4
 
 
+def test_sync_contract_variants_covers_nested_program_courses():
+    """
+    The courses of a program nested in a contract program get the new set's
+    runs, including one with no runs yet, and one with no source run is reported.
+    """
+
+    contract = ContractPageFactory.create()
+    program = ProgramFactory.create()
+    nested_program = ProgramFactory.create()
+    program.add_program_requirement(nested_program)
+    course = _bilingual_source_course()
+    nested_program.add_requirement(course)
+    add_courseware_to_contract(contract, program, skip_edx=True)
+    late_course = _bilingual_source_course()
+    nested_program.add_requirement(late_course)
+    sourceless_course = CourseRunFactory.create().course
+    CourseSupportedVariantFactory.create(
+        variant_object=sourceless_course,
+        language="fr",
+        variant_length="",
+        variant_industry="",
+    )
+    nested_program.add_requirement(sourceless_course)
+    french = add_contract_variant_set(contract, language="fr")
+
+    synced = sync_contract_variants(contract, skip_edx=True)
+
+    assert sorted(
+        (run.course_id, run.language) for run in synced["runs_created"]
+    ) == sorted([(course.id, "fr"), (late_course.id, "en"), (late_course.id, "fr")])
+    assert {"course": sourceless_course, "variant": french} in synced[
+        "missing_source_runs"
+    ]
+
+
 def test_sync_contract_variants_skips_removed_course():
     """
     A removed course whose run stays linked for its learners gets no run for a

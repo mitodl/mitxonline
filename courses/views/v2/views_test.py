@@ -28,7 +28,7 @@ from rest_framework.test import APIClient
 
 from b2b.api import create_contract_run
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
-from b2b.models import ContractProgramItem
+from b2b.models import ContractProgramItem, UserOrganization
 from cms.factories import (
     CoursePageFactory,
     FlexiblePricingFormFactory,
@@ -913,6 +913,37 @@ def test_filter_by_org_id_with_contracted_user(
     assert program_with_contract.title in [
         program["title"] for program in response.data["results"]
     ]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("param", ["org_id", "contract_id"])
+def test_filter_by_org_or_contract_includes_nested_programs(param):
+    """
+    Filtering by org or contract also returns the programs nested in the
+    contract's programs, including b2b-only ones, but no other b2b-only program.
+    """
+    org = OrganizationPageFactory()
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    UserOrganization.objects.create(user=user, organization=org)
+    user.b2b_contracts.add(contract)
+
+    program = ProgramFactory.create(b2b_only=True)
+    module = ProgramFactory.create(b2b_only=True)
+    program.add_program_requirement(module)
+    ContractProgramItem(contract=contract, program=program).save(skip_run_creation=True)
+    unrelated = ProgramFactory.create(b2b_only=True)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+    response = client.get(
+        reverse("v2:programs_api-list"),
+        {param: org.id if param == "org_id" else contract.id},
+    )
+
+    ids = {result["id"] for result in response.data["results"]}
+    assert {program.id, module.id} <= ids
+    assert unrelated.id not in ids
 
 
 @pytest.mark.django_db

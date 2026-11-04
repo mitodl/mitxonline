@@ -1010,7 +1010,8 @@ class ContractPage(Page, ClusterableModel):
         filter_variants=None,
     ):
         """
-        Add a program, and then queue adding all its courses.
+        Add a program, and then queue adding all its courses, including the
+        courses of programs nested in its requirements.
 
         This defaults to not allowing re-runs to happen.
 
@@ -1033,12 +1034,13 @@ class ContractPage(Page, ClusterableModel):
             delattr(program, "_courses_with_requirements_data")
 
         managed = 0
-        no_source = program.courses_qset.exclude(
+        courses = program.courses_qset_recursive
+        no_source = courses.exclude(
             models.Q(courseruns__is_source_run=True)
             | models.Q(courseruns__run_tag="SOURCE")
         ).count()
 
-        for course in program.courses_qset.filter(
+        for course in courses.filter(
             models.Q(courseruns__is_source_run=True)
             | models.Q(courseruns__run_tag="SOURCE")
         ).all():
