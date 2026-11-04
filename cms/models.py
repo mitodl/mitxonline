@@ -444,7 +444,6 @@ class CertificatePage(CourseProgramChildPage):
         help_text="For verifiable credentials issued for this certificate, this is the criteria narrative field. It should be something descriptive, like a list of completed courses, and may be plaintext or markdown. If it is not supplied, no verifiable credential will be provisioned for those certificates.",
     )
 
-    # NOTE: not yet wired into credential issuance -- see mitodl/hq#13417.
     verifiable_credential_description = models.TextField(  # noqa: DJ001
         null=True,
         blank=True,
@@ -974,11 +973,6 @@ class HomePage(VideoPlayerConfigMixin):
         "InstructorIndexPage",
         "ProgramPage",
     ]
-
-    def _get_child_page_of_type(self, cls):
-        """Gets the first child page of the given type if it exists"""
-        child = self.get_children().type(cls).live().first()
-        return child.specific if child else None
 
     @property
     def get_cached_featured_products(self):
@@ -1531,9 +1525,8 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         return super().save(clean=clean, user=user, log_action=log_action, **kwargs)
 
     def _get_child_page_of_type(self, cls):
-        """Gets the first child page of the given type if it exists"""
-        child = self.get_children().type(cls).live().first()
-        return child.specific if child else None
+        """Gets the first live child page of the given type, or None."""
+        return cls.objects.child_of(self).live().first()
 
     @property
     def certificate_page(self):
