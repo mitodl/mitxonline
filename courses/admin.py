@@ -26,12 +26,14 @@ from courses.api import (
     create_run_enrollments,
     create_verifiable_credential,
     downgrade_learner,
+    generate_missing_user_certificates,
     summarize_verifiable_credential_certificate_statuses,
     undo_program_course_run_verification,
 )
 from courses.forms import (
     ADMIN_ENROLL_RUN_SUFFIX,
     AdminEnrollUserInRunsForm,
+    AdminUserLookupForm,
     ProgramAdminForm,
 )
 from courses.models import (
@@ -1373,6 +1375,72 @@ class CourseRunCertificateAdmin(TimestampedModelAdmin):
     list_filter = ["is_revoked", HasCertificateRevisionFilter, "course_run__course"]
     raw_id_fields = ("user", "course_run", "verifiable_credential")
     autocomplete_fields = ("certificate_page_revision",)
+    change_list_template = "admin/courses/courseruncertificate/change_list.html"
+
+    def get_urls(self):
+        """Add the generate-missing-certificates page to this admin's URLs."""
+        custom = [
+            path(
+                "generate-missing/",
+                self.admin_site.admin_view(self.generate_missing_view),
+                name="courses_courseruncertificate_generate_missing",
+            )
+        ]
+        return custom + super().get_urls()
+
+    def generate_missing_view(self, request):
+        """
+        Create the course run and program certificates a single user has
+        earned but doesn't have yet.
+        """
+        if not self.has_add_permission(request):
+            raise PermissionDenied
+
+        form = AdminUserLookupForm(request.POST or None)
+        if request.method == "POST" and form.is_valid():
+            user = form.cleaned_data["user"]
+            try:
+                run_certificates, program_certificates = (
+                    generate_missing_user_certificates(user)
+                )
+            except Exception as exc:  # noqa: BLE001
+                self.message_user(
+                    request,
+                    f"Failed to generate certificates for {user.email}: {exc}",
+                    messages.ERROR,
+                )
+            else:
+                created = [
+                    cert.course_run.courseware_id for cert in run_certificates
+                ] + [cert.program.readable_id for cert in program_certificates]
+                if created:
+                    self.message_user(
+                        request,
+                        f"Created certificates for {user.email}: {', '.join(created)}",
+                        messages.SUCCESS,
+                    )
+                else:
+                    self.message_user(
+                        request,
+                        f"{user.email} has no earned certificates missing",
+                        messages.INFO,
+                    )
+            return redirect(
+                reverse("admin:courses_courseruncertificate_changelist")
+                + f"?q={user.email}"
+            )
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Generate missing certificates for a user",
+            "opts": self.model._meta,  # noqa: SLF001
+            "form": form,
+        }
+        return TemplateResponse(
+            request,
+            "admin/courses/courseruncertificate/generate_missing.html",
+            context,
+        )
 
     def get_readonly_fields(self, request, obj=None):
         """Make course_run and certificate_page_revision read-only when editing"""

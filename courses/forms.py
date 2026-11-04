@@ -195,7 +195,31 @@ class ProgramAdminForm(ModelForm):
         ]
 
 
-class AdminEnrollUserInRunsForm(forms.Form):
+class AdminUserLookupForm(forms.Form):
+    """Admin form that picks one user by email, username, or ID."""
+
+    user = forms.CharField(
+        help_text="Email, username, or ID of the user",
+        widget=forms.TextInput(attrs={"size": 60}),
+    )
+
+    def clean_user(self):
+        """Resolve the entered email, username, or ID to a single User."""
+        value = self.cleaned_data["user"].strip()
+        query = Q(email__iexact=value) | Q(username=value)
+        if value.isdigit():
+            query |= Q(pk=int(value))
+        users = list(get_user_model().objects.filter(query)[:2])
+        if not users:
+            msg = f"No user found matching '{value}'"
+            raise ValidationError(msg)
+        if len(users) > 1:
+            msg = f"More than one user matches '{value}'; use the user ID instead"
+            raise ValidationError(msg)
+        return users[0]
+
+
+class AdminEnrollUserInRunsForm(AdminUserLookupForm):
     """
     Admin form for enrolling one user in any of the course runs whose
     courseware_id ends with ADMIN_ENROLL_RUN_SUFFIX.
@@ -222,18 +246,3 @@ class AdminEnrollUserInRunsForm(forms.Form):
         self.fields["runs"].label_from_instance = lambda run: (
             f"{run.courseware_id} — {run.title}"
         )
-
-    def clean_user(self):
-        """Resolve the entered email, username, or ID to a single User."""
-        value = self.cleaned_data["user"].strip()
-        query = Q(email__iexact=value) | Q(username=value)
-        if value.isdigit():
-            query |= Q(pk=int(value))
-        users = list(get_user_model().objects.filter(query)[:2])
-        if not users:
-            msg = f"No user found matching '{value}'"
-            raise ValidationError(msg)
-        if len(users) > 1:
-            msg = f"More than one user matches '{value}'; use the user ID instead"
-            raise ValidationError(msg)
-        return users[0]

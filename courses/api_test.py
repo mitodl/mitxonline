@@ -64,6 +64,7 @@ from courses.api import (
     downgrade_program_enrollment_and_verified_runs,
     generate_course_run_certificates,
     generate_missing_program_certificates,
+    generate_missing_user_certificates,
     generate_openedx_course_url,
     generate_program_certificate,
     get_audit_program_enrollments_for_upgrade,
@@ -118,6 +119,7 @@ from courses.models import (
     CourseRunCertificate,
     CourseRunEnrollment,
     CourseRunEnrollmentAudit,
+    CourseRunGrade,
     EnrollmentMode,
     PaidCourseRun,
     ProgramCertificate,
@@ -6372,3 +6374,73 @@ class TestUndoProgramCourseRunVerification:
             undo_program_course_run_verification(enrollment)
 
         mock_edx.assert_not_called()
+
+
+@pytest.fixture
+def earned_program_cert_setup(user, mocker, default_mode_records):
+    """
+    A verified program enrollment and a passing, paid grade in a self-paced run
+    of its only course, with no certificates yet.
+    """
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_user")
+    mocker.patch("courses.signals.upsert_custom_properties")
+    course_run = CourseRunFactory.create(is_self_paced=True)
+    course_run.enrollment_modes.set(default_mode_records)
+    program = ProgramFactory.create()
+    program.add_requirement(course_run.course)
+    ProgramEnrollmentFactory.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    CourseRunEnrollmentFactory.create(
+        user=user, run=course_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    grade = CourseRunGradeFactory.create(
+        user=user, course_run=course_run, grade=0.9, passed=True
+    )
+    return SimpleNamespace(course_run=course_run, program=program, grade=grade)
+
+
+def test_generate_missing_user_certificates(user, earned_program_cert_setup):
+    """
+    The run certificate the user earned is created, then the program
+    certificate it completes.
+    """
+    run_certificates, program_certificates = generate_missing_user_certificates(user)
+
+    assert [cert.course_run for cert in run_certificates] == [
+        earned_program_cert_setup.course_run
+    ]
+    assert [cert.program for cert in program_certificates] == [
+        earned_program_cert_setup.program
+    ]
+    assert generate_missing_user_certificates(user) == ([], [])
+
+
+@pytest.mark.parametrize(
+    "case", ["not_passed", "not_paid", "certificate_date_not_reached", "revoked"]
+)
+def test_generate_missing_user_certificates_skips_unearned(
+    user, earned_program_cert_setup, case
+):
+    """Nothing is created for a run certificate that isn't earned yet, or was revoked"""
+    course_run = earned_program_cert_setup.course_run
+    if case == "not_passed":
+        CourseRunGrade.objects.filter(pk=earned_program_cert_setup.grade.pk).update(
+            passed=False
+        )
+    elif case == "not_paid":
+        CourseRunEnrollment.objects.filter(user=user, run=course_run).update(
+            enrollment_mode=EDX_DEFAULT_ENROLLMENT_MODE
+        )
+    elif case == "certificate_date_not_reached":
+        course_run.is_self_paced = False
+        course_run.certificate_available_date = now_in_utc() + timedelta(days=1)
+        course_run.save()
+    elif case == "revoked":
+        CourseRunCertificateFactory.create(
+            user=user, course_run=course_run, is_revoked=True
+        )
+
+    assert generate_missing_user_certificates(user) == ([], [])
+    assert not CourseRunCertificate.objects.filter(user=user).exists()
+    assert not ProgramCertificate.objects.filter(user=user).exists()

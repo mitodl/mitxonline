@@ -1954,6 +1954,80 @@ def generate_multiple_programs_certificate(user, programs):
     return results
 
 
+def generate_missing_user_certificates(user):
+    """
+    Create every certificate the user has earned but doesn't have yet, from the
+    grades and enrollments already stored here (edX isn't queried).
+
+    Course run certificates come first, using the same rules as the periodic
+    certificate generation: a passing grade with a paid enrollment, in a run that
+    is self-paced or past its certificate available date. Program certificates
+    follow, for the user's verified program enrollments, and are retried until
+    none are created so a program that requires another program can be awarded
+    once the required one is.
+
+    Revoked certificates count as existing and are never recreated.
+
+    Args:
+        user (User): a Django user.
+
+    Returns:
+        (list of CourseRunCertificate, list of ProgramCertificate): the
+        certificates that were created.
+    """
+    now = now_in_utc()
+    course_run_certificates = []
+    grades = (
+        CourseRunGrade.objects.filter(user=user, passed=True)
+        .exclude(
+            course_run__in=CourseRunCertificate.all_objects.filter(
+                user=user
+            ).values_list("course_run", flat=True)
+        )
+        .select_related("user", "course_run__course")
+    )
+    for grade in grades:
+        run = grade.course_run
+        if not (
+            run.is_self_paced
+            or (
+                run.certificate_available_date and run.certificate_available_date <= now
+            )
+        ):
+            continue
+        certificate, created, _ = process_course_run_grade_certificate(grade)
+        if created:
+            course_run_certificates.append(certificate)
+
+    program_certificates = []
+    pending_programs = list(
+        Program.objects.filter(
+            enrollments__user=user,
+            enrollments__enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+        .exclude(
+            id__in=ProgramCertificate.all_objects.filter(user=user).values_list(
+                "program", flat=True
+            )
+        )
+        .distinct()
+    )
+    while pending_programs:
+        created_in_pass = []
+        for program in pending_programs:
+            certificate, created = generate_program_certificate(user, program)
+            if created:
+                created_in_pass.append(program)
+                program_certificates.append(certificate)
+        if not created_in_pass:
+            break
+        pending_programs = [
+            program for program in pending_programs if program not in created_in_pass
+        ]
+
+    return course_run_certificates, program_certificates
+
+
 def get_eligible_program_certificate_candidates():
     """
     Return a queryset of ProgramEnrollment rows that are eligible for a program

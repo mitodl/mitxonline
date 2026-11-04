@@ -548,3 +548,60 @@ def test_undo_program_entitlement_verification_action_inactive(mocker, admin_cli
 
     message_texts = [str(m) for m in response.context["messages"]]
     assert any("left inactive" in t and "mitxonline-test-2" in t for t in message_texts)
+
+
+GENERATE_MISSING_CERTIFICATES_URL = (
+    "admin:courses_courseruncertificate_generate_missing"
+)
+
+
+def test_certificate_changelist_links_to_generate_missing(admin_client):
+    """The certificate list has a button for the generate-missing page"""
+    response = admin_client.get(
+        reverse("admin:courses_courseruncertificate_changelist")
+    )
+
+    assert reverse(GENERATE_MISSING_CERTIFICATES_URL) in response.content.decode()
+
+
+def test_generate_missing_certificates_reports_created(mocker, admin_client):
+    """Posting a user generates their missing certificates and lists them"""
+    user = UserFactory.create()
+    run_certificate = mocker.Mock(course_run=mocker.Mock(courseware_id="run-1"))
+    program_certificate = mocker.Mock(program=mocker.Mock(readable_id="program-1"))
+    mock_generate = mocker.patch(
+        "courses.admin.generate_missing_user_certificates",
+        return_value=([run_certificate], [program_certificate]),
+    )
+
+    response = admin_client.post(
+        reverse(GENERATE_MISSING_CERTIFICATES_URL), {"user": user.email}, follow=True
+    )
+
+    mock_generate.assert_called_once_with(user)
+    messages = [str(message) for message in response.context["messages"]]
+    assert messages == [f"Created certificates for {user.email}: run-1, program-1"]
+
+
+def test_generate_missing_certificates_reports_none_missing(mocker, admin_client):
+    """A user with nothing to generate gets a message saying so"""
+    user = UserFactory.create()
+    mocker.patch(
+        "courses.admin.generate_missing_user_certificates", return_value=([], [])
+    )
+
+    response = admin_client.post(
+        reverse(GENERATE_MISSING_CERTIFICATES_URL), {"user": user.email}, follow=True
+    )
+
+    messages = [str(message) for message in response.context["messages"]]
+    assert messages == [f"{user.email} has no earned certificates missing"]
+
+
+def test_generate_missing_certificates_requires_staff(client, user):
+    """Non-staff users can't open the generate-missing page"""
+    client.force_login(user)
+
+    response = client.get(reverse(GENERATE_MISSING_CERTIFICATES_URL))
+
+    assert response.status_code == 302
