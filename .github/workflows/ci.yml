@@ -1,4 +1,7 @@
 name: CI
+# Pull requests are tested as the merge ref (the head merged into the base), so
+# a branch that's behind main still sees main's changes. Pushes to main and the
+# release branches have no pull request, so they keep push runs.
 on:
   pull_request:
   push:
@@ -86,6 +89,20 @@ jobs:
       - name: Migration and OpenAPI spec checks
         run: ./scripts/test/python_checks.sh
         env: *django-env-vars
+
+      # A pull_request run tests the merge ref, not the branch, so a failure can
+      # come from newer base-branch commits and its line numbers can differ from
+      # the branch's. Say so next to the failure. Reused as the last step of
+      # each job below.
+      - &merge-ref-note
+        name: Note that this tested the merge ref
+        if: failure() && github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          echo "::error title=This run tested the merge with ${BASE_REF}::This run tested ${HEAD_SHA:0:8} merged into ${BASE_REF}, not the branch alone, so line numbers refer to the merged tree, and a failure that doesn't reproduce on the branch may come from newer ${BASE_REF} commits. To check out exactly what ran: git fetch origin pull/${PR_NUMBER}/merge && git checkout FETCH_HEAD"
 
   python-tests:
     runs-on: ubuntu-24.04
@@ -179,6 +196,8 @@ jobs:
           ./scripts/test/python_tests.sh -n logical --splits 4 --group ${{ matrix.group }}
         env: *django-shard-env-vars
 
+      - *merge-ref-note
+
   javascript-tests:
     runs-on: ubuntu-24.04
     steps:
@@ -223,6 +242,8 @@ jobs:
           yarn workspaces foreach run build --bail --mode production
         env:
           NODE_ENV: production
+
+      - *merge-ref-note
 
   # ONE required status check standing for this whole workflow.
   #

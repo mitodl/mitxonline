@@ -715,7 +715,7 @@ def undo_program_course_run_verification(enrollment):
     if enrollment.enrollment_mode != EDX_ENROLLMENT_VERIFIED_MODE:
         msg = f"{user.email}'s enrollment in {run.courseware_id} is not verified"
         raise ValueError(msg)
-    if enrollment.b2b_contract_id or run.b2b_contracts.exists():
+    if enrollment.b2b_contract_id or run.b2b_contract_id or run.b2b_contracts.exists():
         msg = f"{run.courseware_id} is B2B-provisioned; its verification comes from the contract"
         raise ValueError(msg)
 

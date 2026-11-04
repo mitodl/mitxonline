@@ -173,7 +173,9 @@ def serialize_course(course, runs=None):
     """
     if runs is None:
         runs = (
-            CourseRun.all_objects.filter(course=course, b2b_contracts__isnull=True)
+            CourseRun.all_objects.filter(
+                course=course, b2b_contracts__isnull=True, b2b_contract__isnull=True
+            )
             .distinct()
             .order_by("id")
         )
