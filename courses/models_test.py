@@ -1170,6 +1170,35 @@ def test_program_elective_programs_property():
     assert required_program not in elective_programs
 
 
+def test_program_courses_qset_recursive():
+    """courses_qset_recursive includes the courses of nested programs at any depth"""
+    parent_program = ProgramFactory.create()
+    required_program = ProgramFactory.create()
+    elective_program = ProgramFactory.create()
+    grandchild_program = ProgramFactory.create()
+    direct_course, required_course, elective_course, grandchild_course, _ = (
+        CourseFactory.create_batch(5)
+    )
+
+    parent_program.add_requirement(direct_course)
+    parent_program.add_program_requirement(required_program)
+    parent_program.add_program_elective(elective_program)
+    required_program.add_requirement(required_course)
+    required_program.add_program_requirement(grandchild_program)
+    elective_program.add_requirement(elective_course)
+    grandchild_program.add_requirement(grandchild_course)
+    # A program nested twice is walked once
+    elective_program.add_program_requirement(grandchild_program)
+
+    assert set(parent_program.courses_qset_recursive) == {
+        direct_course,
+        required_course,
+        elective_course,
+        grandchild_course,
+    }
+    assert set(parent_program.courses_qset) == {direct_course}
+
+
 def test_program_requirement_node_types():
     """Test that the new PROGRAM node type works correctly"""
     parent_program = ProgramFactory.create()
