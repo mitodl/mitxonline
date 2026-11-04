@@ -1,5 +1,8 @@
 name: CI
-on: [push, pull_request]
+on:
+  pull_request:
+  push:
+    branches: [main, "releases/**"]
 jobs:
   python-checks:
     runs-on: ubuntu-24.04
