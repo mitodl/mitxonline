@@ -44,6 +44,7 @@ from courses.models import (
     Course,
     CourseRun,
     CourseRunEnrollment,
+    PaidProgram,
     Program,
     ProgramEnrollment,
     ProgramRun,
@@ -1099,6 +1100,9 @@ class CheckoutProductView(RedirectView):
             return None
         run = runs[0]
 
+        # Only a program the learner actually paid for counts - a verified
+        # enrollment can also be set without a purchase (e.g. by staff), and
+        # that shouldn't make the program's courses free.
         # order_by keeps this deterministic if the learner somehow holds more
         # than one matching verified program enrollment (e.g. the course is
         # in multiple programs) -- prefer the most recently created one.
@@ -1108,6 +1112,9 @@ class CheckoutProductView(RedirectView):
                 enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
                 active=True,
                 program__all_requirements__course=run.course,
+                program__id__in=PaidProgram.objects.filter(
+                    user=self.request.user
+                ).values_list("program__id", flat=True),
             )
             .distinct()
             .order_by("-id")

@@ -28,7 +28,12 @@ from courses.factories import (
     ProgramFactory,
     ProgramRunFactory,
 )
-from courses.models import CourseRunEnrollment, PaidCourseRun, ProgramEnrollment
+from courses.models import (
+    CourseRunEnrollment,
+    PaidCourseRun,
+    PaidProgram,
+    ProgramEnrollment,
+)
 from ecommerce import api
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
@@ -44,6 +49,7 @@ from ecommerce.factories import (
     BasketItemFactory,
     DiscountFactory,
     LineFactory,
+    OrderFactory,
     PaidAmountOffDiscountFactory,
     ProductFactory,
     UnlimitedUseDiscountFactory,
@@ -931,6 +937,12 @@ def test_checkout_product(
     assert [item.product for item in basket.basket_items.all()] == [product]
 
 
+def _pay_for_program(user, program):
+    """Record that the user bought the program"""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    return PaidProgram.objects.create(user=user, program=program, order=order)
+
+
 @pytest.mark.dont_mock_enrollments
 def test_checkout_product_with_no_active_product_uses_cart(user, user_client):
     """
@@ -952,6 +964,7 @@ def test_checkout_product_with_no_active_product_uses_cart(user, user_client):
         enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
         active=True,
     )
+    _pay_for_program(user, program)
 
     resp = user_client.get(
         reverse("checkout-product"), {"course_id": course_run.courseware_id}
@@ -987,6 +1000,7 @@ def test_checkout_product_with_verified_program_enrollment(
         enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
         active=True,
     )
+    _pay_for_program(user, program)
 
     resp = user_client.get(
         reverse("checkout-product"),
@@ -1001,6 +1015,40 @@ def test_checkout_product_with_verified_program_enrollment(
     enrollment = CourseRunEnrollment.objects.get(user=user, run=course_run)
     assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
     assert not Basket.objects.filter(user=user).exists()
+
+
+@pytest.mark.dont_mock_enrollments
+def test_checkout_product_with_unpaid_verified_program_enrollment_uses_cart(
+    user, user_client
+):
+    """
+    A verified program enrollment the learner didn't pay for (e.g. one staff
+    changed to verified) doesn't get the program's courses for free:
+    /cart/add uses the normal cart flow.
+    """
+    program = ProgramFactory.create()
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        ProductFactory.create(purchasable_object=program)
+        run_product = ProductFactory.create(purchasable_object=course_run)
+
+    ProgramEnrollmentFactory.create(
+        program=program,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+    )
+
+    resp = user_client.get(
+        reverse("checkout-product"), {"course_id": course_run.courseware_id}
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+    basket = Basket.objects.get(user=user)
+    assert [item.product for item in basket.basket_items.all()] == [run_product]
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
 
 
 @pytest.mark.dont_mock_enrollments
@@ -1025,6 +1073,7 @@ def test_checkout_product_verified_program_shortcut_with_unusable_profile(
         enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
         active=True,
     )
+    _pay_for_program(user, program)
     mocked_export_compliance.side_effect = ExportComplianceDataError(
         user, ["last_name"]
     )
@@ -1057,6 +1106,7 @@ def test_checkout_product_with_existing_verified_run_enrollment(user, user_clien
         enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
         active=True,
     )
+    _pay_for_program(user, program)
     CourseRunEnrollmentFactory.create(
         user=user,
         run=course_run,
@@ -1123,6 +1173,7 @@ def test_checkout_product_with_program_product_id_uses_cart(user, user_client):
         enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
         active=True,
     )
+    _pay_for_program(user, program)
 
     resp = user_client.get(
         reverse("checkout-product"), {"product_id": program_product.id}
