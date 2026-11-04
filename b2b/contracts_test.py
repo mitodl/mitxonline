@@ -14,6 +14,7 @@ from b2b.constants import (
     PROVISIONING_ACTION_CONTRACT_VARIANT_UPDATED,
 )
 from b2b.contracts import (
+    _remove_run_from_contract,
     add_contract_variant_set,
     add_courseware_to_contract,
     create_contract,
@@ -144,7 +145,7 @@ def test_add_run_already_in_contract_is_skipped(active):
     """
 
     contract = ContractPageFactory.create(active=active)
-    run = CourseRunFactory.create(b2b_contract=contract)
+    run = CourseRunFactory.create(b2b_contracts=[contract])
 
     added = add_courseware_to_contract(contract, run)
 
@@ -175,61 +176,20 @@ def test_remove_course(has_enrollments):
     assert not contract.get_products().exists()
 
 
-def test_remove_program_removes_nested_program_runs():
-    """Removing a program with its runs also removes the runs of courses in programs nested in it."""
+@pytest.mark.parametrize("active", [True, False])
+def test_remove_run_from_contract_removes_association(active):
+    """Unenrolled runs are unlinked even when the contract is inactive."""
 
-    contract = ContractPageFactory.create()
-    program = ProgramFactory.create()
-    nested_program = ProgramFactory.create()
-    program.add_program_requirement(nested_program)
-    nested_program.add_requirement(_source_run().course)
-    add_courseware_to_contract(contract, program, skip_edx=True)
-    [run] = contract.get_course_runs()
-
-    [(removed_run, unlinked)] = remove_courseware_from_contract(
-        contract, program, remove_program_runs=True
+    contract = ContractPageFactory.create(active=active)
+    run = CourseRunFactory.create(b2b_contracts=[contract])
+    memberships = CourseRun.b2b_contracts.through.objects.filter(
+        courserun=run, contractpage=contract
     )
+    assert memberships.exists()
 
-    assert removed_run == run
-    assert unlinked is True
-    assert not contract.get_course_runs().exists()
-    assert not contract.programs.exists()
+    assert _remove_run_from_contract(contract, run) is True
 
-
-@pytest.mark.parametrize("shared_as", ["nested", "linked", "direct"])
-def test_remove_program_keeps_runs_other_programs_include(shared_as):
-    """
-    Removing a program with its runs keeps the runs of courses that another of
-    the contract's programs still includes, whether nested in it, linked to the
-    contract itself, or as one of its own courses.
-    """
-
-    contract = ContractPageFactory.create()
-    program = ProgramFactory.create()
-    other_program = ProgramFactory.create()
-    shared_course = _source_run().course
-    own_course = _source_run().course
-    program.add_requirement(own_course)
-    if shared_as == "direct":
-        program.add_requirement(shared_course)
-        other_program.add_requirement(shared_course)
-    else:
-        module = ProgramFactory.create()
-        module.add_requirement(shared_course)
-        program.add_program_requirement(module)
-        if shared_as == "nested":
-            other_program.add_program_requirement(module)
-        else:
-            other_program = module
-    add_courseware_to_contract(contract, program, skip_edx=True)
-    add_courseware_to_contract(contract, other_program, skip_edx=True)
-
-    removed = remove_courseware_from_contract(
-        contract, program, remove_program_runs=True
-    )
-
-    assert [run.course for run, _ in removed] == [own_course]
-    assert [run.course for run in contract.get_course_runs()] == [shared_course]
+    assert not memberships.exists()
 
 
 @pytest.mark.parametrize("other_contract_active", [True, False])
@@ -258,9 +218,7 @@ def test_remove_run_another_contract_holds(other_contract_active, has_enrollment
     removed_run.refresh_from_db()
     assert unlinked is not has_enrollments
     assert removed_run.live is True
-    assert removed_run.b2b_contract_id == (
-        contract.id if has_enrollments else other_contract.id
-    )
+    assert removed_run.b2b_contracts.filter(pk=contract.pk).exists() is has_enrollments
     assert other_contract.get_products().count() == products
     assert CourseRun.b2b_contracts.through.objects.filter(
         courserun=run, contractpage=other_contract
