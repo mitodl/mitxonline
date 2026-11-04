@@ -1063,7 +1063,7 @@ class CheckoutProductView(RedirectView):
 
         return super().get_redirect_url(*args, **kwargs)
 
-    def _enroll_via_verified_program(
+    def _enroll_via_verified_program(  # noqa: PLR0911
         self, product_ids, course_run_ids, courseware_ids, program_ids
     ):
         """
