@@ -17,12 +17,13 @@ wizard (C2) gets its own permission class scoped by invite token.
 import logging
 
 import django_filters
+from authlib.integrations.base_client.errors import OAuthError
 from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, inline_serializer
 from opaque_keys import InvalidKeyError
-from requests.exceptions import HTTPError
+from requests.exceptions import RequestException
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
@@ -147,7 +148,10 @@ class ProvisioningExceptionMixin:
                 {"detail": str(exc)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        if isinstance(exc, HTTPError):
+        # RequestException covers HTTPError as well as a connection error or a
+        # timeout, and bootstrapping the client raises OAuthError when the
+        # token request fails.
+        if isinstance(exc, RequestException | OAuthError):
             log.exception("Keycloak call failed during provisioning")
             return Response(
                 {"detail": "The Keycloak admin API call failed."},

@@ -2,8 +2,10 @@
 
 import faker
 import pytest
+from authlib.integrations.base_client.errors import OAuthError
 from django.urls import reverse
-from requests.exceptions import HTTPError
+from requests.exceptions import ConnectionError as RequestsConnectionError
+from requests.exceptions import HTTPError, Timeout
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -1016,6 +1018,30 @@ def test_identity_provider_detail_is_a_502_when_keycloak_fails(
     organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
     _identity_provider(organization)
     mocked_connection.client.list.side_effect = HTTPError("boom")
+
+    response = staff_drf_client.get(
+        _identity_provider_url(organization.org_key, "exampleu")
+    )
+
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        RequestsConnectionError("refused"),
+        Timeout("timed out"),
+        OAuthError("invalid_client"),
+    ],
+)
+def test_identity_provider_detail_is_a_502_when_keycloak_is_unreachable(
+    staff_drf_client, mocker, error
+):
+    """Bootstrapping the Keycloak client fails without an HTTPError."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+    mocker.patch("b2b.provisioning.KeycloakConnection", side_effect=error)
 
     response = staff_drf_client.get(
         _identity_provider_url(organization.org_key, "exampleu")
