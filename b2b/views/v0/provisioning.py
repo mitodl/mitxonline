@@ -17,12 +17,13 @@ wizard (C2) gets its own permission class scoped by invite token.
 import logging
 
 import django_filters
+from authlib.integrations.base_client.errors import OAuthError
 from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, inline_serializer
 from opaque_keys import InvalidKeyError
-from requests.exceptions import HTTPError
+from requests.exceptions import RequestException
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
@@ -64,6 +65,7 @@ from b2b.provisioning import (
     create_identity_provider,
     create_organization,
     delete_identity_provider,
+    get_identity_provider_attribute_maps,
     parse_identity_provider_metadata,
     refresh_identity_provider_metadata,
     set_onboarding_state,
@@ -88,6 +90,7 @@ from b2b.serializers.v0.provisioning import (
     CreateOrganizationSerializer,
     ExpiredEnrollmentCodeSerializer,
     IdentityProviderTransitionSerializer,
+    OrganizationIdentityProviderDetailSerializer,
     OrganizationIdentityProviderSerializer,
     OrganizationOnboardingSerializer,
     OrganizationProvisioningAuditSerializer,
@@ -145,7 +148,10 @@ class ProvisioningExceptionMixin:
                 {"detail": str(exc)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        if isinstance(exc, HTTPError):
+        # RequestException covers HTTPError as well as a connection error or a
+        # timeout, and bootstrapping the client raises OAuthError when the
+        # token request fails.
+        if isinstance(exc, RequestException | OAuthError):
             log.exception("Keycloak call failed during provisioning")
             return Response(
                 {"detail": "The Keycloak admin API call failed."},
@@ -403,11 +409,24 @@ class IdentityProviderProvisioningViewSet(
 
         return Response(self.get_serializer(self.get_queryset(), many=True).data)
 
-    @extend_schema(responses={200: OrganizationIdentityProviderSerializer})
+    @extend_schema(
+        responses={
+            200: OrganizationIdentityProviderDetailSerializer,
+            502: DetailSerializer,
+        }
+    )
     def retrieve(self, request, alias=None, **kwargs):  # noqa: ARG002
-        """Return a single identity provider."""
+        """Return an identity provider, including its attribute mappers."""
 
-        return Response(self.get_serializer(self.get_object()).data)
+        identity_provider = self.get_object()
+        (
+            identity_provider.attribute_map,
+            identity_provider.attribute_name_map,
+        ) = get_identity_provider_attribute_maps(identity_provider)
+
+        return Response(
+            OrganizationIdentityProviderDetailSerializer(identity_provider).data
+        )
 
     @extend_schema(
         request=CreateIdentityProviderSerializer,

@@ -176,6 +176,12 @@ send to the partner.
 An IdP alias is chosen by staff, not derived from `org_key`, because one
 organization can have more than one IdP.
 
+`GET` on a single IdP also returns `attribute_map` and `attribute_name_map`,
+read from Keycloak's attribute-importer mappers at request time, so it returns
+502 when that Keycloak call fails. The list and an organization's nested
+`identity_providers` leave them out, because they would cost a Keycloak call
+per IdP.
+
 ### Editing an identity provider
 
 `DELETE` on an IdP is destructive beyond this API. Keycloak's IdP delete also
@@ -199,17 +205,26 @@ merge into it. For SAML, send both maps together (an empty object for the one
 with no entries), because sending one alone would delete the other's mappers.
 A user attribute can be in only one of the two, and the pair can't leave a
 SAML IdP with no mappers. OIDC takes `attribute_map` only, and an empty
-object clears its mappers. Mappers of other types added in the Keycloak
-console are left alone.
+object clears its mappers. To change one mapping, read the current maps from
+the IdP's `GET` and send them back with the change. Mappers of other types
+added in the Keycloak console are left alone.
+
+Mappers are updated in place. An unchanged mapping leaves its mapper alone, a
+changed one keeps the rest of its config (sync mode, SAML name format, the
+mapper's name), a removed one is deleted, and a new one is created with
+`syncMode` `INHERIT` and, for SAML, the URI name format. Where two mappers
+import the same user attribute, the `GET` shows the later one and only that
+one is edited. A mapper with no user attribute or no source isn't shown and
+isn't touched.
 
 `alias` and `protocol` can't be changed. Sending either is a 400, and so is a
 field that belongs to the other protocol or a body with no fields. The
 lifecycle state doesn't change here, only through `transition/`.
 
-The update writes the IdP to Keycloak, then replaces the mappers, then saves
+The update writes the IdP to Keycloak, then updates the mappers, then saves
 the MITx Online record, with no compensation. If a step fails, Keycloak is
-ahead of MITx Online, and on SAML it may have fewer mappers than it started
-with. Send the same `PATCH` again to finish it.
+ahead of MITx Online and may have only some of the mapper changes. Send the
+same `PATCH` again to finish it.
 
 ### Lifecycle
 
@@ -392,7 +407,7 @@ changes an existing `org_key`.
 - Domain verification, before C2.
 - Where C2's partner invite token is stored. `OrganizationOnboarding` is the
   likely place, but it has no token field yet.
-- An IdP edit form over the `PATCH` route, and a test-login flow.
+- A test-login flow.
 - The contract fields the staff dashboard can't reach
   (`welcome_message_extra`, `google_sheet_target`, `google_sheet_target_tab`,
   program order) and a variant set editor. They are all the Wagtail contract
