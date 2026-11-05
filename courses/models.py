@@ -2176,12 +2176,14 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
         Revision,
         null=False,
         # blank=True so the admin form can be left empty: clean()/save() then
-        # fill in the certificate page's latest revision.
+        # fill in the certificate page's published revision.
         blank=True,
         # PROTECT, not CASCADE: every certificate now points at a revision,
-        # and Wagtail's purge_revisions (and deleting a certificate page)
-        # delete non-latest revisions, relying on ProtectedError to skip ones
-        # still referenced. CASCADE would silently delete issued certificates.
+        # and Wagtail's purge_revisions deletes non-latest revisions, relying
+        # on ProtectedError to skip ones still referenced. CASCADE would
+        # silently delete issued certificates. (Deleting the page itself
+        # removes all its revisions, so it's blocked up front by the
+        # before_delete_page hook in cms/wagtail_hooks.py.)
         on_delete=models.PROTECT,
         limit_choices_to=limit_to_certificate_pages,
     )
@@ -2286,12 +2288,14 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
         Revision,
         null=False,
         # blank=True so the admin form can be left empty: clean()/save() then
-        # fill in the certificate page's latest revision.
+        # fill in the certificate page's published revision.
         blank=True,
         # PROTECT, not CASCADE: every certificate now points at a revision,
-        # and Wagtail's purge_revisions (and deleting a certificate page)
-        # delete non-latest revisions, relying on ProtectedError to skip ones
-        # still referenced. CASCADE would silently delete issued certificates.
+        # and Wagtail's purge_revisions deletes non-latest revisions, relying
+        # on ProtectedError to skip ones still referenced. CASCADE would
+        # silently delete issued certificates. (Deleting the page itself
+        # removes all its revisions, so it's blocked up front by the
+        # before_delete_page hook in cms/wagtail_hooks.py.)
         on_delete=models.PROTECT,
         limit_choices_to=limit_to_certificate_pages,
     )
