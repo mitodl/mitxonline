@@ -270,6 +270,7 @@ INSTALLED_APPS = (
     "compliance",
     "openedx",
     # must be after "users" to pick up custom user model
+    "location",
     "ecommerce",
     "flexiblepricing",
     "micromasters_import",
