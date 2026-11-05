@@ -37,6 +37,7 @@ from b2b.constants import (
     PROVISIONING_ACTION_CHOICES,
     PROVISIONING_ACTION_ORG_UPDATED,
 )
+from b2b.forms import ContractPageForm
 from courses.models import Program
 from main.models import AuditModel, ValidateOnSaveMixin
 from variants.models import SupportedVariant
@@ -565,6 +566,13 @@ class ContractPage(Page, ClusterableModel):
     is_creatable = False
     # Declared first so it is the default manager; see ContractPageManager.
     objects = ContractPageManager()
+    base_form_class = ContractPageForm
+    # A copy is a new contract, and the organization hasn't opted in under it.
+    exclude_fields_in_copy = [
+        "learner_records_opt_in",
+        "learner_records_opt_in_recorded_on",
+        "learner_records_opt_in_recorded_by",
+    ]
     active_objects = ActiveContractManager()
 
     # Written only by the contract API, which saves the row without a Wagtail
@@ -644,6 +652,23 @@ class ContractPage(Page, ClusterableModel):
         max_length=100,
         help_text="The index or title of the worksheet in the Google Sheet to put the codes.",
     )
+    learner_records_opt_in = models.BooleanField(
+        default=False,
+        help_text="Whether the organization has asked for machine access to its learners' records under this contract. The credential reads identifiable learner records, so a contract existing is not an opt-in.",
+    )
+    learner_records_opt_in_recorded_on = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="When the learner records opt-in was last changed.",
+    )
+    learner_records_opt_in_recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="The staff member who last changed the learner records opt-in.",
+    )
     variant_options = GenericRelation(
         "variants.SupportedVariant",
         object_id_field="object_id",
@@ -722,6 +747,15 @@ class ContractPage(Page, ClusterableModel):
             heading="Availability",
             icon="calendar-alt",
         ),
+        MultiFieldPanel(
+            [
+                FieldPanel("learner_records_opt_in"),
+                FieldPanel("learner_records_opt_in_recorded_on", read_only=True),
+                FieldPanel("learner_records_opt_in_recorded_by", read_only=True),
+            ],
+            heading="Learner Records API",
+            icon="key",
+        ),
         InlinePanel(
             "contract_programs",
             heading="Programs",
@@ -756,6 +790,13 @@ class ContractPage(Page, ClusterableModel):
         """Save the page, and update the slug and title appropriately."""
 
         self.title = str(self.name)
+
+        if self.alias_of_id:
+            # Wagtail ignores exclude_fields_in_copy for an alias, and copies
+            # every field to it again each time the original is published.
+            self.learner_records_opt_in = False
+            self.learner_records_opt_in_recorded_on = None
+            self.learner_records_opt_in_recorded_by = None
 
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
 
