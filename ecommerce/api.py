@@ -36,7 +36,7 @@ from courses.api import (
     downgrade_program_enrollment_and_verified_runs,
 )
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
-from courses.models import CourseRunEnrollment
+from courses.models import CourseRunEnrollment, Program
 from courses.utils import is_uai_course_run, is_xpro_course_run
 from ecommerce.constants import (
     ADMIN_FULFILLED_PAYMENT_DATA,
@@ -893,6 +893,14 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
         log.error(message)
         return False, message
 
+    # Nothing was charged for a $0 order, so there's no processor transaction
+    # to refund. Most of these are the course run orders made for a program
+    # purchase, where the payment (and the refund) is on the program's order.
+    if order.total_price_paid == 0:
+        message = _zero_value_order_refund_message(order)
+        log.error(message)
+        return False, message
+
     transaction_dict = order_recent_transaction.data
 
     # Ensure the payment gateway can find the transaction ID — it may be stored
@@ -943,6 +951,80 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
     )
 
     return True, message
+
+
+def find_paid_program_order_for_zero_value_order(order: Order) -> Order | None:
+    """
+    Find the order where the learner actually paid for the program.
+
+    Buying a program costs money once, on the program's order. When the
+    learner then enrolls in each course, the system also makes a $0 order for
+    that course, just to record that they have a seat (see
+    create_verified_program_course_run_order). To refund, you need the
+    program's order, not the $0 course order. This finds it.
+
+    The $0 order uses the program's 100% discount (see
+    create_verified_program_discount), and that discount is how we know which
+    program it came from. Matching on the course alone isn't enough: the
+    course may be in more than one program the learner bought.
+
+    Args:
+    - order (Order): the $0 order
+    Returns:
+    - FulfilledOrder, the learner's order placed before this one that paid for
+      that program, or None if there isn't exactly one
+    """
+    program_ctype = ContentType.objects.get_for_model(Program)
+    program_ids = Product.objects.filter(
+        content_type=program_ctype,
+        discounts__discount__redemption_type=REDEMPTION_TYPE_INTERNAL,
+        discounts__discount__order_redemptions__redeemed_order=order,
+    ).values_list("object_id", flat=True)
+
+    candidates = list(
+        FulfilledOrder.objects.filter(
+            purchaser=order.purchaser,
+            state=OrderStatus.FULFILLED,
+            created_on__lt=order.created_on,
+            lines__purchased_content_type=program_ctype,
+            lines__purchased_object_id__in=program_ids,
+            lines__discounted_unit_price__gt=0,
+        ).distinct()[:2]
+    )
+
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def _zero_value_order_refund_message(order: Order) -> str:
+    """Explain why a $0 order can't be refunded, and what to refund instead."""
+    message = f"Order {order.reference_number} is a $0 order, so there is no payment to refund."
+    program_order = find_paid_program_order_for_zero_value_order(order)
+    if not program_order:
+        return message
+
+    message += f" It was granted by program order {program_order.reference_number}"
+    if _has_gateway_refundable_payment(program_order):
+        return f"{message} - refund that order instead."
+    return f"{message}, which has no payment gateway transaction to refund - Finance needs to refund it manually."
+
+
+def _has_gateway_refundable_payment(order: Order) -> bool:
+    """
+    Whether refund_order can refund the order's payment through the gateway.
+
+    Orders fulfilled administratively (ADMIN_FULFILLED_PAYMENT_DATA) and
+    PayPal payments have no CyberSource transaction refund_order can use.
+    """
+    payment = order.transactions.filter(
+        transaction_type=TRANSACTION_TYPE_PAYMENT
+    ).first()
+    data = payment.data if payment else {}
+    return (
+        not data.get("is_administrative")
+        and "paypal_token" not in data
+        and "req_amount" in data
+        and "req_currency" in data
+    )
 
 
 def record_order_refund(
