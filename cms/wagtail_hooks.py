@@ -107,7 +107,7 @@ def block_deleting_pages_with_certificate_revisions(request, page):
         request,
         f"Can't delete '{page.get_admin_display_title()}': "
         + " and ".join(f"{count} {label}" for count, label in certificate_counts)
-        + " point at revisions of this page or its certificate page. "
+        + " point at revisions of this page or pages under it. "
         "Unpublish it instead.",
     )
     return redirect(reverse("wagtailadmin_pages:edit", args=(page.id,)))
