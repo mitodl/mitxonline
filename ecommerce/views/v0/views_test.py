@@ -1,0 +1,2467 @@
+"""View tests for the v0 API."""
+
+import operator as op
+import random
+from datetime import datetime, timedelta
+from decimal import Decimal
+from urllib.parse import parse_qs, unquote, urlparse
+from zoneinfo import ZoneInfo
+
+import freezegun
+import pytest
+import reversion
+from django.db import connection
+from django.forms.models import model_to_dict
+from django.test import Client, override_settings
+from django.test.utils import CaptureQueriesContext
+from django.urls import reverse
+from django.utils.dateparse import parse_datetime
+from mitol.common.utils.datetime import now_in_utc
+from reversion.models import Version
+
+from b2b.constants import CONTRACT_MEMBERSHIP_CODE, CONTRACT_MEMBERSHIP_MANAGED
+from b2b.factories import ContractPageFactory
+from compliance.api import verify_user_with_exports
+from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
+from courses.factories import (
+    BlockedCountryFactory,
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+    ProgramFactory,
+)
+from courses.models import PaidCourseRun, PaidProgram, ProgramEnrollment
+from ecommerce.api import fulfill_completed_order
+from ecommerce.constants import (
+    DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+    DISCOUNT_TYPE_PERCENT_OFF,
+    PAYMENT_TYPE_CUSTOMER_SUPPORT,
+    PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    REDEMPTION_TYPE_INTERNAL,
+    REDEMPTION_TYPE_ONE_TIME,
+    REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+    REDEMPTION_TYPE_UNLIMITED,
+    ZERO_PAYMENT_DATA,
+)
+from ecommerce.discounts import DiscountType
+from ecommerce.factories import (
+    BasketFactory,
+    BasketItemFactory,
+    DiscountFactory,
+    DiscountRedemptionFactory,
+    InternalDiscountFactory,
+    LineFactory,
+    OrderFactory,
+    PaidAmountOffDiscountFactory,
+    ProductFactory,
+    ProgramProductFactory,
+    TransactionFactory,
+    UnlimitedUseDiscountFactory,
+    make_paid_amount_off_offer,
+    make_purchase,
+)
+from ecommerce.models import (
+    Basket,
+    BasketDiscount,
+    BasketItem,
+    Discount,
+    DiscountProduct,
+    DiscountRedemption,
+    Order,
+    OrderRefundStatus,
+    OrderStatus,
+    RefundRequest,
+    RefundRequestStatus,
+    UserDiscount,
+)
+from ecommerce.serializers import (
+    BasketItemSerializer,
+    BasketWithProductSerializer,
+    DiscountSerializer,
+    ProductSerializer,
+)
+from flexiblepricing.constants import FlexiblePriceStatus
+from flexiblepricing.factories import (
+    FlexiblePriceFactory,
+    FlexiblePriceTierFactory,
+    approve_flexible_price,
+)
+from main.constants import (
+    USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
+    USER_MSG_TYPE_BASKET_EMPTY,
+    USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
+    USER_MSG_TYPE_DISCOUNT_INVALID,
+    USER_MSG_TYPE_ENROLL_BLOCKED,
+    USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_PROFILE_INCOMPLETE,
+)
+from main.settings import TIME_ZONE
+from main.test_utils import assert_drf_json_equal
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
+
+pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture
+def products():
+    """Generate a batch of 5 products."""
+    with reversion.create_revision():
+        return ProductFactory.create_batch(5)
+
+
+@pytest.fixture
+def discounts():
+    """Generate a batch of 5 discounts."""
+    return DiscountFactory.create_batch(5)
+
+
+def create_basket(user, products):
+    """
+    Bootstraps a basket with a product in it for testing the discount
+    redemption APIs
+    TODO: this should probably just be a factory
+    """
+    basket = Basket(user=user)
+    basket.save()
+
+    basket_item = BasketItem(
+        product=products[random.randrange(0, len(products))],  # noqa: S311
+        basket=basket,
+        quantity=1,
+    )
+    basket_item.save()
+
+    return basket
+
+
+def create_basket_with_product(user, product):
+    """
+    Bootstraps a basket with a specific product in it
+    """
+    basket = Basket(user=user)
+    basket.save()
+
+    basket_item = BasketItem(product=product, basket=basket, quantity=1)
+    basket_item.save()
+
+    return basket
+
+
+@pytest.mark.skip_nplusone_check
+def test_list_products(user_drf_client, products):
+    """Test the list products API."""
+    resp = user_drf_client.get(
+        reverse("v0:products_api-list"),
+        {
+            "limit": 10,
+        },
+    )
+    resp_products = sorted(resp.json()["results"], key=op.itemgetter("id"))
+
+    assert len(resp_products) == len(products)
+
+    for product, resp_product in zip(products, resp_products):
+        assert_drf_json_equal(resp_product, ProductSerializer(product).data)
+
+
+def test_get_products(user_drf_client, products):
+    """Test the get products API."""
+    product = products[random.randrange(0, len(products))]  # noqa: S311
+
+    resp = user_drf_client.get(
+        reverse("v0:products_api-detail", kwargs={"pk": product.id})
+    )
+
+    assert_drf_json_equal(resp.json(), ProductSerializer(product).data)
+
+
+def test_get_products_inactive(user_drf_client, products):
+    """Test that Product detail API doesn't return data for inactive product"""
+    product = products[random.randrange(0, len(products))]  # noqa: S311
+    product.is_active = False
+    product.save()
+
+    resp = user_drf_client.get(
+        reverse("v0:products_api-detail", kwargs={"pk": product.id})
+    )
+
+    assert_drf_json_equal(
+        resp.json(), {"detail": "No Product matches the given query."}
+    )
+
+
+def test_product_user_flexible_price(user_drf_client, user, products):
+    """Test the user_flexible_price action returns product with flexible pricing info."""
+    product = products[random.randrange(0, len(products))]  # noqa: S311
+    course = product.purchasable_object.course
+
+    # Create a flexible price tier and approved flexible price for the user
+    tier = FlexiblePriceTierFactory.create(
+        courseware_object=course,
+        income_threshold_usd=25000,
+        current=True,
+        discount__amount=50,
+        discount__discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+        discount__payment_type=PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    )
+    FlexiblePriceFactory.create(
+        income_usd=20000,
+        country_of_income="US",
+        user=user,
+        courseware_object=course,
+        status=FlexiblePriceStatus.APPROVED,
+        tier=tier,
+    )
+
+    resp = user_drf_client.get(
+        reverse("v0:products_api-user-flexible-price", kwargs={"pk": product.id})
+    )
+
+    assert resp.status_code == 200
+    resp_data = resp.json()
+
+    # Verify basic product fields are present
+    assert resp_data["id"] == product.id
+    assert resp_data["price"] == str(product.price)
+    assert resp_data["description"] == product.description
+    assert resp_data["is_active"] == product.is_active
+
+    # Verify flexible price information is present
+    assert "product_flexible_price" in resp_data
+    assert resp_data["product_flexible_price"] is not None
+    assert float(resp_data["product_flexible_price"]["amount"]) == float(
+        tier.discount.amount
+    )
+    assert (
+        resp_data["product_flexible_price"]["discount_type"]
+        == DISCOUNT_TYPE_PERCENT_OFF
+    )
+
+
+def test_product_user_flexible_price_no_flexible_price(user_drf_client, user, products):
+    """Test the user_flexible_price action when user has no flexible price."""
+    product = products[random.randrange(0, len(products))]  # noqa: S311
+
+    resp = user_drf_client.get(
+        reverse("v0:products_api-user-flexible-price", kwargs={"pk": product.id})
+    )
+
+    assert resp.status_code == 200
+    resp_data = resp.json()
+
+    # Verify basic product fields are present
+    assert resp_data["id"] == product.id
+
+    # Verify flexible price discount has no amount when user has no approved flexible price
+    assert resp_data["product_flexible_price"] is None
+
+
+def test_product_user_flexible_price_unauthenticated(client, products):
+    """Test the user_flexible_price action requires authentication."""
+    product = products[random.randrange(0, len(products))]  # noqa: S311
+
+    resp = client.get(
+        reverse("v0:products_api-user-flexible-price", kwargs={"pk": product.id})
+    )
+
+    assert resp.status_code == 200
+    resp_data = resp.json()
+
+    # Verify basic product fields are present
+    assert resp_data["id"] == product.id
+
+    # Verify flexible price discount has no amount when user has no approved flexible price
+    assert resp_data["product_flexible_price"] is None
+
+
+@pytest.mark.parametrize("purchased_a_program", [False, True])
+def test_user_pricing_quotes_the_paid_amount_off_credit(
+    user_client, user, purchased_a_program
+):
+    """
+    An eligible learner sees the program at price minus their child purchase,
+    and the credit names the courseware they bought: a run purchase names its
+    course, a sub-program purchase names the program.
+    """
+    purchased = (
+        ProgramFactory.create() if purchased_a_program else CourseRunFactory.create()
+    )
+    offer = make_paid_amount_off_offer(user, purchased)
+    credited = purchased if purchased_a_program else purchased.course
+
+    resp = user_client.get(
+        reverse(
+            "v0:products_api-user-pricing",
+            kwargs={"pk": offer.program_product.id},
+        )
+    )
+
+    assert resp.status_code == 200
+    quoted = resp.json()
+    assert quoted["user_price"] == "899.00"
+    assert quoted["discount"]["discount_type"] == DISCOUNT_TYPE_PAID_AMOUNT_OFF
+    assert quoted["discount"]["amount_off"] == "100.00"
+    assert quoted["discount"]["source"] == {
+        "type": CONTENT_TYPE_MODEL_PROGRAM
+        if purchased_a_program
+        else CONTENT_TYPE_MODEL_COURSE,
+        "readable_id": credited.readable_id,
+        "title": credited.title,
+    }
+
+
+def test_user_pricing_requires_a_signed_in_user(client):
+    """
+    An anonymous request is a 403, not a list-price quote: the answer is
+    per-user, and a silent anonymous fallback would hide a caller whose
+    session did not reach this host.
+    """
+    product = ProductFactory.create()
+
+    resp = client.get(
+        reverse("v0:products_api-user-pricing", kwargs={"pk": product.id})
+    )
+
+    assert resp.status_code == 403
+
+
+def test_user_pricing_returns_the_single_product_flexible_price_data(user_client, user):
+    """hq#12799: the response carries exactly what user_flexible_price returns."""
+    product = ProductFactory.create()
+    finaid = approve_flexible_price(user, product.purchasable_object.course, 50)
+
+    single = user_client.get(
+        reverse("v0:products_api-user-flexible-price", kwargs={"pk": product.id})
+    ).json()
+    quoted = user_client.get(
+        reverse("v0:products_api-user-pricing", kwargs={"pk": product.id})
+    ).json()
+
+    assert single["product_flexible_price"]["id"] == finaid.id
+    assert {key: quoted[key] for key in single} == single
+    assert quoted["discount"]["id"] == finaid.id
+    assert quoted["discount"]["payment_type"] == PAYMENT_TYPE_FINANCIAL_ASSISTANCE
+    assert quoted["discount"]["source"] is None
+
+
+def test_user_pricing_404s_for_a_product_the_queryset_excludes(user_client):
+    """A product whose run closed enrollment is a 404, like an unknown id."""
+    closed_run = CourseRunFactory.create(
+        enrollment_end=now_in_utc() - timedelta(days=1)
+    )
+    closed = ProductFactory.create(purchasable_object=closed_run)
+
+    resp = user_client.get(
+        reverse("v0:products_api-user-pricing", kwargs={"pk": closed.id})
+    )
+
+    assert resp.status_code == 404
+
+
+def test_get_basket(user_drf_client, user):
+    """Test the view that returns a state of Basket"""
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket)
+    resp = user_drf_client.get(reverse("v0:baskets_api-detail", args=[basket.id]))
+    assert_drf_json_equal(resp.json(), BasketWithProductSerializer(basket).data)
+
+
+def test_get_basket_items(user_drf_client, user):
+    """Test the view that returns a list of BasketItems in a Basket"""
+    basket = BasketFactory.create(user=user)
+    basket_item = BasketItemFactory.create(basket=basket)
+    basket_item_2 = BasketItemFactory.create(basket=basket)
+
+    # this item belongs to another basket, and should not be in the response
+    BasketItemFactory.create()
+    resp = user_drf_client.get(
+        reverse("v0:baskets_api-items-list", args=[basket.id]), follow=True
+    )
+    basket_info = resp.json()
+    assert len(basket_info) == 2
+    assert_drf_json_equal(
+        resp.json(),
+        [
+            BasketItemSerializer(basket_item).data,
+            BasketItemSerializer(basket_item_2).data,
+        ],
+    )
+
+
+def test_get_basket_item(user_drf_client, user):
+    """Test retrieving a single item from a basket."""
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket)
+    basket_item_2 = BasketItemFactory.create(basket=basket)
+
+    # this item belongs to another basket, and should not be in the response
+    BasketItemFactory.create()
+    resp = user_drf_client.get(
+        reverse("v0:baskets_api-items-detail", args=[basket.id, basket_item_2.id]),
+        follow=True,
+    )
+    assert_drf_json_equal(
+        resp.json(),
+        BasketItemSerializer(basket_item_2).data,
+    )
+
+
+def test_delete_basket_item(user_drf_client, user):
+    """Test the view to delete item from the basket"""
+    basket_item = BasketItemFactory.create(basket__user=user)
+    basket = basket_item.basket
+    assert basket.basket_items.count() == 1
+    user_drf_client.delete(
+        reverse("v0:baskets_api-items-detail", args=[basket.id, basket_item.id]),
+        content_type="application/json",
+    )
+    assert BasketItem.objects.filter(basket=basket).count() == 0
+
+
+def test_add_basket_item(user_drf_client, user):
+    """Test the view to add a new item into the Basket"""
+    new_product = ProductFactory.create()
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket)
+    assert BasketItem.objects.filter(basket__user=user).count() == 1
+
+    resp = user_drf_client.post(
+        reverse("v0:baskets_api-items-list", args=[basket.id]),
+        data={
+            "user": user.id,
+            "product": new_product.id,
+            "basket": basket.id,
+        },
+        follow=True,
+    )
+
+    assert resp.status_code == 201
+    assert BasketItem.objects.filter(basket__user=user).count() == 2
+
+
+@pytest.mark.parametrize("existing_basket", [True, False])
+@pytest.mark.parametrize("add_discount", [True, False])
+@pytest.mark.parametrize("bad_product", [True, False])
+@override_settings(ENABLE_MULTIPLE_CART_ITEMS=True)
+@pytest.mark.zeal_allow("ecommerce.Product", "get()")
+@pytest.mark.zeal_allow("ecommerce.BasketItem", "get()")
+def test_create_basket_with_products(
+    user, user_client, existing_basket, add_discount, bad_product
+):
+    """Test creating a basket with products."""
+
+    products = ProductFactory.create_batch(size=2)
+
+    basket = BasketFactory(user=user) if existing_basket else None
+
+    url = reverse("v0:baskets_api-create_with_products")
+    payload = {
+        "product_ids": [
+            {"product_id": -3 if bad_product else product.id, "quantity": 1}
+            for product in products
+        ],
+    }
+
+    if add_discount:
+        discount = DiscountFactory(discount_type="fixed-price", amount=100)
+        payload["discount_code"] = discount.discount_code
+
+    response = user_client.post(
+        url,
+        data=payload,
+        content_type="application/json",
+    )
+
+    if bad_product:
+        assert response.status_code == 404
+        return
+
+    assert response.status_code == 200
+
+    basket_id = response.data["id"]
+    assert Basket.objects.get(id=basket_id).basket_items.count() == 2
+
+    if existing_basket:
+        assert basket
+        assert basket_id == basket.id
+
+    if add_discount:
+        assert (
+            Basket.objects.get(id=basket_id)
+            .discounts.filter(redeemed_discount=discount)
+            .exists()
+        )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        pytest.param({}, id="product_ids-missing"),
+        pytest.param({"product_ids": [5]}, id="product_ids-not-objects"),
+        pytest.param(
+            {"product_ids": [{"product_id": 5, "quantity": 0}]},
+            id="quantity-below-minimum",
+        ),
+    ],
+)
+def test_create_basket_with_products_rejects_malformed_body(user_client, payload):
+    """A body that doesn't match the request serializer is rejected with a 400."""
+
+    response = user_client.post(
+        reverse("v0:baskets_api-create_with_products"),
+        data=payload,
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+
+
+@pytest.mark.parametrize("discount_code", ["", None], ids=["blank", "null"])
+def test_create_basket_with_products_empty_discount_code(user_client, discount_code):
+    """An empty discount code means "no discount", not a validation error."""
+
+    product = ProductFactory.create()
+
+    response = user_client.post(
+        reverse("v0:baskets_api-create_with_products"),
+        data={
+            "product_ids": [{"product_id": product.id, "quantity": 1}],
+            "discount_code": discount_code,
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert Basket.objects.get(id=response.data["id"]).discounts.count() == 0
+
+
+def test_create_basket_with_products_checkout_redirects(user_client):
+    """The checkout flag sends the user to the checkout interstitial."""
+
+    product = ProductFactory.create()
+
+    response = user_client.post(
+        reverse("v0:baskets_api-create_with_products"),
+        data={
+            "product_ids": [{"product_id": product.id, "quantity": 1}],
+            "checkout": True,
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 302
+    assert response.url == reverse("checkout_interstitial_page")
+
+
+@pytest.mark.parametrize(
+    (
+        "existing_basket",
+        "add_discount",
+        "bad_discount",
+        "existing_discount",
+    ),
+    [
+        (True, False, False, "no"),
+        (False, True, False, "no"),
+        (False, False, False, "no"),
+        (False, True, True, "no"),
+        (True, True, False, "better"),
+        (True, True, True, "better"),
+        (True, True, False, "worse"),
+        (True, True, True, "worse"),
+    ],
+)
+@pytest.mark.zeal_allow("ecommerce.BasketDiscount", "get()")
+def test_create_basket_with_product(  # noqa: PLR0913
+    user,
+    user_client,
+    existing_basket,
+    add_discount,
+    bad_discount,
+    existing_discount,
+):
+    """Test creating a basket with a single product, and/or a discount."""
+
+    # Use a fixed price well above any discount amount so that the discount
+    # comparison logic works correctly regardless of discount type (percent-off,
+    # dollars-off, or fixed-price).
+    product = ProductFactory.create(price=Decimal("1000.00"))
+
+    basket = BasketFactory(user=user) if existing_basket else None
+
+    url = reverse(
+        "v0:baskets_api-create_from_product",
+        kwargs={"product_id": product.id},
+    )
+
+    if add_discount:
+        if existing_discount in ["better", "worse"]:
+            # Create and apply a percent-off discount that is either better or
+            # worse than the supplied 50% discount below. "better" = 60% off
+            # (lower final price), "worse" = 10% off (higher final price).
+            # redemption_type is set explicitly to avoid import-time randomness
+            # from DiscountFactory affecting discount validity checks.
+
+            ex_discount = DiscountFactory(
+                discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+                amount=10 if existing_discount == "worse" else 60,
+                redemption_type=REDEMPTION_TYPE_UNLIMITED,
+            )
+            BasketDiscount.objects.create(
+                redeemed_basket=basket,
+                redeemed_discount=ex_discount,
+                redeemed_by=user,
+                redemption_date=now_in_utc(),
+            )
+
+        if bad_discount:
+            discount = DiscountFactory(
+                discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+                amount=50,
+                max_redemptions=1,
+                redemption_type=REDEMPTION_TYPE_UNLIMITED,
+            )
+            order = OrderFactory.create(state=OrderStatus.FULFILLED)
+            DiscountRedemption.objects.create(
+                redeemed_by=order.purchaser,
+                redemption_date=order.created_on,
+                redeemed_discount=discount,
+                redeemed_order=order,
+            )
+        else:
+            discount = DiscountFactory(
+                discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+                amount=50,
+                redemption_type=REDEMPTION_TYPE_UNLIMITED,
+            )
+
+        url = reverse(
+            "v0:baskets_api-create_from_product_with_discount",
+            kwargs={
+                "product_id": product.id,
+                "discount_code": discount.discount_code,
+            },
+        )
+
+    response = user_client.post(url)
+
+    # This returns a 201 if we created the _basket line item_.
+    assert response.status_code >= 200
+    assert response.status_code < 300
+
+    basket_id = response.data["id"]
+    assert Basket.objects.get(id=basket_id).basket_items.count() == 1
+
+    if existing_basket:
+        assert basket
+        assert basket_id == basket.id
+
+    if add_discount and existing_discount == "no":
+        if bad_discount:
+            assert (
+                not Basket.objects.get(id=basket_id)
+                .discounts.filter(redeemed_discount=discount)
+                .exists()
+            )
+        else:
+            assert (
+                Basket.objects.get(id=basket_id)
+                .discounts.filter(redeemed_discount=discount)
+                .exists()
+            )
+
+    if add_discount and existing_discount != "no":
+        if bad_discount:
+            assert (
+                not Basket.objects.get(id=basket_id)
+                .discounts.filter(redeemed_discount=discount)
+                .exists()
+            )
+            assert (
+                Basket.objects.get(id=basket_id)
+                .discounts.filter(redeemed_discount=ex_discount)
+                .exists()
+            )
+        else:
+            assert (
+                Basket.objects.get(id=basket_id)
+                .discounts.filter(
+                    redeemed_discount=(
+                        discount if existing_discount == "worse" else ex_discount
+                    )
+                )
+                .exists()
+            )
+
+
+# These four tests use transaction=True rather than the default django_db
+# marker. The views under test call select_for_update(), which requires an
+# active transaction.atomic() block in the view itself - the default
+# django_db marker silently masks a missing atomic() block by wrapping the
+# whole test in its own outer transaction, so this is the only way to
+# actually exercise (and catch regressions in) that requirement.
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.zeal_allow("ecommerce.Discount", "products")
+def test_create_basket_from_product_lists_the_paid_amount_off_credit(
+    mocker, user_drf_client, paid_amount_off_source
+):
+    """The cart shows the automatic credit as a discount line, not just a lower total."""
+    mocker.patch("ecommerce.views.v0.sync_hubspot_cart_add")
+    url = reverse(
+        "v0:baskets_api-create_from_product",
+        kwargs={"product_id": paid_amount_off_source.program_product.id},
+    )
+
+    response = user_drf_client.post(url)
+
+    assert response.status_code == 201
+    assert Decimal(response.data["discounted_price"]) == Decimal("899.00")
+    assert [d["redeemed_discount"]["id"] for d in response.data["discounts"]] == [
+        paid_amount_off_source.discount.id
+    ]
+
+
+def test_create_basket_from_product_anonymous(mocker):
+    """
+    Test that an anonymous caller can create a basket via create_from_product,
+    without triggering hubspot sync or picking up auto-applied discounts.
+    """
+    mock_sync = mocker.patch("ecommerce.views.v0.sync_hubspot_cart_add")
+    product = ProductFactory.create()
+    UnlimitedUseDiscountFactory.create(automatic=True)
+
+    client = Client()
+    url = reverse(
+        "v0:baskets_api-create_from_product",
+        kwargs={"product_id": product.id},
+    )
+
+    response = client.post(url)
+
+    assert response.status_code == 201
+
+    basket = Basket.objects.get(id=response.data["id"])
+    assert basket.is_anonymous is True
+    assert basket.basket_items.count() == 1
+    assert basket.discounts.count() == 0
+    mock_sync.assert_not_called()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_create_basket_from_product_anonymous_checkout_redirect(mocker):
+    """Test that checkout=True redirects an anonymous caller to the anonymous checkout flow"""
+    mocker.patch("ecommerce.views.v0.sync_hubspot_cart_add")
+    product = ProductFactory.create()
+
+    client = Client()
+    url = reverse(
+        "v0:baskets_api-create_from_product",
+        kwargs={"product_id": product.id},
+    )
+
+    response = client.post(url, {"checkout": True})
+
+    assert response.status_code == 302
+    assert response.url == reverse("checkout-anonymous")
+
+
+@pytest.mark.django_db(transaction=True)
+def test_clear_basket_anonymous():
+    """Test that an anonymous caller can clear their own anonymous basket"""
+    client = Client()
+    product = ProductFactory.create()
+
+    create_url = reverse(
+        "v0:baskets_api-create_from_product",
+        kwargs={"product_id": product.id},
+    )
+    response = client.post(create_url)
+    basket_id = response.data["id"]
+
+    clear_response = client.delete(reverse("v0:baskets_api-clear_basket"))
+
+    assert clear_response.status_code == 204
+    assert not Basket.objects.filter(id=basket_id).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_clear_basket_anonymous_with_no_basket_yet():
+    """Test that clearing with no prior basket is a harmless no-op"""
+    client = Client()
+
+    response = client.delete(reverse("v0:baskets_api-clear_basket"))
+
+    assert response.status_code == 204
+
+
+@pytest.mark.parametrize(
+    ["try_flex_pricing_discount", "try_whitespace"],  # noqa: PT006
+    [
+        [True, False],  # noqa: PT007
+        [False, True],  # noqa: PT007
+        [True, True],  # noqa: PT007
+    ],
+)
+def test_redeem_discount(  # noqa: PLR0913
+    user,
+    user_drf_client,
+    products,
+    discounts,
+    try_flex_pricing_discount,
+    try_whitespace,
+):
+    """
+    Bootstraps a basket (see create_basket) and then attempts to redeem a
+    discount on it. Should get back a success message. (The API call returns an
+    ID so this doesn't just do json_equal.)
+
+    The try_flex_pricing_discount sets whether or not the discount should be
+    flagged to be used with a Flexible Pricing tier. If it is, then the
+    redemption attempt should fail.
+
+    The try_whitespace flag sets whether or not the discount should have some
+    whitespace appended/prepended to it - the redemption code should strip this
+    and the code should apply successfully.
+    """
+    basket = create_basket(user, products)
+
+    assert basket is not None
+    assert len(basket.basket_items.all()) > 0
+
+    discount = discounts[random.randrange(0, len(discounts))]  # noqa: S311
+
+    if try_flex_pricing_discount:
+        discount.payment_type = PAYMENT_TYPE_FINANCIAL_ASSISTANCE
+        discount.save()
+        discount.refresh_from_db()
+
+    if try_whitespace:
+        # limit the discount_code to 47 so we can shove some blank characters in
+        discount.discount_code = discount.discount_code[0:45]
+        discount.discount_code = f"   {discount.discount_code}  "[0:50]
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
+    )
+
+    resp_json = resp.json()
+
+    if try_flex_pricing_discount:
+        assert "not found" in resp_json
+    else:
+        assert "message" in resp_json
+        assert resp_json["message"] == "Discount applied"
+
+
+def test_redeem_internal_discount_is_not_found(user, user_drf_client, products):
+    """An internal discount's code is inert at the cart, even when it links to the product in the basket."""
+    basket = create_basket(user, products)
+    discount = InternalDiscountFactory.create()
+    DiscountProduct.objects.create(
+        discount=discount, product=basket.basket_items.first().product
+    )
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
+    )
+
+    assert resp.status_code == 404
+    assert basket.discounts.count() == 0
+
+
+# Discount tests
+
+
+def test_discount_rest_api(admin_drf_client, user_drf_client):
+    """
+    Checks that the admin REST API is only accessible by an admin
+    user, and then checks basic functionality (list, retrieve, create).
+    """
+    discount = DiscountFactory.create()
+    discount_payload = model_to_dict(discount)
+    discount_payload["discount_code"] += "Test"
+    discount_payload["id"] = None
+
+    # checking permissions - these should return 403
+
+    resp = user_drf_client.get(reverse("v0:discounts_api-list"))
+    assert resp.status_code == 403
+
+    resp = user_drf_client.get(
+        reverse("v0:discounts_api-detail", kwargs={"pk": discount.id})
+    )
+    assert resp.status_code == 403
+
+    resp = user_drf_client.post(reverse("v0:discounts_api-list"), discount_payload)
+    assert resp.status_code == 403
+
+    resp = user_drf_client.patch(
+        reverse("v0:discounts_api-detail", kwargs={"pk": discount.id}), discount_payload
+    )
+    assert resp.status_code == 403
+
+    resp = user_drf_client.delete(
+        reverse("v0:discounts_api-detail", kwargs={"pk": discount.id})
+    )
+    assert resp.status_code == 403
+
+    # checking CRUD ops
+
+    resp = admin_drf_client.get(reverse("v0:discounts_api-list"))
+    data = resp.json()
+
+    assert resp.status_code == 200
+    assert len(resp.json()) >= 1
+    assert data[0]["id"] == discount.id
+
+    resp = admin_drf_client.get(
+        reverse("v0:discounts_api-detail", kwargs={"pk": discount.id})
+    )
+    data = resp.json()
+
+    assert resp.status_code == 200
+    assert data["id"] == discount.id
+
+    resp = admin_drf_client.post(reverse("v0:discounts_api-list"), discount_payload)
+    data = resp.json()
+
+    assert resp.status_code == 201
+    assert data["discount_code"] == discount_payload["discount_code"]
+    assert data["id"] is not None
+
+    data["discount_code"] = "New Discount Code"
+    discount_payload = data
+
+    resp = admin_drf_client.patch(
+        reverse("v0:discounts_api-detail", kwargs={"pk": discount_payload["id"]}),
+        discount_payload,
+    )
+    data = resp.json()
+
+    assert resp.status_code == 200
+    assert_drf_json_equal(resp.json(), DiscountSerializer(discount_payload).data)
+
+    resp = admin_drf_client.delete(
+        reverse("v0:discounts_api-detail", kwargs={"pk": discount_payload["id"]})
+    )
+
+    assert resp.status_code == 204
+    assert Discount.objects.filter(pk=discount_payload["id"]).count() == 0
+
+
+def test_discount_rest_api_refuses_to_retype_an_internal_discount(admin_drf_client):
+    """Staff can edit discounts over the API, but re-typing an internal one would make its code live."""
+    discount = InternalDiscountFactory.create()
+
+    resp = admin_drf_client.patch(
+        reverse("v0:discounts_api-detail", kwargs={"pk": discount.id}),
+        {"redemption_type": REDEMPTION_TYPE_UNLIMITED},
+    )
+
+    assert resp.status_code == 400
+    discount.refresh_from_db()
+    assert discount.redemption_type == REDEMPTION_TYPE_INTERNAL
+
+
+def test_discount_rest_api_refuses_an_automatic_internal_discount(admin_drf_client):
+    """The API mirror of the internal shape rule returns a 400, not a 500."""
+    resp = admin_drf_client.post(
+        reverse("v0:discounts_api-list"),
+        {
+            "amount": 100,
+            "automatic": True,
+            "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+            "redemption_type": REDEMPTION_TYPE_INTERNAL,
+            "discount_code": "automatic-internal",
+        },
+    )
+
+    assert resp.status_code == 400
+    assert not Discount.objects.filter(discount_code="automatic-internal").exists()
+
+
+def test_attaching_a_non_program_product_to_a_program_child_purchase_discount_is_a_400(
+    admin_drf_client,
+):
+    """Program-child-purchase discounts only ever link to program products."""
+    discount = PaidAmountOffDiscountFactory.create()
+    product = ProductFactory.create()  # course-run product
+
+    resp = admin_drf_client.patch(
+        reverse("v0:discounts_api-products-detail", args=[discount.id, product.id]),
+        {"product_id": product.id},
+    )
+
+    assert resp.status_code == 400
+    assert not DiscountProduct.objects.filter(
+        discount=discount, product=product
+    ).exists()
+
+
+def test_attaching_a_deactivated_product_is_a_404(admin_drf_client):
+    """Product.delete() only clears is_active; a deactivated product can't be sold,
+    so it can't be linked either — same as the dashboard's product picker.
+    """
+    discount = DiscountFactory.create()
+    product = ProductFactory.create()
+    product.delete()
+
+    resp = admin_drf_client.patch(
+        reverse("v0:discounts_api-products-detail", args=[discount.id, product.id]),
+        {"product_id": product.id},
+    )
+
+    assert resp.status_code == 404
+    assert not DiscountProduct.objects.filter(
+        discount=discount, product=product
+    ).exists()
+
+
+def test_attaching_to_an_unknown_discount_is_a_404(admin_drf_client):
+    """A discount id that matches nothing is a client error, not a server one."""
+    missing_id = DiscountFactory.create().id + 1
+    product = ProductFactory.create()
+
+    resp = admin_drf_client.patch(
+        reverse("v0:discounts_api-products-detail", args=[missing_id, product.id]),
+        {"product_id": product.id},
+    )
+
+    assert resp.status_code == 404
+
+
+def test_attaching_an_unknown_product_is_a_404(admin_drf_client):
+    """A product_id that matches nothing is a client error, not a server one."""
+    discount = DiscountFactory.create()
+    missing_id = ProductFactory.create().id + 1
+
+    resp = admin_drf_client.patch(
+        reverse("v0:discounts_api-products-detail", args=[discount.id, missing_id]),
+        {"product_id": missing_id},
+    )
+
+    assert resp.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "zerovalue",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.skip_nplusone_check
+def test_discount_redemptions_api(
+    user, products, admin_drf_client, user_drf_client, zerovalue
+):
+    """
+    Tests pulling redemeptions from a discount after submitting an order with
+    one in it.
+    """
+
+    discount = DiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_FIXED_PRICE,
+        amount=0 if zerovalue else 1,
+    )
+
+    # permissions testing
+    resp = user_drf_client.get(
+        reverse("v0:discounts_api-detail", kwargs={"pk": discount.id})
+    )
+    assert resp.status_code == 403
+
+    resp = user_drf_client.get(
+        reverse("v0:discounts_api-redemptions-list", args=[discount.id]),
+    )
+    assert resp.status_code == 403
+
+    # create basket with discount, then check for redemptions
+
+    create_basket(user, products)
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
+    )
+
+    assert resp.status_code == 200
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+
+    assert resp.status_code == 200
+
+    # If the order is zero-value, the response changes somewhat, so check for that.
+    if zerovalue:
+        assert "no_checkout" in resp.json()
+        assert resp.json()["no_checkout"]
+    else:
+        assert len(resp.json()["payload"].keys()) > 0
+
+    resp = admin_drf_client.get(
+        reverse("v0:discounts_api-redemptions-list", args=[discount.id]),
+    )
+    assert resp.status_code == 200
+
+    results = resp.json()
+    assert len(results) > 0
+
+
+def test_user_discounts_api(user_drf_client, admin_drf_client, discounts, user):
+    """
+    Tests retrieving and creating user discounts via the API.
+    """
+
+    discount = discounts[random.randrange(0, len(discounts))]  # noqa: S311
+
+    # permissions testing
+
+    resp = user_drf_client.get(reverse("v0:discounts_api-detail", args=[discount.id]))
+    assert resp.status_code == 403
+
+    resp = user_drf_client.get(
+        reverse("v0:discounts_api-assignees-list", args=[discount.id]),
+    )
+    assert resp.status_code == 403
+
+    # create a user discount using the model first
+
+    user_discount = UserDiscount(discount=discount, user=user)
+    user_discount.save()
+
+    resp = admin_drf_client.get(
+        reverse("v0:discounts_api-assignees-list", args=[discount.id]),
+    )
+    assert resp.status_code == 200
+
+    data = resp.json()
+    assert len(data) > 0
+
+    resp = admin_drf_client.get(
+        reverse(
+            "v0:discounts_api-assignees-detail", args=[discount.id, user_discount.id]
+        ),
+    )
+    assert resp.status_code == 200
+
+    data = resp.json()
+    assert data["id"] == user_discount.id
+
+    # try to post a user discount - that should also work
+    discount = DiscountFactory.create()
+
+    resp = admin_drf_client.post(
+        reverse("v0:discounts_api-assignees-list", args=[discount.id]),
+        {"discount": discount.id, "user": user.id},
+    )
+    assert resp.status_code >= 200 and resp.status_code < 300  # noqa: PT018
+
+    resp = admin_drf_client.get(
+        reverse("v0:discounts_api-assignees-list", args=[discount.id]),
+    )
+    assert resp.status_code == 200
+
+    data = resp.json()
+    assert len(data) > 0
+
+
+@pytest.mark.parametrize("use_redemption_type_flags", [True, False])
+def test_bulk_discount_create(admin_drf_client, use_redemption_type_flags):
+    """
+    Try to make some bulk discounts.
+    """
+    test_payload = {
+        "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+        "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
+        "count": 5,
+        "amount": 50,
+        "prefix": "Generated-Code-",
+        "expires": "2030-01-01T00:00:00",
+        "one_time": True,
+    }
+
+    if use_redemption_type_flags:
+        test_payload["one_time"] = True
+    else:
+        test_payload["redemption_type"] = REDEMPTION_TYPE_ONE_TIME
+
+    resp = admin_drf_client.post(
+        reverse("v0:discounts_api-create_batch"),
+        test_payload,
+    )
+
+    assert resp.status_code == 201
+
+    discounts = Discount.objects.filter(
+        discount_code__startswith="Generated-Code-"
+    ).all()
+
+    assert len(discounts) == 5
+
+    assert discounts[0].discount_type == DISCOUNT_TYPE_PERCENT_OFF
+    assert discounts[0].redemption_type == REDEMPTION_TYPE_ONE_TIME
+    assert discounts[0].amount == 50
+    assert discounts[0].is_bulk
+
+
+def test_bulk_discount_create_rejects_a_percent_off_above_100(admin_drf_client):
+    """
+    generate_discount_code enforces this ceiling with a bare Exception, so the
+    serializer has to answer 400 before the view reaches it.
+    """
+    resp = admin_drf_client.post(
+        reverse("v0:discounts_api-create_batch"),
+        {
+            "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+            "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
+            "count": 5,
+            "amount": 101,
+            "prefix": "Generated-Code-",
+        },
+    )
+
+    assert resp.status_code == 400
+    assert not Discount.objects.filter(
+        discount_code__startswith="Generated-Code-"
+    ).exists()
+
+
+@pytest.mark.parametrize("count", [None, 1], ids=["count-omitted", "count-1"])
+def test_bulk_discount_create_generates_one_code_from_a_prefix(admin_drf_client, count):
+    """A prefix generates codes whether or not the caller asks for more than one."""
+    payload = {
+        "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+        "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
+        "amount": 50,
+        "prefix": "Generated-Code-",
+    }
+
+    if count is not None:
+        payload["count"] = count
+
+    resp = admin_drf_client.post(
+        reverse("v0:discounts_api-create_batch"),
+        payload,
+    )
+
+    assert resp.status_code == 201
+    assert (
+        Discount.objects.filter(discount_code__startswith="Generated-Code-").count()
+        == 1
+    )
+
+
+def test_bulk_discount_create_with_explicit_codes(admin_drf_client):
+    """Named codes are created verbatim, with no prefix involved."""
+    resp = admin_drf_client.post(
+        reverse("v0:discounts_api-create_batch"),
+        {
+            "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+            "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
+            "amount": 50,
+            "codes": ["FIRST-CODE", "SECOND-CODE"],
+        },
+    )
+
+    assert resp.status_code == 201
+    assert sorted(Discount.objects.values_list("discount_code", flat=True)) == [
+        "FIRST-CODE",
+        "SECOND-CODE",
+    ]
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        pytest.param(
+            {"prefix": "Generated-Code-", "codes": ["A-CODE"]}, id="prefix-and-codes"
+        ),
+        pytest.param({}, id="neither-prefix-nor-codes"),
+        pytest.param({"codes": ["A-CODE"], "count": 2}, id="codes-with-count"),
+        pytest.param({"prefix": "Generated-Code-", "count": 0}, id="count-below-one"),
+    ],
+)
+def test_bulk_discount_create_rejects_ambiguous_code_sources(admin_drf_client, extra):
+    """
+    generate_discount_code takes codes or a prefix, never both and never neither,
+    and count only applies to a prefix. The serializer answers 400 for the rest.
+    """
+    resp = admin_drf_client.post(
+        reverse("v0:discounts_api-create_batch"),
+        {
+            "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+            "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
+            "amount": 50,
+            **extra,
+        },
+    )
+
+    assert resp.status_code == 400
+    assert not Discount.objects.exists()
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        pytest.param(
+            {"discount_type": DISCOUNT_TYPE_PAID_AMOUNT_OFF}, id="calculation"
+        ),
+        pytest.param(
+            {"redemption_type": REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE}, id="redemption"
+        ),
+        pytest.param({"redemption_type": REDEMPTION_TYPE_INTERNAL}, id="internal"),
+    ],
+)
+def test_bulk_discount_create_rejects_the_new_discount_and_redemption_types(
+    admin_drf_client, override
+):
+    """
+    A paid-amount-off discount needs the matching redemption type, a
+    program-child-purchase discount needs automatic plus the program product
+    links, and an internal discount is never learner-redeemable, so bulk
+    generation refuses all three rather than raising its way to a 500.
+    """
+    resp = admin_drf_client.post(
+        reverse("v0:discounts_api-create_batch"),
+        {
+            "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+            "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
+            "count": 5,
+            "amount": 50,
+            "prefix": "Generated-Code-",
+            **override,
+        },
+    )
+
+    assert resp.status_code == 400
+    assert not Discount.objects.filter(
+        discount_code__startswith="Generated-Code-"
+    ).exists()
+
+
+# Checkout tests
+
+
+@pytest.mark.parametrize("try_product_discount", [True, False])
+def test_redeem_product_discount(
+    user, user_drf_client, products, discounts, try_product_discount
+):
+    """
+    Bootstraps a basket (see create_basket) and then attempts to redeem a
+    discount on it that is linked to an existing product. The result depends
+    on try_product_discount.
+
+    The try_product_discount parameter sets whether or not the discount should
+    apply to the product that gets generated. If True, the discount application
+    should succeed. If False, it won't.
+    """
+    basket = create_basket(user, products)
+
+    assert basket is not None
+    assert len(basket.basket_items.all()) > 0
+
+    discount = discounts[random.randrange(0, len(discounts))]  # noqa: S311
+
+    if try_product_discount:
+        discount_product = DiscountProduct(
+            discount=discount, product=basket.basket_items.first().product
+        ).save()
+        discount.refresh_from_db()
+    else:
+        new_product = ProductFactory.create()
+        discount_product = DiscountProduct(  # noqa: F841
+            discount=discount, product=new_product
+        ).save()
+        discount.refresh_from_db()
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
+    )
+
+    resp_json = resp.json()
+
+    if try_product_discount:
+        assert "message" in resp_json
+        assert resp_json["message"] == "Discount applied"
+    else:
+        assert "not found" in resp_json
+
+
+def test_redeem_discount_with_higher_discount(
+    user, user_drf_client, products, discounts
+):
+    """
+    Bootstraps a basket (see create_basket) and then attempts to redeem a
+    discount on it. Should get back a success message. (The API call returns an
+    ID so this doesn't just do json_equal.)
+    """
+    product = products[random.randrange(0, len(products), 1)]  # noqa: S311
+    course = product.purchasable_object.course
+    tier = FlexiblePriceTierFactory.create(
+        courseware_object=course,
+        income_threshold_usd=25000,
+        current=True,
+        discount__amount=50,
+    )
+    flexible_price = FlexiblePriceFactory.create(  # noqa: F841
+        income_usd=50000,
+        country_of_income="US",
+        user=user,
+        courseware_object=course,
+        status=FlexiblePriceStatus.APPROVED,
+        tier=tier,
+    )
+    basket = create_basket(user, [product])
+
+    assert basket is not None
+    assert len(basket.basket_items.all()) > 0
+
+    discount = discounts[random.randrange(0, len(discounts))]  # noqa: S311
+
+    # check flexible price discount is applied
+    resp = user_drf_client.get(reverse("checkout_api-cart"))
+    resp_json = resp.json()
+    assert (
+        float(resp_json["discounts"][0]["redeemed_discount"]["amount"])
+        == tier.discount.amount
+    )
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
+    )
+    assert "message" in resp.json()
+    resp_json = resp.json()
+    assert resp_json["message"] == "Discount applied"
+
+    # check flexible price discount is applied
+    flexible_discounted_price = DiscountType.get_discounted_price(
+        [tier.discount], product
+    )
+    discounted_price = DiscountType.get_discounted_price([discount], product)
+    resp = user_drf_client.get(reverse("checkout_api-cart"))
+    resp_json = resp.json()
+
+    resolved_discount_amount = (
+        tier.discount.amount
+        if flexible_discounted_price < discounted_price
+        else discount.amount
+    )
+
+    assert (
+        float(resp_json["discounts"][0]["redeemed_discount"]["amount"])
+        == resolved_discount_amount
+    )
+
+
+@pytest.mark.parametrize(
+    "time, expects",  # noqa: PT006
+    [["valid", True], ["past", False], ["future", False]],  # noqa: PT007
+)
+def test_redeem_time_limited_discount(  # noqa: PLR0913
+    user, user_drf_client, products, discounts, time, expects
+):
+    """
+    Bootstraps a basket (see create_basket) and then attempts to redeem a
+    discount on it. The result will depend on whether or not the discount is
+    valid for the current time.
+    """
+    basket = create_basket(user, products)
+
+    assert basket is not None
+    assert len(basket.basket_items.all()) > 0
+
+    discount = discounts[random.randrange(0, len(discounts))]  # noqa: S311
+
+    check_delta = timedelta(days=30)
+
+    if time == "valid":
+        discount.activation_date = datetime.now(ZoneInfo(TIME_ZONE)) - check_delta
+        discount.expiration_date = datetime.now(ZoneInfo(TIME_ZONE)) + check_delta
+    elif time == "past":
+        discount.activation_date = (
+            datetime.now(ZoneInfo(TIME_ZONE)) - check_delta - check_delta
+        )
+        discount.expiration_date = datetime.now(ZoneInfo(TIME_ZONE)) - check_delta
+    elif time == "future":
+        discount.activation_date = datetime.now(ZoneInfo(TIME_ZONE)) + check_delta
+        discount.expiration_date = (
+            datetime.now(ZoneInfo(TIME_ZONE)) + check_delta + check_delta
+        )
+
+    mocked_date_delta = timedelta(days=90)
+    mocked_date_for_saving = datetime.now(ZoneInfo(TIME_ZONE)) - mocked_date_delta
+
+    with freezegun.freeze_time(mocked_date_for_saving):
+        discount.save()
+        discount.refresh_from_db()
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
+    )
+
+    resp_json = resp.json()
+
+    if expects:
+        assert "message" in resp_json
+        assert resp_json["message"] == "Discount applied"
+    else:
+        assert "not found" in resp_json
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout(user, user_drf_client, products):
+    """
+    Hits the start checkout view, which should create an Order record
+    and its associated line items.
+    """
+    create_basket(user, products)
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+
+    # if there's not a payload in here, something went wrong
+    assert "payload" in resp.json()
+
+    order = Order.objects.filter(purchaser=user).get()
+
+    assert order.state == OrderStatus.PENDING
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout_with_discounts(user, user_drf_client, products, discounts):
+    """
+    Applies a discount, then hits the start checkout view, which should create
+    an Order record and its associated line items.
+    """
+    test_redeem_discount(user, user_drf_client, products, discounts, False, False)  # noqa: FBT003
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+
+    # if there's not a payload in here, something went wrong
+    assert "payload" in resp.json()
+
+    order = Order.objects.filter(purchaser=user).get()
+
+    assert order.state == OrderStatus.PENDING
+
+
+@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
+def test_start_checkout_with_no_lines(user, user_drf_client):
+    """Test that checking out with an empty cart generates an error."""
+
+    basket = BasketFactory.create(user=user)
+
+    assert basket.basket_items.count() == 0
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+
+    assert "error" in resp.json()
+    assert resp.json()["error"] == USER_MSG_TYPE_BASKET_EMPTY
+    assert resp.status_code == 400
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize(
+    ("in_contract", "contract_type"),
+    [
+        (
+            True,
+            CONTRACT_MEMBERSHIP_CODE,
+        ),
+        (
+            False,
+            CONTRACT_MEMBERSHIP_CODE,
+        ),
+        (
+            False,
+            CONTRACT_MEMBERSHIP_MANAGED,
+        ),
+    ],
+)
+def test_start_checkout_with_b2b_products(
+    user, user_drf_client, in_contract, contract_type
+):
+    """Test that start_checkout works when there's B2B items in the basket."""
+
+    contract = ContractPageFactory.create(membership_type=contract_type)
+    courserun = CourseRunFactory.create(b2b_contracts=[contract], b2b_only=True)
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=courserun)
+
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product)
+
+    if in_contract:
+        user.b2b_contracts.add(contract)
+        user.b2b_organizations.add(contract.organization)
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+    resp_body = resp.json()
+
+    if in_contract:
+        assert resp.status_code == 200
+        assert not resp_body["error"]
+        return
+
+    assert "error" in resp_body
+    assert resp_body["error"] == USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE
+    assert resp.status_code == 400
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout_with_blocked_country(user, user_drf_client):
+    """Test that we get an error if the user's in a blocked country."""
+
+    courserun = CourseRunFactory.create()
+    blocked_country = BlockedCountryFactory.create(course=courserun.course)
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=courserun)
+
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product)
+
+    user.legal_address.country = str(blocked_country.country)
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+    resp_body = resp.json()
+
+    assert "error" in resp_body
+    assert resp_body["error"] == USER_MSG_TYPE_ENROLL_BLOCKED
+    assert resp.status_code == 400
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout_with_incomplete_profile(
+    mocker, mocked_export_compliance, user, user_drf_client
+):
+    """Checkout should ask for the missing profile fields instead of erroring."""
+    mocked_export_compliance.side_effect = verify_user_with_exports
+    mock_client = mocker.patch("compliance.api.get_cybersource_client")
+    courserun = CourseRunFactory.create()
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=courserun)
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product)
+    # A country that doesn't require state/postal code, so only these are missing
+    user.legal_address.country = "GB"
+    user.legal_address.street_address_1 = ""
+    user.legal_address.city = ""
+    user.legal_address.save()
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+
+    assert resp.status_code == 400
+    resp_body = resp.json()
+    assert resp_body["error"] == USER_MSG_TYPE_PROFILE_INCOMPLETE
+    assert resp_body["missing_fields"] == ["city", "street_address_1"]
+    mock_client.return_value.validate_export_compliance.assert_not_called()
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout_with_upgraded_course(user, user_drf_client):
+    """Test that we get an error if the user already has a verified enrollment."""
+
+    courserun = CourseRunFactory.create()
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=courserun)
+
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product)
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+    resp_body = resp.json()
+
+    assert resp.status_code == 200
+
+    order = Order.objects.filter(
+        reference_number=resp_body["payload"]["reference_number"]
+    ).get()
+    fulfill_completed_order(order, ZERO_PAYMENT_DATA, basket=basket)
+
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product)
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+    resp_body = resp.json()
+
+    assert "error" in resp_body
+    assert resp_body["error"] == USER_MSG_TYPE_ENROLL_DUPLICATED
+    assert resp.status_code == 400
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout_with_unupgradable_course(user, user_drf_client):
+    """Test that we get an error if the enrollment can't be upgraded."""
+
+    courserun = CourseRunFactory.create(
+        start_date=now_in_utc() - timedelta(days=30),
+        upgrade_deadline=now_in_utc() - timedelta(days=15),
+    )
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=courserun)
+
+    CourseRunEnrollmentFactory.create(user=user, run=courserun, enrollment_mode="audit")
+
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product)
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+    resp_body = resp.json()
+
+    assert "error" in resp_body
+    assert resp_body["error"] == USER_MSG_TYPE_COURSE_NON_UPGRADABLE
+    assert resp.status_code == 400
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout_with_bad_discount(user, user_drf_client):
+    """Test that we get an error if the user has a bad discount in the basket."""
+
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket)
+    discount = UnlimitedUseDiscountFactory.create()
+
+    other_product = ProductFactory.create()
+    DiscountProduct.objects.create(
+        discount=discount,
+        product=other_product,
+    )
+
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=discount,
+        redeemed_basket=basket,
+    )
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+    resp_body = resp.json()
+
+    assert "error" in resp_body
+    assert resp_body["error"] == USER_MSG_TYPE_DISCOUNT_INVALID
+    assert resp.status_code == 400
+
+
+@pytest.mark.zeal_allow("ecommerce.Product", "purchasable_object")
+def test_order_history_list(user, user_drf_client):
+    """Test that we can get a user's order history."""
+    with reversion.create_revision():
+        prod_1 = ProductFactory.create()
+        prod_2 = ProductFactory.create()
+
+    prod_1_version = Version.objects.get_for_object(prod_1).last()
+    prod_2_version = Version.objects.get_for_object(prod_2).last()
+
+    order_1 = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    order_1_line = LineFactory.create(order=order_1, product_version=prod_1_version)
+
+    order_2 = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    order_2_line = LineFactory.create(order=order_2, product_version=prod_2_version)
+
+    resp = user_drf_client.get(reverse("v0:orderhistory_api-list"))
+
+    assert resp.status_code == 200
+
+    payload = resp.json()
+    # Paginated even with no `limit`: the response shape must not depend on
+    # whether the caller passed a pagination parameter.
+    assert set(payload) == {"count", "next", "previous", "results"}
+    assert payload["count"] == 2
+
+    returned_orders = payload["results"]
+    assert len(returned_orders) == 2
+    for returned_order in returned_orders:
+        assert returned_order["id"] in [
+            order_1.id,
+            order_2.id,
+        ]
+        for order_line in returned_order["lines"]:
+            assert order_line["id"] in [
+                order_1_line.id,
+                order_2_line.id,
+            ]
+
+
+def test_order_history_retrieve(user, user_drf_client):
+    """Test that we can get a user's order history."""
+    with reversion.create_revision():
+        prod_1 = ProductFactory.create()
+
+    prod_1_version = Version.objects.get_for_object(prod_1).last()
+
+    order_1 = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    order_1_line = LineFactory.create(order=order_1, product_version=prod_1_version)
+
+    resp = user_drf_client.get(reverse("v0:orderhistory_api-list"), {"id": order_1.id})
+
+    assert resp.status_code == 200
+
+    returned_orders = resp.json()["results"]
+    assert len(returned_orders) == 1
+    returned_order = returned_orders[0]
+    assert returned_order["id"] == order_1.id
+    assert returned_order["lines"][0]["id"] == order_1_line.id
+
+
+# Each extra order on the page costs this many queries, all of them rooted in
+# `LineSerializer.product`: `Line.product` rebuilds an unsaved Product from a
+# reversion Version, so its generic `purchasable_object` — and the course, course
+# page, feature image, instructors, flexible-pricing form and current price under
+# it — resolve per line. A prefetch on the view's Order queryset cannot reach
+# them; serializing `line.purchased_object`, which is already prefetched, instead
+# of `product.purchasable_object` could.
+QUERIES_PER_ADDITIONAL_ORDER = 10
+
+# What one request costs before any order is serialized.
+FIXED_QUERIES_PER_PAGE = 6
+
+
+def _create_order_with_line(user):
+    """Create one fulfilled order carrying a single course-run line."""
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    LineFactory.create(
+        order=order,
+        product_version=Version.objects.get_for_object(product).last(),
+    )
+
+
+def _order_history_query_count(user_drf_client):
+    """Query count for one page of order history."""
+    with CaptureQueriesContext(connection) as queries:
+        resp = user_drf_client.get(reverse("v0:orderhistory_api-list"))
+    assert resp.status_code == 200
+    return len(queries.captured_queries)
+
+
+@pytest.mark.zeal_allow("ecommerce.Product", "purchasable_object")
+def test_order_history_query_count_grows_only_by_the_known_page_walk(
+    user, user_drf_client
+):
+    """
+    Pin what a page of order history costs in queries, and what a row adds.
+
+    Two row counts rather than one: the difference isolates a per-row
+    regression, which an absolute count alone cannot distinguish from a rise in
+    fixed cost, and the totals catch a regression that runs once per request,
+    which the difference alone cancels out. Any drop here is welcome and means
+    lowering a constant.
+    """
+    for _ in range(2):
+        _create_order_with_line(user)
+    # The ContentType and Site caches are process-wide, so the first request in
+    # a process pays their misses. Warm them ahead of both measurements.
+    _order_history_query_count(user_drf_client)
+    two_orders = _order_history_query_count(user_drf_client)
+
+    for _ in range(4):
+        _create_order_with_line(user)
+    six_orders = _order_history_query_count(user_drf_client)
+
+    assert six_orders - two_orders == 4 * QUERIES_PER_ADDITIONAL_ORDER
+    assert two_orders == FIXED_QUERIES_PER_PAGE + 2 * QUERIES_PER_ADDITIONAL_ORDER
+    assert six_orders == FIXED_QUERIES_PER_PAGE + 6 * QUERIES_PER_ADDITIONAL_ORDER
+
+
+def test_order_history_titles_follow_the_snapshotted_product(user, user_drf_client):
+    """
+    A title is decided by the product the line snapshots, not by the line's own
+    denormalized `purchased_content_type`.
+
+    The two agree wherever the app creates Lines, so a disagreement is the
+    symptom of reading the column instead: a program product would take the
+    course-run branch and dereference `.course` on a `Program`.
+    """
+    with reversion.create_revision():
+        product = ProgramProductFactory.create()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    LineFactory.create(
+        order=order,
+        product_version=Version.objects.get_for_object(product).last(),
+    )
+
+    resp = user_drf_client.get(reverse("v0:orderhistory_api-list"))
+
+    assert resp.status_code == 200
+    assert resp.json()["results"][0]["titles"] == [f"No Title - {product.id}"]
+
+
+@pytest.mark.skip_nplusone_check
+def test_order_receipt_retrieve(user, user_drf_client):
+    """Test that we can get a receipt for a user's order."""
+    with reversion.create_revision():
+        prod_1 = ProductFactory.create()
+
+    prod_1_version = Version.objects.get_for_object(prod_1).last()
+
+    order_1 = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    order_1_line = LineFactory.create(order=order_1, product_version=prod_1_version)
+    TransactionFactory.create(order=order_1)
+
+    resp = user_drf_client.get(
+        reverse("v0:order_receipt_api", kwargs={"pk": order_1.id})
+    )
+
+    assert resp.status_code == 200
+
+    receipt = resp.json()
+
+    assert receipt["reference_number"] == order_1.reference_number
+    assert Decimal(receipt["lines"][0]["price"]) == order_1_line.total_price
+    # The TransactionFactory creates a transaction with no payment data so this
+    # should be None.
+    assert receipt["transactions"]["card_number"] is None
+
+
+@pytest.mark.skip_nplusone_check
+def test_program_product_purchasing(user, user_drf_client):
+    """Test that we can purchase products that are for programs."""
+
+    program = ProgramFactory.create()
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=program, price=0)
+
+    basket = BasketFactory.create(user=user)
+    BasketItem.objects.create(basket=basket, product=product)
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+
+    assert "no_checkout" in resp.json()
+
+    assert ProgramEnrollment.objects.filter(
+        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    ).exists()
+
+
+def test_receipt_by_run_redirects(user, client):
+    """Test that a fulfilled PaidCourseRun redirects to the correct receipt URL."""
+    client.force_login(user)
+    course_run = CourseRunFactory.create()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    PaidCourseRun.objects.create(user=user, course_run=course_run, order=order)
+
+    resp = client.get(
+        reverse("order_receipt_by_run_lookup", kwargs={"run_id": course_run.id})
+    )
+
+    assert resp.status_code == 302
+    assert resp["Location"] == f"/orders/receipt/{order.id}/"
+
+
+def test_receipt_by_run_redirects_on_non_api_route(user, client):
+    """Test non-API route redirects for a fulfilled PaidCourseRun."""
+    client.force_login(user)
+    course_run = CourseRunFactory.create()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    PaidCourseRun.objects.create(user=user, course_run=course_run, order=order)
+
+    resp = client.get(
+        reverse("order_receipt_by_run_lookup", kwargs={"run_id": course_run.id})
+    )
+
+    assert resp.status_code == 302
+    assert resp["Location"] == f"/orders/receipt/{order.id}/"
+
+
+def test_receipt_by_run_not_found(user, client):
+    """Test that a missing PaidCourseRun returns 404."""
+    client.force_login(user)
+    course_run = CourseRunFactory.create()
+
+    resp = client.get(
+        reverse("order_receipt_by_run_lookup", kwargs={"run_id": course_run.id})
+    )
+
+    assert resp.status_code == 404
+
+
+def test_receipt_by_run_unauthenticated(client):
+    """Test that unauthenticated users are redirected to the login page."""
+    next_path = reverse("order_receipt_by_run_lookup", kwargs={"run_id": 1})
+    resp = client.get(next_path)
+
+    assert resp.status_code == 302
+    location = resp["Location"]
+    assert "/login/" in location
+    next_values = parse_qs(urlparse(location).query).get("next")
+    assert next_values is not None
+    assert unquote(next_values[0]) == next_path
+
+
+def test_receipt_by_run_uses_latest_paid_record(user, client):
+    """Test receipt-by-run picks the latest fulfilled PaidCourseRun."""
+    client.force_login(user)
+    course_run = CourseRunFactory.create()
+    older_order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    newer_order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    PaidCourseRun.objects.create(user=user, course_run=course_run, order=older_order)
+    PaidCourseRun.objects.create(user=user, course_run=course_run, order=newer_order)
+
+    resp = client.get(
+        reverse("order_receipt_by_run_lookup", kwargs={"run_id": course_run.id})
+    )
+
+    assert resp.status_code == 302
+    assert resp["Location"] == f"/orders/receipt/{newer_order.id}/"
+
+
+def test_receipt_by_program_redirects(user, client):
+    """Test that a fulfilled PaidProgram redirects to the correct receipt URL."""
+    client.force_login(user)
+    program = ProgramFactory.create()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    PaidProgram.objects.create(user=user, program=program, order=order)
+
+    resp = client.get(
+        reverse("order_receipt_by_program_lookup", kwargs={"program_id": program.id})
+    )
+
+    assert resp.status_code == 302
+    assert resp["Location"] == f"/orders/receipt/{order.id}/"
+
+
+def test_receipt_by_program_redirects_on_non_api_route(user, client):
+    """Test non-API route redirects for a fulfilled PaidProgram."""
+    client.force_login(user)
+    program = ProgramFactory.create()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    PaidProgram.objects.create(user=user, program=program, order=order)
+
+    resp = client.get(
+        reverse("order_receipt_by_program_lookup", kwargs={"program_id": program.id})
+    )
+
+    assert resp.status_code == 302
+    assert resp["Location"] == f"/orders/receipt/{order.id}/"
+
+
+def test_receipt_by_program_not_found(user, client):
+    """Test that a missing PaidProgram returns 404."""
+    client.force_login(user)
+    program = ProgramFactory.create()
+
+    resp = client.get(
+        reverse("order_receipt_by_program_lookup", kwargs={"program_id": program.id})
+    )
+
+    assert resp.status_code == 404
+
+
+def test_receipt_by_program_unauthenticated(client):
+    """Test that unauthenticated users are redirected to the login page."""
+    next_path = reverse("order_receipt_by_program_lookup", kwargs={"program_id": 1})
+    resp = client.get(next_path)
+
+    assert resp.status_code == 302
+    location = resp["Location"]
+    assert "/login/" in location
+    next_values = parse_qs(urlparse(location).query).get("next")
+    assert next_values is not None
+    assert unquote(next_values[0]) == next_path
+
+
+def test_receipt_by_program_uses_latest_paid_record(user, client):
+    """Test receipt-by-program picks the latest fulfilled PaidProgram."""
+    client.force_login(user)
+    program = ProgramFactory.create()
+    older_order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    newer_order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    PaidProgram.objects.create(user=user, program=program, order=older_order)
+    PaidProgram.objects.create(user=user, program=program, order=newer_order)
+
+    resp = client.get(
+        reverse("order_receipt_by_program_lookup", kwargs={"program_id": program.id})
+    )
+
+    assert resp.status_code == 302
+    assert resp["Location"] == f"/orders/receipt/{newer_order.id}/"
+
+
+def test_refund_request_success(user, user_drf_client):
+    """An authenticated user can submit a refund request for their own fulfilled order."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": "other",
+            "refund_reason_text": "Changed my mind.",
+            "consent_given": True,
+        },
+    )
+
+    assert resp.status_code == 201
+    assert RefundRequest.objects.filter(order=order, user=user).exists()
+
+
+def test_refund_request_unauthenticated(client):
+    """Unauthenticated requests to the refund request endpoint are rejected."""
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+
+    resp = client.post(
+        reverse("v0:refund_requests_api"),
+        data={"order": order.id, "consent_given": True},
+        content_type="application/json",
+    )
+
+    assert resp.status_code == 403
+
+
+def test_refund_request_other_users_order(user, user_drf_client):
+    """A user cannot submit a refund request for another user's order."""
+    other_order = OrderFactory.create(state=OrderStatus.FULFILLED)
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={"order": other_order.id, "consent_given": True},
+    )
+
+    assert resp.status_code == 400
+    assert "order" in resp.json()["errors"]
+
+
+def test_refund_request_non_fulfilled_order(user, user_drf_client):
+    """A refund request for a non-fulfilled order is rejected."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.PENDING)
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={"order": order.id, "consent_given": True},
+    )
+
+    assert resp.status_code == 400
+    assert "order" in resp.json()["errors"]
+
+
+def test_refund_request_no_consent(user, user_drf_client):
+    """A refund request submitted without consent is rejected."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={"order": order.id, "consent_given": False},
+    )
+
+    assert resp.status_code == 400
+    assert "consent_given" in resp.json()["errors"]
+
+
+@pytest.mark.skip_nplusone_check
+def test_refund_request_b2b_order(user, user_drf_client):
+    """B2B contract orders are excluded from self-service refund requests."""
+    contract = ContractPageFactory.create()
+    courserun = CourseRunFactory.create(b2b_contracts=[contract])
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=courserun)
+    product_version = Version.objects.get_for_object(product).last()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    LineFactory.create(
+        order=order,
+        purchased_object=courserun,
+        product_version=product_version,
+        b2b_contract=contract,
+    )
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={"order": order.id, "consent_given": True},
+    )
+
+    assert resp.status_code == 400
+    assert "order" in resp.json()["errors"]
+
+
+def test_order_history_includes_refund_eligible(user, user_drf_client):
+    """Order history responses include the refund_eligible field."""
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    product_version = Version.objects.get_for_object(product).last()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    LineFactory.create(order=order, product_version=product_version)
+
+    resp = user_drf_client.get(reverse("v0:orderhistory_api-list"))
+
+    assert resp.status_code == 200
+    returned_orders = resp.json()["results"]
+    assert len(returned_orders) == 1
+    assert "refund_eligible" in returned_orders[0]
+
+
+@pytest.mark.skip_nplusone_check
+def test_order_receipt_includes_refund_deadline(user, user_drf_client):
+    """The receipt carries the refund window's end so the UI can display it."""
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    product_version = Version.objects.get_for_object(product).last()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    LineFactory.create(order=order, product_version=product_version)
+
+    resp = user_drf_client.get(reverse("v0:order_receipt_api", kwargs={"pk": order.id}))
+
+    assert resp.status_code == 200
+    receipt = resp.json()
+    assert receipt["refund_eligible"] is True
+    assert parse_datetime(receipt["refund_deadline"]) == order.refund_deadline
+
+
+def test_refund_request_duplicate_rejected(user, user_drf_client):
+    """A second request is rejected while the first is still awaiting review."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    payload = {
+        "order": order.id,
+        "refund_reason": "financial_reasons",
+        "consent_given": True,
+    }
+
+    assert (
+        user_drf_client.post(
+            reverse("v0:refund_requests_api"), data=payload
+        ).status_code
+        == 201
+    )
+
+    resp = user_drf_client.post(reverse("v0:refund_requests_api"), data=payload)
+
+    assert resp.status_code == 400
+    assert "order" in resp.json()["errors"]
+    assert RefundRequest.objects.filter(order=order).count() == 1
+
+
+def test_refund_request_accepted_when_review_is_required(
+    paid_amount_off_source, user_drf_client
+):
+    """A used-source order can still request a refund — it just gets a human."""
+    order = paid_amount_off_source.source_line.order
+    DiscountRedemptionFactory.create(
+        redeemed_discount=paid_amount_off_source.discount,
+        source_line=paid_amount_off_source.source_line,
+        redeemed_order=OrderFactory.create(state=OrderStatus.FULFILLED),
+    )
+    assert order.refund_status == OrderRefundStatus.REVIEW_REQUIRED
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": "other",
+            "refund_reason_text": "I upgraded to the full program.",
+            "consent_given": True,
+        },
+    )
+
+    assert resp.status_code == 201
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize("order_count", [2, 6])
+def test_order_history_answers_funded_credits_in_the_page_query(
+    user, user_drf_client, order_count
+):
+    """The funded-credit check is one EXISTS in the list query, not one per order."""
+    lines = [
+        make_purchase(user, CourseRunFactory.create(), Decimal("100.00"))
+        for _ in range(order_count)
+    ]
+    DiscountRedemptionFactory.create(
+        redeemed_discount=PaidAmountOffDiscountFactory.create(),
+        source_line=lines[0],
+        redeemed_order=OrderFactory.create(state=OrderStatus.FULFILLED),
+    )
+
+    with CaptureQueriesContext(connection) as ctx:
+        resp = user_drf_client.get(reverse("v0:orderhistory_api-list"))
+
+    assert resp.status_code == 200
+    eligible = {
+        order["id"]: order["refund_eligible"] for order in resp.json()["results"]
+    }
+    assert eligible[lines[0].order.id] is False
+    assert all(eligible[line.order.id] for line in lines[1:])
+    assert (
+        sum("ecommerce_discountredemption" in q["sql"] for q in ctx.captured_queries)
+        == 1
+    )
+
+
+def test_refund_request_allowed_after_denial(user, user_drf_client):
+    """A denied request does not block the learner from asking again."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    RefundRequest.objects.create(
+        order=order, user=user, consent_given=True, status=RefundRequestStatus.DENIED
+    )
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": "financial_reasons",
+            "consent_given": True,
+        },
+    )
+
+    assert resp.status_code == 201
+
+
+@pytest.mark.parametrize("refund_reason", ["", "other"])
+def test_refund_request_requires_text_without_a_preset_reason(
+    user, user_drf_client, refund_reason
+):
+    """A blank reason and "Other" both need the learner's own words."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": refund_reason,
+            "refund_reason_text": "   ",
+            "consent_given": True,
+        },
+    )
+
+    assert resp.status_code == 400
+    assert "refund_reason_text" in resp.json()["errors"]
+
+
+def test_refund_request_preset_reason_needs_no_text(user, user_drf_client):
+    """A preset reason stands on its own."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": "technical_difficulties",
+            "consent_given": True,
+        },
+    )
+
+    assert resp.status_code == 201
+
+
+def test_refund_request_text_length_capped(user, user_drf_client):
+    """The free-text reason is capped to the length the UI advertises."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": "other",
+            "refund_reason_text": "x" * 1001,
+            "consent_given": True,
+        },
+    )
+
+    assert resp.status_code == 400
+    assert "refund_reason_text" in resp.json()["errors"]
+
+
+@pytest.mark.skip_nplusone_check
+def test_order_receipt_includes_refund_status(user, user_drf_client):
+    """The receipt reports one refund state for the UI to branch on."""
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    product_version = Version.objects.get_for_object(product).last()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    LineFactory.create(order=order, product_version=product_version)
+
+    resp = user_drf_client.get(reverse("v0:order_receipt_api", kwargs={"pk": order.id}))
+
+    assert resp.status_code == 200
+    assert resp.json()["refund_status"] == "eligible"
+    assert resp.json()["refund_requested_on"] is None
+
+
+@pytest.mark.skip_nplusone_check
+def test_order_receipt_refund_status_after_requesting(user, user_drf_client):
+    """Submitting a request moves the receipt's refund state without a page change."""
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    product_version = Version.objects.get_for_object(product).last()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    LineFactory.create(order=order, product_version=product_version)
+
+    user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": "financial_reasons",
+            "consent_given": True,
+        },
+    )
+
+    receipt = user_drf_client.get(
+        reverse("v0:order_receipt_api", kwargs={"pk": order.id})
+    ).json()
+
+    assert receipt["refund_status"] == "requested"
+    assert parse_datetime(receipt["refund_requested_on"]) == (
+        order.refund_requests.get().created_on
+    )
+
+
+@pytest.mark.parametrize(
+    "refund_reason",
+    [
+        "not_enough_time",
+        "course_not_as_expected",
+        "technical_difficulties",
+        "course_too_difficult",
+        "purchased_by_mistake",
+        "prefer_not_to_say",
+    ],
+)
+def test_refund_request_accepts_every_preset_reason(
+    user, user_drf_client, refund_reason
+):
+    """Every reason the refund modal offers is accepted without free text."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": refund_reason,
+            "consent_given": True,
+        },
+    )
+
+    assert resp.status_code == 201
+    assert RefundRequest.objects.get(order=order).refund_reason == refund_reason
+
+
+def test_refund_request_rejects_an_unknown_reason(user, user_drf_client):
+    """A reason outside the enum is rejected rather than stored."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+
+    resp = user_drf_client.post(
+        reverse("v0:refund_requests_api"),
+        data={
+            "order": order.id,
+            "refund_reason": "i_changed_my_mind",
+            "consent_given": True,
+        },
+    )
+
+    assert resp.status_code == 400
+    assert "refund_reason" in resp.json()["errors"]
+
+
+@pytest.mark.skip_nplusone_check
+def test_order_receipt_reports_when_a_request_was_decided(user, user_drf_client):
+    """A declined request carries the date it was decided, not just submitted."""
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    product_version = Version.objects.get_for_object(product).last()
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    LineFactory.create(order=order, product_version=product_version)
+    request = RefundRequest.objects.create(
+        order=order, user=user, consent_given=True, status=RefundRequestStatus.DENIED
+    )
+
+    receipt = user_drf_client.get(
+        reverse("v0:order_receipt_api", kwargs={"pk": order.id})
+    ).json()
+
+    assert receipt["refund_status"] == "denied"
+    assert parse_datetime(receipt["refund_reviewed_on"]) == request.updated_on

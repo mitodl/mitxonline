@@ -3,7 +3,8 @@
 import logging
 import random
 from datetime import datetime, timedelta
-from urllib.parse import parse_qs, urljoin, urlparse
+from functools import partial
+from urllib.parse import parse_qs, quote, urljoin, urlparse
 
 import requests
 from django.conf import settings
@@ -12,6 +13,8 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.shortcuts import reverse
 from edx_api.client import EdxApi
+from edx_api.course_detail.models import CourseMode
+from edx_api.course_list import CourseList
 from edx_api.course_runs.exceptions import CourseRunAPIError
 from edx_api.course_runs.models import CourseRun, CourseRunList
 from mitol.common.utils import (
@@ -28,16 +31,23 @@ from rest_framework import status
 import courses.models
 from authentication import api as auth_api
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
+from main import features
 from main.utils import get_partitioned_set_difference, get_redis_lock
 from openedx.constants import (
+    CANNOT_CLEAR_DEADLINE_MSG,
     EDX_DEFAULT_ENROLLMENT_MODE,
+    EDX_ENROLLMENT_VERIFIED_MODE,
+    OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
     OPENEDX_USERNAME_MAX_LEN,
     PLATFORM_EDX,
+    UpgradeDeadlineSyncResult,
 )
 from openedx.exceptions import (
+    EdxApiCourseOutlineError,
     EdxApiEmailSettingsErrorException,
     EdxApiEnrollErrorException,
+    EdxApiNotificationPreferencesError,
     EdxApiRegistrationValidationException,
     EdxApiUserUpdateError,
     NoEdxApiAuthError,
@@ -47,7 +57,7 @@ from openedx.exceptions import (
     UnknownEdxApiEnrollException,
     UserNameUpdateFailedException,
 )
-from openedx.models import OpenEdxApiAuth, OpenEdxUser
+from openedx.models import CourseRunClone, OpenEdxApiAuth, OpenEdxUser
 from openedx.utils import SyncResult, edx_url
 
 log = logging.getLogger(__name__)
@@ -56,6 +66,7 @@ User = get_user_model()
 OPENEDX_REGISTER_USER_PATH = "/user_api/v1/account/registration/"
 OPENEDX_REGISTRATION_VALIDATION_PATH = "/api/user/v1/validation/registration"
 OPENEDX_UPDATE_USER_PATH = "/api/user/v1/accounts/"
+OPENEDX_NOTIFICATION_PREFERENCES_PATH = "/api/notifications/v3/configurations/"
 OPENEDX_REQUEST_DEFAULTS = dict(honor_code=True)  # noqa: C408
 
 OPENEDX_SOCIAL_LOGIN_PATH = settings.OPENEDX_SOCIAL_LOGIN_PATH
@@ -64,6 +75,7 @@ OPENEDX_OAUTH2_ACCESS_TOKEN_PATH = "/oauth2/access_token"  # noqa: S105
 OPENEDX_OAUTH2_SCOPES = ["read", "write"]
 OPENEDX_OAUTH2_ACCESS_TOKEN_PARAM = "code"  # noqa: S105
 OPENEDX_OAUTH2_ACCESS_TOKEN_EXPIRY_MARGIN_SECONDS = 10
+OPENEDX_OAUTH2_INVALID_GRANT_ERROR = "invalid_grant"
 
 OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS = 60
 OPENEDX_AUTH_MAX_TTL_IN_SECONDS = 60 * 60
@@ -79,10 +91,23 @@ def create_user(user, edx_username=None):
 
     Args:
         user (user.models.User): the application user
+        edx_username (str): the username to use in Open edX (optional)
     """
+    ignore_edx_failures = settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False)
 
-    create_edx_user(user, edx_username)
-    create_edx_auth_token(user)
+    try:
+        create_edx_user(user, edx_username)
+    except Exception:
+        log.exception("Failed to create edX user for user: %s", user.id)
+        if not ignore_edx_failures:
+            raise
+
+    try:
+        create_edx_auth_token(user)
+    except Exception:
+        log.exception("Failed to create edX auth token for user: %s", user.id)
+        if not ignore_edx_failures:
+            raise
 
 
 def _build_user_data(user, current_username, access_token):
@@ -109,6 +134,14 @@ def _is_duplicate_username_error(resp, data):
     return (
         resp.status_code == status.HTTP_409_CONFLICT
         and data.get("error_code") == "duplicate-username"
+    )
+
+
+def _is_duplicate_email_error(resp, data):
+    """Check if the response indicates a duplicate email error."""
+    return (
+        resp.status_code == status.HTTP_409_CONFLICT
+        and data.get("error_code") == "duplicate-email"
     )
 
 
@@ -223,9 +256,27 @@ def _handle_username_collision(  # noqa: PLR0913
     if suggestions:
         suggested_usernames = suggestions
 
+    # Filter out any suggestions that are already taken locally in MITx Online.
+    # edX does not know about our local username uniqueness constraint, so its
+    # suggestions may collide with existing OpenEdxUser records here.
+    if suggested_usernames:
+        locally_taken = set(
+            OpenEdxUser.objects.filter(edx_username__in=suggested_usernames)
+            .exclude(user=user)
+            .values_list("edx_username", flat=True)
+        )
+        if locally_taken:
+            log.debug(
+                "Skipping OpenEdX suggestions already taken locally: %s",
+                locally_taken,
+            )
+            suggested_usernames = [
+                u for u in suggested_usernames if u not in locally_taken
+            ]
+
     if not suggested_usernames:
         log.info(
-            "OpenEdX returned empty username suggestions, falling back to local generation"
+            "OpenEdX returned no locally available username suggestions, falling back to local generation"
         )
         base_username = open_edx_user.desired_edx_username
         if not base_username:
@@ -256,7 +307,7 @@ def _set_edx_error(open_edx_user, data):
     open_edx_user.save()
 
 
-def _create_edx_user_request(open_edx_user, user, access_token):
+def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901, PLR0915
     """
     Handle the actual user creation request to Open edX with retry logic for duplicate usernames.
 
@@ -305,7 +356,7 @@ def _create_edx_user_request(open_edx_user, user, access_token):
     try:
         resp = None
         data = None
-
+        tried_duplicate_email_fix = False
         while attempt < max_attempts:
             attempt += 1
 
@@ -326,6 +377,16 @@ def _create_edx_user_request(open_edx_user, user, access_token):
 
             data = _parse_openedx_response(resp)
 
+            # Only try for LTI user duplicate email error fix if the response error was duplicate-email
+            if _is_duplicate_email_error(resp, data) and not tried_duplicate_email_fix:
+                tried_duplicate_email_fix = True
+                client = get_edx_api_lti_dup_email_client()
+                dup_email_fix_resp = client.fix_lti_user(email=user.email)
+                # If the LTI API fixed the duplicate email issue, Retry account creation
+                if dup_email_fix_resp.status_code == status.HTTP_200_OK:
+                    continue
+                break
+
             new_username, should_continue, should_reset_attempts = (
                 _handle_username_collision(
                     resp,
@@ -342,8 +403,7 @@ def _create_edx_user_request(open_edx_user, user, access_token):
                 if should_reset_attempts:
                     attempt = 0
                 continue
-            else:
-                break
+            break
 
         if _is_bad_request(resp):
             # this is a known type of error dependent on user input
@@ -355,6 +415,25 @@ def _create_edx_user_request(open_edx_user, user, access_token):
         lock.release()
 
 
+def _edx_user_exists(user):
+    """
+    Returns True if the user can be verified to exist in edX, False otherwise.
+    """
+    try:
+        client = get_edx_api_client(user)
+        if client is None:
+            return False
+        client.user_info.get_user_info()
+    except Exception:  # noqa: BLE001
+        log.warning(
+            "_edx_user_exists: could not verify edX user for: %s",
+            user.id,
+            exc_info=True,
+        )
+        return False
+    return True
+
+
 def create_edx_user(user, edx_username=None):
     """
     Makes a request to create an equivalent user in Open edX
@@ -363,7 +442,18 @@ def create_edx_user(user, edx_username=None):
         user (user.models.User): the application user
         edx_username (str): the username to use in Open edX
     """
-    application = Application.objects.get(name=settings.OPENEDX_OAUTH_APP_NAME)
+    ignore_edx_failures = settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False)
+
+    try:
+        application = Application.objects.get(name=settings.OPENEDX_OAUTH_APP_NAME)
+    except Application.DoesNotExist:
+        log.exception(
+            "create_edx_user: OpenEdX OAuth application not found for user: %s", user.id
+        )
+        if not ignore_edx_failures:
+            raise
+        return False
+
     expiry_date = now_in_utc() + timedelta(hours=settings.OPENEDX_TOKEN_EXPIRES_HOURS)
     access_token = AccessToken.objects.create(
         user=user, application=application, token=generate_token(), expires=expiry_date
@@ -379,19 +469,17 @@ def create_edx_user(user, edx_username=None):
         log.warning("create_edx_user: skipping create for %s, no edx_username", user)
         return False
 
-    if open_edx_user.has_been_synced:
-        # Here we should check with edx that the user exists on that end.
-        try:
-            client = get_edx_api_client(user)
-            client.user_info.get_user_info()
-        except:  # noqa: S110, E722
-            pass
-        else:
-            open_edx_user.has_been_synced = True
-            open_edx_user.save()
-            return False
+    if open_edx_user.has_been_synced and _edx_user_exists(user):
+        # User already exists in edX, skip creation
+        return False
 
-    return _create_edx_user_request(open_edx_user, user, access_token)
+    try:
+        return _create_edx_user_request(open_edx_user, user, access_token)
+    except Exception:
+        log.exception("create_edx_user: failed to create edX user for: %s", user.id)
+        if not ignore_edx_failures:
+            raise
+        return False
 
 
 def reconcile_edx_username(user, *, desired_username=None):
@@ -553,6 +641,12 @@ def update_edx_user_profile(user):
         )
         return
 
+    # Safety net, mirroring get_edx_api_client: make sure the user actually has an
+    # OpenEdxApiAuth record before we read it.
+    if create_edx_auth_token(user) is None:
+        log.info("Skipping user profile update for %s, could not create edX auth", user)
+        return
+
     auth = get_valid_edx_api_auth(user)
     req_session = requests.Session()
     resp = req_session.patch(
@@ -590,6 +684,12 @@ def update_edx_user_email(user):
     Args:
         user(user.models.User): the user to update the record for
     """
+    if not user.openedx_user_exists:
+        log.info(
+            "Skipping user email update for %s, user has no Open edX account", user
+        )
+        return
+
     with requests.Session() as req_session:
         django_session = auth_api.create_user_session(user)
         session_cookie = requests.cookies.create_cookie(
@@ -702,7 +802,7 @@ def repair_faulty_openedx_users(users):
         try:
             # edX is our only openedx for the time being. If a different openedx is added, this
             # function will need to be updated.
-            created_user, created_auth_token = repair_faulty_edx_user(user)
+            repair_faulty_edx_user(user)
         except HTTPError as exc:  # noqa: PERF203
             log.exception(
                 "Failed to repair faulty user %s (%s). %s",
@@ -750,27 +850,113 @@ def get_valid_edx_api_auth(user, ttl_in_seconds=OPENEDX_AUTH_DEFAULT_TTL_IN_SECO
     return auth
 
 
+def _is_dead_refresh_token_error(exc):
+    """
+    Determines whether a token endpoint error means the refresh token itself is dead.
+
+    Only a 400 invalid_grant means the token is dead, which Open edX returns once it has
+    been swept away by the expired-token job, rotated away, revoked (a password reset,
+    retirement or support-tool disable deletes a user's tokens outright), or issued to a
+    different OAuth application. Such a token can never be refreshed again, so the only
+    recovery is a full re-authorization.
+
+    The endpoint's other errors are not fixed by re-authorizing and would be hidden by
+    it, so they propagate: unauthorized_client and invalid_scope mean the Open edX OAuth
+    application is misconfigured, invalid_request and unsupported_grant_type mean we
+    built the request wrong, and a 401 invalid_client means our credentials are wrong.
+
+    Args:
+        exc (requests.exceptions.HTTPError): the error raised by the token request
+
+    Returns:
+        bool: whether a full re-authorization should be attempted
+    """
+    response = exc.response
+    if response is None or response.status_code != status.HTTP_400_BAD_REQUEST:
+        return False
+    try:
+        body = response.json()
+    except ValueError:
+        return False
+    return (
+        isinstance(body, dict)
+        and body.get("error") == OPENEDX_OAUTH2_INVALID_GRANT_ERROR
+    )
+
+
 def _refresh_edx_api_auth(auth):
     """
     Updates the api tokens for the given auth
+
+    If Open edX reports the stored refresh token is no longer usable, the tokens are
+    cleared and replaced by re-running the full authorization flow. When that
+    re-authorization fails the caller's transaction is left to roll the clearing back,
+    so the dead record survives rather than the user losing it.
 
     Args:
         auth (openedx.models.OpenEdxApiAuth): the auth to update
 
     Returns:
         auth:
-            updated OpenEdxApiAuth
+            the auth for the user, holding freshly issued tokens
+
+    Raises:
+        requests.exceptions.HTTPError: if the refresh failed for a reason re-authorizing
+            cannot fix. Re-authorizing has its own failure modes, which propagate too.
+        openedx.exceptions.NoEdxApiAuthError: if the user has no synced Open edX
+            account, leaving nothing to re-authorize against
     """
     # Note: this is subject to thundering herd problems, we should address this at some point
-    return _create_tokens_and_update_auth(
-        auth,
-        dict(  # noqa: C408
-            refresh_token=auth.refresh_token,
-            grant_type="refresh_token",
-            client_id=settings.OPENEDX_API_CLIENT_ID,
-            client_secret=settings.OPENEDX_API_CLIENT_SECRET,
-        ),
-    )
+    try:
+        return _create_tokens_and_update_auth(
+            auth,
+            dict(  # noqa: C408
+                refresh_token=auth.refresh_token,
+                grant_type="refresh_token",
+                client_id=settings.OPENEDX_API_CLIENT_ID,
+                client_secret=settings.OPENEDX_API_CLIENT_SECRET,
+            ),
+        )
+    except HTTPError as exc:
+        user = auth.user
+        response_summary = (
+            get_error_response_summary(exc.response)
+            if exc.response is not None
+            else "no response available"
+        )
+        if not _is_dead_refresh_token_error(exc):
+            # warning rather than exception: the raise below is what Sentry should
+            # report, and logging at error level would file the same failure twice
+            log.warning(
+                "Refreshing the Open edX token for %s failed unrecoverably. %s",
+                user,
+                response_summary,
+            )
+            raise
+        log.warning(
+            "Open edX rejected the refresh token for %s as invalid_grant; "
+            "re-running the authorization flow. %s",
+            user,
+            response_summary,
+        )
+        # cleared in place rather than deleted: get_valid_edx_api_auth holds this row
+        # under select_for_update, and a waiter that unblocks on a deleted row sees no
+        # row at all. Both values falsy is enough to stop create_edx_auth_token treating
+        # the record as already authorized.
+        auth.refresh_token = ""
+        auth.access_token = ""
+        auth.save(update_fields=["refresh_token", "access_token"])
+        try:
+            new_auth = create_edx_auth_token(user)
+        except Exception:
+            # distinguishes a failed recovery from an ordinary create_edx_auth_token
+            # failure, which are otherwise identical in Sentry
+            log.warning("Re-authorizing %s after invalid_grant failed", user)
+            raise
+        if new_auth is None:
+            msg = f"{user!s} no longer has a synced Open edX account to re-authorize"
+            raise NoEdxApiAuthError(msg) from exc
+        return new_auth
 
 
 def get_edx_api_client(user, ttl_in_seconds=OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS):
@@ -784,6 +970,18 @@ def get_edx_api_client(user, ttl_in_seconds=OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS)
     Returns:
          EdxApi: edx api client instance
     """
+    # create_edx_auth_token is called here as a safety net to ensure the user always
+    # has an OpenEdxApiAuth record before we try to read it. It is idempotent: internally
+    # it uses get_or_create, so calling it on every request is safe and causes no side
+    # effects when the record already exists.
+    if create_edx_auth_token(user) is None:
+        if settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False):
+            log.warning(
+                "get_edx_api_client: user %s is not yet synced with edX, skipping", user
+            )
+            return None
+        raise NoEdxApiAuthError(f"{user!s} is not yet synced with edX")  # noqa: EM102
+
     try:
         auth = get_valid_edx_api_auth(user, ttl_in_seconds=ttl_in_seconds)
     except OpenEdxApiAuth.DoesNotExist:
@@ -812,6 +1010,46 @@ def get_edx_api_service_client():
     )
 
     return edx_client  # noqa: RET504
+
+
+def get_edx_course_outline(course_id: str) -> dict:
+    """
+    Fetch course outline data from the Open edX course outline plugin endpoint.
+
+    Args:
+        course_id (str): edX course key (e.g., course-v1:MITx+1.00x+1T2026)
+    Returns:
+        dict: Parsed JSON response from the outline API
+    """
+    edx_client = get_edx_api_service_client()
+    encoded_course_id = quote(course_id, safe="")
+    outline_path = settings.OL_OPENEDX_COURSE_OUTLINE_URL.format(
+        course_id=encoded_course_id
+    )
+    outline_url = edx_url(outline_path)
+    requester = edx_client.get_requester()
+    try:
+        response = requester.get(outline_url)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as exc:
+        message = "Open edX course outline request failed"
+        log.exception(
+            "Failed to fetch Open edX course outline for course_id=%s url=%s",
+            course_id,
+            outline_url,
+        )
+        raise EdxApiCourseOutlineError(message) from exc
+
+    try:
+        return response.json()
+    except (ValueError, requests.exceptions.JSONDecodeError) as exc:
+        message = "Open edX course outline response was invalid"
+        log.exception(
+            "Open edX course outline response was not valid JSON for course_id=%s url=%s",
+            course_id,
+            outline_url,
+        )
+        raise EdxApiCourseOutlineError(message) from exc
 
 
 def get_edx_api_jwt_client(
@@ -850,7 +1088,11 @@ def get_edx_api_jwt_client(
         "client_secret": client_secret,
         "token_type": "jwt",
     }
-    resp = requests.post(edx_url(OPENEDX_OAUTH2_ACCESS_TOKEN_PATH), data=data)  # noqa: S113
+    resp = requests.post(
+        edx_url(OPENEDX_OAUTH2_ACCESS_TOKEN_PATH),
+        data=data,
+        timeout=settings.EDX_API_CLIENT_TIMEOUT,
+    )
     resp.raise_for_status()
     access_token = resp.json()["access_token"]
 
@@ -922,6 +1164,17 @@ def get_edx_api_course_detail_client():
     return edx_client.course_detail
 
 
+def get_edx_api_lti_dup_email_client():
+    """
+    Gets an edx api client instance for use with the grades api
+
+    Returns:
+        CourseDetails: edx api course client instance
+    """
+    edx_client = get_edx_api_service_client()
+    return edx_client.lti_tools
+
+
 def get_edx_api_course_mode_client():
     """
     Gets an edx api client instance for use with the grades api
@@ -933,15 +1186,74 @@ def get_edx_api_course_mode_client():
     return edx_client.course_mode
 
 
-def get_edx_api_course_list_client():
+def get_edx_api_course_list_client(*, use_jwt=True):
     """
     Gets an edx api client instance for use with the course list api
 
+    Uses a client-credentials JWT for the courses service worker when one is
+    configured, and the static service worker token otherwise. edX rate-limits
+    the course list API per user, so the JWT only gets its own limit when its
+    app is owned by a different user than the static token's, or once edX gives
+    service users a separate rate (openedx/openedx-platform#39180). The app's
+    user must be staff, or edX accepts the JWT but refuses to list courses;
+    sync_course_runs switches to the static token when that happens.
+
+    Falls back to the static token if the JWT can't be obtained, e.g. when the
+    courses service worker settings fall back to an app that doesn't allow the
+    client-credentials grant.
+
+    Args:
+        use_jwt (bool): False to skip the JWT and use the static token
+
     Returns:
-        CourseList: edx api course list client instance
+        tuple: (CourseList, bool) the edx api course list client instance, and
+        whether it uses the client-credentials JWT
     """
+    if (
+        use_jwt
+        and settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID
+        and settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET
+    ):
+        try:
+            edx_client = get_edx_api_jwt_client(
+                settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID,
+                settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET,
+            )
+        except requests.HTTPError as e:
+            # A 4xx means the app is set up wrong, which nothing else would
+            # surface, so make sure it reaches Sentry.
+            status_code = e.response.status_code if e.response is not None else None
+            log.log(
+                logging.ERROR
+                if status_code is not None and 400 <= status_code < 500  # noqa: PLR2004
+                else logging.WARNING,
+                "Could not get a client-credentials JWT for the course list API "
+                "(HTTP %s), using the static service worker token instead",
+                status_code,
+            )
+        except (KeyError, ValueError) as e:
+            # A 200 without a usable token also means the app is set up wrong.
+            # No exc_info, the traceback's frames hold the client secret.
+            log.error(  # noqa: TRY400
+                "Could not get a client-credentials JWT for the course list API "
+                "(%s), using the static service worker token instead",
+                type(e).__name__,
+            )
+        except requests.RequestException as e:
+            log.warning(
+                "Could not get a client-credentials JWT for the course list API "
+                "(%s), using the static service worker token instead",
+                type(e).__name__,
+            )
+        else:
+            # edX only accepts a JWT under the "JWT" scheme, but the client's
+            # course_list property always sends "Bearer".
+            return CourseList(
+                edx_client.get_requester(token_type="jwt"),  # noqa: S106
+                edx_client.base_url,
+            ), True
     edx_client = get_edx_api_service_client()
-    return edx_client.course_list
+    return edx_client.course_list, False
 
 
 def get_edx_api_grades_client():
@@ -1038,14 +1350,26 @@ def enroll_in_edx_course_runs(
     """
     edx_client = get_edx_api_service_client()
 
-    if not user.openedx_users.exists() or not user.edx_username:
-        msg = (
-            f"User {user} has no Open edX user (or no username): '{user.edx_username}'"
-        )
-        raise OpenEdxUserMissingError(msg)
+    # repair_faulty_edx_user's own check re-verifies existence against edX
+    # over HTTP even when we already know locally that the user is synced
+    # (see create_edx_user's `has_been_synced and _edx_user_exists(user)`),
+    # so only pay for that round trip - plus the fresh AccessToken/OpenEdxUser
+    # writes repair performs - when there's an actual local sign of trouble.
+    if not user.openedx_user_exists:
+        try:
+            repair_faulty_edx_user(user)
+        except Exception as exc:
+            msg = f"Failed to verify/create user {user.edx_username} in OpenEdX"
+            raise OpenEdxUserMissingError(msg) from exc
+
+        # Only re-check after a repair attempt; re-reading the property on the
+        # happy path repeats the same query (flagged as an N+1).
+        openedx_user = user.openedx_users.first()
+        if openedx_user is None or not openedx_user.has_been_synced:
+            msg = f"User {user.edx_username} does not exist in OpenEdX and could not be created"
+            raise OpenEdxUserMissingError(msg)
 
     username = user.edx_username
-
     results = []
     for course_run in course_runs:
         try:
@@ -1068,41 +1392,64 @@ def enroll_in_edx_course_runs(
                     )
             results.append(enrollment)
         except HTTPError as exc:  # noqa: PERF203
-            if exc.response.status_code == 406:  # noqa: PLR2004
-                log.warning(
-                    "User %s does not exist in edX, attempting to create user.",
-                    user.edx_username,
-                )
-                # If the user doesn't exist, we need to create them first
-                try:
-                    created_user, _ = repair_faulty_edx_user(user)
-                    if created_user:
-                        enrollment = edx_client.enrollments.create_student_enrollment(
-                            course_run.courseware_id,
-                            mode=mode,
-                            username=username,
-                            force_enrollment=force_enrollment,
-                        )
-                        results.append(enrollment)
-                except Exception as exc:
-                    log.exception("Failed to create user %s in edX.", user.edx_username)
-                    raise UnknownEdxApiEnrollException(user, course_run, exc) from exc
-            else:
-                log.exception(
-                    "Failed to enroll user %s in course run %s with mode %s.",
-                    user.edx_username,
-                    course_run.courseware_id,
-                    mode,
-                )
-                raise EdxApiEnrollErrorException(user, course_run, exc) from exc
+            # logging is left to callers, who are best positioned to decide
+            # the right level - retry_failed_edx_enrollments demotes
+            # permanent per-enrollment failures to WARNING to avoid paging
+            # Sentry on every retry (see MITXONLINE-5Q0); an unconditional
+            # log.error here would page Sentry regardless of that decision.
+            raise EdxApiEnrollErrorException(user, course_run, exc) from exc
         except Exception as exc:  # pylint: disable=broad-except
             raise UnknownEdxApiEnrollException(user, course_run, exc) from exc
     return results
 
 
+def _is_permanent_enrollment_failure(exc):
+    """
+    Whether a failed edX enrollment attempt is unlikely to ever succeed on
+    retry (expired course mode, deleted course run, etc) as opposed to a
+    transient/systemic failure (5xx, rate limiting, network error).
+
+    A systemic edX outage would otherwise cause every affected enrollment to
+    fail on the same run and get counted toward the retry cap together,
+    potentially exhausting all retries for perfectly healthy enrollments
+    within a single extended outage window instead of just the handful that
+    are actually permanently broken.
+    """
+    if isinstance(exc, OpenEdxUserMissingError):
+        # a user edX record that repair_faulty_edx_user can't create is not
+        # a transient blip in practice - see MITXONLINE-5Q0, chronic for 6+
+        # months at 52k+ events with no sign of resolving itself on retry
+        return True
+
+    if not isinstance(exc, EdxApiEnrollErrorException):
+        # network errors, unexpected exceptions, etc - assume transient
+        return False
+
+    response = exc.http_error.response
+    if response is None:
+        return False
+
+    return (
+        status.HTTP_400_BAD_REQUEST
+        <= response.status_code
+        < status.HTTP_500_INTERNAL_SERVER_ERROR
+        and response.status_code != status.HTTP_429_TOO_MANY_REQUESTS
+    )
+
+
 def retry_failed_edx_enrollments():
     """
-    Gathers all CourseRunEnrollments with edx_enrolled=False and retries them via the edX API
+    Gathers all CourseRunEnrollments with edx_enrolled=False and retries them via the edX API.
+
+    An enrollment that has already failed OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES
+    times with a permanent, per-enrollment error (see
+    _is_permanent_enrollment_failure) is excluded going forward instead of
+    being retried on every run forever - see MITXONLINE-5ZV, where a handful
+    of permanently-unrecoverable enrollments (expired course mode, deleted
+    course run) generated hundreds of thousands of repeat failures over 6+
+    months. Transient/systemic failures (edX downtime, rate limiting) don't
+    count against the cap, so an outage doesn't dead-letter healthy
+    enrollments that just happened to be retried during it.
 
     Returns:
         list of CourseRunEnrollment: All CourseRunEnrollments that were successfully retried
@@ -1114,6 +1461,7 @@ def retry_failed_edx_enrollments():
         user__is_active=True,
         edx_enrolled=False,
         created_on__lt=now - timedelta(minutes=OPENEDX_REPAIR_GRACE_PERIOD_MINS),
+        edx_enrollment_retry_count__lt=OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES,
     )
     succeeded = []
     for enrollment in failed_run_enrollments:
@@ -1124,7 +1472,38 @@ def retry_failed_edx_enrollments():
                 user, [course_run], mode=enrollment.enrollment_mode
             )
         except Exception as exc:  # pylint: disable=broad-except
-            log.exception(str(exc))  # noqa: TRY401
+            if not _is_permanent_enrollment_failure(exc):
+                # transient/unexpected - worth a Sentry event since it may
+                # signal a real edX outage or a new failure mode
+                log.exception(str(exc))  # noqa: TRY401
+                continue
+            # permanent, per-enrollment failure that is already tracked via
+            # edx_enrollment_retry_count and visible in the admin - logging
+            # this at ERROR would send a Sentry event on every one of
+            # OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES attempts for every broken
+            # enrollment, which is exactly what buried MITXONLINE-5Q0 in 1.26M+
+            # events. Log it at WARNING (kept in app logs, no Sentry issue)
+            # instead.
+            log.warning(
+                "edX enrollment repair failed permanently for user %s in course run %s (%s)",
+                user.edx_username,
+                course_run.courseware_id,
+                type(exc).__name__,
+                exc_info=True,
+            )
+            enrollment.edx_enrollment_retry_count += 1
+            enrollment.save(update_fields=["edx_enrollment_retry_count"])
+            if (
+                enrollment.edx_enrollment_retry_count
+                >= OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES
+            ):
+                log.warning(
+                    "Giving up on edX enrollment repair for user %s in course run "
+                    "%s after %d failed attempts - will not be retried automatically",
+                    user.edx_username,
+                    course_run.courseware_id,
+                    enrollment.edx_enrollment_retry_count,
+                )
         else:
             enrollment.edx_enrolled = True
             enrollment.edx_emails_subscription = True
@@ -1175,8 +1554,9 @@ def update_edx_user_name(user):
     Raises:
         UserNameUpdateFailedException: Raised if underlying edX API request fails due to any reason
     """
-
     edx_client = get_edx_api_client(user)
+    if edx_client is None:
+        return None
     try:
         return edx_client.user_info.update_user_name(user.edx_username, user.name)
     except Exception as exc:  # noqa: BLE001
@@ -1191,6 +1571,8 @@ def sync_enrollments_with_edx(
 ) -> SyncResult[courses.models.CourseRunEnrollment]:
     """Syncs enrollment records so that local enrollments match the enrollment data in edX"""
     client = get_edx_api_client(user)
+    if client is None:
+        return SyncResult()
     edx_enrollments = client.enrollments.get_student_enrollments()
     local_enrollments = (
         user.courserunenrollment_set(manager="all_objects")
@@ -1267,6 +1649,8 @@ def subscribe_to_edx_course_emails(user, course_run):
         EdxApiChangeEmailSettingsException: Raised if an unknown error was encountered during the edX API request
     """
     edx_client = get_edx_api_client(user)
+    if edx_client is None:
+        return None
     try:
         result = edx_client.email_settings.subscribe(course_run.courseware_id)
     except HTTPError as exc:
@@ -1293,6 +1677,8 @@ def unsubscribe_from_edx_course_emails(user, course_run):
         EdxApiChangeEmailSettingsException: Raised if an unknown error was encountered during the edX API request
     """
     edx_client = get_edx_api_client(user)
+    if edx_client is None:
+        return None
     try:
         result = edx_client.email_settings.unsubscribe(course_run.courseware_id)
     except HTTPError as exc:
@@ -1492,80 +1878,14 @@ def update_edx_course(  # noqa: PLR0913
     )
 
 
-def process_course_run_clone(target_id: int, *, base_id: int | str | None = None):
-    """
-    Clone a course run, using details from CourseRun objects in MITx Online.
-
-    When we need a new course run (as a re-run or a special B2B course run), we
-    create the CourseRun object in the system, and then we need to make the run
-    in edX. This will assume there's a base course run that uses the readable ID
-    of the underlying _Course_ record, and will clone that. Some of the data from
-    the CourseRun will then be copied over into the newly cloned edX run (dates,
-    etc.) and the URL will be backfilled into the CourseRun.
-
-    If a different course run needs to be used as the base course, you can
-    set that. Pass either the PK of the course or the readable ID. If a readable
-    ID is passed, it will be supplied verbatim to the clone API. (In other words,
-    it can be a course that MITx Online doesn't know about.)
-
-    Args:
-    - target_id (int): The PK of the target course (i.e. the one we're creating)
-    - base_id (int|str): The PK or readable ID of the base course to clone.
-    Returns:
-    bool, whether or not it worked
-    """
-    edx_client = get_edx_api_jwt_client(
-        settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID,
-        settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET,
-        use_studio=True,
-    )
-
-    target_course = courses.models.CourseRun.objects.get(pk=target_id)
-    base_course = target_course.course.readable_id
-
-    if base_id:
-        if base_id is int:
-            if courses.models.Course.objects.filter(pk=base_id).exists():
-                base_course = courses.models.Course.objects.get(pk=base_id).readable_id
-            elif courses.models.CourseRun.objects.filter(pk=base_id).exists():
-                base_course = courses.models.CourseRun.objects.get(
-                    pk=base_id
-                ).readable_id
-            else:
-                msg = f"Specified base course {base_id} doesn't exist."
-                raise ValueError(msg)
-        else:
-            base_course = str(base_id)
-
-    get_edx_course(base_course, client=edx_client)
-
-    try:
-        get_edx_course(target_course.readable_id, client=edx_client)
-
-        msg = f"Course ID {target_course.readable_id} was found in edX. Can't continue."
-        raise ValueError(msg)
-    except CourseRunAPIError:
-        # An HTTP error is good in this case. We don't want the target course to exist.
-        pass
-
-    resp = clone_edx_course(base_course, target_course.readable_id, client=edx_client)
-
-    if not resp:
-        msg = f"Couldn't clone {base_course} to {target_course.readable_id}."
-        raise ValueError(msg)
-
-    # We should have the target course in edX now. We need to update it with the
-    # data from our course run.
+def fix_cloned_run_data(target_course: CourseRun, *, edx_client=None) -> CourseRun:
+    """Fix the title, pacing, and dates for a newly cloned run."""
 
     course_params = [
         target_course.readable_id,
         target_course.title,
         "self_paced" if target_course.is_self_paced else "instructor_paced",
     ]
-
-    # We can only specify the start and end dates if there are both of them.
-    # And, we can only specify enrollment start/stop if there are both of them
-    # and the course has start/end dates.
 
     if target_course.start_date and target_course.end_date:
         course_params.append(target_course.start_date)
@@ -1575,20 +1895,542 @@ def process_course_run_clone(target_id: int, *, base_id: int | str | None = None
             course_params.append(target_course.enrollment_start)
             course_params.append(target_course.enrollment_end)
 
-    resp = update_edx_course(
+    return update_edx_course(
         *course_params,
         client=edx_client,
     )
 
-    # Set the ingestion flag on the course run to True
-    # All B2B courses should be flagged for content file ingestion - we can
-    # toggle it off manually if necessary.
-    # In the odd chance we don't have a page, trigger a warning.
-    if target_course.course.page:
-        target_course.course.page.ingest_content_files_for_ai = True
-        target_course.course.save()
+
+def process_course_run_clone(
+    target_course: CourseRun,
+    base_course_key: str,
+    *,
+    clone: CourseRunClone | None = None,
+):
+    """
+    Clone a course run in edX, using details from a set of MITx Online runs.
+
+    In edX, re-running a course copies course content into the new run, and allows
+    you to change certain parameters of the resulting run. Depending on final setup,
+    the new run gets content updates from the parent course run.
+
+    Re-running a course will instruct edX to re-run the specified base course,
+    using the parameters of the specified target course for the new run, including
+    the course run key (readable ID/courseware ID). Therefore, to use this, the
+    target_course must be set up properly before passing it in. Ensure that the
+    courseware ID is set up properly - including any run tag or organization field
+    changes - and that the run dates are set if necessary. Note that enrollment
+    dates can only be set if the course has a start and end date.
+
+    We'll kick off the re-run process, then update the new run with the data from
+    the target_course and ensure that the course modes are in as specified in the
+    target_course.
+
+    The base course can just be a course run key (as a string); it does not need
+    to exist in MITx Online.
+
+    The target course must _not_ exist in edX, unless `clone` shows an earlier
+    attempt already asked edX to create it. Then the clone request is skipped
+    and only the run data and modes are pushed, so a retry after a clone call
+    that edX completed but we did not see finish does not fail forever.
+
+    Args:
+    - target_course (CourseRun): The CourseRun to create in edX.
+    Kwargs:
+    - base_course_key (str): The key of the course to re-run.
+    - clone (CourseRunClone): the run's clone progress record, if tracked.
+    """
+
+    edx_client = get_edx_api_jwt_client(
+        settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID,
+        settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET,
+        use_studio=True,
+    )
+
+    # Ensure the base course exists on the edX side. You may pass a key in that
+    # does not exist in MITx Online, so we can't just check locally.
+    get_edx_course(base_course_key, client=edx_client)
+
+    try:
+        get_edx_course(target_course.readable_id, client=edx_client)
+    except CourseRunAPIError as exc:
+        # Only a 404 says the target is absent. Anything else (auth, a 5xx) says
+        # nothing about it, and treating it as absent would stamp the request
+        # and clone over whatever is there. Re-raise so the task retries.
+        cause = exc.__cause__
+        if not (
+            isinstance(cause, HTTPError)
+            and cause.response is not None
+            and cause.response.status_code == status.HTTP_404_NOT_FOUND
+        ):
+            raise
+        target_exists = False
     else:
-        log.warning(
-            "Warning: processed course run clone for %s but can't set the ingestion flag because there's no CoursePage",
-            target_course,
+        target_exists = True
+
+    if target_exists and not (clone and clone.clone_requested_at):
+        msg = f"Course ID {target_course.readable_id} was found in edX. Can't continue."
+        raise ValueError(msg)
+
+    if target_exists:
+        log.info(
+            "Course ID %s is already in edX from an earlier clone attempt, "
+            "skipping the clone request",
+            target_course.readable_id,
         )
+    else:
+        if clone:
+            clone.mark_requested()
+
+        resp = clone_edx_course(
+            base_course_key, target_course.readable_id, client=edx_client
+        )
+
+        if not resp:
+            msg = f"Couldn't clone {base_course_key} to {target_course.readable_id}."
+            raise ValueError(msg)
+
+    # We should have the target course in edX now. We need to update it with the
+    # data from our course run.
+    # Run these after the transaction that this will most likely be
+    transaction.on_commit(partial(fix_cloned_run_data, target_course=target_course))
+    transaction.on_commit(partial(push_edx_modes_from_run, course_run=target_course))
+
+
+def get_edx_course_modes(
+    course_id: str, *, client: EdxApi | None = None
+) -> list[CourseMode]:
+    """
+    Get the current modes for a given course.
+
+    Args:
+    - course_id (str): the readable ID of the course to use as the base
+    Keyword Args:
+    - client (EdxApi): edX client (if you want to reuse one)
+    Returns:
+    - list(edx_api.course_detail.models.CourseMode): the modes configured for the course
+    """
+
+    edx_client = client if client else get_edx_api_service_client()
+
+    return edx_client.course_mode.get_course_modes(course_id=course_id)
+
+
+def get_edx_course_mode(
+    course_id: str, mode_slug: str, *, client: EdxApi | None = None
+) -> CourseMode:
+    """
+    Get the specified mode for a given course.
+
+    Args:
+    - course_id: the readable ID of the course to use as the base
+    - mode_slug: the slug of the mode you want to retrieve (audit, verified, etc)
+    Keyword Args:
+    - client (EdxApi): edX client (if you want to reuse one)
+    Returns:
+    - list(edx_api.course_detail.models.CourseMode): the modes configured for the course
+    """
+
+    edx_client = client if client else get_edx_api_service_client()
+
+    return edx_client.course_mode.get_course_mode(
+        course_id=course_id, mode_slug=mode_slug
+    )
+
+
+def create_edx_course_mode(  # noqa: PLR0913
+    course_id: str,
+    mode_slug: str,
+    mode_display_name: str,
+    *,
+    description: str | None = None,
+    currency: str = "USD",
+    expiration_datetime: datetime | None = None,
+    client: EdxApi | None = None,
+    min_price: int = 0,
+) -> CourseMode:
+    """Create a course mode for the given edX course."""
+
+    edx_client = client if client else get_edx_api_service_client()
+
+    return edx_client.course_mode.create_course_mode(
+        course_id=course_id,
+        mode_slug=mode_slug,
+        mode_display_name=mode_display_name,
+        description=description,
+        currency=currency,
+        expiration_datetime=str(expiration_datetime) if expiration_datetime else None,
+        min_price=min_price,
+    )
+
+
+def update_edx_course_mode(  # noqa: PLR0913
+    course_id: str,
+    mode_slug: str,
+    mode_display_name: str,
+    *,
+    description: str | None = None,
+    currency: str = "USD",
+    expiration_datetime: datetime | None = None,
+    client: EdxApi | None = None,
+    min_price: int = 0,
+) -> None:
+    """
+    Update a course mode for the given edX course.
+
+    Returns None - edx-api-client's update_course_mode has no return value, and
+    edX answers the PATCH with 204 No Content.
+
+    Note that every non-None argument here is sent to edX and overwrites what is
+    already there, so callers doing a partial update (e.g. only the expiration
+    date) must pass the mode's current values for everything else. In particular
+    `min_price` defaults to 0 rather than None, so leaving it out zeroes the
+    price of a paid mode.
+    """
+
+    edx_client = client if client else get_edx_api_service_client()
+
+    edx_client.course_mode.update_course_mode(
+        course_id=course_id,
+        mode_slug=mode_slug,
+        mode_display_name=mode_display_name,
+        description=description,
+        currency=currency,
+        expiration_datetime=str(expiration_datetime) if expiration_datetime else None,
+        min_price=min_price,
+    )
+
+
+def delete_edx_course_mode(
+    course_id: str, mode_slug: str, *, client: EdxApi | None = None
+):
+    """Delete the specified course mode from the edX course."""
+
+    edx_client = client if client else get_edx_api_service_client()
+
+    return edx_client.course_mode.delete_course_mode(
+        course_id=course_id,
+        mode_slug=mode_slug,
+    )
+
+
+def push_edx_modes_from_run(course_run: CourseRun, *, edx_client=None) -> int:
+    """Push course modes from the run into edX. Returns the number of modes created."""
+
+    existing_mode_slugs = [edx_mode.mode_slug for edx_mode in course_run.edx_modes]
+    created_count = 0
+
+    for mode in course_run.enrollment_modes.all():
+        if mode.mode_slug not in existing_mode_slugs:
+            # If the mode requires payment, the price gets set to a nominal amount
+            # because it just needs to be non-zero. edX doesn't need to know what
+            # the price actually is, which is sometimes ambiguous anyway.
+
+            create_edx_course_mode(
+                course_id=course_run.courseware_id,
+                mode_slug=mode.mode_slug,
+                mode_display_name=mode.mode_display_name,
+                min_price=(1 if mode.requires_payment else 0),
+                # The CourseRun post_save signal skips new runs because their edX
+                # course doesn't exist yet, so this is where a rerun's deadline
+                # reaches edX.
+                expiration_datetime=(
+                    course_run.upgrade_deadline
+                    if mode.mode_slug == EDX_ENROLLMENT_VERIFIED_MODE
+                    else None
+                ),
+                client=edx_client,
+            )
+            created_count += 1
+
+    return created_count
+
+
+def _notification_preferences_headers(user):
+    """
+    Build Authorization headers that let us call the LMS as the learner.
+
+    create_edx_auth_token() is called first as a safety net: it is idempotent
+    (get_or_create internally), so a user provisioned purely through the API
+    gateway still ends up with an OpenEdxApiAuth record before we read it.
+    This mirrors get_edx_api_client().
+
+    Args:
+        user (users.models.User): the learner whose identity to borrow
+
+    Returns:
+        dict: request headers carrying the learner's bearer token
+
+    Raises:
+        NoEdxApiAuthError: if the user has no usable Open edX auth
+    """
+    # create_edx_auth_token and the token refresh both call raise_for_status
+    # internally, so failures arrive as HTTPError / OpenEdXOAuth2Error. Those
+    # are not all the same thing, and the difference matters to the learner:
+    #
+    #   * no OpenEdxUser / no OpenEdxApiAuth row -> this learner has no usable
+    #     Open edX identity, which is the "still being set up" case
+    #     (NoEdxApiAuthError). A dead refresh token lands here too: the refresh
+    #     recovers from invalid_grant itself by re-authorizing, and raises
+    #     NoEdxApiAuthError when there is no synced account to re-authorize.
+    #   * any HTTPError that still escapes -- a 5xx, bad client credentials,
+    #     or a 400 the refresh deliberately does not recover from
+    #     (misconfiguration) -- or a handshake that never came back with a code
+    #     -> the token service or its configuration is at fault, not this
+    #     learner's account. Surface it as an upstream failure so a synced
+    #     learner gets an accurate, retryable status instead of a misleading 409.
+    try:
+        if create_edx_auth_token(user) is None:
+            raise NoEdxApiAuthError(f"{user!s} is not yet synced with edX")  # noqa: EM102
+        auth = get_valid_edx_api_auth(user)
+    except OpenEdxApiAuth.DoesNotExist:
+        raise NoEdxApiAuthError(  # noqa: B904
+            f"{user!s} does not have an associated OpenEdxApiAuth"  # noqa: EM102
+        )
+    except HTTPError as exc:
+        raise EdxApiNotificationPreferencesError(  # noqa: B904
+            f"Open edX token service failed for {user!s}: {exc!s}",  # noqa: EM102
+            status_code=getattr(exc.response, "status_code", None),
+        )
+    except requests.exceptions.RequestException as exc:
+        # Must follow the HTTPError branch, which is a subclass: this is the
+        # token service timing out or refusing the connection.
+        raise EdxApiNotificationPreferencesError(  # noqa: B904
+            f"Could not reach the Open edX token service for {user!s}: {exc!s}"  # noqa: EM102
+        )
+    except OpenEdXOAuth2Error as exc:
+        raise EdxApiNotificationPreferencesError(  # noqa: B904
+            f"Open edX OAuth2 handshake failed for {user!s}: {exc!s}"  # noqa: EM102
+        )
+
+    return {"Authorization": f"Bearer {auth.access_token}"}
+
+
+def get_notification_preferences(user):
+    """
+    Fetch the learner's notification preferences from Open edX.
+
+    Args:
+        user (users.models.User): the learner
+
+    Returns:
+        dict: the LMS response body
+
+    Raises:
+        NoEdxApiAuthError: if the user has no usable Open edX auth
+        EdxApiNotificationPreferencesError: if the LMS rejects the request
+    """
+    headers = _notification_preferences_headers(user)
+    try:
+        resp = requests.get(
+            edx_url(OPENEDX_NOTIFICATION_PREFERENCES_PATH),
+            headers=headers,
+            timeout=settings.EDX_API_CLIENT_TIMEOUT,
+        )
+    except requests.exceptions.RequestException as exc:
+        # A timeout or connection failure is still an upstream failure; without
+        # this it escapes the view as a 500 instead of a 502.
+        raise EdxApiNotificationPreferencesError(
+            f"Could not reach Open edX to fetch notification preferences: {exc!s}"  # noqa: EM102
+        ) from exc
+
+    if resp.status_code != status.HTTP_200_OK:
+        raise EdxApiNotificationPreferencesError(
+            f"Error fetching Open edX notification preferences. {get_error_response_summary(resp)}",  # noqa: EM102
+            status_code=resp.status_code,
+        )
+
+    try:
+        return resp.json()
+    except requests.exceptions.JSONDecodeError as exc:
+        raise EdxApiNotificationPreferencesError(
+            "Open edX returned notification preferences that were not valid JSON"  # noqa: EM101
+        ) from exc
+
+
+def update_notification_preference(user, preference):
+    """
+    Update a single notification preference field for the learner.
+
+    The upstream API is deliberately one-field-at-a-time; `preference` is the
+    already-validated body (notification_app, notification_type,
+    notification_channel and either value or email_cadence).
+
+    Args:
+        user (users.models.User): the learner
+        preference (dict): the validated single-field update
+
+    Returns:
+        dict: the LMS response body
+
+    Raises:
+        NoEdxApiAuthError: if the user has no usable Open edX auth
+        EdxApiNotificationPreferencesError: if the LMS rejects the request
+    """
+    headers = {
+        **_notification_preferences_headers(user),
+        "Content-Type": "application/json",
+    }
+    try:
+        resp = requests.put(
+            edx_url(OPENEDX_NOTIFICATION_PREFERENCES_PATH),
+            json=preference,
+            headers=headers,
+            timeout=settings.EDX_API_CLIENT_TIMEOUT,
+        )
+    except requests.exceptions.RequestException as exc:
+        raise EdxApiNotificationPreferencesError(
+            f"Could not reach Open edX to update notification preferences: {exc!s}"  # noqa: EM102
+        ) from exc
+
+    if resp.status_code != status.HTTP_200_OK:
+        raise EdxApiNotificationPreferencesError(
+            f"Error updating Open edX notification preferences. {get_error_response_summary(resp)}",  # noqa: EM102
+            status_code=resp.status_code,
+        )
+
+    try:
+        return resp.json()
+    except requests.exceptions.JSONDecodeError as exc:
+        raise EdxApiNotificationPreferencesError(
+            "Open edX returned a notification preferences update that was not valid JSON"  # noqa: EM101
+        ) from exc
+
+
+def get_edx_mode_expiration(edx_mode: CourseMode) -> datetime | None:
+    """
+    Read expiration_datetime off an edX course mode without letting a malformed
+    value blow up the caller.
+
+    edx-api-client parses the raw string with dateutil and only guards against
+    a missing key, so a non-null-but-unparseable value (e.g. "") raises
+    ParserError instead of returning None.
+    """
+
+    try:
+        return edx_mode.expiration_datetime
+    except ValueError:
+        log.warning(
+            "Could not parse expiration_datetime %r on the %s mode of %s",
+            edx_mode.json.get("expiration_datetime"),
+            edx_mode.mode_slug,
+            edx_mode.course_id,
+        )
+        return None
+
+
+def get_edx_verified_mode(
+    courseware_id: str, *, client: EdxApi | None = None
+) -> CourseMode | None:
+    """
+    Get the verified course mode for an edX course, or None if it has none.
+
+    Args:
+    - courseware_id (str): the edX course ID
+    Keyword Args:
+    - client (EdxApi): edX client (if you want to reuse one)
+    Returns:
+    - CourseMode or None
+    """
+
+    edx_client = client if client else get_edx_api_service_client()
+
+    return find_object_with_matching_attr(
+        get_edx_course_modes(courseware_id, client=edx_client),
+        "mode_slug",
+        EDX_ENROLLMENT_VERIFIED_MODE,
+    )
+
+
+def sync_courserun_upgrade_deadline_to_edx(
+    course_run: "courses.models.CourseRun", *, client: EdxApi | None = None
+) -> UpgradeDeadlineSyncResult:
+    """
+    Push a CourseRun's upgrade_deadline into the expiration_datetime of its
+    verified course mode in edX.
+
+    MITx Online's upgrade_deadline is what actually gates paid enrollment (it
+    drives CourseRun.is_upgradable, which gates checkout), while edX keeps its
+    own copy on the verified mode. Nothing synced the two, so edX's copy drifted
+    - it gets rewritten to the course end minus a configurable window on every
+    Studio publish. This makes MITx Online authoritative: whatever a staff
+    member sets here is pushed to edX, and setting expiration_datetime flips
+    edX's expiration_datetime_is_explicit flag, which stops the publish signal
+    from overwriting it again.
+
+    Args:
+        course_run (CourseRun): the run whose deadline should be pushed.
+        client (EdxApi): optional edX client to reuse across calls.
+
+    Returns:
+        UpgradeDeadlineSyncResult: what happened. The task records it as its
+            result; reconcile_upgrade_deadlines --fix calls this directly to pin
+            unpinned runs.
+
+    Raises:
+        HTTPError: if the edX API rejects the read or the write.
+    """
+
+    edx_client = client if client else get_edx_api_service_client()
+
+    verified_mode = get_edx_verified_mode(course_run.courseware_id, client=edx_client)
+
+    if verified_mode is None:
+        log.warning(
+            "No %s mode exists in edX for %s, so there is no upgrade deadline to set",
+            EDX_ENROLLMENT_VERIFIED_MODE,
+            course_run.courseware_id,
+        )
+        return UpgradeDeadlineSyncResult.NO_VERIFIED_MODE
+
+    edx_deadline = get_edx_mode_expiration(verified_mode)
+    new_deadline = course_run.upgrade_deadline
+
+    if new_deadline is None:
+        if edx_deadline is None:
+            return UpgradeDeadlineSyncResult.UNCHANGED
+        log.warning(
+            CANNOT_CLEAR_DEADLINE_MSG.format(
+                courseware_id=course_run.courseware_id,
+                edx_deadline=edx_deadline.isoformat(),
+            )
+        )
+        return UpgradeDeadlineSyncResult.CLEAR_UNSUPPORTED
+
+    # A matching date is only safe to skip once edX marks it explicit. Until
+    # then, edX treats it as its own default (course end minus a window) and
+    # rewrites it on every Studio publish. Sending the date sets the flag.
+    if (
+        edx_deadline == new_deadline
+        and verified_mode.json.get("expiration_datetime_is_explicit") is True
+    ):
+        log.debug(
+            "edX already has upgrade deadline %s for %s",
+            new_deadline.isoformat(),
+            course_run.courseware_id,
+        )
+        return UpgradeDeadlineSyncResult.UNCHANGED
+
+    # Every non-None field we send overwrites edX's copy, so echo the mode's
+    # current values back and let only expiration_datetime actually change.
+    # min_price especially: update_edx_course_mode defaults it to 0, which would
+    # turn the paid mode free.
+    update_edx_course_mode(
+        course_id=course_run.courseware_id,
+        mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+        mode_display_name=verified_mode.mode_display_name,
+        description=verified_mode.description,
+        currency=verified_mode.currency or "USD",
+        min_price=verified_mode.min_price or 0,
+        expiration_datetime=new_deadline,
+        client=edx_client,
+    )
+
+    log.info(
+        "Pushed upgrade deadline %s to the edX %s mode of %s (was %s)",
+        new_deadline.isoformat(),
+        EDX_ENROLLMENT_VERIFIED_MODE,
+        course_run.courseware_id,
+        edx_deadline.isoformat() if edx_deadline else None,
+    )
+    return UpgradeDeadlineSyncResult.UPDATED

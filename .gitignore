@@ -116,12 +116,6 @@ webpack-stats/
 # Celery Beat
 celerybeat-schedule
 
-# pants
-/.pants.d/
-/dist/
-/.pids
-/.pants.workdir.file_lock*
-
 # Local Docker customizations
 docker-compose.*.yml
 
@@ -130,3 +124,7 @@ docker-compose.*.yml
 
 
 certs/*
+
+.claude/
+
+.drf_lint_cache.json

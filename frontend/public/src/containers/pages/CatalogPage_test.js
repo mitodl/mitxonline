@@ -46,8 +46,8 @@ const displayedCourse = {
         }
       ],
       page: {
-        feature_image_src:             "/static/images/mit-dome.png",
-        page_url:                      "/courses/course-v1:edX+E2E-101/",
+        feature_image_src:             null,
+        page_url:                      "https://learn.mit.edu/courses/course-v1:edX+E2E-101",
         financial_assistance_form_url: "",
         description:                   "E2E Test Course",
         current_price:                 999.0,
@@ -64,8 +64,8 @@ const displayedCourse = {
     }
   ],
   page: {
-    feature_image_src:             "/static/images/mit-dome.png",
-    page_url:                      "/courses/course-v1:edX+E2E-101/",
+    feature_image_src:             null,
+    page_url:                      "https://learn.mit.edu/courses/course-v1:edX+E2E-101",
     financial_assistance_form_url: "",
     description:                   "E2E Test Course",
     current_price:                 999.0,
@@ -126,8 +126,7 @@ const displayedProgram = {
     }
   ],
   page: {
-    feature_image_src:
-      "http://mitxonline.odl.local:8013/static/images/mit-dome.png"
+    feature_image_src: null
   },
   program_type: "Series",
   departments:  [
@@ -689,7 +688,8 @@ describe("CatalogPage", function() {
 
     // Mock the second page of course API results.
     helper.handleRequestStub.returns({
-      body: {
+      status: 200,
+      body:   {
         next:    null,
         results: [course2]
       }
@@ -706,7 +706,10 @@ describe("CatalogPage", function() {
     )
 
     // Should expect 2 courses to be visually displayed in the catalog now. Total count should stay 2.
-    expect(inner.state().courseQueryPage).equals(2)
+    expect(inner.state().courseQueryPage).equals(3)
+    expect(JSON.stringify(inner.state().allCoursesRetrieved)).equals(
+      JSON.stringify([...courses, course2])
+    )
     expect(inner.instance().renderNumberOfCatalogItems()).equals(2)
   })
 

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from drf_spectacular.utils import extend_schema_field
+from mitol.common.serializers import BaseSerializer
 from rest_framework import serializers
 
 from cms.serializers import CoursePageSerializer
@@ -10,22 +9,43 @@ from courses import models
 from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
 from courses.utils import get_approved_flexible_price_exists
 from ecommerce.serializers import ProductFlexibilePriceSerializer
-from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from ecommerce.serializers.v0 import BaseProductSerializer
+from openedx.constants import EDX_ENROLLMENT_MODES
 
 
-class BaseCourseSerializer(serializers.ModelSerializer):
+class EnrollmentModeSerializer(serializers.ModelSerializer):
+    """Enrollment mode serializer."""
+
+    class Meta:
+        """Meta opts for the serializer"""
+
+        model = models.EnrollmentMode
+        fields = [
+            "mode_slug",
+            "mode_display_name",
+            "requires_payment",
+        ]
+
+
+class BaseCourseSerializer(BaseSerializer):
     """Basic course model serializer"""
+
+    required_prefetches = []
 
     type = serializers.SerializerMethodField(read_only=True)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        if not self.context.get("include_page_fields") or not hasattr(instance, "page"):
+        if not self.context.get("include_page_fields"):
             return data
-        return {**data, **CoursePageSerializer(instance=instance.page).data}
+        page = instance.course_page
+        if page is None:
+            return data
+        return {**data, **CoursePageSerializer(instance=page).data}
 
     @staticmethod
-    def get_type(obj):  # noqa: ARG004
+    def get_type(obj) -> str:  # noqa: ARG004
+        """Returns the type of object this is serializing."""
         return CONTENT_TYPE_MODEL_COURSE
 
     class Meta:
@@ -46,8 +66,16 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
     is_enrollable = serializers.SerializerMethodField()
     course_number = serializers.SerializerMethodField()
     courseware_url = serializers.SerializerMethodField()
+    enrollment_modes = serializers.SerializerMethodField()
 
-    def get_courseware_url(self, instance) -> Optional[str]:
+    def get_enrollment_modes(self, instance) -> list[dict]:
+        """Get the enrollment modes for the course run"""
+        modes = getattr(instance, "prefetched_enrollment_modes", None)
+        if modes is None:
+            modes = instance.enrollment_modes.all()
+        return EnrollmentModeSerializer(modes, many=True).data
+
+    def get_courseware_url(self, instance) -> str | None:
         """Get the courseware URL"""
         return instance.courseware_url
 
@@ -88,6 +116,15 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
             "id",
             "live",
             "course_number",
+            "enrollment_modes",
+            "language",
+            "is_primary_language",
+            "language_label",
+            "variant_industry",
+            "variant_industry_label",
+            "variant_length",
+            "variant_length_label",
+            "course_id",
         ]
 
 
@@ -97,12 +134,19 @@ class BaseProgramSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField(read_only=True)
 
     @staticmethod
-    def get_type(obj):  # noqa: ARG004
+    def get_type(obj) -> str:  # noqa: ARG004
         return CONTENT_TYPE_MODEL_PROGRAM
 
     class Meta:
         model = models.Program
-        fields = ["title", "readable_id", "id", "type"]
+        fields = [
+            "title",
+            "readable_id",
+            "id",
+            "type",
+            "display_mode",
+        ]
+        read_only_fields = ["title", "readable_id", "display_mode"]
 
 
 class CourseRunCertificateSerializer(serializers.ModelSerializer):
@@ -116,89 +160,61 @@ class CourseRunCertificateSerializer(serializers.ModelSerializer):
 class CourseRunGradeSerializer(serializers.ModelSerializer):
     """CourseRunGrade serializer"""
 
+    grade = serializers.FloatField(read_only=True, min_value=0.0, max_value=1.0)
+    letter_grade = serializers.CharField(read_only=True, max_length=10, allow_null=True)
+
     class Meta:
         model = models.CourseRunGrade
         fields = ["grade", "letter_grade", "passed", "set_by_admin", "grade_percent"]
+        read_only_fields = ["passed", "set_by_admin", "grade_percent"]
 
 
 class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
-    certificate = serializers.SerializerMethodField(read_only=True)
-    enrollment_mode = serializers.ChoiceField(
-        (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE), read_only=True
-    )
+    certificate = CourseRunCertificateSerializer(read_only=True, allow_null=True)
+    enrollment_mode = serializers.ChoiceField(EDX_ENROLLMENT_MODES, read_only=True)
+    grades = CourseRunGradeSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = models.CourseRunEnrollment
+        fields = [
+            "id",
+            "edx_emails_subscription",
+            "certificate",
+            "enrollment_mode",
+            "grades",
+        ]
+
+
+class BaseCourseRunEnrollmentWithFlexiblePriceSerializer(
+    BaseCourseRunEnrollmentSerializer
+):
     approved_flexible_price_exists = serializers.SerializerMethodField()
-    grades = serializers.SerializerMethodField(read_only=True)
-
-    @extend_schema_field(CourseRunCertificateSerializer(allow_null=True))
-    def get_certificate(self, enrollment):
-        """
-        Resolve a certificate for this enrollment if it exists
-        """
-        # When create method is called it returns list object of enrollments
-        if isinstance(enrollment, list):
-            enrollment = enrollment[0] if enrollment else None
-
-        # No need to include a certificate if there is no corresponding wagtail page
-        # to support the render
-        try:
-            if (
-                not enrollment
-                or not enrollment.run.course.page
-                or not enrollment.run.course.page.certificate_page
-            ):
-                return None
-        except models.Course.page.RelatedObjectDoesNotExist:
-            return None
-
-        # Using IDs because we don't need the actual record and this avoids redundant queries
-        user_id = enrollment.user_id
-        course_run_id = enrollment.run_id
-        try:
-            return CourseRunCertificateSerializer(
-                models.CourseRunCertificate.objects.get(
-                    user_id=user_id, course_run_id=course_run_id
-                )
-            ).data
-        except models.CourseRunCertificate.DoesNotExist:
-            return None
 
     @extend_schema_field(bool)
     def get_approved_flexible_price_exists(self, instance):
         return get_approved_flexible_price_exists(instance, self.context)
 
-    @extend_schema_field(CourseRunGradeSerializer(many=True))
-    def get_grades(self, instance):
-        instance_run = instance[0].run if isinstance(instance, list) else instance.run
-        instance_user = (
-            instance[0].user if isinstance(instance, list) else instance.user
-        )
-
-        return CourseRunGradeSerializer(
-            instance=models.CourseRunGrade.objects.filter(
-                user=instance_user, course_run=instance_run
-            ).all(),
-            many=True,
-        ).data
-
-    class Meta:
+    class Meta(BaseCourseRunEnrollmentSerializer.Meta):
         model = models.CourseRunEnrollment
         fields = [
-            "run",
-            "id",
-            "edx_emails_subscription",
-            "certificate",
-            "enrollment_mode",
+            *BaseCourseRunEnrollmentSerializer.Meta.fields,
             "approved_flexible_price_exists",
-            "grades",
         ]
 
 
-@extend_schema_field(ProductFlexibilePriceSerializer)
+@extend_schema_field(BaseProductSerializer)
 class ProductRelatedField(serializers.RelatedField):
-    """serializer for the Product generic field"""
+    """Simple serializer for the Product generic field"""
 
     def to_representation(self, instance):
-        serializer = ProductFlexibilePriceSerializer(
+        return BaseProductSerializer(instance=instance, context=self.context).data
+
+
+@extend_schema_field(ProductFlexibilePriceSerializer)
+class ProductFlexiblePriceRelatedField(serializers.RelatedField):
+    """Serializer for the Product generic field, including flexible price data"""
+
+    def to_representation(self, instance):
+        return ProductFlexibilePriceSerializer(
             instance=instance, context=self.context
-        )
-        return serializer.data
+        ).data

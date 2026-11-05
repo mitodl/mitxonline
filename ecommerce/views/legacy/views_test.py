@@ -1,0 +1,2340 @@
+import operator as op
+import random
+import uuid
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+import freezegun
+import pytest
+import reversion
+from django.conf import settings
+from django.forms.models import model_to_dict
+from django.test import Client, RequestFactory
+from django.urls import reverse
+from mitol.common.utils.datetime import now_in_utc
+from mitol.payment_gateway.api import PaymentGateway
+from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+from rest_framework import status
+from rest_framework.test import APIClient
+from reversion.models import Version
+
+from b2b.factories import ContractPageFactory
+from compliance.api import verify_user_with_exports
+from compliance.exceptions import ExportComplianceDataError
+from courses.factories import (
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+    ProgramEnrollmentFactory,
+    ProgramFactory,
+    ProgramRunFactory,
+)
+from courses.models import (
+    CourseRunEnrollment,
+    PaidCourseRun,
+    PaidProgram,
+    ProgramEnrollment,
+)
+from ecommerce import api
+from ecommerce.constants import (
+    DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PERCENT_OFF,
+    PAYMENT_TYPE_CUSTOMER_SUPPORT,
+    PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    REDEMPTION_TYPE_ONE_TIME,
+    REFERENCE_NUMBER_PREFIX,
+)
+from ecommerce.discounts import DiscountType
+from ecommerce.factories import (
+    BasketFactory,
+    BasketItemFactory,
+    DiscountFactory,
+    LineFactory,
+    OrderFactory,
+    PaidAmountOffDiscountFactory,
+    ProductFactory,
+    UnlimitedUseDiscountFactory,
+)
+from ecommerce.models import (
+    Basket,
+    BasketDiscount,
+    BasketItem,
+    Discount,
+    DiscountProduct,
+    Order,
+    OrderStatus,
+    PendingOrder,
+    UserDiscount,
+)
+from ecommerce.serializers import (
+    BasketItemSerializer,
+    BasketSerializer,
+    BasketWithProductSerializer,
+    DiscountSerializer,
+    ProductSerializer,
+)
+from flexiblepricing.constants import FlexiblePriceStatus
+from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
+from main import features
+from main.constants import (
+    USER_MSG_COOKIE_NAME,
+    USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
+    USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_ENROLL_FAILED,
+    USER_MSG_TYPE_PAYMENT_ACCEPTED,
+    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+    USER_MSG_TYPE_PROFILE_INCOMPLETE,
+)
+from main.settings import TIME_ZONE
+from main.test_utils import assert_drf_json_equal
+from main.utils import encode_json_cookie_value
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from users.factories import UserFactory
+
+pytestmark = [pytest.mark.django_db]
+
+
+def set_anonymous_basket_session(client, anonymous_id):
+    """
+    Seed a test client's session with an anonymous_basket_id.
+
+    SESSION_ENGINE is signed_cookies, so session.save() only updates the
+    in-memory session_key - it doesn't rewrite the client's cookie jar the
+    way it would for a server-side session backend. The cookie has to be set
+    manually or the modified session never reaches the next request.
+    """
+    session = client.session
+    session["anonymous_basket_id"] = str(anonymous_id)
+    session.save()
+    client.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
+
+
+@pytest.fixture
+def products():
+    with reversion.create_revision():
+        return ProductFactory.create_batch(5)
+
+
+@pytest.fixture
+def discounts():
+    return DiscountFactory.create_batch(5)
+
+
+@pytest.fixture
+def user(db):
+    """Creates a user"""
+    return UserFactory.create()
+
+
+@pytest.fixture(autouse=True)
+def mock_create_run_enrollments(request, mocker):
+    return (
+        mocker.patch("courses.api.create_run_enrollments", autospec=True)
+        if "dont_mock_enrollments" not in request.keywords
+        else None
+    )
+
+
+@pytest.mark.skip_nplusone_check
+def test_list_products(user_drf_client, products):
+    resp = user_drf_client.get(reverse("products_api-list"), {"l": 10, "o": 0})
+    resp_products = sorted(resp.json()["results"], key=op.itemgetter("id"))
+
+    assert len(resp_products) == len(products)
+
+    for product, resp_product in zip(products, resp_products):
+        assert_drf_json_equal(resp_product, ProductSerializer(product).data)
+
+
+def test_get_products(user_drf_client, products):
+    product = products[random.randrange(0, len(products))]  # noqa: S311
+
+    resp = user_drf_client.get(
+        reverse("products_api-detail", kwargs={"pk": product.id})
+    )
+
+    assert_drf_json_equal(resp.json(), ProductSerializer(product).data)
+
+
+def test_get_products_inactive(user_drf_client, products):
+    """Test that Product detail API doesn't return data for inactive product"""
+    product = products[random.randrange(0, len(products))]  # noqa: S311
+    product.is_active = False
+    product.save()
+
+    resp = user_drf_client.get(
+        reverse("products_api-detail", kwargs={"pk": product.id})
+    )
+
+    assert_drf_json_equal(
+        resp.json(), {"detail": "No Product matches the given query."}
+    )
+
+
+def test_get_basket(user_drf_client, user):
+    """Test the view that returns a state of Basket"""
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket)
+    resp = user_drf_client.get(
+        reverse("basket-detail", kwargs={"username": user.edx_username})
+    )
+    assert_drf_json_equal(resp.json(), BasketSerializer(basket).data)
+
+
+def test_get_basket_items(user_drf_client, user):
+    """Test the view that returns a list of BasketItems in a Basket"""
+    basket = BasketFactory.create(user=user)
+    basket_item = BasketItemFactory.create(basket=basket)
+    basket_item_2 = BasketItemFactory.create(basket=basket)
+
+    # this item belongs to another basket, and should not be in the response
+    BasketItemFactory.create()
+    resp = user_drf_client.get(f"/api/baskets/{basket.id}/items", follow=True)
+    basket_info = resp.json()
+    assert len(basket_info) == 2
+    assert_drf_json_equal(
+        resp.json(),
+        [
+            BasketItemSerializer(basket_item).data,
+            BasketItemSerializer(basket_item_2).data,
+        ],
+    )
+
+
+def test_delete_basket_item(user_drf_client, user):
+    """Test the view to delete item from the basket"""
+    basket_item = BasketItemFactory.create(basket__user=user)
+    basket = basket_item.basket
+    assert basket.basket_items.count() == 1
+    user_drf_client.delete(
+        f"/api/baskets/{user.edx_username}/items/{basket_item.id}/",
+        content_type="application/json",
+    )
+    assert BasketItem.objects.filter(basket=basket).count() == 0
+
+
+def test_add_basket_item(user_drf_client, user):
+    """Test the view to add a new item into the Basket"""
+    new_product = ProductFactory.create()
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket)
+    assert BasketItem.objects.filter(basket__user=user).count() == 1
+
+    user_drf_client.post(
+        f"/api/baskets/{basket.id}/items/",
+        data={"product": new_product.id},
+        follow=True,
+    )
+    assert BasketItem.objects.filter(basket__user=user).count() == 2
+
+
+def create_basket(user, products):
+    """
+    Bootstraps a basket with a product in it for testing the discount
+    redemption APIs
+    TODO: this should probably just be a factory
+    """
+    basket = Basket(user=user)
+    basket.save()
+
+    basket_item = BasketItem(
+        product=products[random.randrange(0, len(products))],  # noqa: S311
+        basket=basket,
+        quantity=1,
+    )
+    basket_item.save()
+
+    return basket
+
+
+def create_basket_with_product(user, product):
+    """
+    Bootstraps a basket with a specific product in it
+    """
+    basket = Basket(user=user)
+    basket.save()
+
+    basket_item = BasketItem(product=product, basket=basket, quantity=1)
+    basket_item.save()
+
+    return basket
+
+
+def create_pending_order(user):
+    """
+    Call generate_checkout_payload to create a PendingOrder with a realistic
+    CyberSource payload. Returns the payload dict from the payment gateway.
+    """
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = user
+    request.session = {}
+    return api.generate_checkout_payload(request)
+
+
+@pytest.mark.parametrize(
+    ["try_flex_pricing_discount", "try_whitespace"],  # noqa: PT006
+    [
+        [True, False],  # noqa: PT007
+        [False, True],  # noqa: PT007
+        [True, True],  # noqa: PT007
+    ],
+)
+def test_redeem_discount(  # noqa: PLR0913
+    user,
+    user_drf_client,
+    products,
+    discounts,
+    try_flex_pricing_discount,
+    try_whitespace,
+):
+    """
+    Bootstraps a basket (see create_basket) and then attempts to redeem a
+    discount on it. Should get back a success message. (The API call returns an
+    ID so this doesn't just do json_equal.)
+
+    The try_flex_pricing_discount sets whether or not the discount should be
+    flagged to be used with a Flexible Pricing tier. If it is, then the
+    redemption attempt should fail.
+
+    The try_whitespace flag sets whether or not the discount should have some
+    whitespace appended/prepended to it - the redemption code should strip this
+    and the code should apply successfully.
+    """
+    basket = create_basket(user, products)
+
+    assert basket is not None
+    assert len(basket.basket_items.all()) > 0
+
+    discount = discounts[random.randrange(0, len(discounts))]  # noqa: S311
+
+    if try_flex_pricing_discount:
+        discount.payment_type = PAYMENT_TYPE_FINANCIAL_ASSISTANCE
+        discount.save()
+        discount.refresh_from_db()
+
+    if try_whitespace:
+        # limit the discount_code to 47 so we can shove some blank characters in
+        discount.discount_code = discount.discount_code[0:45]
+        discount.discount_code = f"   {discount.discount_code}  "[0:50]
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
+    )
+
+    resp_json = resp.json()
+
+    if try_flex_pricing_discount:
+        assert "not found" in resp_json
+    else:
+        assert "message" in resp_json
+        assert resp_json["message"] == "Discount applied"
+
+
+def test_redeem_discount_refuses_a_program_child_purchase_code(
+    user, user_drf_client, products, discounts
+):
+    """
+    The endpoint clears the basket's existing discount only once validation has
+    passed, so a refused code has to leave the standing discount in place.
+    """
+    basket = create_basket(user, products)
+    standing_discount = discounts[0]
+    BasketDiscount.objects.create(
+        redeemed_basket=basket,
+        redeemed_by=user,
+        redeemed_discount=standing_discount,
+        redemption_date=now_in_utc(),
+    )
+    program_child_purchase_discount = PaidAmountOffDiscountFactory.create()
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"),
+        {"discount": program_child_purchase_discount.discount_code},
+    )
+
+    assert resp.status_code == 404
+    assert basket.discounts.get().redeemed_discount == standing_discount
+
+
+@pytest.mark.parametrize("try_product_discount", [True, False])
+def test_redeem_product_discount(
+    user, user_drf_client, products, discounts, try_product_discount
+):
+    """
+    Bootstraps a basket (see create_basket) and then attempts to redeem a
+    discount on it that is linked to an existing product. The result depends
+    on try_product_discount.
+
+    The try_product_discount parameter sets whether or not the discount should
+    apply to the product that gets generated. If True, the discount application
+    should succeed. If False, it won't.
+    """
+    basket = create_basket(user, products)
+
+    assert basket is not None
+    assert len(basket.basket_items.all()) > 0
+
+    discount = discounts[random.randrange(0, len(discounts))]  # noqa: S311
+
+    if try_product_discount:
+        discount_product = DiscountProduct(
+            discount=discount, product=basket.basket_items.first().product
+        ).save()
+        discount.refresh_from_db()
+    else:
+        new_product = ProductFactory.create()
+        discount_product = DiscountProduct(  # noqa: F841
+            discount=discount, product=new_product
+        ).save()
+        discount.refresh_from_db()
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
+    )
+
+    resp_json = resp.json()
+
+    if try_product_discount:
+        assert "message" in resp_json
+        assert resp_json["message"] == "Discount applied"
+    else:
+        assert "not found" in resp_json
+
+
+def test_redeem_discount_with_higher_discount(
+    user, user_drf_client, products, discounts
+):
+    """
+    Bootstraps a basket (see create_basket) and then attempts to redeem a
+    discount on it. Should get back a success message. (The API call returns an
+    ID so this doesn't just do json_equal.)
+    """
+    product = products[random.randrange(0, len(products), 1)]  # noqa: S311
+    course = product.purchasable_object.course
+    tier = FlexiblePriceTierFactory.create(
+        courseware_object=course,
+        income_threshold_usd=25000,
+        current=True,
+        discount__amount=50,
+    )
+    flexible_price = FlexiblePriceFactory.create(  # noqa: F841
+        income_usd=50000,
+        country_of_income="US",
+        user=user,
+        courseware_object=course,
+        status=FlexiblePriceStatus.APPROVED,
+        tier=tier,
+    )
+    basket = create_basket(user, [product])
+
+    assert basket is not None
+    assert len(basket.basket_items.all()) > 0
+
+    discount = discounts[random.randrange(0, len(discounts))]  # noqa: S311
+
+    # check flexible price discount is applied
+    resp = user_drf_client.get(reverse("checkout_api-cart"))
+    resp_json = resp.json()
+    assert (
+        float(resp_json["discounts"][0]["redeemed_discount"]["amount"])
+        == tier.discount.amount
+    )
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
+    )
+    assert "message" in resp.json()
+    resp_json = resp.json()
+    assert resp_json["message"] == "Discount applied"
+
+    # check flexible price discount is applied
+    flexible_discounted_price = DiscountType.get_discounted_price(
+        [tier.discount], product
+    )
+    discounted_price = DiscountType.get_discounted_price([discount], product)
+    resp = user_drf_client.get(reverse("checkout_api-cart"))
+    resp_json = resp.json()
+
+    resolved_discount_amount = (
+        tier.discount.amount
+        if flexible_discounted_price < discounted_price
+        else discount.amount
+    )
+
+    assert (
+        float(resp_json["discounts"][0]["redeemed_discount"]["amount"])
+        == resolved_discount_amount
+    )
+
+
+@pytest.mark.parametrize(
+    "time, expects",  # noqa: PT006
+    [["valid", True], ["past", False], ["future", False]],  # noqa: PT007
+)
+def test_redeem_time_limited_discount(  # noqa: PLR0913
+    user, user_drf_client, products, discounts, time, expects
+):
+    """
+    Bootstraps a basket (see create_basket) and then attempts to redeem a
+    discount on it. The result will depend on whether or not the discount is
+    valid for the current time.
+    """
+    basket = create_basket(user, products)
+
+    assert basket is not None
+    assert len(basket.basket_items.all()) > 0
+
+    discount = discounts[random.randrange(0, len(discounts))]  # noqa: S311
+
+    check_delta = timedelta(days=30)
+
+    if time == "valid":
+        discount.activation_date = datetime.now(ZoneInfo(TIME_ZONE)) - check_delta
+        discount.expiration_date = datetime.now(ZoneInfo(TIME_ZONE)) + check_delta
+    elif time == "past":
+        discount.activation_date = (
+            datetime.now(ZoneInfo(TIME_ZONE)) - check_delta - check_delta
+        )
+        discount.expiration_date = datetime.now(ZoneInfo(TIME_ZONE)) - check_delta
+    elif time == "future":
+        discount.activation_date = datetime.now(ZoneInfo(TIME_ZONE)) + check_delta
+        discount.expiration_date = (
+            datetime.now(ZoneInfo(TIME_ZONE)) + check_delta + check_delta
+        )
+
+    mocked_date_delta = timedelta(days=90)
+    mocked_date_for_saving = datetime.now(ZoneInfo(TIME_ZONE)) - mocked_date_delta
+
+    with freezegun.freeze_time(mocked_date_for_saving):
+        discount.save()
+        discount.refresh_from_db()
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
+    )
+
+    resp_json = resp.json()
+
+    if expects:
+        assert "message" in resp_json
+        assert resp_json["message"] == "Discount applied"
+    else:
+        assert "not found" in resp_json
+
+
+@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
+def test_start_checkout_with_invalid_discounts(user, user_client, products, discounts):
+    """
+    Applies a discount, invalidates all the discounts, then hits the start
+    checkout view, which should return an error.
+    """
+    check_delta = timedelta(days=30)
+    more_check_delta = timedelta(days=120)
+
+    test_redeem_discount(user, user_client, products, discounts, False, False)  # noqa: FBT003
+
+    for discount in discounts:
+        discount.activation_date = (
+            datetime.now(ZoneInfo(TIME_ZONE)) - check_delta - check_delta
+        )
+        discount.expiration_date = datetime.now(ZoneInfo(TIME_ZONE)) - check_delta
+
+        with freezegun.freeze_time(
+            datetime.now(ZoneInfo(TIME_ZONE)) - more_check_delta
+        ):
+            discount.save()
+            discount.refresh_from_db()
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize(
+    "apply_discount",
+    [
+        True,
+        False,
+    ],
+)
+def test_start_checkout_with_discounts_and_b2b(
+    user, user_drf_client, user_client, apply_discount
+):
+    """
+    Create a contract and enrollment code, try to add those to the basket, then
+    try to checkout. (Some of this will be very similar to the b2b api test that
+    checks the logic itself - this makes sure the method gets called.)
+    """
+    contract = ContractPageFactory.create()
+    with reversion.create_revision():
+        product = ProductFactory.create(price=999)
+
+    product.purchasable_object.b2b_contracts.add(contract)
+    product.purchasable_object.b2b_only = True
+    product.purchasable_object.save()
+    product.refresh_from_db()
+
+    if apply_discount:
+        # Only members may redeem a contract's code, and the checkout's
+        # contract-pricing pass reuses the contract's own bulk code rather
+        # than minting another.
+        user.b2b_contracts.add(contract)
+        discount = UnlimitedUseDiscountFactory.create(
+            amount=1, b2b_contract=contract, is_bulk=True
+        )
+        discount_product = DiscountProduct.objects.create(
+            discount=discount, product=product
+        )
+        discount_product.save()
+        discount.products.add(discount_product)
+
+        test_redeem_discount(user, user_drf_client, [product], [discount], False, False)  # noqa: FBT003
+    else:
+        # just create a basket
+        create_basket(user, [product])
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    # if there's not a payload in here, something went wrong
+    if apply_discount:
+        assert resp.status_code == 200
+
+        order = Order.objects.filter(purchaser=user).get()
+
+        assert order.state == OrderStatus.PENDING
+    else:
+        # This should error, which means it redirects back to the cart page.
+        assert resp.status_code == 302
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout_with_stripe(mocker, user, user_client, fake):
+    """Make sure we get the right result out of the interstitial for Stripe payments."""
+
+    class FakePayload:
+        """A fake Stripe payload, so the interstitial page doesn't fail."""
+
+        id = "test1234"
+        client_reference_id = "mitxonline-test-12345"
+
+    def patched_generate_checkout_payload(request, **kwargs):
+        """Return a GET payload to test the redirect."""
+
+        return {
+            "url": fake.url(),
+            "payload": FakePayload(),
+            "method": "GET",
+        }
+
+    mocker.patch(
+        "ecommerce.api.generate_checkout_payload",
+        side_effect=patched_generate_checkout_payload,
+    )
+
+    with reversion.create_revision():
+        product = ProductFactory.create()
+
+    create_basket(user, [product])
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize(
+    "decision, expected_redirect_url, expected_state, basket_exists",  # noqa: PT006
+    [
+        ("CANCEL", reverse("cart"), OrderStatus.CANCELED, True),
+        ("DECLINE", reverse("cart"), OrderStatus.DECLINED, True),
+        ("ERROR", reverse("cart"), OrderStatus.ERRORED, True),
+        ("REVIEW", reverse("cart"), OrderStatus.CANCELED, True),
+        ("ACCEPT", reverse("user-dashboard"), OrderStatus.FULFILLED, False),
+    ],
+)
+@pytest.mark.dont_mock_enrollments
+def test_checkout_result(  # noqa: PLR0913
+    settings,
+    user,
+    user_client,
+    api_client,
+    mocker,
+    products,
+    decision,
+    expected_redirect_url,
+    expected_state,
+    basket_exists,
+):
+    """
+    Generates an order and then processes the checkout callback.
+    """
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=True,
+    )
+    basket = create_basket(user, products)
+
+    checkout_payload = create_pending_order(user)
+
+    payload = checkout_payload["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": decision,
+        "message": "payment processor message",
+        "transaction_id": "12345",
+    }
+
+    order = Order.objects.get(state=OrderStatus.PENDING, purchaser=user)
+
+    assert order.reference_number == payload["req_reference_number"]
+
+    resp = user_client.post(reverse("checkout-result-callback"), payload)
+    assert resp.status_code == 302
+    assert resp.url == expected_redirect_url
+
+    resp = api_client.post(reverse("checkout_result_api"), payload)
+
+    # checkout_result_api will always respond with a 200 unless validate_processor_response returns false
+    assert resp.status_code == 200
+
+    order.refresh_from_db()
+
+    if decision == "ACCEPT":
+        # test if course run is recorded in PaidCourseRun for review order
+        course_run = order.purchased_runs[0]
+        paid_courserun_count = PaidCourseRun.objects.filter(
+            order=order, course_run=course_run, user=order.purchaser
+        ).count()
+        assert paid_courserun_count == 1
+
+        # test that the user is actually enrolled
+        assert CourseRunEnrollment.objects.filter(
+            user=order.purchaser, run=course_run
+        ).exists()
+    else:
+        assert order.state == expected_state
+
+        # there should be no record in PaidCourseRun if order is in other states
+        course_run = order.purchased_runs[0]
+        paid_courserun_count = PaidCourseRun.objects.filter(
+            order=order, course_run=course_run, user=order.purchaser
+        ).count()
+        assert paid_courserun_count == 0
+        assert not CourseRunEnrollment.objects.filter(
+            user=order.purchaser, run=course_run
+        ).exists()
+
+    assert Basket.objects.filter(id=basket.id).exists() is basket_exists
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.dont_mock_enrollments
+def test_checkout_result_redirects_uai_b2c_courserun_to_learn_dashboard(
+    settings,
+    user,
+    user_client,
+    mocker,
+):
+    """Accepted UAI+B2C course run purchases should redirect to the MIT Learn dashboard."""
+    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.mit.edu/dashboard"
+
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=True,
+    )
+
+    run = CourseRunFactory.create(courseware_id="course-v1:UAI_B2C+TEST+2026")
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run)
+
+    create_basket_with_product(user, product)
+
+    checkout_payload = create_pending_order(user)
+
+    payload = checkout_payload["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": "ACCEPT",
+        "message": "payment processor message",
+        "transaction_id": "12345",
+    }
+
+    resp = user_client.post(reverse("checkout-result-callback"), payload)
+    assert resp.status_code == 302
+    order = Order.objects.get(purchaser=user, state=OrderStatus.FULFILLED)
+    assert (
+        resp.url
+        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
+    )
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.dont_mock_enrollments
+def test_checkout_result_redirects_uai_b2c_program_to_learn_dashboard(
+    settings,
+    user,
+    user_client,
+    mocker,
+):
+    """Accepted UAI+B2C program purchases should redirect to the MIT Learn dashboard."""
+    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.mit.edu/dashboard"
+
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=True,
+    )
+    mocker.patch("courses.api.create_program_enrollments")
+
+    program = ProgramFactory.create(readable_id="program-v1:UAI+B2C.3+2026")
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=program)
+
+    create_basket_with_product(user, product)
+
+    checkout_payload = create_pending_order(user)
+
+    payload = checkout_payload["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": "ACCEPT",
+        "message": "payment processor message",
+        "transaction_id": "12345",
+    }
+
+    resp = user_client.post(reverse("checkout-result-callback"), payload)
+    assert resp.status_code == 302
+    order = Order.objects.get(purchaser=user, state=OrderStatus.FULFILLED)
+    assert (
+        resp.url
+        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
+    )
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.dont_mock_enrollments
+def test_checkout_result_redirects_to_learn_when_flag_enabled(
+    settings,
+    user,
+    user_client,
+    products,
+    mocker,
+):
+    """Fulfilled purchases redirect to Learn dashboard when feature flag is enabled."""
+    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.mit.edu/dashboard"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=True,
+    )
+    mocker.patch(
+        "ecommerce.views.legacy.is_posthog_enabled",
+        return_value=True,
+    )
+
+    create_basket(user, products)
+
+    checkout_payload = create_pending_order(user)
+
+    payload = checkout_payload["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": "ACCEPT",
+        "message": "payment processor message",
+        "transaction_id": "12345",
+    }
+
+    resp = user_client.post(reverse("checkout-result-callback"), payload)
+    assert resp.status_code == 302
+    order = Order.objects.get(purchaser=user, state=OrderStatus.FULFILLED)
+    assert (
+        resp.url
+        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
+    )
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.dont_mock_enrollments
+def test_checkout_result_no_learn_redirect_without_global_id(
+    settings,
+    user_client,
+    products,
+    mocker,
+):
+    """Fulfilled purchases fall back to legacy dashboard when user has no global_id."""
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+
+    user_no_global_id = UserFactory.create(global_id=None)
+    user_client.force_login(user_no_global_id)
+
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=True,
+    )
+    mock_is_enabled = mocker.patch(
+        "ecommerce.views.legacy.is_posthog_enabled",
+    )
+
+    create_basket(user_no_global_id, products)
+
+    checkout_payload = create_pending_order(user_no_global_id)
+
+    payload = checkout_payload["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": "ACCEPT",
+        "message": "payment processor message",
+        "transaction_id": "12345",
+    }
+
+    resp = user_client.post(reverse("checkout-result-callback"), payload)
+    assert resp.status_code == 302
+    assert resp.url == reverse("user-dashboard")
+    mock_is_enabled.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "cart_exists, cart_empty",  # noqa: PT006
+    [(True, False), (True, True), (False, True)],
+)
+@pytest.mark.parametrize("is_external_checkout", [True, False])
+def test_checkout_product(
+    user, user_client, cart_exists, cart_empty, is_external_checkout
+):
+    """
+    Verifies that both /cart/add?product_id=? and /cart/add?course_id=? url adds the product to the cart
+    and redirect to checkout
+    """
+    basket = BasketFactory.create() if cart_exists else None
+    if not cart_empty:
+        BasketItemFactory.create(basket=basket)
+
+    product = ProductFactory.create()
+
+    # Case 1: For in app checkout we have the product id at hand so this API is called with "product_id"
+    # Case 2: For external checkout e.g. edX we only have Course Id so this api is called with "course_id" which is then
+    # converted into product
+    if is_external_checkout:
+        course_run = CourseRunFactory.create()
+        course_run.products.add(product)
+        api_payload = {"course_run_id": course_run.courseware_id}
+    else:
+        api_payload = {"product_id": product.id}
+
+    resp = user_client.get(reverse("checkout-product"), api_payload)
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+
+    basket = Basket.objects.get(user=user)
+
+    assert [item.product for item in basket.basket_items.all()] == [product]
+
+
+def _pay_for_program(user, program):
+    """Record that the user bought the program"""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    return PaidProgram.objects.create(user=user, program=program, order=order)
+
+
+@pytest.mark.dont_mock_enrollments
+def test_checkout_product_with_no_active_product_uses_cart(user, user_client):
+    """
+    Verifies that /cart/add?course_id=? falls back to the normal cart flow
+    (instead of a 500) when the run's course belongs to a verified program
+    enrollment but the run itself has no active Product to purchase.
+    """
+    program = ProgramFactory.create()
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        ProductFactory.create(purchasable_object=program)
+        # No product for course_run itself -- this is the case that used to
+        # 500 instead of falling back to the cart.
+
+    ProgramEnrollmentFactory.create(
+        program=program,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+    )
+    _pay_for_program(user, program)
+
+    resp = user_client.get(
+        reverse("checkout-product"), {"course_id": course_run.courseware_id}
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
+
+
+@pytest.mark.dont_mock_enrollments
+@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
+@pytest.mark.parametrize("by_product_id", [True, False])
+def test_checkout_product_with_verified_program_enrollment(
+    user, user_client, by_product_id
+):
+    """
+    Verifies that /cart/add?course_id=? and /cart/add?product_id=? skip the
+    cart and redirect straight to the dashboard, creating a verified
+    enrollment directly, when the learner already holds a verified enrollment
+    in a program the course belongs to.
+    """
+    program = ProgramFactory.create()
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        ProductFactory.create(purchasable_object=program)
+        run_product = ProductFactory.create(purchasable_object=course_run)
+
+    ProgramEnrollmentFactory.create(
+        program=program,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+    )
+    _pay_for_program(user, program)
+
+    resp = user_client.get(
+        reverse("checkout-product"),
+        {"product_id": run_product.id}
+        if by_product_id
+        else {"course_id": course_run.courseware_id},
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("user-dashboard")
+
+    enrollment = CourseRunEnrollment.objects.get(user=user, run=course_run)
+    assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    assert not Basket.objects.filter(user=user).exists()
+
+
+@pytest.mark.dont_mock_enrollments
+def test_checkout_product_with_unpaid_verified_program_enrollment_uses_cart(
+    user, user_client
+):
+    """
+    A verified program enrollment the learner didn't pay for (e.g. one staff
+    changed to verified) doesn't get the program's courses for free:
+    /cart/add uses the normal cart flow.
+    """
+    program = ProgramFactory.create()
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        ProductFactory.create(purchasable_object=program)
+        run_product = ProductFactory.create(purchasable_object=course_run)
+
+    ProgramEnrollmentFactory.create(
+        program=program,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+    )
+
+    resp = user_client.get(
+        reverse("checkout-product"), {"course_id": course_run.courseware_id}
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+    basket = Basket.objects.get(user=user)
+    assert [item.product for item in basket.basket_items.all()] == [run_product]
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
+
+
+@pytest.mark.dont_mock_enrollments
+@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
+def test_checkout_product_verified_program_shortcut_with_unusable_profile(
+    mocked_export_compliance, user, user_client
+):
+    """
+    When the learner's profile can't pass the export compliance check, the
+    verified-program shortcut errors rather than falling through to the cart,
+    where the course would be charged at full price.
+    """
+    program = ProgramFactory.create()
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        ProductFactory.create(purchasable_object=program)
+        ProductFactory.create(purchasable_object=course_run)
+    ProgramEnrollmentFactory.create(
+        program=program,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+    )
+    _pay_for_program(user, program)
+    mocked_export_compliance.side_effect = ExportComplianceDataError(
+        user, ["last_name"]
+    )
+
+    with pytest.raises(ExportComplianceDataError):
+        user_client.get(
+            reverse("checkout-product"), {"course_id": course_run.courseware_id}
+        )
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
+
+
+@pytest.mark.dont_mock_enrollments
+def test_checkout_product_with_existing_verified_run_enrollment(user, user_client):
+    """
+    Verifies that /cart/add?course_id=? skips straight to the dashboard,
+    without touching the basket, when the learner already holds a verified
+    enrollment in the run itself (e.g. they've already used the shortcut
+    once, or revisit the link).
+    """
+    program = ProgramFactory.create()
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        ProductFactory.create(purchasable_object=program)
+        ProductFactory.create(purchasable_object=course_run)
+
+    ProgramEnrollmentFactory.create(
+        program=program,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+    )
+    _pay_for_program(user, program)
+    CourseRunEnrollmentFactory.create(
+        user=user,
+        run=course_run,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+    )
+
+    resp = user_client.get(
+        reverse("checkout-product"), {"course_id": course_run.courseware_id}
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("user-dashboard")
+    assert not Basket.objects.filter(user=user).exists()
+
+
+@pytest.mark.parametrize("by_product_id", [True, False])
+def test_checkout_product_with_audit_program_enrollment_uses_cart(
+    user, user_client, by_product_id
+):
+    """
+    Verifies that /cart/add?course_id=? and /cart/add?product_id=? still fall
+    back to the normal cart flow when the learner's program enrollment isn't
+    verified.
+    """
+    program = ProgramFactory.create()
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    product = ProductFactory.create(purchasable_object=course_run)
+
+    ProgramEnrollmentFactory.create(
+        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+
+    resp = user_client.get(
+        reverse("checkout-product"),
+        {"product_id": product.id}
+        if by_product_id
+        else {"course_id": course_run.courseware_id},
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+
+    basket = Basket.objects.get(user=user)
+    assert [item.product for item in basket.basket_items.all()] == [product]
+
+
+def test_checkout_product_with_program_product_id_uses_cart(user, user_client):
+    """
+    Verifies that /cart/add?product_id=? for a program's product uses the
+    normal cart flow, even with a verified enrollment in that program: the
+    shortcut only covers course runs.
+    """
+    program = ProgramFactory.create()
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        program_product = ProductFactory.create(purchasable_object=program)
+        ProductFactory.create(purchasable_object=course_run)
+    ProgramEnrollmentFactory.create(
+        program=program,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+    )
+    _pay_for_program(user, program)
+
+    resp = user_client.get(
+        reverse("checkout-product"), {"product_id": program_product.id}
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+    basket = Basket.objects.get(user=user)
+    assert [item.product for item in basket.basket_items.all()] == [program_product]
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
+
+
+@pytest.mark.parametrize(
+    "cart_exists, cart_empty, expected_status, expected_message",  # noqa: PT006
+    [
+        (False, True, status.HTTP_406_NOT_ACCEPTABLE, "No basket"),
+        (True, True, status.HTTP_406_NOT_ACCEPTABLE, "No product in basket"),
+        (True, False, status.HTTP_200_OK, ""),
+    ],
+)
+def test_checkout_product_cart(  # noqa: PLR0913
+    user, user_drf_client, cart_exists, cart_empty, expected_status, expected_message
+):
+    """
+    Verifies that cart/ works the way it is expected and generates proper responses/data in the cart page
+    """
+    basket = None
+
+    if cart_exists:
+        basket = BasketFactory.create(user=user)
+
+    if not cart_empty:
+        BasketItemFactory.create(basket=basket)
+
+    resp = user_drf_client.get(reverse("checkout_api-cart"))
+    assert resp.status_code == expected_status
+
+    if cart_empty:
+        assert resp.data == expected_message
+    else:
+        assert_drf_json_equal(resp.json(), BasketWithProductSerializer(basket).data)
+
+
+def test_checkout_cart_with_program_product(user, user_drf_client):
+    """
+    Verifies that the cart API returns program product data correctly.
+    """
+    program = ProgramFactory.create()
+    product = ProductFactory.create(purchasable_object=program)
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product)
+
+    resp = user_drf_client.get(reverse("checkout_api-cart"))
+    assert resp.status_code == status.HTTP_200_OK
+
+    data = resp.json()
+    assert len(data["basket_items"]) == 1
+
+    purchasable_object = data["basket_items"][0]["product"]["purchasable_object"]
+    assert purchasable_object["id"] == program.id
+    assert purchasable_object["title"] == program.title
+    assert purchasable_object["readable_id"] == program.readable_id
+
+
+def test_checkout_product_with_program_id(user, user_client):
+    """
+    Verifies that /cart/add?program_id=? url adds the program to the cart
+    and redirect to checkout
+    """
+    BasketFactory.create(user=user)
+    program_run = ProgramRunFactory.create()
+    product = ProductFactory.create()
+
+    program_run.products.add(product)
+    api_payload = {"program_id": program_run.program.id}
+
+    resp = user_client.get(reverse("checkout-product"), api_payload)
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+
+    basket = Basket.objects.get(user=user)
+
+    assert [item.product for item in basket.basket_items.all()] == [product]
+
+
+@pytest.mark.parametrize("multiple_cart_enabled", [True, False])
+def test_add_to_cart_api_with_feature_flag(
+    user_drf_client, user, multiple_cart_enabled, settings
+):
+    """Test add_to_cart API behavior with and without multiple cart items feature"""
+    settings.ENABLE_MULTIPLE_CART_ITEMS = multiple_cart_enabled
+
+    # Create products
+    product1 = ProductFactory.create()
+    product2 = ProductFactory.create()
+
+    # Add first product
+    resp = user_drf_client.post(
+        reverse("checkout_api-add_to_cart"),
+        data={"product_id": product1.id},
+    )
+    assert resp.status_code == 200
+
+    basket = Basket.objects.get(user=user)
+    assert basket.basket_items.count() == 1
+
+    # Add second product
+    resp = user_drf_client.post(
+        reverse("checkout_api-add_to_cart"),
+        data={"product_id": product2.id},
+    )
+    assert resp.status_code == 200
+
+    basket.refresh_from_db()
+    if multiple_cart_enabled:
+        # Should have both products
+        assert basket.basket_items.count() == 2
+        products_in_basket = {item.product for item in basket.basket_items.all()}
+        assert products_in_basket == {product1, product2}
+    else:
+        # Should only have the second product (legacy behavior)
+        assert basket.basket_items.count() == 1
+        assert basket.basket_items.first().product == product2
+
+
+def test_add_to_cart_triggers_hubspot_cart_add_for_uai_course(
+    user_drf_client, user, settings, mocker
+):
+    """Adding a UAI course run product should trigger UAI-routed HubSpot cart-add tracking."""
+    settings.ENABLE_MULTIPLE_CART_ITEMS = True
+    mock_sync = mocker.patch("ecommerce.views.legacy.sync_hubspot_cart_add")
+
+    course_run = CourseRunFactory.create(courseware_id="course-v1:UAI_MIT+1.001x+2026")
+    product = ProductFactory.create(purchasable_object=course_run)
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-add_to_cart"),
+        data={"product_id": product.id},
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    mock_sync.assert_called_once_with(
+        user,
+        product,
+        is_uai=True,
+        is_xpro=False,
+    )
+
+
+def test_add_to_cart_does_not_trigger_hubspot_for_duplicate_product(
+    user_drf_client, user, settings, mocker
+):
+    """When multiple cart items are enabled, duplicate adds should not emit a second tracking event."""
+    settings.ENABLE_MULTIPLE_CART_ITEMS = True
+    mock_sync = mocker.patch("ecommerce.views.legacy.sync_hubspot_cart_add")
+
+    product = ProductFactory.create()
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product)
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-add_to_cart"),
+        data={"product_id": product.id},
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["message"] == "Product already in cart"
+    mock_sync.assert_not_called()
+
+
+def test_add_to_cart_anonymous_creates_basket():
+    """An anonymous caller can add a product to a new anonymous basket"""
+    client = APIClient()
+    product = ProductFactory.create()
+
+    resp = client.post(
+        reverse("checkout_api-add_to_cart"),
+        data={"product_id": product.id},
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+
+    basket = Basket.objects.get(anonymous_id__isnull=False)
+    assert basket.basket_items.count() == 1
+    assert basket.basket_items.first().product == product
+    assert client.session["anonymous_basket_id"] == str(basket.anonymous_id)
+
+
+@pytest.mark.parametrize(
+    "cart_exists, cart_empty, expected_status, expected_message",  # noqa: PT006
+    [
+        (False, True, status.HTTP_406_NOT_ACCEPTABLE, "No basket"),
+        (True, True, status.HTTP_406_NOT_ACCEPTABLE, "No product in basket"),
+        (True, False, status.HTTP_200_OK, ""),
+    ],
+)
+def test_checkout_cart_anonymous(
+    cart_exists, cart_empty, expected_status, expected_message
+):
+    """Verifies cart/ behaves the same way for anonymous users as for authenticated ones"""
+    client = APIClient()
+
+    # An authenticated user's basket must never leak to an anonymous caller
+    other_basket = BasketFactory.create()
+    BasketItemFactory.create(basket=other_basket)
+
+    basket = None
+    if cart_exists:
+        anonymous_id = uuid.uuid4()
+        basket = Basket.objects.create(anonymous_id=anonymous_id)
+        set_anonymous_basket_session(client, anonymous_id)
+
+    if basket and not cart_empty:
+        BasketItemFactory.create(basket=basket)
+
+    resp = client.get(reverse("checkout_api-cart"))
+    assert resp.status_code == expected_status
+
+    if cart_empty:
+        assert resp.data == expected_message
+    else:
+        assert_drf_json_equal(resp.json(), BasketWithProductSerializer(basket).data)
+
+
+def test_checkout_cart_anonymous_no_session_does_not_leak_other_baskets():
+    """An anonymous caller with no session id must never see another user's basket"""
+    client = APIClient()
+
+    other_basket = BasketFactory.create()
+    BasketItemFactory.create(basket=other_basket)
+
+    resp = client.get(reverse("checkout_api-cart"))
+
+    assert resp.status_code == status.HTTP_406_NOT_ACCEPTABLE
+    assert resp.data == "No basket"
+
+
+def test_basket_items_count_authenticated(user, user_drf_client):
+    """Authenticated basket item count reflects the user's own basket"""
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create_batch(2, basket=basket)
+
+    resp = user_drf_client.get(reverse("checkout_api-basket_items_count"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == 2
+
+
+def test_basket_items_count_anonymous_no_session_returns_zero():
+    """An anonymous caller with no session yet gets zero, not an error, and no leak"""
+    client = APIClient()
+
+    other_basket = BasketFactory.create()
+    BasketItemFactory.create(basket=other_basket)
+
+    resp = client.get(reverse("checkout_api-basket_items_count"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == 0
+
+
+def test_basket_items_count_anonymous_with_items():
+    """An anonymous caller with an established basket gets the real count"""
+    client = APIClient()
+    anonymous_id = uuid.uuid4()
+    basket = Basket.objects.create(anonymous_id=anonymous_id)
+    BasketItemFactory.create_batch(3, basket=basket)
+
+    set_anonymous_basket_session(client, anonymous_id)
+
+    resp = client.get(reverse("checkout_api-basket_items_count"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == 3
+
+
+def test_redeem_discount_anonymous_forbidden():
+    """Anonymous users cannot redeem discount codes, unlike the other checkout actions"""
+    client = APIClient()
+
+    resp = client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": "SOMECODE"}
+    )
+
+    assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_checkout_product_anonymous():
+    """CheckoutProductView is reachable anonymously and populates an anonymous basket"""
+    client = Client()
+    product = ProductFactory.create()
+
+    resp = client.get(reverse("checkout-product"), {"product_id": product.id})
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+
+    basket = Basket.objects.get(anonymous_id__isnull=False)
+    assert [item.product for item in basket.basket_items.all()] == [product]
+
+
+def test_anonymous_checkout_view_requires_login():
+    """AnonymousCheckoutView is defense-in-depth protected behind LoginRequiredMixin"""
+    client = Client()
+
+    resp = client.get(reverse("checkout-anonymous"))
+
+    assert resp.status_code == 302
+    assert resp.url.startswith(reverse("gateway-login"))
+
+
+def test_anonymous_checkout_view_claims_basket_and_redirects(user):
+    """
+    The anonymous_basket_id must survive the login round trip so that the
+    basket set up before authentication can be claimed once the user logs in.
+    """
+    client = Client()
+    product = ProductFactory.create()
+
+    resp = client.post(
+        reverse("checkout_api-add_to_cart"), data={"product_id": product.id}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+
+    anon_basket = Basket.objects.get(anonymous_id__isnull=False)
+    session_anon_id = client.session["anonymous_basket_id"]
+
+    # Force login with a non-remote backend: real APISIX-authenticated sessions
+    # carry a header on every subsequent request that keeps a
+    # RemoteUserBackend-authenticated session alive, but this test client
+    # doesn't send that header, so using that backend here would cause
+    # ApisixUserMiddleware to immediately invalidate the session again.
+    client.force_login(user, backend="django.contrib.auth.backends.ModelBackend")
+
+    assert client.session["anonymous_basket_id"] == session_anon_id
+
+    resp2 = client.get(reverse("checkout-anonymous"))
+
+    assert resp2.status_code == 302
+    assert resp2.url == reverse("checkout_interstitial_page")
+
+    anon_basket.refresh_from_db()
+    assert anon_basket.user_id == user.id
+    assert anon_basket.anonymous_id is None
+    assert "anonymous_basket_id" not in client.session
+
+
+def test_discount_rest_api(admin_drf_client, user_drf_client):
+    """
+    Checks that the admin REST API is only accessible by an admin
+    user, and then checks basic functionality (list, retrieve, create).
+    """
+    discount = DiscountFactory.create()
+    discount_payload = model_to_dict(discount)
+    discount_payload["discount_code"] += "Test"
+    discount_payload["id"] = None
+
+    # checking permissions - these should return 403
+
+    resp = user_drf_client.get(reverse("discounts_api-list"))
+    assert resp.status_code == 403
+
+    resp = user_drf_client.get(
+        reverse("discounts_api-detail", kwargs={"pk": discount.id})
+    )
+    assert resp.status_code == 403
+
+    resp = user_drf_client.post(reverse("discounts_api-list"), discount_payload)
+    assert resp.status_code == 403
+
+    resp = user_drf_client.patch(
+        reverse("discounts_api-detail", kwargs={"pk": discount.id}), discount_payload
+    )
+    assert resp.status_code == 403
+
+    resp = user_drf_client.delete(
+        reverse("discounts_api-detail", kwargs={"pk": discount.id})
+    )
+    assert resp.status_code == 403
+
+    # checking CRUD ops
+
+    resp = admin_drf_client.get(reverse("discounts_api-list"))
+    data = resp.json()
+
+    assert resp.status_code == 200
+    assert len(resp.json()) >= 1
+    assert data["results"][0]["id"] == discount.id
+
+    resp = admin_drf_client.get(
+        reverse("discounts_api-detail", kwargs={"pk": discount.id})
+    )
+    data = resp.json()
+
+    assert resp.status_code == 200
+    assert data["id"] == discount.id
+
+    resp = admin_drf_client.post(reverse("discounts_api-list"), discount_payload)
+    data = resp.json()
+
+    assert resp.status_code == 201
+    assert data["discount_code"] == discount_payload["discount_code"]
+    assert data["id"] is not None
+
+    data["discount_code"] = "New Discount Code"
+    discount_payload = data
+
+    resp = admin_drf_client.patch(
+        reverse("discounts_api-detail", kwargs={"pk": discount_payload["id"]}),
+        discount_payload,
+    )
+    data = resp.json()
+
+    assert resp.status_code == 200
+    assert_drf_json_equal(resp.json(), DiscountSerializer(discount_payload).data)
+
+    resp = admin_drf_client.delete(
+        reverse("discounts_api-detail", kwargs={"pk": discount_payload["id"]})
+    )
+
+    assert resp.status_code == 204
+    assert Discount.objects.filter(pk=discount_payload["id"]).count() == 0
+
+
+def test_attaching_a_non_program_product_to_a_program_child_purchase_discount_is_a_400(
+    admin_drf_client,
+):
+    """Program-child-purchase discounts only ever link to program products."""
+    discount = PaidAmountOffDiscountFactory.create()
+    product = ProductFactory.create()  # course-run product
+
+    resp = admin_drf_client.patch(
+        reverse("discounts_api-products-detail", args=[discount.id, product.id]),
+        {"product_id": product.id},
+    )
+
+    assert resp.status_code == 400
+    assert not DiscountProduct.objects.filter(
+        discount=discount, product=product
+    ).exists()
+
+
+def test_attaching_a_deactivated_product_is_a_404(admin_drf_client):
+    """Product.delete() only clears is_active; a deactivated product can't be sold,
+    so it can't be linked either — same as the dashboard's product picker.
+    """
+    discount = DiscountFactory.create()
+    product = ProductFactory.create()
+    product.delete()
+
+    resp = admin_drf_client.patch(
+        reverse("discounts_api-products-detail", args=[discount.id, product.id]),
+        {"product_id": product.id},
+    )
+
+    assert resp.status_code == 404
+    assert not DiscountProduct.objects.filter(
+        discount=discount, product=product
+    ).exists()
+
+
+def test_attaching_to_an_unknown_discount_is_a_404(admin_drf_client):
+    """A discount id that matches nothing is a client error, not a server one."""
+    missing_id = DiscountFactory.create().id + 1
+    product = ProductFactory.create()
+
+    resp = admin_drf_client.patch(
+        reverse("discounts_api-products-detail", args=[missing_id, product.id]),
+        {"product_id": product.id},
+    )
+
+    assert resp.status_code == 404
+
+
+def test_attaching_an_unknown_product_is_a_404(admin_drf_client):
+    """A product_id that matches nothing is a client error, not a server one."""
+    discount = DiscountFactory.create()
+    missing_id = ProductFactory.create().id + 1
+
+    resp = admin_drf_client.patch(
+        reverse("discounts_api-products-detail", args=[discount.id, missing_id]),
+        {"product_id": missing_id},
+    )
+
+    assert resp.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "zerovalue",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.skip_nplusone_check
+def test_discount_redemptions_api(
+    user, products, admin_drf_client, user_drf_client, zerovalue
+):
+    """
+    Tests pulling redemeptions from a discount after submitting an order with
+    one in it.
+    """
+
+    discount = DiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_FIXED_PRICE,
+        amount=int(not zerovalue),
+    )
+
+    # permissions testing
+    resp = user_drf_client.get(
+        reverse("discounts_api-detail", kwargs={"pk": discount.id})
+    )
+    assert resp.status_code == 403
+
+    resp = user_drf_client.get(f"/api/discounts/{discount.id}/redemptions/")
+    assert resp.status_code == 403
+
+    # create basket with discount, then check for redemptions
+
+    create_basket(user, products)
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
+    )
+
+    assert resp.status_code == 200
+
+    checkout_payload = create_pending_order(user)
+
+    if zerovalue:
+        assert "no_checkout" in checkout_payload
+    else:
+        assert "payload" in checkout_payload
+
+    resp = admin_drf_client.get(f"/api/discounts/{discount.id}/redemptions/")
+    assert resp.status_code == 200
+
+    results = resp.json()
+    assert results["count"] > 0
+
+
+def test_user_discounts_api(user_drf_client, admin_drf_client, discounts, user):
+    """
+    Tests retrieving and creating user discounts via the API.
+    """
+
+    discount = discounts[random.randrange(0, len(discounts))]  # noqa: S311
+
+    # permissions testing
+
+    resp = user_drf_client.get(
+        reverse("discounts_api-detail", kwargs={"pk": discount.id})
+    )
+    assert resp.status_code == 403
+
+    resp = user_drf_client.get(f"/api/discounts/{discount.id}/assignees/")
+    assert resp.status_code == 403
+
+    # create a user discount using the model first
+
+    user_discount = UserDiscount(discount=discount, user=user)
+    user_discount.save()
+
+    resp = admin_drf_client.get(f"/api/discounts/{discount.id}/assignees/")
+    assert resp.status_code == 200
+
+    data = resp.json()
+    assert data["count"] > 0
+
+    # try to post a user discount - that should also work
+    discount = DiscountFactory.create()
+
+    resp = admin_drf_client.post(
+        reverse("userdiscounts_api-list"), {"discount": discount.id, "user": user.id}
+    )
+    assert resp.status_code >= 200 and resp.status_code < 300  # noqa: PT018
+
+    resp = admin_drf_client.get(f"/api/discounts/{discount.id}/assignees/")
+    assert resp.status_code == 200
+
+    data = resp.json()
+    assert data["count"] > 0
+
+
+@pytest.mark.skip_nplusone_check
+def test_paid_and_unpaid_courserun_checkout(
+    settings, user, user_client, user_drf_client, products
+):
+    """
+    Tests checking out a paid or unpaid course run:
+     - If a course run is already paid, it should redirect to cart with 302 status code including a user message in the response cookies
+     - Otherwise, it should be successful with 200 status code
+    """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+    product = products[0]
+    basket = create_basket_with_product(user, product)
+    order = PendingOrder.create_from_basket(
+        basket, gateway_type=MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+    )
+    order_flow = order.get_object_flow()
+    order_flow.fulfill({"result": "Payment succeeded", "transaction_id": "12345"})
+
+    basket.delete()
+
+    # recreate basket with the same product and then call checkout/to_payment
+    basket = create_basket_with_product(user, product)
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+    assert USER_MSG_COOKIE_NAME in resp.cookies
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_ENROLL_DUPLICATED}
+    )
+
+    basket.delete()
+
+    unpaid_product = products[1]
+    # create basket with different unpaid product
+    basket = create_basket_with_product(user, unpaid_product)
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+    assert resp.status_code == 200
+
+
+@pytest.mark.skip_nplusone_check
+def test_checkout_interstitial_incomplete_profile(
+    mocker, mocked_export_compliance, user, user_client, products
+):
+    """An incomplete legal address should send the learner back to the cart to fix it."""
+    mocked_export_compliance.side_effect = verify_user_with_exports
+    mocker.patch("compliance.api.get_cybersource_client")
+    # A country that doesn't require state/postal code, so only this is missing
+    user.legal_address.country = "GB"
+    user.legal_address.street_address_1 = ""
+    user.legal_address.save()
+    create_basket_with_product(user, products[0])
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+    # The cart opens its profile dialog on the fields named here.
+    assert resp.url == f"{reverse('cart')}?profile_incomplete=street_address_1"
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_PROFILE_INCOMPLETE}
+    )
+    assert not PendingOrder.objects.filter(purchaser=user).exists()
+
+
+@pytest.mark.parametrize(
+    ("missing_fields", "expected_url", "expected_message"),
+    [
+        (["email"], "/cart/", USER_MSG_TYPE_ENROLL_FAILED),
+        (
+            ["email", "last_name"],
+            "/cart/?profile_incomplete=last_name",
+            USER_MSG_TYPE_PROFILE_INCOMPLETE,
+        ),
+    ],
+)
+def test_checkout_interstitial_rejected_email(  # noqa: PLR0913
+    mocker, user, user_client, missing_fields, expected_url, expected_message
+):
+    """
+    The cart's profile dialog can't edit the email address, so a rejection of
+    only that sends the learner to support rather than to an empty dialog.
+    """
+    mocker.patch(
+        "ecommerce.views.legacy.api.generate_checkout_payload",
+        return_value={
+            "profile_incomplete": True,
+            "error": USER_MSG_TYPE_PROFILE_INCOMPLETE,
+            "missing_fields": missing_fields,
+        },
+    )
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+    assert resp.url == expected_url
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": expected_message}
+    )
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize(
+    "decision, expected_state, basket_exists",  # noqa: PT006
+    [
+        ("CANCEL", OrderStatus.CANCELED, True),
+        ("DECLINE", OrderStatus.DECLINED, True),
+        ("ERROR", OrderStatus.ERRORED, True),
+        ("REVIEW", OrderStatus.CANCELED, True),
+        ("ACCEPT", OrderStatus.FULFILLED, False),
+    ],
+)
+def test_checkout_api_result(  # noqa: PLR0913
+    settings,
+    user,
+    user_client,
+    api_client,
+    mocker,
+    products,
+    decision,
+    expected_state,
+    basket_exists,
+):
+    """
+    Tests the proper handling of an order after receiving a valid Cybersource payment response.
+    """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=True,
+    )
+    basket = create_basket(user, products)
+
+    checkout_payload = create_pending_order(user)
+
+    payload = checkout_payload["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": decision,
+        "message": "payment processor message",
+        "transaction_id": "12345",
+    }
+
+    order = Order.objects.get(state=OrderStatus.PENDING, purchaser=user)
+
+    assert order.reference_number == payload["req_reference_number"]
+
+    resp = api_client.post(reverse("checkout_result_api"), payload)
+
+    # checkout_result_api will always respond with a 200 unless validate_processor_response returns false
+    assert resp.status_code == 200
+
+    order.refresh_from_db()
+
+    if decision == "ACCEPT":
+        # test if course run is recorded in PaidCourseRun for review order
+        course_run = order.purchased_runs[0]
+        paid_courserun_count = PaidCourseRun.objects.filter(
+            order=order, course_run=course_run, user=order.purchaser
+        ).count()
+        assert paid_courserun_count == 1
+
+    else:
+        assert order.state == expected_state
+
+        # there should be no record in PaidCourseRun if order is in other states
+        course_run = order.purchased_runs[0]
+        paid_courserun_count = PaidCourseRun.objects.filter(
+            order=order, course_run=course_run, user=order.purchaser
+        ).count()
+        assert paid_courserun_count == 0
+
+    assert Basket.objects.filter(id=basket.id).exists() is basket_exists
+
+
+@pytest.mark.skip_nplusone_check
+def test_checkout_api_result_verification_failure(
+    api_client,
+    mocker,
+    user,
+    products,
+):
+    """
+    Tests the failure of verifying of messages from expected from Cybersource.
+    """
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=False,
+    )
+
+    create_basket(user, products)
+
+    checkout_payload = create_pending_order(user)
+
+    payload = checkout_payload["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": OrderStatus.PENDING,
+        "message": "payment processor message",
+        "transaction_id": "12345",
+    }
+
+    resp = api_client.post(reverse("checkout_result_api"), payload)
+
+    # the validation gets checked sooner now, and returns a 401
+    assert resp.status_code == 401
+
+
+@pytest.mark.skip_nplusone_check
+def test_checkout_api_result_program_accept(
+    settings,
+    user,
+    user_client,
+    mocker,
+):
+    """
+    Tests that an ACCEPT response from CyberSource works for a program product,
+    i.e., does not raise AttributeError accessing .course on a Program object.
+    """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=True,
+    )
+
+    program = ProgramFactory.create()
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=program)
+
+    basket = create_basket_with_product(user, product)
+
+    checkout_payload = create_pending_order(user)
+
+    payload = checkout_payload["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": "ACCEPT",
+        "message": "payment processor message",
+        "transaction_id": "12345",
+    }
+
+    resp = user_client.post(reverse("checkout-result-callback"), payload)
+
+    assert resp.status_code == 302
+
+    order = Order.objects.get(state=OrderStatus.FULFILLED, purchaser=user)
+    assert USER_MSG_COOKIE_NAME in resp.cookies
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {
+            "type": USER_MSG_TYPE_PAYMENT_ACCEPTED,
+            "run": order.lines.first().courseware,
+        }
+    )
+    assert not Basket.objects.filter(id=basket.id).exists()
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize(
+    "upgrade_deadline, status_code",  # noqa: PT006
+    [
+        (now_in_utc() - timedelta(days=1), 302),
+        (now_in_utc() + timedelta(days=1), 200),
+        (None, 200),
+    ],
+)
+def test_non_upgradable_courserun_checkout(  # noqa: PLR0913
+    user, user_client, user_drf_client, products, upgrade_deadline, status_code
+):
+    """
+    Tests that checking out with upgradable and non-upgradable course transitions the checkout with right state
+    """
+    product = products[0]
+    product.purchasable_object = CourseRunFactory.create(
+        upgrade_deadline=upgrade_deadline
+    )
+    product.save()
+
+    create_basket_with_product(user, product)
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+    assert resp.status_code == status_code
+
+    # In case of 302, the the user
+    if status_code == 302:
+        assert resp.url == reverse("cart")
+        assert USER_MSG_COOKIE_NAME in resp.cookies
+        assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+            {"type": USER_MSG_TYPE_COURSE_NON_UPGRADABLE}
+        )
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout_with_zero_value(settings, user, user_client, products):
+    """
+    Check that the checkout redirects the user to dashboard when basket price is zero
+    """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+    discount = DiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_PERCENT_OFF, amount=100
+    )
+    test_redeem_discount(user, user_client, products, [discount], False, False)  # noqa: FBT003
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("user-dashboard")
+    assert USER_MSG_COOKIE_NAME in resp.cookies
+    order = Order.objects.filter(purchaser=user).get()
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {
+            "type": USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+            "run": order.lines.first().purchased_object.course.title,
+        }
+    )
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout_with_zero_value_redirects_to_learn(
+    settings, user, user_client, products, mocker
+):
+    """
+    Check that a zero-value checkout redirects to Learn dashboard when flag is enabled.
+    """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.mit.edu/dashboard"
+
+    mocker.patch(
+        "ecommerce.views.legacy.is_posthog_enabled",
+        return_value=True,
+    )
+
+    discount = DiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_PERCENT_OFF, amount=100
+    )
+    test_redeem_discount(user, user_client, products, [discount], False, False)  # noqa: FBT003
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+    order = Order.objects.filter(purchaser=user).get()
+    assert (
+        resp.url
+        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
+    )
+    assert USER_MSG_COOKIE_NAME not in resp.cookies
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout_and_ensure_edx_username_created(mocker, settings, products):
+    """
+    Check that checking out with a user that doesn't have an edx username
+    creates them an edx username
+    """
+    mocked_create_user = mocker.patch("openedx.tasks.create_user_from_id.delay")
+    mocker.patch("openedx.api.create_edx_auth_token")
+    user = UserFactory.create()
+    user.openedx_users.all().delete()
+    user_client = Client()
+    user_client.force_login(user)
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+    discount = DiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_PERCENT_OFF, amount=100
+    )
+    test_redeem_discount(user, user_client, products, [discount], False, False)  # noqa: FBT003
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("user-dashboard")
+    assert USER_MSG_COOKIE_NAME in resp.cookies
+    order = Order.objects.filter(purchaser=user).get()
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {
+            "type": USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+            "run": order.lines.first().purchased_object.course.title,
+        }
+    )
+    mocked_create_user.assert_called()
+
+
+@pytest.mark.parametrize("use_redemption_type_flags", [True, False])
+def test_bulk_discount_create(admin_drf_client, use_redemption_type_flags):
+    """
+    Try to make some bulk discounts.
+    """
+    test_payload = {
+        "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+        "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
+        "count": 5,
+        "amount": 50,
+        "prefix": "Generated-Code-",
+        "expires": "2030-01-01T00:00:00",
+        "one_time": True,
+    }
+
+    if use_redemption_type_flags:
+        test_payload["one_time"] = True
+    else:
+        test_payload["redemption_type"] = REDEMPTION_TYPE_ONE_TIME
+
+    resp = admin_drf_client.post(
+        reverse("discounts_api-create_batch"),
+        test_payload,
+    )
+
+    assert resp.status_code == 201
+
+    discounts = Discount.objects.filter(
+        discount_code__startswith="Generated-Code-"
+    ).all()
+
+    assert len(discounts) == 5
+
+    assert discounts[0].discount_type == DISCOUNT_TYPE_PERCENT_OFF
+    assert discounts[0].redemption_type == REDEMPTION_TYPE_ONE_TIME
+    assert discounts[0].amount == 50
+    assert discounts[0].is_bulk
+
+
+@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
+def test_checkout_interstitial_google_analytics_object(
+    mocker, settings, user, user_client, products
+):
+    """
+    Tests that the interstitial page receives the correct GA structure
+    """
+
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+    settings.FEATURES[features.ENABLE_GOOGLE_ANALYTICS_DATA_PUSH] = True
+    settings.POSTHOG_ENABLED = False
+
+    product = products[0]
+    basket = create_basket_with_product(user, product)
+    PendingOrder.create_from_basket(
+        basket, gateway_type=MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+    )
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+    assert resp.status_code == 200
+
+    ga_purchase_payload = resp.context["ga_purchase_payload"]
+    assert isinstance(ga_purchase_payload["value"], float)
+    assert isinstance(ga_purchase_payload["items"], list)
+    assert isinstance(ga_purchase_payload["shipping"], float)
+    assert isinstance(ga_purchase_payload["tax"], float)
+    for item in ga_purchase_payload["items"]:
+        assert isinstance(item["discount"], float)
+        assert isinstance(item["price"], float)
+        assert isinstance(item["quantity"], int)
+
+
+@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
+def test_checkout_interstitial_no_ga_flag_without_global_id(
+    mocker, settings, user_client, products
+):
+    """A user with no global_id is left unflagged rather than sharing a bucket."""
+
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+
+    user_no_global_id = UserFactory.create(global_id=None)
+    user_client.force_login(user_no_global_id)
+
+    mock_is_enabled = mocker.patch("ecommerce.views.legacy.is_posthog_enabled")
+
+    basket = create_basket_with_product(user_no_global_id, products[0])
+    PendingOrder.create_from_basket(
+        basket, gateway_type=MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+    )
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 200
+    assert "ga_purchase_payload" not in resp.context
+    mock_is_enabled.assert_not_called()
+
+
+@pytest.mark.skip_nplusone_check
+def test_program_product_purchasing(user, user_drf_client):
+    """Test that we can purchase products that are for programs."""
+
+    program = ProgramFactory.create()
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=program, price=0)
+
+    basket = BasketFactory.create(user=user)
+    BasketItem.objects.create(basket=basket, product=product)
+
+    checkout_payload = create_pending_order(user)
+    assert "no_checkout" in checkout_payload
+
+    assert ProgramEnrollment.objects.filter(
+        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    ).exists()
+
+
+def test_backoffice_callback_invalid_payload(mocker, client):
+    """Test that the backoffice API fails out early if the payload is invalid."""
+
+    payload = {
+        "signature": "123456",
+        "waffles": "",
+        "signed_field_names": "waffles",
+    }
+
+    mocked_get_order = mocker.patch(
+        "ecommerce.api.get_order_from_cybersource_payment_response"
+    )
+
+    response = client.post(reverse("checkout_result_api"), payload)
+
+    assert response.status_code == 401
+    mocked_get_order.assert_not_called()
+
+
+def test_backoffice_callback_bad_order(mocker, client, settings):
+    """Test that the backoffice API returns 404 if there's no order."""
+
+    last_order = Order.objects.order_by("pk").last()
+    max_order_id = (last_order.id if last_order else 0) + 200
+
+    payload = {
+        "req_consumer_id": "bob@doe.local",
+        "req_customer_ip_address": "127.0.0.1",
+        "req_reference_number": f"{REFERENCE_NUMBER_PREFIX}{settings.ENVIRONMENT}-{max_order_id}",
+        "req_line_item_count": 0,
+    }
+
+    mocked_processor = mocker.patch(
+        "ecommerce.api.process_cybersource_payment_response"
+    )
+
+    payload = PaymentGateway.get_gateway_class(  # noqa: SLF001
+        settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
+    )._sign_cybersource_payload(payload)
+
+    response = client.post(reverse("checkout_result_api"), payload)
+
+    assert response.status_code == 404
+    mocked_processor.assert_not_called()
+
+
+def test_backoffice_callback_good_order(mocker, client, settings):
+    """Test that the backoffice API fullfils the order if it's good."""
+
+    with reversion.create_revision():
+        product = ProductFactory.create()
+
+    product_version = Version.objects.get_for_object(product).first()
+
+    order_line = LineFactory.create(product_version=product_version)
+    order = order_line.order
+
+    # Ultimately, don't really care that much about the payload
+    # A successful one is fine - fully testing fulfillment is done elsewhere
+    payload = {
+        "req_consumer_id": "bob@doe.local",
+        "req_customer_ip_address": "127.0.0.1",
+        "req_reference_number": order.reference_number,
+        "req_line_item_count": 1,
+        "req_item_0_code": order_line.courseware,
+        "req_item_0_name": order_line.courseware,
+        "req_item_0_sku": order_line.product.id,
+        "req_item_0_unit_price": order_line.total_price,
+        "req_item_0_tax_amount": 0,
+        "req_item_0_quantity": 1,
+        "message": "Completed",
+        "reason_code": "",
+        "transaction_id": "12345abcde",
+        "decision": "ACCEPT",
+    }
+
+    mocked_processor = mocker.patch(
+        "ecommerce.api.process_cybersource_payment_response"
+    )
+
+    payload = PaymentGateway.get_gateway_class(  # noqa: SLF001
+        settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
+    )._sign_cybersource_payload(payload)
+
+    response = client.post(reverse("checkout_result_api"), payload)
+
+    assert response.status_code == 200
+    mocked_processor.assert_called()

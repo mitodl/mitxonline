@@ -1,6 +1,5 @@
 """Mail views"""
 
-from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
@@ -8,11 +7,10 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
 from mail import api
-from mail.constants import EMAIL_PW_RESET, EMAIL_VERIFICATION
+from mail.constants import EMAIL_VERIFICATION
 from mail.forms import EmailDebuggerForm
 
 EMAIL_DEBUG_EXTRA_CONTEXT = {
-    EMAIL_PW_RESET: {"uid": "abc-def", "token": "abc-def"},
     EMAIL_VERIFICATION: {"confirmation_url": "http://www.example.com/confirm/url"},
 }
 
@@ -42,7 +40,7 @@ class EmailDebuggerView(View):
             return JsonResponse({"error": "invalid input"})
 
         email_type = form.cleaned_data["email_type"]
-        context = {"base_url": settings.SITE_BASE_URL, "site_name": settings.SITE_NAME}
+        context = api.get_base_context()
 
         email_extra_context = EMAIL_DEBUG_EXTRA_CONTEXT.get(email_type, {})
         context.update(email_extra_context)

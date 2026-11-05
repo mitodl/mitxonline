@@ -9,7 +9,7 @@ export type Product = {
   description: string,
   purchasable_object: any,
   is_active: boolean,
-  product_flexible_price: Discount
+  product_flexible_price?: Discount
 }
 
 export type BasketItem = {
@@ -19,8 +19,7 @@ export type BasketItem = {
 }
 
 export type Purchaser = {
-  first_name: ?string,
-  last_name: ?string,
+  name: ?string,
   email: ?string,
   country: ?string
 }

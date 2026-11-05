@@ -73,7 +73,7 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name="programrequirement",
             constraint=models.CheckConstraint(
-                check=models.Q(
+                condition=models.Q(
                     models.Q(
                         ("course__isnull", True),
                         ("depth", 1),

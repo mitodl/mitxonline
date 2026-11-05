@@ -107,4 +107,29 @@ describe("ProgramProductDetailEnroll", () => {
     const modal = inner.find(".upgrade-enrollment-modal")
     assert.isOk(modal)
   })
+
+  it("calls program enrollment API when Enroll Now is clicked", async () => {
+    const program = programs[0]
+    const createProgramEnrollmentStub = helper.sandbox.stub().resolves({})
+
+    const { inner } = await renderPage()
+    inner.setProps({ createProgramEnrollment: createProgramEnrollmentStub })
+
+    const enrollBtn = inner.find(".enroll-now").at(0)
+    assert.isTrue(enrollBtn.exists())
+    await enrollBtn.prop("onClick")()
+
+    assert.isTrue(createProgramEnrollmentStub.calledOnceWithExactly(program.id))
+
+    const modal = inner.find("#upgrade-enrollment-dialog")
+    assert.isTrue(modal.find("select.form-control").exists())
+
+    assert.isFalse(modal.find("button.enroll-now-free").exists())
+
+    // toggle the dialog back and check if the program enrollment api was not called again
+    await modal.prop("toggle")()
+    inner.update()
+    assert.isFalse(inner.find("#upgrade-enrollment-dialog").prop("isOpen"))
+    assert.strictEqual(createProgramEnrollmentStub.callCount, 1)
+  })
 })

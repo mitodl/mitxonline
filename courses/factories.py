@@ -1,12 +1,14 @@
 """Factories for creating course data in tests"""
 
+import json
 import string  # noqa: F401
+from pathlib import Path
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 import factory
 import faker
 import pytest
-import pytz
 import wagtail_factories
 from factory import SubFactory, fuzzy
 from factory.django import DjangoModelFactory
@@ -21,8 +23,10 @@ from courses.models import (
     CourseRunGrade,
     CoursesTopic,
     Department,
+    EnrollmentMode,
     LearnerProgramRecordShare,
     PartnerSchool,
+    PartnerSchoolProgram,
     Program,
     ProgramCertificate,
     ProgramEnrollment,
@@ -30,16 +34,42 @@ from courses.models import (
     ProgramRequirementNodeType,
     ProgramRun,
 )
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
+from variants.factories import CourseSupportedVariantFactory
 
 FAKE = faker.Factory.create()
 
+# stub data that mirrors production
+DEPARTMENTS = {
+    dept["slug"]: dept["name"]
+    for dept in json.loads(Path("courses/test_data/departments.json").read_text())
+}
+MODES = [
+    EDX_ENROLLMENT_AUDIT_MODE,
+    EDX_ENROLLMENT_VERIFIED_MODE,
+]
+
 
 class DepartmentFactory(DjangoModelFactory):
-    name = factory.Sequence(lambda x: f"Testing - {x} Department")
+    name = factory.LazyAttribute(lambda dept: DEPARTMENTS[dept.slug])
+    slug = factory.Iterator(DEPARTMENTS.keys())
 
     class Meta:
         model = Department
+
+        django_get_or_create = ("slug",)
+
+
+class EnrollmentModeFactory(DjangoModelFactory):
+    """Factory for EnrollmentModes."""
+
+    mode_slug = factory.Iterator(MODES)
+    mode_display_name = factory.LazyAttribute(lambda emode: emode.mode_slug)
+
+    class Meta:
+        model = EnrollmentMode
+        django_get_or_create = ("mode_slug",)
 
 
 class ProgramFactory(DjangoModelFactory):
@@ -55,7 +85,30 @@ class ProgramFactory(DjangoModelFactory):
     def departments(self, create, extracted, **kwargs):  # noqa: ARG002
         if not create or not extracted:
             return
-        self.departments.add(*extracted)
+        self.departments.set(extracted)
+
+    @factory.post_generation
+    def enrollment_modes(self, create, extracted, **kwargs):  # noqa: ARG002
+        """
+        Post-generation method to add enrollment modes to the course run.
+        By default, adds the audit and verified modes if no modes are provided.
+
+        Args:
+            create: Whether the instance is being created (as opposed to just built).
+            extracted: The enrollment modes to add, if any were provided when the factory was called.
+            **kwargs: Additional keyword arguments (not used here).
+        """
+        if not create:
+            return
+        if extracted is not None and len(extracted) > 0:
+            self.enrollment_modes.set(extracted)
+        else:
+            self.enrollment_modes.add(
+                EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)
+            )
+            self.enrollment_modes.add(
+                EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
+            )
 
     class Meta:
         model = Program
@@ -75,7 +128,9 @@ class CourseFactory(DjangoModelFactory):
     """Factory for Courses"""
 
     title = fuzzy.FuzzyText(prefix="Course ")
-    readable_id = factory.Sequence("course-v1:PyT+Course{0}".format)
+    readable_id = factory.LazyFunction(
+        lambda: f"course-v1:PyT+{''.join(FAKE.words(nb=3, unique=True))}"
+    )
     live = True
     departments = factory.SubFactory(DepartmentFactory)
 
@@ -86,6 +141,24 @@ class CourseFactory(DjangoModelFactory):
         if not create or not extracted:
             return
         self.departments.add(*extracted)
+
+    @factory.post_generation
+    def possible_variant_sets(self, create, extracted, **kwargs):  # noqa: ARG002
+        """Craete a default variant set, unless provided some."""
+
+        if not create:
+            return
+
+        if extracted:
+            self.possible_variant_sets.add(extracted)
+        else:
+            CourseSupportedVariantFactory.create(
+                variant_object=self,
+                language="en",
+                variant_industry="",
+                variant_length="",
+                default_variant=True,
+            )
 
     class Meta:
         model = Course
@@ -100,49 +173,127 @@ class CourseRunFactory(DjangoModelFactory):
         lambda number: f"course-v1:PyT+CR{FAKE.slug()}+R{number}"
     )
     run_tag = factory.Sequence("R{0}".format)
-    courseware_url_path = factory.Faker("uri")
     start_date = factory.Faker(
-        "date_time_this_month", before_now=True, after_now=False, tzinfo=pytz.utc
+        "date_time_between", start_date="-30d", end_date="-1d", tzinfo=ZoneInfo("UTC")
     )
     end_date = factory.Faker(
-        "date_time_this_year", before_now=False, after_now=True, tzinfo=pytz.utc
+        "date_time_between", start_date="+1d", end_date="+1y", tzinfo=ZoneInfo("UTC")
     )
     certificate_available_date = factory.Faker(
-        "date_time_this_year", before_now=False, after_now=True, tzinfo=pytz.utc
+        "date_time_between", start_date="+1d", end_date="+30d", tzinfo=ZoneInfo("UTC")
     )
 
     enrollment_start = factory.Faker(
-        "date_time_this_month", before_now=True, after_now=False, tzinfo=pytz.utc
+        "date_time_between", start_date="-30d", end_date="-1d", tzinfo=ZoneInfo("UTC")
     )
     enrollment_end = factory.Faker(
-        "date_time_this_month", before_now=False, after_now=True, tzinfo=pytz.utc
+        "date_time_between", start_date="+1d", end_date="+30d", tzinfo=ZoneInfo("UTC")
     )
     expiration_date = factory.Faker(
-        "date_time_between", start_date="+1y", end_date="+2y", tzinfo=pytz.utc
+        "date_time_between", start_date="+1y", end_date="+2y", tzinfo=ZoneInfo("UTC")
     )
     upgrade_deadline = factory.Faker(
-        "date_time_between", start_date="+1y", end_date="+2y", tzinfo=pytz.utc
+        "date_time_between", start_date="+1y", end_date="+2y", tzinfo=ZoneInfo("UTC")
     )
 
     live = True
-    b2b_contract = None
+    b2b_only = False
+    is_source_run = False
+    language = ""
+    is_primary_language = False
+
+    @factory.post_generation
+    def enrollment_modes(self, create, extracted, **kwargs):  # noqa: ARG002
+        """
+        Post-generation method to add enrollment modes to the course run.
+        By default, adds the audit and verified modes if no modes are provided.
+
+        Args:
+            create: Whether the instance is being created (as opposed to just built).
+            extracted: The enrollment modes to add, if any were provided when the factory was called.
+            **kwargs: Additional keyword arguments (not used here).
+        """
+        if not create:
+            return
+        if extracted is not None:
+            self.enrollment_modes.set(extracted)
+        else:
+            self.enrollment_modes.add(
+                EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)
+            )
+            self.enrollment_modes.add(
+                EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
+            )
+
+    @factory.post_generation
+    def b2b_contracts(self, create, extracted, **kwargs):  # noqa: ARG002
+        """Handle assignment of B2B contracts."""
+
+        if not create:
+            return
+
+        if extracted is not None:
+            self.b2b_contracts.set(extracted)
 
     class Meta:
         model = CourseRun
 
     class Params:
+        # Dates that move into the future use an explicit "+1d" floor rather than
+        # Faker's future_datetime, which starts one second from now. A run whose
+        # start_date or end_date falls inside a test's own runtime changes state
+        # mid-test - is_archived flips, first_unexpired_run moves on - which makes
+        # any expected-vs-actual comparison flaky. past_datetime needs no such
+        # floor: it moves further into the past as the test runs.
         past_start = factory.Trait(
-            start_date=factory.Faker("past_datetime", tzinfo=pytz.utc)
+            start_date=factory.Faker("past_datetime", tzinfo=ZoneInfo("UTC"))
         )
         past_enrollment_end = factory.Trait(
-            enrollment_end=factory.Faker("past_datetime", tzinfo=pytz.utc)
+            enrollment_end=factory.Faker("past_datetime", tzinfo=ZoneInfo("UTC"))
         )
         in_progress = factory.Trait(
-            start_date=factory.Faker("past_datetime", tzinfo=pytz.utc),
-            end_date=factory.Faker("future_datetime", tzinfo=pytz.utc),
+            start_date=factory.Faker("past_datetime", tzinfo=ZoneInfo("UTC")),
+            end_date=factory.Faker(
+                "date_time_between",
+                start_date="+1d",
+                end_date="+1y",
+                tzinfo=ZoneInfo("UTC"),
+            ),
         )
         in_future = factory.Trait(
-            start_date=factory.Faker("future_datetime", tzinfo=pytz.utc), end_date=None
+            start_date=factory.Faker(
+                "date_time_between",
+                start_date="+1d",
+                end_date="+30d",
+                tzinfo=ZoneInfo("UTC"),
+            ),
+            end_date=None,
+        )
+        completed = factory.Trait(
+            start_date=factory.Faker(
+                "date_time_between",
+                start_date="-3M",
+                end_date="-2M",
+                tzinfo=ZoneInfo("UTC"),
+            ),
+            end_date=factory.Faker(
+                "date_time_between",
+                start_date="-5d",
+                end_date="now",
+                tzinfo=ZoneInfo("UTC"),
+            ),
+            enrollment_start=factory.Faker(
+                "date_time_between",
+                start_date="-4M",
+                end_date="-3M",
+                tzinfo=ZoneInfo("UTC"),
+            ),
+            enrollment_end=factory.Faker(
+                "date_time_between",
+                start_date="-1M",
+                end_date="-10d",
+                tzinfo=ZoneInfo("UTC"),
+            ),
         )
 
 
@@ -165,14 +316,6 @@ class ProgramRequirementFactory(DjangoModelFactory):
 
     class Meta:
         model = ProgramRequirement
-
-    @classmethod
-    def add_root(cls, program):
-        if not ProgramRequirement.get_root_nodes().filter(program=program).exists():
-            return ProgramRequirement.add_root(
-                program=program, node_type=ProgramRequirementNodeType.PROGRAM_ROOT.value
-            )
-        return program.get_requirements_root()
 
 
 class BlockedCountryFactory(DjangoModelFactory):
@@ -219,6 +362,24 @@ class ProgramCertificateFactory(DjangoModelFactory):
     class Meta:
         model = ProgramCertificate
 
+    class Params:
+        past_issue_date = factory.Trait(
+            issue_date=factory.Faker(
+                "date_time_between",
+                start_date="-5y",
+                end_date="-1h",
+                tzinfo=ZoneInfo("UTC"),
+            )
+        )
+        future_issue_date = factory.Trait(
+            issue_date=factory.Faker(
+                "date_time_between",
+                start_date="+1d",
+                end_date="+1m",
+                tzinfo=ZoneInfo("UTC"),
+            )
+        )
+
 
 class CourseRunEnrollmentFactory(DjangoModelFactory):
     """Factory for CourseRunEnrollment"""
@@ -240,6 +401,24 @@ class CourseRunCertificateFactory(DjangoModelFactory):
     class Meta:
         model = CourseRunCertificate
 
+    class Params:
+        past_issue_date = factory.Trait(
+            issue_date=factory.Faker(
+                "date_time_between",
+                start_date="-5y",
+                end_date="-1h",
+                tzinfo=ZoneInfo("UTC"),
+            )
+        )
+        future_issue_date = factory.Trait(
+            issue_date=factory.Faker(
+                "date_time_between",
+                start_date="+1d",
+                end_date="+1m",
+                tzinfo=ZoneInfo("UTC"),
+            )
+        )
+
 
 class ProgramEnrollmentFactory(DjangoModelFactory):
     """Factory for ProgramEnrollment"""
@@ -259,6 +438,16 @@ class PartnerSchoolFactory(DjangoModelFactory):
         model = PartnerSchool
 
 
+class PartnerSchoolProgramFactory(DjangoModelFactory):
+    partner_school = SubFactory(PartnerSchoolFactory)
+    program = SubFactory(ProgramFactory)
+    email = fuzzy.FuzzyText(suffix="@example.com")
+    alt_email = ""
+
+    class Meta:
+        model = PartnerSchoolProgram
+
+
 class LearnerProgramRecordShareFactory(DjangoModelFactory):
     user = SubFactory(UserFactory)
     program = SubFactory(ProgramFactory)
@@ -272,7 +461,6 @@ class LearnerProgramRecordShareFactory(DjangoModelFactory):
 @pytest.fixture
 def program_with_empty_requirements():
     program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(program)
     root_node = program.requirements_root
 
     root_node.add_child(
@@ -361,3 +549,59 @@ class ProgramCollectionFactory(wagtail_factories.PageFactory):
         for program in extracted:
             self.programs.add(program)
         self.save()
+
+
+def create_program_with_tracks():
+    """Create a program with a core group and two tracks, each a group of two courses"""
+    program = ProgramFactory.create()
+    core_courses = CourseFactory.create_batch(2)
+    root_node = program.requirements_root
+
+    core_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Core Courses",
+    )
+    for course in core_courses:
+        core_node.add_child(node_type=ProgramRequirementNodeType.COURSE, course=course)
+
+    tracks_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=1,
+        title="Tracks",
+        elective_flag=True,
+    )
+    track_nodes = []
+    track_courses = []
+    for title in ("General Track", "Methods Track"):
+        track_node = tracks_node.add_child(
+            node_type=ProgramRequirementNodeType.TRACK, title=title
+        )
+        group_node = track_node.add_child(
+            node_type=ProgramRequirementNodeType.OPERATOR,
+            operator=ProgramRequirement.Operator.ALL_OF,
+            title="Required",
+        )
+        courses = CourseFactory.create_batch(2)
+        for course in courses:
+            group_node.add_child(
+                node_type=ProgramRequirementNodeType.COURSE, course=course
+            )
+        track_nodes.append(track_node)
+        track_courses.append(courses)
+
+    return SimpleNamespace(
+        program=program,
+        root_node=root_node,
+        core_courses=core_courses,
+        tracks_node=tracks_node,
+        track_nodes=track_nodes,
+        track_courses=track_courses,
+    )
+
+
+@pytest.fixture
+def program_with_tracks():
+    """A program with a core group and two tracks, each one group of two courses"""
+    return create_program_with_tracks()

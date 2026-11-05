@@ -12,9 +12,10 @@ from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
+    EnrollmentModeFactory,
     ProgramFactory,
 )
-from courses.models import CourseRunEnrollment, CoursesTopic, Department
+from courses.models import Course, CourseRunEnrollment, CoursesTopic, Department
 from courses.serializers.v1.base import BaseProgramSerializer
 from courses.serializers.v2.courses import (
     CourseRunEnrollmentSerializer,
@@ -23,40 +24,66 @@ from courses.serializers.v2.courses import (
 )
 from courses.views.v2 import UserEnrollmentFilterSet
 from main.test_utils import assert_drf_json_equal
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
+from variants.serializers import SupportedVariantSerializer
 
 pytestmark = [pytest.mark.django_db]
 
 
 @pytest.mark.parametrize("is_anonymous", [True, False])
-@pytest.mark.parametrize("all_runs", [True, False])
 @pytest.mark.parametrize(
-    "certificate_type", ["MicroMasters Credential", "Certificate of Completion"]
+    "cert_available",
+    [
+        True,
+        False,
+    ],
 )
 def test_serialize_course(
-    mocker, mock_context, is_anonymous, all_runs, certificate_type
+    mock_context,
+    is_anonymous,
+    cert_available,
 ):
     """Test Course serialization"""
+
+    if not cert_available:
+        courseRun1 = CourseRunFactory.create(certificate_available_date=None)
+        courseRun2 = CourseRunFactory.create(
+            certificate_available_date=None, course=courseRun1.course
+        )
+        courseRun1.enrollment_modes.clear()
+        courseRun2.enrollment_modes.clear()
+    else:
+        courseRun1 = CourseRunFactory.create()
+        courseRun1.enrollment_modes.add(
+            EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
+        )
+        courseRun2 = CourseRunFactory.create(course=courseRun1.course)
+        courseRun2.enrollment_modes.add(
+            EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
+        )
+
     if is_anonymous:
         mock_context["request"].user = AnonymousUser()
-    if all_runs:
-        mock_context["all_runs"] = True
     user = mock_context["request"].user
-    courseRun1 = CourseRunFactory.create()
-    courseRun2 = CourseRunFactory.create(course=courseRun1.course)
     course = courseRun1.course
     topics = [CoursesTopic.objects.create(name=f"topic{num}") for num in range(3)]
     course.page.topics.set([topics[0], topics[1], topics[2]])
     department = "a course departments"
     course.departments.set([Department.objects.create(name=department)])
-    program = ProgramFactory.create(program_type="Series")
-    if certificate_type == "MicroMasters Credential":
-        program.program_type = "MicroMasters®"
+    # Only the program awards the MicroMasters credential, not its courses
+    program = ProgramFactory.create(program_type="MicroMasters®")
     program.add_requirement(course)
-    program.save()
 
     CourseRunEnrollmentFactory.create(
         run=courseRun1, **({} if is_anonymous else {"user": user})
     )
+
+    # Fake out a "has_verified_courserun" attribute - this is an annotation that the
+    # viewset adds, but won't be here because we're just passing it in a straight
+    # Course object.
+    course.has_verified_courserun = course.courseruns.filter(
+        enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+    ).exists()
 
     data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
 
@@ -75,7 +102,8 @@ def test_serialize_course(
             "min_weekly_hours": course.page.min_weekly_hours,
             "departments": [{"name": department}],
             "page": CoursePageSerializer(course.page).data,
-            "certificate_type": certificate_type,
+            "certificate_type": "Certificate of Completion",
+            "certificate_available": cert_available,
             "availability": "dated",
             "topics": [{"name": topic.name} for topic in topics],
             "required_prerequisites": True,
@@ -85,15 +113,75 @@ def test_serialize_course(
             "min_price": course.page.min_price,
             "max_price": course.page.max_price,
             "time_commitment": course.page.effort,
-            "programs": (
-                BaseProgramSerializer(course.programs, many=True).data
-                if all_runs
-                else None
-            ),
+            "programs": BaseProgramSerializer(course.programs, many=True).data,
             "include_in_learn_catalog": course.page.include_in_learn_catalog,
             "ingest_content_files_for_ai": course.page.ingest_content_files_for_ai,
+            "possible_variant_sets": [
+                SupportedVariantSerializer(vs).data
+                for vs in course.possible_variant_sets.all()
+            ],
         },
+        ignore_order=True,
     )
+
+
+def _mark_verified_courserun(course):
+    """
+    Stand in for CourseViewSet's ``has_verified_courserun`` annotation so a bare
+    serializer sees the same precondition the list endpoint would.
+    """
+    course.has_verified_courserun = course.courseruns.filter(
+        enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+    ).exists()
+    return course
+
+
+def _course_eligible_for_certificate():
+    """Build a course with a verified, unexpired run (certificate_available preconditions met)."""
+    course_run = CourseRunFactory.create()
+    course_run.enrollment_modes.add(
+        EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
+    )
+    return _mark_verified_courserun(course_run.course)
+
+
+def test_serialize_course_certificate_available_certificates_disabled(mock_context):
+    """certificate_available should be False when certificates are disabled for the course."""
+    course = _course_eligible_for_certificate()
+    assert (
+        CourseWithCourseRunsSerializer(instance=course, context=mock_context).data[
+            "certificate_available"
+        ]
+        is True
+    )
+
+    course.certificates_disabled = True
+    course.save()
+
+    data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
+
+    assert data["certificate_available"] is False
+
+
+def test_serialize_course_certificate_available_no_certificate_page(mock_context):
+    """certificate_available should be False when the course has no live certificate page."""
+    course = _course_eligible_for_certificate()
+    assert (
+        CourseWithCourseRunsSerializer(instance=course, context=mock_context).data[
+            "certificate_available"
+        ]
+        is True
+    )
+
+    course.page.certificate_page.delete()
+
+    # Course.certificate_page is a cached_property and the assertion above warmed
+    # it, so re-read the course to let the serializer see the deletion.
+    course = _mark_verified_courserun(Course.objects.get(pk=course.pk))
+
+    data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
+
+    assert data["certificate_available"] is False
 
 
 @pytest.mark.parametrize("prerequisites_cms_value", ["mock value", None, ""])
@@ -125,6 +213,7 @@ def test_serialize_course_required_prerequisites(
             "departments": [],
             "page": CoursePageSerializer(course.page).data,
             "certificate_type": "Certificate of Completion",
+            "certificate_available": False,
             "topics": [],
             "availability": "anytime",
             "required_prerequisites": expected_required_prerequisites,
@@ -134,43 +223,63 @@ def test_serialize_course_required_prerequisites(
             "min_price": course.page.min_price,
             "max_price": course.page.max_price,
             "time_commitment": course.page.effort,
-            "programs": None,
+            "programs": BaseProgramSerializer(course.programs, many=True).data,
             "include_in_learn_catalog": course.page.include_in_learn_catalog,
             "ingest_content_files_for_ai": course.page.ingest_content_files_for_ai,
+            "possible_variant_sets": [
+                SupportedVariantSerializer(vs).data
+                for vs in course.possible_variant_sets.all()
+            ],
         },
     )
+
+
+def test_serialize_course_with_no_page(mock_context):
+    """Test that a course with no CMS page serializes page as None."""
+    run = CourseRunFactory.create(course__page=None)
+    course = run.course
+
+    data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
+
+    assert data["page"] is None
 
 
 class TestCourseRunEnrollmentSerializerV2:
     """Test the v2 CourseRunEnrollmentSerializer."""
 
-    def test_serializer_without_b2b_contract(self):
+    def test_serializer_without_b2b_contract(self, mock_context):
         """Test serialization without B2B contract."""
         enrollment = CourseRunEnrollmentFactory.create()
-        serialized_data = CourseRunEnrollmentSerializer(enrollment).data
+        serialized_data = CourseRunEnrollmentSerializer(
+            enrollment, context=mock_context
+        ).data
 
         assert "b2b_organization_id" in serialized_data
         assert "b2b_contract_id" in serialized_data
         assert serialized_data["b2b_organization_id"] is None
         assert serialized_data["b2b_contract_id"] is None
 
-    def test_serializer_with_b2b_contract(self):
+    def test_serializer_with_b2b_contract(self, mock_context):
         """Test serialization with B2B contract."""
         org = OrganizationPageFactory.create()
         contract = ContractPageFactory.create(organization=org)
 
-        enrollment = CourseRunEnrollmentFactory.create()
-        enrollment.run.b2b_contract = contract
-        enrollment.run.save()
+        enrollment = CourseRunEnrollmentFactory.create(
+            run__b2b_contracts=[contract], b2b_contract=contract
+        )
 
-        serialized_data = CourseRunEnrollmentSerializer(enrollment).data
+        serialized_data = CourseRunEnrollmentSerializer(
+            enrollment, context=mock_context
+        ).data
         assert serialized_data["b2b_organization_id"] == org.id
         assert serialized_data["b2b_contract_id"] == contract.id
 
-    def test_serializer_fields(self):
+    def test_serializer_fields(self, mock_context):
         """Test that all expected fields are present."""
         enrollment = CourseRunEnrollmentFactory.create()
-        serialized_data = CourseRunEnrollmentSerializer(enrollment).data
+        serialized_data = CourseRunEnrollmentSerializer(
+            enrollment, context=mock_context
+        ).data
 
         expected_fields = {
             "run",
@@ -191,14 +300,13 @@ class TestUserEnrollmentFiltering:
     """Test B2B filtering for user enrollments."""
 
     def test_exclude_b2b_filter_logic(self):
-        """Test that the exclude_b2b filter correctly filters out B2B enrollments."""
-        regular_enrollment = CourseRunEnrollmentFactory.create()
-
-        org = OrganizationPageFactory.create(title="Test B2B Org")
-        contract = ContractPageFactory.create(organization=org)
-        b2b_enrollment = CourseRunEnrollmentFactory.create()
-        b2b_enrollment.run.b2b_contract = contract
-        b2b_enrollment.run.save()
+        """exclude_b2b filters out enrollments made through a contract, not every enrollment in a contract run."""
+        contract = ContractPageFactory.create()
+        run = CourseRunFactory.create(b2b_contracts=[contract])
+        regular_enrollment = CourseRunEnrollmentFactory.create(run=run)
+        b2b_enrollment = CourseRunEnrollmentFactory.create(
+            run=run, b2b_contract=contract
+        )
 
         queryset = CourseRunEnrollment.objects.filter(
             id__in=[regular_enrollment.id, b2b_enrollment.id]
@@ -232,13 +340,15 @@ class TestUserEnrollmentFiltering:
         contract1 = ContractPageFactory.create(organization=org1)
         contract2 = ContractPageFactory.create(organization=org2)
 
-        enrollment1 = CourseRunEnrollmentFactory.create()
-        enrollment1.run.b2b_contract = contract1
-        enrollment1.run.save()
+        enrollment1 = CourseRunEnrollmentFactory.create(
+            run__b2b_contracts=[contract1], b2b_contract=contract1
+        )
+        # A personal enrollment in the same contract run doesn't belong to org1.
+        CourseRunEnrollmentFactory.create(run=enrollment1.run)
 
-        enrollment2 = CourseRunEnrollmentFactory.create()
-        enrollment2.run.b2b_contract = contract2
-        enrollment2.run.save()
+        enrollment2 = CourseRunEnrollmentFactory.create(
+            run__b2b_contracts=[contract2], b2b_contract=contract2
+        )
 
         queryset = CourseRunEnrollment.objects.all()
         filter_data = QueryDict(f"org_id={org1.id}")
@@ -252,3 +362,96 @@ class TestUserEnrollmentFiltering:
         result = filter_set.qs
         assert result.count() == 1
         assert result.first().id == enrollment2.id
+
+
+# ---- Language / titles serializer tests ----
+
+
+def test_course_serializer_canonical_run_per_tag(mock_context):
+    """get_courseruns returns one canonical run per tag (the primary-language one)."""
+    course = CourseFactory.create()
+    run_en = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_primary_language=True,
+        courseware_id="course-v1:T+C+1T2026-en",
+    )
+    CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="zh",
+        is_primary_language=False,
+        courseware_id="course-v1:T+C+1T2026-zh",
+    )
+    serializer = CourseWithCourseRunsSerializer(course, context=mock_context)
+    assert len(serializer.data["courseruns"]) == 1
+    assert serializer.data["courseruns"][0]["courseware_id"] == run_en.courseware_id
+
+
+def test_course_serializer_canonical_run_fallback_to_oldest(mock_context):
+    """When no run has is_primary_language=True, the oldest run is canonical."""
+    course = CourseFactory.create()
+    run_first = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_primary_language=False,
+        courseware_id="course-v1:T+C+1T2026-en",
+    )
+    CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="zh",
+        is_primary_language=False,
+        courseware_id="course-v1:T+C+1T2026-zh",
+    )
+    serializer = CourseWithCourseRunsSerializer(course, context=mock_context)
+    assert len(serializer.data["courseruns"]) == 1
+    assert serializer.data["courseruns"][0]["courseware_id"] == run_first.courseware_id
+
+
+@pytest.mark.parametrize(
+    ("context_key", "expected_key"),
+    [
+        (None, None),
+        ("contract_id", "second"),
+        ("org_id", "second"),
+    ],
+)
+def test_course_run_serializer_b2b_contract(mock_context, context_key, expected_key):
+    """
+    The b2b_contract field returns the contract the request was scoped to, or
+    to None.
+    """
+    contracts = {
+        "first": ContractPageFactory.create(),
+        "second": ContractPageFactory.create(),
+    }
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=list(contracts.values()))
+
+    context = {**mock_context}
+    if context_key == "contract_id":
+        context["contract_id"] = str(contracts["second"].id)
+    elif context_key == "org_id":
+        context["org_id"] = str(contracts["second"].organization_id)
+
+    data = CourseRunSerializer(run, context=context).data
+
+    if expected_key:
+        assert data["b2b_contract"] == contracts[expected_key].id
+    else:
+        assert not data["b2b_contract"]
+
+    assert (
+        CourseRunSerializer(CourseRunFactory.create(), context=context).data[
+            "b2b_contract"
+        ]
+        is None
+    )
+
+
+def test_course_run_serializer_b2b_only():
+    """b2b_only is serialized, so MIT Learn's ETL can keep contract-only runs out of its catalog."""
+    run = CourseRunFactory.create(b2b_only=True)
+    assert CourseRunSerializer(run).data["b2b_only"] is True

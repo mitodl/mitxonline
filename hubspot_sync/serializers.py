@@ -6,11 +6,13 @@ from django.conf import settings
 from mitol.hubspot_api.api import format_app_id
 from rest_framework import serializers
 
-from courses.models import CourseRunCertificate, CourseRunEnrollment, ProgramCertificate
+from courses.models import (
+    CourseRun,
+    CourseRunEnrollment,
+    Program,
+    ProgramEnrollment,
+)
 from ecommerce import models
-from ecommerce.constants import DISCOUNT_TYPE_DOLLARS_OFF, DISCOUNT_TYPE_PERCENT_OFF
-from ecommerce.discounts import resolve_product_version
-from ecommerce.models import Product
 from hubspot_sync.api import format_product_name, get_hubspot_id_for_object
 from main.utils import format_decimal
 from users.serializers import UserSerializer
@@ -35,6 +37,46 @@ ORDER_STATUS_MAPPING = {
 }
 
 
+def _get_prefetched_first_related(instance, relation_name: str):
+    """Return first prefetched related object if relation was prefetched."""
+    prefetched = getattr(instance, "_prefetched_objects_cache", {})
+    related_items = prefetched.get(relation_name)
+    if related_items is None:
+        return None
+    return related_items[0] if related_items else None
+
+
+def _get_line_enrollment(instance):
+    """Return enrollment related to the purchased object and order purchaser."""
+    purchased_object = instance.purchased_object
+    purchaser = instance.order.purchaser
+    if isinstance(purchased_object, CourseRun):
+        return CourseRunEnrollment.all_objects.filter(
+            run=purchased_object, user=purchaser
+        ).first()
+    if isinstance(purchased_object, Program):
+        return ProgramEnrollment.all_objects.filter(
+            program=purchased_object, user=purchaser
+        ).first()
+    return None
+
+
+def _get_first_order_line(instance):
+    """Return first order line, preferring prefetched relation when available."""
+    first_line = _get_prefetched_first_related(instance, "lines")
+    if first_line is not None:
+        return first_line
+    return models.Line.objects.filter(order=instance).first()
+
+
+def _get_first_order_redemption(instance):
+    """Return first order redemption, preferring prefetched relation when available."""
+    first_redemption = _get_prefetched_first_related(instance, "discounts")
+    if first_redemption is not None:
+        return first_redemption
+    return instance.discounts.first()
+
+
 class LineSerializer(serializers.ModelSerializer):
     """Line Serializer for Hubspot"""
 
@@ -47,36 +89,23 @@ class LineSerializer(serializers.ModelSerializer):
     enrollment_mode = serializers.SerializerMethodField()
     change_status = serializers.SerializerMethodField()
 
-    _product = None
-    _enrollment = None
-
-    def _get_product(self, instance):
-        """Retrieve the line product just once"""
-        if not self._product:
-            version = instance.product_version
-            product = Product.all_objects.filter(id=version.object_id).first()
-            if product:
-                self._product = resolve_product_version(
-                    product, product_version=version
-                )
-            else:
-                self._product = version.object
-        return self._product
-
     def _get_enrollment(self, instance):
-        """Returns the CourseRunEnrollment associated with the Order, if one exists, else None"""
-        self._enrollment = CourseRunEnrollment.all_objects.filter(
-            run=instance.purchased_object, user=instance.order.purchaser
-        ).first()
-        return self._enrollment
+        """Returns the enrollment associated with the Order, if one exists, else None"""
+        cache_attr = "_hubspot_line_enrollment"
+        if hasattr(instance, cache_attr):
+            return getattr(instance, cache_attr)
+
+        enrollment = _get_line_enrollment(instance)
+        setattr(instance, cache_attr, enrollment)
+        return enrollment
 
     def get_enrollment_mode(self, instance):
-        """Returns the CourseRunEnrollment's mode associated with the Order, if a CourseRunEnrollment exists, else None"""
+        """Returns the enrollment's mode associated with the Order, if an enrollment exists, else None"""
         enrollment = self._get_enrollment(instance)
         return enrollment.enrollment_mode if enrollment is not None else None
 
     def get_change_status(self, instance):
-        """Returns the CourseRunEnrollment's change_status associated with the Order, if a CourseRunEnrollment exists, else None"""
+        """Returns the enrollment's change_status associated with the Order, if an enrollment exists, else None"""
         enrollment = self._get_enrollment(instance)
         return enrollment.change_status if enrollment is not None else None
 
@@ -87,14 +116,14 @@ class LineSerializer(serializers.ModelSerializer):
     def get_name(self, instance):
         """Get the product version name"""
         if instance.product_version:
-            return format_product_name(self._get_product(instance))
+            return format_product_name(instance.product)
         return ""
 
     def get_hs_product_id(self, instance):
         """Return the hubspot id for the product"""
         if not instance.product_version:
             return None
-        return get_hubspot_id_for_object(self._get_product(instance))
+        return get_hubspot_id_for_object(instance.product)
 
     def get_status(self, instance):
         """Get status of the associated Order"""
@@ -102,15 +131,19 @@ class LineSerializer(serializers.ModelSerializer):
 
     def get_product_id(self, instance):
         """Return the product version text_id"""
-        product = self._get_product(instance)
-        if product:  # noqa: RET503
+        product = instance.product
+        if product:
             return product.purchasable_object.readable_id
+
+        return None
 
     def get_price(self, instance):
         """Get the product version price"""
-        product = self._get_product(instance)
-        if product:  # noqa: RET503
+        product = instance.product
+        if product:
             return format_decimal(product.price)
+
+        return None
 
     class Meta:
         fields = (
@@ -142,34 +175,31 @@ class OrderToDealSerializer(serializers.ModelSerializer):
     pipeline = serializers.ReadOnlyField(default=settings.HUBSPOT_PIPELINE_ID)
     status = serializers.ReadOnlyField(source="state")
 
-    _discount_checked = False
-    _discount = None
-    _product = None
-
-    def _get_product(self, instance):
-        """Retrieve the line product just once"""
-        if not self._product:
-            version = instance.lines.first().product_version
-            product = Product.objects.filter(id=version.object_id).first()
-            if product:
-                self._product = resolve_product_version(
-                    product, product_version=version
-                )
-            else:
-                self._product = version.object
-        return self._product
-
     def _get_discount(self, instance):
-        """Return the order discount"""
-        if self._discount is None and not self._discount_checked:
-            redemption = instance.discounts.first()
-            self._discount_checked = True
-            if redemption:
-                self._discount = instance.discounts.first().redeemed_discount
-        return self._discount
+        """Return the first redeemed discount for the order."""
+        cache_attr = "_hubspot_order_discount"
+        if hasattr(instance, cache_attr):
+            return getattr(instance, cache_attr)
+
+        redemption = _get_first_order_redemption(instance)
+        discount = redemption.redeemed_discount if redemption else None
+        setattr(instance, cache_attr, discount)
+        return discount
 
     def get_unique_app_id(self, instance):
-        """Get the app_id for the object"""
+        """Get the app_id for the object - based on user and purchasable object for consistency"""
+        # For consistency between cart-add and checkout, base the unique_app_id on
+        # the user and purchasable object rather than the order ID
+        first_line = _get_first_order_line(instance)
+        if first_line and first_line.purchased_object:
+            # Generate consistent ID based on user and purchasable object
+            user_identifier = instance.purchaser.global_id
+            object_type = first_line.purchased_content_type.model
+            object_id = first_line.purchased_object_id
+            consistent_id = f"{user_identifier}-{object_type}-{object_id}"
+            return format_app_id(consistent_id)
+
+        # Fallback to original behavior for orders without lines
         return format_app_id(instance.id)
 
     def get_dealname(self, instance):
@@ -182,56 +212,66 @@ class OrderToDealSerializer(serializers.ModelSerializer):
 
     def get_closedate(self, instance):
         """Return the updated_on date (as a timestamp in milliseconds) if fulfilled"""
-        if instance.state == models.OrderStatus.FULFILLED:  # noqa: RET503
+        if instance.state == models.OrderStatus.FULFILLED:
             return int(instance.updated_on.timestamp() * 1000)
+
+        return None
 
     def get_discount_type(self, instance):
         """Get the discount type of the applied coupon"""
         discount = self._get_discount(instance)
-        if discount:  # noqa: RET503
+        if discount:
             return discount.discount_type
+
+        return None
 
     def get_amount(self, instance):
         """Get the amount paid after discount"""
         return format_decimal(instance.total_price_paid)
 
+    def _get_discounted_line_prices(self, instance):
+        """
+        The order's list and discounted unit prices as (list, discounted), or
+        None when there is no discount to report.
+
+        Both come from the price frozen onto the line when the order was priced,
+        so neither drifts if the discount is edited afterwards, and the
+        subtraction is right for every discount type — including one whose
+        stored amount is always 0.
+        """
+        line = _get_first_order_line(instance)
+        if not self._get_discount(instance) or line is None:
+            return None
+
+        return (Decimal(line.unit_price), line.get_discounted_unit_price())
+
     def get_discount_amount(self, instance):
         """Get the discount amount if any"""
-        discount = self._get_discount(instance)
-        if not discount:
+        prices = self._get_discounted_line_prices(instance)
+        if prices is None:
             return "0.00"
-        product_price = self._get_product(instance).price
-        if discount.discount_type == DISCOUNT_TYPE_PERCENT_OFF:
-            discount_amount = Decimal(product_price * (discount.amount / 100))
-        elif discount.discount_type == DISCOUNT_TYPE_DOLLARS_OFF:
-            discount_amount = discount.amount
-        else:
-            discount_amount = Decimal(product_price - discount.amount)
-        return format_decimal(discount_amount)
+        list_price, discounted_price = prices
+        return format_decimal(list_price - discounted_price)
 
     def get_discount_percent(self, instance):
         """Get the discount percentage if any"""
-        discount = self._get_discount(instance)
-        if not discount:
+        prices = self._get_discounted_line_prices(instance)
+        if prices is None:
             return "0"
-        product_price = self._get_product(instance).price
-        if discount.discount_type == DISCOUNT_TYPE_PERCENT_OFF:
-            discount_percent = discount.amount
-        elif discount.discount_type == DISCOUNT_TYPE_DOLLARS_OFF:
-            discount_percent = Decimal(discount.amount / product_price) * 100
-        elif discount.amount == 0 or product_price == 0:
-            discount_percent = Decimal(100)
-        else:
-            discount_percent = Decimal(
-                ((product_price - discount.amount) / product_price) * 100
-            )
-        return format_decimal(discount_percent)
+        list_price, discounted_price = prices
+        if list_price == 0:
+            # A $0 product carrying a discount code is fully discounted by
+            # convention (B2B enrollment codes).
+            return format_decimal(Decimal(100))
+        return format_decimal((list_price - discounted_price) / list_price * 100)
 
     def get_coupon_code(self, instance):
         """Get the coupon code used for the order if any"""
         discount = self._get_discount(instance)
-        if discount:  # noqa: RET503
+        if discount:
             return discount.discount_code
+
+        return None
 
     class Meta:
         fields = (
@@ -280,36 +320,8 @@ class ProductSerializer(serializers.ModelSerializer):
 class HubspotContactSerializer(UserSerializer):
     """User Serializer for Hubspot"""
 
-    program_certificates = serializers.SerializerMethodField()
-    course_run_certificates = serializers.SerializerMethodField()
-
-    def get_program_certificates(self, instance):
-        """Return a list of program names that the user has a certificate for."""
-        programs_user_has_cert = ProgramCertificate.objects.filter(
-            user=instance, is_revoked=False
-        ).select_related("program")
-        program_name_array = [
-            str(program_cert.program) for program_cert in programs_user_has_cert
-        ]
-        return ";".join(program_name_array)
-
-    def get_course_run_certificates(self, instance):
-        """Return a list of course run names that the user has a certificate for."""
-        course_runs_user_has_cert = CourseRunCertificate.objects.filter(
-            user=instance, is_revoked=False
-        ).select_related("course_run")
-        course_run_name_array = [
-            str(course_run_cert.course_run)
-            for course_run_cert in course_runs_user_has_cert
-        ]
-        return ";".join(course_run_name_array)
-
     class Meta:
-        fields = (
-            *UserSerializer.Meta.fields,
-            "program_certificates",
-            "course_run_certificates",
-        )
+        fields = (*UserSerializer.Meta.fields,)
         read_only_fields = fields
         model = models.User
 

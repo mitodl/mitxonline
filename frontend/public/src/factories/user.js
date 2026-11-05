@@ -36,6 +36,7 @@ export const makeUser = (username: ?string): LoggedInUser => ({
   created_on:       casual.moment.format(),
   updated_on:       casual.moment.format(),
   country:          "US",
+  global_id:        casual.uuid,
   user_profile:     {
     gender:               "f",
     year_of_birth:        1980,
@@ -55,8 +56,6 @@ export const makeUser = (username: ?string): LoggedInUser => ({
   },
   legal_address: {
     street_address:     [casual.street],
-    first_name:         casual.first_name,
-    last_name:          casual.last_name,
     city:               casual.city,
     state_or_territory: "US-MA",
     country:            "US",

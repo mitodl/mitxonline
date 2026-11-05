@@ -1,0 +1,428 @@
+"""Tests for B2B tasks."""
+
+import pytest
+
+from b2b.api import create_contract_run_key
+from b2b.factories import ContractPageFactory, OrganizationPageFactory
+from b2b.tasks import (
+    create_program_contract_runs,
+    push_unconfirmed_org_members_to_keycloak,
+    push_upgraded_enrollments_to_edx,
+)
+from courses.factories import (
+    CourseFactory,
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+    ProgramFactory,
+)
+from courses.models import ProgramRequirement, ProgramRequirementNodeType
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
+
+pytestmark = [pytest.mark.django_db]
+
+
+def add_courses_to_program(program, courses):
+    """Helper function to add courses to a program via requirements tree."""
+    root_node = program.requirements_root
+
+    required_courses_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+
+    for course in courses:
+        required_courses_node.add_child(
+            node_type=ProgramRequirementNodeType.COURSE, course=course
+        )
+
+
+def test_create_program_contract_runs_success(mocker):
+    """Test successful creation of contract runs for a program."""
+    organization = OrganizationPageFactory.create()
+    contract = ContractPageFactory.create(organization=organization)
+    program = ProgramFactory.create()
+    course1 = CourseFactory.create()
+    course2 = CourseFactory.create()
+
+    add_courses_to_program(program, [course1, course2])
+
+    CourseRunFactory.create(
+        course=course1,
+        is_source_run=True,
+        courseware_id="course-v1:MITx+course1+SOURCE",
+    )
+    CourseRunFactory.create(
+        course=course2, run_tag="SOURCE", courseware_id="course-v1:MITx+course2+SOURCE"
+    )
+
+    mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
+
+    mock_cache_add = mocker.patch("django.core.cache.cache.add", return_value=True)
+    mock_cache_delete = mocker.patch("django.core.cache.cache.delete")
+
+    mock_task = mocker.Mock()
+    mock_task.request.id = "test-task-id"
+
+    result = create_program_contract_runs.apply(
+        args=[contract.id, program.id],
+        kwargs={},
+    )
+
+    assert result.successful()
+    assert mock_create_contract_run.call_count == 2
+    mock_create_contract_run.assert_any_call(contract, course1, org_prefix=None)
+    mock_create_contract_run.assert_any_call(contract, course2, org_prefix=None)
+
+    expected_lock_key = f"create_program_contract_runs_lock:{contract.id}:{program.id}"
+    mock_cache_add.assert_called_once()
+    mock_cache_delete.assert_called_once_with(expected_lock_key)
+
+
+def test_create_program_contract_runs_nested_programs(mocker):
+    """Courses of nested programs get contract runs, including when the program has no courses of its own."""
+    contract = ContractPageFactory.create()
+    program = ProgramFactory.create()
+    nested_program = ProgramFactory.create()
+    program.add_program_requirement(nested_program)
+    nested_course = CourseFactory.create()
+    add_courses_to_program(nested_program, [nested_course])
+    CourseRunFactory.create(course=nested_course, is_source_run=True)
+
+    mocker.patch("django.core.cache.cache.add", return_value=True)
+    mocker.patch("django.core.cache.cache.delete")
+    mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
+
+    result = create_program_contract_runs.apply(
+        args=[contract.id, program.id],
+        kwargs={},
+    )
+
+    assert result.successful()
+    mock_create_contract_run.assert_called_once_with(
+        contract, nested_course, org_prefix=None
+    )
+
+
+def test_create_program_contract_runs_lock_not_acquired(mocker):
+    """Test task skips execution when lock cannot be acquired."""
+
+    organization = OrganizationPageFactory.create()
+    contract = ContractPageFactory.create(organization=organization)
+    program = ProgramFactory.create()
+
+    mocker.patch("django.core.cache.cache.add", return_value=False)
+    mock_cache_delete = mocker.patch("django.core.cache.cache.delete")
+    mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
+    mock_log_info = mocker.patch("b2b.tasks.log.info")
+
+    result = create_program_contract_runs.apply(
+        args=[contract.id, program.id],
+        kwargs={},
+    )
+
+    assert result.successful()
+    mock_log_info.assert_called_once_with(
+        "Task already running for contract %s and program %s, skipping duplicate",
+        contract.id,
+        program.id,
+    )
+    mock_create_contract_run.assert_not_called()
+    mock_cache_delete.assert_not_called()
+
+
+def test_create_program_contract_runs_skips_existing_runs(mocker):
+    """Test that existing contract runs are skipped."""
+    organization = OrganizationPageFactory.create(org_key="TEST")
+    contract = ContractPageFactory.create(organization=organization)
+    program = ProgramFactory.create()
+    course = CourseFactory.create()
+    add_courses_to_program(program, [course])
+
+    source_run = CourseRunFactory.create(
+        course=course,
+        is_source_run=True,
+        courseware_id="course-v1:MITx+testcourse+SOURCE",
+    )
+
+    existing_courseware_id = create_contract_run_key(source_run, contract)
+
+    CourseRunFactory.create(
+        course=course, courseware_id=existing_courseware_id, b2b_contracts=[contract]
+    )
+
+    mocker.patch("django.core.cache.cache.add", return_value=True)
+    mocker.patch("django.core.cache.cache.delete")
+    mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
+    mock_log_debug = mocker.patch("b2b.tasks.log.debug")
+
+    result = create_program_contract_runs.apply(
+        args=[contract.id, program.id],
+        kwargs={},
+    )
+
+    assert result.successful()
+    mock_create_contract_run.assert_not_called()
+    mock_log_debug.assert_called_once_with(
+        "Contract run already exists for course %s in contract %s",
+        course.readable_id,
+        contract.slug,
+    )
+
+
+def test_create_program_contract_runs_courses_without_source_runs(mocker):
+    """Test handling of courses without source runs."""
+
+    organization = OrganizationPageFactory.create()
+    contract = ContractPageFactory.create(organization=organization)
+    program = ProgramFactory.create()
+
+    course_with_source = CourseFactory.create()
+    CourseRunFactory.create(
+        course=course_with_source,
+        is_source_run=True,
+        courseware_id="course-v1:MITx+course1+SOURCE",
+    )
+
+    course_without_source = CourseFactory.create()
+    CourseRunFactory.create(
+        course=course_without_source, is_source_run=False, run_tag="REGULAR"
+    )
+
+    add_courses_to_program(program, [course_with_source, course_without_source])
+
+    mocker.patch("django.core.cache.cache.add", return_value=True)
+    mocker.patch("django.core.cache.cache.delete")
+    mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
+    mock_log_info = mocker.patch("b2b.tasks.log.info")
+
+    result = create_program_contract_runs.apply(
+        args=[contract.id, program.id],
+        kwargs={},
+    )
+
+    assert result.successful()
+    mock_create_contract_run.assert_called_once_with(
+        contract, course_with_source, org_prefix=None
+    )
+
+    final_log_call = mock_log_info.call_args_list[-1]
+    assert "Completed contract run creation" in final_log_call[0][0]
+
+    assert final_log_call[0][5] == 1
+
+
+def test_create_program_contract_runs_no_source_runs_for_course(mocker):
+    """Test handling when a course has no valid source run."""
+
+    organization = OrganizationPageFactory.create()
+    contract = ContractPageFactory.create(organization=organization)
+    program = ProgramFactory.create()
+    course = CourseFactory.create()
+    add_courses_to_program(program, [course])
+
+    CourseRunFactory.create(course=course, is_source_run=False, run_tag="REGULAR")
+
+    mocker.patch("django.core.cache.cache.add", return_value=True)
+    mocker.patch("django.core.cache.cache.delete")
+    mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
+
+    result = create_program_contract_runs.apply(
+        args=[contract.id, program.id],
+        kwargs={},
+    )
+
+    assert result.successful()
+    mock_create_contract_run.assert_not_called()
+
+
+def test_create_program_contract_runs_clears_cached_requirements_data(mocker):
+    """Test that cached requirements data is cleared from the program."""
+    organization = OrganizationPageFactory.create()
+    contract = ContractPageFactory.create(organization=organization)
+    program = ProgramFactory.create()
+    course = CourseFactory.create()
+    add_courses_to_program(program, [course])
+
+    CourseRunFactory.create(
+        course=course, is_source_run=True, courseware_id="course-v1:MITx+course+SOURCE"
+    )
+
+    mocker.patch("django.core.cache.cache.add", return_value=True)
+    mocker.patch("django.core.cache.cache.delete")
+    _mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
+
+    result = create_program_contract_runs.apply(
+        args=[contract.id, program.id],
+        kwargs={},
+    )
+
+    assert result.successful()
+    _mock_create_contract_run.assert_called_once()
+
+
+def test_create_program_contract_runs_exception_releases_lock(mocker):
+    """Test that lock is released even when an exception occurs."""
+    organization = OrganizationPageFactory.create()
+    contract = ContractPageFactory.create(organization=organization)
+    program = ProgramFactory.create()
+
+    mocker.patch("django.core.cache.cache.add", return_value=True)
+    mock_cache_delete = mocker.patch("django.core.cache.cache.delete")
+
+    mock_get_contract = mocker.patch("b2b.models.ContractPage.objects.get")
+    mock_get_contract.side_effect = RuntimeError("Database error")
+
+    with pytest.raises(RuntimeError):
+        create_program_contract_runs.apply(
+            args=[contract.id, program.id],
+            kwargs={},
+        )
+
+    expected_lock_key = f"create_program_contract_runs_lock:{contract.id}:{program.id}"
+    mock_cache_delete.assert_called_once_with(expected_lock_key)
+
+
+def test_create_program_contract_runs_source_run_by_tag(mocker):
+    """Test finding source run by 'SOURCE' tag when is_source_run is False."""
+    organization = OrganizationPageFactory.create()
+    contract = ContractPageFactory.create(organization=organization)
+    program = ProgramFactory.create()
+    course = CourseFactory.create()
+    add_courses_to_program(program, [course])
+
+    CourseRunFactory.create(
+        course=course,
+        is_source_run=False,
+        run_tag="SOURCE",
+        courseware_id="course-v1:MITx+testcourse+SOURCE",
+    )
+
+    mocker.patch("django.core.cache.cache.add", return_value=True)
+    mocker.patch("django.core.cache.cache.delete")
+    mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
+
+    result = create_program_contract_runs.apply(
+        args=[contract.id, program.id],
+        kwargs={},
+    )
+
+    assert result.successful()
+    mock_create_contract_run.assert_called_once_with(contract, course, org_prefix=None)
+
+
+def test_create_program_contract_runs_mixed_source_run_types(mocker):
+    """Test handling programs with mix of is_source_run=True and run_tag='SOURCE' courses."""
+
+    organization = OrganizationPageFactory.create()
+    contract = ContractPageFactory.create(organization=organization)
+    program = ProgramFactory.create()
+
+    course1 = CourseFactory.create()
+    course2 = CourseFactory.create()
+    add_courses_to_program(program, [course1, course2])
+
+    CourseRunFactory.create(
+        course=course1,
+        is_source_run=True,
+        courseware_id="course-v1:MITx+course1+SOURCE",
+    )
+
+    CourseRunFactory.create(
+        course=course2,
+        is_source_run=False,
+        run_tag="SOURCE",
+        courseware_id="course-v1:MITx+course2+SOURCE",
+    )
+
+    mocker.patch("django.core.cache.cache.add", return_value=True)
+    mocker.patch("django.core.cache.cache.delete")
+    mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
+
+    result = create_program_contract_runs.apply(
+        args=[contract.id, program.id],
+        kwargs={},
+    )
+
+    assert result.successful()
+    assert mock_create_contract_run.call_count == 2
+    mock_create_contract_run.assert_any_call(contract, course1, org_prefix=None)
+    mock_create_contract_run.assert_any_call(contract, course2, org_prefix=None)
+
+
+def test_create_program_contract_runs_logging_output(mocker):
+    """Test that appropriate log messages are generated."""
+    organization = OrganizationPageFactory.create()
+    contract = ContractPageFactory.create(organization=organization)
+    program = ProgramFactory.create()
+    course = CourseFactory.create()
+    add_courses_to_program(program, [course])
+
+    CourseRunFactory.create(
+        course=course, is_source_run=True, courseware_id="course-v1:MITx+course+SOURCE"
+    )
+
+    mocker.patch("django.core.cache.cache.add", return_value=True)
+    mocker.patch("django.core.cache.cache.delete")
+    mocker.patch("b2b.api.create_contract_run")
+    mock_log_info = mocker.patch("b2b.tasks.log.info")
+
+    result = create_program_contract_runs.apply(
+        args=[contract.id, program.id],
+        kwargs={},
+    )
+
+    assert result.successful()
+
+    assert any(
+        "Created contract run for course" in str(call)
+        for call in mock_log_info.call_args_list
+    )
+
+    final_call = mock_log_info.call_args_list[-1]
+    assert "Completed contract run creation" in final_call[0][0]
+    assert final_call[0][1] == program.readable_id
+    assert final_call[0][2] == contract.slug
+    assert final_call[0][3] == 1
+    assert final_call[0][4] == 0
+    assert final_call[0][5] == 0
+
+
+def test_push_unconfirmed_org_members_to_keycloak(mocker):
+    """The task runs the push."""
+
+    mocked_push = mocker.patch("b2b.provisioning.push_unconfirmed_members_to_keycloak")
+
+    push_unconfirmed_org_members_to_keycloak()
+
+    mocked_push.assert_called_once_with()
+
+
+def test_push_upgraded_enrollments_to_edx(mocker):
+    """Pushed enrollments are marked enrolled; failures are left for retry."""
+
+    good, bad, already_done = CourseRunEnrollmentFactory.create_batch(
+        3, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE, edx_enrolled=False
+    )
+    already_done.edx_enrolled = True
+    already_done.save()
+
+    def fake_enroll(user, runs, *, mode):
+        if runs[0] == bad.run:
+            raise ConnectionError
+
+    mocked_enroll = mocker.patch(
+        "openedx.api.enroll_in_edx_course_runs", side_effect=fake_enroll
+    )
+
+    push_upgraded_enrollments_to_edx([good.id, bad.id, already_done.id])
+
+    assert mocked_enroll.call_count == 2
+    mocked_enroll.assert_any_call(
+        good.user, [good.run], mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    good.refresh_from_db()
+    bad.refresh_from_db()
+    assert good.edx_enrolled is True
+    assert bad.edx_enrolled is False

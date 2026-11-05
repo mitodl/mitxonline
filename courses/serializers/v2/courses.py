@@ -3,40 +3,83 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
+from decimal import Decimal  # noqa: TC003
 
+from django.conf import settings
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
-from mitol.olposthog.features import is_enabled
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.api import create_run_enrollments
-from courses.serializers.utils import get_topics_from_page
+from courses.serializers.utils import get_topics_from_page, has_live_certificate_page
 from courses.serializers.v1.base import (
-    BaseCourseRunEnrollmentSerializer,
+    BaseCourseRunEnrollmentWithFlexiblePriceSerializer,
     BaseCourseRunSerializer,
     BaseCourseSerializer,
-    ProductRelatedField,
+    BaseProgramSerializer,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
-from courses.utils import get_approved_flexible_price_exists, get_dated_courseruns
+from courses.utils import (
+    get_approved_flexible_price_exists,
+)
+from ecommerce.serializers.v0 import BaseProductSerializer
 from main import features
-from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from variants.serializers import SupportedVariantSerializer
 
 log = logging.getLogger(__name__)
+
+
+def _get_canonical_runs_per_tag(runs):
+    """
+    Given a list of CourseRun objects, return one canonical run per run_tag.
+
+    The canonical run is:
+    1. The run with ``is_primary_language=True`` in that group, or
+    2. The run with the lowest ``id`` (oldest creation order) if none is flagged.
+    """
+    groups = defaultdict(list)
+    for run in runs:
+        groups[run.run_tag].append(run)
+
+    canonical = []
+    for tag_runs in groups.values():
+        primary = next((r for r in tag_runs if r.is_primary_language), None)
+        canonical.append(
+            primary if primary is not None else min(tag_runs, key=lambda r: r.id)
+        )
+    return canonical
+
+
+class CourseLocalizedTitleSerializer(serializers.Serializer):
+    """Serializer for localized course title list"""
+
+    language = serializers.CharField()
+    title = serializers.CharField()
 
 
 @extend_schema_serializer(component_name="V2Course")
 class CourseSerializer(BaseCourseSerializer):
     """Course model serializer"""
 
+    required_prefetches: list[str] = [
+        *BaseCourseSerializer.required_prefetches,
+        "programs",
+        # Resolved by CourseFinancialAssistanceFormUrlPrefetcher in the view's
+        # queryset; without it CoursePageSerializer would fall back to the lazy
+        # per-page cascade.
+        "financial_assistance_form_url",
+    ]
+
     departments = DepartmentSerializer(many=True, read_only=True)
     next_run_id = serializers.SerializerMethodField()
-    page = CoursePageSerializer(read_only=True)
-    programs = serializers.SerializerMethodField()
+    page = CoursePageSerializer(read_only=True, allow_null=True)
+    programs = BaseProgramSerializer(many=True, read_only=True)
     topics = serializers.SerializerMethodField()
     certificate_type = serializers.SerializerMethodField()
+    certificate_available = serializers.SerializerMethodField()
     availability = serializers.SerializerMethodField()
     required_prerequisites = serializers.SerializerMethodField()
     duration = serializers.SerializerMethodField()
@@ -49,6 +92,7 @@ class CourseSerializer(BaseCourseSerializer):
     max_price = serializers.SerializerMethodField()
     include_in_learn_catalog = serializers.BooleanField(read_only=True)
     ingest_content_files_for_ai = serializers.BooleanField(read_only=True)
+    possible_variant_sets = SupportedVariantSerializer(read_only=True, many=True)
 
     @extend_schema_field(bool)
     def get_required_prerequisites(self, instance):
@@ -57,123 +101,112 @@ class CourseSerializer(BaseCourseSerializer):
         Returns:
             bool: True when the prerequisites field is populated in the course page CMS.  False otherwise.
         """
-        return bool(
-            hasattr(instance, "page")
-            and hasattr(instance.page, "prerequisites")
-            and instance.page.prerequisites != ""
-        )
+        page = instance.course_page
+        return bool(page and page.prerequisites != "")
 
     @extend_schema_field(str)
     def get_duration(self, instance):
         """
         Get the duration of the course from the course page CMS.
         """
-        if hasattr(instance, "page") and hasattr(instance.page, "length"):
-            return instance.page.length
-
-        return None
+        page = instance.course_page
+        return page.length if page else None
 
     def get_time_commitment(self, instance) -> str | None:
         """
         Get the time commitment of the course from the course page CMS.
         """
-        if hasattr(instance, "page") and hasattr(instance.page, "effort"):
-            return instance.page.effort
-
-        return None
+        page = instance.course_page
+        return page.effort if page else None
 
     def get_min_weekly_hours(self, instance) -> str | None:
         """
         Get the min weekly hours of the course from the course page CMS.
         """
-        if hasattr(instance, "page") and hasattr(instance.page, "min_weekly_hours"):
-            return instance.page.min_weekly_hours
-
-        return None
+        page = instance.course_page
+        return page.min_weekly_hours if page else None
 
     def get_max_weekly_hours(self, instance) -> str | None:
         """
         Get the max weekly hours of the course from the course page CMS.
         """
-        if hasattr(instance, "page") and hasattr(instance.page, "max_weekly_hours"):
-            return instance.page.max_weekly_hours
-
-        return None
+        page = instance.course_page
+        return page.max_weekly_hours if page else None
 
     def get_next_run_id(self, instance) -> int | None:
         """Get next run id"""
-        if self.context.get("org_id"):
-            run = instance.get_first_unexpired_org_run(
+        if self.context.get("org_id") or self.context.get("contract_id"):
+            run = instance.get_first_unexpired_b2b_run(
                 self.context.get("user_contracts")
             )
         else:
             run = instance.first_unexpired_run
         return run.id if run is not None else None
 
-    def get_programs(self, instance) -> list[dict] | None:
-        if self.context.get("all_runs", False):
-            from courses.serializers.v1.base import BaseProgramSerializer
-
-            return BaseProgramSerializer(instance.programs, many=True).data
-
-        return None
-
     @extend_schema_field(list[dict])
     def get_topics(self, instance):
         """List topics of a course"""
-        if hasattr(instance, "page") and instance.page is not None:
-            return get_topics_from_page(instance.page)
+        page = instance.course_page
+        if page is not None:
+            return get_topics_from_page(page)
         return []
 
     @extend_schema_field(str)
-    def get_certificate_type(self, instance):
-        if instance.programs:
-            program = instance.programs[0]
-            if "MicroMasters" in program.program_type:
-                return "MicroMasters Credential"
+    def get_certificate_type(self, instance):  # noqa: ARG002
+        """Return the certificate type."""
+        # A course certificate is a certificate of completion even when the
+        # course belongs to a MicroMasters program; only the program itself
+        # awards the MicroMasters credential.
         return "Certificate of Completion"
+
+    @extend_schema_field(bool)
+    def get_certificate_available(self, instance) -> bool:
+        """Return if there is a certificate available for the course."""
+
+        # has_verified_courserun is annotated by CourseViewSet, but this
+        # serializer is also nested in CourseRunWithCourseSerializer (v2
+        # enrollments, certificates) and instantiated bare in cms.models, where
+        # no annotation is present. Defaulting to False keeps those callers
+        # returning what they returned when this read an absent attribute.
+        return (
+            instance.first_unexpired_run is not None
+            and bool(getattr(instance, "has_verified_courserun", False))
+            and not instance.certificates_disabled
+            and has_live_certificate_page(instance)
+        )
 
     @extend_schema_field(str)
     def get_availability(self, instance):
         """Get course availability"""
-        dated_courseruns = get_dated_courseruns(instance.courseruns)
-        if dated_courseruns.count() == 0:
-            return "anytime"
-        return "dated"
+        return "dated" if instance.has_dated_courseruns else "anytime"
 
     def get_min_weeks(self, instance) -> int | None:
         """
         Get the min weeks of the course from the CMS page.
         """
-        if hasattr(instance, "page") and hasattr(instance.page, "min_weeks"):
-            return instance.page.min_weeks
-
-        return None
+        page = instance.course_page
+        return page.min_weeks if page else None
 
     def get_max_weeks(self, instance) -> int | None:
         """
         Get the max weeks of the course from the CMS page.
         """
-        if hasattr(instance, "page") and hasattr(instance.page, "max_weeks"):
-            return instance.page.max_weeks
+        page = instance.course_page
+        return page.max_weeks if page else None
 
-        return None
-
-    def get_min_price(self, instance) -> int | None:
+    def get_min_price(self, instance) -> Decimal | None:
         """
         Get the min price of the product from the CMS page.
         """
-        if hasattr(instance, "page") and hasattr(instance.page, "min_price"):
-            return instance.page.min_price
-        return None
+        page = instance.course_page
+        return page.min_price if page else None
 
-    def get_max_price(self, instance) -> int | None:
+    def get_max_price(self, instance) -> Decimal | None:
         """
         Get the max price of the product from the CMS page.
         """
-        if hasattr(instance, "page") and hasattr(instance.page, "max_price"):
-            return instance.page.max_price
-        return None
+        page = instance.course_page
+        return page.max_price if page else None
 
     class Meta:
         model = models.Course
@@ -187,6 +220,7 @@ class CourseSerializer(BaseCourseSerializer):
             "programs",
             "topics",
             "certificate_type",
+            "certificate_available",
             "required_prerequisites",
             "duration",
             "min_weeks",
@@ -199,6 +233,7 @@ class CourseSerializer(BaseCourseSerializer):
             "max_weekly_hours",
             "include_in_learn_catalog",
             "ingest_content_files_for_ai",
+            "possible_variant_sets",
         ]
 
 
@@ -206,8 +241,9 @@ class CourseSerializer(BaseCourseSerializer):
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
-    products = ProductRelatedField(many=True, read_only=True)
+    products = serializers.SerializerMethodField(method_name="get_products")
     approved_flexible_price_exists = serializers.SerializerMethodField()
+    b2b_contract = serializers.SerializerMethodField()
 
     class Meta:
         model = models.CourseRun
@@ -215,6 +251,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
             "products",
             "approved_flexible_price_exists",
             "b2b_contract",
+            "b2b_only",
         ]
 
     def to_representation(self, instance):
@@ -231,24 +268,83 @@ class CourseRunSerializer(BaseCourseRunSerializer):
     def get_approved_flexible_price_exists(self, instance):
         return get_approved_flexible_price_exists(instance, self.context)
 
+    @extend_schema_field(serializers.IntegerField(allow_null=True))
+    def get_b2b_contract(self, instance):
+        """
+        Return the ID of the B2B contract this run is being displayed for.
+
+        A run can belong to several contracts. If the request was scoped to a
+        contract or an organization, the matching contract is returned;
+        otherwise, returns None.
+        """
+        contracts = sorted(instance.b2b_contracts.all(), key=lambda c: c.id)
+        if not contracts:
+            return None
+
+        contract_id = self.context.get("contract_id")
+        org_id = self.context.get("org_id")
+
+        # These come from query params, so compare as strings.
+        for contract in contracts:
+            if contract_id is not None and str(contract.id) == str(contract_id):
+                return contract.id
+            if (
+                contract_id is None
+                and org_id is not None
+                and str(contract.organization_id) == str(org_id)
+            ):
+                return contract.id
+
+        return None
+
+    @extend_schema_field(BaseProductSerializer(many=True))
+    def get_products(self, obj):
+        # Use prefetched products if available to avoid N+1 queries
+        products = (
+            obj.prefetched_products
+            if hasattr(obj, "prefetched_products")
+            else obj.products.all()
+        )
+
+        return BaseProductSerializer(products, many=True, context=self.context).data
+
 
 @extend_schema_serializer(component_name="CourseWithCourseRunsSerializerV2")
 class CourseWithCourseRunsSerializer(CourseSerializer):
     """Course model serializer - also serializes child course runs"""
 
+    # Declared here rather than on CourseSerializer: that class is also nested
+    # in CourseRunWithCourseSerializer (v2 enrollments, certificates) and
+    # instantiated bare in cms.models, none of which prefetch these. This
+    # subclass has exactly one caller, CourseViewSet.
+    required_prefetches: list[str] = [
+        *CourseSerializer.required_prefetches,
+        "page",
+        "departments",
+        "courseruns",
+        "possible_variant_sets",
+    ]
+
     courseruns = serializers.SerializerMethodField()
 
     @extend_schema_field(CourseRunSerializer(many=True))
     def get_courseruns(self, instance):
-        """Get the course runs for the given instance."""
-        courseruns = instance.courseruns.order_by("id")
+        """
+        Return one canonical run per run_tag.
 
-        if "org_id" in self.context:
-            courseruns = courseruns.filter(
-                b2b_contract__organization_id=self.context["org_id"]
-            )
-
-        return CourseRunSerializer(courseruns, many=True, read_only=True).data
+        The canonical run for a run_tag group is the one with
+        ``is_primary_language=True``. If no run in the group is so designated,
+        the oldest run (lowest id) in the group is used.
+        """
+        all_runs = instance.get_filtered_runs(
+            courserun_is_enrollable=self.context.get("courserun_is_enrollable"),
+            org_id=self.context.get("org_id"),
+            contract_id=self.context.get("contract_id"),
+        )
+        canonical_runs = _get_canonical_runs_per_tag(all_runs)
+        return CourseRunSerializer(
+            canonical_runs, many=True, read_only=True, context=self.context
+        ).data
 
     class Meta:
         model = models.Course
@@ -271,17 +367,11 @@ class CourseRunWithCourseSerializer(CourseRunSerializer):
 
 
 @extend_schema_serializer(component_name="CourseRunEnrollmentRequestV2")
-class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
+class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSerializer):
     """CourseRunEnrollment model serializer"""
 
     run = CourseRunWithCourseSerializer(read_only=True)
     run_id = serializers.IntegerField(write_only=True)
-    certificate = serializers.SerializerMethodField(read_only=True)
-    enrollment_mode = serializers.ChoiceField(
-        (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE), read_only=True
-    )
-    approved_flexible_price_exists = serializers.SerializerMethodField()
-    grades = serializers.SerializerMethodField(read_only=True)
     b2b_organization_id = serializers.SerializerMethodField()
     b2b_contract_id = serializers.SerializerMethodField()
 
@@ -293,29 +383,49 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
             run = models.CourseRun.objects.get(id=run_id)
         except models.CourseRun.DoesNotExist:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})  # noqa: B904
+
+        if run.b2b_only:
+            raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
+
+        # The enrollment window governs getting into a run. An existing active
+        # enrollment is exempt so that mode changes and idempotent retries for
+        # already-enrolled learners keep working after the window closes.
+        if (
+            not run.is_enrollable
+            and not models.CourseRunEnrollment.objects.filter(
+                run=run, user=user, active=True
+            ).exists()
+        ):
+            raise ValidationError(
+                {"run_id": f"Course run is not open for enrollment: {run_id}"}
+            )
+
         successful_enrollments, _ = create_run_enrollments(
             user,
             [run],
-            keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
+            keep_failed_enrollments=settings.FEATURES.get(
+                features.IGNORE_EDX_FAILURES, False
+            ),
         )
-        return successful_enrollments
+
+        return successful_enrollments[0] if successful_enrollments else None
 
     @extend_schema_field(serializers.IntegerField(allow_null=True))
     def get_b2b_organization_id(self, enrollment):
         """Get the B2B organization ID if this enrollment is associated with a B2B contract."""
-        if enrollment.run.b2b_contract:
-            return enrollment.run.b2b_contract.organization.id
+        if enrollment.b2b_contract:
+            return enrollment.b2b_contract.organization_id
         return None
 
     @extend_schema_field(serializers.IntegerField(allow_null=True))
     def get_b2b_contract_id(self, enrollment):
         """Get the B2B contract ID if this enrollment is associated with a B2B contract."""
-        if enrollment.run.b2b_contract:
-            return enrollment.run.b2b_contract.id
-        return None
+        return enrollment.b2b_contract_id
 
-    class Meta(BaseCourseRunEnrollmentSerializer.Meta):
-        fields = BaseCourseRunEnrollmentSerializer.Meta.fields + [  # noqa: RUF005
+    class Meta(BaseCourseRunEnrollmentWithFlexiblePriceSerializer.Meta):
+        fields = [
+            *BaseCourseRunEnrollmentWithFlexiblePriceSerializer.Meta.fields,
+            "run",
             "run_id",
             "b2b_organization_id",
             "b2b_contract_id",

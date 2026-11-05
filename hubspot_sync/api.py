@@ -2,17 +2,24 @@
 
 import logging
 import re
+import time
 from decimal import Decimal
 from typing import List  # noqa: UP035
 
+from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from django.db.models import Q
 from hubspot.crm.objects import (
+    ApiException,
     SimplePublicObject,
     SimplePublicObjectInput,
 )
+from hubspot.crm.objects.models import Filter, FilterGroup, PublicObjectSearchRequest
+from hubspot.crm.properties.exceptions import ApiException as PropertiesApiException
 from mitol.common.utils.datetime import now_in_utc
 from mitol.hubspot_api.api import (
+    HubspotApi,
     HubspotAssociationType,
     HubspotObjectType,
     associate_objects_request,
@@ -24,16 +31,1098 @@ from mitol.hubspot_api.api import (
     get_all_objects,
     get_line_items_for_deal,
     make_object_properties_message,
+    sync_object_property,
+    sync_property_group,
     transform_object_properties,
     upsert_object_request,
 )
+from mitol.hubspot_api.exceptions import TooManyRequestsException
 from mitol.hubspot_api.models import HubspotObject
+from reversion.models import Version
 
+from courses.constants import ALL_ENROLL_CHANGE_STATUSES
+from ecommerce import models
+from ecommerce.constants import (
+    DISCOUNT_TYPE_DOLLARS_OFF,
+    DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+    DISCOUNT_TYPE_PERCENT_OFF,
+)
 from ecommerce.models import Line, Order, Product
 from hubspot_sync.rate_limiter import wait_for_hubspot_rate_limit
-from users.models import User
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from users.models import (
+    COMPANY_SIZE_CHOICES,
+    GENDER_CHOICES,
+    HIGHEST_EDUCATION_CHOICES,
+    YRS_EXPERIENCE_CHOICES,
+    User,
+)
 
 log = logging.getLogger(__name__)
+
+# HubSpot internal option value for the "Checkout Abandoned" deal stage.
+CART_ADD_DEAL_STAGE = "checkout_abandoned"
+
+# Shared custom object property definitions for certificate schemas.
+CERTIFICATE_IS_REVOKED_OPTIONS = [
+    {
+        "label": "True",
+        "value": "true",
+        "hidden": False,
+        "displayOrder": 0,
+    },
+    {
+        "label": "False",
+        "value": "false",
+        "hidden": False,
+        "displayOrder": 1,
+    },
+]
+
+CERTIFICATE_COMMON_PROPERTIES = {
+    "unique_app_id": {
+        "name": "unique_app_id",
+        "label": "Unique App ID",
+        "type": "string",
+        "fieldType": "text",
+        "groupName": "certificateinformation",
+        "hasUniqueValue": True,
+    },
+    "user_email": {
+        "name": "user_email",
+        "label": "User Email",
+        "type": "string",
+        "fieldType": "text",
+        "groupName": "certificateinformation",
+    },
+    "issue_date": {
+        "name": "issue_date",
+        "label": "Issue Date",
+        "type": "datetime",
+        "fieldType": "date",
+        "groupName": "certificateinformation",
+    },
+    "is_revoked": {
+        "name": "is_revoked",
+        "label": "Is Revoked",
+        "type": "enumeration",
+        "fieldType": "booleancheckbox",
+        "groupName": "certificateinformation",
+        "options": CERTIFICATE_IS_REVOKED_OPTIONS,
+    },
+}
+
+# Schema definitions used by the create_hubspot_certificate_schema command.
+CERTIFICATE_CUSTOM_OBJECT_SCHEMAS = {
+    "course_run_certificate": {
+        "labels": {
+            "singular": "Course Run Certificate",
+            "plural": "Course Run Certificates",
+        },
+        "primaryDisplayProperty": "course_run_readable_id",
+        "searchableProperties": [
+            "unique_app_id",
+            "course_run_readable_id",
+            "user_email",
+        ],
+        "associatedObjects": ["CONTACT"],
+        "properties": [
+            CERTIFICATE_COMMON_PROPERTIES["unique_app_id"],
+            {
+                "name": "course_run_readable_id",
+                "label": "Course Run Readable ID",
+                "type": "string",
+                "fieldType": "text",
+                "groupName": "certificateinformation",
+            },
+            {
+                "name": "course_run_title",
+                "label": "Course Run Title",
+                "type": "string",
+                "fieldType": "text",
+                "groupName": "certificateinformation",
+            },
+            CERTIFICATE_COMMON_PROPERTIES["user_email"],
+            CERTIFICATE_COMMON_PROPERTIES["issue_date"],
+            CERTIFICATE_COMMON_PROPERTIES["is_revoked"],
+        ],
+    },
+    "program_certificate": {
+        "labels": {
+            "singular": "Program Certificate",
+            "plural": "Program Certificates",
+        },
+        "primaryDisplayProperty": "program_readable_id",
+        "searchableProperties": [
+            "unique_app_id",
+            "program_readable_id",
+            "user_email",
+        ],
+        "associatedObjects": ["CONTACT"],
+        "properties": [
+            CERTIFICATE_COMMON_PROPERTIES["unique_app_id"],
+            {
+                "name": "program_readable_id",
+                "label": "Program Readable ID",
+                "type": "string",
+                "fieldType": "text",
+                "groupName": "certificateinformation",
+            },
+            {
+                "name": "program_title",
+                "label": "Program Title",
+                "type": "string",
+                "fieldType": "text",
+                "groupName": "certificateinformation",
+            },
+            CERTIFICATE_COMMON_PROPERTIES["user_email"],
+            CERTIFICATE_COMMON_PROPERTIES["issue_date"],
+            CERTIFICATE_COMMON_PROPERTIES["is_revoked"],
+        ],
+    },
+}
+
+CUSTOM_ECOMMERCE_PROPERTIES = {
+    # defines which hubspot properties are mapped with which local properties when objects are synced.
+    # See https://developers.hubspot.com/docs/methods/ecomm-bridge/ecomm-bridge-overview for more details
+    "deals": {
+        "groups": [{"name": "coupon", "label": "Coupon"}],
+        "properties": [
+            {
+                "name": "status",
+                "label": "Order Status",
+                "description": "The current status of the order",
+                "groupName": "dealinformation",
+                "type": "enumeration",
+                "fieldType": "select",
+                "options": [
+                    {
+                        "value": models.OrderStatus.FULFILLED,
+                        "label": models.OrderStatus.FULFILLED,
+                        "displayOrder": 0,
+                        "hidden": False,
+                    },
+                    {
+                        "value": models.OrderStatus.CANCELED,
+                        "label": models.OrderStatus.CANCELED,
+                        "displayOrder": 1,
+                        "hidden": False,
+                    },
+                    {
+                        "value": models.OrderStatus.ERRORED,
+                        "label": models.OrderStatus.ERRORED,
+                        "displayOrder": 2,
+                        "hidden": False,
+                    },
+                    {
+                        "value": models.OrderStatus.DECLINED,
+                        "label": models.OrderStatus.DECLINED,
+                        "displayOrder": 3,
+                        "hidden": False,
+                    },
+                    {
+                        "value": models.OrderStatus.PENDING,
+                        "label": models.OrderStatus.PENDING,
+                        "displayOrder": 4,
+                        "hidden": False,
+                    },
+                    {
+                        "value": models.OrderStatus.REFUNDED,
+                        "label": models.OrderStatus.REFUNDED,
+                        "displayOrder": 5,
+                        "hidden": False,
+                    },
+                    {
+                        "value": models.OrderStatus.PARTIALLY_REFUNDED,
+                        "label": models.OrderStatus.PARTIALLY_REFUNDED,
+                        "displayOrder": 6,
+                        "hidden": False,
+                    },
+                    {
+                        "value": models.OrderStatus.REVIEW,
+                        "label": models.OrderStatus.REVIEW,
+                        "displayOrder": 7,
+                        "hidden": False,
+                    },
+                    {
+                        "value": "created",
+                        "label": "created",
+                        "displayOrder": 8,
+                        "hidden": False,
+                    },
+                    {
+                        "value": "failed",
+                        "label": "failed",
+                        "displayOrder": 9,
+                        "hidden": False,
+                    },
+                ],
+            },
+            {
+                "name": "discount_percent",
+                "label": "Percent Discount",
+                "description": "Percentage off regular price",
+                "groupName": "coupon",
+                "type": "number",
+                "fieldType": "number",
+            },
+            {
+                "name": "discount_amount",
+                "label": "Discount savings",
+                "description": "The discount on the deal as an amount.",
+                "groupName": "coupon",
+                "type": "number",
+                "fieldType": "number",
+            },
+            {
+                "name": "discount_type",
+                "label": "Discount Type",
+                "description": "Type of discount (percent-off, dollars-off, fixed-price, or paid-amount-off)",
+                "groupName": "coupon",
+                "type": "enumeration",
+                "fieldType": "select",
+                "options": [
+                    {
+                        "value": DISCOUNT_TYPE_PERCENT_OFF,
+                        "label": DISCOUNT_TYPE_PERCENT_OFF,
+                        "displayOrder": 0,
+                        "hidden": False,
+                    },
+                    {
+                        "value": DISCOUNT_TYPE_DOLLARS_OFF,
+                        "label": DISCOUNT_TYPE_DOLLARS_OFF,
+                        "displayOrder": 1,
+                        "hidden": False,
+                    },
+                    {
+                        "value": DISCOUNT_TYPE_FIXED_PRICE,
+                        "label": DISCOUNT_TYPE_FIXED_PRICE,
+                        "displayOrder": 2,
+                        "hidden": False,
+                    },
+                    {
+                        "value": DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+                        "label": DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+                        "displayOrder": 3,
+                        "hidden": False,
+                    },
+                ],
+            },
+            {
+                "name": "coupon_code",
+                "label": "Coupon Code",
+                "description": "The coupon code used for the purchase",
+                "groupName": "coupon",
+                "type": "string",
+                "fieldType": "text",
+            },
+            {
+                "name": "unique_app_id",
+                "label": "Unique App ID",
+                "description": "The unique app ID for the deal",
+                "groupName": "dealinformation",
+                "type": "string",
+                "fieldType": "text",
+                "hasUniqueValue": True,
+                "hidden": True,
+            },
+        ],
+    },
+    "contacts": {
+        "groups": [],
+        "properties": [
+            {
+                "name": "name",
+                "label": "Name",
+                "description": "Full name",
+                "groupName": "contactinformation",
+                "type": "string",
+                "fieldType": "text",
+            },
+            {
+                "name": "yearofbirth",
+                "label": "Year of birth",
+                "description": "Year of birth",
+                "groupName": "contactinformation",
+                "type": "number",
+                "fieldType": "number",
+            },
+            {
+                "name": "gender",
+                "label": "Gender",
+                "description": "Gender",
+                "groupName": "contactinformation",
+                "type": "enumeration",
+                "fieldType": "select",
+                "options": [
+                    {
+                        "value": GENDER_CHOICES[0][0],
+                        "label": GENDER_CHOICES[0][1],
+                        "displayOrder": 0,
+                        "hidden": False,
+                    },
+                    {
+                        "value": GENDER_CHOICES[1][0],
+                        "label": GENDER_CHOICES[1][1],
+                        "displayOrder": 1,
+                        "hidden": False,
+                    },
+                    {
+                        "value": GENDER_CHOICES[2][0],
+                        "label": GENDER_CHOICES[2][1],
+                        "displayOrder": 2,
+                        "hidden": False,
+                    },
+                    {
+                        "value": GENDER_CHOICES[3][0],
+                        "label": GENDER_CHOICES[3][1],
+                        "displayOrder": 3,
+                        "hidden": False,
+                    },
+                    {
+                        "value": GENDER_CHOICES[4][0],
+                        "label": GENDER_CHOICES[4][1],
+                        "displayOrder": 4,
+                        "hidden": False,
+                    },
+                ],
+            },
+            {
+                "name": "companysize",
+                "label": "Number of employees",
+                "description": "Company size",
+                "groupName": "contactinformation",
+                "type": "enumeration",
+                "fieldType": "select",
+                "options": [
+                    {
+                        "value": COMPANY_SIZE_CHOICES[1][0],
+                        "label": COMPANY_SIZE_CHOICES[1][1],
+                        "displayOrder": 0,
+                        "hidden": False,
+                    },
+                    {
+                        "value": COMPANY_SIZE_CHOICES[2][0],
+                        "label": COMPANY_SIZE_CHOICES[2][1],
+                        "displayOrder": 1,
+                        "hidden": False,
+                    },
+                    {
+                        "value": COMPANY_SIZE_CHOICES[3][0],
+                        "label": COMPANY_SIZE_CHOICES[3][1],
+                        "displayOrder": 2,
+                        "hidden": False,
+                    },
+                    {
+                        "value": COMPANY_SIZE_CHOICES[4][0],
+                        "label": COMPANY_SIZE_CHOICES[4][1],
+                        "displayOrder": 3,
+                        "hidden": False,
+                    },
+                    {
+                        "value": COMPANY_SIZE_CHOICES[5][0],
+                        "label": COMPANY_SIZE_CHOICES[5][1],
+                        "displayOrder": 4,
+                        "hidden": False,
+                    },
+                    {
+                        "value": COMPANY_SIZE_CHOICES[6][0],
+                        "label": COMPANY_SIZE_CHOICES[6][1],
+                        "displayOrder": 5,
+                        "hidden": False,
+                    },
+                    {
+                        "value": COMPANY_SIZE_CHOICES[7][0],
+                        "label": COMPANY_SIZE_CHOICES[7][1],
+                        "displayOrder": 6,
+                        "hidden": False,
+                    },
+                ],
+            },
+            {
+                "name": "jobfunction",
+                "label": "Job Function",
+                "description": "Job Function",
+                "groupName": "contactinformation",
+                "type": "string",
+                "fieldType": "text",
+            },
+            {
+                "name": "yearsexperience",
+                "label": "Years of experience",
+                "description": "Years of experience",
+                "groupName": "contactinformation",
+                "type": "enumeration",
+                "fieldType": "select",
+                "options": [
+                    {
+                        "value": YRS_EXPERIENCE_CHOICES[1][0],
+                        "label": YRS_EXPERIENCE_CHOICES[1][1],
+                        "displayOrder": 0,
+                        "hidden": False,
+                    },
+                    {
+                        "value": YRS_EXPERIENCE_CHOICES[2][0],
+                        "label": YRS_EXPERIENCE_CHOICES[2][1],
+                        "displayOrder": 1,
+                        "hidden": False,
+                    },
+                    {
+                        "value": YRS_EXPERIENCE_CHOICES[3][0],
+                        "label": YRS_EXPERIENCE_CHOICES[3][1],
+                        "displayOrder": 2,
+                        "hidden": False,
+                    },
+                    {
+                        "value": YRS_EXPERIENCE_CHOICES[4][0],
+                        "label": YRS_EXPERIENCE_CHOICES[4][1],
+                        "displayOrder": 3,
+                        "hidden": False,
+                    },
+                    {
+                        "value": YRS_EXPERIENCE_CHOICES[5][0],
+                        "label": YRS_EXPERIENCE_CHOICES[5][1],
+                        "displayOrder": 4,
+                        "hidden": False,
+                    },
+                    {
+                        "value": YRS_EXPERIENCE_CHOICES[6][0],
+                        "label": YRS_EXPERIENCE_CHOICES[6][1],
+                        "displayOrder": 5,
+                        "hidden": False,
+                    },
+                    {
+                        "value": YRS_EXPERIENCE_CHOICES[7][0],
+                        "label": YRS_EXPERIENCE_CHOICES[7][1],
+                        "displayOrder": 6,
+                        "hidden": False,
+                    },
+                ],
+            },
+            {
+                "name": "leadershiplevel",
+                "label": "Leadership level",
+                "description": "Leadership level",
+                "groupName": "contactinformation",
+                "type": "string",
+                "fieldType": "text",
+            },
+            {
+                "name": "highesteducation",
+                "label": "Highest education",
+                "description": "Highest level of education completed",
+                "groupName": "contactinformation",
+                "type": "enumeration",
+                "fieldType": "select",
+                "options": [
+                    {
+                        "value": HIGHEST_EDUCATION_CHOICES[1][0],
+                        "label": HIGHEST_EDUCATION_CHOICES[1][1],
+                        "displayOrder": 0,
+                        "hidden": False,
+                    },
+                    {
+                        "value": HIGHEST_EDUCATION_CHOICES[2][0],
+                        "label": HIGHEST_EDUCATION_CHOICES[2][1],
+                        "displayOrder": 1,
+                        "hidden": False,
+                    },
+                    {
+                        "value": HIGHEST_EDUCATION_CHOICES[3][0],
+                        "label": HIGHEST_EDUCATION_CHOICES[3][1],
+                        "displayOrder": 2,
+                        "hidden": False,
+                    },
+                    {
+                        "value": HIGHEST_EDUCATION_CHOICES[4][0],
+                        "label": HIGHEST_EDUCATION_CHOICES[4][1],
+                        "displayOrder": 3,
+                        "hidden": False,
+                    },
+                    {
+                        "value": HIGHEST_EDUCATION_CHOICES[5][0],
+                        "label": HIGHEST_EDUCATION_CHOICES[5][1],
+                        "displayOrder": 4,
+                        "hidden": False,
+                    },
+                    {
+                        "value": HIGHEST_EDUCATION_CHOICES[6][0],
+                        "label": HIGHEST_EDUCATION_CHOICES[6][1],
+                        "displayOrder": 5,
+                        "hidden": False,
+                    },
+                    {
+                        "value": HIGHEST_EDUCATION_CHOICES[7][0],
+                        "label": HIGHEST_EDUCATION_CHOICES[7][1],
+                        "displayOrder": 6,
+                        "hidden": False,
+                    },
+                    {
+                        "value": HIGHEST_EDUCATION_CHOICES[8][0],
+                        "label": HIGHEST_EDUCATION_CHOICES[8][1],
+                        "displayOrder": 7,
+                        "hidden": False,
+                    },
+                    {
+                        "value": HIGHEST_EDUCATION_CHOICES[9][0],
+                        "label": HIGHEST_EDUCATION_CHOICES[9][1],
+                        "displayOrder": 8,
+                        "hidden": False,
+                    },
+                ],
+            },
+            {
+                "name": "typeisstudent",
+                "label": "Is student",
+                "description": "Is a student",
+                "groupName": "contactinformation",
+                "type": "bool",
+                "fieldType": "booleancheckbox",
+                "options": [
+                    {
+                        "value": True,
+                        "label": "True",
+                        "displayOrder": 0,
+                        "hidden": False,
+                    },
+                    {
+                        "value": False,
+                        "label": "False",
+                        "displayOrder": 1,
+                        "hidden": False,
+                    },
+                ],
+            },
+            {
+                "name": "typeisprofessional",
+                "label": "Is professional",
+                "description": "Is a professional",
+                "groupName": "contactinformation",
+                "type": "bool",
+                "fieldType": "booleancheckbox",
+                "options": [
+                    {
+                        "value": True,
+                        "label": "True",
+                        "displayOrder": 0,
+                        "hidden": False,
+                    },
+                    {
+                        "value": False,
+                        "label": "False",
+                        "displayOrder": 1,
+                        "hidden": False,
+                    },
+                ],
+            },
+            {
+                "name": "typeiseducator",
+                "label": "Is educator",
+                "description": "Is a educator",
+                "groupName": "contactinformation",
+                "type": "bool",
+                "fieldType": "booleancheckbox",
+                "options": [
+                    {
+                        "value": True,
+                        "label": "True",
+                        "displayOrder": 0,
+                        "hidden": False,
+                    },
+                    {
+                        "value": False,
+                        "label": "False",
+                        "displayOrder": 1,
+                        "hidden": False,
+                    },
+                ],
+            },
+            {
+                "name": "typeisother",
+                "label": "Is other",
+                "description": "Is a other",
+                "groupName": "contactinformation",
+                "type": "bool",
+                "fieldType": "booleancheckbox",
+                "options": [
+                    {
+                        "value": True,
+                        "label": "True",
+                        "displayOrder": 0,
+                        "hidden": False,
+                    },
+                    {
+                        "value": False,
+                        "label": "False",
+                        "displayOrder": 1,
+                        "hidden": False,
+                    },
+                ],
+            },
+        ],
+    },
+    "line_items": {
+        "groups": [],
+        "properties": [
+            {
+                "name": "status",
+                "label": "Order Status",
+                "description": "The current status of the order associated with the line item",
+                "groupName": "lineiteminformation",
+                "type": "enumeration",
+                "fieldType": "select",
+                "options": [
+                    {
+                        "value": models.OrderStatus.FULFILLED,
+                        "label": models.OrderStatus.FULFILLED,
+                        "displayOrder": 0,
+                        "hidden": False,
+                    },
+                    {
+                        "value": models.OrderStatus.CANCELED,
+                        "label": models.OrderStatus.CANCELED,
+                        "displayOrder": 1,
+                        "hidden": False,
+                    },
+                    {
+                        "value": models.OrderStatus.ERRORED,
+                        "label": models.OrderStatus.ERRORED,
+                        "displayOrder": 2,
+                        "hidden": False,
+                    },
+                    {
+                        "value": models.OrderStatus.DECLINED,
+                        "label": models.OrderStatus.DECLINED,
+                        "displayOrder": 3,
+                        "hidden": False,
+                    },
+                    {
+                        "value": models.OrderStatus.PENDING,
+                        "label": models.OrderStatus.PENDING,
+                        "displayOrder": 4,
+                        "hidden": False,
+                    },
+                    {
+                        "value": models.OrderStatus.REFUNDED,
+                        "label": models.OrderStatus.REFUNDED,
+                        "displayOrder": 5,
+                        "hidden": False,
+                    },
+                    {
+                        "value": models.OrderStatus.PARTIALLY_REFUNDED,
+                        "label": models.OrderStatus.PARTIALLY_REFUNDED,
+                        "displayOrder": 6,
+                        "hidden": False,
+                    },
+                    {
+                        "value": models.OrderStatus.REVIEW,
+                        "label": models.OrderStatus.REVIEW,
+                        "displayOrder": 7,
+                        "hidden": False,
+                    },
+                    {
+                        "value": "created",
+                        "label": "created",
+                        "displayOrder": 8,
+                        "hidden": False,
+                    },
+                    {
+                        "value": "failed",
+                        "label": "failed",
+                        "displayOrder": 9,
+                        "hidden": False,
+                    },
+                ],
+            },
+            {
+                "name": "enrollment_mode",
+                "label": "Enrollment Mode",
+                "description": "The enrollment mode the user is currently enrolled into the product as.",
+                "groupName": "lineiteminformation",
+                "type": "enumeration",
+                "fieldType": "select",
+                "options": [
+                    {
+                        "value": EDX_ENROLLMENT_AUDIT_MODE,
+                        "label": EDX_ENROLLMENT_AUDIT_MODE,
+                        "displayOrder": 0,
+                        "hidden": False,
+                    },
+                    {
+                        "value": EDX_ENROLLMENT_VERIFIED_MODE,
+                        "label": EDX_ENROLLMENT_VERIFIED_MODE,
+                        "displayOrder": 1,
+                        "hidden": False,
+                    },
+                ],
+            },
+            {
+                "name": "change_status",
+                "label": "Change Status",
+                "description": "Any change in enrollment status.",
+                "groupName": "lineiteminformation",
+                "type": "enumeration",
+                "fieldType": "select",
+                "options": [
+                    {
+                        "value": ALL_ENROLL_CHANGE_STATUSES[0],
+                        "label": ALL_ENROLL_CHANGE_STATUSES[0],
+                        "displayOrder": 0,
+                        "hidden": False,
+                    },
+                    {
+                        "value": ALL_ENROLL_CHANGE_STATUSES[1],
+                        "label": ALL_ENROLL_CHANGE_STATUSES[1],
+                        "displayOrder": 1,
+                        "hidden": False,
+                    },
+                    {
+                        "value": ALL_ENROLL_CHANGE_STATUSES[2],
+                        "label": ALL_ENROLL_CHANGE_STATUSES[2],
+                        "displayOrder": 2,
+                        "hidden": False,
+                    },
+                    {
+                        "value": ALL_ENROLL_CHANGE_STATUSES[3],
+                        "label": ALL_ENROLL_CHANGE_STATUSES[3],
+                        "displayOrder": 3,
+                        "hidden": False,
+                    },
+                ],
+            },
+        ],
+    },
+    "products": {
+        "groups": [],
+        "properties": [
+            {
+                "name": "unique_app_id",
+                "label": "Unique App ID",
+                "description": "The unique app ID for the product",
+                "groupName": "productinformation",
+                "type": "string",
+                "fieldType": "text",
+                "hasUniqueValue": True,
+                "hidden": True,
+            },
+        ],
+    },
+}
+
+
+def upsert_custom_properties():
+    """Create or update all custom properties and groups"""
+    for ecommerce_object_type, ecommerce_object in CUSTOM_ECOMMERCE_PROPERTIES.items():
+        for group in ecommerce_object["groups"]:
+            log.debug("Adding group %s", group["name"])
+            sync_property_group(ecommerce_object_type, group["name"], group["label"])
+        for obj_property in ecommerce_object["properties"]:
+            log.debug(
+                "Adding property %s for %s",
+                obj_property.get("name"),
+                ecommerce_object_type,
+            )
+            sync_object_property(ecommerce_object_type, obj_property)
+
+
+def _get_course_run_certificate_hubspot_property() -> dict:
+    """Build the legacy contact property definition for course run certificates.
+
+    Retained for backward compatibility with tests and admin flows that still
+    reference the old contact-property-based implementation.
+    """
+    from courses.models import CourseRun  # noqa: PLC0415
+
+    options = []
+    for idx, course_run in enumerate(CourseRun.objects.order_by("id")):
+        sanitized_title = course_run.title.replace(";", "")
+        option_value = f"{course_run.courseware_id} - {sanitized_title}"
+        options.append(
+            {
+                "value": option_value,
+                "label": option_value,
+                "displayOrder": idx,
+                "hidden": False,
+            }
+        )
+
+    return {
+        "name": "course_run_certificates",
+        "label": "Course Run Certificates",
+        "description": "Course run certificates earned by user",
+        "groupName": "contactinformation",
+        "type": "enumeration",
+        "fieldType": "checkbox",
+        "options": options,
+    }
+
+
+def _get_program_certificate_hubspot_property() -> dict:
+    """Build the legacy contact property definition for program certificates.
+
+    Retained for backward compatibility with tests and admin flows that still
+    reference the old contact-property-based implementation.
+    """
+    from courses.models import Program  # noqa: PLC0415
+
+    options = []
+    for idx, program in enumerate(Program.objects.order_by("id")):
+        sanitized_title = program.title.replace(";", "")
+        option_value = f"{program.readable_id} - {sanitized_title}"
+        options.append(
+            {
+                "value": option_value,
+                "label": option_value,
+                "displayOrder": idx,
+                "hidden": False,
+            }
+        )
+
+    return {
+        "name": "program_certificates",
+        "label": "Program Certificates",
+        "description": "Program certificates earned by user",
+        "groupName": "contactinformation",
+        "type": "enumeration",
+        "fieldType": "checkbox",
+        "options": options,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Certificate custom object sync helpers
+# ---------------------------------------------------------------------------
+
+
+def _format_cert_unique_app_id(prefix: str, cert_id: int) -> str:
+    """Return a stable unique_app_id for a certificate record."""
+    return format_app_id(f"{prefix}-{cert_id}")
+
+
+def _find_hubspot_certificate_by_unique_app_id(
+    hubspot_client: HubspotApi,
+    object_type: str,
+    unique_app_id: str,
+) -> str | None:
+    """Search HubSpot for an existing certificate custom object by unique_app_id.
+
+    Returns the HubSpot object id string, or None if not found.
+    """
+    wait_for_hubspot_rate_limit()
+    response = hubspot_client.crm.objects.search_api.do_search(
+        object_type=object_type,
+        public_object_search_request=PublicObjectSearchRequest(
+            filter_groups=[
+                FilterGroup(
+                    filters=[
+                        Filter(
+                            property_name="unique_app_id",
+                            operator="EQ",
+                            value=unique_app_id,
+                        )
+                    ]
+                )
+            ],
+            properties=["unique_app_id"],
+            limit=1,
+        ),
+    )
+    if response.results:
+        return response.results[0].id
+    return None
+
+
+def _associate_certificate_with_contact(
+    hubspot_client: HubspotApi,
+    cert_object_type: str,
+    cert_hubspot_id: str,
+    contact_hubspot_id: str,
+) -> None:
+    """Create a v4 association between a certificate custom object and a contact.
+
+    Uses create_default() which auto-creates associations with the default type.
+    """
+    wait_for_hubspot_rate_limit()
+    hubspot_client.crm.associations.v4.basic_api.create_default(
+        from_object_type=cert_object_type,
+        from_object_id=cert_hubspot_id,
+        to_object_type=HubspotObjectType.CONTACTS.value,
+        to_object_id=contact_hubspot_id,
+    )
+
+
+def _get_custom_object_type_id_by_name(
+    hubspot_client: HubspotApi,
+    object_type_name: str,
+) -> str | None:
+    """Look up the objectTypeId (e.g., '2-62918642') from the custom object name.
+
+    Returns the objectTypeId needed for API calls, or None if not found.
+    """
+    try:
+        wait_for_hubspot_rate_limit()
+        schemas = hubspot_client.crm.schemas.core_api.get_all()
+        for schema in getattr(schemas, "results", []):
+            if schema.name == object_type_name:
+                return schema.object_type_id
+    except Exception:
+        log.exception(
+            "Failed to fetch objectTypeId for custom object name %s",
+            object_type_name,
+        )
+    return None
+
+
+def sync_course_run_certificate_with_hubspot(cert) -> SimplePublicObject | None:
+    """Upsert a CourseRunCertificate as a HubSpot custom object and associate it to the owner contact.
+
+    Uses the "course_run_certificate" custom object schema
+    (run the create_hubspot_certificate_schema management command first).
+
+    Returns:
+        SimplePublicObject: The HubSpot object.
+    """
+    object_type_name = "course_run_certificate"
+
+    hubspot_client = HubspotApi(access_token=settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN)
+
+    # Look up the objectTypeId from the custom object name
+    object_type_id = _get_custom_object_type_id_by_name(
+        hubspot_client, object_type_name
+    )
+    if not object_type_id:
+        log.warning(
+            "Could not find objectTypeId for custom object %s; "
+            "falling back to object type name",
+            object_type_name,
+        )
+    object_type = object_type_id or object_type_name
+
+    unique_app_id = _format_cert_unique_app_id("crc", cert.id)
+    properties = {
+        "unique_app_id": unique_app_id,
+        "course_run_readable_id": cert.course_run.courseware_id,
+        "course_run_title": cert.course_run.title,
+        "user_email": cert.user.email,
+        "issue_date": str(int(cert.issue_date.timestamp() * 1000)),
+        "is_revoked": "true" if cert.is_revoked else "false",
+    }
+
+    existing_id = _find_hubspot_certificate_by_unique_app_id(
+        hubspot_client, object_type, unique_app_id
+    )
+
+    wait_for_hubspot_rate_limit()
+    if existing_id:
+        hubspot_certificate_result = hubspot_client.crm.objects.basic_api.update(
+            object_type=object_type,
+            object_id=existing_id,
+            simple_public_object_input=SimplePublicObjectInput(properties=properties),
+        )
+    else:
+        hubspot_certificate_result = hubspot_client.crm.objects.basic_api.create(
+            object_type=object_type,
+            simple_public_object_input_for_create=SimplePublicObjectInput(
+                properties=properties
+            ),
+        )
+
+    # Associate with the owning contact.
+    contact_id = _find_hubspot_contact_id_by_email(hubspot_client, cert.user.email)
+    if contact_id:
+        try:
+            _associate_certificate_with_contact(
+                hubspot_client,
+                object_type,
+                hubspot_certificate_result.id,
+                contact_id,
+            )
+        except Exception:
+            log.exception(
+                "Failed to associate course run certificate %s (hs_id=%s) "
+                "with contact %s",
+                cert.id,
+                hubspot_certificate_result.id,
+                contact_id,
+            )
+
+    return hubspot_certificate_result
+
+
+def sync_program_certificate_with_hubspot(cert) -> SimplePublicObject | None:
+    """Upsert a ProgramCertificate as a HubSpot custom object and associate it to the owner contact.
+
+    Uses the "program_certificate" custom object schema
+    (run the create_hubspot_certificate_schema management command first).
+
+    Returns:
+        SimplePublicObject: The HubSpot object.
+    """
+    object_type_name = "program_certificate"
+
+    hubspot_client = HubspotApi(access_token=settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN)
+
+    # Look up the objectTypeId from the custom object name
+    object_type_id = _get_custom_object_type_id_by_name(
+        hubspot_client, object_type_name
+    )
+    if not object_type_id:
+        log.warning(
+            "Could not find objectTypeId for custom object %s; "
+            "falling back to object type name",
+            object_type_name,
+        )
+    object_type = object_type_id or object_type_name
+
+    unique_app_id = _format_cert_unique_app_id("pgc", cert.id)
+    properties = {
+        "unique_app_id": unique_app_id,
+        "program_readable_id": cert.program.readable_id,
+        "program_title": cert.program.title,
+        "user_email": cert.user.email,
+        "issue_date": str(int(cert.issue_date.timestamp() * 1000)),
+        "is_revoked": "true" if cert.is_revoked else "false",
+    }
+
+    existing_id = _find_hubspot_certificate_by_unique_app_id(
+        hubspot_client, object_type, unique_app_id
+    )
+
+    wait_for_hubspot_rate_limit()
+    if existing_id:
+        hubspot_certificate_result = hubspot_client.crm.objects.basic_api.update(
+            object_type=object_type,
+            object_id=existing_id,
+            simple_public_object_input=SimplePublicObjectInput(properties=properties),
+        )
+    else:
+        hubspot_certificate_result = hubspot_client.crm.objects.basic_api.create(
+            object_type=object_type,
+            simple_public_object_input_for_create=SimplePublicObjectInput(
+                properties=properties
+            ),
+        )
+
+    # Associate with the owning contact.
+    contact_id = _find_hubspot_contact_id_by_email(hubspot_client, cert.user.email)
+    if contact_id:
+        try:
+            _associate_certificate_with_contact(
+                hubspot_client,
+                object_type,
+                hubspot_certificate_result.id,
+                contact_id,
+            )
+        except Exception:
+            log.exception(
+                "Failed to associate program certificate %s (hs_id=%s) with contact %s",
+                cert.id,
+                hubspot_certificate_result.id,
+                contact_id,
+            )
+
+    return hubspot_certificate_result
 
 
 def make_contact_create_message_list_from_user_ids(
@@ -84,17 +1173,20 @@ def make_contact_update_message_list_from_user_ids(
     return request_input
 
 
-def make_contact_sync_message_from_user(user: User) -> SimplePublicObjectInput:
+def make_contact_sync_message_from_user(
+    user: User, *, skip_certificates: bool = False
+) -> SimplePublicObjectInput:
     """
     Create the body of a HubSpot sync message for a contact. This will flatten the contained LegalAddress and Profile
     serialized data into one larger serializable dict
 
     Args:
         user (User): User object.
+        skip_certificates (bool): Deprecated no-op, retained for backward compatibility.
     Returns:
         SimplePublicObjectInput: Input object for upserting User data to Hubspot
     """
-    from hubspot_sync.serializers import HubspotContactSerializer
+    from hubspot_sync.serializers import HubspotContactSerializer  # noqa: PLC0415
 
     contact_properties_map = {
         "email": "email",
@@ -117,12 +1209,16 @@ def make_contact_sync_message_from_user(user: User) -> SimplePublicObjectInput:
         "type_is_professional": "typeisprofessional",
         "type_is_educator": "typeiseducator",
         "type_is_other": "typeisother",
-        "program_certificates": "program_certificates",
-        "course_run_certificates": "course_run_certificates",
     }
+
+    # skip_certificates is kept for backward API compatibility but is now a no-op
+    # because certificates are synced as HubSpot custom objects, not contact properties.
+    _ = skip_certificates
+
     properties = HubspotContactSerializer(user).data
     properties.update(properties.pop("legal_address") or {})
     properties.update(properties.pop("user_profile") or {})
+
     hubspot_props = transform_object_properties(properties, contact_properties_map)
     return make_object_properties_message(hubspot_props)
 
@@ -182,7 +1278,7 @@ def make_deal_sync_message_from_order(order: Order) -> SimplePublicObjectInput:
     Returns:
         SimplePublicObjectInput: input object for upserting Order data to Hubspot
     """
-    from hubspot_sync.serializers import OrderToDealSerializer
+    from hubspot_sync.serializers import OrderToDealSerializer  # noqa: PLC0415
 
     properties = OrderToDealSerializer(order).data
     return make_object_properties_message(properties)
@@ -243,7 +1339,7 @@ def make_line_item_sync_message_from_line(line: Line) -> SimplePublicObjectInput
     Returns:
         SimplePublicObjectInput: input object for upserting Line data to Hubspot
     """
-    from hubspot_sync.serializers import LineSerializer
+    from hubspot_sync.serializers import LineSerializer  # noqa: PLC0415
 
     properties = LineSerializer(line).data
     return make_object_properties_message(properties)
@@ -306,7 +1402,7 @@ def make_product_sync_message_from_product(product: Product) -> SimplePublicObje
     Returns:
         SimplePublicObjectInput: input object for upserting Product data to Hubspot
     """
-    from hubspot_sync.serializers import ProductSerializer
+    from hubspot_sync.serializers import ProductSerializer  # noqa: PLC0415
 
     properties = ProductSerializer(product).data
     return make_object_properties_message(properties)
@@ -486,6 +1582,55 @@ def sync_deal_line_hubspot_ids_to_db(order, hubspot_order_id) -> bool:
     return matches == expected_matches
 
 
+_ASSOCIATION_MAX_ATTEMPTS = 4  # 1 initial attempt + 3 retries
+_ASSOCIATION_INITIAL_RETRY_DELAY = 1  # seconds; doubles each retry
+
+
+def _associate_objects_with_retry(
+    from_type: str,
+    from_id: str,
+    to_type: str,
+    to_id: str,
+    assoc_type: str,
+) -> None:
+    """Call associate_objects_request with exponential-backoff retry on transient errors.
+
+    Retries up to _ASSOCIATION_MAX_ATTEMPTS - 1 times on ApiException or
+    TooManyRequestsException before re-raising the last exception.
+    """
+    last_exc: Exception | None = None
+    for attempt in range(1, _ASSOCIATION_MAX_ATTEMPTS + 1):
+        delay = (
+            _ASSOCIATION_INITIAL_RETRY_DELAY * 2 ** (attempt - 2) if attempt > 1 else 0
+        )
+        if delay:
+            log.warning(
+                "Retrying association (%s→%s) attempt %d after %ds",
+                from_type,
+                to_type,
+                attempt,
+                delay,
+            )
+            time.sleep(delay)
+        try:
+            wait_for_hubspot_rate_limit()
+            associate_objects_request(from_type, from_id, to_type, to_id, assoc_type)
+        except (ApiException, TooManyRequestsException) as exc:
+            last_exc = exc
+            log.warning(
+                "Association (%s %s → %s %s) failed on attempt %d: %s",
+                from_type,
+                from_id,
+                to_type,
+                to_id,
+                attempt,
+                exc,
+            )
+        else:
+            return
+    raise last_exc
+
+
 def get_hubspot_id_for_object(  # noqa: C901
     obj: Order or Product or Line or User,
     raise_error: bool = False,  # noqa: FBT001, FBT002
@@ -501,7 +1646,7 @@ def get_hubspot_id_for_object(  # noqa: C901
         The hubspot id for the object if it has been previously synced to Hubspot.
         Raises a ValueError if no matching Hubspot object can be found.
     """
-    from hubspot_sync.serializers import get_hubspot_serializer
+    from hubspot_sync.serializers import get_hubspot_serializer  # noqa: PLC0415
 
     content_type = ContentType.objects.get_for_model(obj)
     hubspot_obj = HubspotObject.objects.filter(
@@ -509,6 +1654,7 @@ def get_hubspot_id_for_object(  # noqa: C901
     ).first()
     if hubspot_obj:
         return hubspot_obj.hubspot_id
+    wait_for_hubspot_rate_limit()
     if isinstance(obj, User):
         try:
             hubspot_obj = find_contact(obj.email)
@@ -537,7 +1683,7 @@ def get_hubspot_id_for_object(  # noqa: C901
             serialized_product["name"],
             raise_count_error=raise_error,
         )
-    if hubspot_obj and hubspot_obj.id:  # noqa: RET503
+    if hubspot_obj and hubspot_obj.id:
         try:
             HubspotObject.objects.update_or_create(
                 object_id=obj.id,
@@ -553,6 +1699,8 @@ def get_hubspot_id_for_object(  # noqa: C901
     elif raise_error:
         msg = f"Hubspot id could not be found for {content_type.name} for id {obj.id}"
         raise ValueError(msg)
+
+    return None
 
 
 def sync_line_item_with_hubspot(line: Line) -> SimplePublicObject:
@@ -579,17 +1727,33 @@ def sync_line_item_with_hubspot(line: Line) -> SimplePublicObject:
         content_type, HubspotObjectType.LINES.value, object_id=line.id, body=body
     )
     # Associate the parent deal with the line item
-    associate_objects_request(
-        HubspotObjectType.LINES.value,
-        result.id,
-        HubspotObjectType.DEALS.value,
-        get_hubspot_id_for_object(line.order),
-        HubspotAssociationType.LINE_DEAL.value,
-    )
+    deal_hubspot_id = get_hubspot_id_for_object(line.order)
+    if not deal_hubspot_id:
+        log.info(
+            "No HubSpot ID found for order %d; syncing deal before associating line %d",
+            line.order.id,
+            line.id,
+        )
+        sync_deal_with_hubspot(line.order)
+        deal_hubspot_id = get_hubspot_id_for_object(line.order)
+    if deal_hubspot_id:
+        _associate_objects_with_retry(
+            HubspotObjectType.LINES.value,
+            result.id,
+            HubspotObjectType.DEALS.value,
+            deal_hubspot_id,
+            HubspotAssociationType.LINE_DEAL.value,
+        )
+    else:
+        log.warning(
+            "No HubSpot ID found for order %d after sync; skipping line-deal association for line %d",
+            line.order.id,
+            line.id,
+        )
     return result
 
 
-def sync_deal_with_hubspot(order: Order) -> SimplePublicObject:
+def sync_deal_with_hubspot(order: Order) -> SimplePublicObject | None:
     """
     Sync an Order with a hubspot deal
 
@@ -597,8 +1761,18 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject:
         order (Order): The Order object.
 
     Returns:
-        SimplePublicObject: The hubspot deal object
+        SimplePublicObject | None: The hubspot deal object, or None if skipped for B2B users
     """
+    # Skip sync for B2B users to avoid errors
+    if order.purchaser.b2b_contracts.exists():
+        log.info(
+            "Skipping HubSpot deal sync for B2B user %s (user_id=%d, order_id=%d)",
+            order.purchaser.edx_username or order.purchaser.email,
+            order.purchaser.id,
+            order.id,
+        )
+        return None
+
     body = make_deal_sync_message_from_order(order)
     content_type = ContentType.objects.get_for_model(Order)
 
@@ -613,16 +1787,168 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject:
         content_type, HubspotObjectType.DEALS.value, object_id=order.id, body=body
     )
     # Create association between deal and contact
-    associate_objects_request(
-        HubspotObjectType.DEALS.value,
-        result.id,
-        HubspotObjectType.CONTACTS.value,
-        get_hubspot_id_for_object(order.purchaser),
-        HubspotAssociationType.DEAL_CONTACT.value,
-    )
+    contact_hubspot_id = get_hubspot_id_for_object(order.purchaser)
+    if not contact_hubspot_id:
+        log.info(
+            "No HubSpot ID found for purchaser %d; syncing contact before associating deal %d",
+            order.purchaser.id,
+            order.id,
+        )
+        sync_contact_with_hubspot(order.purchaser)
+        contact_hubspot_id = get_hubspot_id_for_object(order.purchaser)
+    if contact_hubspot_id:
+        _associate_objects_with_retry(
+            HubspotObjectType.DEALS.value,
+            result.id,
+            HubspotObjectType.CONTACTS.value,
+            contact_hubspot_id,
+            HubspotAssociationType.DEAL_CONTACT.value,
+        )
+    else:
+        log.warning(
+            "No HubSpot ID found for purchaser %d after sync; skipping deal-contact association for order %d",
+            order.purchaser.id,
+            order.id,
+        )
 
     for line in order.lines.all():
         sync_line_item_with_hubspot(line)
+    return result
+
+
+def sync_deal_with_hubspot_targeted(
+    order: Order, token: str
+) -> SimplePublicObject | None:
+    """
+    Sync an Order with a hubspot deal using a specific HubSpot token.
+    This enables routing deals to different HubSpot accounts (e.g., UAI vs MITx Online account).
+    This function is idempotent - it will not create duplicates if called multiple times.
+
+    Args:
+        order (Order): The Order object.
+        token (str): The HubSpot API token to use.
+
+    Returns:
+        SimplePublicObject | None: The hubspot deal object, or None if skipped for B2B users
+    """
+    # Skip sync for B2B users to avoid errors
+    if order.purchaser.b2b_contracts.exists():
+        log.info(
+            "Skipping HubSpot deal sync for B2B user %s (user_id=%d, order_id=%d)",
+            order.purchaser.edx_username or order.purchaser.email,
+            order.purchaser.id,
+            order.id,
+        )
+        return None
+
+    hubspot_client = HubspotApi(access_token=token)
+
+    deal_input = _build_target_deal_message(order, hubspot_client)
+    dealname = deal_input.properties.get("dealname")
+    unique_app_id = deal_input.properties.get("unique_app_id")
+
+    # Ensure all products for this order's lines exist in the target account before
+    # creating the deal, so that line items can reference valid product IDs.
+    for line in order.lines.all():
+        _ensure_target_hubspot_product_for_line(line, hubspot_client)
+
+    # Check if deal already exists by dealname first
+    existing_deal_id = _find_target_deal_id_by_dealname(hubspot_client, dealname)
+
+    # If not found by dealname, also check by unique_app_id to prevent duplicates
+    if not existing_deal_id and unique_app_id:
+        existing_deal_id = _find_target_deal_id_by_unique_app_id(
+            hubspot_client, unique_app_id
+        )
+
+    if existing_deal_id:
+        # Deal exists, update it with the latest order data
+        wait_for_hubspot_rate_limit()
+        result = hubspot_client.crm.objects.basic_api.update(
+            object_type=HubspotObjectType.DEALS.value,
+            object_id=existing_deal_id,
+            simple_public_object_input=deal_input,
+        )
+    else:
+        # Create new deal
+        wait_for_hubspot_rate_limit()
+        result = hubspot_client.crm.objects.basic_api.create(
+            object_type=HubspotObjectType.DEALS.value,
+            simple_public_object_input_for_create=deal_input,
+        )
+
+    # Ensure contact exists and is associated
+    contact_id = _ensure_hubspot_contact_for_user(
+        order.purchaser, hubspot_client, skip_certificates=_is_uai_token(token)
+    )
+
+    if not contact_id:
+        log.error(
+            "Failed to create or find contact in target HubSpot account for user %s (email: %s)",
+            order.purchaser.id,
+            order.purchaser.email,
+        )
+        # Still return the deal result, but log the association failure
+        return result
+
+    # Check if deal-contact association exists
+    try:
+        wait_for_hubspot_rate_limit()
+        associations = hubspot_client.crm.associations.v4.basic_api.get_page(
+            object_type=HubspotObjectType.DEALS.value,
+            object_id=result.id,
+            to_object_type=HubspotObjectType.CONTACTS.value,
+        )
+        contact_associated = any(
+            assoc.to_object_id == contact_id for assoc in associations.results
+        )
+
+        if not contact_associated:
+            wait_for_hubspot_rate_limit()
+            hubspot_client.crm.associations.v4.basic_api.create_default(
+                from_object_type=HubspotObjectType.DEALS.value,
+                from_object_id=result.id,
+                to_object_type=HubspotObjectType.CONTACTS.value,
+                to_object_id=contact_id,
+            )
+            log.info(
+                "Created deal-contact association for deal %s and contact %s",
+                result.id,
+                contact_id,
+            )
+    except Exception:  # noqa: BLE001
+        # If we can't check associations, try to create (HubSpot will ignore duplicates)
+        try:
+            wait_for_hubspot_rate_limit()
+            hubspot_client.crm.associations.v4.basic_api.create_default(
+                from_object_type=HubspotObjectType.DEALS.value,
+                from_object_id=result.id,
+                to_object_type=HubspotObjectType.CONTACTS.value,
+                to_object_id=contact_id,
+            )
+            log.info(
+                "Created deal-contact association for deal %s and contact %s (via fallback)",
+                result.id,
+                contact_id,
+            )
+        except Exception:
+            log.exception(
+                "Failed to create deal-contact association for deal %s and contact %s",
+                result.id,
+                contact_id,
+            )
+
+    for line in order.lines.all():
+        _upsert_target_deal_line_item(line, result.id, hubspot_client)
+
+    # Update the local HubspotObject mapping to maintain ID tracking
+    content_type = ContentType.objects.get_for_model(Order)
+    HubspotObject.objects.update_or_create(
+        object_id=order.id,
+        content_type=content_type,
+        defaults={"hubspot_id": result.id},
+    )
+
     return result
 
 
@@ -661,6 +1987,15 @@ def sync_contact_with_hubspot(user: User):
         ApiException: Raised if HubSpot upsert request fails.
         TooManyRequestsException: Too many requests against HubSpot's API.
     """
+    # Skip sync for B2B users to avoid errors
+    if user.b2b_contracts.exists():
+        log.info(
+            "Skipping HubSpot sync for B2B user %s (user_id=%d)",
+            user.edx_username or user.email,
+            user.id,
+        )
+        return None
+
     content_type = ContentType.objects.get_for_model(User)
     body = make_contact_sync_message_from_user(user)
 
@@ -677,6 +2012,785 @@ def sync_contact_with_hubspot(user: User):
     user.save(update_fields=["hubspot_sync_datetime"])
 
     return result
+
+
+def _resolve_hubspot_token(*, is_uai: bool, is_xpro: bool = False) -> str | None:
+    """Resolve HubSpot API token, routing UAI/XPro orders to the UAI/xPro account."""
+    if is_uai or is_xpro:
+        return getattr(
+            settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None
+        ) or getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
+    return getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
+
+
+def _is_uai_token(token: str) -> bool:
+    """Return True if the token belongs to the UAI/XPro HubSpot account."""
+    uai_token = getattr(settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
+    return bool(uai_token) and token == uai_token
+
+
+def _find_hubspot_contact_id_by_email(
+    hubspot_client: HubspotApi, email: str
+) -> str | None:
+    """Find a contact id by email in the target HubSpot account."""
+    wait_for_hubspot_rate_limit()
+    response = hubspot_client.crm.objects.search_api.do_search(
+        object_type=HubspotObjectType.CONTACTS.value,
+        public_object_search_request=PublicObjectSearchRequest(
+            filter_groups=[
+                FilterGroup(
+                    filters=[Filter(property_name="email", operator="EQ", value=email)]
+                )
+            ],
+            properties=["email"],
+            limit=1,
+        ),
+    )
+    if response.results:
+        return response.results[0].id
+    return None
+
+
+def _get_target_property_options(
+    hubspot_client: HubspotApi, object_type: str, property_name: str
+) -> list[str]:
+    """Return allowed option values for a HubSpot property in the target account."""
+    wait_for_hubspot_rate_limit()
+    property_definition = hubspot_client.crm.properties.core_api.get_by_name(
+        object_type,
+        property_name,
+    )
+    return [
+        str(option.value)
+        for option in getattr(property_definition, "options", [])
+        if getattr(option, "value", None) is not None
+    ]
+
+
+def _pick_preferred_option(
+    allowed_options: list[str], preferred_options: list[str]
+) -> str | None:
+    """Return the first preferred option present in allowed options."""
+    for preferred_option in preferred_options:
+        if preferred_option in allowed_options:
+            return preferred_option
+    if allowed_options:
+        return allowed_options[0]
+    return None
+
+
+def _normalize_status_for_target(
+    current_status: str | None, allowed_statuses: list[str]
+) -> str | None:
+    """Map MITx statuses to target-account options and return a valid status."""
+    status_map = {
+        models.OrderStatus.PENDING: "created",
+        models.OrderStatus.FULFILLED: "fulfilled",
+        models.OrderStatus.CANCELED: "failed",
+        models.OrderStatus.DECLINED: "failed",
+        models.OrderStatus.ERRORED: "failed",
+        models.OrderStatus.REFUNDED: "refunded",
+        models.OrderStatus.PARTIALLY_REFUNDED: "refunded",
+        models.OrderStatus.REVIEW: "created",
+    }
+    mapped_status = status_map.get(current_status or "", current_status)
+    if mapped_status in allowed_statuses:
+        return mapped_status
+    return _pick_preferred_option(
+        allowed_statuses,
+        ["created", "checkout_pending", "fulfilled", "failed", "refunded"],
+    )
+
+
+def _get_target_pipeline_stage_map(hubspot_client: HubspotApi) -> dict[str, list[str]]:
+    """Return mapping of deal pipeline id to valid stage ids in target account."""
+    wait_for_hubspot_rate_limit()
+    pipelines_response = hubspot_client.crm.pipelines.pipelines_api.get_all(
+        object_type=HubspotObjectType.DEALS.value
+    )
+    pipeline_stage_map = {}
+    for pipeline in getattr(pipelines_response, "results", []):
+        pipeline_id = str(getattr(pipeline, "id", "") or "")
+        if not pipeline_id:
+            continue
+        stages = [
+            str(getattr(stage, "id", ""))
+            for stage in getattr(pipeline, "stages", [])
+            if getattr(stage, "id", None) is not None
+        ]
+        if stages:
+            pipeline_stage_map[pipeline_id] = stages
+    return pipeline_stage_map
+
+
+def _normalize_deal_properties_for_target_account(  # noqa: C901
+    hubspot_client: HubspotApi, deal_input: SimplePublicObjectInput
+) -> None:
+    """Normalize dealstage and status so they are valid in the target HubSpot account."""
+    deal_properties = deal_input.properties
+
+    legacy_stage_map = {
+        "48288379": "checkout_abandoned",
+        "48288388": "checkout_pending",
+        "48288389": "checkout_completed",
+        "48288390": "processed",
+    }
+
+    current_pipeline = str(deal_properties.get("pipeline") or "")
+    try:
+        pipeline_stage_map = _get_target_pipeline_stage_map(hubspot_client)
+    except Exception:  # noqa: BLE001
+        pipeline_stage_map = {}
+
+    if pipeline_stage_map:
+        if current_pipeline not in pipeline_stage_map:
+            resolved_pipeline = _pick_preferred_option(
+                list(pipeline_stage_map.keys()),
+                [
+                    str(getattr(settings, "UAI_HUBSPOT_PIPELINE_ID", "")),
+                    str(getattr(settings, "HUBSPOT_PIPELINE_ID", "")),
+                    "default",
+                ],
+            )
+            if resolved_pipeline:
+                deal_properties["pipeline"] = resolved_pipeline
+                current_pipeline = resolved_pipeline
+
+        allowed_stages = pipeline_stage_map.get(current_pipeline, [])
+    else:
+        try:
+            allowed_stages = _get_target_property_options(
+                hubspot_client, HubspotObjectType.DEALS.value, "dealstage"
+            )
+        except PropertiesApiException:
+            allowed_stages = []
+
+    current_stage = deal_properties.get("dealstage")
+    mapped_legacy_stage = legacy_stage_map.get(str(current_stage))
+    if mapped_legacy_stage and (current_stage not in allowed_stages):
+        deal_properties["dealstage"] = mapped_legacy_stage
+        current_stage = mapped_legacy_stage
+
+    if allowed_stages and current_stage not in allowed_stages:
+        resolved_stage = _pick_preferred_option(
+            allowed_stages,
+            [
+                "checkout_pending",
+                "created",
+                "appointmentscheduled",
+                "qualifiedtobuy",
+            ],
+        )
+        if resolved_stage:
+            deal_properties["dealstage"] = resolved_stage
+            log.info(
+                "Normalized dealstage for target account from %s to %s",
+                current_stage,
+                resolved_stage,
+            )
+
+    try:
+        allowed_statuses = _get_target_property_options(
+            hubspot_client, HubspotObjectType.DEALS.value, "status"
+        )
+    except PropertiesApiException:
+        allowed_statuses = []
+
+    if allowed_statuses:
+        resolved_status = _normalize_status_for_target(
+            deal_properties.get("status"),
+            allowed_statuses,
+        )
+        if resolved_status:
+            deal_properties["status"] = resolved_status
+
+
+def _normalize_line_item_properties_for_target_account(
+    hubspot_client: HubspotApi, line_item_input: SimplePublicObjectInput
+) -> None:
+    """Normalize line-item status so it is valid in the target HubSpot account."""
+    line_item_properties = line_item_input.properties
+
+    try:
+        allowed_statuses = _get_target_property_options(
+            hubspot_client, HubspotObjectType.LINES.value, "status"
+        )
+    except PropertiesApiException:
+        allowed_statuses = []
+
+    if allowed_statuses:
+        resolved_status = _normalize_status_for_target(
+            line_item_properties.get("status"),
+            allowed_statuses,
+        )
+        if resolved_status:
+            line_item_properties["status"] = resolved_status
+
+
+def _ensure_target_hubspot_custom_properties(
+    hubspot_client: HubspotApi, *, skip_certificates: bool = False
+) -> None:
+    """Ensure custom MITx e-commerce properties and groups exist in the target account."""
+    object_configs = {
+        object_type: {
+            "groups": list(config["groups"]),
+            "properties": list(config["properties"]),
+        }
+        for object_type, config in CUSTOM_ECOMMERCE_PROPERTIES.items()
+    }
+    # skip_certificates is kept for backward compatibility; certificate sync
+    # now uses custom objects and no longer adds contact properties.
+    _ = skip_certificates
+
+    for object_type, config in object_configs.items():
+        wait_for_hubspot_rate_limit()
+        existing_groups = hubspot_client.crm.properties.groups_api.get_all(object_type)
+        existing_group_names = {
+            group.name for group in getattr(existing_groups, "results", [])
+        }
+
+        for group in config["groups"]:
+            wait_for_hubspot_rate_limit()
+            try:
+                if group["name"] in existing_group_names:
+                    hubspot_client.crm.properties.groups_api.update(
+                        object_type, group["name"], group
+                    )
+                else:
+                    hubspot_client.crm.properties.groups_api.create(object_type, group)
+            except PropertiesApiException:
+                log.exception(
+                    "Failed syncing HubSpot property group %s for %s in target account",
+                    group["name"],
+                    object_type,
+                )
+                raise
+
+        wait_for_hubspot_rate_limit()
+        existing_properties = hubspot_client.crm.properties.core_api.get_all(
+            object_type
+        )
+        existing_property_names = {
+            prop.name for prop in getattr(existing_properties, "results", [])
+        }
+
+        for prop in config["properties"]:
+            wait_for_hubspot_rate_limit()
+            try:
+                if prop["name"] in existing_property_names:
+                    # HubSpot-managed unique_app_id definitions are read-only in some accounts.
+                    if prop["name"] == "unique_app_id":
+                        continue
+                    hubspot_client.crm.properties.core_api.update(
+                        object_type,
+                        prop["name"],
+                        prop,
+                    )
+                else:
+                    hubspot_client.crm.properties.core_api.create(object_type, prop)
+            except PropertiesApiException:
+                log.exception(
+                    "Failed syncing HubSpot property %s for %s in target account",
+                    prop["name"],
+                    object_type,
+                )
+                raise
+
+
+def _build_target_deal_message(
+    order: Order, hubspot_client: HubspotApi
+) -> SimplePublicObjectInput:
+    """Create a deal message normalized for target-account property options."""
+    deal_input = make_deal_sync_message_from_order(order)
+    _normalize_deal_properties_for_target_account(hubspot_client, deal_input)
+    return deal_input
+
+
+def _build_target_line_item_message(
+    line: Line, hubspot_client: HubspotApi
+) -> SimplePublicObjectInput:
+    """Create a line-item message normalized for target-account property options."""
+    line_item_input = make_line_item_sync_message_from_line(line)
+    target_product_id = _ensure_target_hubspot_product_for_line(line, hubspot_client)
+    if target_product_id:
+        line_item_input.properties["hs_product_id"] = target_product_id
+    _normalize_line_item_properties_for_target_account(hubspot_client, line_item_input)
+    return line_item_input
+
+
+def _find_target_product_id_by_unique_app_id(
+    hubspot_client: HubspotApi, unique_app_id: str
+) -> str | None:
+    """Find product id in target account by unique_app_id."""
+    wait_for_hubspot_rate_limit()
+    response = hubspot_client.crm.objects.search_api.do_search(
+        object_type=HubspotObjectType.PRODUCTS.value,
+        public_object_search_request=PublicObjectSearchRequest(
+            filter_groups=[
+                FilterGroup(
+                    filters=[
+                        Filter(
+                            property_name="unique_app_id",
+                            operator="EQ",
+                            value=unique_app_id,
+                        )
+                    ]
+                )
+            ],
+            properties=["unique_app_id"],
+            limit=1,
+        ),
+    )
+    if response.results:
+        return response.results[0].id
+    return None
+
+
+def _find_target_deal_id_by_dealname(
+    hubspot_client: HubspotApi, dealname: str
+) -> str | None:
+    """Find deal id in target account by dealname."""
+    wait_for_hubspot_rate_limit()
+    try:
+        response = hubspot_client.crm.objects.search_api.do_search(
+            object_type=HubspotObjectType.DEALS.value,
+            public_object_search_request=PublicObjectSearchRequest(
+                filter_groups=[
+                    FilterGroup(
+                        filters=[
+                            Filter(
+                                property_name="dealname",
+                                operator="EQ",
+                                value=dealname,
+                            )
+                        ]
+                    )
+                ],
+                properties=["dealname"],
+                limit=1,
+            ),
+        )
+        if response.results:
+            return response.results[0].id
+    except TooManyRequestsException:
+        # Re-raise rate limit errors so calling code can retry
+        # to avoid creating duplicates when we can't search
+        log.warning("Rate limited searching for deal by dealname: %s", dealname)
+        raise
+    except Exception:
+        log.exception("Failed to search for deal by dealname: %s", dealname)
+    return None
+
+
+def _find_target_deal_id_by_unique_app_id(
+    hubspot_client: HubspotApi, unique_app_id: str
+) -> str | None:
+    """Find deal id in target account by unique_app_id."""
+    wait_for_hubspot_rate_limit()
+    try:
+        response = hubspot_client.crm.objects.search_api.do_search(
+            object_type=HubspotObjectType.DEALS.value,
+            public_object_search_request=PublicObjectSearchRequest(
+                filter_groups=[
+                    FilterGroup(
+                        filters=[
+                            Filter(
+                                property_name="unique_app_id",
+                                operator="EQ",
+                                value=unique_app_id,
+                            )
+                        ]
+                    )
+                ],
+                properties=["unique_app_id"],
+                limit=1,
+            ),
+        )
+        if response.results:
+            return response.results[0].id
+    except TooManyRequestsException:
+        # Re-raise rate limit errors so calling code can retry
+        # to avoid creating duplicates when we can't search
+        log.warning(
+            "Rate limited searching for deal by unique_app_id: %s", unique_app_id
+        )
+        raise
+    except Exception:
+        log.exception("Failed to search for deal by unique_app_id: %s", unique_app_id)
+    return None
+
+
+def _find_target_line_item_id_by_unique_app_id(
+    hubspot_client: HubspotApi, unique_app_id: str
+) -> str | None:
+    """Find line item id in target account by unique_app_id."""
+    wait_for_hubspot_rate_limit()
+    try:
+        response = hubspot_client.crm.objects.search_api.do_search(
+            object_type=HubspotObjectType.LINES.value,
+            public_object_search_request=PublicObjectSearchRequest(
+                filter_groups=[
+                    FilterGroup(
+                        filters=[
+                            Filter(
+                                property_name="unique_app_id",
+                                operator="EQ",
+                                value=unique_app_id,
+                            )
+                        ]
+                    )
+                ],
+                limit=1,
+            ),
+        )
+        if response.results:
+            return response.results[0].id
+        else:
+            return None
+    except TooManyRequestsException:
+        # Re-raise rate limit errors so calling code can retry
+        # to avoid creating duplicates when we can't search
+        log.warning(
+            "Rate limited searching for line item with unique_app_id %s",
+            unique_app_id,
+        )
+        raise
+    except ApiException:
+        log.exception(
+            "Failed to search for line item with unique_app_id %s",
+            unique_app_id,
+        )
+        return None
+    except Exception:
+        log.exception(
+            "Unexpected error searching for line item with unique_app_id %s",
+            unique_app_id,
+        )
+        return None
+
+
+def _find_target_deal_line_item_id_by_product(
+    hubspot_client: HubspotApi, deal_id: str, hs_product_id: str
+) -> str | None:
+    """
+    Find the line item on a target-account deal that points at the given product.
+
+    Cart-add creates a fresh local Order/Line each time, so the line item's
+    unique_app_id can't be used to find an earlier line item on the same deal.
+    Matching by the deal's associated line items and their product avoids
+    depending on any local record id.
+    """
+    wait_for_hubspot_rate_limit()
+    associations = hubspot_client.crm.associations.v4.basic_api.get_page(
+        object_type=HubspotObjectType.DEALS.value,
+        object_id=deal_id,
+        to_object_type=HubspotObjectType.LINES.value,
+    )
+    for association in associations.results:
+        wait_for_hubspot_rate_limit()
+        line_item = hubspot_client.crm.objects.basic_api.get_by_id(
+            object_type=HubspotObjectType.LINES.value,
+            object_id=association.to_object_id,
+            properties=["hs_product_id"],
+        )
+        if str(line_item.properties.get("hs_product_id")) == str(hs_product_id):
+            return line_item.id
+    return None
+
+
+def _upsert_target_deal_line_item(
+    line: Line, deal_id: str, hubspot_client: HubspotApi
+) -> None:
+    """
+    Create or update the line item for a Line on a deal.
+    """
+    line_item_input = _build_target_line_item_message(line, hubspot_client)
+
+    # Not sure if we ever ever expect a line item w/o a product id...
+    hs_product_id = line_item_input.properties.get("hs_product_id")
+    existing_line_item_id = (
+        _find_target_deal_line_item_id_by_product(
+            hubspot_client, deal_id, hs_product_id
+        )
+        if hs_product_id
+        else None
+    )
+
+    wait_for_hubspot_rate_limit()
+    if existing_line_item_id:
+        hubspot_client.crm.objects.basic_api.update(
+            object_type=HubspotObjectType.LINES.value,
+            object_id=existing_line_item_id,
+            simple_public_object_input=line_item_input,
+        )
+    else:
+        line_item = hubspot_client.crm.objects.basic_api.create(
+            object_type=HubspotObjectType.LINES.value,
+            simple_public_object_input_for_create=line_item_input,
+        )
+
+        wait_for_hubspot_rate_limit()
+        hubspot_client.crm.associations.v4.basic_api.create_default(
+            from_object_type=HubspotObjectType.LINES.value,
+            from_object_id=line_item.id,
+            to_object_type=HubspotObjectType.DEALS.value,
+            to_object_id=deal_id,
+        )
+
+
+def _ensure_target_hubspot_product_for_line(
+    line: Line, hubspot_client: HubspotApi
+) -> str | None:
+    """Return a target-account product id for a line item's hs_product_id."""
+    product = line.product
+    if not product:
+        return None
+
+    product_input = make_product_sync_message_from_product(product)
+    unique_app_id = str(product_input.properties.get("unique_app_id") or "")
+    if unique_app_id:
+        existing_product_id = _find_target_product_id_by_unique_app_id(
+            hubspot_client, unique_app_id
+        )
+        if existing_product_id:
+            return existing_product_id
+
+    wait_for_hubspot_rate_limit()
+    created_product = hubspot_client.crm.objects.basic_api.create(
+        object_type=HubspotObjectType.PRODUCTS.value,
+        simple_public_object_input_for_create=product_input,
+    )
+    return created_product.id
+
+
+def _ensure_target_hubspot_contact_properties(
+    hubspot_client: HubspotApi, *, skip_certificates: bool = False
+) -> None:
+    """Backward-compatible wrapper retained for tests/callers."""
+    _ensure_target_hubspot_custom_properties(
+        hubspot_client, skip_certificates=skip_certificates
+    )
+
+
+def _ensure_hubspot_contact_for_user(
+    user: User, hubspot_client: HubspotApi, *, skip_certificates: bool = False
+) -> str | None:
+    """Return target-account contact id, creating a contact when missing."""
+    try:
+        contact_id = _find_hubspot_contact_id_by_email(hubspot_client, user.email)
+        if contact_id:
+            log.info(
+                "Found existing HubSpot contact in target account for user_id=%s email=%s contact_id=%s",
+                user.id,
+                user.email,
+                contact_id,
+            )
+            # Only update local HubspotObject mapping for primary (MITx Online) account
+            # to avoid overwriting existing mappings when syncing to secondary (UAI) accounts
+            if not skip_certificates:
+                content_type = ContentType.objects.get_for_model(User)
+                HubspotObject.objects.update_or_create(
+                    object_id=user.id,
+                    content_type=content_type,
+                    defaults={"hubspot_id": contact_id},
+                )
+            return contact_id
+
+        # Create new contact if not found
+        log.info(
+            "Creating new HubSpot contact in target account for user_id=%s email=%s (skip_certificates=%s)",
+            user.id,
+            user.email,
+            skip_certificates,
+        )
+        wait_for_hubspot_rate_limit()
+        contact = hubspot_client.crm.objects.basic_api.create(
+            object_type=HubspotObjectType.CONTACTS.value,
+            simple_public_object_input_for_create=make_contact_sync_message_from_user(
+                user, skip_certificates=skip_certificates
+            ),
+        )
+
+        log.info(
+            "Successfully created HubSpot contact in target account for user_id=%s email=%s contact_id=%s",
+            user.id,
+            user.email,
+            contact.id,
+        )
+
+        user.hubspot_sync_datetime = now_in_utc()
+        user.save(update_fields=["hubspot_sync_datetime"])
+
+        # Only update local HubspotObject mapping for primary (MITx Online) account
+        # to avoid overwriting existing mappings when syncing to secondary (UAI) accounts
+        if not skip_certificates:
+            content_type = ContentType.objects.get_for_model(User)
+            HubspotObject.objects.update_or_create(
+                object_id=user.id,
+                content_type=content_type,
+                defaults={"hubspot_id": contact.id},
+            )
+
+    except TooManyRequestsException:
+        # Re-raise rate limit errors so calling code can retry
+        log.warning(
+            "Rate limited ensuring HubSpot contact for user_id=%s email=%s in target account",
+            user.id,
+            user.email,
+        )
+        raise
+    except Exception:
+        log.exception(
+            "Failed to ensure HubSpot contact for user_id=%s email=%s in target account",
+            user.id,
+            user.email,
+        )
+        return None
+    else:
+        return contact.id
+
+
+def _sync_cart_add_deal_with_hubspot(
+    order: Order, contact_id: str, hubspot_client: HubspotApi
+) -> SimplePublicObject:
+    """Create or update cart-add deal and line-item objects and associate them in target account."""
+    deal_input = _build_target_deal_message(order, hubspot_client)
+    # Prefer "Checkout Abandoned" for cart-add events, then normalize so the
+    # payload still matches the selected target-account pipeline configuration.
+    deal_input.properties["dealstage"] = CART_ADD_DEAL_STAGE
+    _normalize_deal_properties_for_target_account(hubspot_client, deal_input)
+
+    # Extract unique_app_id from deal input to check for existing deals
+    unique_app_id = deal_input.properties.get("unique_app_id")
+
+    # Ensure all products for this order's lines exist in the target account before
+    # creating the deal, so that line items can reference valid product IDs.
+    for line in order.lines.all():
+        _ensure_target_hubspot_product_for_line(line, hubspot_client)
+
+    # Use the same dual lookup logic as checkout flow to prevent duplicates
+    existing_deal_id = _find_target_deal_id_by_dealname(
+        hubspot_client, deal_input.properties.get("dealname")
+    )
+    if not existing_deal_id and unique_app_id:
+        existing_deal_id = _find_target_deal_id_by_unique_app_id(
+            hubspot_client, unique_app_id
+        )
+
+    wait_for_hubspot_rate_limit()
+    if existing_deal_id:
+        # Update existing deal
+        deal = hubspot_client.crm.objects.basic_api.update(
+            object_type=HubspotObjectType.DEALS.value,
+            object_id=existing_deal_id,
+            simple_public_object_input=deal_input,
+        )
+    else:
+        # Create new deal
+        deal = hubspot_client.crm.objects.basic_api.create(
+            object_type=HubspotObjectType.DEALS.value,
+            simple_public_object_input_for_create=deal_input,
+        )
+
+    wait_for_hubspot_rate_limit()
+    hubspot_client.crm.associations.v4.basic_api.create_default(
+        from_object_type=HubspotObjectType.DEALS.value,
+        from_object_id=deal.id,
+        to_object_type=HubspotObjectType.CONTACTS.value,
+        to_object_id=contact_id,
+    )
+
+    for line in order.lines.all():
+        _upsert_target_deal_line_item(line, deal.id, hubspot_client)
+
+    return deal
+
+
+def track_cart_add_with_hubspot(
+    user: User, product: Product, *, is_uai_course: bool, is_xpro_course: bool = False
+) -> bool:
+    """
+    Create and sync a dedicated deal that represents a cart-add occurrence.
+
+    This mirrors the existing deal sync path used by ecommerce orders but creates
+    a standalone pending order/line so each cart add is a distinct deal.
+
+    Args:
+        user (User): The user adding to cart
+        product (Product): Product being added
+        is_uai_course (bool): Whether this is a UAI/Learn course add
+        is_xpro_course (bool): Whether this is an XPro course add
+
+    Returns:
+        bool: True if synced successfully, False otherwise.
+    """
+    token = _resolve_hubspot_token(is_uai=is_uai_course, is_xpro=is_xpro_course)
+    if not token:
+        return False
+
+    try:
+        hubspot_client = HubspotApi(access_token=token)
+        is_uai_account = _is_uai_token(token)
+
+        _ensure_target_hubspot_contact_properties(
+            hubspot_client, skip_certificates=is_uai_account
+        )
+
+        contact_id = _ensure_hubspot_contact_for_user(
+            user, hubspot_client, skip_certificates=is_uai_account
+        )
+        if not contact_id:
+            return False
+
+        product_version = Version.objects.get_for_object(product).first()
+        if not product_version:
+            log.info(
+                "No version found for product_id=%s; cannot sync cart-add deal",
+                product.id,
+            )
+            return False
+
+        with transaction.atomic():
+            order = Order.objects.create(
+                state=models.OrderStatus.PENDING,
+                purchaser=user,
+                total_price_paid=0,
+            )
+            line = Line.objects.create(
+                order=order,
+                purchased_object_id=product.object_id,
+                purchased_content_type_id=product.content_type_id,
+                product_version=product_version,
+                quantity=1,
+                discounted_unit_price=Line.compute_discounted_unit_price_for(
+                    order, product_version
+                ),
+            )
+            order.total_price_paid = line.discounted_price
+            # auto_now fields are skipped when update_fields excludes them, so
+            # updated_on has to be listed to move.
+            order.save(update_fields=["total_price_paid", "updated_on"])
+
+        deal = _sync_cart_add_deal_with_hubspot(order, contact_id, hubspot_client)
+        log.info(
+            "Synced cart-add deal with HubSpot for user_id=%s product_id=%s deal_id=%s is_uai=%s is_xpro=%s",
+            user.id,
+            product.id,
+            deal.id,
+            is_uai_course,
+            is_xpro_course,
+        )
+    except Exception:  # pylint: disable=broad-except
+        log.exception(
+            "Failed to sync HubSpot cart-add deal for user %s product %s (is_uai=%s is_xpro=%s)",
+            user.id,
+            product.id,
+            is_uai_course,
+            is_xpro_course,
+        )
+        return False
+
+    return True
 
 
 MODEL_CREATE_FUNCTION_MAPPING = {

@@ -2,6 +2,8 @@
 Serializers for Wagtail API Schema
 """
 
+import bleach
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from cms.models import CoursePage, ProgramPage
@@ -52,7 +54,30 @@ class FacultySerializer(serializers.Serializer):
     instructor_title = serializers.CharField()
     instructor_bio_short = serializers.CharField()
     instructor_bio_long = serializers.CharField()
-    feature_image_src = serializers.CharField()
+    feature_image_src = serializers.CharField(allow_null=True)
+
+
+class FAQItemSerializer(serializers.Serializer):
+    """
+    Serializer for FAQ items shown on course/program pages.
+    """
+
+    id = serializers.IntegerField()
+    question = serializers.CharField()
+    answer = serializers.CharField()
+
+
+class TestimonialItemSerializer(serializers.Serializer):
+    """
+    Serializer for testimonial items shown on course/program pages.
+    """
+
+    id = serializers.IntegerField()
+    quote = serializers.CharField()
+    name = serializers.CharField()
+    title = serializers.CharField(allow_blank=True)
+    date_published = serializers.DateField()
+    image_src = serializers.CharField(allow_null=True)
 
 
 class PriceItemSerializer(serializers.Serializer):
@@ -82,6 +107,15 @@ class OverrideSerializer(serializers.Serializer):
     type = serializers.CharField()
     value = OverrideValueSerializer()
     id = serializers.CharField()
+
+
+class HowYoullLearnSerializer(serializers.Serializer):
+    """Serializer for the How You'll Learn generated property"""
+
+    key = serializers.CharField()
+    icon = serializers.CharField()
+    title = serializers.CharField()
+    text = serializers.CharField()
 
 
 class PageMetaSerializer(serializers.Serializer):
@@ -176,17 +210,22 @@ class CoursePageItemSerializer(serializers.ModelSerializer):
             "max_price",
             "prerequisites",
             "faq_url",
+            "hubspot_form_id",
             "about",
             "what_you_learn",
             "feature_image",
             "video_url",
             "faculty_section_title",
             "faculty",
+            "faqs",
+            "testimonials",
             "certificate_page",
             "course_details",
             "topic_list",
             "include_in_learn_catalog",
             "ingest_content_files_for_ai",
+            "show_course_outline",
+            "how_youll_learn",
         ]
 
         # NOTE: We use this serializer for schema generation only,
@@ -197,9 +236,12 @@ class CoursePageItemSerializer(serializers.ModelSerializer):
     meta = PageMetaSerializer()
     feature_image = FeatureImageSerializer()
     faculty = FacultySerializer(many=True)
+    faqs = FAQItemSerializer(many=True)
+    testimonials = TestimonialItemSerializer(many=True)
     certificate_page = CertificatePageSerializer(allow_null=True)
     course_details = CourseSerializer()
     topic_list = TopicSerializer(many=True)
+    how_youll_learn = HowYoullLearnSerializer(many=True)
 
 
 class CoursePageListSerializer(serializers.Serializer):
@@ -215,6 +257,8 @@ class ProgramPageItemSerializer(serializers.ModelSerializer):
     """
     Serializer for individual program page items, including all relevant fields.
     """
+
+    description = serializers.SerializerMethodField()
 
     class Meta:
         model = ProgramPage
@@ -234,26 +278,40 @@ class ProgramPageItemSerializer(serializers.ModelSerializer):
             "max_price",
             "prerequisites",
             "faq_url",
+            "hubspot_form_id",
             "about",
             "what_you_learn",
             "feature_image",
             "video_url",
             "faculty_section_title",
             "faculty",
+            "faqs",
+            "testimonials",
             "certificate_page",
             "program_details",
+            "how_youll_learn",
         ]
 
         # NOTE: We use this serializer for schema generation only,
         # And only for GET requests, in which all fields are returned.
         extra_kwargs = {field: {"required": True} for field in fields}
 
+    @extend_schema_field(str)
+    def get_description(self, instance):
+        """The description shown on the home page and product page."""
+        if instance.description:
+            return bleach.clean(instance.description, tags={}, strip=True)
+        return ""
+
     meta = PageMetaSerializer()
     price = PriceItemSerializer(many=True)
     feature_image = FeatureImageSerializer()
     faculty = FacultySerializer(many=True)
+    faqs = FAQItemSerializer(many=True)
+    testimonials = TestimonialItemSerializer(many=True)
     certificate_page = CertificatePageSerializer()
     program_details = ProgramSerializer()
+    how_youll_learn = HowYoullLearnSerializer(many=True)
 
 
 class ProgramPageListSerializer(serializers.Serializer):

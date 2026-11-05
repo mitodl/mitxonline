@@ -39,7 +39,7 @@ class CourseRunFieldBlock(blocks.FieldBlock):
 
     def get_courseruns(self):
         """Lazy evaluation of the queryset"""
-        queryset = apps.get_model("courses", "CourseRun").objects.live()
+        queryset = apps.get_model("courses", "CourseRun").objects.live(include_b2b=True)
 
         if self.parent_readable_id:
             queryset = queryset.filter(course__readable_id=self.parent_readable_id)

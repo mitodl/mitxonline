@@ -10,6 +10,7 @@ from contextlib import contextmanager
 
 import pytest
 from deepdiff import DeepDiff
+from deepdiff.helper import COLORED_VIEW
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.files.uploadedfile import SimpleUploadedFile
 from requests.exceptions import HTTPError
@@ -40,10 +41,12 @@ def assert_drf_json_equal(obj1, obj2, ignore_order=False):  # noqa: FBT002
     json_renderer = JSONRenderer()
     converted1 = json.loads(json_renderer.render(obj1))
     converted2 = json.loads(json_renderer.render(obj2))
-    if ignore_order:
-        assert DeepDiff(converted1, converted2, ignore_order=ignore_order) == {}
-    else:
-        assert converted1 == converted2
+    diff = DeepDiff(
+        converted1, converted2, ignore_order=ignore_order, view=COLORED_VIEW
+    )
+
+    if diff != {}:
+        pytest.fail(f"Values differ:\n\n{diff!s}")
 
 
 class MockResponse:

@@ -15,7 +15,7 @@ class DeferralPlugin:
         from_courseware_id = deferral_request_row.from_courseware_id
         to_courseware_id = deferral_request_row.to_courseware_id
 
-        from_enrollment, to_enrollment = defer_enrollment(
+        _, to_enrollment = defer_enrollment(
             user,
             from_courseware_id,
             to_courseware_id,

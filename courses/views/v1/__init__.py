@@ -1,14 +1,16 @@
 """Course views version 1"""
 
 import logging
-from typing import Optional, Tuple, Union  # noqa: UP035
+from typing import Tuple, Union  # noqa: UP035
 
 import django_filters
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, HttpResponseRedirect
+from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
@@ -17,21 +19,24 @@ from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import permission_classes
+from rest_framework.exceptions import ValidationError
 from rest_framework.generics import GenericAPIView
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from reversion.models import Version
 
+from compliance.exceptions import ExportComplianceCheckError
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
     get_relevant_course_run_qset,
     get_user_relevant_program_course_run_qset,
+    partner_schools_for_program,
 )
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
+from courses.exceptions import CountryBlockedError
 from courses.models import (
     Course,
     CourseRun,
@@ -72,6 +77,7 @@ from main.constants import (
     USER_MSG_TYPE_ENROLL_FAILED,
     USER_MSG_TYPE_ENROLLED,
 )
+from main.pagination import Pagination
 from main.utils import encode_json_cookie_value, redirect_with_user_message
 from openapi.utils import extend_schema_get_queryset
 from openedx.api import (
@@ -96,15 +102,6 @@ class UpdateCourseRunEnrollmentSerializer(serializers.Serializer):
     )
 
 
-class Pagination(PageNumberPagination):
-    """Paginator class for infinite loading"""
-
-    page_size = 12
-    page_size_query_param = "page_size"
-    max_page_size = 100
-    ordering = "-created_on"
-
-
 class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     """API view set for Programs"""
 
@@ -118,7 +115,7 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         return (
             Program.objects.filter(b2b_only=False)
-            .prefetch_related("departments")
+            .prefetch_related("departments", "enrollment_modes")
             .select_related("page")
         )
 
@@ -173,26 +170,16 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = CourseFilterSet
 
     def get_queryset(self):
-        courserun_is_enrollable = self.request.query_params.get(
-            "courserun_is_enrollable", None
+        # Filtering by courserun_is_enrollable is CourseFilterSet's job; the
+        # queryset is the same either way.
+        return Course.objects.select_related("page").prefetch_related(
+            "departments",
+            "courseruns__products",
+            Prefetch(
+                "courseruns__enrollment_modes",
+                to_attr="prefetched_enrollment_modes",
+            ),
         )
-
-        if courserun_is_enrollable:
-            queryset = (
-                Course.objects.filter()
-                .select_related("page")
-                .prefetch_related("departments")
-                .all()
-            )
-        else:
-            queryset = (
-                Course.objects.filter()
-                .select_related("page")
-                .prefetch_related("courseruns", "departments")
-                .all()
-            )
-
-        return queryset
 
     def get_serializer_context(self):
         added_context = {}
@@ -201,7 +188,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             and self.request.query_params
             and self.request.query_params.get("readable_id", None)
         ):
-            added_context["all_runs"] = True
+            added_context["include_programs"] = True
 
         return {**super().get_serializer_context(), **added_context}
 
@@ -241,18 +228,28 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
         if relevant_to:
             course = Course.objects.filter(readable_id=relevant_to).first()
             if course:
-                return get_relevant_course_run_qset(course)
+                runs_qset = get_relevant_course_run_qset(course)
             else:
                 program = Program.objects.filter(readable_id=relevant_to).first()
-                return (
+                runs_qset = (
                     get_user_relevant_program_course_run_qset(program)
                     if program
-                    else Program.objects.none()
+                    else CourseRun.objects.none()
                 )
+            return runs_qset.prefetch_related(
+                Prefetch(
+                    "enrollment_modes",
+                    to_attr="prefetched_enrollment_modes",
+                )
+            )
         else:
             return (
                 CourseRun.objects.select_related("course")
-                .prefetch_related("course__departments", "course__page")
+                .prefetch_related(
+                    "course__departments",
+                    "course__page",
+                    Prefetch("enrollment_modes", to_attr="prefetched_enrollment_modes"),
+                )
                 .filter(live=True)
             )
 
@@ -269,7 +266,7 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
 
 def _validate_enrollment_post_request(
     request: Request,
-) -> Union[Tuple[Optional[HttpResponse], None, None], Tuple[None, User, CourseRun]]:  # noqa: UP006
+) -> Union[Tuple[HttpResponse | None, None, None], Tuple[None, User, CourseRun]]:  # noqa: UP006
     """
     Validates a request to create an enrollment. Returns a response if validation fails, or a user and course run
     if validation succeeds.
@@ -289,18 +286,6 @@ def _validate_enrollment_post_request(
             "Attempting to enroll in a non-existent run (id: %s)", str(run_id_str)
         )
         return HttpResponseRedirect(request.headers["Referer"]), None, None
-    if run.course.is_country_blocked(user):
-        resp = HttpResponseRedirect(request.headers["Referer"])
-        resp.set_cookie(
-            key=USER_MSG_COOKIE_NAME,
-            value=encode_json_cookie_value(
-                {
-                    "type": USER_MSG_TYPE_ENROLL_BLOCKED,
-                }
-            ),
-            max_age=USER_MSG_COOKIE_MAX_AGE,
-        )
-        return resp, None, None
     if (
         PaidCourseRun.fulfilled_paid_course_run_exists(user, run)
         or CourseRunEnrollment.objects.filter(
@@ -337,15 +322,33 @@ class CreateEnrollmentView(APIView):
         if resp is not None:
             return resp
 
+        # Check early so a blocked learner isn't provisioned an edX account.
+        # create_run_enrollments remains the authoritative check.
+        if run.course.is_country_blocked(user):
+            return redirect_with_user_message(
+                reverse("user-dashboard"),
+                {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
+            )
+
         if not user.openedx_user_exists:
             create_user(user)
             user.refresh_from_db()
 
-        _, edx_request_success = create_run_enrollments(
-            user=user,
-            runs=[run],
-            keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
-        )
+        try:
+            _, edx_request_success = create_run_enrollments(
+                user=user,
+                runs=[run],
+                keep_failed_enrollments=settings.FEATURES.get(
+                    features.IGNORE_EDX_FAILURES, False
+                ),
+            )
+        except (CountryBlockedError, ExportComplianceCheckError):
+            # Don't propagate the specifics of the compliance decision to the
+            # client - the underlying cause is logged where it's raised.
+            return redirect_with_user_message(
+                reverse("user-dashboard"),
+                {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
+            )
 
         def respond(data, status=True):  # noqa: FBT002
             """
@@ -355,7 +358,9 @@ class CreateEnrollmentView(APIView):
                 return Response("Ok" if status else "Fail")
             return HttpResponseRedirect(data)
 
-        if edx_request_success or is_enabled(features.IGNORE_EDX_FAILURES):
+        if edx_request_success or settings.FEATURES.get(
+            features.IGNORE_EDX_FAILURES, False
+        ):
             resp = respond(reverse("user-dashboard"))
             cookie_value = {
                 "type": USER_MSG_TYPE_ENROLLED,
@@ -419,7 +424,13 @@ class UserEnrollmentsApiViewSet(
         return (
             CourseRunEnrollment.objects.filter(user=self.request.user)
             .select_related("run__course__page", "user", "run")
-            .all()
+            .prefetch_related(
+                Prefetch(
+                    "run__enrollment_modes",
+                    to_attr="prefetched_enrollment_modes",
+                )
+            )
+            .prefetch("certificate", "grades")
         )
 
     def get_serializer_context(self):
@@ -441,7 +452,9 @@ class UserEnrollmentsApiViewSet(
         deactivated_enrollment = deactivate_run_enrollment(
             enrollment,
             change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
-            keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
+            keep_failed_enrollments=settings.FEATURES.get(
+                features.IGNORE_EDX_FAILURES, False
+            ),
         )
         if deactivated_enrollment is None:
             return Response(status=status.HTTP_400_BAD_REQUEST)
@@ -530,7 +543,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
             )
             .filter(user=request.user)
             .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
-            .all()
+            .order_by("-id")
         )
 
         program_list = []
@@ -545,7 +558,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                     )
                     .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
                     .select_related("run__course__page")
-                    .all(),
+                    .order_by("-id"),
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),
                 }
@@ -581,12 +594,19 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         are so there's nothing to process there.
         """
 
-        program = Program.objects.get(pk=pk)
-        (enrollment, created) = ProgramEnrollment.objects.update_or_create(
-            user=request.user,
-            program=program,
-            defaults={"change_status": ENROLL_CHANGE_STATUS_UNENROLLED},
-        )
+        program = get_object_or_404(Program, pk=pk)
+        enrollment = ProgramEnrollment.objects.filter(
+            user=request.user, program=program
+        ).first()
+        if enrollment:
+            if not enrollment.can_unenroll:
+                return Response(
+                    {
+                        "message": "Cannot unenroll from a purchased program, contact support."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            enrollment.deactivate_and_save(ENROLL_CHANGE_STATUS_UNENROLLED)
 
         return self.list(request)
 
@@ -601,9 +621,48 @@ class PartnerSchoolViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = PartnerSchoolSerializer
     queryset = PartnerSchool.objects.all()
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="program",
+                type=int,
+                description="Only return schools assigned to this program id.",
+                required=False,
+            )
+        ]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    def get_queryset(self):
+        """Optionally scope the list to a single program."""
+        queryset = super().get_queryset()
+        program_id = self.request.query_params.get("program")
+        if program_id:
+            try:
+                program_id = int(program_id)
+            except ValueError:
+                msg = "program must be an integer id."
+                raise ValidationError({"program": msg}) from None
+            queryset = queryset.filter(programs__id=program_id).distinct()
+        return queryset
+
+
+def get_enrolled_program_or_404(user, program_id: int) -> Program:
+    """Return a program only if the user has an active enrollment for it."""
+
+    enrollment = get_object_or_404(
+        ProgramEnrollment.objects.select_related("program"),
+        user=user,
+        program_id=program_id,
+    )
+    return enrollment.program
+
 
 class GetLearnerRecordView(APIView):
     """View to get learner record by program ID"""
+
+    permission_classes = [IsAuthenticated]
 
     @extend_schema(
         operation_id="learner_record_retrieve_by_id",
@@ -614,7 +673,7 @@ class GetLearnerRecordView(APIView):
         """
         Retrieve the learner record for a specific program.
         """
-        program = Program.objects.get(pk=pk)
+        program = get_enrolled_program_or_404(request.user, pk)
         serializer = LearnerRecordSerializer(program, context={"request": request})
         return Response(serializer.data)
 
@@ -631,7 +690,7 @@ class LearnerRecordShareView(APIView):
         Sets up a sharing link for the learner's record. Returns back the entire
         learner record.
         """
-        program = Program.objects.get(pk=pk)
+        program = get_enrolled_program_or_404(request.user, pk)
 
         school = None
 
@@ -640,11 +699,13 @@ class LearnerRecordShareView(APIView):
             and request.data["partnerSchool"] is not None
         ):
             try:
-                school = PartnerSchool.objects.get(pk=request.data["partnerSchool"])
-            except:  # noqa: E722
+                school = partner_schools_for_program(program).get(
+                    pk=request.data["partnerSchool"]
+                )
+            except PartnerSchool.DoesNotExist:
                 return Response("Partner school not found.", status.HTTP_404_NOT_FOUND)
 
-            (ps_share, created) = LearnerProgramRecordShare.objects.filter(
+            (ps_share, _) = LearnerProgramRecordShare.objects.filter(
                 user=request.user, program=program, partner_school=school
             ).get_or_create(user=request.user, program=program, partner_school=school)
             ps_share.is_active = True
@@ -652,7 +713,7 @@ class LearnerRecordShareView(APIView):
 
             send_partner_school_email.delay(ps_share.share_uuid)
         else:
-            (ps_share, created) = LearnerProgramRecordShare.objects.filter(
+            LearnerProgramRecordShare.objects.filter(
                 user=request.user, program=program, partner_school=None, is_active=True
             ).get_or_create(
                 user=request.user, program=program, partner_school=None, is_active=True
@@ -676,7 +737,7 @@ class RevokeLearnerRecordShareView(APIView):
         anonymous ones; shares sent to partner schools are always allowed once they
         are sent.
         """
-        program = Program.objects.get(pk=pk)
+        program = get_enrolled_program_or_404(request.user, pk)
 
         LearnerProgramRecordShare.objects.filter(
             user=request.user, partner_school=None, program=program
@@ -723,7 +784,7 @@ class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return Department.objects.annotate(
-            courses=Count("course"), programs=Count("program")
+            course_count=Count("courses"), program_count=Count("programs")
         )
 
     @extend_schema(

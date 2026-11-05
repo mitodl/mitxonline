@@ -32,7 +32,7 @@ def anon_drf_client():
         False,
     ],
 )
-def test_serialize_certificate(is_program):
+def test_serialize_certificate(is_program, mock_context):
     """Test that the certificate serializes properly."""
 
     if is_program:
@@ -47,17 +47,22 @@ def test_serialize_certificate(is_program):
         certificate = ProgramCertificateFactory.create(
             certificate_page_revision=cert_page.revisions.last()
         )
-        serialized_data = ProgramCertificateSerializer(certificate).data
+        serialized_data = ProgramCertificateSerializer(
+            certificate, context=mock_context
+        ).data
     else:
         certificate = CourseRunCertificateFactory.create(
             certificate_page_revision=cert_page.revisions.last()
         )
-        serialized_data = CourseRunCertificateSerializer(certificate).data
+        serialized_data = CourseRunCertificateSerializer(
+            certificate, context=mock_context
+        ).data
 
     expected_data = {
         "user": PublicUserSerializer(certificate.user).data,
         "uuid": certificate.uuid,
         "is_revoked": certificate.is_revoked,
+        "issue_date": certificate.issue_date,
         "certificate_page_revision": cert_page.revisions.last().id,
         "certificate_page": {
             "id": cert_page.id,
@@ -83,13 +88,16 @@ def test_serialize_certificate(is_program):
             "overrides": [],
             "signatory_items": cert_page.signatory_items,
         },
+        "verifiable_credential_json": certificate.verifiable_credential.credential_data
+        if certificate.verifiable_credential
+        else None,
     }
 
     if is_program:
         expected_data["program"] = ProgramSerializer(certificate.program).data
     else:
         expected_data["course_run"] = CourseRunWithCourseSerializer(
-            certificate.course_run
+            certificate.course_run, context=mock_context
         ).data
 
     assert_drf_json_equal(expected_data, serialized_data, ignore_order=True)

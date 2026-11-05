@@ -18,6 +18,7 @@ from users.models import (
     OPENEDX_HIGHEST_EDUCATION_MAPPINGS,
     LegalAddress,
     User,
+    UserProfile,
 )
 
 pytestmark = pytest.mark.django_db
@@ -137,6 +138,29 @@ def test_user_is_editor(is_staff, is_superuser, has_editor_group, exp_is_editor)
         user.groups.add(Group.objects.get(name=CMS_EDITORS_GROUP_NAME))
         user.save()
     assert user.is_editor is exp_is_editor
+
+
+def test_should_skip_onboarding_with_no_user_profile():
+    """A user with no UserProfile row at all (e.g. one created by the
+    historical migrate_edx_data bulk_create bug) must not crash accessing
+    should_skip_onboarding - it should fall back to the enrollment check
+    instead of raising RelatedObjectDoesNotExist
+    """
+    user = UserFactory.create()
+    UserProfile.objects.filter(user=user).delete()
+
+    assert user.should_skip_onboarding is False
+
+
+def test_should_skip_onboarding_with_completed_onboarding():
+    """A user with a UserProfile behaves as before: completed_onboarding
+    alone is enough to skip onboarding
+    """
+    user = UserFactory.create()
+    user.user_profile.completed_onboarding = True
+    user.user_profile.save()
+
+    assert user.should_skip_onboarding is True
 
 
 def test_legal_address_us_state():

@@ -5,13 +5,13 @@ Fixtures for hubspot_sync tests
 from datetime import datetime
 from decimal import Decimal
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 import pytest
-import pytz
 import reversion
 from django.contrib.contenttypes.models import ContentType
-from hubspot.crm.objects import SimplePublicObject
 from mitol.hubspot_api.factories import HubspotObjectFactory
+from mitol.hubspot_api.models import HubspotObject
 from reversion.models import Version
 
 from ecommerce import factories
@@ -21,14 +21,14 @@ from users.models import User
 # pylint: disable=redefined-outer-name
 
 TIMESTAMPS = [
-    datetime(2017, 1, 1, tzinfo=pytz.utc),
-    datetime(2017, 1, 2, tzinfo=pytz.utc),
-    datetime(2017, 1, 3, tzinfo=pytz.utc),
-    datetime(2017, 1, 4, tzinfo=pytz.utc),
-    datetime(2017, 1, 5, tzinfo=pytz.utc),
-    datetime(2017, 1, 6, tzinfo=pytz.utc),
-    datetime(2017, 1, 7, tzinfo=pytz.utc),
-    datetime(2017, 1, 8, tzinfo=pytz.utc),
+    datetime(2017, 1, 1, tzinfo=ZoneInfo("UTC")),
+    datetime(2017, 1, 2, tzinfo=ZoneInfo("UTC")),
+    datetime(2017, 1, 3, tzinfo=ZoneInfo("UTC")),
+    datetime(2017, 1, 4, tzinfo=ZoneInfo("UTC")),
+    datetime(2017, 1, 5, tzinfo=ZoneInfo("UTC")),
+    datetime(2017, 1, 6, tzinfo=ZoneInfo("UTC")),
+    datetime(2017, 1, 7, tzinfo=ZoneInfo("UTC")),
+    datetime(2017, 1, 8, tzinfo=ZoneInfo("UTC")),
 ]
 
 FAKE_OBJECT_ID = 1234
@@ -72,11 +72,16 @@ def hubspot_order():
         purchased_object=product.purchasable_object,
     )
 
-    HubspotObjectFactory.create(
-        content_object=order.purchaser,
-        content_type=ContentType.objects.get_for_model(User),
+    user_content_type = ContentType.objects.get_for_model(User)
+    if not HubspotObject.objects.filter(
+        content_type=user_content_type,
         object_id=order.purchaser.id,
-    )
+    ).exists():
+        HubspotObjectFactory.create(
+            content_object=order.purchaser,
+            content_type=user_content_type,
+            object_id=order.purchaser.id,
+        )
     HubspotObjectFactory.create(
         content_object=product,
         content_type=ContentType.objects.get_for_model(Product),
@@ -99,11 +104,16 @@ def hubspot_b2b_order():
         purchased_object=product.purchasable_object,
     )
 
-    HubspotObjectFactory.create(
-        content_object=order.purchaser,
-        content_type=ContentType.objects.get_for_model(User),
+    user_content_type = ContentType.objects.get_for_model(User)
+    if not HubspotObject.objects.filter(
+        content_type=user_content_type,
         object_id=order.purchaser.id,
-    )
+    ).exists():
+        HubspotObjectFactory.create(
+            content_object=order.purchaser,
+            content_type=user_content_type,
+            object_id=order.purchaser.id,
+        )
     HubspotObjectFactory.create(
         content_object=product,
         content_type=ContentType.objects.get_for_model(Product),
@@ -121,13 +131,3 @@ def hubspot_order_id(hubspot_order):
         content_type=ContentType.objects.get_for_model(Order),
         object_id=hubspot_order.id,
     ).hubspot_id
-
-
-@pytest.fixture
-def mock_hubspot_api(mocker):
-    """Mock the Hubspot CRM API"""
-    mock_api = mocker.patch("mitol.hubspot_api.api.HubspotApi")
-    mock_api.return_value.crm.objects.basic_api.create.return_value = (
-        SimplePublicObject(id=FAKE_HUBSPOT_ID)
-    )
-    return mock_api

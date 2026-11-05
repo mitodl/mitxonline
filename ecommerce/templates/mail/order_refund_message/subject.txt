@@ -1,1 +1,1 @@
-Refund of MITxOnline Order {{order.reference_number}}
+Refund of {{ site_name }} Order {{order.reference_number}}

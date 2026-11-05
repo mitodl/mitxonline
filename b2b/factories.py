@@ -2,18 +2,28 @@
 
 from uuid import uuid4
 
+import factory
 import faker
 import wagtail_factories
 from factory import Factory, LazyAttribute, LazyFunction, SubFactory
+from factory.django import DjangoModelFactory
 
-from b2b.constants import CONTRACT_INTEGRATION_NONSSO, CONTRACT_INTEGRATION_SSO
+from b2b.constants import CONTRACT_MEMBERSHIP_CODE, CONTRACT_MEMBERSHIP_MANAGED
 from b2b.keycloak_admin_dataclasses import (
     OrganizationRepresentation,
     RealmRepresentation,
 )
-from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
+from b2b.models import (
+    ContractPage,
+    OrganizationIndexPage,
+    OrganizationPage,
+    UserOrganization,
+)
 from cms.factories import HomePageFactory
 from cms.models import HomePage
+from courses.constants import UAI_COURSEWARE_ID_PREFIX
+from users.factories import UserFactory
+from variants.factories import ContractSupportedVariantFactory
 
 FAKE = faker.Faker()
 
@@ -34,13 +44,16 @@ class OrganizationPageFactory(wagtail_factories.PageFactory):
     """OrganizationPage factory class"""
 
     name = LazyAttribute(lambda _: FAKE.unique.company())
-    org_key = LazyAttribute(lambda _: FAKE.unique.text(max_nb_chars=5))
+    org_key = LazyAttribute(lambda _: "".join(FAKE.unique.random_letters(length=5)))
+    org_key_prefix = UAI_COURSEWARE_ID_PREFIX
     description = LazyAttribute(lambda _: FAKE.unique.text())
     logo = None
     sso_organization_id = LazyAttribute(lambda _: uuid4())
     parent = LazyAttribute(
-        lambda _: OrganizationIndexPage.objects.first()
-        or OrganizationIndexPageFactory.create()
+        lambda _: (
+            OrganizationIndexPage.objects.first()
+            or OrganizationIndexPageFactory.create()
+        )
     )
     slug = LazyAttribute(lambda _: FAKE.unique.slug())
 
@@ -55,12 +68,30 @@ class ContractPageFactory(wagtail_factories.PageFactory):
     description = LazyAttribute(lambda _: FAKE.unique.text())
     organization = SubFactory(OrganizationPageFactory)
     parent = LazyAttribute(lambda o: o.organization)
-    integration_type = LazyFunction(
-        lambda: CONTRACT_INTEGRATION_NONSSO
-        if FAKE.boolean()
-        else CONTRACT_INTEGRATION_SSO
+    membership_type = LazyFunction(
+        lambda: (
+            CONTRACT_MEMBERSHIP_CODE if FAKE.boolean() else CONTRACT_MEMBERSHIP_MANAGED
+        )
     )
     slug = LazyAttribute(lambda _: FAKE.unique.slug())
+
+    @factory.post_generation
+    def variant_options(self, create, extracted, **kwargs):  # noqa: ARG002
+        """Craete a default variant set, unless provided some."""
+
+        if not create:
+            return
+
+        if extracted:
+            self.variant_options.add(extracted)
+        else:
+            ContractSupportedVariantFactory.create(
+                variant_object=self,
+                language="en",
+                variant_industry="",
+                variant_length="",
+                default_variant=True,
+            )
 
     class Meta:
         model = ContractPage
@@ -89,3 +120,19 @@ class OrganizationRepresentationFactory(Factory):
     alias = LazyAttribute(lambda _: FAKE.unique.word())
     description = LazyAttribute(lambda _: FAKE.text())
     enabled = True
+
+
+class UserOrganizationFactory(DjangoModelFactory):
+    """Factory for UserOrganizations"""
+
+    class Meta:
+        model = UserOrganization
+        django_get_or_create = (
+            "user",
+            "organization",
+        )
+
+    user = SubFactory(UserFactory)
+    organization = SubFactory(OrganizationPageFactory)
+    keep_until_seen = True
+    is_manager = False

@@ -1,0 +1,2136 @@
+"""Tests for the staff-only B2B provisioning API's business logic."""
+
+import faker
+import pytest
+import requests
+from authlib.integrations.base_client.errors import InvalidTokenError
+from django.core.exceptions import ImproperlyConfigured
+from django.core.management import CommandError, call_command
+from django.db.models import ProtectedError
+from mitol.common.utils import now_in_utc
+
+from b2b.api import reconcile_user_orgs
+from b2b.constants import (
+    IDP_ALLOWED_TRANSITIONS,
+    IDP_LIFECYCLE_CHOICES,
+    IDP_PROTOCOL_OIDC,
+    IDP_PROTOCOL_SAML,
+    IDP_STATE_ACTIVE,
+    IDP_STATE_DISABLED,
+    IDP_STATE_DRAFT,
+    IDP_STATE_TESTING,
+    ONBOARDING_STATE_LIVE,
+    ONBOARDING_STATE_ORG_CREATED,
+    PROVISIONING_ACTION_IDP_CREATED,
+    PROVISIONING_ACTION_IDP_DELETED,
+    PROVISIONING_ACTION_IDP_METADATA_REFRESHED,
+    PROVISIONING_ACTION_IDP_TRANSITIONED,
+    PROVISIONING_ACTION_IDP_UPDATED,
+    PROVISIONING_ACTION_ONBOARDING_CHANGED,
+    PROVISIONING_ACTION_ORG_CREATED,
+    PROVISIONING_ACTION_ORG_UPDATED,
+)
+from b2b.exceptions import (
+    AliasCollisionError,
+    InvalidLifecycleTransitionError,
+    OrganizationNameCollisionError,
+    OrganizationNotProvisionedError,
+    OrphanedKeycloakOrganizationError,
+)
+from b2b.factories import (
+    OrganizationIndexPageFactory,
+    OrganizationPageFactory,
+    UserOrganizationFactory,
+)
+from b2b.keycloak_admin_dataclasses import (
+    IdentityProviderMapperRepresentation,
+    IdentityProviderRepresentation,
+    OrganizationDomainRepresentation,
+    OrganizationRepresentation,
+)
+from b2b.models import (
+    OrganizationIdentityProvider,
+    OrganizationOnboarding,
+    OrganizationPage,
+    OrganizationProvisioningAudit,
+    UserOrganization,
+)
+from b2b.provisioning import (
+    create_identity_provider,
+    create_organization,
+    delete_identity_provider,
+    link_organization_to_keycloak,
+    push_unconfirmed_members_to_keycloak,
+    refresh_identity_provider_metadata,
+    set_onboarding_state,
+    transition_identity_provider,
+    update_identity_provider,
+    update_organization,
+)
+from users.factories import UserFactory
+
+pytestmark = [pytest.mark.django_db]
+FAKE = faker.Faker()
+
+PARSED_METADATA = {
+    "singleSignOnServiceUrl": "https://idp.example.edu/sso",
+    "idpEntityId": "https://idp.example.edu/entity",
+}
+
+
+@pytest.fixture(autouse=True)
+def organization_index():
+    """
+    The index page new OrganizationPages are added under.
+
+    create_organization adds under the existing index rather than calling
+    ensure_b2b_organization_index, which would also move every existing
+    organization page as a side effect of creating one.
+    """
+
+    return OrganizationIndexPageFactory.create()
+
+
+@pytest.fixture
+def connection(mocker):
+    """
+    A KeycloakConnection whose models are mocks.
+
+    Every provisioning function takes a connection, so the tests never touch
+    the network and never need the client bootstrapped.
+    """
+
+    fake_connection = mocker.Mock()
+    fake_connection.organizations.list_all.return_value = []
+    fake_connection.identity_providers.list_all.return_value = []
+    fake_connection.organizations.create.return_value = str(FAKE.uuid4())
+    fake_connection.identity_providers.create.return_value = str(FAKE.uuid4())
+    return fake_connection
+
+
+@pytest.fixture
+def mocked_import_config(mocker):
+    """Stand in for Keycloak's metadata parsing."""
+
+    return mocker.patch(
+        "b2b.provisioning.import_identity_provider_config",
+        return_value=dict(PARSED_METADATA),
+    )
+
+
+def _organization_kwargs(**overrides):
+    return {
+        "name": "Example University",
+        "org_key": "EXAMPLEU",
+        "domains": ["example.edu"],
+        "description": "",
+        "redirect_url": "https://learn.mit.edu/dashboard/organization/exampleu",
+        **overrides,
+    }
+
+
+def test_create_organization_writes_both_systems(connection):
+    """The happy path: Keycloak first, then our records, alias from org_key."""
+
+    organization = create_organization(connection=connection, **_organization_kwargs())
+
+    keycloak_payload = connection.organizations.create.call_args.args[0]
+    assert keycloak_payload["alias"] == "EXAMPLEU"
+    assert keycloak_payload["domains"] == [{"name": "example.edu", "verified": True}]
+
+    assert organization.pk is not None
+    assert str(organization.sso_organization_id) == str(
+        connection.organizations.create.return_value
+    )
+    assert organization.onboarding.state == ONBOARDING_STATE_ORG_CREATED
+
+
+def test_create_organization_rejects_a_duplicate_org_key(connection):
+    """An org_key already used here is a 409, not a second organization."""
+
+    existing = OrganizationPageFactory.create()
+
+    with pytest.raises(AliasCollisionError):
+        create_organization(
+            connection=connection, **_organization_kwargs(org_key=existing.org_key)
+        )
+
+    connection.organizations.create.assert_not_called()
+
+
+def test_create_organization_rejects_an_alias_taken_in_the_realm(connection):
+    """
+    An alias free in our tables can still be taken in the realm.
+
+    The realm is shared with the organizations Pulumi still declares, so
+    creating this anyway would break the next pulumi up that declares the
+    same name.
+    """
+
+    connection.organizations.list_all.return_value = [
+        OrganizationRepresentation(id=str(FAKE.uuid4()), alias="exampleu")
+    ]
+
+    with pytest.raises(AliasCollisionError):
+        create_organization(connection=connection, **_organization_kwargs())
+
+    connection.organizations.create.assert_not_called()
+
+
+@pytest.mark.parametrize("name", ["Example University", "example university!"])
+def test_create_organization_rejects_a_name_that_reuses_a_page_slug(connection, name):
+    """
+    A name whose slug is taken under the index fails before Keycloak is touched.
+
+    Wagtail's own sibling-slug check in add_child() raises a plain
+    ValidationError, which the API turned into a 500 (MITXONLINE-73J), and only
+    after a Keycloak organization had been created and had to be deleted again.
+    """
+
+    create_organization(connection=connection, **_organization_kwargs())
+    connection.organizations.create.reset_mock()
+
+    with pytest.raises(OrganizationNameCollisionError):
+        create_organization(
+            connection=connection,
+            **_organization_kwargs(name=name, org_key="EXAMPLEU2"),
+        )
+
+    connection.organizations.create.assert_not_called()
+    connection.organizations.delete.assert_not_called()
+    assert not OrganizationPage.objects.filter(org_key="EXAMPLEU2").exists()
+
+
+def test_create_organization_compensates_a_failed_local_write(connection, mocker):
+    """
+    A failed MITx Online write deletes the Keycloak organization it made.
+
+    A Keycloak org with no MITx Online counterpart is exactly the orphan shape
+    the compensation exists to prevent.
+    """
+
+    mocker.patch(
+        "b2b.provisioning.OrganizationOnboarding.objects.create",
+        side_effect=ValueError("no"),
+    )
+
+    with pytest.raises(ValueError, match="no"):
+        create_organization(connection=connection, **_organization_kwargs())
+
+    connection.organizations.delete.assert_called_once_with(
+        connection.organizations.create.return_value
+    )
+    assert not OrganizationPage.objects.filter(org_key="EXAMPLEU").exists()
+
+
+def test_create_organization_reports_an_orphan_when_compensation_fails(
+    connection, mocker
+):
+    """
+    When the compensating delete also fails, say so and stop.
+
+    Retrying against a system that just failed is worse than logging the orphan
+    and letting reconcile_keycloak_orgs adopt it on its next run.
+    """
+
+    mocker.patch(
+        "b2b.provisioning.OrganizationOnboarding.objects.create",
+        side_effect=ValueError("no"),
+    )
+    connection.organizations.delete.side_effect = ValueError("also no")
+
+    with pytest.raises(OrphanedKeycloakOrganizationError) as failure:
+        create_organization(connection=connection, **_organization_kwargs())
+
+    assert str(connection.organizations.create.return_value) in str(failure.value)
+    assert not OrganizationPage.objects.filter(org_key="EXAMPLEU").exists()
+
+
+def test_create_organization_never_leaves_a_null_sso_organization_id(connection):
+    """
+    An OrganizationPage without sso_organization_id is silently broken.
+
+    attach_user() returns False without doing anything for those, so every
+    membership write is a no-op. This is the hq#10552 shape.
+    """
+
+    create_organization(connection=connection, **_organization_kwargs())
+
+    assert not OrganizationPage.objects.filter(
+        sso_organization_id__isnull=True
+    ).exists()
+
+
+def test_create_organization_refuses_to_write_a_row_without_an_id(connection):
+    """
+    An unresolvable ID stops the saga rather than writing a null.
+
+    Keycloak sent no Location and the alias lookup found nothing, so there is
+    no ID to store and nothing to compensate with either - the delete needs the
+    ID we do not have. Writing the row anyway would mint exactly the
+    hq#10552 orphan this saga exists to prevent.
+    """
+
+    connection.organizations.create.return_value = None
+    connection.organizations.list_all.return_value = []
+
+    with pytest.raises(OrphanedKeycloakOrganizationError):
+        create_organization(connection=connection, **_organization_kwargs())
+
+    assert not OrganizationPage.objects.filter(org_key="EXAMPLEU").exists()
+
+
+def test_create_organization_looks_up_the_id_when_keycloak_sends_no_location(
+    connection,
+):
+    """Keycloak's create answers 201 with an empty body; fall back to the alias."""
+
+    known_id = str(FAKE.uuid4())
+    connection.organizations.create.return_value = None
+    connection.organizations.list_all.return_value = [
+        OrganizationRepresentation(id=known_id, alias="EXAMPLEU")
+    ]
+
+    # The pre-flight collision check runs against the same list, so start from
+    # an alias that is not yet in the realm and add it on the second call.
+    connection.organizations.list_all.side_effect = [
+        [],
+        [OrganizationRepresentation(id=known_id, alias="EXAMPLEU")],
+    ]
+
+    organization = create_organization(connection=connection, **_organization_kwargs())
+
+    assert str(organization.sso_organization_id) == known_id
+
+
+def test_update_organization_replaces_the_keycloak_representation(connection):
+    """Keycloak's organization PUT replaces, so read-modify-write."""
+
+    organization = OrganizationPageFactory.create()
+    connection.organizations.get.return_value = OrganizationRepresentation(
+        id=str(organization.sso_organization_id),
+        name=organization.name,
+        alias=organization.org_key,
+    )
+
+    update_organization(
+        organization,
+        connection=connection,
+        name="Renamed",
+        domains=["renamed.edu"],
+    )
+
+    _, payload = connection.organizations.update.call_args.args
+    assert payload["name"] == "Renamed"
+    assert payload["domains"] == [{"name": "renamed.edu", "verified": True}]
+    assert payload["alias"] == organization.org_key
+
+    organization.refresh_from_db()
+    assert organization.name == "Renamed"
+
+
+def test_update_organization_refuses_an_unprovisioned_organization(connection):
+    """
+    An org with no Keycloak record cannot be updated in Keycloak.
+
+    Roughly 24 production organizations are in this state (hq#10552). Without
+    the check the GET goes to organizations/None and the operator is told the
+    Keycloak API failed, which is a 502 they would retry forever.
+    """
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+
+    with pytest.raises(OrganizationNotProvisionedError):
+        update_organization(organization, connection=connection, name="Renamed")
+
+    connection.organizations.get.assert_not_called()
+    connection.organizations.update.assert_not_called()
+
+
+def test_create_identity_provider_refuses_an_unprovisioned_organization(
+    connection, mocked_import_config
+):
+    """
+    Same guard as update_organization, checked before anything is written.
+
+    Without it the IdP is created in Keycloak and only the org link fails, so
+    the compensation deletes an IdP that should never have been made.
+    """
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+
+    with pytest.raises(OrganizationNotProvisionedError):
+        create_identity_provider(
+            organization,
+            connection=connection,
+            alias="exampleu",
+            protocol=IDP_PROTOCOL_SAML,
+            metadata_url="https://idp.example.edu/metadata.xml",
+            attribute_map={"email": "E-Mail Address"},
+        )
+
+    mocked_import_config.assert_not_called()
+    connection.identity_providers.create.assert_not_called()
+    connection.identity_providers.delete.assert_not_called()
+
+
+def test_create_identity_provider_starts_in_draft(connection, mocked_import_config):
+    """A new IdP is disabled in Keycloak until somebody moves it to testing."""
+
+    organization = OrganizationPageFactory.create()
+    metadata_url = "https://idp.example.edu/metadata.xml"
+
+    identity_provider = create_identity_provider(
+        organization,
+        connection=connection,
+        alias="exampleu",
+        protocol=IDP_PROTOCOL_SAML,
+        display_name="Example University",
+        metadata_url=metadata_url,
+        attribute_map={"email": "E-Mail Address"},
+    )
+
+    payload = connection.identity_providers.create.call_args.args[0]
+    assert payload["enabled"] is False
+    assert payload["hideOnLogin"] is True
+    assert payload["providerId"] == IDP_PROTOCOL_SAML
+    assert payload["config"]["metadataDescriptorUrl"] == metadata_url
+
+    connection.organizations.associate.assert_called_once_with(
+        "identity-providers", organization.sso_organization_id, "exampleu"
+    )
+
+    assert identity_provider.lifecycle_state == IDP_STATE_DRAFT
+    assert identity_provider.metadata_artifact == PARSED_METADATA
+    assert identity_provider.metadata_source == metadata_url
+    mocked_import_config.assert_called_once()
+
+
+def test_create_identity_provider_creates_attribute_mappers(
+    connection,
+    mocked_import_config,
+):
+    """Attribute mappers are created the same shape ol-infrastructure makes."""
+
+    organization = OrganizationPageFactory.create()
+
+    create_identity_provider(
+        organization,
+        connection=connection,
+        alias="exampleu",
+        protocol=IDP_PROTOCOL_SAML,
+        metadata_url="https://idp.example.edu/metadata.xml",
+        attribute_map={"email": "E-Mail Address"},
+    )
+
+    endpoint, payload = connection.client.create_returning_id.call_args.args
+    assert endpoint == "identity-provider/instances/exampleu/mappers"
+    assert payload["identityProviderMapper"] == "saml-user-attribute-idp-mapper"
+    assert payload["config"]["attribute.friendly.name"] == "E-Mail Address"
+    assert payload["config"]["user.attribute"] == "email"
+
+
+def test_create_identity_provider_keeps_the_client_secret_out_of_the_artifact(
+    connection,
+    mocked_import_config,
+):
+    """
+    The OIDC client secret reaches Keycloak but is never persisted.
+
+    metadata_artifact is served back over the API, so it holds what Keycloak
+    parsed out of the partner's metadata and nothing else.
+    """
+
+    organization = OrganizationPageFactory.create()
+    secret = FAKE.password()
+
+    identity_provider = create_identity_provider(
+        organization,
+        connection=connection,
+        alias="exampleu-oidc",
+        protocol=IDP_PROTOCOL_OIDC,
+        metadata_url="https://idp.example.edu/.well-known/openid-configuration",
+        client_id="mitxonline",
+        client_secret=secret,
+        attribute_map={"email": "email"},
+    )
+
+    payload = connection.identity_providers.create.call_args.args[0]
+    assert payload["config"]["clientSecret"] == secret
+    assert secret not in str(identity_provider.metadata_artifact)
+
+
+def test_create_identity_provider_rejects_a_realm_alias_collision(
+    connection, mocked_import_config
+):
+    """IdP aliases are realm-wide, so a collision across customers is real."""
+
+    organization = OrganizationPageFactory.create()
+    connection.identity_providers.list_all.return_value = [
+        IdentityProviderRepresentation(alias="exampleu")
+    ]
+
+    with pytest.raises(AliasCollisionError):
+        create_identity_provider(
+            organization,
+            connection=connection,
+            alias="exampleu",
+            protocol=IDP_PROTOCOL_SAML,
+            metadata_url="https://idp.example.edu/metadata.xml",
+            attribute_map={"email": "E-Mail Address"},
+        )
+
+    connection.identity_providers.create.assert_not_called()
+    mocked_import_config.assert_not_called()
+
+
+def test_create_identity_provider_compensates_a_failed_local_write(
+    connection,
+    mocked_import_config,
+):
+    """A failed link or row write deletes the IdP Keycloak just made."""
+
+    organization = OrganizationPageFactory.create()
+    connection.organizations.associate.side_effect = ValueError("no")
+
+    with pytest.raises(ValueError, match="no"):
+        create_identity_provider(
+            organization,
+            connection=connection,
+            alias="exampleu",
+            protocol=IDP_PROTOCOL_SAML,
+            metadata_url="https://idp.example.edu/metadata.xml",
+            attribute_map={"email": "E-Mail Address"},
+        )
+
+    connection.identity_providers.delete.assert_called_once_with("exampleu")
+    assert not OrganizationIdentityProvider.objects.filter(alias="exampleu").exists()
+
+
+def _identity_provider(organization, state=IDP_STATE_DRAFT):
+    return OrganizationIdentityProvider.objects.create(
+        organization=organization,
+        alias="exampleu",
+        protocol=IDP_PROTOCOL_SAML,
+        lifecycle_state=state,
+        metadata_source="https://idp.example.edu/metadata.xml",
+        metadata_artifact=dict(PARSED_METADATA),
+    )
+
+
+def test_transition_writes_keycloak_and_our_row_together(connection):
+    """The lifecycle cannot drift from the realm because one call does both."""
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=False, hide_on_login=True
+    )
+
+    transition_identity_provider(
+        identity_provider, IDP_STATE_TESTING, connection=connection
+    )
+
+    _, payload = connection.identity_providers.update.call_args.args
+    assert payload["enabled"] is True
+    assert payload["hideOnLogin"] is True
+
+    identity_provider.refresh_from_db()
+    assert identity_provider.lifecycle_state == IDP_STATE_TESTING
+
+
+def test_transition_refuses_to_skip_testing(connection):
+    """An IdP goes live only after somebody has logged in through it."""
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+
+    with pytest.raises(InvalidLifecycleTransitionError):
+        transition_identity_provider(
+            identity_provider, IDP_STATE_ACTIVE, connection=connection
+        )
+
+    connection.identity_providers.update.assert_not_called()
+    identity_provider.refresh_from_db()
+    assert identity_provider.lifecycle_state == IDP_STATE_DRAFT
+
+
+def test_transition_allows_re_enabling_a_disabled_provider(connection):
+    """An IdP that already went through testing can be turned back on."""
+
+    identity_provider = _identity_provider(
+        OrganizationPageFactory.create(), state=IDP_STATE_DISABLED
+    )
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=False, hide_on_login=True
+    )
+
+    transition_identity_provider(
+        identity_provider, IDP_STATE_ACTIVE, connection=connection
+    )
+
+    identity_provider.refresh_from_db()
+    assert identity_provider.lifecycle_state == IDP_STATE_ACTIVE
+
+
+def test_refresh_metadata_leaves_the_artifact_alone_when_the_fetch_fails(
+    connection, mocker
+):
+    """
+    An unreachable partner endpoint never clears the stored artifact.
+
+    Storing it is what stops a partner's metadata going away from destroying
+    config, so a failed refresh must not undo that.
+    """
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    mocker.patch(
+        "b2b.provisioning.import_identity_provider_config",
+        side_effect=ValueError("unreachable"),
+    )
+
+    with pytest.raises(ValueError, match="unreachable"):
+        refresh_identity_provider_metadata(identity_provider, connection=connection)
+
+    identity_provider.refresh_from_db()
+    assert identity_provider.metadata_artifact == PARSED_METADATA
+    connection.identity_providers.update.assert_not_called()
+
+
+def test_refresh_metadata_stores_what_came_back(connection, mocker):
+    """A successful refresh replaces the artifact and stamps when it happened."""
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    refreshed = {"idpEntityId": "https://idp.example.edu/rotated"}
+    mocker.patch(
+        "b2b.provisioning.import_identity_provider_config", return_value=refreshed
+    )
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
+    )
+
+    refresh_identity_provider_metadata(identity_provider, connection=connection)
+
+    identity_provider.refresh_from_db()
+    assert identity_provider.metadata_artifact == refreshed
+    assert identity_provider.metadata_fetched_at is not None
+
+
+def test_refresh_metadata_drops_keys_the_new_metadata_omits(connection, mocker):
+    """
+    A key the refreshed document no longer defines stops being live in Keycloak.
+
+    The credentials and the lifecycle flags are not metadata and survive.
+    """
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    identity_provider.metadata_artifact = {
+        **PARSED_METADATA,
+        "signingCertificate": "old-certificate",
+    }
+    identity_provider.save()
+
+    refreshed = {"singleSignOnServiceUrl": "https://idp.example.edu/sso2"}
+    mocker.patch(
+        "b2b.provisioning.import_identity_provider_config", return_value=refreshed
+    )
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu",
+        enabled=True,
+        config={
+            **identity_provider.metadata_artifact,
+            "clientId": "mitxonline",
+        },
+    )
+
+    refresh_identity_provider_metadata(identity_provider, connection=connection)
+
+    _, payload = connection.identity_providers.update.call_args.args
+    assert "signingCertificate" not in payload["config"]
+    assert "idpEntityId" not in payload["config"]
+    assert (
+        payload["config"]["singleSignOnServiceUrl"]
+        == refreshed["singleSignOnServiceUrl"]
+    )
+    assert payload["config"]["clientId"] == "mitxonline"
+    assert payload["config"]["metadataDescriptorUrl"] == (
+        identity_provider.metadata_source
+    )
+    assert payload["config"]["useMetadataDescriptorUrl"] == "true"
+    assert payload["enabled"] is True
+
+
+def _oidc_identity_provider(organization, alias="exampleu"):
+    return OrganizationIdentityProvider.objects.create(
+        organization=organization,
+        alias=alias,
+        protocol=IDP_PROTOCOL_OIDC,
+        lifecycle_state=IDP_STATE_ACTIVE,
+        metadata_source="https://idp.example.edu/.well-known/openid-configuration",
+        metadata_artifact={"authorizationUrl": "https://idp.example.edu/authorize"},
+    )
+
+
+def test_update_identity_provider_rotates_the_secret(connection):
+    """A rotation writes the new secret and leaves the rest of the IdP alone."""
+
+    identity_provider = _oidc_identity_provider(OrganizationPageFactory.create())
+    organization_id = str(FAKE.uuid4())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu",
+        enabled=True,
+        hide_on_login=False,
+        organization_id=organization_id,
+        config={
+            "clientId": "mitxonline",
+            "clientSecret": "**********",
+            "authorizationUrl": "https://idp.example.edu/authorize",
+        },
+    )
+
+    rotated = FAKE.password()
+
+    update_identity_provider(
+        identity_provider, client_secret=rotated, connection=connection
+    )
+
+    _, payload = connection.identity_providers.update.call_args.args
+    assert payload["config"]["clientSecret"] == rotated
+    assert payload["config"]["clientId"] == "mitxonline"
+    assert payload["config"]["authorizationUrl"] == "https://idp.example.edu/authorize"
+    assert payload["enabled"] is True
+    assert payload["hideOnLogin"] is False
+    # The org<->IdP link is Keycloak state the replacing PUT could drop.
+    assert payload["organizationId"] == organization_id
+
+
+def test_update_identity_provider_audits_the_change(connection, staff_user):
+    """
+    An edit lands in the change history with who made it.
+
+    The audit trail is what replaced the reviewed Pulumi PR, so an IdP edit
+    that is not in it is a partner's SSO changing with no record.
+    """
+
+    identity_provider = _oidc_identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu",
+        enabled=True,
+        config={"clientId": "mitxonline", "clientSecret": "**********"},
+    )
+
+    update_identity_provider(
+        identity_provider,
+        display_name="Example University",
+        client_id="mitxonline-2",
+        connection=connection,
+        actor=staff_user,
+    )
+
+    (audit,) = OrganizationProvisioningAudit.objects.filter(
+        action=PROVISIONING_ACTION_IDP_UPDATED
+    )
+    assert audit.acting_user == staff_user
+    assert audit.identity_provider_alias == "exampleu"
+    assert audit.data_before["display_name"] == ""
+    assert audit.data_after["display_name"] == "Example University"
+    assert audit.data_before["config"]["clientId"] == "mitxonline"
+    assert audit.data_after["config"]["clientId"] == "mitxonline-2"
+
+
+def test_update_identity_provider_does_not_audit_an_edit_that_changes_nothing(
+    connection, staff_user
+):
+    """
+    A body that repeats the current values writes no change record.
+
+    Keycloak is still written, because re-sending a PATCH is how a
+    half-applied one is recovered.
+    """
+
+    identity_provider = _oidc_identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu",
+        enabled=True,
+        config={"clientId": "mitxonline", "clientSecret": "**********"},
+    )
+
+    update_identity_provider(
+        identity_provider,
+        display_name=identity_provider.display_name,
+        client_id="mitxonline",
+        connection=connection,
+        actor=staff_user,
+    )
+
+    connection.identity_providers.update.assert_called_once()
+    assert not OrganizationProvisioningAudit.objects.filter(
+        action=PROVISIONING_ACTION_IDP_UPDATED
+    ).exists()
+
+
+def test_update_identity_provider_audits_a_rotation_without_the_secret(
+    connection, staff_user
+):
+    """That a rotation happened is recorded; the new secret is not."""
+
+    identity_provider = _oidc_identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu",
+        enabled=True,
+        config={"clientId": "mitxonline", "clientSecret": "**********"},
+    )
+    rotated = FAKE.password()
+
+    update_identity_provider(
+        identity_provider,
+        client_secret=rotated,
+        connection=connection,
+        actor=staff_user,
+    )
+
+    (audit,) = OrganizationProvisioningAudit.objects.filter(
+        action=PROVISIONING_ACTION_IDP_UPDATED
+    )
+    assert audit.data_after["client_secret_rotated"] is True
+    assert rotated not in str(audit.data_before) + str(audit.data_after)
+
+
+def test_update_identity_provider_audits_the_mappers_it_replaced(
+    connection, staff_user
+):
+    """
+    The mappers an edit removed are only readable from the audit record.
+
+    They are gone from Keycloak by the time the call returns, so recording
+    what the operator replaced is the only way to answer what was there.
+    """
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
+    )
+    connection.client.list.return_value = [
+        IdentityProviderMapperRepresentation(
+            id="mapper-1",
+            name="exampleu-email-mapper",
+            identity_provider_mapper="saml-user-attribute-idp-mapper",
+            config={"attribute.friendly.name": "E-Mail", "user.attribute": "email"},
+        )
+    ]
+
+    update_identity_provider(
+        identity_provider,
+        attribute_map={"email": "E-Mail Address"},
+        attribute_name_map={},
+        connection=connection,
+        actor=staff_user,
+    )
+
+    (audit,) = OrganizationProvisioningAudit.objects.filter(
+        action=PROVISIONING_ACTION_IDP_UPDATED
+    )
+    assert audit.data_before["attribute_mappers"] == [
+        {
+            "name": "exampleu-email-mapper",
+            "config": {"attribute.friendly.name": "E-Mail", "user.attribute": "email"},
+        }
+    ]
+    assert audit.data_after["attribute_map"] == {"email": "E-Mail Address"}
+    assert audit.data_after["attribute_name_map"] == {}
+
+
+def test_update_identity_provider_keeps_the_secret_out_of_our_database(connection):
+    """A rotated secret goes to Keycloak and nowhere else."""
+
+    identity_provider = _oidc_identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config={"clientId": "mitxonline"}
+    )
+
+    rotated = FAKE.password()
+
+    update_identity_provider(
+        identity_provider,
+        client_secret=rotated,
+        display_name="Example University",
+        connection=connection,
+    )
+
+    identity_provider.refresh_from_db()
+    assert identity_provider.display_name == "Example University"
+    assert rotated not in str(identity_provider.metadata_artifact)
+
+
+def test_update_identity_provider_returns_an_untouched_secret_masked(connection):
+    """
+    An edit that is not a rotation writes Keycloak's mask back unchanged.
+
+    Keycloak answers the admin GET with `**********` in place of the stored
+    client secret and restores the stored value when it sees that sentinel on
+    the way back in (IdentityProviderResource.updateIdpFromRep). Sending it
+    verbatim is what keeps a display-name edit from clearing the secret.
+    """
+
+    identity_provider = _oidc_identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu",
+        enabled=True,
+        config={"clientId": "mitxonline", "clientSecret": "**********"},
+    )
+
+    update_identity_provider(
+        identity_provider, display_name="Example U", connection=connection
+    )
+
+    _, payload = connection.identity_providers.update.call_args.args
+    assert payload["config"]["clientSecret"] == "**********"
+    assert payload["displayName"] == "Example U"
+
+
+def test_update_identity_provider_reparses_a_new_metadata_source(connection, mocker):
+    """A new metadata URL is parsed, stored and merged into the Keycloak config."""
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    reparsed = {"singleSignOnServiceUrl": "https://idp.example.edu/sso2"}
+    mocker.patch(
+        "b2b.provisioning.import_identity_provider_config", return_value=reparsed
+    )
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
+    )
+
+    update_identity_provider(
+        identity_provider,
+        metadata_url="https://idp.example.edu/metadata2.xml",
+        connection=connection,
+    )
+
+    _, payload = connection.identity_providers.update.call_args.args
+    assert (
+        payload["config"]["singleSignOnServiceUrl"]
+        == reparsed["singleSignOnServiceUrl"]
+    )
+    assert payload["config"]["useMetadataDescriptorUrl"] == "true"
+
+    identity_provider.refresh_from_db()
+    assert identity_provider.metadata_source == "https://idp.example.edu/metadata2.xml"
+    assert identity_provider.metadata_artifact == reparsed
+    assert identity_provider.metadata_fetched_at is not None
+
+
+def test_update_identity_provider_switching_to_xml_drops_the_descriptor_url(
+    connection, mocker
+):
+    """
+    Replacing a metadata URL with uploaded XML turns the URL off in Keycloak.
+
+    Left on, Keycloak keeps re-reading the descriptor the operator just
+    replaced, while our row records the XML they uploaded.
+    """
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    mocker.patch(
+        "b2b.provisioning.import_identity_provider_config",
+        return_value={"singleSignOnServiceUrl": "https://idp.example.edu/sso2"},
+    )
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu",
+        enabled=True,
+        config={
+            **PARSED_METADATA,
+            "metadataDescriptorUrl": "https://idp.example.edu/metadata.xml",
+            "useMetadataDescriptorUrl": "true",
+        },
+    )
+
+    update_identity_provider(
+        identity_provider,
+        metadata_xml="<EntityDescriptor />",
+        connection=connection,
+    )
+
+    _, payload = connection.identity_providers.update.call_args.args
+    assert payload["config"]["useMetadataDescriptorUrl"] == "false"
+    assert payload["config"]["metadataDescriptorUrl"] == ""
+
+
+def test_update_identity_provider_drops_keys_the_new_metadata_omits(connection, mocker):
+    """
+    A key the new document does not define stops being live in Keycloak.
+
+    Overlaying would leave an old signing certificate or a withdrawn logout
+    endpoint in the realm while metadata_artifact says it is gone.
+    """
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    identity_provider.metadata_artifact = {
+        **PARSED_METADATA,
+        "signingCertificate": "old-certificate",
+    }
+    identity_provider.save()
+
+    reparsed = {"singleSignOnServiceUrl": "https://idp.example.edu/sso2"}
+    mocker.patch(
+        "b2b.provisioning.import_identity_provider_config", return_value=reparsed
+    )
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu",
+        enabled=True,
+        config={
+            **identity_provider.metadata_artifact,
+            "clientId": "mitxonline",
+        },
+    )
+
+    update_identity_provider(
+        identity_provider,
+        metadata_url="https://idp.example.edu/metadata2.xml",
+        connection=connection,
+    )
+
+    _, payload = connection.identity_providers.update.call_args.args
+    assert "signingCertificate" not in payload["config"]
+    assert "idpEntityId" not in payload["config"]
+    assert (
+        payload["config"]["singleSignOnServiceUrl"]
+        == reparsed["singleSignOnServiceUrl"]
+    )
+    # Not metadata, so not ours to drop.
+    assert payload["config"]["clientId"] == "mitxonline"
+
+
+def test_update_identity_provider_replaces_every_attribute_mapper(connection):
+    """The supplied maps are the whole mapper set, so the old ones go first."""
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
+    )
+    connection.client.list.return_value = [
+        IdentityProviderMapperRepresentation(
+            id="mapper-1", identity_provider_mapper="saml-user-attribute-idp-mapper"
+        ),
+        IdentityProviderMapperRepresentation(
+            id="mapper-2", identity_provider_mapper="saml-user-attribute-idp-mapper"
+        ),
+    ]
+
+    update_identity_provider(
+        identity_provider,
+        attribute_map={"email": "E-Mail Address"},
+        connection=connection,
+    )
+
+    assert [call.args[0] for call in connection.client.delete.call_args_list] == [
+        "identity-provider/instances/exampleu/mappers/mapper-1",
+        "identity-provider/instances/exampleu/mappers/mapper-2",
+    ]
+
+    endpoint, payload = connection.client.create_returning_id.call_args.args
+    assert endpoint == "identity-provider/instances/exampleu/mappers"
+    assert payload["config"]["attribute.friendly.name"] == "E-Mail Address"
+
+
+def test_update_identity_provider_keeps_mappers_of_other_types(connection):
+    """
+    A mapper that is not an attribute importer survives an attribute edit.
+
+    It was added out of band - a username template, a hardcoded role - and has
+    nothing to do with the maps being supplied.
+    """
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
+    )
+    connection.client.list.return_value = [
+        IdentityProviderMapperRepresentation(
+            id="attribute-mapper",
+            identity_provider_mapper="saml-user-attribute-idp-mapper",
+        ),
+        IdentityProviderMapperRepresentation(
+            id="role-mapper", identity_provider_mapper="oidc-hardcoded-role-idp-mapper"
+        ),
+    ]
+
+    update_identity_provider(
+        identity_provider,
+        attribute_map={"email": "E-Mail Address"},
+        connection=connection,
+    )
+
+    connection.client.delete.assert_called_once_with(
+        "identity-provider/instances/exampleu/mappers/attribute-mapper"
+    )
+
+
+def test_update_identity_provider_leaves_the_mappers_alone_by_default(connection):
+    """An edit that names no map does not touch the mappers."""
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
+    )
+
+    update_identity_provider(
+        identity_provider, display_name="Example U", connection=connection
+    )
+
+    connection.client.list.assert_not_called()
+    connection.client.delete.assert_not_called()
+    connection.client.create_returning_id.assert_not_called()
+
+
+def test_update_identity_provider_can_clear_the_mappers(connection):
+    """
+    Empty maps are a deliberate instruction, not an omission.
+
+    OIDC only, in practice: the API refuses to leave a SAML identity provider
+    with no mappers, because it would then broker users with no email or name.
+    """
+
+    identity_provider = _oidc_identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config={"clientId": "mitxonline"}
+    )
+    connection.client.list.return_value = [
+        IdentityProviderMapperRepresentation(
+            id="mapper-1", identity_provider_mapper="oidc-user-attribute-idp-mapper"
+        )
+    ]
+
+    update_identity_provider(identity_provider, attribute_map={}, connection=connection)
+
+    connection.client.delete.assert_called_once_with(
+        "identity-provider/instances/exampleu/mappers/mapper-1"
+    )
+    connection.client.create_returning_id.assert_not_called()
+
+
+def test_delete_identity_provider_unlinks_before_deleting(connection):
+    """Unlink from the organization, then remove the instance, then our row."""
+
+    organization = OrganizationPageFactory.create()
+    identity_provider = _identity_provider(organization)
+
+    delete_identity_provider(identity_provider, connection=connection)
+
+    connection.organizations.disassociate.assert_called_once_with(
+        "identity-providers", organization.sso_organization_id, "exampleu"
+    )
+    connection.identity_providers.delete.assert_called_once_with("exampleu")
+    assert not OrganizationIdentityProvider.objects.filter(alias="exampleu").exists()
+
+
+def test_delete_identity_provider_refuses_an_unprovisioned_organization(connection):
+    """
+    Reachable because sso_organization_id is editable in the Wagtail admin.
+
+    Creation requires a provisioned organization, but staff can blank the field
+    afterwards. Without the guard the unlink 502s and the IdP can never be
+    deleted.
+    """
+
+    organization = OrganizationPageFactory.create()
+    identity_provider = _identity_provider(organization)
+    organization.sso_organization_id = None
+    organization.save()
+    identity_provider.refresh_from_db()
+
+    with pytest.raises(OrganizationNotProvisionedError):
+        delete_identity_provider(identity_provider, connection=connection)
+
+    connection.organizations.disassociate.assert_not_called()
+    connection.identity_providers.delete.assert_not_called()
+    assert OrganizationIdentityProvider.objects.filter(alias="exampleu").exists()
+
+
+def test_onboarding_set_state_stamps_the_change():
+    """state_changed_at tracks state changes, not every save."""
+
+    organization = OrganizationPageFactory.create()
+    onboarding = OrganizationOnboarding.objects.create(organization=organization)
+    original = onboarding.state_changed_at
+
+    onboarding.set_state(ONBOARDING_STATE_ORG_CREATED, notes="created by hand")
+
+    onboarding.refresh_from_db()
+    assert onboarding.state == ONBOARDING_STATE_ORG_CREATED
+    assert onboarding.notes == "created by hand"
+    assert onboarding.state_changed_at > original
+
+
+def test_every_lifecycle_state_has_transitions():
+    """
+    IDP_ALLOWED_TRANSITIONS covers exactly the lifecycle choices.
+
+    transition_identity_provider indexes the dict by the IdP's current state.
+    That is a KeyError waiting to happen only if the two constants drift apart,
+    so guard the drift rather than the lookup: a runtime .get() would turn
+    "somebody added a fifth state and forgot the transitions" into a silently
+    untransitionable IdP, where this fails the build.
+    """
+
+    assert set(IDP_ALLOWED_TRANSITIONS) == {state for state, _ in IDP_LIFECYCLE_CHOICES}
+
+    valid_states = set(IDP_ALLOWED_TRANSITIONS)
+    for state, destinations in IDP_ALLOWED_TRANSITIONS.items():
+        assert set(destinations) <= valid_states, state
+        assert state not in destinations, state
+
+
+def test_create_organization_checks_the_index_page_before_touching_keycloak(
+    connection, organization_index
+):
+    """
+    A missing index page fails before the Keycloak write, not after.
+
+    It is a precondition we can check for nothing; checking it after the
+    irreversible external write would mean compensating for a failure we could
+    have seen coming.
+    """
+
+    organization_index.delete()
+
+    with pytest.raises(ImproperlyConfigured):
+        create_organization(connection=connection, **_organization_kwargs())
+
+    connection.organizations.create.assert_not_called()
+    connection.organizations.delete.assert_not_called()
+
+
+def _audits(organization):
+    return list(
+        OrganizationProvisioningAudit.objects.filter(
+            organization=organization
+        ).order_by("id")
+    )
+
+
+def test_create_organization_is_audited(connection, staff_user):
+    """Who created the organization, and with what, is recorded with it."""
+
+    organization = create_organization(
+        connection=connection, actor=staff_user, **_organization_kwargs()
+    )
+
+    (audit,) = _audits(organization)
+    assert audit.action == PROVISIONING_ACTION_ORG_CREATED
+    assert audit.acting_user == staff_user
+    assert audit.data_before is None
+    assert audit.data_after["org_key"] == "EXAMPLEU"
+    assert audit.data_after["domains"] == ["example.edu"]
+    assert audit.data_after["sso_organization_id"] == str(
+        organization.sso_organization_id
+    )
+
+
+def test_an_organization_that_cannot_be_audited_is_not_created(connection, mocker):
+    """
+    The audit row is in the same transaction as the records it describes.
+
+    An unaudited organization is the thing the audit trail exists to rule out,
+    so a failed audit write is compensated like any other failed local write.
+    """
+
+    mocker.patch(
+        "b2b.provisioning.OrganizationProvisioningAudit.objects.create",
+        side_effect=ValueError("no"),
+    )
+
+    with pytest.raises(ValueError, match="no"):
+        create_organization(connection=connection, **_organization_kwargs())
+
+    connection.organizations.delete.assert_called_once_with(
+        connection.organizations.create.return_value
+    )
+    assert not OrganizationPage.objects.filter(org_key="EXAMPLEU").exists()
+
+
+def test_update_organization_audits_only_what_changed(connection, staff_user):
+    """Fields sent unchanged are not reported as changes."""
+
+    organization = OrganizationPageFactory.create(name="Example University")
+    connection.organizations.get.return_value = OrganizationRepresentation(
+        id=str(organization.sso_organization_id),
+        name=organization.name,
+        alias=organization.org_key,
+        redirect_url="https://learn.mit.edu/old",
+        domains=[OrganizationDomainRepresentation(name="example.edu", verified=True)],
+    )
+
+    update_organization(
+        organization,
+        connection=connection,
+        actor=staff_user,
+        name="Example University",
+        domains=["example.edu", "example.org"],
+    )
+
+    (audit,) = _audits(organization)
+    assert audit.action == PROVISIONING_ACTION_ORG_UPDATED
+    assert audit.acting_user == staff_user
+    assert audit.data_before == {"domains": ["example.edu"]}
+    assert audit.data_after == {"domains": ["example.edu", "example.org"]}
+
+
+def test_update_organization_audits_a_description_change(connection, staff_user):
+    """
+    The rich-text description is audited as a plain string.
+
+    Loaded the way the view loads it, so the before value is whatever the
+    RichTextField gives back from the database.
+    """
+
+    created = OrganizationPageFactory.create(description="<p>Old description</p>")
+    organization = OrganizationPage.objects.select_related("onboarding").get(
+        pk=created.pk
+    )
+    connection.organizations.get.return_value = OrganizationRepresentation(
+        id=str(organization.sso_organization_id),
+        name=organization.name,
+        alias=organization.org_key,
+    )
+
+    update_organization(
+        organization,
+        connection=connection,
+        actor=staff_user,
+        description="<p>New description</p>",
+    )
+
+    (audit,) = _audits(organization)
+    audit.refresh_from_db()
+    assert audit.data_before == {"description": "<p>Old description</p>"}
+    assert audit.data_after == {"description": "<p>New description</p>"}
+
+
+def test_update_organization_that_changes_nothing_is_not_audited(connection):
+    """A no-op PATCH is not a change to review."""
+
+    organization = OrganizationPageFactory.create()
+    connection.organizations.get.return_value = OrganizationRepresentation(
+        id=str(organization.sso_organization_id),
+        name=organization.name,
+        alias=organization.org_key,
+    )
+
+    update_organization(organization, connection=connection, name=organization.name)
+
+    assert _audits(organization) == []
+
+
+@pytest.mark.parametrize("has_onboarding", [True, False])
+def test_set_onboarding_state_is_audited(staff_user, has_onboarding):
+    """
+    The before state is recorded, and a missing onboarding record is created.
+
+    Organizations that predate the provisioning API have no onboarding row.
+    """
+
+    organization = OrganizationPageFactory.create()
+    if has_onboarding:
+        OrganizationOnboarding.objects.create(
+            organization=organization, state=ONBOARDING_STATE_ORG_CREATED
+        )
+
+    onboarding = set_onboarding_state(
+        organization, ONBOARDING_STATE_LIVE, notes="went live", actor=staff_user
+    )
+
+    assert onboarding.state == ONBOARDING_STATE_LIVE
+    (audit,) = _audits(organization)
+    assert audit.action == PROVISIONING_ACTION_ONBOARDING_CHANGED
+    assert audit.acting_user == staff_user
+    assert audit.data_before == (
+        {"state": ONBOARDING_STATE_ORG_CREATED, "notes": ""} if has_onboarding else None
+    )
+    assert audit.data_after == {"state": ONBOARDING_STATE_LIVE, "notes": "went live"}
+
+
+def test_create_identity_provider_audit_leaves_out_the_client_secret(
+    connection, mocked_import_config, staff_user
+):
+    """The secret goes to Keycloak and nowhere else, the audit trail included."""
+
+    organization = OrganizationPageFactory.create()
+    secret = FAKE.password()
+
+    create_identity_provider(
+        organization,
+        connection=connection,
+        actor=staff_user,
+        alias="exampleu-oidc",
+        protocol=IDP_PROTOCOL_OIDC,
+        metadata_url="https://idp.example.edu/.well-known/openid-configuration",
+        client_id="mitxonline",
+        client_secret=secret,
+    )
+
+    (audit,) = _audits(organization)
+    assert audit.action == PROVISIONING_ACTION_IDP_CREATED
+    assert audit.identity_provider_alias == "exampleu-oidc"
+    assert audit.data_after["client_id"] == "mitxonline"
+    assert audit.data_after["lifecycle_state"] == IDP_STATE_DRAFT
+    assert secret not in str(audit.data_after)
+    assert audit.data_before is None
+
+
+def test_transition_is_audited(connection, staff_user):
+    """Going live is the change most worth being able to attribute."""
+
+    organization = OrganizationPageFactory.create()
+    identity_provider = _identity_provider(organization, state=IDP_STATE_TESTING)
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, hide_on_login=True
+    )
+
+    transition_identity_provider(
+        identity_provider, IDP_STATE_ACTIVE, connection=connection, actor=staff_user
+    )
+
+    (audit,) = _audits(organization)
+    assert audit.action == PROVISIONING_ACTION_IDP_TRANSITIONED
+    assert audit.acting_user == staff_user
+    assert audit.identity_provider_alias == "exampleu"
+    assert audit.data_before == {"lifecycle_state": IDP_STATE_TESTING}
+    assert audit.data_after == {"lifecycle_state": IDP_STATE_ACTIVE}
+
+
+def test_a_refused_transition_is_not_audited(connection):
+    """Nothing changed, so there is nothing to record."""
+
+    organization = OrganizationPageFactory.create()
+    identity_provider = _identity_provider(organization)
+
+    with pytest.raises(InvalidLifecycleTransitionError):
+        transition_identity_provider(
+            identity_provider, IDP_STATE_ACTIVE, connection=connection
+        )
+
+    assert _audits(organization) == []
+
+
+def test_refresh_metadata_audits_the_changed_keys(connection, mocker, staff_user):
+    """A rotated certificate shows up as exactly that, not as the whole config."""
+
+    organization = OrganizationPageFactory.create()
+    identity_provider = _identity_provider(organization)
+    refreshed = {**PARSED_METADATA, "idpEntityId": "https://idp.example.edu/rotated"}
+    mocker.patch(
+        "b2b.provisioning.import_identity_provider_config", return_value=refreshed
+    )
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
+    )
+
+    refresh_identity_provider_metadata(
+        identity_provider, connection=connection, actor=staff_user
+    )
+
+    (audit,) = _audits(organization)
+    assert audit.action == PROVISIONING_ACTION_IDP_METADATA_REFRESHED
+    assert audit.data_before == {"idpEntityId": PARSED_METADATA["idpEntityId"]}
+    assert audit.data_after == {"idpEntityId": "https://idp.example.edu/rotated"}
+
+
+def test_delete_identity_provider_audit_outlives_the_provider(connection, staff_user):
+    """The alias is a string, so the record survives the row it describes."""
+
+    organization = OrganizationPageFactory.create()
+    identity_provider = _identity_provider(organization, state=IDP_STATE_DISABLED)
+
+    delete_identity_provider(identity_provider, connection=connection, actor=staff_user)
+
+    (audit,) = _audits(organization)
+    assert audit.action == PROVISIONING_ACTION_IDP_DELETED
+    assert audit.identity_provider_alias == "exampleu"
+    assert audit.data_before["lifecycle_state"] == IDP_STATE_DISABLED
+    assert not OrganizationIdentityProvider.objects.filter(alias="exampleu").exists()
+
+
+def test_audit_records_cannot_be_rewritten(staff_user):
+    """Append-only: saving an existing record is refused."""
+
+    organization = OrganizationPageFactory.create()
+    set_onboarding_state(organization, ONBOARDING_STATE_LIVE, actor=staff_user)
+    (audit,) = _audits(organization)
+
+    audit.data_after = {"state": "something else"}
+    with pytest.raises(ValueError, match="cannot be changed"):
+        audit.save()
+
+
+def test_an_actor_with_audit_history_cannot_be_deleted(staff_user):
+    """Deleting the account would lose who made the change, so it is refused."""
+
+    organization = OrganizationPageFactory.create()
+    set_onboarding_state(organization, ONBOARDING_STATE_LIVE, actor=staff_user)
+
+    with pytest.raises(ProtectedError):
+        staff_user.delete()
+
+    (audit,) = _audits(organization)
+    assert audit.acting_user == staff_user
+
+
+def test_audit_records_the_org_key(staff_user):
+    """Every row carries the org_key, so history can be found without the page."""
+
+    organization = OrganizationPageFactory.create()
+    set_onboarding_state(organization, ONBOARDING_STATE_LIVE, actor=staff_user)
+
+    (audit,) = _audits(organization)
+    assert audit.org_key == organization.org_key
+
+
+def test_audit_survives_the_organization_being_deleted(staff_user):
+    """Deleting the page in Wagtail must not take its provisioning history with it."""
+
+    organization = OrganizationPageFactory.create()
+    org_key = organization.org_key
+    set_onboarding_state(organization, ONBOARDING_STATE_LIVE, actor=staff_user)
+
+    organization.delete()
+
+    (audit,) = OrganizationProvisioningAudit.objects.filter(org_key=org_key)
+    assert audit.organization is None
+    assert audit.acting_user == staff_user
+
+
+def test_link_organization_creates_a_keycloak_org_with_the_org_key_alias(
+    connection, staff_user
+):
+    """An unlinked org gets a realm org whose alias is its org_key."""
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+
+    created, failed_members = link_organization_to_keycloak(
+        organization, connection=connection, actor=staff_user
+    )
+
+    assert created is True
+    assert failed_members == []
+    assert connection.organizations.create.call_args.args[0]["alias"] == (
+        organization.org_key
+    )
+    organization.refresh_from_db()
+    assert str(organization.sso_organization_id) == str(
+        connection.organizations.create.return_value
+    )
+    assert organization.onboarding.state == ONBOARDING_STATE_ORG_CREATED
+    audit = OrganizationProvisioningAudit.objects.get(organization=organization)
+    assert audit.data_after["keycloak_organization"] == "created"
+
+
+def test_link_organization_adopts_a_realm_org_with_the_same_alias(connection):
+    """A realm org with the alias is linked, not duplicated."""
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    known_id = str(FAKE.uuid4())
+    connection.organizations.list_all.return_value = [
+        OrganizationRepresentation(id=known_id, alias=organization.org_key.lower())
+    ]
+
+    created, _ = link_organization_to_keycloak(organization, connection=connection)
+
+    assert created is False
+    connection.organizations.create.assert_not_called()
+    organization.refresh_from_db()
+    assert str(organization.sso_organization_id) == known_id
+
+
+def test_link_organization_refuses_a_linked_organization(connection):
+    """Re-linking would orphan the existing Keycloak organization."""
+
+    organization = OrganizationPageFactory.create()
+
+    with pytest.raises(ValueError, match="already linked"):
+        link_organization_to_keycloak(organization, connection=connection)
+
+    connection.organizations.create.assert_not_called()
+
+
+def test_link_organization_adds_existing_members_to_keycloak(connection):
+    """Members of the legacy org become members of its Keycloak org."""
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    members = UserOrganizationFactory.create_batch(
+        2, organization=organization, keep_until_seen=False
+    )
+
+    link_organization_to_keycloak(organization, connection=connection)
+
+    organization.refresh_from_db()
+    associated = {
+        call.args for call in connection.organizations.associate.call_args_list
+    }
+    assert associated == {
+        ("members", organization.sso_organization_id, member.user.global_id)
+        for member in members
+    }
+
+
+def test_link_organization_keeps_members_until_seen(connection):
+    """A member missing from their token keeps the org after the link."""
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    member = UserOrganizationFactory.create(
+        organization=organization, keep_until_seen=False
+    )
+
+    link_organization_to_keycloak(organization, connection=connection)
+    reconcile_user_orgs(member.user, [])
+
+    assert UserOrganization.objects.filter(
+        user=member.user, organization=organization, keep_until_seen=True
+    ).exists()
+
+
+def _http_error(status_code):
+    response = requests.Response()
+    response.status_code = status_code
+    return requests.HTTPError(response=response)
+
+
+def test_link_organization_treats_an_existing_keycloak_member_as_added(connection):
+    """An adopted realm org may already have the member (409)."""
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    UserOrganizationFactory.create(organization=organization)
+    connection.organizations.associate.side_effect = _http_error(409)
+
+    _, failed_members = link_organization_to_keycloak(
+        organization, connection=connection
+    )
+
+    assert failed_members == []
+
+
+def test_link_organization_reports_a_member_without_a_global_id(connection):
+    """A member Keycloak can't know about keeps access through the flag."""
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    member = UserOrganizationFactory.create(
+        organization=organization,
+        user=UserFactory.create(global_id=None),
+        keep_until_seen=False,
+    )
+
+    _, failed_members = link_organization_to_keycloak(
+        organization, connection=connection
+    )
+
+    assert failed_members == [member.user]
+    connection.organizations.associate.assert_not_called()
+    member.refresh_from_db()
+    assert member.keep_until_seen is True
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        _http_error(500),
+        requests.ConnectionError("dropped"),
+        InvalidTokenError(),
+    ],
+)
+def test_link_organization_survives_member_sync_errors(connection, error):
+    """A sync failure after the link commits is reported, not raised."""
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    members = UserOrganizationFactory.create_batch(
+        2, organization=organization, keep_until_seen=False
+    )
+    connection.organizations.associate.side_effect = [error, True]
+
+    _, failed_members = link_organization_to_keycloak(
+        organization, connection=connection
+    )
+
+    assert len(failed_members) == 1
+    assert connection.organizations.associate.call_count == 2
+    organization.refresh_from_db()
+    assert organization.sso_organization_id is not None
+    assert all(
+        UserOrganization.objects.get(pk=member.pk).keep_until_seen for member in members
+    )
+
+
+def test_push_unconfirmed_members_pushes_only_members_keycloak_lacks(connection):
+    """A member a token confirmed or Keycloak accepted is not pushed again."""
+
+    organization = OrganizationPageFactory.create()
+    unconfirmed = UserOrganizationFactory.create(
+        organization=organization, keep_until_seen=True
+    )
+    UserOrganizationFactory.create(organization=organization, keep_until_seen=False)
+    UserOrganizationFactory.create(
+        organization=organization,
+        keep_until_seen=True,
+        added_to_keycloak_at=now_in_utc(),
+    )
+
+    failed = push_unconfirmed_members_to_keycloak(connection=connection)
+
+    assert failed == {}
+    connection.organizations.associate.assert_called_once_with(
+        "members", organization.sso_organization_id, unconfirmed.user.global_id
+    )
+    unconfirmed.refresh_from_db()
+    assert unconfirmed.keep_until_seen is True
+    assert unconfirmed.added_to_keycloak_at is not None
+
+
+def test_push_unconfirmed_members_pushes_a_member_once(connection):
+    """A member removed in Keycloak after the push is not added back."""
+
+    UserOrganizationFactory.create(keep_until_seen=True)
+
+    push_unconfirmed_members_to_keycloak(connection=connection)
+    push_unconfirmed_members_to_keycloak(connection=connection)
+
+    connection.organizations.associate.assert_called_once()
+
+
+def test_push_unconfirmed_members_records_an_existing_keycloak_member(connection):
+    """A 409 means Keycloak has the member, so they are not pushed again."""
+
+    member = UserOrganizationFactory.create(keep_until_seen=True)
+    connection.organizations.associate.side_effect = _http_error(409)
+
+    assert push_unconfirmed_members_to_keycloak(connection=connection) == {}
+
+    member.refresh_from_db()
+    assert member.added_to_keycloak_at is not None
+
+
+def test_link_organization_pushes_members_added_to_a_previous_link(connection):
+    """A timestamp from an earlier Keycloak organization doesn't skip the push."""
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    member = UserOrganizationFactory.create(
+        organization=organization, added_to_keycloak_at=now_in_utc()
+    )
+
+    link_organization_to_keycloak(organization, connection=connection)
+
+    organization.refresh_from_db()
+    connection.organizations.associate.assert_called_once_with(
+        "members", organization.sso_organization_id, member.user.global_id
+    )
+
+
+def test_push_unconfirmed_members_skips_unlinked_organizations(connection):
+    """An organization with no Keycloak record has nowhere to push to."""
+
+    UserOrganizationFactory.create(
+        organization=OrganizationPageFactory.create(sso_organization_id=None),
+        keep_until_seen=True,
+    )
+
+    assert push_unconfirmed_members_to_keycloak(connection=connection) == {}
+    connection.organizations.associate.assert_not_called()
+
+
+def test_push_unconfirmed_members_reports_failures_and_carries_on(connection):
+    """One member Keycloak won't take doesn't stop the other organizations."""
+
+    missing_user, added = UserOrganizationFactory.create_batch(2, keep_until_seen=True)
+
+    def fake_associate(_association_type, _org_id, user_id):
+        if user_id == missing_user.user.global_id:
+            raise _http_error(404)
+        return True
+
+    connection.organizations.associate.side_effect = fake_associate
+
+    failed = push_unconfirmed_members_to_keycloak(connection=connection)
+
+    assert failed == {missing_user.organization.org_key: [missing_user.user]}
+    assert connection.organizations.associate.call_count == 2
+    missing_user.refresh_from_db()
+    assert missing_user.added_to_keycloak_at is None
+    connection.organizations.associate.assert_any_call(
+        "members", added.organization.sso_organization_id, added.user.global_id
+    )
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        _http_error(503),
+        requests.ConnectionError("dropped"),
+        requests.Timeout("slow"),
+        InvalidTokenError(),
+    ],
+)
+def test_push_unconfirmed_members_stops_when_keycloak_is_unavailable(connection, error):
+    """An outage ends the run instead of every remaining member timing out."""
+
+    UserOrganizationFactory.create_batch(2, keep_until_seen=True)
+    connection.organizations.associate.side_effect = error
+
+    with pytest.raises(type(error)):
+        push_unconfirmed_members_to_keycloak(connection=connection)
+
+    connection.organizations.associate.assert_called_once()
+    assert not UserOrganization.objects.filter(
+        added_to_keycloak_at__isnull=False
+    ).exists()
+
+
+def test_push_unconfirmed_members_does_not_connect_with_nothing_to_push(mocker):
+    """Bootstrapping the client costs two requests, so skip it when idle."""
+
+    mocked_connection = mocker.patch("b2b.provisioning.KeycloakConnection")
+    UserOrganizationFactory.create(keep_until_seen=False)
+
+    assert push_unconfirmed_members_to_keycloak() == {}
+    mocked_connection.assert_not_called()
+
+
+def test_backfill_command_dry_run_writes_nothing(mocker, connection):
+    """--dry-run reports and leaves both systems alone."""
+
+    mocker.patch(
+        "b2b.management.commands.backfill_keycloak_orgs.KeycloakConnection",
+        return_value=connection,
+    )
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+
+    call_command("backfill_keycloak_orgs", "--dry-run")
+
+    connection.organizations.create.assert_not_called()
+    organization.refresh_from_db()
+    assert organization.sso_organization_id is None
+
+
+def test_backfill_command_dry_run_flags_a_realm_org_linked_elsewhere(
+    mocker, connection, capsys
+):
+    """--dry-run reports the collision the real run would raise."""
+
+    mocker.patch(
+        "b2b.management.commands.backfill_keycloak_orgs.KeycloakConnection",
+        return_value=connection,
+    )
+    taken = OrganizationPageFactory.create()
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    connection.organizations.list_all.return_value = [
+        OrganizationRepresentation(
+            id=str(taken.sso_organization_id), alias=organization.org_key
+        )
+    ]
+
+    with pytest.raises(CommandError, match=organization.org_key):
+        call_command("backfill_keycloak_orgs", "--dry-run")
+
+    assert "Would fail" in capsys.readouterr().err
+
+
+def test_backfill_command_dry_run_reports_member_counts(mocker, connection, capsys):
+    """--dry-run shows how many members each org would take into Keycloak."""
+
+    mocker.patch(
+        "b2b.management.commands.backfill_keycloak_orgs.KeycloakConnection",
+        return_value=connection,
+    )
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    UserOrganizationFactory.create_batch(3, organization=organization)
+
+    call_command("backfill_keycloak_orgs", "--dry-run")
+
+    assert f"Would create: {organization.org_key} (3 members)" in (
+        capsys.readouterr().out
+    )
+
+
+def test_backfill_command_reports_members_it_could_not_sync(mocker, connection, capsys):
+    """Members left out of Keycloak are listed, and the org still counts as linked."""
+
+    mocker.patch(
+        "b2b.management.commands.backfill_keycloak_orgs.KeycloakConnection",
+        return_value=connection,
+    )
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    member = UserOrganizationFactory.create(
+        organization=organization, user=UserFactory.create(global_id=None)
+    )
+
+    call_command("backfill_keycloak_orgs")
+
+    err = capsys.readouterr().err
+    assert f"1 member(s) of {organization.org_key}" in err
+    assert str(member.user.id) in err
+
+
+def test_backfill_command_reports_failures_and_keeps_going(mocker, connection):
+    """One org's Keycloak error does not stop the rest, but the run exits nonzero."""
+
+    mocker.patch(
+        "b2b.management.commands.backfill_keycloak_orgs.KeycloakConnection",
+        return_value=connection,
+    )
+    failing = OrganizationPageFactory.create(sso_organization_id=None, org_key="AAA")
+    working = OrganizationPageFactory.create(sso_organization_id=None, org_key="BBB")
+    connection.organizations.create.side_effect = [
+        requests.HTTPError("boom"),
+        str(FAKE.uuid4()),
+    ]
+
+    with pytest.raises(CommandError, match="AAA"):
+        call_command("backfill_keycloak_orgs")
+
+    failing.refresh_from_db()
+    working.refresh_from_db()
+    assert failing.sso_organization_id is None
+    assert working.sso_organization_id is not None
+
+
+def test_link_organization_refuses_a_realm_org_linked_elsewhere(connection):
+    """Adopting an ID another page holds would break the unique constraint."""
+
+    taken = OrganizationPageFactory.create()
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+    connection.organizations.list_all.return_value = [
+        OrganizationRepresentation(
+            id=str(taken.sso_organization_id), alias=organization.org_key
+        )
+    ]
+
+    with pytest.raises(AliasCollisionError):
+        link_organization_to_keycloak(organization, connection=connection)
+
+
+def test_backfill_command_continues_past_a_local_failure(mocker, connection):
+    """A non-HTTP failure on one org is reported and the rest still run."""
+
+    mocker.patch(
+        "b2b.management.commands.backfill_keycloak_orgs.KeycloakConnection",
+        return_value=connection,
+    )
+    OrganizationPageFactory.create(sso_organization_id=None, org_key="AAA")
+    OrganizationPageFactory.create(sso_organization_id=None, org_key="BBB")
+    link = mocker.patch(
+        "b2b.management.commands.backfill_keycloak_orgs.link_organization_to_keycloak",
+        side_effect=[ValueError("bad page"), (True, [])],
+    )
+
+    with pytest.raises(CommandError, match="AAA"):
+        call_command("backfill_keycloak_orgs")
+
+    assert link.call_count == 2
+
+
+def _organization_update(connection, mocker):
+    organization = OrganizationPageFactory.create(name="Example University")
+    connection.organizations.get.return_value = OrganizationRepresentation(
+        id=str(organization.sso_organization_id),
+        name=organization.name,
+        alias=organization.org_key,
+    )
+
+    def unchanged():
+        organization.refresh_from_db()
+        return organization.name == "Example University"
+
+    return (
+        lambda: update_organization(
+            organization, name="Renamed", connection=connection
+        ),
+        [connection.organizations.update],
+        unchanged,
+    )
+
+
+def _identity_provider_update(connection, mocker):
+    identity_provider = _oidc_identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config={"clientId": "mitxonline"}
+    )
+
+    def unchanged():
+        identity_provider.refresh_from_db()
+        return identity_provider.display_name == ""
+
+    return (
+        lambda: update_identity_provider(
+            identity_provider, display_name="Renamed", connection=connection
+        ),
+        [connection.identity_providers.update],
+        unchanged,
+    )
+
+
+def _mapper_replacement(connection, mocker):
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
+    )
+    connection.client.list.return_value = [
+        IdentityProviderMapperRepresentation(
+            id="mapper-1",
+            name="exampleu-email-mapper",
+            identity_provider_mapper="saml-user-attribute-idp-mapper",
+            config={"attribute.friendly.name": "E-Mail", "user.attribute": "email"},
+        )
+    ]
+    updated_on = identity_provider.updated_on
+
+    def unchanged():
+        # Replacing mappers changes no column of ours, so the save itself is
+        # the only local write there is to see.
+        identity_provider.refresh_from_db()
+        return identity_provider.updated_on == updated_on
+
+    return (
+        lambda: update_identity_provider(
+            identity_provider,
+            attribute_map={"email": "E-Mail Address"},
+            connection=connection,
+        ),
+        [
+            connection.identity_providers.update,
+            connection.client.delete,
+            connection.client.create_returning_id,
+        ],
+        unchanged,
+    )
+
+
+def _metadata_refresh(connection, mocker):
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    mocker.patch(
+        "b2b.provisioning.import_identity_provider_config",
+        return_value={"idpEntityId": "https://idp.example.edu/rotated"},
+    )
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
+    )
+
+    def unchanged():
+        identity_provider.refresh_from_db()
+        return identity_provider.metadata_artifact == PARSED_METADATA
+
+    return (
+        lambda: refresh_identity_provider_metadata(
+            identity_provider, connection=connection
+        ),
+        [connection.identity_providers.update],
+        unchanged,
+    )
+
+
+def _transition(connection, mocker):
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=False, hide_on_login=True
+    )
+
+    def unchanged():
+        identity_provider.refresh_from_db()
+        return identity_provider.lifecycle_state == IDP_STATE_DRAFT
+
+    return (
+        lambda: transition_identity_provider(
+            identity_provider, IDP_STATE_TESTING, connection=connection
+        ),
+        [connection.identity_providers.update],
+        unchanged,
+    )
+
+
+def _deletion(connection, mocker):
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+
+    return (
+        lambda: delete_identity_provider(identity_provider, connection=connection),
+        [connection.organizations.disassociate, connection.identity_providers.delete],
+        OrganizationIdentityProvider.objects.filter(alias="exampleu").exists,
+    )
+
+
+CHANGES_TO_EXISTING_RESOURCES = pytest.mark.parametrize(
+    "setup",
+    [
+        _organization_update,
+        _identity_provider_update,
+        _mapper_replacement,
+        _metadata_refresh,
+        _transition,
+        _deletion,
+    ],
+)
+
+
+@CHANGES_TO_EXISTING_RESOURCES
+def test_a_failed_local_write_never_reaches_keycloak(connection, mocker, setup):
+    """
+    Our row and its audit record are written before Keycloak is.
+
+    Otherwise a failed save leaves a change in the realm that neither our row
+    nor the audit trail knows about.
+    """
+
+    change, keycloak_writes, unchanged = setup(connection, mocker)
+    mocker.patch(
+        "b2b.provisioning.OrganizationProvisioningAudit.objects.create",
+        side_effect=ValueError("no"),
+    )
+
+    with pytest.raises(ValueError, match="no"):
+        change()
+
+    for keycloak_write in keycloak_writes:
+        keycloak_write.assert_not_called()
+    assert unchanged()
+
+
+@CHANGES_TO_EXISTING_RESOURCES
+def test_a_failed_keycloak_write_rolls_back_our_row_and_its_audit(
+    connection, mocker, setup
+):
+    """
+    A change Keycloak refused is neither applied nor recorded here.
+
+    The last write is the one that fails, so every earlier one has already
+    been accepted by the time our side has to roll back.
+    """
+
+    change, keycloak_writes, unchanged = setup(connection, mocker)
+    keycloak_writes[-1].side_effect = RuntimeError("keycloak said no")
+
+    with pytest.raises(RuntimeError, match="keycloak said no"):
+        change()
+
+    assert unchanged()
+    assert not OrganizationProvisioningAudit.objects.exists()
+
+
+def test_transition_checks_and_audits_the_stored_state_not_the_callers(
+    connection, staff_user
+):
+    """
+    The state is re-read under a lock before the transition is checked.
+
+    Two concurrent transitions would otherwise both pass the check against the
+    same starting state and both record it as data_before.
+    """
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    stale = OrganizationIdentityProvider.objects.get(pk=identity_provider.pk)
+    identity_provider.lifecycle_state = IDP_STATE_TESTING
+    identity_provider.save()
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, hide_on_login=True
+    )
+
+    # draft -> active is refused, so this only succeeds against the stored state.
+    transition_identity_provider(
+        stale, IDP_STATE_ACTIVE, connection=connection, actor=staff_user
+    )
+
+    (audit,) = OrganizationProvisioningAudit.objects.filter(
+        action=PROVISIONING_ACTION_IDP_TRANSITIONED
+    )
+    assert audit.data_before == {"lifecycle_state": IDP_STATE_TESTING}

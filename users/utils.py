@@ -4,8 +4,8 @@ import logging
 import re
 from datetime import datetime
 from email.utils import formataddr
+from zoneinfo import ZoneInfo
 
-import pytz
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
@@ -35,4 +35,4 @@ def format_recipient(user: User) -> str:
 def determine_approx_age(year: int):
     """Determines the approximage age based on the year"""
 
-    return datetime.now(tz=pytz.timezone(settings.TIME_ZONE)).year - year
+    return datetime.now(tz=ZoneInfo(settings.TIME_ZONE)).year - year

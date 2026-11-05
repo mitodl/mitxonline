@@ -22,6 +22,7 @@ import {
   programsQueryKey
 } from "../lib/queries/courseRuns"
 import {
+  programEnrollmentQuery,
   programEnrollmentsQuery,
   programEnrollmentsQueryKey,
   programEnrollmentsSelector
@@ -48,6 +49,7 @@ type Props = {
   programStatus: ?number,
   upgradeEnrollmentDialogVisibility: boolean,
   addProductToBasket: (user: number, productId: number) => Promise<any>,
+  createProgramEnrollment: (programId: number) => Promise<any>,
   currentUser: User,
   updateAddlFields: (currentUser: User) => Promise<any>,
   programEnrollments: ?Array<ProgramEnrollment>,
@@ -130,12 +132,26 @@ export class ProgramProductDetailEnroll extends React.Component<
     }
   }
 
-  toggleUpgradeDialogVisibility = () => {
+  toggleUpgradeDialogVisibility = async () => {
     const { upgradeEnrollmentDialogVisibility } = this.state
+    const { programs, createProgramEnrollment } = this.props
 
     this.setState({
       upgradeEnrollmentDialogVisibility: !upgradeEnrollmentDialogVisibility
     })
+    if (!upgradeEnrollmentDialogVisibility) {
+      //if opening dialog
+      try {
+        //find program id
+        const program = programs && programs[0]
+        if (program) {
+          await createProgramEnrollment(program.id)
+        }
+      } catch (error) {
+        console.error("Failed to create program enrollment", error)
+        // Optionally, display an error message to the user.
+      }
+    }
   }
 
   setCurrentCourseRun = (runId: string) => {
@@ -347,7 +363,7 @@ export class ProgramProductDetailEnroll extends React.Component<
 
     return (
       <Modal
-        id={`upgrade-enrollment-dialog`}
+        id="addl-profile-fields-dialog"
         className="upgrade-enrollment-modal"
         isOpen={showAddlProfileFieldsModal}
         toggle={() => this.toggleAddlProfileFieldsModal()}
@@ -418,9 +434,9 @@ export class ProgramProductDetailEnroll extends React.Component<
                 <Fragment>
                   {currentUser && !currentUser.id ? (
                     <a
-                      href={`${routes.login}?next=${encodeURIComponent(
-                        window.location.pathname
-                      )}`}
+                      href={`${
+                        routes.apiGatewayLogin
+                      }?next=${encodeURIComponent(window.location.pathname)}`}
                       className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red-to-blue highlight"
                     >
                       Enroll now
@@ -470,6 +486,9 @@ const updateAddlFields = (currentUser: User) => {
   return mutateAsync(users.editProfileMutation(updatedUser))
 }
 
+const createProgramEnrollment = (programId: number) =>
+  mutateAsync(programEnrollmentQuery(programId))
+
 const mapStateToProps = createStructuredSelector({
   courseRuns:                courseRunsSelector,
   programs:                  programsSelector,
@@ -495,7 +514,8 @@ const mapPropsToConfig = props => [
 ]
 
 const mapDispatchToProps = {
-  updateAddlFields
+  updateAddlFields,
+  createProgramEnrollment
 }
 
 export default compose(

@@ -16,7 +16,7 @@ To set up locally:
 
 Set up uwsgitop
 ---------------
-1. Install uwsgitop: ``docker compose run --rm web poetry add uwsgitop``
+1. Install uwsgitop: ``docker compose run --rm web uv add uwsgitop``
 2. Set UWSGI_RELOAD_ON_RSS in your .env to a high value (e.g. 500)
 3. Set UWSGI_MAX_REQUESTS in your .env to a high value (e.g. 10000)
 4. ``docker compose build``
@@ -27,7 +27,7 @@ Set up uwsgitop
 
 Set up Locust
 -------------
-1. Install Locust: ``docker compose run --rm web poetry add locust``
+1. Install Locust: ``docker compose run --rm web uv add locust``
 2. Add locust to your docker-compose.yml locally, under services:
 
 .. code-block:: shell

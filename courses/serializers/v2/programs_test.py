@@ -1,19 +1,35 @@
 from datetime import timedelta
+from unittest.mock import ANY
 
 import pytest
+from django.db import connection
+from django.db.models import Prefetch
+from django.test.utils import CaptureQueriesContext
 from django.utils.timezone import now
 
 from cms.factories import CoursePageFactory
 from cms.serializers import ProgramPageSerializer
 from courses.factories import (  # noqa: F401
+    CourseFactory,
     CourseRunFactory,
     ProgramCollectionFactory,
     ProgramFactory,
+    create_program_with_tracks,
     program_with_empty_requirements,
+    program_with_requirements,
 )
-from courses.models import CoursesTopic, Department
+from courses.models import (
+    CoursesTopic,
+    Department,
+    Program,
+    ProgramCollectionItem,
+    ProgramRequirement,
+    ProgramRequirementNodeType,
+)
+from courses.serializers.v1.base import EnrollmentModeSerializer
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.serializers.v2.programs import (
+    ProgramDetailSerializer,
     ProgramRequirementTreeSerializer,
     ProgramSerializer,
 )
@@ -60,8 +76,11 @@ def test_serialize_program(
     program_collection = ProgramCollectionFactory.create(
         title="Test Collection",
     )
-    program_collection.programs.add(program_with_empty_requirements)
-    program_collection.save()
+    ProgramCollectionItem.objects.create(
+        collection=program_collection,
+        program=program_with_empty_requirements,
+        sort_order=0,
+    )
     required_program = ProgramFactory.create(
         page=None,
         title="Required Program",
@@ -78,16 +97,20 @@ def test_serialize_program(
         program_with_empty_requirements.add_requirement(course2)
         program_with_empty_requirements.add_requirement(required_program)
         formatted_reqs["courses"]["required"] = [
-            course.id for course in program_with_empty_requirements.required_courses
+            {"id": course.id, "readable_id": course.readable_id}
+            for course in program_with_empty_requirements.required_courses
         ]
         formatted_reqs["courses"]["electives"] = [
-            course.id for course in program_with_empty_requirements.elective_courses
+            {"id": course.id, "readable_id": course.readable_id}
+            for course in program_with_empty_requirements.elective_courses
         ]
         formatted_reqs["programs"]["required"] = [
-            program.id for program in program_with_empty_requirements.required_programs
+            {"id": program.id, "readable_id": program.readable_id}
+            for program in program_with_empty_requirements.required_programs
         ]
         formatted_reqs["programs"]["electives"] = [
-            program.id for program in program_with_empty_requirements.elective_programs
+            {"id": program.id, "readable_id": program.readable_id}
+            for program in program_with_empty_requirements.elective_programs
         ]
         topics = [CoursesTopic.objects.create(name=f"topic{num}") for num in range(3)]
         course1.page.topics.set([topics[0], topics[1]])
@@ -118,6 +141,7 @@ def test_serialize_program(
             if not remove_tree
             else [],
             "collections": [program_collection.id],
+            "programs": None,
             "requirements": formatted_reqs,
             "req_tree": ProgramRequirementTreeSerializer(
                 program_with_empty_requirements.requirements_root
@@ -142,5 +166,401 @@ def test_serialize_program(
             "min_weekly_hours": program_with_empty_requirements.page.min_weekly_hours,
             "min_price": program_with_empty_requirements.page.min_price,
             "max_price": program_with_empty_requirements.page.max_price,
+            "certificate_available": True,
+            "enrollment_modes": EnrollmentModeSerializer(
+                program_with_empty_requirements.enrollment_modes, many=True
+            ).data,
+            "display_mode": None,
         },
     )
+
+
+def test_serialize_program_uses_prefetched_collection_memberships(
+    mock_context,
+    program_with_empty_requirements,  # noqa: F811
+):
+    """ProgramSerializer should prefer prefetched collection memberships when present."""
+    included_collection = ProgramCollectionFactory.create(title="Included Collection")
+    excluded_collection = ProgramCollectionFactory.create(title="Excluded Collection")
+
+    included_membership = ProgramCollectionItem.objects.create(
+        collection=included_collection,
+        program=program_with_empty_requirements,
+        sort_order=0,
+    )
+    ProgramCollectionItem.objects.create(
+        collection=excluded_collection,
+        program=program_with_empty_requirements,
+        sort_order=1,
+    )
+
+    program_with_empty_requirements.prefetched_collection_memberships = [
+        included_membership
+    ]
+
+    data = ProgramSerializer(
+        instance=program_with_empty_requirements, context=mock_context
+    ).data
+
+    assert data["collections"] == [included_collection.id]
+
+
+def test_serialize_program_uses_collection_membership_prefetch_cache(
+    mock_context,
+    program_with_empty_requirements,  # noqa: F811
+):
+    """ProgramSerializer should use Django's prefetch cache for collection IDs."""
+    included_collection = ProgramCollectionFactory.create(title="Cached Collection")
+    ProgramCollectionItem.objects.create(
+        collection=included_collection,
+        program=program_with_empty_requirements,
+        sort_order=0,
+    )
+
+    prefetched_program = Program.objects.prefetch_related("collection_memberships").get(
+        pk=program_with_empty_requirements.pk
+    )
+
+    data = ProgramSerializer(instance=prefetched_program, context=mock_context).data
+
+    assert data["collections"] == [included_collection.id]
+
+
+def test_serialize_program_topics_use_all_requirements_prefetch_cache(
+    mock_context,
+    program_with_requirements,  # noqa: F811
+):
+    """ProgramSerializer should use one bulk topic query with cached all_requirements."""
+    program = program_with_requirements.program
+    course1, course2 = program_with_requirements.required_courses[:2]
+
+    topics = [CoursesTopic.objects.create(name=f"topic{num}") for num in range(3)]
+    course1.page.topics.set([topics[0], topics[1]])
+    course2.page.topics.set([topics[1], topics[2]])
+    course1.page.save()
+    course2.page.save()
+
+    prefetched_program = Program.objects.prefetch_related(
+        Prefetch(
+            "all_requirements",
+            queryset=ProgramRequirement.objects.select_related(
+                "course", "course__page"
+            ).prefetch_related("course__page__topics"),
+        )
+    ).get(pk=program.pk)
+
+    serializer = ProgramSerializer(context=mock_context)
+
+    with CaptureQueriesContext(connection) as context:
+        topics_data = serializer.get_topics(prefetched_program)
+
+    assert len(context) == 1
+    assert topics_data == [{"name": topic.name} for topic in topics]
+
+
+def test_serialize_program_requirements_use_all_requirements_prefetch_cache(
+    mock_context,
+    program_with_requirements,  # noqa: F811
+):
+    """ProgramSerializer should reuse cached all_requirements for requirements."""
+    program = program_with_requirements.program
+    prefetched_program = Program.objects.prefetch_related(
+        Prefetch(
+            "all_requirements",
+            queryset=ProgramRequirement.objects.select_related(
+                "course", "required_program"
+            ).order_by("path"),
+        )
+    ).get(pk=program.pk)
+
+    serializer = ProgramSerializer(context=mock_context)
+
+    with CaptureQueriesContext(connection) as context:
+        requirements_data = serializer.get_requirements(prefetched_program)
+
+    assert len(context) == 0
+    assert requirements_data == {
+        "courses": {
+            "required": [
+                {"id": course.id, "readable_id": course.readable_id}
+                for course in program_with_requirements.required_courses
+            ],
+            "electives": [
+                {"id": course.id, "readable_id": course.readable_id}
+                for course in (
+                    program_with_requirements.elective_courses
+                    + program_with_requirements.mut_exclusive_courses
+                )
+            ],
+        },
+        "programs": {"required": [], "electives": []},
+    }
+
+
+@pytest.mark.parametrize(
+    ("parent_program_live", "parent_page_live", "expected_in_programs"),
+    [
+        (True, True, True),
+        (False, True, False),
+        (True, False, False),
+        (False, False, False),
+    ],
+)
+def test_serialize_program_programs_excludes_non_live(
+    mock_context,
+    program_with_empty_requirements,  # noqa: F811
+    parent_program_live,
+    parent_page_live,
+    expected_in_programs,
+):
+    """Test that get_programs excludes parent programs where live=False or page.live=False"""
+    mock_context["include_programs"] = True
+    parent_program = ProgramFactory.create(live=parent_program_live)
+    parent_program.page.live = parent_page_live
+    parent_program.page.save()
+    parent_program.add_requirement(program_with_empty_requirements)
+
+    data = ProgramSerializer(
+        instance=program_with_empty_requirements, context=mock_context
+    ).data
+
+    if expected_in_programs:
+        assert len(data["programs"]) == 1
+    else:
+        assert data["programs"] == []
+
+
+@pytest.mark.parametrize(
+    ("has_paid_mode", "expected"),
+    [
+        (True, True),
+        (False, False),
+    ],
+)
+def test_serialize_program_certificate_available(
+    mock_context,
+    program_with_empty_requirements,  # noqa: F811
+    has_paid_mode,
+    expected,
+):
+    """Test that certificate_available reflects whether any enrollment mode requires payment."""
+    if not has_paid_mode:
+        program_with_empty_requirements.enrollment_modes.filter(
+            requires_payment=True
+        ).delete()
+
+    data = ProgramSerializer(
+        instance=program_with_empty_requirements, context=mock_context
+    ).data
+
+    assert data["certificate_available"] is expected
+
+
+def test_serialize_program_certificate_available_certificates_disabled(
+    mock_context,
+    program_with_empty_requirements,  # noqa: F811
+):
+    """certificate_available should be False when certificates are disabled for the program."""
+    program_with_empty_requirements.certificates_disabled = True
+    program_with_empty_requirements.save()
+
+    data = ProgramSerializer(
+        instance=program_with_empty_requirements, context=mock_context
+    ).data
+
+    assert data["certificate_available"] is False
+
+
+def test_serialize_program_certificate_available_no_certificate_page(mock_context):
+    """certificate_available should be False when the program has no live certificate page."""
+    program = ProgramFactory.create(page=None)
+
+    data = ProgramSerializer(instance=program, context=mock_context).data
+
+    assert data["certificate_available"] is False
+
+
+def test_serialize_program_with_no_page(mock_context):
+    """Test that a program with no CMS page serializes page as None."""
+    program = ProgramFactory.create(page=None)
+
+    data = ProgramSerializer(instance=program, context=mock_context).data
+
+    assert data["page"] is None
+
+
+def test_serialize_program_with_products(
+    mock_context,
+    program_with_empty_requirements,  # noqa: F811
+):
+    """Test Program serialization includes product data"""
+    from ecommerce.factories import ProductFactory  # noqa: PLC0415
+
+    product = ProductFactory.create(purchasable_object=program_with_empty_requirements)
+
+    data = ProgramDetailSerializer(
+        instance=program_with_empty_requirements, context=mock_context
+    ).data
+
+    assert len(data["products"]) == 1
+    assert data["products"][0]["id"] == product.id
+    assert data["products"][0]["price"] == str(product.price)
+    assert data["products"][0]["is_active"] == product.is_active
+    assert data["products"][0]["description"] == product.description
+
+
+def test_program_requirement_tree_serializer_save():
+    """Verify that the ProgramRequirementTreeSerializer validates data"""
+    program = ProgramFactory.create()
+    course1, course2, course3 = CourseFactory.create_batch(3)
+    root = program.requirements_root
+
+    serializer = ProgramRequirementTreeSerializer(
+        instance=root,
+        data=[
+            {
+                "data": {
+                    "node_type": "operator",
+                    "title": "Required Courses",
+                    "operator": "all_of",
+                },
+                "children": [
+                    {"id": None, "data": {"node_type": "course", "course": course1.id}}
+                ],
+            },
+            {
+                "data": {
+                    "node_type": "operator",
+                    "title": "Elective Courses",
+                    "operator": "min_number_of",
+                    "operator_value": "1",
+                },
+                "children": [
+                    {"id": None, "data": {"node_type": "course", "course": course2.id}},
+                    {"id": None, "data": {"node_type": "course", "course": course3.id}},
+                ],
+            },
+        ],
+        context={"program": program},
+    )
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+
+    root.refresh_from_db()
+    assert ProgramRequirementTreeSerializer(instance=root).data == [
+        {
+            "data": {
+                "node_type": "operator",
+                "operator": "all_of",
+                "operator_value": None,
+                "program": program.id,
+                "course": None,
+                "required_program": None,
+                "title": "Required Courses",
+                "elective_flag": False,
+                "description": "",
+            },
+            "id": ANY,
+            "children": [
+                {
+                    "data": {
+                        "node_type": "course",
+                        "operator": None,
+                        "operator_value": None,
+                        "program": program.id,
+                        "course": course1.id,
+                        "required_program": None,
+                        "title": None,
+                        "elective_flag": False,
+                        "description": "",
+                    },
+                    "id": ANY,
+                }
+            ],
+        },
+        {
+            "data": {
+                "node_type": "operator",
+                "operator": "min_number_of",
+                "operator_value": "1",
+                "program": program.id,
+                "course": None,
+                "required_program": None,
+                "title": "Elective Courses",
+                "elective_flag": False,
+                "description": "",
+            },
+            "id": ANY,
+            "children": [
+                {
+                    "data": {
+                        "node_type": "course",
+                        "operator": None,
+                        "operator_value": None,
+                        "program": program.id,
+                        "course": course2.id,
+                        "required_program": None,
+                        "title": None,
+                        "elective_flag": False,
+                        "description": "",
+                    },
+                    "id": ANY,
+                },
+                {
+                    "data": {
+                        "node_type": "course",
+                        "operator": None,
+                        "operator_value": None,
+                        "program": program.id,
+                        "course": course3.id,
+                        "required_program": None,
+                        "title": None,
+                        "elective_flag": False,
+                        "description": "",
+                    },
+                    "id": ANY,
+                },
+            ],
+        },
+    ]
+
+
+def _program_in_both_tracks(tracked):
+    """Require a new program in each of tracked's track groups; return the program"""
+    child = ProgramFactory.create()
+    for track in tracked.track_nodes:
+        track.get_children().get().add_child(
+            node_type=ProgramRequirementNodeType.PROGRAM, required_program=child
+        )
+    return child
+
+
+def test_serialize_program_programs_lists_a_parent_once(mock_context):
+    """A parent whose two tracks both require the child appears once in programs"""
+    mock_context["include_programs"] = True
+    tracked = create_program_with_tracks()
+    child = _program_in_both_tracks(tracked)
+
+    data = ProgramSerializer(instance=child, context=mock_context).data
+
+    assert [program["id"] for program in data["programs"]] == [tracked.program.id]
+
+
+def test_serialize_program_requirements_lists_a_program_in_two_groups_once(
+    mock_context,
+):
+    """A program in two tracks and a later required group is listed once, as required"""
+    tracked = create_program_with_tracks()
+    child = _program_in_both_tracks(tracked)
+    tracked.root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="More Core",
+    ).add_child(node_type=ProgramRequirementNodeType.PROGRAM, required_program=child)
+
+    data = ProgramSerializer(instance=tracked.program, context=mock_context).data
+
+    assert data["requirements"]["programs"] == {
+        "required": [{"id": child.id, "readable_id": child.readable_id}],
+        "electives": [],
+    }

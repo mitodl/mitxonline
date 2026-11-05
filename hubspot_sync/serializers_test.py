@@ -13,10 +13,8 @@ from mitol.hubspot_api.api import format_app_id
 from mitol.hubspot_api.models import HubspotObject
 
 from courses.factories import (
-    CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
-    ProgramCertificateFactory,
 )
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
@@ -26,17 +24,18 @@ from ecommerce.constants import (
 from ecommerce.factories import (
     DiscountFactory,
     DiscountRedemptionFactory,
+    PaidAmountOffDiscountFactory,
     ProductFactory,
 )
 from ecommerce.models import OrderStatus, Product
 from hubspot_sync.serializers import (
     ORDER_STATUS_MAPPING,
-    HubspotContactSerializer,
     LineSerializer,
     OrderToDealSerializer,
     ProductSerializer,
     format_product_name,
 )
+from main.utils import format_decimal
 
 pytestmark = [pytest.mark.django_db]
 
@@ -115,6 +114,19 @@ def test_serialize_order(settings, hubspot_order, status):
     """Test that OrderToDealSerializer produces the correct serialized data"""
     hubspot_order.state = status
     serialized_data = OrderToDealSerializer(instance=hubspot_order).data
+
+    # Calculate expected unique_app_id based on new logic (user global_id + purchasable object)
+    first_line = hubspot_order.lines.first()
+    if first_line and first_line.purchased_object:
+        user_identifier = hubspot_order.purchaser.global_id
+        object_type = first_line.purchased_content_type.model
+        object_id = first_line.purchased_object_id
+        consistent_id = f"{user_identifier}-{object_type}-{object_id}"
+        expected_unique_app_id = format_app_id(consistent_id)
+    else:
+        # Fallback to original behavior for orders without lines
+        expected_unique_app_id = format_app_id(hubspot_order.id)
+
     assert serialized_data == {
         "dealname": f"MITXONLINE-ORDER-{hubspot_order.id}",
         "dealstage": ORDER_STATUS_MAPPING[status],
@@ -130,7 +142,7 @@ def test_serialize_order(settings, hubspot_order, status):
         "coupon_code": None,
         "status": hubspot_order.state,
         "pipeline": settings.HUBSPOT_PIPELINE_ID,
-        "unique_app_id": format_app_id(hubspot_order.id),
+        "unique_app_id": expected_unique_app_id,
     }
 
 
@@ -170,8 +182,24 @@ def test_serialize_order_with_coupon(  # noqa: PLR0913
         redeemed_by=hubspot_order.purchaser,
         redemption_date=now_in_utc(),
     )
+    # The fixture builds the line before this discount exists, and the deal
+    # reports the price recorded on the line, so re-price it as checkout does.
+    hubspot_order.lines.first().record_discounted_unit_price()
 
     serialized_data = OrderToDealSerializer(instance=hubspot_order).data
+
+    # Calculate expected unique_app_id based on new logic (user global_id + purchasable object)
+    first_line = hubspot_order.lines.first()
+    if first_line and first_line.purchased_object:
+        user_identifier = hubspot_order.purchaser.global_id
+        object_type = first_line.purchased_content_type.model
+        object_id = first_line.purchased_object_id
+        consistent_id = f"{user_identifier}-{object_type}-{object_id}"
+        expected_unique_app_id = format_app_id(consistent_id)
+    else:
+        # Fallback to original behavior for orders without lines
+        expected_unique_app_id = format_app_id(hubspot_order.id)
+
     assert serialized_data == {
         "dealname": f"MITXONLINE-ORDER-{hubspot_order.id}",
         "dealstage": ORDER_STATUS_MAPPING[hubspot_order.state],
@@ -187,25 +215,25 @@ def test_serialize_order_with_coupon(  # noqa: PLR0913
         "discount_percent": percent_off,
         "status": hubspot_order.state,
         "pipeline": settings.HUBSPOT_PIPELINE_ID,
-        "unique_app_id": format_app_id(hubspot_order.id),
+        "unique_app_id": expected_unique_app_id,
     }
 
 
-def test_serialize_contact(settings, user, mocker):
-    """Test that HubspotContactSerializer includes program and course run certificates for the user"""
-    mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+def test_serialize_order_with_paid_amount_off_coupon(hubspot_order):
+    """The deal reports the credit actually applied, not the stored amount of 0."""
+    discount = PaidAmountOffDiscountFactory.create()
+    DiscountRedemptionFactory(
+        redeemed_discount=discount,
+        redeemed_order=hubspot_order,
+        redeemed_by=hubspot_order.purchaser,
+        redemption_date=now_in_utc(),
     )
-    program_cert_1 = ProgramCertificateFactory.create(user=user)
-    program_cert_2 = ProgramCertificateFactory.create(user=user)
-    course_run_cert_1 = CourseRunCertificateFactory.create(user=user)
-    course_run_cert_2 = CourseRunCertificateFactory.create(user=user)
-    serialized_data = HubspotContactSerializer(instance=user).data
-    assert (
-        serialized_data["program_certificates"]
-        == f"{program_cert_1.program!s};{program_cert_2.program!s}"
-    )
-    assert (
-        serialized_data["course_run_certificates"]
-        == f"{course_run_cert_1.course_run!s};{course_run_cert_2.course_run!s}"
-    )
+    line = hubspot_order.lines.first()
+    credit = line.unit_price / 4
+    hubspot_order.lines.update(discounted_unit_price=line.unit_price - credit)
+
+    serialized_data = OrderToDealSerializer(instance=hubspot_order).data
+
+    assert serialized_data["discount_amount"] == format_decimal(credit)
+    assert serialized_data["discount_percent"] == "25.00"
+    assert serialized_data["discount_type"] == "paid-amount-off"

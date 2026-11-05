@@ -11,11 +11,12 @@ from getpass import getpass
 from django.core.management import BaseCommand, call_command
 from django.db.models import Q
 
-from authentication.pipeline.user import CREATE_OPENEDX_USER_RETRY_DELAY
 from mail.api import validate_email_addresses
 from openedx.api import create_user as openedx_create_user
 from openedx.tasks import create_user_from_id as openedx_create_user_from_id
 from users.models import User, validate_iso_3166_1_code
+
+CREATE_OPENEDX_USER_RETRY_DELAY = 60
 
 
 class Command(BaseCommand):
@@ -105,8 +106,6 @@ class Command(BaseCommand):
         new_account.is_superuser = False
         new_account.save()
 
-        new_account.legal_address.first_name = kwargs["firstname"]
-        new_account.legal_address.last_name = kwargs["lastname"]
         new_account.legal_address.country = kwargs["countrycode"]
 
         self.stdout.write(

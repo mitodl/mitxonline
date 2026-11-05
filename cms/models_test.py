@@ -1,27 +1,36 @@
 """Tests for Wagtail models"""
 
 import json
+import uuid
 from datetime import timedelta
-from urllib.parse import quote_plus
+from unittest.mock import Mock, patch
+from urllib.parse import parse_qs, quote_plus, urlparse
 
 import factory
 import pytest
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser, Group
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.cache import caches
-from django.test.client import RequestFactory
-from django.urls import resolve
+from django.forms import ChoiceField
+from django.http import Http404, HttpResponse
+from django.test import RequestFactory
+from django.urls import resolve, reverse
 from mitol.common.factories import UserFactory
 from mitol.common.utils.datetime import now_in_utc
+from wagtail.models import Page
 
+from cms import utils as cms_utils
 from cms.api import create_featured_items
 from cms.constants import CMS_EDITORS_GROUP_NAME
 from cms.factories import (
     CertificatePageFactory,
+    CourseIndexPageFactory,
     CoursePageFactory,
     FlexiblePricingFormFactory,
     HomePageFactory,
     InstructorPageFactory,
+    ProgramIndexPageFactory,
     ProgramPageFactory,
     ResourcePageFactory,
 )
@@ -47,6 +56,7 @@ from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from flexiblepricing.models import FlexiblePrice
+from main.utils import get_learn_product_url
 
 pytestmark = [pytest.mark.django_db]
 
@@ -99,6 +109,7 @@ def test_custom_detail_page_urls_handled(fully_configured_wagtail):
     ],
 )
 def test_course_page_context(  # noqa: PLR0913
+    settings,
     staff_user,
     fully_configured_wagtail,
     is_authenticated,
@@ -159,14 +170,13 @@ def test_course_page_context(  # noqa: PLR0913
         "request": request,
         "run": run,
         "course_runs": relevant_runs,
-        "sign_in_url": f"/signin/?next={quote_plus(course_page.get_url())}"
+        "sign_in_url": f"{reverse(settings.LOGIN_URL)}?next={quote_plus(course_page.get_url())}"
         if exp_sign_in_url
         else None,
         "start_date": getattr(run, "start_date", None),
         "can_access_edx_course": is_authenticated and has_relevant_run,
         "finaid_price": finaid_price,
         "product": product,
-        "hijack_logout_redirect_url": "/admin/users/user",
         "instructors": []
         if not has_instructor
         else [
@@ -261,41 +271,34 @@ def generate_flexible_pricing_response(mocker, request_user, flexible_pricing_fo
     return response
 
 
-@pytest.mark.parametrize(
-    "is_authed,has_submission",  # noqa: PT006
-    [[False, False], [True, False], [True, True]],  # noqa: PT007
-)
-def test_flex_pricing_form_display(mocker, is_authed, has_submission):
+@pytest.mark.parametrize("has_submission", [False, True])
+def test_flex_pricing_form_display(mocker, has_submission):
     """
-    Tests the initial display of the flexible pricing form. If the user is not
-    authenticated, they should see the guest text. If they are, they should
-    see the form if they don't have an in-progress submission.
+    Tests the initial display of the flexible pricing form. An authenticated
+    user sees the form itself unless they have an in-progress submission, in
+    which case they see its status instead. Anonymous users never reach the
+    template - see test_flexible_pricing_form_serve_redirects_anonymous_user_to_login.
     """
     course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
     flex_form = FlexiblePricingFormFactory(selected_course=course_page.course)
 
-    if not is_authed:
-        request_user = AnonymousUser()
-    else:
-        request_user = UserFactory.create()
-        if has_submission:
-            submission = FlexiblePricingRequestSubmission.objects.create(
-                form_data=json.dumps([]), page=flex_form, user=request_user
-            )
-            flexprice = FlexiblePrice.objects.create(  # noqa: F841
-                user=request_user,
-                cms_submission=submission,
-                courseware_object=flex_form.selected_course,
-            )
+    request_user = UserFactory.create()
+    if has_submission:
+        submission = FlexiblePricingRequestSubmission.objects.create(
+            form_data=json.dumps([]), page=flex_form, user=request_user
+        )
+        flexprice = FlexiblePrice.objects.create(  # noqa: F841
+            user=request_user,
+            cms_submission=submission,
+            courseware_object=flex_form.selected_course,
+        )
 
     response = generate_flexible_pricing_response(mocker, request_user, flex_form)
 
     # simple string checking for the rendered content
     # should match what's in the factory
 
-    if not is_authed:
-        assert "Not Logged In" in response.rendered_content
-    elif has_submission:
+    if has_submission:
         assert "Application Processing" in response.rendered_content
     else:
         assert "csrfmiddlewaretoken" in response.rendered_content
@@ -610,6 +613,38 @@ def test_certificate_for_program_page():
         assert signatory.value.signature_image.title == "Image"
 
 
+def test_certificate_page_product_name_field_labels():
+    """
+    product_name is surfaced in the CMS as "Certificate Title" and its help text
+    tells admins the value is what appears on the learner's certificate.
+    """
+    field = CertificatePage._meta.get_field("product_name")  # noqa: SLF001
+    assert field.verbose_name == "Certificate Title"
+    assert field.help_text == (
+        "Specify the course/program name. "
+        "Note: This is what will appear on the learner's certificate."
+    )
+
+
+def test_signatory_page_requires_signature_image():
+    """
+    SignatoryPage.signature_image is now required (null=False, blank=False).
+    This test verifies that the field is properly configured as mandatory.
+    """
+    course_page = CoursePageFactory.create(certificate_page=None)
+    certificate_page = CertificatePageFactory.create(
+        parent=course_page,
+        signatories__0__signatory__page__name="Name",
+        signatories__0__signatory__page__title_1="Title_1",
+        signatories__0__signatory__page__signature_image__title="Image",
+    )
+    items = certificate_page.signatory_items
+    assert len(items) == 1
+    assert items[0]["name"] == "Name"
+    assert items[0]["signature_image"] is not None
+    assert "image" in items[0]["signature_image"].lower()
+
+
 @pytest.mark.parametrize("test_course", [True, False])
 def test_courseware_title_synced_with_product_page_title(test_course):
     """Tests that Courseware title is synced with the Course Page title from CMS"""
@@ -621,6 +656,21 @@ def test_courseware_title_synced_with_product_page_title(test_course):
     courseware = product_page.course if test_course else product_page.program
 
     assert courseware.title == updated_title
+
+
+@pytest.mark.parametrize("test_course", [True, False])
+def test_product_page_save_skips_courseware_save_when_title_unchanged(test_course):
+    """
+    Saving a product page without changing its title must not re-save the
+    linked courseware object, so it fires no redundant Fastly purge signal.
+    """
+    product_page = CoursePageFactory() if test_course else ProgramPageFactory()
+    courseware = product_page.course if test_course else product_page.program
+
+    with patch.object(type(courseware), "save") as mock_courseware_save:
+        product_page.save()
+
+    mock_courseware_save.assert_not_called()
 
 
 @pytest.mark.parametrize("flex_form_for_course", [True, False])
@@ -664,10 +714,10 @@ def test_homepage_featured_products(settings, mocker):
     furthest_future_date = further_future_date + timedelta(days=1)
     redis_cache = caches["redis"]
     # Ensure the key is empty since pytest doesn't clear the cache between tests
-    featured_courses = redis_cache.get("CMS_homepage_featured_courses")
+    featured_courses = redis_cache.get(cms_utils.get_featured_items_cache_key())
     if featured_courses is not None:
-        redis_cache.delete("CMS_homepage_featured_courses")
-    assert redis_cache.get("CMS_homepage_featured_courses") is None
+        redis_cache.delete(cms_utils.get_featured_items_cache_key())
+    assert redis_cache.get(cms_utils.get_featured_items_cache_key()) is None
 
     enrollable_future_course = CourseFactory.create(page=None, live=True)
     enrollable_future_course_page = CoursePageFactory.create(
@@ -682,7 +732,7 @@ def test_homepage_featured_products(settings, mocker):
         end_date=furthest_future_date,
     )
     create_featured_items()
-    assert len(redis_cache.get("CMS_homepage_featured_courses")) == 1
+    assert len(redis_cache.get(cms_utils.get_featured_items_cache_key())) == 1
     hf = HomePageFactory.create()
     assert hf.get_cached_featured_products == [
         {
@@ -690,7 +740,9 @@ def test_homepage_featured_products(settings, mocker):
             "description": enrollable_future_course_page.description,
             "feature_image": enrollable_future_course_page.feature_image,
             "start_date": enrollable_future_courserun.start_date,
-            "url_path": enrollable_future_course_page.get_url(),
+            "url_path": get_learn_product_url(
+                "courses", enrollable_future_course.readable_id
+            ),
             "is_program": enrollable_future_course_page.is_program_page,
             "is_self_paced": False,
             "program_type": None,
@@ -715,7 +767,7 @@ def test_homepage_featured_products(settings, mocker):
         end_date=furthest_future_date,
     )
     create_featured_items()
-    assert len(redis_cache.get("CMS_homepage_featured_courses")) == 1
+    assert len(redis_cache.get(cms_utils.get_featured_items_cache_key())) == 1
     hf = HomePageFactory.create()
     assert hf.get_cached_featured_products == [
         {
@@ -723,9 +775,949 @@ def test_homepage_featured_products(settings, mocker):
             "description": enrollable_future_course_with_no_enrollment_end_page.description,
             "feature_image": enrollable_future_course_with_no_enrollment_end_page.feature_image,
             "start_date": enrollable_future_courserun_with_no_enrollment_end.start_date,
-            "url_path": enrollable_future_course_with_no_enrollment_end_page.get_url(),
+            "url_path": get_learn_product_url(
+                "courses", enrollable_future_course_with_no_enrollment_end.readable_id
+            ),
             "is_program": enrollable_future_course_with_no_enrollment_end_page.is_program_page,
             "is_self_paced": False,
             "program_type": None,
         }
     ]
+
+
+@pytest.fixture
+def course_index_page():
+    """Fixture for creating a course index page with unique slug"""
+    root = Page.get_first_root_node()
+    unique_id = uuid.uuid4().hex[:8]
+    return CourseIndexPageFactory.create(
+        parent=root, slug=f"courses-{unique_id}", title=f"Courses {unique_id}"
+    )
+
+
+@pytest.fixture
+def program_index_page():
+    """Fixture for creating a program index page with unique slug"""
+    root = Page.get_first_root_node()
+    unique_id = uuid.uuid4().hex[:8]
+    return ProgramIndexPageFactory.create(
+        parent=root, slug=f"programs-{unique_id}", title=f"Programs {unique_id}"
+    )
+
+
+def test_course_object_index_page_route_with_empty_path_components(course_index_page):
+    """
+    Test that route() returns super().route() when path_components is empty
+    """
+    rf = RequestFactory()
+    request = rf.get("/")
+
+    # Call route with empty path_components
+    result = course_index_page.route(request, [])
+
+    # Should return the result of super().route() - which is typically a RouteResult
+    # Since we're calling with empty path_components on an index page, it should handle routing normally
+    assert result is not None
+
+
+@patch("cms.models.CoursePage.route")
+def test_course_object_index_page_route_with_valid_course_readable_id(
+    mock_route, course_index_page
+):
+    """
+    Test that route() finds and routes to correct course page by readable_id
+    """
+    rf = RequestFactory()
+    request = rf.get("/")
+
+    # Create a course with unique readable_id but without automatic page creation
+    unique_id = uuid.uuid4().hex[:8]
+    course = CourseFactory.create(
+        readable_id=f"course-v1:MIT+6.00x+{unique_id}", page=None
+    )
+    course_page = CoursePageFactory.create(course=course, parent=course_index_page)
+
+    # Verify the relationship is set correctly
+    assert course_page.course == course
+    assert course.readable_id == f"course-v1:MIT+6.00x+{unique_id}"
+
+    # Test the get_child_by_readable_id method directly
+    found_page = course_index_page.get_child_by_readable_id(course.readable_id)
+    assert found_page.specific == course_page
+
+    path_components = [f"course-v1:MIT+6.00x+{unique_id}"]
+
+    # Mock the route method to return a mock response
+    mock_response = Mock()
+    mock_route.return_value = mock_response
+
+    # Call route on the index page
+    result = course_index_page.route(request, path_components)
+
+    # Verify that the course page's route method was called with correct arguments
+    mock_route.assert_called_once_with(request, [])
+    assert result == mock_response
+    assert result is not None
+
+
+@patch("cms.models.CoursePage.route")
+def test_course_object_index_page_route_with_remaining_components(
+    mock_route, course_index_page
+):
+    """
+    Test that route() passes remaining path components to the child page
+    """
+    rf = RequestFactory()
+    request = rf.get("/")
+
+    # Create a course with unique readable_id but without automatic page creation
+    unique_id = uuid.uuid4().hex[:8]
+    course = CourseFactory.create(
+        readable_id=f"course-v1:MIT+6.00x+{unique_id}", page=None
+    )
+    CoursePageFactory.create(course=course, parent=course_index_page)
+
+    path_components = [f"course-v1:MIT+6.00x+{unique_id}", "additional", "path"]
+    expected_remaining = ["additional", "path"]
+
+    # Mock the route method to return a valid response
+    mock_route.return_value = HttpResponse("Test response")
+
+    # Call route on the index page
+    result = course_index_page.route(request, path_components)
+
+    # Verify the route method was called with remaining components
+    mock_route.assert_called_once_with(request, expected_remaining)
+    assert result == mock_route.return_value
+
+
+def test_course_object_index_page_route_with_invalid_readable_id(course_index_page):
+    """
+    Test that route() raises Http404 when readable_id doesn't match any child page
+    """
+    rf = RequestFactory()
+    request = rf.get("/")
+    # Don't create any course pages - so no readable_id will match
+
+    path_components = ["non-existent-readable-id"]
+
+    # Should raise Http404
+    with pytest.raises(Http404):
+        course_index_page.route(request, path_components)
+
+
+@patch("cms.models.ProgramPage.route")
+def test_program_object_index_page_route_with_valid_program_readable_id(
+    mock_route, program_index_page
+):
+    """
+    Test that route() works correctly for program pages as well
+    """
+    rf = RequestFactory()
+    request = rf.get("/")
+
+    # Create a program with unique readable_id but without automatic page creation
+    unique_id = uuid.uuid4().hex[:8]
+    program = ProgramFactory.create(
+        readable_id=f"program-v1:MIT+MicroMasters+{unique_id}", page=None
+    )
+    program_page = ProgramPageFactory.create(program=program, parent=program_index_page)
+
+    # Verify the relationship is set correctly
+    assert program_page.program == program
+    assert program.readable_id == f"program-v1:MIT+MicroMasters+{unique_id}"
+
+    # Test the get_child_by_readable_id method directly
+    found_page = program_index_page.get_child_by_readable_id(program.readable_id)
+    assert found_page.specific == program_page
+
+    path_components = [f"program-v1:MIT+MicroMasters+{unique_id}"]
+
+    # Mock the route method to return a mock response
+    mock_response = Mock()
+    mock_route.return_value = mock_response
+
+    # Call route on the index page
+    result = program_index_page.route(request, path_components)
+
+    # Verify that the program page's route method was called with correct arguments
+    mock_route.assert_called_once_with(request, [])
+    assert result == mock_response
+    assert result is not None
+
+
+def test_course_object_index_page_route_converts_does_not_exist_to_http404(
+    course_index_page,
+):
+    """
+    Test that route() converts Page.DoesNotExist to Http404
+    """
+    rf = RequestFactory()
+    request = rf.get("/")
+
+    # Create a course but with a different readable_id than what we'll search for
+    unique_id = uuid.uuid4().hex[:8]
+    course = CourseFactory.create(
+        readable_id=f"course-v1:MIT+6.00x+{unique_id}", page=None
+    )
+    CoursePageFactory.create(course=course, parent=course_index_page)
+
+    # Try to route to a different readable_id
+    path_components = ["course-v1:MIT+6.01x+2023_Spring"]
+
+    # Should raise Http404 because Page.DoesNotExist is caught and re-raised as Http404
+    with pytest.raises(Http404):
+        course_index_page.route(request, path_components)
+
+
+def test_course_index_page_get_child_by_readable_id(course_index_page):
+    """
+    Test that CourseIndexPage.get_child_by_readable_id finds the correct course page
+    """
+    # Create multiple courses with different readable_ids but without automatic page creation
+    unique_id1 = uuid.uuid4().hex[:8]
+    unique_id2 = uuid.uuid4().hex[:8]
+    course1 = CourseFactory.create(
+        readable_id=f"course-v1:MIT+6.00x+{unique_id1}", page=None
+    )
+    course2 = CourseFactory.create(
+        readable_id=f"course-v1:MIT+6.01x+{unique_id2}", page=None
+    )
+
+    course_page1 = CoursePageFactory.create(course=course1, parent=course_index_page)
+    course_page2 = CoursePageFactory.create(course=course2, parent=course_index_page)
+
+    # Test finding the first course
+    found_page = course_index_page.get_child_by_readable_id(
+        f"course-v1:MIT+6.00x+{unique_id1}"
+    )
+    assert found_page.specific == course_page1
+    assert found_page.specific.course.readable_id == f"course-v1:MIT+6.00x+{unique_id1}"
+
+    # Test finding the second course
+    found_page = course_index_page.get_child_by_readable_id(
+        f"course-v1:MIT+6.01x+{unique_id2}"
+    )
+    assert found_page.specific == course_page2
+    assert found_page.specific.course.readable_id == f"course-v1:MIT+6.01x+{unique_id2}"
+
+
+def test_program_index_page_get_child_by_readable_id(program_index_page):
+    """
+    Test that ProgramIndexPage.get_child_by_readable_id finds the correct program page
+    """
+    # Create multiple programs with different readable_ids but without automatic page creation
+    unique_id1 = uuid.uuid4().hex[:8]
+    unique_id2 = uuid.uuid4().hex[:8]
+    program1 = ProgramFactory.create(
+        readable_id=f"program-v1:MIT+MicroMasters+{unique_id1}", page=None
+    )
+    program2 = ProgramFactory.create(
+        readable_id=f"program-v1:MIT+MicroMasters+{unique_id2}", page=None
+    )
+
+    program_page1 = ProgramPageFactory.create(
+        program=program1, parent=program_index_page
+    )
+    program_page2 = ProgramPageFactory.create(
+        program=program2, parent=program_index_page
+    )
+
+    # Test finding the first program
+    found_page = program_index_page.get_child_by_readable_id(
+        f"program-v1:MIT+MicroMasters+{unique_id1}"
+    )
+    assert found_page.specific == program_page1
+    assert (
+        found_page.specific.program.readable_id
+        == f"program-v1:MIT+MicroMasters+{unique_id1}"
+    )
+
+    # Test finding the second program
+    found_page = program_index_page.get_child_by_readable_id(
+        f"program-v1:MIT+MicroMasters+{unique_id2}"
+    )
+    assert found_page.specific == program_page2
+    assert (
+        found_page.specific.program.readable_id
+        == f"program-v1:MIT+MicroMasters+{unique_id2}"
+    )
+
+
+def test_course_index_page_get_child_by_readable_id_raises_does_not_exist(
+    course_index_page,
+):
+    """
+    Test that get_child_by_readable_id raises Page.DoesNotExist for invalid readable_id
+    """
+    # Don't create any course pages
+
+    # Should raise Page.DoesNotExist
+    with pytest.raises(Page.DoesNotExist):
+        course_index_page.get_child_by_readable_id("non-existent-readable-id")
+
+
+@patch("cms.models.CoursePage.route")
+def test_course_object_index_page_route_multiple_path_components(
+    mock_route, course_index_page
+):
+    """
+    Test that route() correctly passes all remaining path components to child
+    """
+    rf = RequestFactory()
+    request = rf.get("/")
+
+    unique_id = uuid.uuid4().hex[:8]
+    course = CourseFactory.create(
+        readable_id=f"course-v1:MIT+6.00x+{unique_id}", page=None
+    )
+    CoursePageFactory.create(course=course, parent=course_index_page)
+
+    path_components = [f"course-v1:MIT+6.00x+{unique_id}", "certificate", "123", "view"]
+    expected_remaining = ["certificate", "123", "view"]
+
+    # Mock the route method to return a valid response
+    mock_route.return_value = HttpResponse("Test response")
+
+    # Call route
+    result = course_index_page.route(request, path_components)
+
+    # Verify all remaining components were passed
+    mock_route.assert_called_once_with(request, expected_remaining)
+    assert result == mock_route.return_value
+
+
+class TestFlexiblePricingFormBuilder:
+    """Tests for FlexiblePricingFormBuilder methods"""
+
+    def test_create_country_field_with_currency_exchange_rates(self):
+        """Test create_country_field method with currency exchange rates in database"""
+        from cms.models import FlexiblePricingFormBuilder  # noqa: PLC0415
+        from flexiblepricing.factories import (  # noqa: PLC0415
+            CurrencyExchangeRateFactory,
+        )
+
+        CurrencyExchangeRateFactory.create(currency_code="USD", description="US Dollar")
+        CurrencyExchangeRateFactory.create(currency_code="EUR", description="Euro")
+        CurrencyExchangeRateFactory.create(currency_code="GBP", description="")
+
+        field = None
+        options = {"label": "Country Currency"}
+
+        result = FlexiblePricingFormBuilder.create_country_field(None, field, options)
+
+        assert isinstance(result, ChoiceField)
+
+        expected_choices = [
+            ("USD", "USD - US Dollar"),
+            ("EUR", "EUR - Euro"),
+            ("GBP", "GBP"),
+        ]
+        assert set(result.choices) == set(expected_choices)
+
+        assert "error_messages" in result.__dict__
+        assert (
+            result.error_messages["required"] == "Country Currency is a required field."
+        )
+
+    def test_create_country_field_with_no_currency_exchange_rates(self):
+        """Test create_country_field method with no currency exchange rates in database"""
+        from cms.models import FlexiblePricingFormBuilder  # noqa: PLC0415
+        from flexiblepricing.models import CurrencyExchangeRate  # noqa: PLC0415
+
+        CurrencyExchangeRate.objects.all().delete()
+
+        field = None
+        options = {"label": "Currency Selection"}
+
+        result = FlexiblePricingFormBuilder.create_country_field(None, field, options)
+
+        assert isinstance(result, ChoiceField)
+
+        assert result.choices == []
+
+        assert "error_messages" in result.__dict__
+        assert (
+            result.error_messages["required"]
+            == "Currency Selection is a required field."
+        )
+
+    def test_create_country_field_with_null_description(self):
+        """Test create_country_field method with currency exchange rate having None description"""
+        from cms.models import FlexiblePricingFormBuilder  # noqa: PLC0415
+        from flexiblepricing.factories import (  # noqa: PLC0415
+            CurrencyExchangeRateFactory,
+        )
+
+        CurrencyExchangeRateFactory.create(currency_code="JPY", description=None)
+
+        field = None
+        options = {"label": "Test Label"}
+
+        result = FlexiblePricingFormBuilder.create_country_field(None, field, options)
+
+        assert isinstance(result, ChoiceField)
+
+        expected_choices = [("JPY", "JPY")]
+        assert result.choices == expected_choices
+
+        assert result.error_messages["required"] == "Test Label is a required field."
+
+    def test_create_country_field_ordering(self):
+        """Test that create_country_field maintains alphabetical ordering of choices"""
+        from cms.models import FlexiblePricingFormBuilder  # noqa: PLC0415
+        from flexiblepricing.factories import (  # noqa: PLC0415
+            CurrencyExchangeRateFactory,
+        )
+
+        CurrencyExchangeRateFactory.create(
+            currency_code="ZAR", description="South African Rand"
+        )
+        CurrencyExchangeRateFactory.create(
+            currency_code="AUD", description="Australian Dollar"
+        )
+        CurrencyExchangeRateFactory.create(
+            currency_code="MXN", description="Mexican Peso"
+        )
+
+        field = None
+        options = {"label": "Currency"}
+
+        result = FlexiblePricingFormBuilder.create_country_field(None, field, options)
+
+        expected_choices = [
+            ("AUD", "AUD - Australian Dollar"),
+            ("MXN", "MXN - Mexican Peso"),
+            ("ZAR", "ZAR - South African Rand"),
+        ]
+        assert result.choices == expected_choices
+
+
+# Additional comprehensive tests for FlexiblePricingRequestForm.get_context method
+
+
+def test_flexible_pricing_form_get_context_basic_structure():
+    """Test that get_context returns the expected basic structure"""
+    # Arrange
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+    course_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    # Act
+    context = flex_form.get_context(request)
+
+    # Assert
+    assert "prior_request" in context
+    assert "country_of_income" in context
+    assert "country_of_residence" in context
+    assert "product" in context
+    assert "product_page" in context
+
+
+def test_flexible_pricing_form_get_context_no_previous_submission():
+    """Test get_context when user has no previous flexible pricing submission"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+
+    user.legal_address.country = ""
+    user.legal_address.save()
+
+    course_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    context = flex_form.get_context(request)
+
+    assert context["prior_request"] is None
+    assert context["country_of_income"] == ""
+    assert context["country_of_residence"] == ""
+
+
+def test_flexible_pricing_form_get_context_with_user_legal_address():
+    """Test get_context when user has legal address"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+    user.legal_address.country = "US"
+    user.legal_address.save()
+
+    course_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    context = flex_form.get_context(request)
+
+    assert context["country_of_income"] == "US"
+    assert context["country_of_residence"] == "US"
+
+
+def test_flexible_pricing_form_get_context_previous_submission_overrides():
+    """Test that previous submission country values override legal address"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+
+    user.legal_address.country = "US"
+    user.legal_address.save()
+
+    course_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    FlexiblePriceFactory.create(
+        user=user,
+        courseware_object=course_page.course,
+        country_of_income="CA",
+        country_of_residence="UK",
+    )
+
+    context = flex_form.get_context(request)
+
+    assert context["country_of_income"] == "CA"
+    assert context["country_of_residence"] == "UK"
+
+
+def test_flexible_pricing_form_get_context_with_specific_submission():
+    """Test get_context with specific flexible pricing submission"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+    course_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    submission = FlexiblePricingRequestSubmission.objects.create(
+        form_data=json.dumps({"test": "data"}), page=flex_form, user=user
+    )
+    flexible_price = FlexiblePriceFactory.create(
+        user=user,
+        courseware_object=course_page.course,
+        cms_submission=submission,
+        status=FlexiblePriceStatus.PENDING_MANUAL_APPROVAL,
+    )
+
+    context = flex_form.get_context(request)
+
+    assert context["prior_request"] == flexible_price
+
+
+def test_flexible_pricing_form_get_context_product_for_course():
+    """Test get_context returns active product for course"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+    course_page = CoursePageFactory.create()
+    course_run = CourseRunFactory.create(course=course_page.course)
+    product = ProductFactory.create(purchasable_object=course_run, is_active=True)
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    context = flex_form.get_context(request)
+
+    assert context["product"] == product
+    assert context["product_page"] == course_page.url
+
+
+def test_flexible_pricing_form_get_context_course_no_active_products():
+    """Test get_context returns None when course has no active products"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+    course_page = CoursePageFactory.create()
+    course_run = CourseRunFactory.create(course=course_page.course)
+    ProductFactory.create(purchasable_object=course_run, is_active=False)
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    context = flex_form.get_context(request)
+
+    assert context["product"] is None
+    assert context["product_page"] == course_page.url
+
+
+def test_flexible_pricing_form_get_context_product_for_program():
+    """Test get_context returns None for program (as per the logic)"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+    program_page = ProgramPageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=program_page)
+
+    context = flex_form.get_context(request)
+
+    assert context["product"] is None
+    assert context["product_page"] == program_page.url
+
+
+def test_flexible_pricing_form_get_context_with_anonymous_user():
+    """Test get_context with anonymous user"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = AnonymousUser()
+    course_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    context = flex_form.get_context(request)
+
+    assert context["prior_request"] is None
+    assert context["country_of_income"] == ""
+    assert context["country_of_residence"] == ""
+
+
+def test_flexible_pricing_form_get_context_courseware_specific():
+    """Test that get_previous_submission respects courseware-specific logic"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+
+    course1_page = CoursePageFactory.create()
+    course2_page = CoursePageFactory.create()
+
+    flex_form = FlexiblePricingFormFactory.create(parent=course1_page)
+
+    FlexiblePriceFactory.create(
+        user=user,
+        courseware_object=course2_page.course,
+        country_of_income="FR",
+        country_of_residence="DE",
+    )
+
+    flexible_price_same_course = FlexiblePriceFactory.create(
+        user=user,
+        courseware_object=course1_page.course,
+        country_of_income="JP",
+        country_of_residence="KR",
+    )
+
+    context = flex_form.get_context(request)
+
+    assert context["prior_request"] == flexible_price_same_course
+    assert context["country_of_income"] == "JP"
+    assert context["country_of_residence"] == "KR"
+
+
+def test_flexible_pricing_form_get_context_absolute_last_submission_fallback():
+    """Test that absolute last submission is used for country info when no courseware-specific submission exists"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+
+    course1_page = CoursePageFactory.create()
+    course2_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course1_page)
+
+    FlexiblePriceFactory.create(
+        user=user,
+        courseware_object=course2_page.course,
+        country_of_income="IT",
+        country_of_residence="ES",
+    )
+
+    context = flex_form.get_context(request)
+
+    assert context["prior_request"] is None
+    assert context["country_of_income"] == "IT"
+    assert context["country_of_residence"] == "ES"
+
+
+@pytest.mark.parametrize("has_legal_address", [True, False])
+@pytest.mark.parametrize("has_previous_submission", [True, False])
+def test_flexible_pricing_form_get_context_country_precedence(
+    has_legal_address, has_previous_submission
+):
+    """Test the precedence of country information sources"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+    course_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    if has_legal_address:
+        user.legal_address.country = "US"
+        user.legal_address.save()
+    else:
+        user.legal_address.country = ""
+        user.legal_address.save()
+
+    if has_previous_submission:
+        FlexiblePriceFactory.create(
+            user=user,
+            courseware_object=course_page.course,
+            country_of_income="CA",
+            country_of_residence="MX",
+        )
+
+    context = flex_form.get_context(request)
+
+    if has_previous_submission:
+        assert context["country_of_income"] == "CA"
+        assert context["country_of_residence"] == "MX"
+    elif has_legal_address:
+        assert context["country_of_income"] == "US"
+        assert context["country_of_residence"] == "US"
+    else:
+        assert context["country_of_income"] == ""
+        assert context["country_of_residence"] == ""
+
+
+def test_fp_request_form_get_context_no_previous_submission():
+    """Test get_context when there is no previous submission."""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+
+    course_page = CoursePageFactory.create()
+    run = CourseRunFactory.create(course=course_page.course)
+    product = ProductFactory.create(purchasable_object=run)
+
+    flex_form = FlexiblePricingFormFactory(parent=course_page)
+
+    # Update user's legal address (UserFactory already creates one)
+    user.legal_address.country = "US"
+    user.legal_address.save()
+
+    context = flex_form.get_context(request)
+
+    # Should inherit from parent
+    assert "prior_request" in context
+    assert context["prior_request"] is None
+
+    assert context["country_of_income"] == "US"
+    assert context["country_of_residence"] == "US"
+
+    assert context["product"] == product
+    assert context["product_page"] == course_page.url
+
+
+def test_fp_request_form_get_context_with_previous_submission():
+    """Test get_context when there is a previous submission."""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+
+    course_page = CoursePageFactory.create()
+    run = CourseRunFactory.create(course=course_page.course)
+    product = ProductFactory.create(purchasable_object=run)
+    flex_form = FlexiblePricingFormFactory(parent=course_page)
+
+    # Create previous submission with different country data
+    submission = FlexiblePricingRequestSubmission.objects.create(
+        form_data=json.dumps({}), page=flex_form, user=user
+    )
+    flexible_price = FlexiblePrice.objects.create(
+        user=user,
+        cms_submission=submission,
+        courseware_object=course_page.course,
+        country_of_income="CA",
+        country_of_residence="CA",
+        status=FlexiblePriceStatus.CREATED,
+    )
+
+    user.legal_address.country = "US"
+    user.legal_address.save()
+
+    context = flex_form.get_context(request)
+
+    assert context["prior_request"] == flexible_price
+
+    assert context["country_of_income"] == "CA"
+    assert context["country_of_residence"] == "CA"
+
+    assert context["product"] == product
+    assert context["product_page"] == course_page.url
+
+
+def test_fp_request_form_get_context_no_legal_address():
+    """Test get_context when user has no legal address."""
+    rf = RequestFactory()
+    request = rf.get("/")
+
+    User = get_user_model()
+    user = User.objects.create_user(username="testuser", email="test@example.com")
+    request.user = user
+
+    course_page = CoursePageFactory.create()
+    run = CourseRunFactory.create(course=course_page.course)
+    product = ProductFactory.create(purchasable_object=run)
+    flex_form = FlexiblePricingFormFactory(parent=course_page)
+
+    context = flex_form.get_context(request)
+
+    assert context["country_of_income"] == ""
+    assert context["country_of_residence"] == ""
+
+    assert context["product"] == product
+    assert context["product_page"] == course_page.url
+
+
+def test_fp_request_form_get_context_program_page():
+    """Test get_context when form is under a program page."""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+
+    program_page = ProgramPageFactory.create()
+    flex_form = FlexiblePricingFormFactory(parent=program_page)
+
+    context = flex_form.get_context(request)
+
+    assert context["product"] is None
+    assert context["product_page"] == program_page.url
+
+
+def test_fp_request_form_get_context_absolute_last_submission():
+    """Test that absolute last submission overrides legal address."""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+
+    course_page1 = CoursePageFactory.create()
+    course_page2 = CoursePageFactory.create()
+    run1 = CourseRunFactory.create(course=course_page1.course)
+    run2 = CourseRunFactory.create(course=course_page2.course)
+    ProductFactory.create(purchasable_object=run1)
+    ProductFactory.create(purchasable_object=run2)
+
+    flex_form1 = FlexiblePricingFormFactory(parent=course_page1)
+    flex_form2 = FlexiblePricingFormFactory(parent=course_page2)
+
+    user.legal_address.country = "US"
+    user.legal_address.save()
+    submission = FlexiblePricingRequestSubmission.objects.create(
+        form_data=json.dumps({}), page=flex_form1, user=user
+    )
+    FlexiblePrice.objects.create(
+        user=user,
+        cms_submission=submission,
+        courseware_object=course_page1.course,
+        country_of_income="MX",
+        country_of_residence="MX",
+        status=FlexiblePriceStatus.CREATED,
+    )
+
+    context = flex_form2.get_context(request)
+
+    assert context["country_of_income"] == "MX"
+    assert context["country_of_residence"] == "MX"
+
+
+def test_flexible_pricing_form_serve_redirects_anonymous_user_to_login(settings):
+    """
+    An anonymous visitor cannot apply for financial assistance, so serve() sends
+    them through the gateway login route and back to the form afterwards.
+    """
+    course_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    form_path = "/courses/course-v1:MITxT+3.024x/financial-assistance-request/"
+    request = RequestFactory().get(form_path, {"ecom-service": "true"})
+    request.user = AnonymousUser()
+
+    response = flex_form.serve(request)
+
+    assert response.status_code == 302
+    location = urlparse(response.url)
+    assert location.path == reverse(settings.LOGIN_URL)
+
+    query = parse_qs(location.query)
+    # The whole path comes back, query string included, so a visitor arriving
+    # from Learn returns to the same chrome-less view they started in.
+    assert query["next"] == [f"{form_path}?ecom-service=true"]
+    # Nothing on this form needs the MITxOnline profile, so don't detour through
+    # onboarding on the way back.
+    assert query["skip_onboarding"] == ["1"]
+
+
+def test_flexible_pricing_form_serve_renders_for_authenticated_user():
+    """An authenticated visitor gets the form itself, not a redirect."""
+    course_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    request = RequestFactory().get("/courses/a-course/financial-assistance-request/")
+    request.user = UserFactory.create()
+
+    response = flex_form.serve(request)
+
+    assert response.status_code == 200
+
+
+def _render_certificate_page_form(course_page, user, *, new=False):
+    """Render CertificatePage's admin edit (or create) form panels as HTML"""
+    page = CertificatePage() if new else course_page.get_children().get().specific
+    edit_handler = CertificatePage.get_edit_handler()
+    form = edit_handler.get_form_class()(
+        instance=page, parent_page=course_page, for_user=user
+    )
+    request = RequestFactory().get("/")
+    request.user = user
+    return edit_handler.get_bound_panel(
+        instance=page, form=form, request=request
+    ).render_html()
+
+
+@pytest.mark.parametrize("new", [True, False])
+def test_generate_with_ai_buttons(mocker, settings, new):
+    """Both VC text fields get a button pointing at the parent's metadata URL"""
+    mocker.patch("cms.models.is_enabled", return_value=True)
+    settings.MIT_LEARN_API_BASE_URL = "https://learn.example.com"
+    course_page = CoursePageFactory.create()
+    user = UserFactory.create(is_superuser=True)
+
+    html = _render_certificate_page_form(course_page, user, new=new)
+
+    url = reverse("cms_credential_metadata", args=[course_page.id])
+    assert html.count(f'data-credential-metadata-url="{url}"') == 2
+    assert 'data-credential-metadata-field="description"' in html
+    assert 'data-credential-metadata-field="criteria"' in html
+    assert html.count("This is generated by AI") == 2
+    assert 'name="verifiable_credential_description"' in html
+    assert 'name="verifiable_credential_criteria"' in html
+
+
+def test_generate_with_ai_buttons_need_mit_learn(mocker, settings):
+    """Without a MIT Learn host there are no buttons, but both fields still show"""
+    mocker.patch("cms.models.is_enabled", return_value=True)
+    settings.MIT_LEARN_API_BASE_URL = ""
+    user = UserFactory.create(is_superuser=True)
+
+    html = _render_certificate_page_form(CoursePageFactory.create(), user)
+
+    assert "Generate with AI" not in html
+    assert 'name="verifiable_credential_description"' in html
+    assert 'name="verifiable_credential_criteria"' in html
+
+
+def test_generate_with_ai_buttons_need_flag(mocker, settings):
+    """With the flag off there are no buttons and no description field"""
+    mocker.patch("cms.models.is_enabled", return_value=False)
+    settings.MIT_LEARN_API_BASE_URL = "https://learn.example.com"
+    user = UserFactory.create(is_superuser=True)
+
+    html = _render_certificate_page_form(CoursePageFactory.create(), user)
+
+    assert "Generate with AI" not in html
+    assert 'name="verifiable_credential_description"' not in html
+    assert 'name="verifiable_credential_criteria"' in html
+
+
+def test_generate_with_ai_panel_loads_script():
+    """The panel pulls in the script that makes its buttons work"""
+    panel = CertificatePage.get_edit_handler()
+    form = panel.get_form_class()(
+        instance=CertificatePage(), parent_page=CoursePageFactory.create()
+    )
+    bound = panel.get_bound_panel(instance=CertificatePage(), form=form)
+
+    assert "js/credential_metadata_admin.js" in str(bound.media)

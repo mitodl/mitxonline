@@ -1,8 +1,8 @@
 """flexible price status change email messages"""
 
-from mitol.mail.messages import TemplatedMessage
+from mail.messages import SiteTemplatedMessage
 
 
-class FlexiblePriceStatusChangeMessage(TemplatedMessage):
+class FlexiblePriceStatusChangeMessage(SiteTemplatedMessage):
     template_name = "mail/flexible_price"
     name = "Flexible Price Status Change"

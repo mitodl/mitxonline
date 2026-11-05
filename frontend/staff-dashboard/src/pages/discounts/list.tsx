@@ -1,18 +1,6 @@
-import {
-    List,
-    DateField,
-    ShowButton,
-    Table,
-    useTable,
-    Space,
-    EditButton,
-    Tag,
-    Row,
-    Col,
-    Card,
-    Button,
-} from "@pankod/refine-antd";
-import { CrudFilters, HttpError, useInvalidate, useNavigation } from "@pankod/refine-core";
+import { List, DateField, ShowButton, useTable, EditButton } from "@refinedev/antd";
+import { Table, Space, Tag, Row, Col, Card, Button } from "antd";
+import { CrudFilters, HttpError, useGo, useInvalidate } from "@refinedev/core";
 
 import { DiscountFilterForm } from "components/discounts/filter_form";
 
@@ -20,15 +8,14 @@ import { IDiscount, IDiscountFilters } from "interfaces";
 
 export const DiscountList: React.FC = () => {
     const invalidate = useInvalidate()
-    const navigation = useNavigation()
-    const {tableQueryResult, tableProps, searchFormProps} = useTable<
+    const go = useGo()
+    const {tableQuery, tableProps, searchFormProps} = useTable<
         IDiscount,
         HttpError,
         IDiscountFilters
     >({
         resource: 'discounts',
-        initialCurrent: 1,
-        initialPageSize: 40,
+
         onSearch: (params) => {
             const filters: CrudFilters = [];
             const { q, redemption_type, payment_type, is_redeemed } = params;
@@ -58,11 +45,16 @@ export const DiscountList: React.FC = () => {
             });
 
             return filters;
+        },
+
+        pagination: {
+            current: 1,
+            pageSize: 40
         }
     });
 
     const refreshList = () => {
-        tableQueryResult.refetch()
+        tableQuery.refetch()
     }
 
     return (
@@ -80,7 +72,7 @@ export const DiscountList: React.FC = () => {
                     <List>
                         <Row justify="end" gutter={[10, 10]}>
                             <Col sm={24}>
-                                <Button style={{ "float": "right", "marginBottom": "5px" }} onClick={() => { navigation.push("/discounts/create_batch"); }}>Bulk Create</Button>
+                                <Button style={{ "float": "right", "marginBottom": "5px" }} onClick={() => { go({ to: "/discounts/create_batch" }); }}>Bulk Create</Button>
                             </Col>
                         </Row>
 

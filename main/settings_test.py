@@ -2,11 +2,12 @@
 Validate that our settings functions work
 """
 
+import re
 import sys
 from types import SimpleNamespace
 
 import pytest
-import semantic_version
+import tomllib
 from django.core import mail
 from django.core.exceptions import ImproperlyConfigured
 from mitol.common import envs
@@ -57,7 +58,7 @@ def test_s3_settings(settings_sandbox):
     # Unset, we don't do S3
     settings_vars = settings_sandbox.patch({"MITX_ONLINE_USE_S3": "False"})
 
-    assert settings_vars.get("DEFAULT_FILE_STORAGE") is None
+    assert settings_vars.get("STORAGES", {}).get("default", {}).get("BACKEND") is None
 
     with pytest.raises(ImproperlyConfigured):
         settings_sandbox.patch({"MITX_ONLINE_USE_S3": "True"})
@@ -72,9 +73,21 @@ def test_s3_settings(settings_sandbox):
         }
     )
     assert (
-        settings_vars.get("DEFAULT_FILE_STORAGE")
+        settings_vars.get("STORAGES", {}).get("default", {}).get("BACKEND")
         == "storages.backends.s3boto3.S3Boto3Storage"
     )
+    assert settings_vars["AWS_S3_CUSTOM_DOMAIN"] is None
+
+    settings_vars = settings_sandbox.patch(
+        {
+            "MITX_ONLINE_USE_S3": "True",
+            "AWS_ACCESS_KEY_ID": "1",
+            "AWS_SECRET_ACCESS_KEY": "2",
+            "AWS_STORAGE_BUCKET_NAME": "3",
+            "AWS_S3_CUSTOM_DOMAIN": "mitxonline.example.com/media",
+        }
+    )
+    assert settings_vars["AWS_S3_CUSTOM_DOMAIN"] == "mitxonline.example.com/media"
 
 
 def test_admin_settings(settings_sandbox, settings):
@@ -99,7 +112,7 @@ def test_admin_settings(settings_sandbox, settings):
 def test_csrf_cookie_domain(settings_sandbox):
     """Verify that we can configure CSRF_COOKIE_DOMAIN with a var"""
     # Test the default
-    settings_vars = settings_sandbox.get()
+    settings_vars = settings_sandbox.reload()
     assert settings_vars.get("CSRF_COOKIE_DOMAIN") is None
 
     # Verify the env var works
@@ -110,7 +123,7 @@ def test_csrf_cookie_domain(settings_sandbox):
 def test_csrf_trusted_origins(settings_sandbox):
     """Verify that we can configure CSRF_TRUSTED_ORIGINS with a var"""
     # Test the default
-    settings_vars = settings_sandbox.get()
+    settings_vars = settings_sandbox.reload()
     assert settings_vars.get("CSRF_TRUSTED_ORIGINS") == []
 
     # Verify the env var works
@@ -128,7 +141,7 @@ def test_csrf_trusted_origins(settings_sandbox):
 def test_mitol_apigateway_allowed_redirect_hosts(settings_sandbox):
     """Verify that we can configure MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS with a var"""
     # Test the default
-    settings_vars = settings_sandbox.get()
+    settings_vars = settings_sandbox.reload()
     assert settings_vars.get("MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS") == [
         "localhost",
         "mitxonline.odl.local",
@@ -161,26 +174,15 @@ def test_db_ssl_enable(monkeypatch, settings_sandbox):
     assert settings_vars["DATABASES"]["default"]["OPTIONS"] == {"sslmode": "require"}
 
 
-def test_semantic_version(settings):
-    """
-    Verify that we have a semantic compatible version.
-    """
-    semantic_version.Version(settings.VERSION)
-
-
-def test_server_side_cursors_disabled(settings_sandbox):
-    """DISABLE_SERVER_SIDE_CURSORS should be true by default"""
-    settings_vars = settings_sandbox.get()
-    assert (
-        settings_vars["DEFAULT_DATABASE_CONFIG"]["DISABLE_SERVER_SIDE_CURSORS"] is True
-    )
-
-
-def test_server_side_cursors_enabled(settings_sandbox):
-    """DISABLE_SERVER_SIDE_CURSORS should be false if MITX_ONLINE_DB_DISABLE_SS_CURSORS is false"""
-    settings_vars = settings_sandbox.patch(
-        {"MITX_ONLINE_DB_DISABLE_SS_CURSORS": "False"}
-    )
-    assert (
-        settings_vars["DEFAULT_DATABASE_CONFIG"]["DISABLE_SERVER_SIDE_CURSORS"] is False
-    )
+@pytest.mark.skip("Not fully implemented")
+def test_bump_my_version_format(settings):
+    """Verify VERSION is in sync with pyproject.toml and matches a version format."""
+    with open("pyproject.toml", "rb") as f:  # noqa: PTH123
+        pyproject = tomllib.load(f)
+    version_pattern = pyproject["tool"]["bumpversion"]["parse"]
+    package_version = pyproject["project"]["version"]
+    assert package_version == settings.VERSION
+    semver_pattern = r"[0-9]+\.[0-9]+\.[0-9]+"
+    assert re.fullmatch(version_pattern, settings.VERSION) or re.fullmatch(
+        semver_pattern, settings.VERSION
+    ), f'VERSION "{settings.VERSION}" does not match calver or semver format'

@@ -1,8 +1,14 @@
 // @flow
+/* global SETTINGS:false */
 import { include } from "named-urls"
 import qs from "query-string"
 
 export const getNextParam = (search: string) => qs.parse(search).next || "/"
+
+export const learnProductUrl = (productType: string, readableId: string) => {
+  const base = SETTINGS.mit_learn_base_url || "https://learn.mit.edu"
+  return `${base}/${productType}/${readableId}`
+}
 
 export const routes = {
   root:                   "/",
@@ -54,9 +60,12 @@ export const routes = {
   orderReceipt: "/orders/receipt/:orderId",
 
   informationLinks: include("", {
-    termsOfService: "terms-of-service",
-    privacyPolicy:  "privacy-policy",
-    honorCode:      "honor-code"
+    termsOfService:
+      SETTINGS.mit_learn_terms_url || "https://learn.mit.edu/terms",
+    privacyPolicy:
+      SETTINGS.mit_learn_privacy_url || "https://learn.mit.edu/privacy",
+    honorCode:
+      SETTINGS.mit_learn_honor_code_url || "https://learn.mit.edu/honor_code"
   }),
 
   learnerRecords:      "/records/:program/",

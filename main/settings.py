@@ -8,11 +8,12 @@ import os
 import platform
 import sys
 from datetime import timedelta
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 import cssutils
 import dj_database_url
 from celery.schedules import crontab
+from django.conf import global_settings
 from django.core.exceptions import ImproperlyConfigured
 from mitol.apigateway.settings import *  # noqa: F403  # noqa: F403
 from mitol.common.envs import (
@@ -28,15 +29,17 @@ from mitol.common.settings.celery import *  # noqa: F403
 from mitol.google_sheets.settings.google_sheets import *  # noqa: F403
 from mitol.google_sheets_deferrals.settings.google_sheets_deferrals import *  # noqa: F403
 from mitol.google_sheets_refunds.settings.google_sheets_refunds import *  # noqa: F403
+from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
 from mitol.scim.settings.scim import *  # noqa: F403
 from redbeat import RedBeatScheduler
 
 from main.celery_utils import OffsettingSchedule
+from main.constants import ENV_TO_LEARN_HOSTNAME_MAP
 from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "0.131.1"
+VERSION = "2026.11.3.1"
 
 log = logging.getLogger()
 
@@ -222,7 +225,7 @@ INSTALLED_APPS = (
     "django.contrib.humanize",
     "django.contrib.sites",
     "django_user_agents",
-    "social_django",
+    "django_removals",
     "oauth2_provider",
     "rest_framework",
     "anymail",
@@ -252,8 +255,10 @@ INSTALLED_APPS = (
     "reversion",
     # django-treebeard
     "treebeard",
+    "health_check",
     # Put our apps after this point
     "main",
+    "variants",
     "authentication",
     "courses",
     "hubspot_sync",
@@ -262,23 +267,21 @@ INSTALLED_APPS = (
     "cms.apps.CustomWagtailUsersAppConfig",
     "cms",
     "sheets",
-    # "compliance",
+    "compliance",
     "openedx",
     # must be after "users" to pick up custom user model
-    "hijack",
-    "hijack.contrib.admin",
     "ecommerce",
     "flexiblepricing",
     "micromasters_import",
     # ol-django apps, must be after this project's apps for template precedence
     "mitol.common.apps.CommonApp",
+    "mitol.observability.apps.ObservabilityConfig",
     "mitol.google_sheets.apps.GoogleSheetsApp",
     "mitol.google_sheets_refunds.apps.GoogleSheetsRefundsApp",
     "mitol.google_sheets_deferrals.apps.GoogleSheetsDeferralsApp",
     # "mitol.digitalcredentials.apps.DigitalCredentialsApp",
     "mitol.hubspot_api",
     "mitol.mail.apps.MailApp",
-    "mitol.authentication.apps.TransitionalAuthenticationApp",
     "mitol.payment_gateway.apps.PaymentGatewayApp",
     "mitol.olposthog.apps.OlPosthog",
     "mitol.scim.apps.ScimApp",
@@ -288,50 +291,11 @@ INSTALLED_APPS = (
     "drf_spectacular",
     "mitol.apigateway.apps.ApigatewayApp",
     "b2b",
-    "health_check",
-    "health_check.cache",
-    "health_check.contrib.migrations",
-    "health_check.contrib.celery_ping",
-    "health_check.contrib.redis",
-    "health_check.contrib.db_heartbeat",
     "rest_framework_api_key",
 )
 # Only include the seed data app if this isn't running in prod
 # if ENVIRONMENT not in ("production", "prod"):
 #     INSTALLED_APPS += ("localdev.seed",)  # noqa: ERA001
-
-HEALTH_CHECK = {
-    "SUBSETS": {
-        # The 'startup' subset includes checks that must pass before the application can
-        # start.
-        "startup": [
-            "MigrationsHealthCheck",  # Ensures database migrations are applied.
-            "CacheBackend",  # Verifies the cache backend is operational.
-            "RedisHealthCheck",  # Confirms Redis is reachable and functional.
-            "DatabaseHeartBeatCheck",  # Checks the database connection is alive.
-        ],
-        # The 'liveness' subset includes checks to determine if the application is
-        # running.
-        "liveness": ["DatabaseHeartBeatCheck"],  # Minimal check to ensure the app is
-        # alive.
-        # The 'readiness' subset includes checks to determine if the application is
-        # ready to serve requests.
-        "readiness": [
-            "CacheBackend",  # Ensures the cache is ready for use.
-            "RedisHealthCheck",  # Confirms Redis is ready for use.
-            "DatabaseHeartBeatCheck",  # Verifies the database is ready for queries.
-        ],
-        # The 'full' subset includes all available health checks for a comprehensive
-        # status report.
-        "full": [
-            "MigrationsHealthCheck",  # Ensures database migrations are applied.
-            "CacheBackend",  # Verifies the cache backend is operational.
-            "RedisHealthCheck",  # Confirms Redis is reachable and functional.
-            "DatabaseHeartBeatCheck",  # Checks the database connection is alive.
-            "CeleryPingHealthCheck",  # Verifies Celery workers are responsive.
-        ],
-    }
-}
 
 MIDDLEWARE = (
     "django.middleware.security.SecurityMiddleware",
@@ -340,25 +304,54 @@ MIDDLEWARE = (
     "django.middleware.common.CommonMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "mitol.apigateway.middleware.ApisixUserMiddleware",
+    "main.middleware.AnonymousBasketHandoffMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "main.middleware.HostBasedCSRFMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django.contrib.sites.middleware.CurrentSiteMiddleware",
     "django_user_agents.middleware.UserAgentMiddleware",
-    "hijack.middleware.HijackUserMiddleware",
     "main.middleware.CachelessAPIMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
     "oauth2_provider.middleware.OAuth2TokenMiddleware",
     "django_scim.middleware.SCIMAuthCheckMiddleware",
 )
+ZEAL_ENABLE = get_bool(
+    name="ZEAL_ENABLE", default=False, description="Whether to enable zeal or not"
+)
 
-# enable the nplusone profiler only in debug mode
-if DEBUG:
-    INSTALLED_APPS += ("nplusone.ext.django",)
-    MIDDLEWARE += ("nplusone.ext.django.NPlusOneMiddleware",)
+# enable the zeal nplusone profiler only in debug mode or under pytest
+if ZEAL_ENABLE or ENVIRONMENT == "pytest":
+    INSTALLED_APPS += ("zeal",)
+    # this should be the first middleware so we catch any issues in our own middleware
+    MIDDLEWARE += ("zeal.middleware.zeal_middleware",)
+
+ZEAL_RAISE = False
+ZEAL_ALLOWLIST = []
+
+# use a fast, insecure password hasher under pytest - tests don't need real hashing strength
+if ENVIRONMENT == "pytest":
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
+
+ANONYMOUS_BASKET_CULL_AGE = get_int(
+    name="ANONYMOUS_BASKET_CULL_AGE",
+    default=global_settings.SESSION_COOKIE_AGE,
+    description="Seconds of inactivity after which an anonymous (unclaimed) basket is deleted",
+)
+
+PENDING_ORDER_CULL_AGE_DAYS = get_int(
+    name="PENDING_ORDER_CULL_AGE_DAYS",
+    default=60,
+    description="Age in days after which an unresolved PendingOrder is deleted",
+)
+
+B2B_USER_LATEST_SESSION_CACHE_TIMEOUT = get_int(
+    name="B2B_USER_LATEST_SESSION_CACHE_TIMEOUT",
+    default=60 * 60 * 24 * 30,
+    description="Seconds to keep the auth time of a user's most recent APISIX session, used to skip org reconciliation for older sessions",
+)
 
 MITXONLINE_NEW_USER_LOGIN_URL = get_string(
     name="MITXONLINE_NEW_USER_LOGIN_URL",
@@ -366,7 +359,7 @@ MITXONLINE_NEW_USER_LOGIN_URL = get_string(
     description="URL to redirect new users to after login",
 )
 LOGIN_REDIRECT_URL = "/"
-LOGIN_URL = "/signin"
+LOGIN_URL = "gateway-login"
 LOGOUT_REDIRECT_URL = get_string(
     name="LOGOUT_REDIRECT_URL",
     default="/",
@@ -386,8 +379,6 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                "social_django.context_processors.backends",
-                "social_django.context_processors.login_redirect",
                 "main.context_processors.api_keys",
                 "main.context_processors.configuration_context",
             ]
@@ -406,7 +397,6 @@ DEFAULT_DATABASE_CONFIG = dj_database_url.parse(
         default="sqlite:///{0}".format(os.path.join(BASE_DIR, "db.sqlite3")),  # noqa: PTH118, UP030
         description="The connection url to the Postgres database",
         required=True,
-        write_app_json=False,
     )
 )
 DEFAULT_DATABASE_CONFIG["CONN_MAX_AGE"] = get_int(
@@ -414,13 +404,6 @@ DEFAULT_DATABASE_CONFIG["CONN_MAX_AGE"] = get_int(
     default=0,
     description="Maximum age of connection to Postgres in seconds",
 )
-# If True, disables server-side database cursors to prevent invalid cursor errors when using pgbouncer
-DEFAULT_DATABASE_CONFIG["DISABLE_SERVER_SIDE_CURSORS"] = get_bool(
-    name="MITX_ONLINE_DB_DISABLE_SS_CURSORS",
-    default=True,
-    description="Disables Postgres server side cursors",
-)
-
 
 if get_bool(
     name="MITX_ONLINE_DB_DISABLE_SSL",
@@ -453,107 +436,11 @@ ROBOTS_CACHE_TIMEOUT = get_int(
     description="How long the robots.txt file should be cached",
 )
 
-# Social Auth Configuration
-
 AUTHENTICATION_BACKENDS = (
     "authentication.backends.apisix_remote_user_org.ApisixRemoteUserOrgBackend",
-    "social_core.backends.email.EmailAuth",
     "oauth2_provider.backends.OAuth2Backend",
     "django.contrib.auth.backends.ModelBackend",
 )
-
-SOCIAL_AUTH_LOGIN_ERROR_URL = "login"
-SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS = [urlparse(SITE_BASE_URL).netloc]
-SOCIAL_AUTH_IMMUTABLE_USER_FIELDS = [
-    "global_id",
-]
-
-# Email backend settings
-
-SOCIAL_AUTH_EMAIL_FORM_URL = "login"
-SOCIAL_AUTH_EMAIL_FORM_HTML = "login.html"
-
-SOCIAL_AUTH_EMAIL_USER_FIELDS = ["username", "email", "name", "password"]
-
-# Only validate emails for the email backend
-SOCIAL_AUTH_EMAIL_FORCE_EMAIL_VALIDATION = True
-
-# Configure social_core.pipeline.mail.mail_validation
-SOCIAL_AUTH_EMAIL_VALIDATION_FUNCTION = "mail.verification_api.send_verification_email"
-SOCIAL_AUTH_EMAIL_VALIDATION_URL = "/"
-
-SOCIAL_AUTH_PIPELINE = (
-    # Checks if an admin user attempts to login/register while hijacking another user.
-    "authentication.pipeline.user.forbid_hijack",
-    # Get the information we can about the user and return it in a simple
-    # format to create the user instance later. On some cases the details are
-    # already part of the auth response from the provider, but sometimes this
-    # could hit a provider API.
-    "social_core.pipeline.social_auth.social_details",
-    # Get the social uid from whichever service we're authing thru. The uid is
-    # the unique identifier of the given user in the provider.
-    "social_core.pipeline.social_auth.social_uid",
-    # Verifies that the current auth process is valid within the current
-    # project, this is where emails and domains whitelists are applied (if
-    # defined).
-    "social_core.pipeline.social_auth.auth_allowed",
-    # Checks if the current social-account is already associated in the site.
-    "social_core.pipeline.social_auth.social_user",
-    # Associates the current social details with another user account with the same email address.
-    "social_core.pipeline.social_auth.associate_by_email",
-    # validate an incoming email auth request
-    "authentication.pipeline.user.validate_email_auth_request",
-    # validate the user's email either it is blocked or not.
-    "authentication.pipeline.user.validate_email",
-    # require a password and profile if they're not set
-    "authentication.pipeline.user.validate_password",
-    # Send a validation email to the user to verify its email address.
-    # Disabled by default.
-    "social_core.pipeline.mail.mail_validation",
-    # Send the email address and hubspot cookie if it exists to hubspot.
-    # "authentication.pipeline.user.send_user_to_hubspot",
-    # Generate a username for the user
-    # NOTE: needs to be right before create_user so nothing overrides the username
-    "authentication.pipeline.user.get_username",
-    # Create a user if one doesn't exist, and require a password and name
-    "authentication.pipeline.user.create_user_via_email",
-    # If we're using the OIDC backend, create the user from the OIDC response
-    "authentication.pipeline.user.create_ol_oidc_user",
-    # verify the user against export compliance
-    # "authentication.pipeline.compliance.verify_exports_compliance",
-    # Create the record that associates the social account with the user.
-    "social_core.pipeline.social_auth.associate_user",
-    # create the user's edx user and auth
-    "authentication.pipeline.user.create_openedx_user",
-    # Populate the extra_data field in the social record with the values
-    # specified by settings (and the default ones like access_token, etc).
-    "social_core.pipeline.social_auth.load_extra_data",
-    # Update the user record with any changed info from the auth service.
-    "social_core.pipeline.user.user_details",
-)
-
-
-# Social Auth OIDC configuration
-
-SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT = get_string(
-    name="SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT",
-    default=None,
-    description="The configuration endpoint for the OIDC provider",
-)
-
-SOCIAL_AUTH_OL_OIDC_KEY = get_string(
-    name="SOCIAL_AUTH_OL_OIDC_KEY",
-    default="some available client id",
-    description="The client id for the OIDC provider",
-)
-
-SOCIAL_AUTH_OL_OIDC_SECRET = get_string(
-    name="SOCIAL_AUTH_OL_OIDC_SECRET",
-    default="some super secret key",
-    description="The client secret for the OIDC provider",
-)
-
-SOCIAL_AUTH_OL_OIDC_SCOPE = ["ol-profile"]
 
 AUTH_CHANGE_EMAIL_TTL_IN_MINUTES = get_int(
     name="AUTH_CHANGE_EMAIL_TTL_IN_MINUTES",
@@ -632,13 +519,6 @@ KEYCLOAK_ADMIN_CLIENT_NO_VERIFY_SSL = get_bool(
 
 # Serve static files with dj-static
 STATIC_URL = "/static/"
-CLOUDFRONT_DIST = get_string(
-    name="CLOUDFRONT_DIST",
-    default=None,
-    description="The Cloundfront distribution to use for static assets",
-)
-if CLOUDFRONT_DIST:
-    STATIC_URL = urljoin(f"https://{CLOUDFRONT_DIST}.cloudfront.net", STATIC_URL)
 
 STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.FileSystemFinder",
@@ -670,6 +550,11 @@ INTERNAL_IPS = (
 )
 
 # Configure e-mail settings
+MITOL_MAIL_CONNECTION_BACKEND = get_string(
+    name="MITOL_MAIL_CONNECTION_BACKEND",
+    default="anymail.backends.mailgun.EmailBackend",
+    description="The default email backend to use for outgoing email. This is used for anything that uses mitol.mail and should only be overridden for testing",
+)
 EMAIL_BACKEND = get_string(
     name="MITX_ONLINE_EMAIL_BACKEND",
     default="django.core.mail.backends.smtp.EmailBackend",
@@ -742,6 +627,12 @@ EMAIL_SUPPORT = get_string(
     description="Email address listed for customer support in the frontend. Not used for sending email.",
 )
 
+REFUND_REQUEST_EMAIL = get_string(
+    name="MITX_ONLINE_REFUND_REQUEST_EMAIL",
+    default=EMAIL_SUPPORT,
+    description="Email address that receives refund request notifications from learners.",
+)
+
 NOTIFICATION_EMAIL_BACKEND = get_string(
     name="MITX_ONLINE_NOTIFICATION_EMAIL_BACKEND",
     default="anymail.backends.mailgun.EmailBackend",
@@ -768,7 +659,7 @@ else:
 MIT_LEARN_FROM_EMAIL = get_string(
     name="MIT_LEARN_FROM_EMAIL",
     default="MIT Learn <mitlearn-support@mit.edu>",
-    description="From email address for UAI enrollment emails",
+    description="From email address for outgoing application emails",
 )
 
 MIT_LEARN_REPLY_TO_EMAIL = get_string(
@@ -777,10 +668,55 @@ MIT_LEARN_REPLY_TO_EMAIL = get_string(
     description="Reply-to email address for UAI enrollment emails (defaults to MIT_LEARN_FROM_EMAIL)",
 )
 
+MIT_LEARN_BASE_URL = get_string(
+    name="MIT_LEARN_BASE_URL",
+    default=f"https://{ENV_TO_LEARN_HOSTNAME_MAP.get(ENVIRONMENT, 'learn.mit.edu')}",
+    description="Base URL of the MIT Learn instance for this environment",
+)
+
+# MIT Learn's API is on a separate host, so MIT_LEARN_BASE_URL cannot be reused.
+# Defaults to empty: this setting is called rather than used to build links, and
+# an unconfigured deployment should make no outbound request at all.
+MIT_LEARN_API_BASE_URL = get_string(
+    name="MIT_LEARN_API_BASE_URL",
+    default="",
+    description="Base URL of the MIT Learn API",
+)
+
 MIT_LEARN_DASHBOARD_URL = get_string(
     name="MIT_LEARN_DASHBOARD_URL",
-    default="https://learn.mit.edu/dashboard",
+    default=f"{MIT_LEARN_BASE_URL}/dashboard",
     description="Dashboard URL for UAI enrollment emails",
+)
+
+MIT_LEARN_TERMS_URL = get_string(
+    name="MIT_LEARN_TERMS_URL",
+    default=f"{MIT_LEARN_BASE_URL}/terms",
+    description="Terms of service URL",
+)
+
+MIT_LEARN_PRIVACY_URL = get_string(
+    name="MIT_LEARN_PRIVACY_URL",
+    default=f"{MIT_LEARN_BASE_URL}/privacy",
+    description="Privacy policy URL",
+)
+
+MIT_LEARN_HONOR_CODE_URL = get_string(
+    name="MIT_LEARN_HONOR_CODE_URL",
+    default=f"{MIT_LEARN_BASE_URL}/honor_code",
+    description="Honor code URL",
+)
+
+MAILGUN_WEBHOOK_SIGNING_SECRET = get_string(
+    name="MAILGUN_WEBHOOK_SIGNING_SECRET",
+    default="",
+    description="The secret to use for validating Mailgun webhook signatures",
+)
+
+MAILGUN_WEBHOOK_VALIDATE_SIGNATURE = get_bool(
+    name="MAILGUN_WEBHOOK_VALIDATE_SIGNATURE",
+    default=True,
+    description="Whether to validate Mailgun signature webhooks for enrollment invite emails. Most useful to disable for local development w/ synthetic payloads",
 )
 
 # Logging configuration
@@ -791,53 +727,26 @@ DJANGO_LOG_LEVEL = get_string(
     name="DJANGO_LOG_LEVEL", default="INFO", description="The log level for django"
 )
 
+# mitol-django-observability reads LOG_LEVEL directly from os.environ; bridge the
+# legacy MITX_ONLINE_LOG_LEVEL env var so operators don't silently lose log control.
+os.environ.setdefault("LOG_LEVEL", LOG_LEVEL)
+
 HOSTNAME = platform.node().split(".")[0]
 
-# nplusone profiler logger configuration
-NPLUSONE_LOGGER = logging.getLogger("nplusone")
-NPLUSONE_LOG_LEVEL = logging.ERROR
+# LOGGING is provided by mitol-django-observability (structlog-based, JSON in prod)
+from mitol.observability.settings.logging import LOGGING  # noqa: E402
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "filters": {"require_debug_false": {"()": "django.utils.log.RequireDebugFalse"}},
-    "formatters": {
-        "verbose": {
-            "format": (
-                "[%(asctime)s] %(levelname)s %(process)d [%(name)s] "
-                "%(filename)s:%(lineno)d - "
-                f"[{HOSTNAME}] - %(message)s"
-            ),
-            "datefmt": "%Y-%m-%d %H:%M:%S",
-        }
-    },
-    "handlers": {
-        "console": {
-            "level": "DEBUG",
-            "class": "logging.StreamHandler",
-            "formatter": "verbose",
-        },
-        "mail_admins": {
-            "level": "ERROR",
-            "filters": ["require_debug_false"],
-            "class": "django.utils.log.AdminEmailHandler",
-        },
-    },
-    "loggers": {
-        "django": {
-            "propagate": True,
-            "level": DJANGO_LOG_LEVEL,
-            "handlers": ["console"],
-        },
-        "django.request": {
-            "handlers": ["mail_admins"],
-            "level": DJANGO_LOG_LEVEL,
-            "propagate": True,
-        },
-        "nplusone": {"handlers": ["console"], "level": "ERROR"},
-    },
-    "root": {"handlers": ["console"], "level": LOG_LEVEL},
+# Restore the AdminEmailHandler so Django still emails ADMINS on unhandled 500
+# errors in production (i.e. when DEBUG=False). Sentry captures errors too, but
+# this provides an independent email-based safety net.
+LOGGING.setdefault("filters", {})
+LOGGING["filters"]["require_debug_false"] = {"()": "django.utils.log.RequireDebugFalse"}
+LOGGING["handlers"]["mail_admins"] = {
+    "level": "ERROR",
+    "filters": ["require_debug_false"],
+    "class": "django.utils.log.AdminEmailHandler",
 }
+LOGGING["loggers"]["django.request"]["handlers"].append("mail_admins")
 
 # server-status
 STATUS_TOKEN = get_string(
@@ -871,8 +780,8 @@ USE_X_FORWARDED_HOST = get_bool(
 )
 SITE_NAME = get_string(
     name="SITE_NAME",
-    default="MITx Online",
-    description="Name of the site. e.g MITx Online",
+    default="MIT Learn",
+    description="Name of the site. e.g MIT Learn",
 )
 WAGTAIL_SITE_NAME = SITE_NAME
 
@@ -908,6 +817,14 @@ AWS_SECRET_ACCESS_KEY = get_string(
 AWS_STORAGE_BUCKET_NAME = get_string(
     name="AWS_STORAGE_BUCKET_NAME", default=None, description="S3 Bucket name."
 )
+AWS_S3_CUSTOM_DOMAIN = get_string(
+    name="AWS_S3_CUSTOM_DOMAIN",
+    default=None,
+    description=(
+        "Host (and optional path) that media URLs are built on instead of the bucket's "
+        "S3 hostname, e.g. mitxonline.mit.edu/media to serve them through the CDN."
+    ),
+)
 AWS_QUERYSTRING_AUTH = get_bool(
     name="AWS_QUERYSTRING_AUTH",
     default=False,
@@ -933,9 +850,9 @@ if MITX_ONLINE_USE_S3 and (
         "AWS_STORAGE_BUCKET_NAME"
     )
 if MITX_ONLINE_USE_S3:
-    if CLOUDFRONT_DIST:
-        AWS_S3_CUSTOM_DOMAIN = f"{CLOUDFRONT_DIST}.cloudfront.net"
-    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+    # Override default storage backend to use S3 (Django 5.0+)
+    STORAGES = global_settings.STORAGES.copy()
+    STORAGES["default"]["BACKEND"] = "storages.backends.s3boto3.S3Boto3Storage"
 
 FEATURES_DEFAULT = get_bool(
     name="FEATURES_DEFAULT",
@@ -943,6 +860,14 @@ FEATURES_DEFAULT = get_bool(
     dev_only=True,
     description="The default value for all feature flags",
 )
+
+# Multiple cart items feature flag
+ENABLE_MULTIPLE_CART_ITEMS = get_bool(
+    name="ENABLE_MULTIPLE_CART_ITEMS",
+    default=False,
+    description="Enable users to add multiple items to their cart/basket",
+)
+
 FEATURES = get_features()
 
 # Redis
@@ -1007,13 +932,33 @@ CRON_PROCESS_REFUND_REQUESTS_MINUTES = get_string(
 )
 CRON_COURSE_CERTIFICATES_HOURS = get_string(
     name="CRON_COURSE_CERTIFICATES_HOURS",
-    default="0,12",
+    default="*",
     description="'hours' value for the 'generate-course-certificate' scheduled task (defaults to midnight)",
 )
 CRON_COURSE_CERTIFICATES_DAYS = get_string(
     name="CRON_COURSE_CERTIFICATES_DAYS",
     default="*",
     description="'day_of_week' value for 'generate-course-certificate' scheduled task (default will run once a day).",
+)
+CRON_UPGRADE_PROGRAM_ENROLLMENTS_HOURS = get_string(
+    name="CRON_UPGRADE_PROGRAM_ENROLLMENTS_HOURS",
+    default="1",
+    description="'hours' value for the 'upgrade-eligible-program-enrollments' scheduled task (default runs at 1 AM).",
+)
+CRON_UPGRADE_PROGRAM_ENROLLMENTS_DAYS = get_string(
+    name="CRON_UPGRADE_PROGRAM_ENROLLMENTS_DAYS",
+    default="*",
+    description="'day_of_week' value for 'upgrade-eligible-program-enrollments' scheduled task (default runs daily).",
+)
+CRON_MISSING_PROGRAM_CERTIFICATES_HOURS = get_string(
+    name="CRON_MISSING_PROGRAM_CERTIFICATES_HOURS",
+    default="2",
+    description="'hours' value for the 'generate-missing-program-certificates' scheduled task (default runs at 2 AM).",
+)
+CRON_MISSING_PROGRAM_CERTIFICATES_DAYS = get_string(
+    name="CRON_MISSING_PROGRAM_CERTIFICATES_DAYS",
+    default="*",
+    description="'day_of_week' value for 'generate-missing-program-certificates' scheduled task (default runs daily).",
 )
 CRON_ORPHAN_CHECK_HOURS = get_string(
     name="CRON_ORPHAN_CHECK_HOURS",
@@ -1046,7 +991,7 @@ REPAIR_OPENEDX_USERS_OFFSET = int(REPAIR_OPENEDX_USERS_FREQUENCY / 2)
 
 REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ = get_int(
     name="REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ",
-    default=86400,
+    default=180,
     description="How many seconds between refreshing featured items for the homepage cache",
 )
 
@@ -1062,6 +1007,18 @@ KEYCLOAK_ORG_SYNC_OFFSET = get_int(
     name="KEYCLOAK_ORG_SYNC_OFFSET",
     default=int(KEYCLOAK_ORG_SYNC_FREQUENCY / 2),
     description="Offset for the Keycloak org sync",
+)
+
+B2B_GSHEETS_UPDATE_FREQUENCY = get_int(
+    name="B2B_GSHEETS_UPDATE_FREQUENCY",
+    default=3600,
+    description="How many seconds to wait between updating the enrollment code Google Sheets for B2B contracts",
+)
+
+B2B_GSHEETS_UPDATE_OFFSET = get_int(
+    name="B2B_GSHEETS_UPDATE_OFFSET",
+    default=int(B2B_GSHEETS_UPDATE_FREQUENCY / 2),
+    description="Offset for the B2B enrollment code sheet updates",
 )
 
 CELERY_BEAT_SCHEDULE = {
@@ -1083,7 +1040,7 @@ CELERY_BEAT_SCHEDULE = {
     "sync-courseruns-data": {
         "task": "courses.tasks.sync_courseruns_data",
         "schedule": crontab(
-            minute=0,
+            minute=10,
             hour=CRON_COURSERUN_SYNC_HOURS,
             day_of_week=CRON_COURSERUN_SYNC_DAYS,
             day_of_month="*",
@@ -1118,12 +1075,53 @@ CELERY_BEAT_SCHEDULE = {
             offset=timedelta(seconds=KEYCLOAK_ORG_SYNC_OFFSET),
         ),
     },
+    "push-unconfirmed-org-members-to-keycloak": {
+        "task": "b2b.tasks.push_unconfirmed_org_members_to_keycloak",
+        "schedule": OffsettingSchedule(
+            run_every=timedelta(seconds=KEYCLOAK_ORG_SYNC_FREQUENCY),
+            offset=timedelta(seconds=KEYCLOAK_ORG_SYNC_OFFSET),
+        ),
+    },
+    "clear-expired-tokens": {
+        "task": "main.tasks.run_clear_tokens",
+        "schedule": crontab(minute=0, hour=9, day_of_week=1),  # every week
+    },
+    "upgrade-eligible-program-enrollments": {
+        "task": "courses.tasks.upgrade_eligible_program_enrollments",
+        "schedule": crontab(
+            minute=0,
+            hour=CRON_UPGRADE_PROGRAM_ENROLLMENTS_HOURS,
+            day_of_week=CRON_UPGRADE_PROGRAM_ENROLLMENTS_DAYS,
+            day_of_month="*",
+            month_of_year="*",
+        ),
+    },
+    "generate-missing-program-certificates": {
+        "task": "courses.tasks.generate_program_certificates",
+        "schedule": crontab(
+            minute=0,
+            hour=CRON_MISSING_PROGRAM_CERTIFICATES_HOURS,
+            day_of_week=CRON_MISSING_PROGRAM_CERTIFICATES_DAYS,
+            day_of_month="*",
+            month_of_year="*",
+        ),
+    },
+    "update-b2b-enrollment-code-sheets": {
+        "task": "b2b.tasks.queue_update_all_contract_enrollment_sheets",
+        "schedule": OffsettingSchedule(
+            run_every=timedelta(seconds=B2B_GSHEETS_UPDATE_FREQUENCY),
+            offset=timedelta(seconds=B2B_GSHEETS_UPDATE_OFFSET),
+        ),
+    },
+    "cull-anonymous-baskets": {
+        "task": "ecommerce.tasks.perform_cull_anonymous_baskets",
+        "schedule": crontab(minute=0, hour=4),
+    },
+    "cull-stale-pending-orders": {
+        "task": "ecommerce.tasks.perform_cull_stale_pending_orders",
+        "schedule": crontab(minute=30, hour=4),
+    },
 }
-
-# Hijack
-HIJACK_ALLOW_GET_REQUESTS = True
-HIJACK_LOGOUT_REDIRECT_URL = "/admin/users/user"
-HIJACK_REGISTER_ADMIN = False
 
 # django cache back-ends
 CACHES = {
@@ -1160,6 +1158,10 @@ OAUTH2_PROVIDER = {
         "write": "Write scope",
         "openid": "OpenID Connect scope",
         "user:read": "Can read user and profile data",
+        # Service-to-service only, never granted to a user-facing client.
+        # Remove with b2b/views/v0/service.py once org-manager status is
+        # visible in Keycloak (mitodl/hq#10594).
+        "b2b:manager-check": "Can check whether a user manages an organization",
         # "digitalcredentials": "Can read and write Digital Credentials data",  # noqa: ERA001
     },
     "DEFAULT_SCOPES": ["user:read"],
@@ -1171,9 +1173,24 @@ OAUTH2_PROVIDER = {
         default=["http", "https"],
         description="List of schemes allowed for oauth2 redirect URIs",
     ),
+    "PKCE_REQUIRED": False,
+    "REFRESH_TOKEN_EXPIRE_SECONDS": get_int(
+        name="REFRESH_TOKEN_EXPIRE_SECONDS",
+        default=60 * 60 * 24 * 30,  # 30 days
+        description="Number of seconds until a refresh token expires",
+    ),
 }
 
 SCIM_SERVICE_PROVIDER["USER_ADAPTER"] = "users.adapters.LearnUserAdapter"  # noqa: F405
+
+ENROLLMENT_ELIGIBILITY_THROTTLE_RATE = get_string(
+    name="ENROLLMENT_ELIGIBILITY_THROTTLE_RATE",
+    default="2/min",
+    description=(
+        "DRF throttle rate for the enrollment eligibility endpoints. A cache "
+        "miss there costs a live CyberSource export compliance call."
+    ),
+)
 
 # DRF configuration
 REST_FRAMEWORK = {
@@ -1184,9 +1201,12 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "EXCEPTION_HANDLER": "main.exceptions.exception_handler",
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
-    "DEFAULT_VERSIONING": "rest_framework.versioning.NamespaceVersioning",
+    "DEFAULT_VERSIONING_CLASS": "main.versioning.FallbackNamespaceVersioning",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "ALLOWED_VERSIONS": ["v0", "v1", "v2"],
+    "ALLOWED_VERSIONS": ["v0", "v1", "v2", "v3"],
+    "DEFAULT_THROTTLE_RATES": {
+        "enrollment_eligibility": ENROLLMENT_ELIGIBILITY_THROTTLE_RATE,
+    },
     "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",)
     if not DEBUG
     else (
@@ -1195,24 +1215,29 @@ REST_FRAMEWORK = {
     ),
 }
 
-# Relative URL to be used by Djoser for the link in the password reset email
-# (see: http://djoser.readthedocs.io/en/stable/settings.html#password-reset-confirm-url)
-PASSWORD_RESET_CONFIRM_URL = "password_reset/confirm/{uid}/{token}/"  # noqa: S105
-
 # ol-django configuration
 
 import_settings_modules(
-    "mitol.authentication.settings.djoser_settings",
-    "mitol.payment_gateway.settings.cybersource",
+    "mitol.payment_gateway.settings",
+    "mitol.olposthog.settings.olposthog",
+)
+
+CYBERSOURCE_INQUIRY_LOG_NACL_ENCRYPTION_KEY = get_string(
+    name="CYBERSOURCE_INQUIRY_LOG_NACL_ENCRYPTION_KEY",
+    default=None,
+    description=(
+        "Base64-encoded NaCl public key used to encrypt cached CyberSource "
+        "export compliance request/response payloads."
+    ),
 )
 
 # mitol-django-common
 MITOL_COMMON_USER_FACTORY = "users.factories.UserFactory"
 
 # mitol-django-mail
-MITOL_MAIL_FROM_EMAIL = MAILGUN_FROM_EMAIL
+MITOL_MAIL_FROM_EMAIL = MIT_LEARN_FROM_EMAIL
 MITOL_MAIL_REPLY_TO_ADDRESS = MITX_ONLINE_REPLY_TO_ADDRESS
-MITOL_MAIL_MESSAGE_CLASSES = []
+MITOL_MAIL_MESSAGE_CLASSES = ["b2b.mail.EnrollmentCodeAssignmentMessage"]
 MITOL_MAIL_RECIPIENT_OVERRIDE = MAILGUN_RECIPIENT_OVERRIDE
 MITOL_MAIL_FORMAT_RECIPIENT_FUNC = "users.utils.format_recipient"
 MITOL_MAIL_ENABLE_EMAIL_DEBUGGER = get_bool(  # NOTE: this will override the legacy mail debugger defined in this project
@@ -1221,10 +1246,6 @@ MITOL_MAIL_ENABLE_EMAIL_DEBUGGER = get_bool(  # NOTE: this will override the leg
     description="Enable the mitol-mail email debugger",
     dev_only=True,
 )
-
-# mitol-django-authentication
-MITOL_AUTHENTICATION_FROM_EMAIL = MAILGUN_FROM_EMAIL
-MITOL_AUTHENTICATION_REPLY_TO_EMAIL = MITX_ONLINE_REPLY_TO_ADDRESS
 
 OPENEDX_OAUTH_PROVIDER = get_string(
     name="OPENEDX_OAUTH_PROVIDER",
@@ -1260,6 +1281,16 @@ OPENEDX_COURSE_BASE_URL = get_string(
     name="OPENEDX_COURSE_BASE_URL",
     default="http://edx.odl.local:18000/learn/course/",
     description="The base URL to use to construct URLs to a course",
+)
+OPENEDX_COURSE_BASE_URL_SUFFIX = get_string(
+    name="OPENEDX_COURSE_BASE_URL_SUFFIX",
+    default="/home",
+    description="The suffix (with leading slash) to append to a course URL.",
+)
+OL_OPENEDX_COURSE_OUTLINE_URL = get_string(
+    name="OL_OPENEDX_COURSE_OUTLINE_URL",
+    default="/api/ol-course-outline/v0/{course_id}/",
+    description="Path template for Open edX course outline plugin endpoint.",
 )
 
 OPENEDX_BASE_REDIRECT_URL = get_string(
@@ -1330,6 +1361,35 @@ EDX_API_CLIENT_TIMEOUT = get_int(
     description="Timeout (in seconds) for requests made via the edX API client",
 )
 
+OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES = get_int(
+    name="OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES",
+    default=3,
+    description="How many times to retry a rate-limited (429) edX course list API request",
+)
+OPENEDX_COURSE_LIST_THROTTLE_WAIT_SECONDS = get_int(
+    name="OPENEDX_COURSE_LIST_THROTTLE_WAIT_SECONDS",
+    default=60,
+    description="Seconds to wait before retrying a rate-limited edX course list API request when edX doesn't say how long to wait, and the longest wait allowed when it does",
+)
+
+OPENEDX_COURSE_CLONE_MAX_RETRIES = get_int(
+    name="OPENEDX_COURSE_CLONE_MAX_RETRIES",
+    default=5,
+    description="Maximum number of retry attempts for transient Open edX course clone failures",
+)
+
+OPENEDX_COURSE_CLONE_RETRY_DELAY = get_int(
+    name="OPENEDX_COURSE_CLONE_RETRY_DELAY",
+    default=300,
+    description="Base retry delay in seconds for Open edX course clone retries; each successive retry multiplies this delay",
+)
+
+OPENEDX_COURSE_CLONE_RETRY_JITTER = get_int(
+    name="OPENEDX_COURSE_CLONE_RETRY_JITTER",
+    default=60,
+    description="Maximum number of randomized jitter seconds to add to Open edX course clone retries",
+)
+
 # django debug toolbar only in debug mode
 if DEBUG:
     INSTALLED_APPS += ("debug_toolbar",)
@@ -1382,16 +1442,36 @@ MITOL_GOOGLE_SHEETS_DEFERRALS_PLUGINS = ["sheets.deferrals_plugin.DeferralPlugin
 
 
 # Fastly configuration
-MITX_ONLINE_FASTLY_AUTH_TOKEN = get_string(
-    name="FASTLY_AUTH_TOKEN",
+# MITxOnline's own Fastly config follows the convention used throughout this file:
+# the MITX_ONLINE_-prefixed name is the *env var*, the unprefixed one the setting
+# (as EMAIL_BACKEND is read from MITX_ONLINE_EMAIL_BACKEND, and 16 others).
+# These three previously inverted that -- prefixed settings reading bare env vars --
+# which is how the env vars came to be renamed to the setting names, breaking the
+# read entirely: https://github.com/mitodl/ol-infrastructure/pull/5119
+FASTLY_AUTH_TOKEN = get_string(
+    name="MITX_ONLINE_FASTLY_AUTH_TOKEN",
     default=None,
     description="Optional token for the Fastly purge API.",
 )
 
-MITX_ONLINE_FASTLY_URL = get_string(
-    name="FASTLY_URL",
+FASTLY_URL = get_string(
+    name="MITX_ONLINE_FASTLY_URL",
     default="https://api.fastly.com",
     description="The URL to the Fastly API.",
+)
+
+# Not MITX_ONLINE_-prefixed, because the value is not MITxOnline's: MIT_LEARN_* is
+# this file's namespace for MIT Learn config, and those seven settings all use the
+# env var name unchanged.
+MIT_LEARN_FASTLY_SERVICE_ID = get_string(
+    name="MIT_LEARN_FASTLY_SERVICE_ID",
+    default=None,
+    description=(
+        "Fastly service ID for the MIT Learn frontend, used for surrogate key "
+        "(tag) purging. MIT Learn tags its product page responses with MITxOnline "
+        "surrogate keys, so this is Learn's service ID -- not the service ID of "
+        "MITxOnline's own Fastly service."
+    ),
 )
 
 # Hubspot sync settings
@@ -1426,36 +1506,6 @@ HUBSPOT_TASK_DELAY = get_int(
     description="Number of milliseconds to wait between consecutive Hubspot calls",
 )
 
-# PostHog related settings
-POSTHOG_PROJECT_API_KEY = get_string(
-    name="POSTHOG_PROJECT_API_KEY",
-    default="",
-    description="API token to communicate with PostHog",
-)
-
-POSTHOG_API_HOST = get_string(
-    name="POSTHOG_API_HOST",
-    default="",
-    description="API host for PostHog",
-)
-POSTHOG_FEATURE_FLAG_REQUEST_TIMEOUT_MS = get_int(
-    name="POSTHOG_FEATURE_FLAG_REQUEST_TIMEOUT_MS",
-    default=3000,
-    description="Timeout(MS) for PostHog feature flag requests.",
-)
-
-POSTHOG_MAX_RETRIES = get_int(
-    name="POSTHOG_MAX_RETRIES",
-    default=3,
-    description="Number of times that requests to PostHog should be retried after failing.",
-)
-
-POSTHOG_ENABLED = get_bool(
-    name="POSTHOG_ENABLED",
-    default=False,
-    description="Whether PostHog is enabled",
-)
-
 # HomePage Hubspot Form Settings
 HUBSPOT_HOME_PAGE_FORM_GUID = get_string(
     name="HUBSPOT_HOME_PAGE_FORM_GUID",
@@ -1469,18 +1519,15 @@ HUBSPOT_PORTAL_ID = get_string(
     description="Hubspot Portal ID",
 )
 
-# Unified Ecommerce integration
-
-UNIFIED_ECOMMERCE_URL = get_string(
-    name="UNIFIED_ECOMMERCE_URL",
-    default="",
-    description="The base URL for Unified Ecommerce.",
+UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = get_string(
+    name="UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN",
+    default=None,
+    description="Hubspot private token for UAI/Learn account",
 )
-
-UNIFIED_ECOMMERCE_API_KEY = get_string(
-    name="UNIFIED_ECOMMERCE_API_KEY",
-    default="",
-    description="The API key for Unified Ecommerce.",
+UAI_HUBSPOT_PIPELINE_ID = get_string(
+    name="UAI_HUBSPOT_PIPELINE_ID",
+    default="75e28846-ad0d-4be2-a027-5e1da6590b98",
+    description="Hubspot ecommerce pipeline ID for the UAI/xPro account",
 )
 
 SPECTACULAR_SETTINGS = open_spectacular_settings
@@ -1557,11 +1604,11 @@ MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS = get_delimited_list(
     description="The list of hosts the app is allowed to redirect to",
 )
 
-OPENTELEMETRY_ENABLED = get_bool(
-    name="OPENTELEMETRY_ENABLED",
-    default=False,
-    description="Enable collection and shipment of opentelemetry data",
-)
+# Telemetry turns on when any of OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
+# OTEL_EXPORTER_OTLP_METRICS_ENDPOINT or OTEL_EXPORTER_OTLP_ENDPOINT is set in
+# the environment, or the OPENTELEMETRY_ENDPOINT setting below is. Per signal
+# the environment is read most-specific-first, and the setting applies only
+# when the environment supplies nothing. There is no flag to disable it.
 OPENTELEMETRY_SERVICE_NAME = get_string(
     name="OPENTELEMETRY_SERVICE_NAME",
     default="mitxonline",
@@ -1577,8 +1624,10 @@ OPENTELEMETRY_ENDPOINT = get_string(
     default=None,
     description="Endpoint for opentelemetry",
 )
-OPENTELEMETRY_TRACES_BATCH_SIZE = get_int(
-    name="OPENTELEMETRY_TRACES_BATCH_SIZE",
+# Name must match what mitol.observability.telemetry looks up, or the default
+# silently applies instead.
+OPENTELEMETRY_BATCH_SIZE = get_int(
+    name="OPENTELEMETRY_BATCH_SIZE",
     default=512,
     description="Batch size for traces",
 )
@@ -1623,3 +1672,30 @@ TRINO_PASSWORD = get_string(
     default=None,
     description="Password for Trino authentication",
 )
+
+VERIFIABLE_CREDENTIAL_SIGNER_URL = get_string(
+    name="VERIFIABLE_CREDENTIAL_SIGNER_URL",
+    default="",
+    description="The URL of the VC Signer service. Used for issuing verifiable credentials.",
+)
+
+VERIFIABLE_CREDENTIAL_BEARER_TOKEN = get_string(
+    name="VERIFIABLE_CREDENTIAL_BEARER_TOKEN",
+    default="",
+    description="The bearer token used to authenticate with the VC Signer service.",
+)
+
+VERIFIABLE_CREDENTIAL_DID = get_string(
+    name="VERIFIABLE_CREDENTIAL_DID",
+    default="",
+    description="The Decentralized Identifier (DID) used as the issuer for verifiable credentials.",
+)
+
+MIT_LEARN_ATTACH_URL = get_string(
+    name="MIT_LEARN_ATTACH_URL",
+    default=f"{MIT_LEARN_BASE_URL}/enrollmentcode/",
+    description="The URL to use for generating contract attachment URLs for B2B.",
+)
+
+if ECOMMERCE_DEFAULT_PAYMENT_GATEWAY == "None":  # noqa: F405
+    ECOMMERCE_DEFAULT_PAYMENT_GATEWAY = MITOL_PAYMENT_GATEWAY_CYBERSOURCE

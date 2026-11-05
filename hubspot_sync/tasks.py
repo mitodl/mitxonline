@@ -11,7 +11,12 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import F
 from hubspot.crm.associations import BatchInputPublicAssociation, PublicAssociation
-from hubspot.crm.objects import ApiException, BatchInputSimplePublicObjectInput
+from hubspot.crm.objects import (
+    ApiException,
+)
+from hubspot.crm.objects import (
+    BatchInputSimplePublicObjectBatchInputForCreate as BatchInputCreate,
+)
 from mitol.common.decorators import single_task
 from mitol.common.utils.collections import chunks
 from mitol.common.utils.datetime import now_in_utc
@@ -20,7 +25,7 @@ from mitol.hubspot_api.decorators import raise_429
 from mitol.hubspot_api.exceptions import TooManyRequestsException
 from mitol.hubspot_api.models import HubspotObject
 
-from ecommerce.models import Line, Order, Product
+from ecommerce.models import Order, Product
 from hubspot_sync import api
 from hubspot_sync.api import (
     get_hubspot_id_for_object,
@@ -148,9 +153,10 @@ def sync_contact_with_hubspot(user_id: int) -> str:
         user_id(int): The User ID.
 
     Returns:
-        str: The HubSpot ID for the User.
+        str: The HubSpot ID for the User, or None if user was skipped (e.g., B2B user).
     """
-    return api.sync_contact_with_hubspot(User.objects.get(id=user_id)).id
+    result = api.sync_contact_with_hubspot(User.objects.get(id=user_id))
+    return result.id if result else None
 
 
 @app.task(
@@ -184,7 +190,7 @@ def sync_product_with_hubspot(product_id: int) -> str:
 )
 @raise_429
 @single_task(10, key=task_obj_lock)
-def sync_deal_with_hubspot(order_id: int) -> str:
+def sync_deal_with_hubspot(order_id: int) -> str | None:
     """
     Sync an Order with a hubspot deal
 
@@ -192,9 +198,10 @@ def sync_deal_with_hubspot(order_id: int) -> str:
         order_id(int): The Order ID.
 
     Returns:
-        str: The hubspot id for the deal
+        str | None: The hubspot id for the deal, or None if skipped for B2B users
     """
-    return api.sync_deal_with_hubspot(Order.objects.get(id=order_id)).id
+    result = api.sync_deal_with_hubspot(Order.objects.get(id=order_id))
+    return result.id if result else None
 
 
 @app.task(
@@ -206,17 +213,102 @@ def sync_deal_with_hubspot(order_id: int) -> str:
 )
 @raise_429
 @single_task(10, key=task_obj_lock)
-def sync_line_with_hubspot(line_id: int) -> str:
+def sync_deal_with_hubspot_targeted(
+    order_id: int, *, is_uai: bool, is_xpro: bool = False
+) -> str | None:
     """
-    Sync a Line with a hubspot line
+    Sync an Order with a hubspot deal using the appropriate HubSpot token.
+    This allows routing UAI/XPro orders to their respective HubSpot accounts.
 
     Args:
-        line_id(int): The Line id
+        order_id(int): The Order ID.
+        is_uai(bool): Whether this is a UAI order, determines which token to use.
+        is_xpro(bool): Whether this is an XPro order, determines which token to use.
 
     Returns:
-        str: The hubspot id for the line
+        str | None: The hubspot id for the deal, or None if skipped for B2B users
     """
-    return api.sync_line_item_with_hubspot(Line.objects.get(id=line_id)).id
+    token = api._resolve_hubspot_token(is_uai=is_uai, is_xpro=is_xpro)  # noqa: SLF001
+    if not token:
+        if is_xpro:
+            account_type = "XPro"
+        elif is_uai:
+            account_type = "UAI"
+        else:
+            account_type = "standard"
+        error_message = f"No HubSpot token available for {account_type} account"
+        raise ValueError(error_message)
+
+    result = api.sync_deal_with_hubspot_targeted(Order.objects.get(id=order_id), token)
+    return result.id if result else None
+
+
+@app.task(
+    acks_late=True,
+    autoretry_for=(TooManyRequestsException, BlockingIOError),
+    max_retries=3,
+    retry_backoff=60,
+    retry_jitter=True,
+)
+@raise_429
+@single_task(10, key=task_obj_lock)
+def sync_course_run_certificate_with_hubspot(cert_id: int) -> str | None:
+    """Sync a CourseRunCertificate to a HubSpot custom object record."""
+    from courses.models import CourseRunCertificate  # noqa: PLC0415
+
+    cert = CourseRunCertificate.all_objects.get(id=cert_id)
+    result = api.sync_course_run_certificate_with_hubspot(cert)
+    return result.id if result else None
+
+
+@app.task(
+    acks_late=True,
+    autoretry_for=(TooManyRequestsException, BlockingIOError),
+    max_retries=3,
+    retry_backoff=60,
+    retry_jitter=True,
+)
+@raise_429
+@single_task(10, key=task_obj_lock)
+def sync_program_certificate_with_hubspot(cert_id: int) -> str | None:
+    """Sync a ProgramCertificate to a HubSpot custom object record."""
+    from courses.models import ProgramCertificate  # noqa: PLC0415
+
+    cert = ProgramCertificate.all_objects.get(id=cert_id)
+    result = api.sync_program_certificate_with_hubspot(cert)
+    return result.id if result else None
+
+
+@app.task(
+    acks_late=True,
+    autoretry_for=(TooManyRequestsException, BlockingIOError),
+    max_retries=3,
+    retry_backoff=60,
+    retry_jitter=True,
+)
+@raise_429
+@single_task(10, key=task_obj_lock)
+def sync_cart_add_event_with_hubspot(
+    user_id: int, product_id: int, *, is_uai_course: bool, is_xpro_course: bool = False
+) -> bool:
+    """
+    Track a cart add event in HubSpot for a user/product pair.
+
+    Args:
+        user_id (int): The User ID.
+        product_id (int): The Product ID.
+        is_uai_course (bool): Whether the product's course run is UAI.
+        is_xpro_course (bool): Whether the product's course run is XPro.
+
+    Returns:
+        bool: True if the event was submitted, False otherwise.
+    """
+    return api.track_cart_add_with_hubspot(
+        User.objects.get(id=user_id),
+        Product.objects.get(id=product_id),
+        is_uai_course=is_uai_course,
+        is_xpro_course=is_xpro_course,
+    )
 
 
 @app.task(
@@ -247,17 +339,41 @@ def batch_create_hubspot_objects_chunked(
     content_type = ContentType.objects.exclude(app_label="auth").get(
         model=ct_model_name
     )
-    chunked_ids = _batched_chunks(hubspot_type, object_ids)
+    chunked_ids = list(_batched_chunks(hubspot_type, object_ids))
+    total_chunks = len(chunked_ids)
+    total_objects = len(object_ids)
+
+    log.info(
+        "Starting batch create for %s: %d %s(s) split into %d chunk(s)",
+        hubspot_type,
+        total_objects,
+        ct_model_name,
+        total_chunks,
+    )
+
     errored_chunks = []
     last_error_status = None
-    for chunk in chunked_ids:
+    for chunk_index, chunk in enumerate(chunked_ids, start=1):
+        chunk_size = len(chunk)
+        log.info(
+            "Processing chunk %d/%d: %d %s(s) (Total progress: %d/%d, %.1f%%)",
+            chunk_index,
+            total_chunks,
+            chunk_size,
+            ct_model_name,
+            len(created_ids),
+            total_objects,
+            (len(created_ids) / total_objects * 100) if total_objects > 0 else 0,
+        )
+
         try:
             response = HubspotApi().crm.objects.batch_api.create(
                 hubspot_type,
-                BatchInputSimplePublicObjectInput(
+                BatchInputCreate(
                     inputs=api.MODEL_CREATE_FUNCTION_MAPPING[ct_model_name](chunk)
                 ),
             )
+            chunk_created_count = 0
             for result in response.results:
                 if ct_model_name == "user":
                     user = User.objects.filter(
@@ -274,13 +390,52 @@ def batch_create_hubspot_objects_chunked(
                     object_id=object_id,
                 )
                 created_ids.append(result.id)
+                chunk_created_count += 1
+
+            log.info(
+                "Successfully created %d %s(s) in chunk %d/%d",
+                chunk_created_count,
+                ct_model_name,
+                chunk_index,
+                total_chunks,
+            )
         except ApiException as ae:
             last_error_status = ae.status
+            log.warning(
+                "ApiException (status %s) in chunk %d/%d for %s, attempting individual retries",
+                ae.status,
+                chunk_index,
+                total_chunks,
+                hubspot_type,
+            )
             still_failed = handle_failed_batch_chunk(chunk, hubspot_type)
             if still_failed:
                 errored_chunks.append(still_failed)
+                log.error(  # noqa: TRY400
+                    "Chunk %d/%d: %d %s(s) still failed after individual retries",
+                    chunk_index,
+                    total_chunks,
+                    len(still_failed),
+                    ct_model_name,
+                )
         wait_for_hubspot_rate_limit()
+
+    log.info(
+        "Completed batch create for %s: %d/%d %s(s) successfully created",
+        hubspot_type,
+        len(created_ids),
+        total_objects,
+        ct_model_name,
+    )
+
     if errored_chunks:
+        total_failed = sum(len(chunk) for chunk in errored_chunks)
+        log.error(
+            "Batch create completed with errors: %d %s(s) failed across %d chunk(s)",
+            total_failed,
+            ct_model_name,
+            len(errored_chunks),
+        )
         raise ApiException(
             status=last_error_status,
             reason=f"Batch hubspot create failed for the following chunks: {errored_chunks}",
@@ -320,7 +475,7 @@ def batch_update_hubspot_objects_chunked(
         inputs = api.MODEL_UPDATE_FUNCTION_MAPPING[ct_model_name](chunk)
         try:
             response = HubspotApi().crm.objects.batch_api.update(
-                hubspot_type, BatchInputSimplePublicObjectInput(inputs=inputs)
+                hubspot_type, BatchInputCreate(inputs=inputs)
             )
             chunk_updated_ids = [result.id for result in response.results]
             for result in response.results:
@@ -387,11 +542,12 @@ def batch_upsert_hubspot_objects(  # pylint:disable=too-many-arguments  # noqa: 
             id__in=[id[0] for id in synced_object_ids]  # noqa: A001
         )
         if model_name == "user":
-            unsynced_objects = (
-                unsynced_objects.filter(is_active=True, email__contains="@")
-                .exclude(social_auth__isnull=True)
-                .order_by(F("hubspot_sync_datetime").asc(nulls_first=True))
-            )
+            unsynced_objects = unsynced_objects.filter(
+                is_active=True,
+                email__contains="@",
+                global_id__isnull=False,
+                last_login__isnull=False,
+            ).order_by(F("hubspot_sync_datetime").asc(nulls_first=True))
         unsynced_object_ids = unsynced_objects.values_list("id", flat=True)
         object_ids = unsynced_object_ids if create else synced_object_ids
     elif not create:

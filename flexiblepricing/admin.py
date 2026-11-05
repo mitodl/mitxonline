@@ -39,7 +39,10 @@ class FlexiblePriceAdmin(VersionAdmin):
         "courseware_object_id",
         "courseware_content_type",
         "tier",
+        "created_on",
+        "updated_on",
     )
+    readonly_fields = ("created_on", "updated_on")
     raw_id_fields = ("user",)
 
     def has_delete_permission(self, *args, **kwargs):  # pylint: disable=unused-argument, signature-differs  # noqa: ARG002

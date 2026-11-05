@@ -1,19 +1,49 @@
 """Shared pytest configuration for courses application"""
 
-import random
+from collections import defaultdict
+from math import ceil
+from typing import NamedTuple
 
 import pytest
+from django.contrib.auth import get_user_model
+from faker import Faker
 
+from b2b.factories import ContractPageFactory, OrganizationPageFactory
+from b2b.models import ContractPage, OrganizationPage
 from courses.factories import (
     CourseFactory,
+    CourseRunCertificateFactory,
+    CourseRunEnrollmentFactory,
     CourseRunFactory,
+    ProgramCertificateFactory,
+    ProgramEnrollmentFactory,
     ProgramFactory,
-    ProgramRequirementFactory,
 )
 from courses.models import (
+    Course,
+    CourseRun,
+    CourseRunCertificate,
+    CourseRunEnrollment,
+    Program,
+    ProgramCertificate,
+    ProgramEnrollment,
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
+from variants.models import SupportedVariant
+
+User = get_user_model()
+fake = Faker()
+langopts = [
+    "de_DE",
+    "fr",
+    "ar",
+    "zh_CN",
+]
+COURSERUN_EXCLUDE_KEYS = [
+    "_state",
+    "id",
+]
 
 
 @pytest.fixture
@@ -44,8 +74,16 @@ def course_catalog_course_count(request):
     return getattr(request, "param", 10)
 
 
+class CourseCatalogData(NamedTuple):
+    courses: list[Course]
+    programs: list[Program]
+    course_runs: list[CourseRun]
+
+
 @pytest.fixture
-def course_catalog_data(course_catalog_program_count, course_catalog_course_count):
+def course_catalog_data(
+    fake, course_catalog_program_count, course_catalog_course_count
+) -> CourseCatalogData:
     """
     Current production data is around 85 courses and 150 course runs. I opted to create 3 of each to allow
     the best course run logic to play out as well as to push the endpoint a little harder in testing.
@@ -64,27 +102,76 @@ def course_catalog_data(course_catalog_program_count, course_catalog_course_coun
     programs = []
     courses = []
     course_runs = []
-    for n in range(course_catalog_course_count):
-        course, course_runs_for_course = _create_course(n)
+    for idx in range(course_catalog_course_count):
+        course, course_runs_for_course = _create_course(idx)
         courses.append(course)
-        course_runs.append(course_runs_for_course)
-    for n in range(course_catalog_program_count):  # noqa: B007
-        program = _create_program(courses)
+        course_runs.extend(course_runs_for_course)
+    for _ in range(course_catalog_program_count):
+        program = _create_program(programs, courses, fake)
         programs.append(program)
-    return courses, programs, course_runs
+    return CourseCatalogData(courses, programs, course_runs)
 
 
-def _create_course(n):
-    test_course = CourseFactory.create(title=f"Test Course {n}")
-    cr1 = CourseRunFactory.create(course=test_course, past_start=True)
-    cr2 = CourseRunFactory.create(course=test_course, in_progress=True)
-    cr3 = CourseRunFactory.create(course=test_course, in_future=True)
-    return test_course, [cr1, cr2, cr3]
+def _create_course(idx):
+    test_course = CourseFactory.create(title=f"Test Course {idx}")
+    cr1 = CourseRunFactory.create(
+        course=test_course, past_start=True, enrollment_modes=[]
+    )
+    cr2 = CourseRunFactory.create(
+        course=test_course, in_progress=True, enrollment_modes=[]
+    )
+    cr3 = CourseRunFactory.create(
+        course=test_course, in_future=True, enrollment_modes=[]
+    )
+    crvs = []
+    if idx % 2:
+        # Make some variant runs - by default, half of the courses should get one.
+        # These are for normal, customer-facing courses, so the only variants we'll
+        # configure are translations.
+        language = fake.random_element(langopts)
+        SupportedVariant.objects.create(variant_object=test_course, language=language)
+        crv1 = CourseRunFactory.create(
+            course=test_course,
+            past_start=True,
+            courseware_id=f"{cr1.courseware_id}_{language}",
+            language=language,
+            is_primary_language=False,
+            run_tag=cr1.run_tag,
+            enrollment_modes=[],
+        )
+        crv2 = CourseRunFactory.create(
+            course=test_course,
+            past_start=True,
+            courseware_id=f"{cr2.courseware_id}_{language}",
+            language=language,
+            is_primary_language=False,
+            run_tag=cr2.run_tag,
+            enrollment_modes=[],
+        )
+        crv3 = CourseRunFactory.create(
+            course=test_course,
+            past_start=True,
+            courseware_id=f"{cr3.courseware_id}_{language}",
+            language=language,
+            is_primary_language=False,
+            run_tag=cr3.run_tag,
+            enrollment_modes=[],
+        )
+        crvs = [
+            crv1,
+            crv2,
+            crv3,
+        ]
+    return test_course, [
+        cr1,
+        cr2,
+        cr3,
+        *crvs,
+    ]
 
 
-def _create_program(courses):
+def _create_program(programs, courses, fake):
     program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(program)
     root_node = program.requirements_root
     required_courses_node = root_node.add_child(
         node_type=ProgramRequirementNodeType.OPERATOR,
@@ -98,17 +185,271 @@ def _create_program(courses):
         title="Elective Courses",
         elective_flag=True,
     )
-    if len(courses) > 3:  # noqa: PLR2004
-        for c in random.sample(courses, 3):
-            required_courses_node.add_child(
-                node_type=ProgramRequirementNodeType.COURSE, course=c
-            )
-        for c in random.sample(courses, 3):
-            elective_courses_node.add_child(
-                node_type=ProgramRequirementNodeType.COURSE, course=c
-            )
-    else:
+
+    courses = fake.random_sample(courses, length=min(len(courses), 5))
+
+    # Select 3 courses for required
+    for course in courses[:2]:
         required_courses_node.add_child(
-            node_type=ProgramRequirementNodeType.COURSE, course=courses[0]
+            node_type=ProgramRequirementNodeType.COURSE, course=course
         )
+
+    # the rest are electives
+    for course in courses[2:]:
+        elective_courses_node.add_child(
+            node_type=ProgramRequirementNodeType.COURSE, course=course
+        )
+
+    if programs:
+        # 33% chance this gets a required program
+        if fake.boolean(chance_of_getting_true=0.33):
+            required_courses_node.add_child(
+                node_type=ProgramRequirementNodeType.PROGRAM,
+                required_program=fake.random_element(programs),
+            )
+        # 66% chance this gets an elective program
+        if fake.boolean(chance_of_getting_true=0.66):
+            elective_courses_node.add_child(
+                node_type=ProgramRequirementNodeType.PROGRAM,
+                required_program=fake.random_element(programs),
+            )
+
     return program
+
+
+class B2BCourses(NamedTuple):
+    organizations: list[OrganizationPage]
+    contracts_by_org_id: dict[int, ContractPage]
+    course_runs: list[CourseRun]
+    course_runs_by_contract_id: dict[int, list[CourseRun]]
+    course_runs_by_org_id: dict[int, list[CourseRun]]
+
+
+@pytest.fixture
+def b2b_courses(fake, course_catalog_data):
+    """Configure some of the courses as b2b"""
+    _, _, runs = course_catalog_data
+    organizations = OrganizationPageFactory.create_batch(3)
+    contracts = []
+    contracts_by_org_id = {}
+    course_runs = []
+    course_runs_by_contract_id = defaultdict(list)
+    course_runs_by_org_id = defaultdict(list)
+
+    for org in organizations:
+        org_contracts = ContractPageFactory.create_batch(3, organization=org)
+        contracts_by_org_id[org.id] = org_contracts
+        contracts.extend(org_contracts)
+
+    for run in fake.random_sample(runs, length=ceil(len(runs) * 0.5)):
+        contract = fake.random_element(elements=contracts)
+
+        run.b2b_contracts.add(contract)
+
+        course_runs.append(run)
+        course_runs_by_contract_id[contract.id].append(run)
+        course_runs_by_org_id[contract.organization_id].append(run)
+
+    return B2BCourses(
+        organizations=organizations,
+        contracts_by_org_id=contracts_by_org_id,
+        course_runs=course_runs,
+        course_runs_by_contract_id=course_runs_by_contract_id,
+        course_runs_by_org_id=course_runs_by_org_id,
+    )
+
+
+@pytest.fixture
+def user_run_enrollment_count(request, course_catalog_data: CourseCatalogData):
+    course_count = len(course_catalog_data.courses)
+    count = getattr(request, "param", ceil(course_count * 0.7))
+    if count > course_count:
+        return pytest.fail("Cannot have more certificates than courses")
+    return count
+
+
+@pytest.fixture
+def user_run_certificate_count(request, user_run_enrollment_count):
+    count = getattr(request, "param", ceil(user_run_enrollment_count * 0.7))
+    if count > user_run_enrollment_count:
+        return pytest.fail("Cannot have more run certificates than run enrollments")
+    return count
+
+
+@pytest.fixture
+def user_program_enrollment_count(request, course_catalog_data):
+    program_count = len(course_catalog_data.programs)
+    count = getattr(request, "param", ceil(program_count * 0.7))
+    if count > program_count:
+        return pytest.fail("Cannot have more certificates than programs")
+    return count
+
+
+@pytest.fixture
+def user_program_certificate_count(request, user_program_enrollment_count):
+    count = getattr(request, "param", ceil(user_program_enrollment_count * 0.7))
+    if count > user_program_enrollment_count:
+        return pytest.fail(
+            "Cannot have more program certificates than program enrollments"
+        )
+    return count
+
+
+class UserEnrollmentConfig(NamedTuple):
+    run_enrollment_count: int
+    run_certificate_count: int
+    program_enrollment_count: int
+    program_certificate_count: int
+
+
+@pytest.fixture
+def user_enrollment_config(
+    request,
+    user_run_enrollment_count,
+    user_run_certificate_count,
+    user_program_enrollment_count,
+    user_program_certificate_count,
+) -> UserEnrollmentConfig:
+    return getattr(
+        request,
+        "param",
+        UserEnrollmentConfig(
+            user_run_enrollment_count,
+            user_run_certificate_count,
+            user_program_enrollment_count,
+            user_program_certificate_count,
+        ),
+    )
+
+
+class UserWithEnrollmentsAndCerts(NamedTuple):
+    user: User
+    run_enrollments: list[CourseRunEnrollment]
+    run_certificates: list[CourseRunCertificate]
+    program_enrollments: list[ProgramEnrollment]
+    program_certificates: list[ProgramCertificate]
+
+
+def _sample_runs_for_programs(fake, course_runs, programs, length):
+    """
+    Sample `length` course runs, split so that at least one of `programs` has a
+    run among its courses and at least one has none.
+
+    Enrolling in a program does not imply enrolling in any of its courses, so
+    both cases are real and both are worth generating. Sampling runs
+    independently of the programs leaves the split to chance instead: it happens
+    to produce full coverage about 97.6% of the time, which makes the uncovered
+    case effectively untested and makes any test asserting full coverage fail
+    the rest of the time.
+
+    Runs are returned in the order they should be enrolled in -- consumers
+    compare positionally against responses ordered by enrollment id.
+    """
+    if len(programs) < 2:  # noqa: PLR2004
+        return pytest.fail("Need at least 2 program enrollments to cover only some")
+    if length < 1:
+        return pytest.fail("Need at least 1 run enrollment to cover a program")
+
+    course_ids_by_program_id = {
+        program.id: {course.id for course in program.courses_qset}
+        for program in programs
+    }
+    runs_by_course_id = defaultdict(list)
+    for run in course_runs:
+        runs_by_course_id[run.course_id].append(run)
+
+    # Whichever program is left uncovered, some other program has to keep a run
+    # outside it, or there is nothing left that can be covered.
+    for uncovered in fake.random_sample(programs, length=len(programs)):
+        uncovered_course_ids = course_ids_by_program_id[uncovered.id]
+        runs_outside_uncovered = {
+            program.id: [
+                run
+                for course_id in course_ids_by_program_id[program.id]
+                - uncovered_course_ids
+                for run in runs_by_course_id[course_id]
+            ]
+            for program in programs
+            if program.id != uncovered.id
+        }
+        coverable = [
+            program for program in programs if runs_outside_uncovered.get(program.id)
+        ]
+        if coverable:
+            break
+    else:
+        return pytest.fail(
+            "No program has a course run outside another program's courses; "
+            "cannot cover one program and leave another uncovered"
+        )
+
+    eligible = [run for run in course_runs if run.course_id not in uncovered_course_ids]
+    if length > len(eligible):
+        return pytest.fail(
+            f"Cannot enroll in {length} runs outside {uncovered.readable_id}'s "
+            f"courses; only {len(eligible)} of {len(course_runs)} runs are eligible"
+        )
+
+    covered = fake.random_element(coverable)
+    covering_run = fake.random_element(runs_outside_uncovered[covered.id])
+    return [
+        covering_run,
+        *fake.random_sample(
+            [run for run in eligible if run.id != covering_run.id], length=length - 1
+        ),
+    ]
+
+
+@pytest.fixture
+def user_with_enrollments_and_certificates(
+    fake,
+    user,
+    course_catalog_data: CourseCatalogData,
+    user_enrollment_config: UserEnrollmentConfig,
+):
+    """
+    Fixture for a user with enrollments and certificates
+    """
+    _, programs, course_runs = course_catalog_data
+
+    programs_to_enroll_in = fake.random_sample(
+        programs, length=user_enrollment_config.program_enrollment_count
+    )
+    programs_with_certificate = fake.random_sample(
+        programs_to_enroll_in, length=user_enrollment_config.program_enrollment_count
+    )
+
+    runs_to_enroll_in = _sample_runs_for_programs(
+        fake,
+        course_runs,
+        programs_to_enroll_in,
+        user_enrollment_config.run_enrollment_count,
+    )
+    runs_with_certificate = fake.random_sample(
+        runs_to_enroll_in, length=user_enrollment_config.run_certificate_count
+    )
+
+    program_enrollments = [
+        ProgramEnrollmentFactory.create(user=user, program=program)
+        for program in programs_to_enroll_in
+    ]
+    program_certificates = [
+        ProgramCertificateFactory.create(user=user, program=program)
+        for program in programs_with_certificate
+    ]
+    run_enrollments = [
+        CourseRunEnrollmentFactory.create(run=run, user=user)
+        for run in runs_to_enroll_in
+    ]
+    run_certificates = [
+        CourseRunCertificateFactory.create(user=user, course_run=run)
+        for run in runs_with_certificate
+    ]
+
+    return UserWithEnrollmentsAndCerts(
+        user=user,
+        run_enrollments=run_enrollments,
+        run_certificates=run_certificates,
+        program_enrollments=program_enrollments,
+        program_certificates=program_certificates,
+    )

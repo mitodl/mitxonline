@@ -20,17 +20,13 @@
     }
 
     div.learner-record-inst-logo {
-      padding: 20px 40px;
-      border: 1px solid $home-page-border-grey;
-      border-radius: 5px;
-      align-self: start;
-      align-items: center;
-      margin: 0;
+      display: flex;
+      padding: 20px 32px 20px 32px;
     }
 
-    img {
-      width: 200px;
-      height: auto;
+    .learner-record-inst-logo img {
+      height: 30.7569px;
+      opacity: 1;
     }
   }
 

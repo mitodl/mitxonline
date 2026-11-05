@@ -33,7 +33,6 @@ import {
   enrollmentMutation,
   deactivateEnrollmentMutation
 } from "../lib/queries/enrollment"
-import AddlProfileFieldsForm from "./forms/AddlProfileFieldsForm"
 import CourseInfoBox from "./CourseInfoBox"
 
 import type { User, Country } from "../flow/authTypes"
@@ -55,16 +54,13 @@ type Props = {
   createEnrollment: (runId: number) => Promise<any>,
   addToCart: (productId: string) => Promise<any>,
   deactivateEnrollment: (runId: number) => Promise<any>,
-  updateAddlFields: (currentUser: User) => Promise<any>,
   forceRequest: () => any,
   countries: Array<Country>
 }
 type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean,
   addedToCartDialogVisibility: boolean,
-  showAddlProfileFieldsModal: boolean,
-  currentCourseRun: ?EnrollmentFlaggedCourseRun,
-  destinationUrl: string
+  currentCourseRun: ?EnrollmentFlaggedCourseRun
 }
 
 export class CourseProductDetailEnroll extends React.Component<
@@ -74,27 +70,9 @@ export class CourseProductDetailEnroll extends React.Component<
   state = {
     upgradeEnrollmentDialogVisibility: false,
     addedToCartDialogVisibility:       false,
-    currentCourseRun:                  null,
-    showAddlProfileFieldsModal:        false,
-    destinationUrl:                    ""
+    currentCourseRun:                  null
   }
 
-  toggleAddlProfileFieldsModal() {
-    this.setState({
-      showAddlProfileFieldsModal: !this.state.showAddlProfileFieldsModal
-    })
-
-    if (
-      !this.state.showAddlProfileFieldsModal &&
-      this.state.destinationUrl.length > 0
-    ) {
-      const target = this.state.destinationUrl
-      this.setState({
-        destinationUrl: ""
-      })
-      window.open(target, "_blank")
-    }
-  }
   toggleCartConfirmationDialogVisibility() {
     this.setState({
       addedToCartDialogVisibility: !this.state.addedToCartDialogVisibility
@@ -120,45 +98,6 @@ export class CourseProductDetailEnroll extends React.Component<
     }
   }
 
-  redirectToCourseHomepage(url: string, ev: any) {
-    /*
-    If we've got addl_field_flag, then display the extra info modal. Otherwise,
-    send the learner directly to the page.
-    */
-
-    const { currentUser, updateAddlFields } = this.props
-    if (
-      currentUser &&
-      currentUser.legal_address &&
-      currentUser.legal_address.country !== "" &&
-      currentUser.legal_address.country !== null &&
-      currentUser.user_profile &&
-      currentUser.user_profile.year_of_birth !== "" &&
-      currentUser.user_profile.year_of_birth !== null
-    ) {
-      return
-    }
-
-    ev.preventDefault()
-
-    this.setState({
-      destinationUrl:             url,
-      showAddlProfileFieldsModal: true
-    })
-
-    updateAddlFields(currentUser)
-  }
-
-  async saveProfile(profileData: User, { setSubmitting }: Object) {
-    const { updateAddlFields } = this.props
-
-    try {
-      await updateAddlFields(profileData)
-    } finally {
-      setSubmitting(false)
-      this.toggleAddlProfileFieldsModal()
-    }
-  }
   toggleUpgradeDialogVisibility = () => {
     const { upgradeEnrollmentDialogVisibility } = this.state
     this.setCurrentCourseRun(null)
@@ -292,7 +231,10 @@ export class CourseProductDetailEnroll extends React.Component<
             <strong>{course && course.title}</strong> added to your cart.
           </div>
           <div className="float-container">
-            <button className="btn btn-gradient-white-to-blue btn-secondary close-dialog-btn">
+            <button
+              className="btn btn-gradient-white-to-blue btn-secondary close-dialog-btn"
+              onClick={() => this.toggleCartConfirmationDialogVisibility()}
+            >
               Close
             </button>
             <button
@@ -349,7 +291,9 @@ export class CourseProductDetailEnroll extends React.Component<
     const product = run && run.products ? run.products[0] : null
     const newCartDesign = checkFeatureFlag(
       "new-cart-design",
-      currentUser && currentUser.id ? currentUser.id : "anonymousUser"
+      currentUser && currentUser.global_id ?
+        currentUser.global_id :
+        "anonymousUser"
     )
     const canUpgrade = !!(run && run.is_upgradable && product)
     return upgradableCourseRuns.length > 0 ||
@@ -491,48 +435,11 @@ export class CourseProductDetailEnroll extends React.Component<
       ) : null
   }
 
-  renderAddlProfileFieldsModal() {
-    const { currentUser, countries } = this.props
-    const { showAddlProfileFieldsModal } = this.state
-
-    return (
-      <Modal
-        id={`upgrade-enrollment-dialog`}
-        className="upgrade-enrollment-modal"
-        isOpen={showAddlProfileFieldsModal}
-        toggle={() => this.toggleAddlProfileFieldsModal()}
-      >
-        <ModalHeader
-          id={`more-info-modal-${currentUser.id}`}
-          toggle={() => this.toggleAddlProfileFieldsModal()}
-        >
-          Provide More Info
-        </ModalHeader>
-        <ModalBody>
-          <div className="row">
-            <div className="col-12">
-              <p>
-                We need more information about you before you can start the
-                course.
-              </p>
-            </div>
-          </div>
-          <AddlProfileFieldsForm
-            onSubmit={this.saveProfile.bind(this)}
-            onCancel={() => this.toggleAddlProfileFieldsModal()}
-            user={currentUser}
-            countries={countries}
-          ></AddlProfileFieldsForm>
-        </ModalBody>
-      </Modal>
-    )
-  }
-
   renderEnrollLoginButton(run: EnrollmentFlaggedCourseRun) {
     return (
       <h2>
         <a
-          href={`${routes.login}?next=${encodeURIComponent(
+          href={`${routes.apiGatewayLogin}?next=${encodeURIComponent(
             window.location.pathname
           )}`}
           className="btn btn-primary btn-enrollment-button btn-lg  btn-gradient-red-to-blue highlight"
@@ -548,9 +455,9 @@ export class CourseProductDetailEnroll extends React.Component<
       <h2>
         <button
           onClick={() =>
-            (window.location = `${routes.login}?next=${encodeURIComponent(
-              window.location.pathname
-            )}`)
+            (window.location = `${
+              routes.apiGatewayLogin
+            }?next=${encodeURIComponent(window.location.pathname)}`)
           }
           className="btn btn-primary btn-enrollment-button btn-lg highlight"
           disabled={true}
@@ -635,7 +542,6 @@ export class CourseProductDetailEnroll extends React.Component<
                   this.renderEnrollLoginButton(run) :
                 this.renderAccessCourseButton()}
 
-              {run && currentUser ? this.renderAddlProfileFieldsModal() : null}
               {this.renderUpgradeEnrollmentDialog()}
               {this.renderAddToCartConfirmationDialog()}
             </>
@@ -668,20 +574,6 @@ const addToCart = (productId: string) =>
 const deactivateEnrollment = (run: number) =>
   mutateAsync(deactivateEnrollmentMutation(run))
 
-const updateAddlFields = (currentUser: User) => {
-  const updatedUser = {
-    name:          currentUser.name,
-    email:         currentUser.email,
-    legal_address: currentUser.legal_address,
-    user_profile:  {
-      ...currentUser.user_profile,
-      addl_field_flag: true
-    }
-  }
-
-  return mutateAsync(users.editProfileMutation(updatedUser))
-}
-
 const mapStateToProps = createStructuredSelector({
   courses:         coursesSelector,
   currentUser:     currentUserSelector,
@@ -699,7 +591,6 @@ const mapDispatchToProps = {
   createEnrollment,
   addToCart,
   deactivateEnrollment,
-  updateAddlFields,
   addUserNotification
 }
 

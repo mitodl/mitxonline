@@ -17,24 +17,27 @@ take care of it). If the creation is successful, this will optionally run the
 create_courseware_page command for the course run.
 """
 
+import logging
 from decimal import Decimal, InvalidOperation
-from urllib import parse
 
-import reversion
 from django.conf import settings
-from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.core.management import BaseCommand
-from django_countries import countries
 
-from cms.api import create_default_courseware_page
-from courses.models import BlockedCountry, Course, CourseRun, Department, Program
-from ecommerce.models import Product
+from courses.api import import_courserun_from_edx
+from courses.constants import (
+    COURSE_VARIANT_INDUSTRY,
+    COURSE_VARIANT_LANGUAGE,
+    COURSE_VARIANT_LENGTH,
+)
+from courses.models import Program
 from openedx.api import get_edx_api_course_detail_client
 
-try:
-    from b2b.models import ContractPage
-except ImportError:
-    ContractPage = None
+INDUSTRY_OPTS = [opt[0] for opt in COURSE_VARIANT_INDUSTRY]
+LENGTH_OPTS = [opt[0] for opt in COURSE_VARIANT_LENGTH]
+LANG_OPTS = [opt[0] for opt in COURSE_VARIANT_LANGUAGE]
+
+log = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -42,7 +45,7 @@ class Command(BaseCommand):
     Creates a courseware object.
     """
 
-    help = "Creates a course run using details from edX. Supports setting catalog/AI flags, CMS page creation options, and B2B contract assignment."
+    help = "Creates a course run using details from edX. Supports setting catalog/AI flags and CMS page creation options."
 
     def add_arguments(self, parser) -> None:
         parser.add_argument(
@@ -50,6 +53,16 @@ class Command(BaseCommand):
             type=str,
             nargs="?",
             help="The course run to create. Do not specify with --program.",
+        )
+
+        parser.add_argument(
+            "--use-specific-course",
+            type=str,
+            nargs="?",
+            help=(
+                "Readable ID of an existing Course to use as the base course "
+                "for the imported run(s), instead of deriving it from the course key."
+            ),
         )
 
         parser.add_argument(
@@ -63,7 +76,7 @@ class Command(BaseCommand):
             "--run-tag",
             type=str,
             nargs="?",
-            help="The run tag (3T2022, etc.) to use. The + will be appended to this when combining it with the course's readable ID. Requires --program. Do not specify with --courserun.",
+            help="The run tag (3T2022, etc.) to use. The + will be appended to this when combining it with the course's readable ID. Requires --program. Do not specify with --courserun unless also specifying a language.",
         )
 
         parser.add_argument(
@@ -96,9 +109,16 @@ class Command(BaseCommand):
             "-d",
             "--dept",
             "--department",
-            help="Specify department(s) assigned to the course object.  If program is specified, all courses associated with the program and imported will have the same department.",
+            help="Specify department(s) assigned to the course object. If not specified, the course will be created without departments.",
             action="append",
             dest="depts",
+            required=False,
+        )
+
+        parser.add_argument(
+            "--create-depts",
+            action="store_true",
+            help="Create any departments that need to be created.",
         )
 
         parser.add_argument(
@@ -126,38 +146,43 @@ class Command(BaseCommand):
         )
 
         parser.add_argument(
-            "--contract",
-            type=str,
-            help="Assign the resulting course run to the specified B2B contract (contract ID or slug).",
+            "--source-course",
+            action="store_true",
+            help="Designate the course run(s) to import as source course runs.",
         )
 
-    def _resolve_contract(self, contract_identifier):
-        """
-        Resolve a contract by ID or slug.
+        parser.add_argument(
+            "--language",
+            "--lang",
+            type=str,
+            help='Set the language for the course run. Defaults to "en".',
+            choices=LANG_OPTS,
+            default="en",
+        )
+        parser.add_argument(
+            "--primary-lang",
+            action="store_true",
+            help="Set this course run as the default for the language. Requires a language to be set.",
+        )
 
-        Args:
-            contract_identifier (str): Contract ID (numeric) or slug
+        parser.add_argument(
+            "--length",
+            "--len",
+            type=str,
+            choices=LENGTH_OPTS,
+            default="",
+            help="Customization option: course content length.",
+        )
+        parser.add_argument(
+            "--industry",
+            "--ind",
+            type=str,
+            choices=INDUSTRY_OPTS,
+            default="",
+            help="Customization option: course industry focus.",
+        )
 
-        Returns:
-            ContractPage or None: The resolved contract or None if not found/not available
-        """
-        if not ContractPage or not contract_identifier:
-            return None
-
-        if contract_identifier.isdigit():
-            try:
-                return ContractPage.objects.get(id=int(contract_identifier))
-            except ContractPage.DoesNotExist:
-                pass
-
-        try:
-            return ContractPage.objects.get(slug=contract_identifier)
-        except ContractPage.DoesNotExist:
-            pass
-
-        return None
-
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: C901, PLR0915
+    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: C901, PLR0915, ARG002
         if kwargs.get("publish_cms_page") and kwargs.get("draft_cms_page"):
             self.stderr.write(
                 self.style.ERROR(
@@ -168,17 +193,6 @@ class Command(BaseCommand):
 
         edx_course_detail = get_edx_api_course_detail_client()
         edx_courses = []
-
-        contract = None
-        if kwargs.get("contract"):
-            contract = self._resolve_contract(kwargs.get("contract"))
-            if not contract:
-                self.stdout.write(
-                    self.style.ERROR(
-                        f"Contract '{kwargs.get('contract')}' not found or B2B module not available."
-                    )
-                )
-                return False
 
         price = None
         if kwargs.get("price"):
@@ -193,6 +207,14 @@ class Command(BaseCommand):
                     )
                 )
                 price = None
+
+        publish_cms_page = False
+
+        if kwargs.get("live") or kwargs.get("publish_cms_page"):
+            publish_cms_page = True
+
+        if kwargs.get("live") and kwargs.get("draft_cms_page"):
+            publish_cms_page = False
 
         if kwargs.get("courserun") is not None:
             try:
@@ -212,7 +234,7 @@ class Command(BaseCommand):
                 return False
         elif kwargs.get("program") is not None and kwargs.get("run_tag") is not None:
             try:
-                if kwargs.get("program").isnumeric():
+                if kwargs.get("program", "").isnumeric():
                     program = Program.objects.filter(pk=kwargs.get("program")).get()
                 else:
                     program = Program.objects.filter(
@@ -249,155 +271,101 @@ class Command(BaseCommand):
         success_count = 0
 
         for edx_course in edx_courses:
-            courserun_tag = edx_course.course_id.split("+")[-1]
-            course_readable_id = edx_course.course_id.removesuffix(f"+{courserun_tag}")
-            course = Course.objects.filter(readable_id=course_readable_id)
-            if kwargs.get("depts") and len(kwargs.get("depts")) > 0:
-                add_depts = Department.objects.filter(
-                    name__in=kwargs.get("depts")
-                ).all()
-
-            if "add_depts" not in locals() or not add_depts:
-                self.stdout.write(
+            try:
+                run_data = import_courserun_from_edx(
+                    course_key=edx_course.course_id,
+                    live=kwargs.get("live", False),
+                    use_specific_course=kwargs.get("use_specific_course"),
+                    price=price,
+                    block_countries=kwargs.get("block_countries"),
+                    departments=kwargs.get("depts"),
+                    create_depts=kwargs.get("create_depts", False),
+                    create_cms_page=kwargs.get("create_cms_page", False),
+                    publish_cms_page=publish_cms_page,
+                    include_in_learn_catalog=kwargs.get(
+                        "include_in_learn_catalog", False
+                    ),
+                    ingest_content_files_for_ai=kwargs.get(
+                        "ingest_content_files_for_ai", False
+                    ),
+                    is_source_run=kwargs.get("source_course", False),
+                    variant_industry=kwargs.get("industry", ""),
+                    variant_length=kwargs.get("length", ""),
+                    language=kwargs.get("language", "en"),
+                    is_primary_language=kwargs.get("primary_lang", False),
+                )
+            except ValidationError:
+                log.exception(
+                    "import_courserun couldn't import %s - validation error",
+                    edx_course.course_id,
+                )
+                self.stderr.write(
                     self.style.ERROR(
-                        "Departments must exist and be specified with the --dept argument prior to running this command to create courses."
+                        f"Validation error importing {edx_course.course_id}."
                     )
                 )
-                return False
+                return f"Validation error importing {edx_course.course_id}."
+            except LookupError:
+                log.exception(
+                    "import_courserun: couldn't import %s - lookup error (probably bad language code?)",
+                    edx_course.course_id,
+                )
+                self.stderr.write(
+                    self.style.ERROR(
+                        f"Lookup error importing {edx_course.course_id}. (This is likely a bad language code or variant option.)"
+                    )
+                )
+                return f"Lookup error importing {edx_course.course_id}. (This is likely a bad language code or variant option.)"
 
-            (course, created) = Course.objects.get_or_create(
-                readable_id=course_readable_id,
-                defaults={
-                    "title": edx_course.name,
-                    "readable_id": course_readable_id,
-                    "live": kwargs.get("live", False),
-                },
-            )
-            course.departments.set(add_depts)
-            course.save()
+            if not isinstance(run_data, tuple) or len(run_data) != 3:  # noqa: PLR2004
+                continue
 
-            if created:
+            run, page, product = run_data
+
+            if page:
+                self.stdout.write(self.style.SUCCESS(f"\t --> Created page {page}"))
+
+            if product:
                 self.stdout.write(
-                    self.style.SUCCESS(
-                        f"Created course for {course_readable_id}: {course}"
-                    )
+                    self.style.SUCCESS(f"\t --> Created product {product}")
                 )
 
-            new_run = CourseRun.objects.create(
-                course=course,
-                run_tag=courserun_tag,
-                courseware_id=edx_course.course_id,
-                start_date=edx_course.start,
-                end_date=edx_course.end,
-                enrollment_start=edx_course.enrollment_start,
-                enrollment_end=edx_course.enrollment_end,
-                title=edx_course.name,
-                live=kwargs.get("live", False),
-                is_self_paced=edx_course.is_self_paced(),
-                courseware_url_path=parse.urljoin(
-                    settings.OPENEDX_API_BASE_URL,
-                    f"/courses/{edx_course.course_id}/course",
-                ),
-                b2b_contract=contract,
-            )
-
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"Created course run for {edx_course.course_id}: id {new_run.id}"
-                )
-            )
-
-            if contract:
+            if kwargs.get("run_tag", False):
+                run.run_tag = kwargs.get("run_tag")
+            else:
                 self.stdout.write(
-                    self.style.SUCCESS(
-                        f"Assigned course run to contract: {contract.name} (ID: {contract.id})"
+                    self.style.WARNING(
+                        f"WARNING: No specific run tag specified for {run.courseware_id} in language {run.language}, so using the default {run.run_tag}. This is probably not what you want."
                     )
                 )
+
+            try:
+                run.save()
+            except ValidationError:
+                log.exception(
+                    "import_courserun: ValidationError reached importing %s",
+                    run.courseware_id,
+                )
+                self.stderr.write(
+                    self.style.ERROR(
+                        f"ERROR: Could not set options on {run.courseware_id}, so variant options will be blank."
+                    )
+                )
+                continue
 
             success_count += 1
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Created new run {run.courseware_id} in course {run.course.readable_id}"
+                )
+            )
 
-            if kwargs.get("create_cms_page"):
-                try:
-                    # Determine whether to publish the CMS page
-                    cms_page_live = kwargs.get("live", False)
-
-                    if kwargs.get("publish_cms_page"):
-                        cms_page_live = True
-                    elif kwargs.get("draft_cms_page"):
-                        cms_page_live = False
-
-                    course_page = create_default_courseware_page(
-                        new_run.course, live=cms_page_live
+            if run and not run.course.validate_variant_run(run):
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Created run {run.courseware_id} is not a valid variant for course {run.course.readable_id}. Consider adjusting the run settings or course variant options."
                     )
-
-                    if kwargs.get("include_in_learn_catalog") or kwargs.get(
-                        "ingest_content_files_for_ai"
-                    ):
-                        if kwargs.get("include_in_learn_catalog"):
-                            course_page.include_in_learn_catalog = True
-                        if kwargs.get("ingest_content_files_for_ai"):
-                            course_page.ingest_content_files_for_ai = True
-                        course_page.save()
-
-                    status_msg = "live" if cms_page_live else "draft"
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f"Created {status_msg} CMS page for {new_run.course.readable_id}"
-                        )
-                    )
-                except Exception as e:  # noqa: BLE001
-                    self.stdout.write(
-                        self.style.ERROR(
-                            f"Could not create CMS page {new_run.course.readable_id}, skipping it: {e}"
-                        )
-                    )
-
-            if price:
-                content_type = ContentType.objects.get_for_model(CourseRun)
-                with reversion.create_revision():
-                    (course_product, created) = Product.objects.update_or_create(
-                        content_type=content_type,
-                        object_id=new_run.id,
-                        defaults={
-                            "price": Decimal(price),
-                            "description": new_run.courseware_id,
-                            "is_active": True,
-                        },
-                    )
-
-                    course_product.save()
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f"Created product {course_product} for {new_run.courseware_id}"
-                        )
-                    )
-
-            if kwargs.get("block_countries"):
-                for code_or_name in kwargs.get("block_countries").split(","):
-                    country_code = countries.by_name(code_or_name)
-                    if not country_code:
-                        country_name = countries.countries.get(code_or_name, None)
-                        country_code = code_or_name if country_name else None
-                    else:
-                        country_name = code_or_name
-
-                    if country_code:
-                        BlockedCountry.objects.get_or_create(
-                            course=course, country=country_code
-                        )
-                        self.stdout.write(
-                            self.style.SUCCESS(
-                                f"Blocked Enrollments for {country_name} ({country_code})."
-                            )
-                        )
-                        continue
-
-                    self.stdout.write(
-                        self.style.ERROR(
-                            f"Could not block country {code_or_name}. "
-                            f"Please verify that it is a valid country name or code."
-                        )
-                    )
+                )
 
         self.stdout.write(self.style.SUCCESS(f"{success_count} course runs created"))
         return None

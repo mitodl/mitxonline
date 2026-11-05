@@ -2,8 +2,6 @@
 mitx_online views
 """
 
-from urllib.parse import urljoin
-
 from django.conf import settings
 from django.contrib.auth.views import redirect_to_login
 from django.http import (
@@ -15,7 +13,10 @@ from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.cache import never_cache
+from mitol.olposthog.features import is_enabled
 from rest_framework.pagination import LimitOffsetPagination
+
+from main import features
 
 
 def get_base_context(request):  # noqa: ARG001
@@ -27,28 +28,37 @@ def get_base_context(request):  # noqa: ARG001
         context["domain_verification_tag"] = (
             settings.GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE
         )
-    context["hijack_logout_redirect_url"] = settings.HIJACK_LOGOUT_REDIRECT_URL
 
     return context
 
 
 @never_cache
-def index(request, **kwargs):  # noqa: ARG001
+def index(request, **kwargs):
     """
     The index view. Display available programs
     """
-
-    # If we're getting sent here, and the APISIX middleware is enabled, we should
-    # punt them to its login page instead.
-
-    if (
-        request.path.startswith("/signin")
-        and not settings.MITOL_APIGATEWAY_DISABLE_MIDDLEWARE
-    ):
-        return HttpResponseRedirect(urljoin(settings.SITE_BASE_URL, "/login"))
-
-    context = get_base_context(request)
+    context = {**get_base_context(request), **kwargs}
     return render(request, "index.html", context=context)
+
+
+@never_cache
+def dashboard(request, **kwargs):
+    """
+    Dashboard view - redirects to the new learn frontend if the feature flag
+    is enabled for this user, otherwise serves the legacy React app.
+    """
+    if request.user.is_authenticated:
+        global_id = request.user.global_id
+        if global_id and is_enabled(
+            features.REDIRECT_LEARN_DASHBOARD,
+            default=False,
+            opt_unique_id=global_id,
+        ):
+            redirect_url = settings.MIT_LEARN_DASHBOARD_URL
+            if qs := request.META.get("QUERY_STRING"):
+                redirect_url = f"{redirect_url}?{qs}"
+            return HttpResponseRedirect(redirect_url)
+    return index(request, **kwargs)
 
 
 @never_cache
@@ -74,9 +84,23 @@ def handler500(request):
     )
 
 
-def cms_signin_redirect_to_site_signin(request):  # noqa: ARG001
-    """Redirect wagtail admin signin to site signin page"""
-    return redirect_to_login(reverse("wagtailadmin_home"), login_url="/signin")
+def cms_signin_redirect_to_site_signin(request):
+    """CMS signin redirect to site signin page."""
+    # Redirect to /cms/ after login, not to wagtailadmin_home to avoid redirect loops
+    cms_url = request.build_absolute_uri("/cms/")
+    return redirect_to_login(cms_url, login_url=reverse("gateway-login"))
+
+
+def staff_dashboard_signin_redirect_to_site_signin(request):
+    """Staff dashboard signin redirect to site signin page."""
+    # Only redirect if user is not authenticated
+    if not request.user.is_authenticated:
+        staff_dashboard_url = request.build_absolute_uri("/staff-dashboard/")
+        return redirect_to_login(
+            staff_dashboard_url, login_url=reverse("gateway-login")
+        )
+
+    return refine(request)
 
 
 class RefinePagination(LimitOffsetPagination):

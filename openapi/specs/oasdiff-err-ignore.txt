@@ -1,0 +1,9 @@
+# Errors `oasdiff breaking` should not fail the openapi-diff check on, one per
+# line, copied verbatim from the check's output, each with a comment saying
+# why the change is safe for API clients.
+#
+# The check compares a PR's specs with its base branch's, so an entry only
+# matters until its change is on `release`: PRs into main compare against
+# main, which already has the change, and release PRs compare `release` with
+# `release-candidate`. Once the change has shipped, delete its entries; left
+# in place they would hide a genuine breaking change of the same shape.

@@ -6,14 +6,15 @@ from decimal import Decimal
 
 import bleach
 import pytest
-from django.test.client import RequestFactory
+from django.test import RequestFactory
 
+from cms.api import resolve_financial_assistance_form_urls
 from cms.factories import (
     CoursePageFactory,
     FlexiblePricingFormFactory,
     ProgramPageFactory,
 )
-from cms.models import FlexiblePricingRequestForm
+from cms.models import CoursePage, FlexiblePricingRequestForm
 from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses.factories import (
     CourseFactory,
@@ -24,6 +25,7 @@ from courses.factories import (
 )
 from ecommerce.factories import ProductFactory
 from main.test_utils import assert_drf_json_equal
+from main.utils import get_learn_product_url
 
 pytestmark = [pytest.mark.django_db]
 
@@ -59,11 +61,13 @@ def test_serialize_course_page(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": course_page.url,
+            "page_url": get_learn_product_url(
+                "courses", course_page.product.readable_id
+            ),
             "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_page.slug}/",
             "instructors": [],
             "current_price": None,
-            "description": bleach.clean(course_page.description, tags=[], strip=True),
+            "description": bleach.clean(course_page.description, tags={}, strip=True),
             "live": True,
             "length": course_page.length,
             "effort": course_page.effort,
@@ -83,7 +87,7 @@ def test_serialize_course_page_with_flex_price_with_program_fk_and_parent(
     mocker.patch("cms.serializers.get_wagtail_img_src", return_value=fake_image_src)
 
     program = ProgramFactory(page=None)
-    program_page = ProgramPageFactory(program=program)
+    program_page = ProgramPageFactory(program=program, list_price=Decimal("99.99"))
     financial_assistance_form = FlexiblePricingFormFactory(
         selected_program_id=program.id, parent=program_page
     )
@@ -102,11 +106,13 @@ def test_serialize_course_page_with_flex_price_with_program_fk_and_parent(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": course_page.url,
+            "page_url": get_learn_product_url(
+                "courses", course_page.product.readable_id
+            ),
             "financial_assistance_form_url": f"{program_page.get_url()}{financial_assistance_form.slug}/",
             "instructors": [],
             "current_price": None,
-            "description": bleach.clean(course_page.description, tags=[], strip=True),
+            "description": bleach.clean(course_page.description, tags={}, strip=True),
             "live": True,
             "length": course_page.length,
             "effort": course_page.effort,
@@ -144,11 +150,13 @@ def test_serialize_course_page_with_flex_price_with_program_fk_no_parent(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": course_page.url,
+            "page_url": get_learn_product_url(
+                "courses", course_page.product.readable_id
+            ),
             "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_form.slug}/",
             "instructors": [],
             "current_price": None,
-            "description": bleach.clean(course_page.description, tags=[], strip=True),
+            "description": bleach.clean(course_page.description, tags={}, strip=True),
             "live": True,
             "length": course_page.length,
             "effort": course_page.effort,
@@ -186,11 +194,13 @@ def test_serialize_course_page_with_flex_price_form_as_program_child(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": course_page.url,
+            "page_url": get_learn_product_url(
+                "courses", course_page.product.readable_id
+            ),
             "financial_assistance_form_url": f"{program_page.get_url()}{financial_assistance_page.slug}/",
             "instructors": [],
             "current_price": None,
-            "description": bleach.clean(course_page.description, tags=[], strip=True),
+            "description": bleach.clean(course_page.description, tags={}, strip=True),
             "live": True,
             "length": course_page.length,
             "effort": course_page.effort,
@@ -225,11 +235,13 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": course_page.url,
+            "page_url": get_learn_product_url(
+                "courses", course_page.product.readable_id
+            ),
             "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_form.slug}/",
             "instructors": [],
             "current_price": None,
-            "description": bleach.clean(course_page.description, tags=[], strip=True),
+            "description": bleach.clean(course_page.description, tags={}, strip=True),
             "live": True,
             "length": course_page.length,
             "effort": course_page.effort,
@@ -238,13 +250,13 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
 
 
 @pytest.mark.parametrize(
-    "own_program_has_form,related_program,related_program_has_form",  # noqa: PT006
+    ("own_program_has_form", "related_program", "related_program_has_form"),
     [
-        [True, False, False],  # noqa: PT007
-        [True, True, False],  # noqa: PT007
-        [False, True, False],  # noqa: PT007
-        [False, True, True],  # noqa: PT007
-        [True, True, True],  # noqa: PT007
+        (True, False, False),
+        (True, True, False),
+        (False, True, False),
+        (False, True, True),
+        (True, True, True),
     ],
 )
 def test_serialized_course_finaid_form_url(
@@ -280,16 +292,22 @@ def test_serialized_course_finaid_form_url(
     if related_program:
         program1.add_related_program(program2)
 
+    # financial_assistance_form_url is a cached_property on CoursePage, so each
+    # assertion below needs a freshly loaded page - re-serializing the same
+    # in-memory instance would return the answer cached before the form existed.
+    def serialize_fresh():
+        return CoursePageSerializer(CoursePage.objects.get(pk=course1.page.pk)).data
+
     if own_program_has_form:
         own_fa_page = FlexiblePricingFormFactory.create(
             parent=program1.page, selected_program=program1
         )
 
-        serialized_output = CoursePageSerializer(course1.page).data
+        serialized_output = serialize_fresh()
 
         assert own_fa_page.slug in serialized_output["financial_assistance_form_url"]
     else:
-        serialized_output = CoursePageSerializer(course1.page).data
+        serialized_output = serialize_fresh()
 
         assert serialized_output["financial_assistance_form_url"] == ""
 
@@ -298,7 +316,7 @@ def test_serialized_course_finaid_form_url(
             parent=program2.page, selected_program=program2
         )
 
-        serialized_output = CoursePageSerializer(course1.page).data
+        serialized_output = serialize_fresh()
 
         if own_program_has_form:
             assert (
@@ -311,6 +329,73 @@ def test_serialized_course_finaid_form_url(
             )
 
 
+@pytest.mark.parametrize(
+    ("own_form_published", "related_form_published"),
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+def test_serialized_course_finaid_form_url_publishing_states(
+    own_form_published, related_form_published
+):
+    """
+    Test a few scenarios where financial aid forms exist but are not yet published.
+    """
+
+    program1 = ProgramFactory.create()
+    course1 = CourseFactory.create()
+    program1.add_requirement(course1)
+
+    program2 = ProgramFactory.create()
+    course2 = CourseFactory.create()
+    program2.add_requirement(course2)
+    program1.add_related_program(program2)
+
+    own_fa_page = FlexiblePricingFormFactory.create(
+        parent=program1.page, selected_program=program1, live=own_form_published
+    )
+    related_fa_page = FlexiblePricingFormFactory.create(
+        parent=program2.page, selected_program=program2, live=related_form_published
+    )
+
+    serialized_output = CoursePageSerializer(course1.page).data
+
+    if own_form_published:
+        assert own_fa_page.slug in serialized_output["financial_assistance_form_url"]
+    elif related_form_published:
+        assert (
+            related_fa_page.slug in serialized_output["financial_assistance_form_url"]
+        )
+    else:
+        assert serialized_output["financial_assistance_form_url"] == ""
+
+
+def test_financial_assistance_url_ignores_non_live_forms(fully_configured_wagtail):
+    """A draft form must never win over the published one."""
+
+    course_page = CoursePageFactory()
+
+    # Non-live form for this course, created first so it has the lower pk and
+    # would win on min-pk if liveness were not filtered.
+    FlexiblePricingFormFactory(
+        parent=course_page,
+        selected_course=course_page.product,
+        live=False,
+    )
+    live_form = FlexiblePricingFormFactory(
+        parent=course_page,
+        selected_course=course_page.product,
+        live=True,
+    )
+
+    urls = resolve_financial_assistance_form_urls([course_page.course_id])
+
+    assert urls[course_page.course_id].endswith(f"{live_form.slug}/")
+
+
 def test_serialize_program_page(
     mocker, fully_configured_wagtail, staff_user, mock_context
 ):
@@ -321,6 +406,7 @@ def test_serialize_program_page(
 
     program = ProgramFactory(page=None)
     program_page = ProgramPageFactory(program=program)
+    ProductFactory(purchasable_object=program, price=Decimal("99.99"))
     financial_assistance_form = FlexiblePricingFormFactory(
         selected_program_id=program.id, parent=program_page
     )
@@ -335,13 +421,71 @@ def test_serialize_program_page(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": program_page.url,
+            "page_url": get_learn_product_url(
+                "programs", program_page.product.readable_id
+            ),
             "financial_assistance_form_url": f"{program_page.get_url()}{financial_assistance_form.slug}/",
-            "description": bleach.clean(program_page.description, tags=[], strip=True),
+            "description": bleach.clean(program_page.description, tags={}, strip=True),
             "live": True,
             "length": program_page.length,
             "effort": program_page.effort,
             "price": None,
+            "list_price": 99.99,
+            "include_in_learn_catalog": False,
+        },
+    )
+
+
+def test_serialize_program_page__form_child_of_course_with_program_fk(
+    mocker, fully_configured_wagtail, staff_user, mock_context
+):
+    """Program page uses course URL when form is child of course page.
+
+    This covers the case where a financial assistance form is created under a
+    course page in Wagtail but is linked to a program via the Selected Program
+    FK. The program page should link to the course-based URL for the form
+    rather than a /programs/ URL.
+    """
+
+    fake_image_src = "http://example.com/my.img"
+    patched_get_wagtail_src = mocker.patch(  # noqa: F841
+        "cms.serializers.get_wagtail_img_src", return_value=fake_image_src
+    )
+
+    program = ProgramFactory(page=None)
+    program_page = ProgramPageFactory(program=program)
+
+    course = CourseFactory(page=None)
+    program.add_requirement(course)
+    course_page = CoursePageFactory(course=course)
+
+    financial_assistance_form = FlexiblePricingFormFactory(
+        selected_program_id=program.id, parent=course_page
+    )
+
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = staff_user
+
+    data = ProgramPageSerializer(
+        instance=program_page, context=program_page.get_context(request)
+    ).data
+
+    assert_drf_json_equal(
+        data,
+        {
+            "feature_image_src": fake_image_src,
+            "page_url": get_learn_product_url(
+                "programs", program_page.product.readable_id
+            ),
+            "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_form.slug}/",
+            "description": bleach.clean(program_page.description, tags={}, strip=True),
+            "live": True,
+            "length": program_page.length,
+            "effort": program_page.effort,
+            "price": None,
+            "list_price": None,
+            "include_in_learn_catalog": False,
         },
     )
 
@@ -373,13 +517,17 @@ def test_serialize_program_page__with_related_financial_form(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": program_page.url,
+            "page_url": get_learn_product_url(
+                "programs", program_page.product.readable_id
+            ),
             "financial_assistance_form_url": f"{other_program_page.get_url()}{financial_assistance_form.slug}/",
-            "description": bleach.clean(program_page.description, tags=[], strip=True),
+            "description": bleach.clean(program_page.description, tags={}, strip=True),
             "live": True,
             "length": program_page.length,
             "effort": program_page.effort,
             "price": None,
+            "list_price": None,
+            "include_in_learn_catalog": False,
         },
     )
 
@@ -405,13 +553,17 @@ def test_serialize_program_page__no_financial_form(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": program_page.url,
+            "page_url": get_learn_product_url(
+                "programs", program_page.product.readable_id
+            ),
             "financial_assistance_form_url": "",
-            "description": bleach.clean(program_page.description, tags=[], strip=True),
+            "description": bleach.clean(program_page.description, tags={}, strip=True),
             "live": True,
             "length": program_page.length,
             "effort": program_page.effort,
             "price": None,
+            "list_price": None,
+            "include_in_learn_catalog": False,
         },
     )
 
@@ -440,13 +592,17 @@ def test_serialize_program_page__with_related_program_no_financial_form(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": program_page.url,
+            "page_url": get_learn_product_url(
+                "programs", program_page.product.readable_id
+            ),
             "financial_assistance_form_url": "",
-            "description": bleach.clean(program_page.description, tags=[], strip=True),
+            "description": bleach.clean(program_page.description, tags={}, strip=True),
             "live": True,
             "length": program_page.length,
             "effort": program_page.effort,
             "price": None,
+            "list_price": None,
+            "include_in_learn_catalog": False,
         },
     )
 
@@ -470,10 +626,8 @@ def test_get_current_price_with_queryset_single_product(
     course_run = CourseRunFactory(course=course_page.product)
     product = ProductFactory(purchasable_object=course_run, price=Decimal("99.99"))
 
-    # Mock active_products to return a QuerySet-like object
-    mock_queryset = mocker.MagicMock()
-    mock_queryset.all.return_value = [product]
-    course_page.product.active_products = mock_queryset
+    # Mock active_products to return a list of products
+    course_page.product.active_products = [product]
 
     serializer = CoursePageSerializer()
     result = serializer.get_current_price(course_page)
@@ -493,10 +647,8 @@ def test_get_current_price_with_queryset_multiple_products(
     product2 = ProductFactory(purchasable_object=course_run2, price=Decimal("100.00"))
     product3 = ProductFactory(purchasable_object=course_run3, price=Decimal("75.00"))
 
-    # Mock active_products to return a QuerySet-like object
-    mock_queryset = mocker.MagicMock()
-    mock_queryset.all.return_value = [product1, product2, product3]
-    course_page.product.active_products = mock_queryset
+    # Mock active_products to return a list of products
+    course_page.product.active_products = [product1, product2, product3]
 
     serializer = CoursePageSerializer()
     result = serializer.get_current_price(course_page)
@@ -546,10 +698,8 @@ def test_get_current_price_with_empty_queryset(mocker, fully_configured_wagtail)
     """Test get_current_price with empty QuerySet"""
     course_page = CoursePageFactory()
 
-    # Mock active_products to return empty QuerySet
-    mock_queryset = mocker.MagicMock()
-    mock_queryset.all.return_value = []
-    course_page.product.active_products = mock_queryset
+    # Mock active_products to return empty list
+    course_page.product.active_products = []
 
     serializer = CoursePageSerializer()
     result = serializer.get_current_price(course_page)

@@ -55,7 +55,10 @@ def test_context_for_user(settings, test_user, extra_context):
 
     assert context_for_user(user=test_user, extra_context=extra_context) == {
         "base_url": settings.SITE_BASE_URL,
-        "site_name": settings.SITE_NAME,
+        "site_name": "MIT Learn",
+        "mit_learn_terms_url": settings.MIT_LEARN_TERMS_URL,
+        "mit_learn_privacy_url": settings.MIT_LEARN_PRIVACY_URL,
+        "mit_learn_honor_code_url": settings.MIT_LEARN_HONOR_CODE_URL,
         **(extra_context or {}),
         **user_ctx,
     }
@@ -173,7 +176,7 @@ def test_build_message(mocker, settings):
     """
     Tests that build_message correctly builds a message object using the Anymail APIs
     """
-    settings.MAILGUN_FROM_EMAIL = "from-email@example.com"
+    settings.MIT_LEARN_FROM_EMAIL = "from-email@example.com"
     settings.MITX_ONLINE_REPLY_TO_ADDRESS = "reply-email@example.com"
     subject = "subject"
     text_body = "body"
@@ -196,7 +199,7 @@ def test_build_message(mocker, settings):
         subject=subject,
         body=text_body,
         to=[recipient_email],
-        from_email=settings.MAILGUN_FROM_EMAIL,
+        from_email=settings.MIT_LEARN_FROM_EMAIL,
         connection=mock_connection,
         headers={"Reply-To": settings.MITX_ONLINE_REPLY_TO_ADDRESS},
     )
@@ -247,8 +250,9 @@ def test_send_message(mailoutbox):
 
     send_messages(messages)
 
-    for message in mailoutbox:
-        assert message in messages
+    recipients = [message.to[0] for message in mailoutbox]
+    for user in users:
+        assert formataddr((user.name, user.email)) in recipients
 
 
 def test_send_message_failure(mocker):

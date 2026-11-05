@@ -9,15 +9,22 @@ import pytest
 import reversion
 from django.contrib.contenttypes.models import ContentType
 from hubspot.crm.associations import BatchInputPublicAssociation, PublicAssociation
-from hubspot.crm.objects import ApiException, BatchInputSimplePublicObjectInput
+from hubspot.crm.objects import (
+    ApiException,
+)
+from hubspot.crm.objects import (
+    BatchInputSimplePublicObjectBatchInputForCreate as BatchInputCreate,
+)
 from mitol.hubspot_api.api import HubspotAssociationType, HubspotObjectType
 from mitol.hubspot_api.exceptions import TooManyRequestsException
 from mitol.hubspot_api.factories import HubspotObjectFactory, SimplePublicObjectFactory
 from mitol.hubspot_api.models import HubspotObject
 from reversion.models import Version
 
+from b2b.factories import ContractPageFactory
+from courses.factories import CourseRunCertificateFactory, ProgramCertificateFactory
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
-from ecommerce.models import Product
+from ecommerce.models import Order, Product
 from hubspot_sync import tasks
 from hubspot_sync.api import (
     make_contact_create_message_list_from_user_ids,
@@ -26,11 +33,15 @@ from hubspot_sync.api import (
 from hubspot_sync.tasks import (
     batch_upsert_associations,
     batch_upsert_associations_chunked,
+    sync_cart_add_event_with_hubspot,
     sync_contact_with_hubspot,
+    sync_course_run_certificate_with_hubspot,
     sync_deal_with_hubspot,
+    sync_deal_with_hubspot_targeted,
     sync_product_with_hubspot,
+    sync_program_certificate_with_hubspot,
 )
-from users.factories import UserFactory, UserSocialAuthFactory
+from users.factories import UserFactory
 from users.models import User
 
 pytestmark = [pytest.mark.django_db]
@@ -82,6 +93,169 @@ def test_task_sync_deal_with_hubspot(mocker):
     mock_api_call.assert_called_once_with(mock_object)
 
 
+def test_task_sync_course_run_certificate_with_hubspot(mocker):
+    """Course run certificate task should call API and return hubspot id."""
+    cert = CourseRunCertificateFactory.create()
+    mock_result = SimplePublicObjectFactory()
+
+    mock_api_call = mocker.patch(
+        "hubspot_sync.tasks.api.sync_course_run_certificate_with_hubspot",
+        return_value=mock_result,
+    )
+
+    assert sync_course_run_certificate_with_hubspot(cert.id) == mock_result.id
+    mock_api_call.assert_called_once()
+
+
+def test_task_sync_program_certificate_with_hubspot(mocker):
+    """Program certificate task should call API and return hubspot id."""
+    cert = ProgramCertificateFactory.create()
+    mock_result = SimplePublicObjectFactory()
+
+    mock_api_call = mocker.patch(
+        "hubspot_sync.tasks.api.sync_program_certificate_with_hubspot",
+        return_value=mock_result,
+    )
+
+    assert sync_program_certificate_with_hubspot(cert.id) == mock_result.id
+    mock_api_call.assert_called_once()
+
+
+def test_task_sync_cart_add_event_with_hubspot(mocker):
+    """sync_cart_add_event_with_hubspot should call API tracker and return success state."""
+    user = UserFactory.create()
+    product = ProductFactory.create()
+    mock_api_call = mocker.patch(
+        "hubspot_sync.tasks.api.track_cart_add_with_hubspot", return_value=True
+    )
+
+    assert (
+        sync_cart_add_event_with_hubspot(user.id, product.id, is_uai_course=True)
+        is True
+    )
+    mock_api_call.assert_called_once_with(
+        user, product, is_uai_course=True, is_xpro_course=False
+    )
+
+
+def test_task_sync_deal_with_hubspot_targeted(mocker, settings):
+    """sync_deal_with_hubspot_targeted should call the api function with Order object and resolved token, return hubspot id"""
+    mock_object = OrderFactory.create()
+    mock_result = SimplePublicObjectFactory()
+    test_token = "test-token-123"  # noqa: S105
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = test_token
+
+    mock_api_call = mocker.patch(
+        "hubspot_sync.tasks.api.sync_deal_with_hubspot_targeted",
+        return_value=mock_result,
+    )
+
+    assert (
+        sync_deal_with_hubspot_targeted(mock_object.id, is_uai=False) == mock_result.id
+    )
+    mock_api_call.assert_called_once_with(mock_object, test_token)
+
+
+def test_task_sync_deal_with_hubspot_targeted_order_not_found(mocker, settings):
+    """sync_deal_with_hubspot_targeted should raise Order.DoesNotExist when order ID doesn't exist"""
+    non_existent_id = 99999
+    test_token = "test-token-123"  # noqa: S105
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = test_token
+
+    # Ensure order doesn't exist
+    assert not Order.objects.filter(id=non_existent_id).exists()
+
+    with pytest.raises(Order.DoesNotExist):
+        sync_deal_with_hubspot_targeted(non_existent_id, is_uai=False)
+
+
+@pytest.mark.parametrize(
+    "status, expected_error",  # noqa: PT006
+    [[429, TooManyRequestsException], [500, ApiException]],  # noqa: PT007
+)
+def test_task_sync_deal_with_hubspot_targeted_api_error(
+    mocker, status, expected_error, settings
+):
+    """sync_deal_with_hubspot_targeted should propagate API exceptions properly"""
+    mock_object = OrderFactory.create()
+    test_token = "test-token-123"  # noqa: S105
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = test_token
+
+    mocker.patch(
+        "hubspot_sync.tasks.api.sync_deal_with_hubspot_targeted",
+        side_effect=expected_error(status=status),
+    )
+
+    with pytest.raises(expected_error):
+        sync_deal_with_hubspot_targeted(mock_object.id, is_uai=False)
+
+
+def test_task_sync_deal_with_hubspot_targeted_uai_order(mocker, settings):
+    """sync_deal_with_hubspot_targeted should use UAI token for UAI orders"""
+    mock_object = OrderFactory.create()
+    mock_result = SimplePublicObjectFactory()
+    uai_token = "uai-token-123"  # noqa: S105
+    settings.UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = uai_token
+
+    mock_api_call = mocker.patch(
+        "hubspot_sync.tasks.api.sync_deal_with_hubspot_targeted",
+        return_value=mock_result,
+    )
+
+    assert (
+        sync_deal_with_hubspot_targeted(mock_object.id, is_uai=True) == mock_result.id
+    )
+    mock_api_call.assert_called_once_with(mock_object, uai_token)
+
+
+def test_task_sync_deal_with_hubspot_targeted_no_token_error(mocker, settings):
+    """sync_deal_with_hubspot_targeted should raise ValueError when no token is available"""
+    mock_object = OrderFactory.create()
+    # Don't set any tokens in settings
+
+    with pytest.raises(
+        ValueError, match="No HubSpot token available for standard account"
+    ):
+        sync_deal_with_hubspot_targeted(mock_object.id, is_uai=False)
+
+    with pytest.raises(ValueError, match="No HubSpot token available for UAI account"):
+        sync_deal_with_hubspot_targeted(mock_object.id, is_uai=True)
+
+
+def test_task_sync_deal_with_hubspot_skips_b2b_users(mocker):
+    """sync_deal_with_hubspot task should return None for B2B users"""
+    order = OrderFactory.create()
+    contract = ContractPageFactory.create()
+    order.purchaser.b2b_contracts.add(contract)
+
+    mock_api_call = mocker.patch(
+        "hubspot_sync.tasks.api.sync_deal_with_hubspot", return_value=None
+    )
+
+    result = sync_deal_with_hubspot(order.id)
+
+    assert result is None
+    mock_api_call.assert_called_once_with(order)
+
+
+def test_task_sync_deal_with_hubspot_targeted_skips_b2b_users(mocker, settings):
+    """sync_deal_with_hubspot_targeted task should return None for B2B users"""
+    order = OrderFactory.create()
+    contract = ContractPageFactory.create()
+    order.purchaser.b2b_contracts.add(contract)
+    test_token = "test-token-123"  # noqa: S105
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = test_token
+
+    mock_api_call = mocker.patch(
+        "hubspot_sync.tasks.api.sync_deal_with_hubspot_targeted", return_value=None
+    )
+
+    result = sync_deal_with_hubspot_targeted(order.id, is_uai=False)
+
+    assert result is None
+    mock_api_call.assert_called_once_with(order, test_token)
+
+
 @pytest.mark.parametrize("task_func", SYNC_FUNCTIONS)
 @pytest.mark.parametrize(
     "status, expected_error",  # noqa: PT006
@@ -112,7 +286,7 @@ def test_batch_upsert_hubspot_objects(settings, mocker, mocked_celery, create):
     mock_update = mocker.patch(
         "hubspot_sync.tasks.batch_update_hubspot_objects_chunked.s"
     )
-    unsynced_users = [social.user for social in UserSocialAuthFactory.create_batch(2)]
+    unsynced_users = UserFactory.create_batch(2)
     synced_users = UserFactory.create_batch(13)
     content_type = ContentType.objects.get_for_model(User)
     hs_objects = [
@@ -238,7 +412,7 @@ def test_batch_update_hubspot_objects_chunked(mocker, id_count):
     )
     mock_hubspot_api.return_value.crm.objects.batch_api.update.assert_any_call(
         HubspotObjectType.CONTACTS.value,
-        BatchInputSimplePublicObjectInput(
+        BatchInputCreate(
             inputs=make_contact_update_message_list_from_user_ids(
                 mock_ids[0 : min(id_count, 10)]
             )
@@ -296,7 +470,7 @@ def test_batch_create_hubspot_objects_chunked(mocker, id_count):
     )
     mock_hubspot_api.return_value.crm.objects.batch_api.create.assert_any_call(
         HubspotObjectType.CONTACTS.value,
-        BatchInputSimplePublicObjectInput(
+        BatchInputCreate(
             inputs=make_contact_create_message_list_from_user_ids(
                 mock_ids[0 : min(id_count, 10)]
             )

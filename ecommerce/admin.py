@@ -1,5 +1,8 @@
 """Admin management for Ecommerce module"""
 
+import logging
+
+import reversion
 from django.contrib import admin, messages
 from django.contrib.admin.decorators import display
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
@@ -9,10 +12,13 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.views.generic import TemplateView
 from mitol.common.admin import TimestampedModelAdmin
+from mitol.payment_gateway.models import StripeWebhookSecret, StripeWebhookSecretRoute
 from reversion.admin import VersionAdmin
 from viewflow import fsm
 
 from ecommerce.api import refund_order
+from ecommerce.constants import REDEMPTION_TYPE_INTERNAL
+from ecommerce.discount_sources import fulfilled_redemptions_funded_by
 from ecommerce.forms import AdminRefundOrderForm
 from ecommerce.models import (
     Basket,
@@ -30,17 +36,44 @@ from ecommerce.models import (
     PendingOrder,
     Product,
     RefundedOrder,
+    RefundRequest,
+    StripeEventLog,
     Transaction,
     UserDiscount,
 )
+from main.admin import ReadOnlyModelAdmin
+
+log = logging.getLogger(__name__)
 
 
 @admin.register(Transaction)
 class TransactionAdmin(VersionAdmin):
-    """Admin for Product"""
+    """Admin for Transaction"""
 
     model = Transaction
+    list_display = (
+        "id",
+        "transaction_id",
+        "order",
+        "amount",
+        "transaction_type",
+        "created_on",
+        "updated_on",
+    )
+    readonly_fields = (
+        "transaction_id",
+        "order",
+        "amount",
+        "data",
+        "transaction_type",
+        "reason",
+        "created_on",
+        "updated_on",
+    )
     raw_id_fields = ("order",)
+
+    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
+        return False
 
 
 @admin.register(Product)
@@ -59,7 +92,7 @@ class ProductAdmin(VersionAdmin):
     list_filter = ("content_type", "is_active")
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
-        product = Product.objects.get(id=object_id)
+        product = Product.all_objects.get(id=object_id)
         extra_context = {"subtitle": self.content_object(product)}
         return super(ProductAdmin, self).change_view(  # noqa: UP008
             request, object_id, form_url, extra_context
@@ -69,15 +102,35 @@ class ProductAdmin(VersionAdmin):
         """Return the content object details"""
         return str(obj.purchasable_object)
 
-    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
-        """Disable the delete permission for Product models"""
-        return False
-
     def get_queryset(self, request):  # noqa: ARG002
         """
         Return the all objects for the Product Admin
         """
         return self.model.all_objects.get_queryset()
+
+    def save_model(self, request, obj, form, change):
+        """Ensure Product saves via admin always produce a reversion entry."""
+        with reversion.create_revision():
+            super().save_model(request, obj, form, change)
+            reversion.set_user(request.user)
+
+    def delete_model(self, request, obj):
+        """Soft-delete the model."""
+
+        with reversion.create_revision():
+            obj.is_active = False
+            obj.save()
+            reversion.set_user(request.user)
+
+    def delete_queryset(self, request, queryset):
+        """Soft-delete using the queryset."""
+
+        with reversion.create_revision():
+            for item in queryset:
+                item.is_active = False
+                item.save()
+
+            reversion.set_user(request.user)
 
 
 @admin.register(Basket)
@@ -103,6 +156,8 @@ class BasketItemAdmin(VersionAdmin):
 @admin.register(Discount)
 class DiscountAdmin(admin.ModelAdmin):
     model = Discount
+    exclude = ["is_program_discount"]
+    raw_id_fields = ["b2b_contract"]
     search_fields = ["discount_type", "redemption_type", "discount_code"]
     list_display = [
         "id",
@@ -114,6 +169,14 @@ class DiscountAdmin(admin.ModelAdmin):
     ]
     list_filter = ["discount_type", "redemption_type", "payment_type"]
 
+    def get_readonly_fields(self, request, obj=None):  # noqa: ARG002
+        # An internal discount's code is visible on receipts, so any other
+        # redemption type would make that code live. DiscountShapeMixin refuses
+        # the same change over the API.
+        if obj is not None and obj.redemption_type == REDEMPTION_TYPE_INTERNAL:
+            return ("redemption_type",)
+        return ()
+
 
 @admin.register(DiscountProduct)
 class DiscountProductAdmin(admin.ModelAdmin):
@@ -121,10 +184,12 @@ class DiscountProductAdmin(admin.ModelAdmin):
     search_fields = [
         "discount__discount_type",
         "discount__redemption_type",
+        "discount__discount_code",
         "product__description",
         "product__price",
     ]
     list_display = ["id", "discount", "product"]
+    list_filter = ["product"]
     raw_id_fields = ("discount", "product")
 
 
@@ -163,6 +228,7 @@ class DiscountRedemptionAdmin(admin.ModelAdmin):
         "redeemed_discount",
         "redeemed_by",
         "redeemed_order",
+        "source_line",
     )
 
 
@@ -177,7 +243,12 @@ class OrderLineInline(admin.TabularInline):
     """Inline editor for lines"""
 
     model = Line
-    readonly_fields = ["unit_price", "total_price", "discounted_price"]
+    readonly_fields = [
+        "unit_price",
+        "total_price",
+        "discounted_price",
+        "discounted_unit_price",
+    ]
     min_num = 1
     extra = 0
 
@@ -186,7 +257,12 @@ class OrderDiscountInline(admin.TabularInline):
     """Inline editor for DiscountRedemptions in an Order"""
 
     model = DiscountRedemption
-    readonly_fields = ["redemption_date", "redeemed_by", "redeemed_discount"]
+    readonly_fields = [
+        "redemption_date",
+        "redeemed_by",
+        "redeemed_discount",
+        "source_line",
+    ]
     min_num = 0
     extra = 0
 
@@ -205,27 +281,21 @@ class OrderTransactionInline(admin.TabularInline):
     can_add = False
 
 
-class BaseOrderAdmin(fsm.FlowAdminMixin, TimestampedModelAdmin):
+class BaseOrderAdmin(TimestampedModelAdmin):
     """Base admin for Order"""
 
+    include_timestamps_in_list = True
     search_fields = [
         "id",
         "purchaser__email",
         "purchaser__username",
         "reference_number",
     ]
-    list_display = ["id", "state", "get_purchaser", "total_price_paid"]
+    list_display = ["id", "state", "gateway_type", "get_purchaser", "total_price_paid"]
     list_fields = ["state"]
     list_filter = ["state"]
     inlines = [OrderLineInline, OrderDiscountInline, OrderTransactionInline]
     readonly_fields = ["reference_number"]
-    flow_state = OrderFlow.state
-
-    def get_transition_fields(self, request, obj, slug):  # noqa: ARG002
-        return ["state"]
-
-    def get_object_flow(self, request, obj):
-        return OrderFlow(obj, user=request.user)
 
     def has_change_permission(self, request, obj=None):  # noqa: ARG002
         return False
@@ -243,16 +313,37 @@ class BaseOrderAdmin(fsm.FlowAdminMixin, TimestampedModelAdmin):
         )
 
 
+class FlowOrderAdmin(fsm.FlowAdminMixin, BaseOrderAdmin):
+    """Order admin with viewflow FSM state-transition controls.
+
+    Deliberately not used for the generic Order admin: the only transition it
+    would surface there is `refund`, which is post-gateway bookkeeping and blows
+    up when triggered directly from a button.
+    """
+
+    flow_state = OrderFlow.state
+
+    def get_object_flow(self, request, obj):
+        return OrderFlow(obj, user=request.user)
+
+
 @admin.register(Order)
 class OrderAdmin(BaseOrderAdmin):
     """Admin for Order"""
 
-    list_display = ["id", "state", "purchaser", "total_price_paid", "reference_number"]
+    list_display = [
+        "id",
+        "state",
+        "gateway_type",
+        "purchaser",
+        "total_price_paid",
+        "reference_number",
+    ]
     model = Order
 
 
 @admin.register(PendingOrder)
-class PendingOrderAdmin(BaseOrderAdmin):
+class PendingOrderAdmin(FlowOrderAdmin):
     """Admin for PendingOrder"""
 
     model = PendingOrder
@@ -264,7 +355,10 @@ class PendingOrderAdmin(BaseOrderAdmin):
 
 @admin.register(CanceledOrder)
 class CanceledOrderAdmin(BaseOrderAdmin):
-    """Admin for CanceledOrder"""
+    """Admin for CanceledOrder
+
+    Not a FlowOrderAdmin: a canceled order's state can't be altered further.
+    """
 
     model = CanceledOrder
 
@@ -274,49 +368,51 @@ class CanceledOrderAdmin(BaseOrderAdmin):
 
 
 @admin.register(FulfilledOrder)
-class FulfilledOrderAdmin(TimestampedModelAdmin):
+class FulfilledOrderAdmin(BaseOrderAdmin):
     """Admin for FulfilledOrder"""
 
-    readonly_fields = ["reference_number"]
-    search_fields = [
-        "id",
-        "purchaser__email",
-        "purchaser__username",
-        "reference_number",
-    ]
-    list_display = ["id", "state", "get_purchaser", "total_price_paid"]
-    list_fields = ["state"]
-    list_filter = ["state"]
-    inlines = [OrderLineInline, OrderDiscountInline, OrderTransactionInline]
     model = FulfilledOrder
-
-    def has_change_permission(self, request, obj=None):  # noqa: ARG002
-        return False
-
-    @display(description="Purchaser")
-    def get_purchaser(self, obj: Order):
-        return f"{obj.purchaser.name} ({obj.purchaser.email})"
 
     def get_queryset(self, request):
         """Filter only to fulfilled orders"""
-        return (
-            super()
-            .get_queryset(request)
-            .prefetch_related("purchaser", "lines__product_version")
-            .filter(state=OrderStatus.FULFILLED)
-        )
+        return super().get_queryset(request).filter(state=OrderStatus.FULFILLED)
 
-    def response_change(self, request, obj):
-        if "refund" in request.POST:
-            return HttpResponseRedirect(
-                "%s/?order=%s" % (reverse("refund-order"), obj.id)  # noqa: UP031
-            )
 
-        return super().response_change(request, obj)
+@admin.register(RefundRequest)
+class RefundRequestAdmin(TimestampedModelAdmin):
+    """Admin for learner-submitted refund requests. Status is editable; all other fields are read-only."""
+
+    model = RefundRequest
+    list_display = (
+        "id",
+        "user",
+        "order",
+        "refund_reason",
+        "status",
+        "consent_given",
+        "created_on",
+    )
+    list_filter = ("status", "refund_reason")
+    search_fields = ("user__email", "order__reference_number")
+    readonly_fields = (
+        "order",
+        "user",
+        "refund_reason",
+        "refund_reason_text",
+        "consent_given",
+        "created_on",
+        "updated_on",
+    )
+
+    def has_add_permission(self, _request):
+        return False
+
+    def has_delete_permission(self, _request, _obj=None):
+        return False
 
 
 @admin.register(RefundedOrder)
-class RefundedOrderAdmin(BaseOrderAdmin):
+class RefundedOrderAdmin(FlowOrderAdmin):
     """Admin for RefundedOrder"""
 
     model = RefundedOrder
@@ -324,6 +420,11 @@ class RefundedOrderAdmin(BaseOrderAdmin):
     def get_queryset(self, request):
         """Filter only to refunded orders"""
         return super().get_queryset(request).filter(state=OrderStatus.REFUNDED)
+
+
+def _used_source_redemptions(order):
+    """Paid-amount-off credits a line of this order funded, which a refund leaves in place."""
+    return fulfilled_redemptions_funded_by(order)
 
 
 class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
@@ -343,12 +444,27 @@ class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, Template
                 refund_amount = refund_form.cleaned_data.get("refund_amount")
 
                 # Call the refund CyberSource API with provided reason and amount
-                refund_api_success, _ = refund_order(
-                    order_id=order.id,
-                    refund_amount=refund_amount,
-                    refund_reason=refund_reason,
-                    unenroll=should_unenroll,
-                )
+                try:
+                    refund_api_success, _ = refund_order(
+                        order_id=order.id,
+                        refund_amount=refund_amount,
+                        refund_reason=refund_reason,
+                        unenroll=should_unenroll,
+                    )
+                except Exception as ex:
+                    log.exception(
+                        "Unexpected error while refunding order %s",
+                        order.reference_number,
+                    )
+                    messages.error(
+                        request,
+                        f"Order {order.reference_number} refund failed with an unexpected error: {ex}",
+                    )
+                    return HttpResponseRedirect(
+                        reverse(
+                            "admin:ecommerce_fulfilledorder_change", args=(order.id,)
+                        )
+                    )
 
                 if not refund_api_success:
                     messages.error(
@@ -385,6 +501,7 @@ class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, Template
                     "form_valid": refund_form.is_valid(),
                     "errors": errors,
                     "error_messages": error_messages,
+                    "used_source_redemptions": _used_source_redemptions(order),
                 },
             )
         except NotImplementedError:
@@ -430,5 +547,87 @@ class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, Template
                 "order": order,
                 "form_valid": True,
                 "errors": {},
+                "used_source_redemptions": _used_source_redemptions(order),
             },
         )
+
+
+class StripeEventTypeNamespaceFilter(admin.SimpleListFilter):
+    """Filter by Stripe event "namespace"."""
+
+    title = "event namespace"
+    parameter_name = "event_namespace"
+
+    def lookups(self, request, model_admin):  # noqa: ARG002
+        """Return the list of namespaces. This is the first dot of the type."""
+
+        type_qs = (
+            StripeEventLog.objects.order_by("event_type")
+            .only("event_type")
+            .values_list("event_type", flat=True)
+        )
+
+        namespaces = []
+
+        for eventtype in type_qs.all():
+            names = eventtype.split(".")
+            namespaces.append((names[0], names[0])) if (
+                names[0],
+                names[0],
+            ) not in namespaces else None
+
+        return namespaces
+
+    def queryset(self, request, queryset):  # noqa: ARG002
+        """Return the queryset filtered by the specified type."""
+
+        if self.value():
+            queryset = queryset.filter(event_type__startswith=self.value())
+
+        return queryset
+
+
+@admin.register(StripeEventLog)
+class StripeEventLogAdmin(ReadOnlyModelAdmin):
+    """Admin for StripeEventLog"""
+
+    model = StripeEventLog
+    list_display = [
+        "created_on",
+        "event_id",
+        "event_type",
+        "related_order__reference_number",
+        "related_order__purchaser__email",
+    ]
+    list_filter = [
+        StripeEventTypeNamespaceFilter,
+        "event_type",
+    ]
+
+
+class StripeWebhookSecretRouteInline(admin.TabularInline):
+    """Inline for the routes for the webhook secret"""
+
+    model = StripeWebhookSecretRoute
+
+
+@admin.register(StripeWebhookSecret)
+class StripeWebhookSecretAdmin(admin.ModelAdmin):
+    """Admin for the Stripe Webhook Secrets model from payment_gateway."""
+
+    model = StripeWebhookSecret
+    list_display = [
+        "secret_name",
+        "is_active",
+    ]
+    list_filter = [
+        "is_active",
+    ]
+    inlines = [
+        StripeWebhookSecretRouteInline,
+    ]
+
+    def get_queryset(self, request):  # noqa: ARG002
+        """Return the all_objects manager."""
+
+        return StripeWebhookSecret.all_objects

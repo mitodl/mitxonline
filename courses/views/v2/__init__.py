@@ -2,18 +2,27 @@
 Course API Views version 2
 """
 
-import contextlib
+import logging
+from functools import cached_property
 
 import django_filters
-from django.db.models import Count, Prefetch
+from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
+from django.db.models import Prefetch, Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
+from django_qp import QueryParamsMixinView
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from mitol.olposthog.features import is_enabled
-from rest_framework import mixins, serializers, status, viewsets
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.pagination import PageNumberPagination
+from prefetch import PrefetchOption
+from pydantic import BaseModel
+from rest_framework import mixins, status, viewsets
+from rest_framework.decorators import (
+    api_view,
+    permission_classes,
+)
 from rest_framework.permissions import (
     AllowAny,
     IsAuthenticated,
@@ -21,8 +30,15 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
-from courses.api import deactivate_run_enrollment
+from b2b.models import ContractPage, ContractProgramItem
+from cms.models import CoursePage
+from courses.api import (
+    create_run_enrollments,
+    deactivate_run_enrollment,
+    reconcile_verified_program_enrollments,
+)
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
+from courses.exceptions import EnrollmentCreationFailedError, EnrollmentError
 from courses.models import (
     Course,
     CourseRun,
@@ -33,11 +49,14 @@ from courses.models import (
     Program,
     ProgramCertificate,
     ProgramCollection,
+    ProgramEnrollment,
     ProgramRequirement,
+    VerifiableCredential,
 )
 from courses.serializers.v2.certificates import (
     CourseRunCertificateSerializer,
     ProgramCertificateSerializer,
+    VerifiableCredentialSerializer,
 )
 from courses.serializers.v2.courses import (
     CourseRunEnrollmentSerializer,
@@ -49,21 +68,28 @@ from courses.serializers.v2.departments import (
 )
 from courses.serializers.v2.programs import (
     ProgramCollectionSerializer,
-    ProgramSerializer,
+    ProgramDetailSerializer,
+    UserProgramEnrollmentDetailSerializer,
 )
-from courses.utils import get_enrollable_courses, get_unenrollable_courses
+from courses.utils import (
+    get_enrollable_courses,
+    get_program_certificate_by_enrollment,
+    get_unenrollable_courses,
+    live_certificate_page_exists,
+    verified_courserun_exists,
+)
+from ecommerce.api import create_verified_program_course_run_enrollment
+from ecommerce.exceptions import VerifiedProgramInvalidOrderError
+from ecommerce.models import Product
 from main import features
+from main.pagination import Pagination
 from openapi.utils import extend_schema_get_queryset
 from openedx.api import sync_enrollments_with_edx
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from variants.models import SupportedVariant
 
-
-class Pagination(PageNumberPagination):
-    """Paginator class for infinite loading"""
-
-    page_size = 12
-    page_size_query_param = "page_size"
-    max_page_size = 100
-    ordering = "-created_on"
+log = logging.getLogger(__name__)
+VPE_MAX_PROGRAMS = 2
 
 
 def user_has_org_access(user, org_id):
@@ -75,60 +101,157 @@ def user_has_org_access(user, org_id):
     )
 
 
+class NumberInFilter(django_filters.BaseInFilter, django_filters.NumberFilter):
+    pass
+
+
+class ReadableIdLookupMixin:
+    """
+    Mixin to support lookup by either integer pk or readable_id string.
+    """
+
+    def get_object(self):
+        """
+        Returns the object the view is displaying.
+        Supports lookup by either integer pk or readable_id string.
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+        identifier = self.kwargs[lookup_url_kwarg]
+
+        filter_kwargs = (
+            {"pk": int(identifier)}
+            if identifier.isdigit()
+            else {"readable_id": identifier}
+        )
+
+        obj = get_object_or_404(queryset, **filter_kwargs)
+        self.check_object_permissions(self.request, obj)
+        return obj
+
+
 class ProgramFilterSet(django_filters.FilterSet):
+    id = NumberInFilter(field_name="id", lookup_expr="in", label="Program ID")
     org_id = django_filters.NumberFilter(method="filter_by_org_id")
+    contract_id = django_filters.NumberFilter(method="filter_by_contract_id")
 
     class Meta:
         model = Program
-        fields = ["id", "live", "readable_id", "page__live", "org_id"]
+        fields = ["id", "live", "readable_id", "page__live", "org_id", "contract_id"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     @property
     def qs(self):
-        """If the request isn't explicitly filtering on org_id, exclude contracted courses."""
+        """Return the filtered queryset for Programs.
 
-        if "org_id" not in getattr(self.request, "GET", {}):
-            return super().qs.filter(b2b_only=False)
+        - Always de-duplicate results to avoid duplivalidated_params_modelcate Programs when joins
+          (e.g., contract memberships) introduce multiple rows per Program.
+        - If the request isn't explicitly filtering on org_id or contract_id,
+          exclude B2B-only programs by default.
+        """
 
-        return super().qs
+        base_qs = super().qs.distinct()
+
+        if "org_id" not in getattr(
+            self.request, "GET", {}
+        ) and "contract_id" not in getattr(self.request, "GET", {}):
+            return base_qs.filter(b2b_only=False)
+
+        return base_qs
 
     def filter_by_org_id(self, queryset, _, org_id):
-        """Filter according to org_id. If the user is in org_id, return only related programs."""
+        """
+        Filter according to org_id. If the user is in org_id, return only the
+        programs in its contracts, and the programs nested in those.
+        """
         if self.request and user_has_org_access(self.request.user, org_id):
-            return queryset.filter(contracts__organization__id=org_id)
+            return queryset.filter(
+                id__in=Program.expand_nested_program_ids(
+                    ContractProgramItem.objects.filter(
+                        contract__organization__id=org_id
+                    ).values_list("program_id", flat=True)
+                )
+            )
         else:
             return queryset.filter(b2b_only=False)
 
+    def filter_by_contract_id(self, queryset, _, contract_id):
+        """
+        Filter according to contract_id. If the user has access to the contract,
+        return only its programs, and the programs nested in those.
+        """
+        user = self.request.user if self.request else None
+        if (
+            user
+            and user.is_authenticated
+            and contract_id
+            and user.b2b_contracts.filter(id=contract_id).exists()
+        ):
+            return queryset.filter(
+                id__in=Program.expand_nested_program_ids(
+                    ContractProgramItem.objects.filter(
+                        contract__id=contract_id
+                    ).values_list("program_id", flat=True)
+                )
+            )
+        return queryset.filter(b2b_only=False)
 
-class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
+
+class ProgramViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
     """API viewset for Programs"""
 
     permission_classes = [IsAuthenticatedOrReadOnly]
-    serializer_class = ProgramSerializer
+    serializer_class = ProgramDetailSerializer
     pagination_class = Pagination
     filter_backends = [DjangoFilterBackend]
     filterset_class = ProgramFilterSet
+    lookup_value_regex = "[^/]+"  # Accept any non-slash character
+
+    def get_serializer_context(self):
+        """Add context flags used by ProgramSerializer.
+
+        - include_programs: include parent programs when retrieving a single
+          program or when filtering by readable_id (parity with CourseViewSet).
+        - org_id / contract_id: used to filter parent programs for B2B.
+        """
+        added_context = {}
+        qp = self.request.query_params
+
+        if self.action == "retrieve" or qp.get("readable_id"):
+            added_context["include_programs"] = True
+
+        if qp.get("org_id"):
+            added_context["org_id"] = qp.get("org_id")
+        if qp.get("contract_id"):
+            added_context["contract_id"] = qp.get("contract_id")
+
+        return {**super().get_serializer_context(), **added_context}
 
     def get_queryset(self):
+        # Prefetch only products related to Program objects
+        program_content_type = ContentType.objects.get_for_model(Program)
+        program_product_queryset = Product.objects.filter(
+            content_type=program_content_type
+        )
+        products_prefetch = Prefetch(
+            "products",
+            queryset=program_product_queryset,
+            to_attr="prefetched_products",
+        )
         return (
             Program.objects.filter()
-            .select_related("page")
+            .select_related("page", "page__feature_image")
+            .annotate(has_live_certificate_page=live_certificate_page_exists())
             .prefetch_related(
+                "enrollment_modes",
                 Prefetch("departments", queryset=Department.objects.only("id", "name")),
                 Prefetch(
                     "all_requirements",
                     queryset=ProgramRequirement.objects.select_related(
                         "course",
-                    )
-                    .prefetch_related(
-                        Prefetch(
-                            "course__page__topics",
-                            queryset=CoursesTopic.objects.only("name"),
-                        )
-                    )
-                    .only(
+                    ).only(
                         "id",
                         "path",
                         "depth",
@@ -143,16 +266,38 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
                         "elective_flag",
                     ),
                 ),
+                # A plain lookup, not a Prefetch with a queryset: see
+                # CourseViewSet.get_queryset. Giving a Prefetch on
+                # CoursePage.topics any queryset - here it was .only("name") -
+                # hands every page one shared QuerySet object, so the last page
+                # in the batch decides what every page carries. Nothing reads
+                # these topics today (ProgramSerializer.get_topics queries them
+                # itself), but the prefetch must not be the broken shape if
+                # something starts to.
                 Prefetch(
-                    "programcollection_set",
+                    "all_requirements__course__page",
+                    queryset=CoursePage.objects.prefetch_related("topics"),
+                ),
+                Prefetch(
+                    "collection_memberships__collection",
                     queryset=ProgramCollection.objects.only("id", "title"),
                 ),
+                products_prefetch,
             )
+            .order_by("title")
         )
 
     @extend_schema(
         operation_id="programs_retrieve_v2",
         description="API view set for Programs - v2",
+        parameters=[
+            OpenApiParameter(
+                "id",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="A unique integer value (pk) or readable_id string identifying this program.",
+            ),
+        ],
     )
     def retrieve(self, request, *args, **kwargs):
         """Retrieve a specific program."""
@@ -164,21 +309,22 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
         return super().list(request, *args, **kwargs)
 
 
-class IdInFilter(django_filters.BaseInFilter, django_filters.NumberFilter):
-    pass
-
-
 class CourseFilterSet(django_filters.FilterSet):
     courserun_is_enrollable = django_filters.BooleanFilter(
         method="filter_courserun_is_enrollable",
         label="Course Run Is Enrollable",
         field_name="courserun_is_enrollable",
     )
-    id = IdInFilter(field_name="id", lookup_expr="in", label="Course ID")
+    id = NumberInFilter(field_name="id", lookup_expr="in", label="Course ID")
     org_id = django_filters.NumberFilter(
         method="filter_org_id",
         label="Only show courses belonging to this B2B/UAI organization",
         field_name="org_id",
+    )
+    contract_id = django_filters.NumberFilter(
+        method="filter_contract_id",
+        label="Only show courses belonging to this B2B contract",
+        field_name="contract_id",
     )
     include_approved_financial_aid = django_filters.BooleanFilter(
         method="filter_include_approved_financial_aid",
@@ -195,7 +341,11 @@ class CourseFilterSet(django_filters.FilterSet):
             "page__live",
             "courserun_is_enrollable",
             "org_id",
+            "contract_id",
             "include_approved_financial_aid",
+            "courseruns__language",
+            "courseruns__variant_length",
+            "courseruns__variant_industry",
         ]
 
     def filter_org_id(self, queryset, _, value):
@@ -207,8 +357,27 @@ class CourseFilterSet(django_filters.FilterSet):
 
         if user_has_org_access(user, value):
             return queryset.filter(
-                courseruns__b2b_contract__organization_id=value,
-                courseruns__b2b_contract__active=True,
+                courseruns__b2b_contracts__active=True,
+                courseruns__b2b_contracts__organization_id=value,
+            )
+        return Course.objects.none()
+
+    def filter_contract_id(self, queryset, _, value):
+        """
+        Filter courses that have course runs linked to the specified contract_id,
+        if the user has access to that contract.
+        """
+        user = self.request.user
+
+        if (
+            user
+            and user.is_authenticated
+            and value
+            and user.b2b_contracts.filter(id=value).exists()
+        ):
+            return queryset.filter(
+                courseruns__b2b_contracts__active=True,
+                courseruns__b2b_contracts__id=value,
             )
         return Course.objects.none()
 
@@ -228,61 +397,230 @@ class CourseFilterSet(django_filters.FilterSet):
             else get_unenrollable_courses(queryset)
         )
 
-    def filter_queryset(self, queryset):
-        queryset = super().filter_queryset(queryset)
-        # perform additional filtering
 
-        filter_keys = self.form.cleaned_data.keys()
+class CourseParams(BaseModel):
+    """Types for Course APi querystring"""
 
-        if "courserun_is_enrollable" not in filter_keys:
-            queryset = queryset.prefetch_related(
-                Prefetch("courseruns", queryset=CourseRun.objects.order_by("id")),
-            )
+    org_id: int | None = None
+    contract_id: int | None = None
+    courserun_is_enrollable: bool | None = None
+    include_approved_financial_aid: bool = False
 
-        return queryset
+    @cached_property
+    def has_org_or_contract_id(self) -> bool:
+        """Return True if either org or contract id specified"""
+        return any((self.org_id, self.contract_id))
 
 
-class CourseViewSet(viewsets.ReadOnlyModelViewSet):
+class CourseViewSet(
+    QueryParamsMixinView[CourseParams],
+    ReadableIdLookupMixin,
+    viewsets.ReadOnlyModelViewSet,
+):
     """API view set for Courses"""
 
+    validated_params = CourseParams()  # for drf_spectacular
     pagination_class = Pagination
     permission_classes = []
     filter_backends = [DjangoFilterBackend]
     serializer_class = CourseWithCourseRunsSerializer
     filterset_class = CourseFilterSet
+    lookup_value_regex = "[^/]+"  # Accept any non-slash character
+    validated_params_model = CourseParams
+
+    def get_program_filters(self) -> Q:
+        """Get filters for course programs"""
+        params = self.validated_params
+        program_filters = Q()
+
+        if params.org_id is not None:
+            program_filters &= Q(
+                contract_memberships__contract__organization__pk=params.org_id
+            )
+        elif params.contract_id is not None:
+            program_filters &= Q(contract_memberships__contract__pk=params.contract_id)
+
+        else:
+            program_filters &= Q(b2b_only=False)
+
+        return program_filters
 
     def get_queryset(self):
         """Get the queryset for the viewset."""
-
-        return (
-            Course.objects.select_related("page")
-            .prefetch_related("departments")
-            .annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
-            .annotate(count_courseruns=Count("courseruns"))
-            .order_by("title")
-            .distinct()
+        queryset = Course.objects.select_related("page", "page__feature_image")
+        # Use Prefetch for reverse GenericRelation (products on CourseRun)
+        # 1. Get the ContentType object for the CourseRun model
+        courserun_content_type = ContentType.objects.get_for_model(CourseRun)
+        # 2. Create a Prefetch object to specify the queryset for the 'tags' relation
+        # This internal queryset only fetches products related to the CourseRun content type
+        courserun_product_queryset = Product.objects.filter(
+            content_type=courserun_content_type
+        )
+        # 3. Use prefetch_related on main queryset, referencing the reverse relation's name (e.g., 'products')
+        products_prefetch = Prefetch(
+            "products",
+            queryset=courserun_product_queryset,
+            to_attr="prefetched_products",
+        )
+        modes_prefetch = Prefetch(
+            "enrollment_modes",
+            to_attr="prefetched_enrollment_modes",
+        )
+        # b2b_contracts is prefetched because get_first_unexpired_b2b_run and
+        # get_filtered_runs now match contracts in Python over the loaded runs
+        # rather than with a b2b_contracts__in filter - without it each run
+        # costs a query.
+        #
+        # Narrowed to organization_id because that and the pk are all those two
+        # methods read. ContractPage is a Wagtail Page, so the unnarrowed
+        # prefetch selects the whole multi-table row - ~50 columns including two
+        # RichTextFields - once per (run, contract) pair.
+        #
+        # active_objects, not objects: the M2M related manager filters to
+        # active, in-window contracts (see ContractPageManager), so this
+        # prefetch always has, and the unfiltered ContractPage.objects would
+        # silently widen it.
+        #
+        # ``contract.id`` stays free under only(): it is the MTI parent's pk, so
+        # DeferredAttribute._check_parent_chain resolves it from the loaded
+        # page_ptr_id rather than reloading the row.
+        contracts_prefetch = Prefetch(
+            "b2b_contracts",
+            queryset=ContractPage.active_objects.only("organization_id"),
+        )
+        course_runs_prefetch = Prefetch(
+            "courseruns",
+            queryset=CourseRun.objects.order_by("id").prefetch_related(
+                contracts_prefetch, modes_prefetch, products_prefetch
+            ),
+        )
+        # Topics are serialized per course along with their parent topics, whose
+        # sort key is CoursesTopic.Meta.ordering == ["parent__name", "name"] -
+        # hence walking up to the grandparent.
+        #
+        # Plain lookups, deliberately. Never give a ``Prefetch`` on
+        # ``CoursePage.topics`` a ``queryset=`` - any queryset, not just one
+        # carrying select_related.
+        #
+        # ``topics`` is a ParentalManyToManyField, and modelcluster's deferring
+        # manager (modelcluster/fields.py) implements ``_apply_rel_filters`` as
+        # nothing but a call to the passed queryset's ``_next_is_sticky``.
+        #
+        # ``_next_is_sticky`` returns ``self``; its own docstring in Django
+        # says it "should be immediately followed by a filter() that does
+        # create a clone". modelcluster never adds that filter, where Django's
+        # own ManyRelatedManager ends in ``.filter(**self.core_filters)`` and
+        # so clones. ``prefetch_one_level`` takes the ``lookup.queryset is not
+        # None`` branch, hands every page that same object, and assigns
+        # ``qs._result_cache = vals`` once per page - so the last page in the
+        # batch decides what every page carries. That is why the wrong topics
+        # tracked ``page_size``.
+        #
+        # Without ``queryset=`` the ``else`` branch calls
+        # ``manager.get_queryset()``, which builds a fresh queryset per page.
+        # Naming the parent chain keeps the query count flat in course count.
+        queryset = queryset.prefetch_related(
+            "departments",
+            course_runs_prefetch,
+            # Prefetches "page__topics" on its way to the parent chain, so the
+            # shorter lookup does not need listing as well.
+            "page__topics__parent__parent",
+            "page__linked_instructors__linked_instructor_page",
+        )
+        # Only booleans are ever read from these, so Exists() beats an aggregate:
+        # it needs no GROUP BY, which also keeps the paginator's COUNT cheap.
+        queryset = queryset.annotate(
+            has_verified_courserun=verified_courserun_exists(),
+            has_live_certificate_page=live_certificate_page_exists(),
+        )
+        queryset = queryset.prefetch_related(
+            Prefetch(
+                "possible_variant_sets",
+                queryset=SupportedVariant.objects.filter(active=True).filter(
+                    Q(b2b_only=self.validated_params.has_org_or_contract_id)
+                    | Q(default_variant=True)
+                ),
+            )
+        )
+        # One queryset for both prefetches: the financial assistance URL is
+        # picked by walking a course's programs, so a program this view filters
+        # out of "programs" must not be able to supply the URL either.
+        program_queryset = (
+            Program.objects.filter(self.get_program_filters())
+            .filter(
+                live=True,
+                page__live=True,
+            )
+            .only("id", "readable_id", "title", "display_mode", "program_type")
+        )
+        queryset = queryset.prefetch(
+            # Resolved in the queryset so nothing queries during serialization.
+            # Applies to the detail route too, since ReadableIdLookupMixin.
+            # get_object filters this same queryset.
+            PrefetchOption(
+                "financial_assistance_form_url", program_queryset=program_queryset
+            ),
+            PrefetchOption("programs", queryset=program_queryset),
         )
 
+        return queryset.order_by("title").distinct()
+
     def get_serializer_context(self):
-        added_context = {}
-        qp = self.request.query_params
-        if qp.get("readable_id"):
-            added_context["all_runs"] = True
-        if qp.get("include_approved_financial_aid"):
-            added_context["include_approved_financial_aid"] = True
-        if qp.get("org_id"):
-            user = self.request.user
-            added_context["org_id"] = qp.get("org_id")
-            added_context["user_contracts"] = (
-                user.b2b_contracts.values_list("id", flat=True).all()
-                if user.is_authenticated and user.b2b_contracts
-                else []
+        added_context = {
+            "include_approved_financial_aid": self.validated_params.include_approved_financial_aid,
+        }
+        if self.validated_params.courserun_is_enrollable is not None:
+            added_context["courserun_is_enrollable"] = (
+                self.validated_params.courserun_is_enrollable
             )
+        if self.validated_params.has_org_or_contract_id:
+            # If an org or contract is specified, we extract the user's contracts
+            # according to those params, so filtering on some course run data is
+            # correct (notably next_run_id).
+
+            added_context["user_contracts"] = []
+
+            user = self.request.user
+            if self.validated_params.org_id:
+                added_context["org_id"] = self.validated_params.org_id
+                added_context["user_contracts"] = (
+                    (
+                        user.b2b_contracts.filter(
+                            organization__pk=added_context["org_id"]
+                        )
+                        .values_list("id", flat=True)
+                        .all()
+                    )
+                    if hasattr(user, "b2b_contracts")
+                    else []
+                )
+            if self.validated_params.contract_id:
+                added_context["contract_id"] = self.validated_params.contract_id
+                # make sure we filter this - user should be in the contract we're
+                # filtering against
+                added_context["user_contracts"] = (
+                    (
+                        user.b2b_contracts.filter(pk=added_context["contract_id"])
+                        .values_list("id", flat=True)
+                        .all()
+                    )
+                    if hasattr(user, "b2b_contracts")
+                    else []
+                )
+
         return {**super().get_serializer_context(), **added_context}
 
     @extend_schema(
         operation_id="api_v2_courses_retrieve",
         description="Retrieve a specific course - API v2",
+        parameters=[
+            OpenApiParameter(
+                "id",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="A unique integer value (pk) or readable_id string identifying this course.",
+            ),
+        ],
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
@@ -301,7 +639,7 @@ class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = []
 
     def get_queryset(self):
-        return Department.objects.all().order_by("name")
+        return Department.objects.for_serialization().order_by("name")
 
     @extend_schema(
         operation_id="departments_retrieve_v2",
@@ -344,10 +682,13 @@ class ProgramCollectionViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         """
         Returns all ProgramCollection objects ordered by title.
+        Prefetches collection_items and related programs for efficient serialization.
         """
         return (
             ProgramCollection.objects.select_related()
-            .prefetch_related("programs")
+            .prefetch_related(
+                "collection_items__program", "collection_items__program__departments"
+            )
             .order_by("title")
         )
 
@@ -361,7 +702,7 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
     )
     exclude_b2b = django_filters.BooleanFilter(
         method="filter_exclude_b2b",
-        label="Exclude B2B enrollments (enrollments linked to course runs with B2B contracts)",
+        label="Exclude B2B enrollments (enrollments made through a B2B contract)",
     )
 
     class Meta:
@@ -371,13 +712,13 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
     def filter_exclude_b2b(self, queryset, name, value):  # noqa: ARG002
         """Filter out B2B enrollments if exclude_b2b is True."""
         if value:
-            return queryset.filter(run__b2b_contract__isnull=True)
+            return queryset.filter(b2b_contract__isnull=True)
         return queryset
 
     def filter_org_id(self, queryset, name, value):  # noqa: ARG002
         """Filter enrollments by B2B organization ID."""
         if value:
-            return queryset.filter(run__b2b_contract__organization_id=value)
+            return queryset.filter(b2b_contract__organization_id=value)
         return queryset
 
 
@@ -394,20 +735,31 @@ class UserEnrollmentsApiViewSet(
     filter_backends = [DjangoFilterBackend]
     filterset_class = UserEnrollmentFilterSet
 
+    queryset = (
+        CourseRunEnrollment.objects.select_related(
+            "user",
+            "run",
+            "b2b_contract",
+        )
+        .prefetch_related(
+            "run__b2b_contracts",
+            "run__course__page",
+            Prefetch("run__enrollment_modes", to_attr="prefetched_enrollment_modes"),
+        )
+        .prefetch(
+            "certificate",
+            "grades",
+            "run__course__financial_assistance_form_url",
+            PrefetchOption(
+                "run__course__programs", queryset=Program.objects.filter(b2b_only=False)
+            ),
+        )
+    )
+
     @extend_schema_get_queryset(CourseRunEnrollment.objects.none())
     def get_queryset(self):
         """Get the queryset for user enrollments."""
-        return (
-            CourseRunEnrollment.objects.filter(user=self.request.user)
-            .select_related(
-                "run__course__page",
-                "user",
-                "run",
-                "run__b2b_contract",
-                "run__b2b_contract__organization",
-            )
-            .all()
-        )
+        return super().get_queryset().filter(user=self.request.user)
 
     def get_serializer_context(self):
         """Get the serializer context."""
@@ -419,23 +771,46 @@ class UserEnrollmentsApiViewSet(
     @extend_schema(
         operation_id="user_enrollments_list_v2",
         description="List user enrollments with B2B organization and contract information - API v2. "
-        "Use ?exclude_b2b=true to filter out enrollments linked to course runs with B2B contracts. "
+        "Use ?exclude_b2b=true to filter out enrollments made through a B2B contract. "
         "Use ?org_id=<id> to filter enrollments by specific B2B organization.",
     )
     def list(self, request, *args, **kwargs):
         """List user enrollments with optional sync."""
         if is_enabled(features.SYNC_ON_DASHBOARD_LOAD):
-            with contextlib.suppress(Exception):
+            ignore_edx_failures = settings.FEATURES.get(
+                features.IGNORE_EDX_FAILURES, False
+            )
+            try:
                 sync_enrollments_with_edx(self.request.user)
+            except Exception:  # pylint: disable=broad-except
+                log.exception(
+                    "Failed to sync enrollments with edX for user: %s",
+                    self.request.user.id,
+                )
+                if not ignore_edx_failures:
+                    raise
         return super().list(request, *args, **kwargs)
 
     @extend_schema(
         operation_id="user_enrollments_create_v2",
         description="Create a new user enrollment - API v2",
     )
-    def create(self, request, *args, **kwargs):
+    def create(self, request, *args, **kwargs):  # noqa: ARG002
         """Create a new enrollment."""
-        return super().create(request, *args, **kwargs)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        enrollment = serializer.save()
+        if enrollment is not None:
+            # serializer.save() hands back a plain instance, so the nested
+            # CourseSerializer would have to resolve its prefetched fields one
+            # query at a time. Read it back through this viewset's queryset
+            # instead: one query, and the response matches the list route.
+            serializer = self.get_serializer(self.queryset.get(pk=enrollment.pk))
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED,
+            headers=self.get_success_headers(serializer.data),
+        )
 
     @extend_schema(
         operation_id="user_enrollments_destroy_v2",
@@ -447,48 +822,416 @@ class UserEnrollmentsApiViewSet(
         deactivated_enrollment = deactivate_run_enrollment(
             enrollment,
             change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
-            keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
+            keep_failed_enrollments=settings.FEATURES.get(
+                features.IGNORE_EDX_FAILURES, False
+            ),
         )
         if deactivated_enrollment is None:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-@extend_schema(
-    parameters=[
-        OpenApiParameter("cert_uuid", OpenApiTypes.UUID, OpenApiParameter.PATH),
-    ],
-    responses=CourseRunCertificateSerializer,
-)
-@api_view(["GET"])
-@permission_classes([AllowAny])
-def get_course_certificate(request, cert_uuid):
-    """Get a course certificate by UUID."""
+def _create_course_enrollment_from_program(request, courserun_id, program_enrollment):
+    """Create the course enrollment based on the specified program enrollment."""
 
-    cert_uuid = serializers.UUIDField().to_internal_value(cert_uuid)
+    run = CourseRun.objects.filter(courseware_id=courserun_id).get()
 
-    cert = get_object_or_404(CourseRunCertificate, is_revoked=False, uuid=cert_uuid)
+    # A program enrollment doesn't entitle the learner to bypass the run's
+    # enrollment window. This guards both the audit and the verified paths
+    # below, neither of which checks the window itself.
+    #
+    # The window only governs getting into a run in the first place. A learner
+    # who already holds a seat may still change mode (e.g. an audit enrollment
+    # upgrading because they bought the program), which is gated by
+    # is_upgradable further down rather than by the window.
+    if (
+        not run.is_enrollable
+        and not CourseRunEnrollment.objects.filter(
+            run=run, user=request.user, active=True
+        ).exists()
+    ):
+        log.warning(
+            "_create_course_enrollment_from_program: user %s tried to enroll in %s, which is outside its enrollment window",
+            request.user,
+            courserun_id,
+        )
+        return Response(status=status.HTTP_400_BAD_REQUEST)
 
+    in_program = run.course in [
+        *program_enrollment.program.required_courses,
+        *program_enrollment.program.elective_courses,
+    ]
+
+    should_create_audit_enrollment = (
+        program_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        or not in_program
+        or not run.is_upgradable
+    )
+
+    effective_enrollment_mode = (
+        EDX_ENROLLMENT_AUDIT_MODE
+        if should_create_audit_enrollment
+        else program_enrollment.enrollment_mode
+    )
+
+    if CourseRunEnrollment.objects.filter(
+        run__courseware_id=courserun_id,
+        user=request.user,
+        enrollment_mode=effective_enrollment_mode,
+    ).exists():
+        # Learner already has a matching enrollment, so nothing to do.
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # Check if:
+    # .. the program enrollment is audit,
+    # .. if the run isn't in the program
+
+    if should_create_audit_enrollment:
+        # Audit enrollments just get created, regardless of whether or not
+        # the course is an elective.
+        enrollments, _ = create_run_enrollments(
+            request.user,
+            [run],
+            mode=EDX_ENROLLMENT_AUDIT_MODE,
+            keep_failed_enrollments=True,
+        )
+        if len(enrollments) == 0:
+            raise EnrollmentCreationFailedError
+        return _created_enrollment_response(enrollments[0])
+
+    # Everything checks out for a verified enrollment, so generate one.
+    # This requires generating an order.
+
+    try:
+        enrollment = create_verified_program_course_run_enrollment(
+            request, run, program_enrollment.program
+        )
+    except VerifiedProgramInvalidOrderError as exc:
+        # Checkout refused the order, e.g. a compliance denial. (Profile data the
+        # check can't use is raised before this, as ExportComplianceDataError.)
+        # The cause is logged where it's detected.
+        raise EnrollmentError.from_cause(exc) from exc
+
+    return _created_enrollment_response(enrollment)
+
+
+def _created_enrollment_response(enrollment):
+    """
+    Serialize a just-created enrollment the way a GET would.
+
+    create_run_enrollments and create_verified_program_course_run_enrollment
+    return plain instances, so the nested CourseSerializer would resolve its
+    prefetched fields lazily, one query at a time. Reading the row back through
+    UserEnrollmentsApiViewSet.queryset costs one query on a POST and keeps the
+    response identical in shape to the list and detail routes.
+    """
     return Response(
-        CourseRunCertificateSerializer(cert, context={"request": request}).data
+        CourseRunEnrollmentSerializer(
+            UserEnrollmentsApiViewSet.queryset.get(pk=enrollment.pk)
+        ).data,
+        status=status.HTTP_201_CREATED,
     )
 
 
 @extend_schema(
-    parameters=[
-        OpenApiParameter("cert_uuid", OpenApiTypes.UUID, OpenApiParameter.PATH),
-    ],
-    responses=ProgramCertificateSerializer,
+    request=list[str],
+    responses={
+        status.HTTP_201_CREATED: CourseRunEnrollmentSerializer,
+        status.HTTP_204_NO_CONTENT: None,
+        status.HTTP_400_BAD_REQUEST: None,
+        status.HTTP_404_NOT_FOUND: None,
+    },
+)
+@api_view(
+    http_method_names=["post"],
+)
+@permission_classes(
+    [
+        IsAuthenticated,
+    ]
+)
+def add_verified_program_course_enrollment(request, courserun_id: str):
+    """
+    Create a program-related course enrollment for the learner.
+
+    Some special handling is needed for program-related course run enrollments
+    when the learner has an enrollment in the program. The learner should get a
+    course run enrollment that matches their program enrollment at no additional
+    charge.
+    """
+
+    program_ids = request.data
+
+    if (
+        not isinstance(program_ids, list)
+        or len(program_ids) == 0
+        or len(program_ids) > VPE_MAX_PROGRAMS
+    ):
+        return Response(status=status.HTTP_400_BAD_REQUEST)
+
+    programs = Program.objects.filter(readable_id__in=program_ids).all()
+
+    program_enrollments = (
+        ProgramEnrollment.objects.prefetch_related("program")
+        .filter(
+            program__in=programs,
+            user=request.user,
+        )
+        .all()
+    )
+
+    # Early short circuiting for some simpler cases.
+
+    if (
+        len(program_enrollments) == 0
+        or len(programs) == 0
+        or len(programs) != len(program_ids)
+    ):
+        # Insufficient program enrollments, so abort.
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    elif len(programs) == 1 and len(program_enrollments) == 1:
+        # Just one program specified, so stop further processing.
+        return _create_course_enrollment_from_program(
+            request, courserun_id, program_enrollments[0]
+        )
+
+    # Make sure the programs are related to each other before continuing.
+    # Also check for circular reference, which will break the verified enrollment
+    # checks later.
+
+    if (
+        programs[0] not in programs[1].program_nodes
+        and programs[1] not in programs[0].program_nodes
+    ) or (
+        programs[0] in programs[1].program_nodes
+        and programs[1] in programs[0].program_nodes
+    ):
+        log.error(
+            "add_verified_program_course_enrollment: user %s enrolling in %s but programs specified (%s) have bad interdependencies",
+            request.user,
+            courserun_id,
+            ",".join(programs.values_list("readable_id", flat=True)),
+            stack_info=True,
+            extra={
+                "program_1": programs[0],
+                "program_1_nodes": programs[0].program_nodes,
+                "program_2": programs[1],
+                "program_2_nodes": programs[1].program_nodes,
+            },
+        )
+        raise EnrollmentError
+
+    # Figure out which is the most upstream program and check enrollments there.
+
+    root_program = (
+        programs[0] if programs[0] not in programs[1].program_nodes else programs[1]
+    )
+
+    verified_program_enrollments = [
+        enrollment
+        for enrollment in program_enrollments
+        if enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    ]
+
+    reconcile_verified_program_enrollments(
+        request.user, courserun_id, root_program, verified_program_enrollments, programs
+    )
+
+    # If we fell out the bottom, we have all verified enrollments, or we've made
+    # sufficient enrollments to fill the gaps.
+
+    # If we have >1 program, we need to pass in the enrollment for the program
+    # the course belongs to, or the call to create the course run enrollment will fail.
+
+    course_program = (
+        programs[0]
+        if programs[0]
+        .courses_qset.filter(courseruns__courseware_id=courserun_id)
+        .exists()
+        else programs[1]
+    )
+    try:
+        program_enrollment = ProgramEnrollment.objects.get(
+            user=request.user, program=course_program
+        )
+    except ProgramEnrollment.DoesNotExist as exc:
+        raise EnrollmentCreationFailedError from exc
+
+    return _create_course_enrollment_from_program(
+        request, courserun_id, program_enrollment
+    )
+
+
+class _BaseCertificateRetrieveViewSet(
+    mixins.RetrieveModelMixin, viewsets.GenericViewSet
+):
+    """Base class for certificate viewsets"""
+
+    permission_classes = [AllowAny]
+    lookup_field = "uuid"
+    lookup_value_converter = "uuid"
+
+    def get_serializer_context(self):
+        return {"request": self.request}
+
+
+class CourseCertificateRetrieveViewSet(_BaseCertificateRetrieveViewSet):
+    """Viewset to read a single course certificate"""
+
+    serializer_class = CourseRunCertificateSerializer
+    queryset = CourseRunCertificate.objects.prefetch(
+        "course_run__course__financial_assistance_form_url",
+        PrefetchOption(
+            "course_run__course__programs",
+            queryset=Program.objects.filter(b2b_only=False),
+        ),
+    ).prefetch_related("user")
+
+
+class ProgramCertificateRetrieveViewSet(_BaseCertificateRetrieveViewSet):
+    """Viewset to read a single course certificate"""
+
+    serializer_class = ProgramCertificateSerializer
+    queryset = ProgramCertificate.objects.prefetch_related("user")
+
+
+class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
+    """ViewSet for user program and courserun enrollments with v2 serializers."""
+
+    permission_classes = [IsAuthenticated]
+
+    id_parameter = OpenApiParameter(
+        name="id",
+        type=OpenApiTypes.INT,
+        location=OpenApiParameter.PATH,
+        description="Program ID",
+        required=True,
+    )
+
+    @extend_schema(
+        operation_id="v2_program_enrollments_list",
+        responses={200: UserProgramEnrollmentDetailSerializer(many=True)},
+        parameters=[],
+    )
+    def list(self, request):
+        """
+        Returns a unified set of program and course enrollments for the current
+        user using v2 serializers.
+        """
+        program_enrollments = (
+            ProgramEnrollment.objects.select_related(
+                "program",
+                "program__page",
+            )
+            .prefetch_related("program__enrollment_modes")
+            .filter(user=request.user)
+            .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
+            .order_by("-id")
+        )
+
+        program_list = []
+
+        for enrollment in program_enrollments:
+            courses = [course[0] for course in enrollment.program.courses]
+
+            program_list.append(
+                {
+                    "enrollments": CourseRunEnrollment.objects.filter(
+                        user=request.user, run__course__in=courses
+                    )
+                    .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
+                    .select_related("run__course__page", "b2b_contract")
+                    .prefetch_related("run__b2b_contracts")
+                    .prefetch(
+                        "run__course__programs",
+                        "run__course__financial_assistance_form_url",
+                    )
+                    .order_by("-id"),
+                    "program": enrollment.program,
+                    "certificate": get_program_certificate_by_enrollment(enrollment),
+                }
+            )
+
+        return Response(
+            UserProgramEnrollmentDetailSerializer(program_list, many=True).data
+        )
+
+    @extend_schema(
+        operation_id="v2_program_enrollments_retrieve",
+        responses={200: UserProgramEnrollmentDetailSerializer},
+        parameters=[id_parameter],
+    )
+    def retrieve(self, request, pk=None):
+        """
+        Retrieve a specific program enrollment using v2 serializers.
+        """
+        program = Program.objects.get(pk=pk)
+        enrollment = ProgramEnrollment.objects.get(user=request.user, program=program)
+        serializer = UserProgramEnrollmentDetailSerializer(
+            enrollment, context={"request": request}
+        )
+        return Response(serializer.data)
+
+    @extend_schema(
+        operation_id="v2_program_enrollments_destroy",
+        responses={200: UserProgramEnrollmentDetailSerializer(many=True)},
+        parameters=[id_parameter],
+    )
+    def destroy(self, request, pk=None):
+        """
+        Unenroll the user from this program. This is simpler than the corresponding
+        function for CourseRunEnrollments; edX doesn't really know what programs
+        are so there's nothing to process there.
+        """
+
+        program = get_object_or_404(Program, pk=pk)
+        enrollment = ProgramEnrollment.objects.filter(
+            user=request.user, program=program
+        ).first()
+        if enrollment:
+            if not enrollment.can_unenroll:
+                return Response(
+                    {
+                        "message": "Cannot unenroll from a purchased program, contact support."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            enrollment.deactivate_and_save(ENROLL_CHANGE_STATUS_UNENROLLED)
+
+        return self.list(request)
+
+
+@extend_schema(
+    description="Returns the json for the verifiable credential with the given ID",
+    responses={200: VerifiableCredentialSerializer(many=True)},
 )
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def get_program_certificate(request, cert_uuid):
-    """Get a program certificate by UUID."""
-
-    cert_uuid = serializers.UUIDField().to_internal_value(cert_uuid)
-
-    cert = get_object_or_404(ProgramCertificate, is_revoked=False, uuid=cert_uuid)
-
-    return Response(
-        ProgramCertificateSerializer(cert, context={"request": request}).data
+def download_course_credential(request, credential_id):  # noqa: ARG001
+    credential = get_object_or_404(
+        VerifiableCredential,
+        pk=credential_id,
     )
+    response = JsonResponse(credential.credential_data)
+    response["Content-Disposition"] = (
+        f'attachment; filename="credential_{credential_id}.json"'
+    )
+    return response
+
+
+@extend_schema(
+    description="Returns the json for the verifiable credential with the given ID",
+    responses={200: VerifiableCredentialSerializer(many=True)},
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def download_program_credential(request, credential_id):  # noqa: ARG001
+    credential = get_object_or_404(
+        VerifiableCredential,
+        pk=credential_id,
+    )
+    response = JsonResponse(credential.credential_data)
+    response["Content-Disposition"] = (
+        f'attachment; filename="credential_{credential_id}.json"'
+    )
+    return response

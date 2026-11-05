@@ -1,9 +1,9 @@
 from datetime import date, datetime
 from io import StringIO
+from zoneinfo import ZoneInfo
 
 import faker
 import pytest
-import pytz
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import call_command
@@ -87,7 +87,7 @@ def test_program_tier_setup(with_existing_records):
         assert (  # noqa: PT018
             existing_discount.expiration_date is not None
             and existing_discount.expiration_date
-            < datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
+            < datetime.now(tz=ZoneInfo(settings.TIME_ZONE))
         )
         assert existing_tier.current is False
 
@@ -151,6 +151,6 @@ def test_course_tier_setup(with_existing_records):
         assert (  # noqa: PT018
             existing_discount.expiration_date is not None
             and existing_discount.expiration_date
-            < datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
+            < datetime.now(tz=ZoneInfo(settings.TIME_ZONE))
         )
         assert existing_tier.current is False

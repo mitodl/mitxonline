@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from factory import Faker, RelatedFactory, SelfAttribute, SubFactory, Trait
 from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyDateTime, FuzzyText
-from social_django.models import UserSocialAuth
 
 from users.models import GENDER_CHOICES, LegalAddress, User, UserProfile
 
@@ -49,25 +48,18 @@ class UserFactory(DjangoModelFactory):
         legacy_username = Trait(username=FuzzyText())
 
 
-class UserSocialAuthFactory(DjangoModelFactory):
-    """Factory for UserSocialAuth"""
-
-    provider = FuzzyText()
-    user = SubFactory("users.factories.UserFactory")
-    uid = FuzzyText()
-
-    class Meta:
-        model = UserSocialAuth
-
-
 class LegalAddressFactory(DjangoModelFactory):
     """Factory for LegalAddress"""
 
     user = SubFactory("users.factories.UserFactory")
 
+    country = Faker("country_code", representation="alpha-2")
     first_name = Faker("first_name")
     last_name = Faker("last_name")
-    country = Faker("country_code", representation="alpha-2")
+    street_address_1 = Faker("street_address")
+    street_address_2 = Faker("secondary_address")
+    city = Faker("city")
+    postal_code = Faker("postcode")
 
     class Meta:
         model = LegalAddress

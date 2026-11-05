@@ -5,8 +5,8 @@ import logging
 from collections import namedtuple
 from datetime import datetime
 from typing import Union
+from zoneinfo import ZoneInfo
 
-import pytz
 import requests
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
@@ -263,7 +263,7 @@ def determine_courseware_flexible_price_discount(product, user):
                     Q(tier__discount__activation_date=None)
                     | Q(
                         tier__discount__activation_date__lte=datetime.now(
-                            pytz.timezone(TIME_ZONE)
+                            ZoneInfo(TIME_ZONE)
                         )
                     )
                 )
@@ -271,7 +271,7 @@ def determine_courseware_flexible_price_discount(product, user):
                     Q(tier__discount__expiration_date=None)
                     | Q(
                         tier__discount__expiration_date__gte=datetime.now(
-                            pytz.timezone(TIME_ZONE)
+                            ZoneInfo(TIME_ZONE)
                         )
                     )
                 )
@@ -395,7 +395,7 @@ def create_default_flexible_pricing_page(
     Raises:
     - Exception if there's no page for the courseware object specified
     """
-    from cms.models import FlexiblePricingRequestForm
+    from cms.models import FlexiblePricingRequestForm  # noqa: PLC0415
 
     if isinstance(object, Program) or (
         (isinstance(object, Course) and forceCourse)
@@ -424,6 +424,8 @@ def create_default_flexible_pricing_page(
     else:
         slug = slugify(title)
 
+    live = kwargs.get("live", False)
+
     form_page = FlexiblePricingRequestForm(
         intro=FINAID_FORM_TEXTS["intro"],
         title=title,
@@ -433,7 +435,7 @@ def create_default_flexible_pricing_page(
         application_approved_text=FINAID_FORM_TEXTS["approved"],
         application_approved_no_discount_text=FINAID_FORM_TEXTS["approved_no_discount"],
         application_denied_text=FINAID_FORM_TEXTS["denied"],
-        live=False,
+        live=live,
     )
     parent_page.add_child(instance=form_page)
 

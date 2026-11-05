@@ -91,8 +91,7 @@ export type ProgramEnrollment = {
 
 export type PartnerSchool = {
   id: number,
-  name: string,
-  email: string
+  name: string
 }
 
 export type RequirementNode = {

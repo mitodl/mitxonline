@@ -1,72 +1,56 @@
-FROM python:3.10-slim AS base
+# syntax=docker/dockerfile:1
+# hadolint global ignore=DL3008
 
+FROM mitodl/ol-python-base:3.11 AS base
 LABEL maintainer="ODL DevOps <mitx-devops@mit.edu>"
 
-# Add package files, install updated node and pip
-WORKDIR /tmp
+# App-specific apt extras; common-core packages are in mitodl/ol-python-base:3.11.
+# Operator tooling (htop, ngrep, screen, etc.) is also kept here for parity
+# with the production image; trim this list if the production image diverges.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+      dnsutils \
+      htop \
+      iputils-ping \
+      less \
+      lsof \
+      nano \
+      ngrep \
+      procps \
+      wget
 
-# Install packages and add repo needed for postgres 9.6
-COPY apt.txt /tmp/apt.txt
-RUN apt-get update && \
-    apt-get install --no-install-recommends -y $(grep -vE "^\s*#" apt.txt  | tr "\n" " ") && \
-    apt-get clean && \
-    apt-get purge -y && \
-    rm -rf /var/lib/apt-lists/*
+FROM base AS deps
 
-FROM base AS system
-
-# Add, and run as, non-root user.
-RUN mkdir /src && \
-    adduser --disabled-password --gecos "" mitodl && \
-    mkdir /var/media && chown -R mitodl:mitodl /var/media
-
-FROM system AS poetry
-
-# copy in trusted certs
-COPY --chmod=644 certs/*.crt /usr/local/share/ca-certificates/
+# Trusted certs (org PKI + local-dev mkcert root injected at deploy time).
+# COPY --chmod also applies to directories it creates; make them first so
+# /usr/local/share stays traversable (perl, pg_config need it).
+RUN mkdir -p /usr/local/share/ca-certificates
+COPY --chmod=644 certs/ /usr/local/share/ca-certificates/
 RUN update-ca-certificates
 
-# Poetry env configuration
-ENV  \
-  # poetry:
-  PYTHONUNBUFFERED=1 \
-  PYTHONDONTWRITEBYTECODE=1 \
-  PIP_DISABLE_PIP_VERSION_CHECK=on \
-  POETRY_VERSION=2.1.3 \
-  POETRY_VIRTUALENVS_CREATE=false \
-  POETRY_CACHE_DIR='/tmp/cache/poetry' \
-  POETRY_HOME='/home/mitodl/.local' \
-  VIRTUAL_ENV="/opt/venv"
-ENV PATH="$VIRTUAL_ENV/bin:$POETRY_HOME/bin:$PATH"
-
-RUN pip install --no-cache-dir "poetry==$POETRY_VERSION"
-
-COPY pyproject.toml /src
-COPY poetry.lock /src
-COPY mitol_*.gz /src
-
-RUN chown -R mitodl:mitodl /src && \
-    mkdir ${VIRTUAL_ENV} && chown -R mitodl:mitodl ${VIRTUAL_ENV}
+# Install Python dependencies before copying source.
+# mitol_*.gz are local wheels that uv resolves from the lock file.
+COPY --chown=mitodl:mitodl pyproject.toml uv.lock /src/
+COPY --chown=mitodl:mitodl mitol_*.gz /src/
+# Local path dependency resolved by the lock file (metadata-only urllib3-future stub).
+COPY --chown=mitodl:mitodl shims/ /src/shims/
 
 USER mitodl
-RUN curl -sSL https://install.python-poetry.org \
-  | \
-  POETRY_VERSION=${POETRY_VERSION} \
-  POETRY_HOME=${POETRY_HOME} \
-  python3 -q
 WORKDIR /src
-RUN python3 -m venv $VIRTUAL_ENV
-RUN poetry install
+# BuildKit cache mount keeps the uv download cache across builds.
+RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
+    uv sync --frozen --no-install-project --no-dev
 
-
-FROM poetry AS code
+FROM deps AS code
 
 COPY . /src
 WORKDIR /src
 
-# Set pip cache folder, as it is breaking pip when it is on a shared volume
 ENV XDG_CACHE_HOME=/tmp/.cache
 
+# ─── Node / frontend asset build ─────────────────────────────────────────────
 FROM node:17.9 AS node
 
 COPY --from=code /src /src
@@ -78,18 +62,43 @@ RUN yarn workspace mitx-online-public install --immutable && \
     yarn workspace mitx-online-staff-dashboard install --immutable && \
     yarn workspace mitx-online-staff-dashboard run build
 
+# ─── Runtime targets ─────────────────────────────────────────────────────────
 FROM code AS django-server
 
 EXPOSE 8013
 ENV PORT=8013
-CMD ["uwsgi", "uwsgi.ini"]
+CMD ["sh", "-c", "exec granian --interface wsgi --host 0.0.0.0 --port ${PORT:-8013} --workers 2 main.wsgi:application"]
 
 FROM django-server AS production
 
-COPY --from=node /src /src
+# Only the compiled frontend: these are the node stage's outputs that
+# STATICFILES_DIRS and WEBPACK_LOADER in main/settings.py read. The rest of
+# its /src is the source `code` already has, plus node_modules and yarn's
+# cache, which nothing reads at runtime.
+COPY --from=node /src/frontend/public/build /src/frontend/public/build
+COPY --from=node /src/frontend/staff-dashboard/build /src/frontend/staff-dashboard/build
+COPY --from=node /src/webpack-stats /src/webpack-stats
+
+# ─── Local-dev target (ol-infrastructure local-dev k8s/Tilt stack) ───────────
+# Runtime user owns /src (live-synced source), plus dev deps (pytest, ipdb, …)
+# and watchfiles for granian --reload.
+FROM production AS local-dev
+
+USER root
+RUN chown -R mitodl:mitodl /src
+USER mitodl
+
+RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
+    uv sync --frozen --no-install-project
 
 FROM code AS jupyter-notebook
 
-RUN pip install --force-reinstall jupyter
+RUN uv pip install --force-reinstall jupyter
 
 USER mitodl
+
+# ─── Development target (docker compose) ─────────────────────────────────────
+FROM django-server AS development
+
+RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
+    uv sync --frozen --no-install-project

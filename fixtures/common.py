@@ -5,28 +5,35 @@ import os
 
 import pytest
 import responses
-from django.test.client import Client
-from nplusone.core import profiler
+from django.test import Client
+from mitol.common.serializers import THIS_IS_NOT_AN_API
 from rest_framework.test import APIClient
+from zeal import zeal_ignore
 
-from users.factories import UserFactory
+pytestmark = [pytest.mark.usefixtures("urllib3_mock")]
 
 
 @pytest.fixture
 def user(db):  # noqa: ARG001
     """Creates a user"""
+    from users.factories import UserFactory  # noqa: PLC0415
+
     return UserFactory.create()
 
 
 @pytest.fixture
 def staff_user(db):  # noqa: ARG001
     """Staff user fixture"""
+    from users.factories import UserFactory  # noqa: PLC0415
+
     return UserFactory.create(is_staff=True)
 
 
 @pytest.fixture
 def admin_user(db):  # noqa: ARG001
     """Admin user fixture"""
+    from users.factories import UserFactory  # noqa: PLC0415
+
     return UserFactory.create(is_superuser=True, is_staff=True)
 
 
@@ -69,7 +76,7 @@ def admin_drf_client(admin_user):
     return client
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def mocked_responses():
     """Mocked responses for requests library"""
     with responses.RequestsMock() as rsps:
@@ -79,7 +86,10 @@ def mocked_responses():
 @pytest.fixture
 def mock_context(mocker, user):
     """Mocked context for serializers"""
-    return {"request": mocker.Mock(user=user)}
+    return {
+        "request": mocker.Mock(user=user),
+        "skip_prefetch_checks": THIS_IS_NOT_AN_API,
+    }
 
 
 @pytest.fixture
@@ -90,6 +100,7 @@ def valid_address_dict():
         last_name="User",
         country="US",
         state="US-MA",
+        postal_code="02139",
     )
 
 
@@ -101,6 +112,7 @@ def invalid_address_dict():
         last_name="User",
         country="US",
         state="XX",
+        postal_code="02139",
     )
 
 
@@ -112,6 +124,7 @@ def address_no_state_dict():
         last_name="User",
         country="US",
         state=None,
+        postal_code="02139",
     )
 
 
@@ -123,6 +136,7 @@ def intl_address_dict():
         first_name="Test",
         last_name="User",
         country="JP",
+        postal_code="100-0001",
     )
 
 
@@ -134,12 +148,6 @@ def user_profile_dict():
         gender=None,
         year_of_birth=1980,
     )
-
-
-@pytest.fixture
-def nplusone_fail(settings):
-    """Configures the nplusone app to raise errors"""
-    settings.NPLUSONE_RAISE = True
 
 
 @pytest.fixture(autouse=True)
@@ -156,10 +164,26 @@ def webpack_stats(settings):
         )
 
 
-@pytest.fixture
-def raise_nplusone(request):
-    if request.node.get_closest_marker("skip_nplusone"):
-        yield
-    else:
-        with profiler.Profiler():
+@pytest.fixture(autouse=True)
+def check_nplusone(request):
+    """
+    Fail on N+1s, except where a test opts out.
+
+    `skip_nplusone_check` ignores every N+1 in the test. `zeal_allow(model, field)`
+    ignores N+1s on that model and field anywhere in the test, so the test still
+    catches any other N+1; `field` is "get()" for zeal's repeated-.get() detection.
+    """
+    if request.node.get_closest_marker("skip_nplusone_check"):
+        with zeal_ignore():
             yield
+        return
+
+    allowlist = [
+        {"model": marker.args[0], "field": marker.args[1]}
+        for marker in request.node.iter_markers("zeal_allow")
+    ]
+    if allowlist:
+        with zeal_ignore(allowlist=allowlist):
+            yield
+    else:
+        yield

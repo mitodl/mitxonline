@@ -4,6 +4,7 @@ Configuration
 .. toctree::
    :maxdepth: 2
 
+   course_customization
    ecommerce
    quickstart
    b2b

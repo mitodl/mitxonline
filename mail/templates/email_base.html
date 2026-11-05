@@ -239,7 +239,21 @@
 	            <tr>
 	                <td style="padding: 20px;">
                       {% block logo %}
-                      <img src="{{ base_url }}/static/images/mitx-online-logo.png" width="160" height="80" alt="{{ site_name }}" style="margin-bottom: -10px; margin-right: 10px; object-fit: contain;"/>
+                      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                          <td style="text-align: left; width: 60%; padding: 0;">
+                            <img src="{{ base_url }}/static/images/mit-learn.png" width="146" height="24" alt="MIT Learn" style="display: block; max-width: 100%; height: auto;" />
+                          </td>
+                          <td style="text-align: right; width: 40%; padding: 0;">
+                            <img src="{{ base_url }}/static/images/mit-black-logo.png" width="48" height="24" alt="MIT" style="display: block; max-width: 100%; height: auto; margin-left: auto;" />
+                          </td>
+                        </tr>
+                        <tr>
+                          <td colspan="2" style="padding-top: 32px;">
+                            <hr style="border: none; height: 1px; background-color: #e0e0e0; margin: 0;">
+                          </td>
+                        </tr>
+                      </table>
                       {% endblock %}
 	                </td>
 	            </tr>
@@ -281,7 +295,7 @@
                         {% block footer-address %}
                         MIT Open Learning, 600 Technology Square, NE49-2000, Cambridge, MA 02139
                         <br>
-                        &copy; {% now "Y" %} {{ site_name }}, All Rights Reserved. <a href="{{ base_url }}/terms-of-service" style="color: #b0b0b0; text-decoration: underline;">Terms of Service</a> and <a href="{{ base_url }}/privacy-policy" style="color: #b0b0b0; text-decoration: underline;">Privacy Policy</a>
+                        &copy; {% now "Y" %} {{ site_name }}, All Rights Reserved. <a href="{{ mit_learn_terms_url }}" style="color: #b0b0b0; text-decoration: underline;">Terms of Service</a> and <a href="{{ mit_learn_privacy_url }}" style="color: #b0b0b0; text-decoration: underline;">Privacy Policy</a>
                         {% endblock %}
                     </td>
                 </tr>

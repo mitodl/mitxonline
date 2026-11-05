@@ -101,6 +101,27 @@ def test_custom_login_view_authenticated_user_with_onboarding(settings, client):
     assert user.user_profile.completed_onboarding is True
 
 
+def test_custom_login_view_with_no_user_profile(settings, client):
+    """A user with no UserProfile row at all (e.g. one created by the
+    historical migrate_edx_data bulk_create bug) must not crash logging in -
+    the view must create the missing UserProfile rather than accessing
+    user.user_profile directly
+    """
+    settings.MITXONLINE_NEW_USER_LOGIN_URL = "/create-profile"
+
+    user = UserFactory.create()
+    UserProfile.objects.filter(user=user).delete()
+
+    client.force_login(user)
+
+    qs = {"next": "/dashboard"}
+    response = client.get(f"{reverse('gateway-login')}?{urlencode(qs)}")
+
+    assert response.status_code == 302
+    assert response.url == "/create-profile?next=%2Fdashboard"
+    assert UserProfile.objects.get(user=user).completed_onboarding is True
+
+
 @pytest.mark.parametrize(
     "next_url", ["/dashboard", "http://openedx.odl.local/courses/abc"]
 )

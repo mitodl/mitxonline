@@ -5,6 +5,7 @@
 
 {% block seohead %}
     {{ block.super }}
+    <meta name="robots" content="noindex" />
     <meta property="og:site_name" content="{{ site_name }}" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -73,7 +74,7 @@
                     {% endif %}
                     <span class="award-text">
                         {% if page.CEUs %} Awarded {{ CEUs }} Continuing Education Units (CEUs) <br> {% endif %}
-                        {{ start_date|date }} - {{ end_date|date }}
+                        Issued: {{ issue_date |date }}
                     </span>
                     <div class="row justify-content-center certify-by-row">
                         {% for signatory in page.signatory_pages %}
@@ -118,8 +119,8 @@
             </div>
             <div class="cer-footer-info">
                 <ul class="links">
-                    <li><a href="/terms-of-service/">Terms of Services</a></li>
-                    <li><a href="/privacy-policy/">Privacy Policy</a></li>
+                    <li><a href="{{ mit_learn_terms_url }}">Terms of Services</a></li>
+                    <li><a href="{{ mit_learn_privacy_url }}">Privacy Policy</a></li>
                 </ul>
                 {% block copyright %}
                     {% include "copyright.html" %}

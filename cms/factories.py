@@ -12,6 +12,7 @@ from cms.models import (
     HomePage,
     InstructorIndexPage,
     InstructorPage,
+    ProductPageFAQ,
     ProgramIndexPage,
     ProgramPage,
     ResourcePage,
@@ -170,11 +171,23 @@ class InstructorIndexPageFactory(wagtail_factories.PageFactory):
 class InstructorPageFactory(wagtail_factories.PageFactory):
     feature_image = factory.SubFactory(wagtail_factories.ImageFactory)
     parent = LazyAttribute(
-        lambda _: InstructorIndexPage.objects.first()
-        or InstructorIndexPageFactory.create()
+        lambda _: (
+            InstructorIndexPage.objects.first() or InstructorIndexPageFactory.create()
+        )
     )
     title = factory.Faker("name")
     instructor_name = factory.Faker("name")
 
     class Meta:
         model = InstructorPage
+
+
+class ProductPageFAQFactory(factory.django.DjangoModelFactory):
+    """Factory for a single product page FAQ."""
+
+    page = factory.SubFactory(CoursePageFactory)
+    question = factory.Faker("sentence")
+    answer = factory.Faker("paragraph")
+
+    class Meta:
+        model = ProductPageFAQ

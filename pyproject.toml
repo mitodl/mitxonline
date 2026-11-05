@@ -1,122 +1,188 @@
-[tool.poetry]
-name = "MITx Online"
-version = "0.69.1"
+[project]
+name = "mitxonline"
+version = "2026.11.3.1"
 description = "MITx Online"
-license = "BSD-3"
+authors = [{ name = "MIT ODL" }]
+requires-python = "~=3.11.0"
 readme = "README.md"
-packages = []
-authors  = ["MIT ODL"]
-package-mode = false
-requires-poetry = ">2.1,<3"
+license = { text = "BSD-3" }
+dependencies = [
+    "beautifulsoup4>=4.8.2,<5",
+    "bleach>=6.0.0,<7",
+    "boto3>=1.16.63,<2",
+    "celery>=5.2.2,<6",
+    "celery-redbeat>=2.0.0,<3",
+    "click>=8.1,!=8.2.0",
+    "deepdiff>=8.0.0,<9",
+    "dj-database-url>=0.5.0,<0.6",
+    "django>=5.2,<5.3",
+    "django-anymail[mailgun]>=11.1,<12",
+    "django-cors-headers>=4.0.0,<5",
+    "django-countries>=7.2.1,<8",
+    "django-filter>=24.3,<25",
+    "django-health-check[celery,redis]>=4.0.0",
+    "django-ipware>=7.0.0,<8",
+    "django-redis>=6.0.0,<7",
+    "django-oauth-toolkit==3.1",
+    "django-reversion>=5.1.0,<6",
+    "django-robots==6.1",
+    "django-storages>=1.11.1,<2",
+    "django-treebeard>=4.5.1,<4.8",
+    "django-user-agents>=0.4.0,<0.5",
+    "django-viewflow>=2.2.7,<3",
+    "django-webpack-loader>=3.0.0,<4",
+    "djangorestframework==3.18.3",
+    "drf-extensions>=0.8.0,<0.9",
+    "drf-spectacular>=0.29.0,<0.30",
+    "edx-api-client>=1.14.0,<2",
+    "hubspot-api-client>=12.0.0,<13",
+    "ipython>=9.13,<10",
+    "mitol-django-apigateway==2026.4.29",
+    "mitol-django-common==2026.6.16.4",
+    "mitol-django-hubspot-api==2026.4.29",
+    "mitol-django-mail==2026.4.29",
+    "mitol-django-openedx==2026.4.29",
+    "mitol-django-payment-gateway==2026.8.5",
+    "mitol-django-scim==2026.4.29",
+    "mitol-django-observability>=2026.8.19",
+    "opentelemetry-instrumentation-celery>=0.52b0",
+    "opentelemetry-instrumentation-django>=0.52b0",
+    "opentelemetry-instrumentation-psycopg>=0.52b0",
+    "opentelemetry-instrumentation-redis>=0.52b0",
+    "opentelemetry-instrumentation-requests>=0.52b0",
+    "psycopg[c]>=3.2.4,<4",
+    "pyOpenSSL>=26,<27",
+    "pycountry>=26.2.16,<27",
+    "pyparsing>=3.2,<4",
+    "redis>=5.0.0,<6",
+    "requests>=2.28.2,<3",
+    "rich>=14.0.0,<15",
+    "sentry-sdk>=2.29.1,<3",
+    "ulid-py>=1.1.0,<2",
+    "urllib3>=2.0.0,<3",
+    # Metadata-only stub; see shims/urllib3-future/pyproject.toml for why.
+    "urllib3-future",
+    "user-util>=0.1.5,<0.2",
+    "wagtail==7.3.4",
+    "wagtail-metadata>=5.0.0,<6",
+    "djangorestframework-api-key>=3.1.0,<4",
+    "setuptools<80.11",
+    "mitol-django-google-sheets>=2025.6.13,<2026",
+    "mitol-django-google-sheets-deferrals>=2025.3.17,<2026",
+    "mitol-django-google-sheets-refunds>=2025.6.13,<2026",
+    "tabulate>=0.9.0,<0.10",
+    "python-redis-lock>=4.0.0,<5",
+    "django-object-actions>=5.0.0,<6",
+    "requests-oauthlib>=2.0.0,<3",
+    "authlib>=1.6.3,<2",
+    "trino>=0.336.0,<0.337",
+    "granian>=2.5.4,<3",
+    "mitol-django-olposthog>=2026.3.6,<2027",
+    "django-removals>=1.1.6,<2",
+    "django-prefetch>=1.2.3,<2",
+    "django-qp[drf]>=0.2.0",
+    "pydantic>=2.13.4",
+    "pynacl>=1.6.2",
+    "pyjwt==2.15.0",
+]
 
+[dependency-groups]
+prek = ["prek==0.5.5"]
+dev = [
+    { include-group = "prek" },
+    "anys>=0.3.1,<0.4",
+    "bpython>=0.26,<0.27",
+    "ddt>=1.6.0,<2",
+    "django-debug-toolbar>=6.0.0,<7",
+    "django-zeal>=2.2.4,<3",
+    "factory-boy>=3.2.0,<4",
+    "faker>=40.43.0,<=40.43.0",
+    "flaky>=3.7.0,<4",
+    "freezegun>=1.2,<2",
+    "ipdb>=0.13.13,<0.14",
+    "pdbpp>=0.11.6,<0.12",
+    "pytest-cov>=7.0.0,<8",
+    "pytest-django>=4.5.2,<5",
+    "pytest-env>=1.0.0,<2",
+    "pytest-lazy-fixtures>=1.1.4,<2",
+    "pytest-mock>=3.11.1,<4",
+    "responses>=0.26.0,<0.27",
+    "ruff>=0.15,<0.16",
+    "semantic-version>=2.10.0,<3",
+    "wagtail-factories>=4.2,<4.3",
+    "pytest-xdist[psutil]>=3.6.1,<4",
+    "mitol-drf-lint>=2026.8.28",
+    "pytest-urllib3>=0.2.0",
+    "granian[reload]>=2.5.4,<3",
+    "pytest-split>=0.9,<1",
+    "datamodel-code-generator[http]>=0.72.4",
+]
+docs = [
+    "insipid-sphinx-theme>=0.4.4,<0.5",
+    "myst-parser>=5.0.0,<6",
+    "sphinx>=9.0.4,<10",
+    "sphinxcontrib-mermaid>=2.1.1,<3",
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
+[tool.uv]
+constraint-dependencies = ["certifi>=2026.10.19"]  # eMudhra CA compromise: never resolve a certifi that trusts the compromised CAs
+package = false
+default-groups = ["dev"]
+exclude-newer = "7d"
+required-version = ">=0.9.17"
 
-beautifulsoup4 = "^4.8.2"
-bleach = "^5.0.1"
-boto3 = "^1.16.63"
-celery = "^5.2.2"
-celery-redbeat = "^2.0.0"
-click = ">=8.1,!=8.2.0"
-deepdiff = "^8.0.0"
-dj-database-url = "^0.5.0"
-django = "4.2.24"
-django-anymail = {extras = ["mailgun"], version = "^11.1"}
-django-cors-headers = "^4.0.0"
-django-countries = "^7.2.1"
-django-filter = "^24.3"
-django-health-check = { git = "https://github.com/revsys/django-health-check", rev="9cfe2eaec5a15219513a36210b34875c03c64fe4" }  # pragma: allowlist secret
-django-hijack = "^3.6.0"
-django-ipware = "^7.0.0"
-django-oauth-toolkit = "^1.7.0"
-django-redis = "^5.0.0"
-django-reversion = "^5.1.0"
-django-robots = "6.1"
-django-storages = "^1.11.1"
-django-treebeard = "^4.5.1"
-django-user-agents = "^0.4.0"
-django-viewflow = "^2.2.7"
-django-webpack-loader = "^3.0.0"
-djangorestframework = "^3.12.4"
-djoser = "^2.1.0"
-drf-extensions = "^0.7.1"
-drf-spectacular = "^0.28.0"
-edx-api-client = "^1.12.0"
-hubspot-api-client = "^6.1.0"
-hypothesis = "4.23.9"
-ipython = "^8.0.0"
-mitol-django-apigateway = "2025.8.7"
-mitol-django-authentication = "^2025.2.12"
-mitol-django-common = ">=2025.5.23"
-mitol-django-hubspot-api = "2023.12.19"
-mitol-django-mail = "2023.12.19"
-mitol-django-olposthog = "^2024.5.14"
-mitol-django-openedx = "2023.12.19"
-mitol-django-payment-gateway = "2023.12.19"
-mitol-django-scim = ">=2025.5.23"
-newrelic = "^6.4.1.158"
-opentelemetry-api = ">=1.31.0"
-opentelemetry-exporter-otlp = ">=1.31.0"
-opentelemetry-instrumentation-celery = ">=0.52b0"
-opentelemetry-instrumentation-django = ">=0.52b0"
-opentelemetry-instrumentation-psycopg = ">=0.52b0"
-opentelemetry-instrumentation-redis = ">=0.52b0"
-opentelemetry-instrumentation-requests = ">=0.52b0"
-opentelemetry-sdk = ">=1.31.0"
-posthog = "^3.0.1"
-psycopg = "^3.2.4"
-psycopg2 = "^2.9.5"
-pyOpenSSL = "^23.1.1"
-pycountry = "^24.6.1"
-pyparsing = "^3.2"
-redis = "^5.0.0"
-requests = "^2.28.2"
-rich = "^14.0.0"
-sentry-sdk = "^2.29.1"
-social-auth-app-django = "5.4.3"
-ulid-py = "^1.1.0"
-user-util = "^0.1.5"
-uwsgi = "^2.0.19"
-uwsgitop = "^0.12"
-wagtail = "7.0.1"
-wagtail-metadata = "^5.0.0"
-djangorestframework-api-key = "^3.1.0"
-setuptools = "<80.9"
-mitol-django-google-sheets = "^2025.6.13"
-mitol-django-google-sheets-deferrals = "^2025.3.17"
-mitol-django-google-sheets-refunds = "^2025.6.13"
-pytest-lazy-fixtures = "^1.1.4"
-tabulate = "^0.9.0"
-python-redis-lock = "^4.0.0"
-django-object-actions = "^5.0.0"
-requests-oauthlib = "^2.0.0"
-authlib = "^1.6.3"
-trino = "^0.336.0"
-granian = "^2.5.4"
+[tool.uv.exclude-newer-package]
+ol-concourse = "0d"
+django-aqueduct = "0d"
+edx-sysadmin = "0d"
+edx-username-changer = "0d"
+ol-openedx-ai-static-translations = "0d"
+ol-openedx-auto-select-language = "0d"
+ol-openedx-canvas-integration = "0d"
+ol-openedx-chat = "0d"
+ol-openedx-chat-xblock = "0d"
+ol-openedx-checkout-external = "0d"
+ol-openedx-course-export = "0d"
+ol-openedx-course-outline-api = "0d"
+ol-openedx-course-structure-api = "0d"
+ol-openedx-course-sync = "0d"
+ol-openedx-course-translations = "0d"
+ol-openedx-events-handler = "0d"
+ol-openedx-feedback = "0d"
+ol-openedx-git-auto-export = "0d"
+ol-openedx-logging = "0d"
+ol-openedx-lti-utilities = "0d"
+ol-openedx-otel-monitoring = "0d"
+ol-openedx-rapid-response-reports = "0d"
+ol-openedx-sentry = "0d"
+ol-openedx-uai-content-customization = "0d"
+ol-social-auth = "0d"
+openedx-companion-auth = "0d"
+rapid-response-xblock = "0d"
+mitol-django-common = "0d"
+mitol-django-mail = "0d"
+mitol-django-authentication = "0d"
+mitol-django-digitalcredentials = "0d"
+mitol-django-geoip = "0d"
+mitol-django-google-sheets = "0d"
+mitol-django-google-sheets-deferrals = "0d"
+mitol-django-google-sheets-refunds = "0d"
+mitol-django-hubspot-api = "0d"
+mitol-django-oauth-toolkit-extensions = "0d"
+mitol-django-olposthog = "0d"
+mitol-django-openedx = "0d"
+mitol-django-payment-gateway = "0d"
+mitol-django-transcoding = "0d"
+mitol-django-apigateway = "0d"
+mitol-django-observability = "0d"
+mitol-django-scim = "0d"
+mitol-drf-lint = "0d"
 
+[tool.uv.sources]
+urllib3-future = { path = "shims/urllib3-future" }
 
-[tool.poetry.group.dev.dependencies]
-bpython = "^0.25"
-ddt = "^1.6.0"
-django-debug-toolbar = "^4.1.0"
-factory-boy = "^3.2.0"
-faker = "^8.8.2"
-flaky = "^3.7.0"
-freezegun = "^1.2"
-ipdb = "^0.13.13"
-nplusone = "^1.0.0"
-pdbpp = "^0.11.6"
-pre-commit = "^3.7.0"
-pytest-cov = "^4.1.0"
-pytest-django = "^4.5.2"
-pytest-env = "^0.8.0"
-pytest-mock = "^3.11.1"
-responses = "^0.25.0"
-ruff = "^0.9"
-semantic-version = "^2.10.0"
-wagtail-factories = "^4.2"
-pytest-xdist = {extras = ["psutil"], version = "^3.6.1"}
+[tool.uv.build-backend]
+module-root = ""
 
 [tool.ruff]
 target-version = "py310"
@@ -229,6 +295,7 @@ ignore = [
     "W191"
 ]
 fixable = ["ALL"]
+external = ["ORM001", "ORM002"]
 
 typing-modules = ["colour.hints"]
 
@@ -245,3 +312,118 @@ fixture-parentheses = false
 "*_test.py" = ["ARG001", "E501", "S101", "PLR2004"]
 "test_*.py" = ["ARG001", "E501", "S101", "PLR2004"]
 "**/migrations/**" = ["ARG001", "D101", "D100"]
+
+
+
+[tool.pytest.ini_options]
+addopts = "--cov . --cov-report xml --cov-report term --ds=main.settings --reuse-db --color=yes"
+norecursedirs = [
+  "node_modules",
+  ".git",
+  "static",
+  "templates",
+  ".*",
+  "CVS",
+  "_darcs",
+  "{arch}",
+  "*.egg"
+]
+filterwarnings = [
+    "error",
+    # ol-django
+    "ignore:pkg_resources is deprecated as an API",
+    # ol-django
+    "ignore:Deprecated call to `pkg_resources.declare_namespace",
+    "ignore:sentry_sdk.configure_scope",
+    "ignore:CheckConstraint.check:django.utils.deprecation.RemovedInDjango60Warning",
+    # cybersource
+    "ignore:invalid escape sequence '\\\\R'",
+    # cybersource
+    "ignore:'imghdr' is deprecated and slated for removal in Python 3\\.13",
+    # factoryboy
+    "ignore:.*\\._after_postgeneration will stop saving the instance after postgeneration hooks in the next major release",
+    "ignore:authlib\\.jose module is deprecated, please use joserfc instead:authlib.deprecate.AuthlibDeprecationWarning",
+    "ignore:Failed to load HostKeys",
+    # google-api-core warns from 2026-10-24 that it drops Python 3.11 on 2027-10-24
+    "ignore:You are using a Python version .* which Google will stop supporting:FutureWarning",
+]
+env = [
+  "AWS_ACCESS_KEY_ID=",
+  "AWS_SECRET_ACCESS_KEY=",
+  "AWS_STORAGE_BUCKET_NAME=",
+  "CELERY_TASK_ALWAYS_EAGER=True",
+  "DEBUG=False",
+  "DJANGO_SETTINGS_MODULE=main.settings",
+  "GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE=",
+  "KEYCLOAK_BASE_URL=http://keycloak/",
+  "KEYCLOAK_REALM_NAME=ol-test",
+  "KEYCLOAK_CLIENT_ID=mitxonline",
+  "KEYCLOAK_DISCOVERY_URL=https://keycloak/",
+  "KEYCLOAK_ADMIN_CLIENT_ID=apisix",
+  "KEYCLOAK_ADMIN_CLIENT_SECRET=fake_admin_secret",
+  "KEYCLOAK_ADMIN_CLIENT_SCOPES=openid profile email",
+  "KEYCLOAK_ADMIN_CLIENT_NO_VERIFY_SSL=True",
+  "LOGOUT_REDIRECT_URL=https://openedx.odl.local/logout",
+  "MAILGUN_KEY=invalid-key",
+  "MAILGUN_SENDER_DOMAIN=localhost",
+  "MITOL_APIGATEWAY_DISABLE_MIDDLEWARE=True",
+  "MITOL_HUBSPOT_API_PRIVATE_TOKEN=",
+  "MITX_ONLINE_BASE_URL=http://mitxonline.odl.local",
+  "MITX_ONLINE_DB_DISABLE_SSL=True",
+  "MITX_ONLINE_SECURE_SSL_REDIRECT=False",
+  "MITX_ONLINE_EMAIL_BACKEND=django.core.mail.backends.locmem.EmailBackend",
+  "MITX_ONLINE_NOTIFICATION_EMAIL_BACKEND=django.core.mail.backends.locmem.EmailBackend",
+  "MITX_ONLINE_ENVIRONMENT=pytest",
+  "MITX_ONLINE_USE_S3=False",
+  "MITXONLINE_DOCKER_BASE_URL=",
+  "OPENEDX_API_BASE_URL=http://localhost:18000",
+  "OPENEDX_API_CLIENT_ID=fake_client_id",
+  "OPENEDX_API_CLIENT_SECRET=fake_client_secret",
+  "OPENEDX_SERVICE_WORKER_API_TOKEN=fake_service_worker_token",
+  "SENTRY_DSN=",
+  "RECAPTCHA_SITE_KEY=",
+  "RECAPTCHA_SECRET_KEY=",
+  "POSTHOG_ENABLED=True",
+  "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN=",
+  "MITOL_PAYMENT_GATEWAY_STRIPE_API_KEY=not-a-real-key",
+]
+markers = [
+  "dont_mock_enrollments",
+  "skip_nplusone_check",
+  "zeal_allow(model, field): ignore one known N+1 (see fixtures/common.py check_nplusone)"
+]
+pythonpath = ["."]
+
+[tool.bumpversion]
+current_version = "2026.11.3.1"
+commit = false
+tag = false
+parse = "(?P<release>(?:[1-9][0-9]{3})\\.(?:1[0-2]|[1-9])\\.(?:3[0-1]|[12][0-9]|[1-9]))\\.(?P<build>\\d+)"
+serialize = ["{release}.{build}"]
+
+[tool.bumpversion.parts.release]
+calver_format = "{YYYY}.{MM}.{DD}"
+
+[tool.bumpversion.parts.build]
+first_value = "1"
+
+[[tool.bumpversion.files]]
+filename = "main/settings.py"
+search = 'VERSION = "{current_version}"'
+replace = 'VERSION = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "uv.lock"
+search = """
+name = "mitxonline"
+version = "{current_version}"
+source = {{ virtual = "." }}"""
+replace = """
+name = "mitxonline"
+version = "{new_version}"
+source = {{ virtual = "." }}"""

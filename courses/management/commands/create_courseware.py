@@ -3,13 +3,24 @@ Creates a courseware object. This can be a program or a course (and optionally
 a course run).
 """
 
+from datetime import timedelta
+from decimal import Decimal
 from typing import List, Union  # noqa: UP035
 
+import reversion
 from django.core.management import BaseCommand
-from django.db import models
+from django.db import models, transaction
 
-from courses.models import Course, CourseRun, Department, Program
-from main.utils import parse_supplied_date
+from cms.api import (
+    create_default_certificate_page,
+    create_default_courseware_page,
+    create_default_signatory_page,
+    get_optional_placeholder_values_for_courseware_type,
+)
+from courses.models import Course, CourseRun, Department, EnrollmentMode, Program
+from ecommerce.models import Product
+from main.utils import now_datetime_with_tz, parse_supplied_date
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 
 class Command(BaseCommand):
@@ -18,6 +29,58 @@ class Command(BaseCommand):
     """
 
     help = "Creates a courseware object (a program or course, with or without a courserun)."
+
+    def _create_cms_pages_for_courseware_object(
+        self,
+        courseware_object: Union[Course, Program],
+        *,
+        create_courseware_page: bool = False,
+        create_certificate_page: bool = False,
+        create_signatory: bool = False,
+    ):
+        """
+        Creates CMS pages for the provided courseware object. This will populate a CoursePage or ProgramPage, a corresponding certificate page if specified and a signatory if specified.
+
+        Args:
+            courseware_object (Union[Course, Program]): The courseware object to create CMS pages for.
+        """
+        if create_courseware_page:
+            self.stdout.write(
+                f"Creating placeholder CMS page for {courseware_object.readable_id}."
+            )
+            placeholder_values = get_optional_placeholder_values_for_courseware_type(
+                courseware_object
+            )
+            courseware_page = create_default_courseware_page(
+                courseware_object,
+                live=True,
+                optional_kwargs=placeholder_values,
+                include_in_learn_catalog=True,
+            )
+            courseware_page.save_revision().publish()
+            self.stdout.write(
+                self.style.SUCCESS(f"Created CMS page {courseware_page}.")
+            )
+        if create_certificate_page:
+            self.stdout.write(
+                f"Creating placeholder CertificatePage for {courseware_object.readable_id}."
+            )
+            certificate_page = create_default_certificate_page(courseware_object)
+            certificate_page.save_revision().publish()
+            self.stdout.write(
+                self.style.SUCCESS(f"Created CertificatePage {certificate_page}.")
+            )
+        if create_signatory:
+            self.stdout.write(
+                f"Creating placeholder Signatory for {courseware_object.readable_id} CertificatePage."
+            )
+            signatory_page = create_default_signatory_page(
+                courseware_object, include_placeholder_image=True
+            )
+            signatory_page.save_revision().publish()
+            self.stdout.write(
+                self.style.SUCCESS(f"Created Signatory {signatory_page}.")
+            )
 
     def _check_if_courseware_object_readable_id_exists(
         self,
@@ -85,6 +148,42 @@ class Command(BaseCommand):
 
         return Department.objects.filter(name__in=departments).all()
 
+    def _get_or_create_departments(
+        self,
+        department_names: list[str],
+        *,
+        create_if_missing: bool,
+    ) -> models.QuerySet:
+        """
+        Retrieves or creates Department objects based on the provided names.
+
+        Args:
+            department_names (List[str]): List of department names.
+            create_if_missing (bool): If True, creates departments that don't exist.
+                If False, exits with an error if any departments don't exist.
+
+        Returns:
+            models.QuerySet: Query set containing all of the departments specified
+                in the list of department names.
+        """
+        if not department_names:
+            self._department_must_be_defined_error()
+
+        existing_depts = Department.objects.filter(name__in=department_names)
+        existing_names = {dept.name for dept in existing_depts}
+        missing_names = [
+            name for name in department_names if name not in existing_names
+        ]
+
+        if missing_names:
+            if create_if_missing:
+                for dept_name in missing_names:
+                    Department.objects.create(name=dept_name)
+            else:
+                self._departments_do_not_exist_error()
+
+        return Department.objects.filter(name__in=department_names)
+
     def _department_must_be_defined_error(self):
         """
         Outputs an error message indicating that departments must be
@@ -138,12 +237,37 @@ class Command(BaseCommand):
             )
             exit(-1)  # noqa: PLR1722
 
+        if kwargs.get("set_courserun_dates_automatically"):
+            start_date = (now_datetime_with_tz() - timedelta(days=1)).strftime(
+                "%Y-%m-%d"
+            )
+            enrollment_start = start_date
+            end_date = (now_datetime_with_tz() + timedelta(days=365)).strftime(
+                "%Y-%m-%d"
+            )
+            enrollment_end = end_date
+            upgrade_deadline = end_date
+
+            # Retain any explicitly set dates, generate fake ones for anything not set if automatic flag is set.
+            kwargs["start"] = kwargs["start"] if kwargs["start"] else start_date
+            kwargs["end"] = kwargs["end"] if kwargs["end"] else end_date
+            kwargs["enrollment_start"] = (
+                kwargs["enrollment_start"]
+                if kwargs["enrollment_start"]
+                else enrollment_start
+            )
+            kwargs["enrollment_end"] = (
+                kwargs["enrollment_end"] if kwargs["enrollment_end"] else enrollment_end
+            )
+            kwargs["upgrade"] = (
+                kwargs["upgrade"] if kwargs["upgrade"] else upgrade_deadline
+            )
+
         course_run = CourseRun.objects.create(
             course=course,
             title=kwargs["title"],
             run_tag=kwargs["create_run"],
             courseware_id=run_id,
-            courseware_url_path=kwargs["run_url"],
             live=kwargs["live"],
             is_self_paced=kwargs["self_paced"],
             start_date=(
@@ -163,11 +287,214 @@ class Command(BaseCommand):
             upgrade_deadline=(
                 parse_supplied_date(kwargs["upgrade"]) if kwargs["upgrade"] else None
             ),
+            is_source_run=kwargs.get("create_run_as_sourcerun", False),
+            language=kwargs.get("language", ""),
+            is_primary_language=kwargs.get("primary_lang", False),
         )
+
+        if kwargs["price"]:
+            self._create_product(course_run, kwargs["price"])
+
+        if kwargs["mode_audit"]:
+            self._add_enrollment_mode(course_run, EDX_ENROLLMENT_AUDIT_MODE)
+
+        if kwargs["mode_verified"]:
+            self._add_enrollment_mode(course_run, EDX_ENROLLMENT_VERIFIED_MODE)
 
         self.stdout.write(
             self.style.SUCCESS(f"Created course run {course_run.id}: {course_run}")
         )
+
+    def _create_product(self, courserun_or_program, price):
+        """Create a product for the specified course run or program."""
+
+        if not isinstance(courserun_or_program, CourseRun) and not isinstance(
+            courserun_or_program, Program
+        ):
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Price specified for {courserun_or_program} but it's not a course run or program, so skipping product creation."
+                )
+            )
+            return
+
+        with reversion.create_revision():
+            new_product = Product.objects.create(
+                purchasable_object=courserun_or_program,
+                price=price,
+                description=str(courserun_or_program),
+                is_active=True,
+            )
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Created product {new_product} for {courserun_or_program}"
+            )
+        )
+
+    def _add_enrollment_mode(self, courserun_or_program, mode_slug):
+        """Add the specified mode to the course run or program."""
+
+        if not isinstance(courserun_or_program, CourseRun) and not isinstance(
+            courserun_or_program, Program
+        ):
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Enrollment mode {mode_slug} specified for {courserun_or_program} but it's not a course run or program, so skipping modes."
+                )
+            )
+            return
+
+        mode = EnrollmentMode.objects.filter(mode_slug=mode_slug).first()
+
+        if not mode:
+            self.stdout.write(
+                self.style.ERROR(
+                    f"Enrollment mode {mode_slug} not found - this probably means things aren't configured correctly."
+                )
+            )
+            return
+
+        courserun_or_program.enrollment_modes.add(mode)
+        courserun_or_program.save()
+
+    def _handle_program(self, add_depts: models.QuerySet, **kwargs):
+        """Handle creation of a program."""
+        self._check_if_courseware_object_readable_id_exists(
+            Program, kwargs["courseware_id"]
+        )
+
+        new_program = Program.objects.create(
+            readable_id=kwargs["courseware_id"],
+            title=kwargs["title"],
+            live=kwargs["live"],
+            b2b_only=kwargs.pop("b2b_only", False),
+            display_mode=kwargs.pop("program_course", None),
+        )
+
+        if add_depts:
+            self._add_departments_to_courseware_object(new_program, add_depts)
+
+        self._successfully_created_courseware_object_message(new_program)
+
+        if kwargs["related"] is not None and len(kwargs["related"]) > 0:
+            for readable_id in kwargs["related"]:
+                try:
+                    related_program = Program.objects.filter(
+                        readable_id=readable_id
+                    ).get()
+                    new_program.add_related_program(related_program)
+
+                    self.stdout.write(
+                        self.style.SUCCESS(f"Added relationship for {readable_id}.")
+                    )
+                except Exception:  # noqa: BLE001, PERF203
+                    self.stderr.write(
+                        self.style.ERROR(
+                            f"Can't add relationship for {readable_id}: program not found."
+                        )
+                    )
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Added {len(new_program.related_programs)} program relationships."
+            )
+        )
+        self._create_cms_pages_for_courseware_object(
+            new_program,
+            create_courseware_page=kwargs["create_page"],
+            create_certificate_page=kwargs["create_certificate_page"],
+            create_signatory=kwargs["create_signatory"],
+        )
+
+        if kwargs["price"]:
+            self._create_product(new_program, kwargs["price"])
+
+        if kwargs["mode_audit"]:
+            self._add_enrollment_mode(new_program, EDX_ENROLLMENT_AUDIT_MODE)
+
+        if kwargs["mode_verified"]:
+            self._add_enrollment_mode(new_program, EDX_ENROLLMENT_VERIFIED_MODE)
+
+    def _handle_course(self, add_depts: models.QuerySet, **kwargs):
+        """Handle creation of a course."""
+        self._check_if_courseware_object_readable_id_exists(
+            Course, kwargs["courseware_id"]
+        )
+
+        new_course = Course.objects.create(
+            title=kwargs["title"],
+            readable_id=kwargs["courseware_id"],
+            live=kwargs["live"],
+        )
+        if add_depts:
+            self._add_departments_to_courseware_object(new_course, add_depts)
+
+        self._successfully_created_courseware_object_message(new_course)
+
+        if "create_run" in kwargs and kwargs["create_run"] is not None:
+            self._create_course_run(new_course, **kwargs)
+
+        if kwargs["live"] or kwargs["force"]:
+            if kwargs["force"]:
+                self.stderr.write(
+                    self.style.ERROR(
+                        f"WARNING: creating a requirement for {new_course.readable_id} anyway since you specified --force. This will probably break the Django Admin until you set the course to Live."
+                    )
+                )
+
+            new_req = None
+
+        if "program" in kwargs and kwargs["program"] is not None:
+            try:
+                program = Program.objects.filter(pk=kwargs["program"]).first()
+            except:  # noqa: E722
+                program = Program.objects.filter(readable_id=kwargs["program"]).first()
+
+            if program is not None and kwargs["required"]:
+                new_req = program.add_requirement(new_course)
+            elif program is not None and kwargs["elective"]:
+                new_req = program.add_elective(new_course)
+
+            if new_req is not None:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Added {new_course.readable_id} to {program.readable_id}'s {new_req.get_parent().title} requirements."
+                    )
+                )
+        else:
+            self.stdout.write(
+                f"Live flag not specified for {new_course.readable_id}, ignoring any requirements flags"
+            )
+
+        self._create_cms_pages_for_courseware_object(
+            new_course,
+            create_courseware_page=kwargs["create_page"],
+            create_certificate_page=kwargs["create_certificate_page"],
+            create_signatory=kwargs["create_signatory"],
+        )
+
+    def _handle_courserun(self, **kwargs):
+        """Handle creation of a course run."""
+        if not Course.objects.filter(readable_id=kwargs["courseware_id"]).exists():
+            self.stderr.write(
+                self.style.ERROR(
+                    f"Course with ID {kwargs['courseware_id']} doesn't exist."
+                )
+            )
+            exit(-1)  # noqa: PLR1722
+
+        if "create_run" not in kwargs or kwargs["create_run"] is None:
+            self.stderr.write(
+                self.style.ERROR(
+                    "You must specify the run tag with either --run-tag or --create-run when creating a course run."
+                )
+            )
+            exit(-1)  # noqa: PLR1722
+
+        course = Course.objects.filter(readable_id=kwargs["courseware_id"]).get()
+
+        self._create_course_run(course, **kwargs)
 
     def add_arguments(self, parser) -> None:
         parser.add_argument(
@@ -204,12 +531,10 @@ class Command(BaseCommand):
             help="(Course and course run only) Create a run with the specified tag.",
             metavar="create_run",
         )
-
         parser.add_argument(
-            "--run-url",
-            type=str,
-            nargs="?",
-            help="(Course and course run only) Create a run with the specified URL path.",
+            "--create-run-as-sourcerun",
+            action="store_true",
+            help="When specified with --create-run, creates the course run as a source run.",
         )
 
         parser.add_argument(
@@ -297,7 +622,70 @@ class Command(BaseCommand):
             action="store_true",
         )
 
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: C901, PLR0915
+        parser.add_argument(
+            "--create-page",
+            help="Create a CMS page for the created courseware object.",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--create-certificate-page",
+            help="If CMS page for the created courseware object doesn't exist, create it.",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--create-signatory",
+            help="If CMS page for certificate signatory doesn't exist, create it with a placeholder image.",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--set-courserun-dates-automatically",
+            help="If specified, sets course dates automatically for any not explicitly provided when creating a course run.",
+            action="store_true",
+        )
+
+        parser.add_argument(
+            "--price",
+            help="If set, create a product for the item. (Must be a course run or a program.)",
+            type=Decimal,
+        )
+
+        parser.add_argument(
+            "--mode-audit",
+            help="Add the audit mode to the courseware. (Must be a course run or program.)",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--mode-verified",
+            help="Add the verified mode to the courseware. (Must be a course run or program.)",
+            action="store_true",
+        )
+
+        parser.add_argument(
+            "--b2b-only",
+            help="Make the program B2B-only.",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--program-course",
+            help="Make the program a program-course (displays like a course).",
+            action="store_const",
+            const="course",
+        )
+
+        parser.add_argument(
+            "--language",
+            "--lang",
+            type=str,
+            default="en",
+            help='Set the language for the course run. (Default "en".)',
+        )
+        parser.add_argument(
+            "--primary-lang",
+            action="store_true",
+            help="Set this course run as the default for the language.",
+        )
+
+    def handle(self, *_args, **kwargs):
         if not (
             kwargs["force"]
             or kwargs["courseware_id"].startswith("course")
@@ -310,134 +698,21 @@ class Command(BaseCommand):
             )
             exit(-1)  # noqa: PLR1722
 
-        if kwargs["type"] == "program":
-            if kwargs["depts"] and len(kwargs["depts"]) > 0:
-                add_depts = Department.objects.filter(name__in=kwargs["depts"]).all()
-            else:
-                self._department_must_be_defined_error()
-
-            if kwargs["create_depts"]:
-                add_depts = self._create_departments(kwargs["depts"])
-            elif not add_depts:
-                self._departments_do_not_exist_error()
-
-            self._check_if_courseware_object_readable_id_exists(
-                Program, kwargs["courseware_id"]
-            )
-
-            new_program = Program.objects.create(
-                readable_id=kwargs["courseware_id"],
-                title=kwargs["title"],
-                live=kwargs["live"],
-            )
-
-            self._add_departments_to_courseware_object(new_program, add_depts)
-
-            self._successfully_created_courseware_object_message(new_program)
-
-            if kwargs["related"] is not None and len(kwargs["related"]) > 0:
-                for readable_id in kwargs["related"]:
-                    try:
-                        related_program = Program.objects.filter(
-                            readable_id=readable_id
-                        ).get()
-                        new_program.add_related_program(related_program)
-
-                        self.stdout.write(
-                            self.style.SUCCESS(f"Added relationship for {readable_id}.")
-                        )
-                    except Exception:  # noqa: BLE001, PERF203
-                        self.stderr.write(
-                            self.style.ERROR(
-                                f"Can't add relationship for {readable_id}: program not found."
-                            )
-                        )
-
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"Added {len(new_program.related_programs)} program relationships."
+        # Create or get departments if specified.
+        with transaction.atomic():
+            add_depts = None
+            if kwargs.get("depts"):
+                add_depts = self._get_or_create_departments(
+                    kwargs["depts"], create_if_missing=kwargs["create_depts"]
                 )
-            )
-        elif kwargs["type"] == "course":
-            self._check_if_courseware_object_readable_id_exists(
-                Course, kwargs["courseware_id"]
-            )
 
-            new_course = Course.objects.create(
-                title=kwargs["title"],
-                readable_id=kwargs["courseware_id"],
-                live=kwargs["live"],
-            )
-
-            if kwargs["depts"] and len(kwargs["depts"]) > 0:
-                add_depts = Department.objects.filter(name__in=kwargs["depts"]).all()
+            if kwargs["type"] == "program":
+                self._handle_program(add_depts, **kwargs)
+            elif kwargs["type"] == "course":
+                self._handle_course(add_depts, **kwargs)
+            elif kwargs["type"] == "courserun":
+                self._handle_courserun(**kwargs)
             else:
-                self._department_must_be_defined_error()
-
-            if kwargs["create_depts"]:
-                add_depts = self._create_departments(kwargs["depts"])
-            if "add_depts" not in locals() or not add_depts:
-                self._departments_do_not_exist_error()
-
-            self._successfully_created_courseware_object_message(new_course)
-
-            if "create_run" in kwargs and kwargs["create_run"] is not None:
-                self._create_course_run(new_course, **kwargs)
-
-            if kwargs["live"] or kwargs["force"]:
-                if kwargs["force"]:
-                    self.stderr.write(
-                        self.style.ERROR(
-                            f"WARNING: creating a requirement for {new_course.readable_id} anyway since you specified --force. This will probably break the Django Admin until you set the course to Live."
-                        )
-                    )
-
-                new_req = None
-
-            if "program" in kwargs and kwargs["program"] is not None:
-                try:
-                    program = Program.objects.filter(pk=kwargs["program"]).first()
-                except:  # noqa: E722
-                    program = Program.objects.filter(
-                        readable_id=kwargs["program"]
-                    ).first()
-
-                self._add_departments_to_courseware_object(program, add_depts)
-
-                if program is not None and kwargs["required"]:
-                    new_req = program.add_requirement(new_course)
-                elif program is not None and kwargs["elective"]:
-                    new_req = program.add_elective(new_course)
-
-                if new_req is not None:
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f"Added {new_course.readable_id} to {program.readable_id}'s {new_req.get_parent().title} requirements."
-                        )
-                    )
-            else:
-                self.stdout.write(
-                    f"Live flag not specified for {new_course.readable_id}, ignoring any requirements flags"
-                )
-        elif kwargs["type"] == "courserun":
-            if not Course.objects.filter(readable_id=kwargs["courseware_id"]).exists():
                 self.stderr.write(
-                    self.style.ERROR(
-                        f"Course with ID {kwargs['courseware_id']} doesn't exist."
-                    )
+                    self.style.ERROR(f"Not sure what {kwargs['type']} is.")
                 )
-                exit(-1)  # noqa: PLR1722
-
-            if "create_run" not in kwargs or kwargs["create_run"] is None:
-                self.stderr.write(
-                    self.style.ERROR(
-                        "You must specify the run tag with either --run-tag or --create-run when creating a course run."
-                    )
-                )
-                exit(-1)  # noqa: PLR1722
-
-            course = Course.objects.filter(readable_id=kwargs["courseware_id"]).get()
-
-            self._create_course_run(course, **kwargs)
-        else:
-            self.stderr.write(self.style.ERROR(f"Not sure what {kwargs['type']} is."))

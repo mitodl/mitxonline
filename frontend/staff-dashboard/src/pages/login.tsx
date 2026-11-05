@@ -1,7 +1,7 @@
 export default function LoginPage() {
   const sign_in_url =
     new URL(DATASOURCES_CONFIG.mitxOnline).origin +
-    "/signin/?next=/staff-dashboard/";
+    "/login/?next=/staff-dashboard/";
 
   document.location = sign_in_url;
 

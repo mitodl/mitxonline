@@ -3,17 +3,36 @@
 from datetime import timedelta
 
 import pytest
+from django.conf import settings
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from factory import fuzzy
 from mitol.common.utils import now_in_utc
 from rest_framework import status
-from social_django.models import UserSocialAuth
 
 from b2b.factories import ContractPageFactory
+from b2b.models import UserB2BContract
+from compliance.api import get_missing_export_compliance_fields
 from main.test_utils import drf_datetime
 from users.api import User
 from users.factories import UserFactory
 from users.models import ChangeEmailRequest
+from variants.serializers import SupportedVariantSerializer
+
+
+def expected_legal_address(user):
+    """Return the serialized legal address shape for a user."""
+    return {
+        "country": user.legal_address.country,
+        "first_name": user.legal_address.first_name,
+        "last_name": user.legal_address.last_name,
+        "street_address_1": user.legal_address.street_address_1,
+        "street_address_2": user.legal_address.street_address_2,
+        "city": user.legal_address.city,
+        "state": user.legal_address.state,
+        "postal_code": user.legal_address.postal_code,
+    }
 
 
 @pytest.mark.django_db
@@ -58,6 +77,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
 
         if has_orgs:
             contract = ContractPageFactory.create()
+            user.b2b_organizations.add(contract.organization)
             user.b2b_contracts.add(contract)
             user.save()
             b2b_orgs = [
@@ -67,17 +87,27 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
                     "description": contract.organization.description,
                     "logo": None,
                     "slug": contract.organization.slug,
+                    "sso_organization_id": str(
+                        contract.organization.sso_organization_id
+                    ),
                     "contracts": [
                         {
                             "id": contract.id,
                             "name": contract.name,
                             "description": contract.description,
-                            "integration_type": contract.integration_type,
+                            "welcome_message": contract.welcome_message,
+                            "welcome_message_extra": contract.welcome_message_extra,
+                            "membership_type": contract.membership_type,
                             "contract_start": None,
                             "contract_end": None,
-                            "active": True,
                             "slug": contract.slug,
                             "organization": contract.organization.id,
+                            "programs": [],
+                            "variant_options": [
+                                SupportedVariantSerializer(sv).data
+                                for sv in contract.variant_options.all()
+                            ],
+                            "consented_to_data_sharing": None,
                         }
                     ],
                 }
@@ -92,6 +122,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
             "id": None,
             "username": None,
             "email": None,
+            "global_id": None,
             "legal_address": None,
             "is_anonymous": True,
             "is_authenticated": False,
@@ -101,6 +132,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
             "user_profile": None,
             "is_active": False,
             "b2b_organizations": b2b_orgs,
+            "compliance_missing_fields": [],
         }
     else:
         assert resp.json() == {
@@ -108,12 +140,8 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
             "username": user.edx_username,
             "email": user.email,
             "name": user.name,
-            "legal_address": {
-                "first_name": user.legal_address.first_name,
-                "last_name": user.legal_address.last_name,
-                "country": user.legal_address.country,
-                "state": user.legal_address.state,
-            },
+            "global_id": user.global_id,
+            "legal_address": expected_legal_address(user),
             "user_profile": {
                 "gender": user.user_profile.gender,
                 "year_of_birth": user.user_profile.year_of_birth,
@@ -141,7 +169,142 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
             "grants": list(user.get_all_permissions()),
             "is_active": True,
             "b2b_organizations": b2b_orgs,
+            "compliance_missing_fields": get_missing_export_compliance_fields(user),
         }
+
+
+@pytest.mark.django_db
+def test_get_user_by_me_excludes_inactive_contracts(client, user):
+    """Test that /api/v0/users/me only returns active contracts"""
+    client.force_login(user)
+
+    # Create active and inactive contracts in the same organization
+    active_contract = ContractPageFactory.create(active=True)
+    inactive_contract = ContractPageFactory.create(
+        organization=active_contract.organization
+    )
+
+    # Add user to the organization
+    user.b2b_organizations.add(active_contract.organization)
+    # Add user to both contracts
+    user.b2b_contracts.add(active_contract)
+    user.b2b_contracts.add(inactive_contract)
+    user.save()
+
+    inactive_contract.active = False
+    inactive_contract.save()
+
+    resp = client.get(reverse("users_api-me"))
+
+    assert resp.status_code == status.HTTP_200_OK
+
+    response_data = resp.json()
+    assert len(response_data["b2b_organizations"]) == 1
+
+    org_data = response_data["b2b_organizations"][0]
+    assert org_data["id"] == active_contract.organization.id
+
+    # Should only include the active contract
+    assert len(org_data["contracts"]) == 1
+    assert org_data["contracts"][0]["id"] == active_contract.id
+
+    # Should not include the inactive contract
+    contract_ids = [contract["id"] for contract in org_data["contracts"]]
+    assert inactive_contract.id not in contract_ids
+
+
+@pytest.mark.django_db
+def test_get_user_by_me_excludes_unenrolled_contracts(client, user):
+    """Test that /api/v0/users/me only returns contracts the user is enrolled in"""
+    client.force_login(user)
+
+    # Create two active contracts in the same organization
+    enrolled_contract = ContractPageFactory.create(active=True)
+    unenrolled_contract = ContractPageFactory.create(
+        active=True, organization=enrolled_contract.organization
+    )
+
+    # Add user to the organization
+    user.b2b_organizations.add(enrolled_contract.organization)
+    # Add user to only one contract
+    user.b2b_contracts.add(enrolled_contract)
+    user.save()
+
+    resp = client.get(reverse("users_api-me"))
+
+    assert resp.status_code == status.HTTP_200_OK
+
+    response_data = resp.json()
+    assert len(response_data["b2b_organizations"]) == 1
+
+    org_data = response_data["b2b_organizations"][0]
+    # Should only include the enrolled contract
+    assert len(org_data["contracts"]) == 1
+    assert org_data["contracts"][0]["id"] == enrolled_contract.id
+
+    # Should not include the unenrolled contract
+    contract_ids = [contract["id"] for contract in org_data["contracts"]]
+    assert unenrolled_contract.id not in contract_ids
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("consented", [None, True, False])
+def test_get_user_by_me_contract_consent(client, user, consented):
+    """
+    /api/v0/users/me returns the user's own consent for each contract, and not
+    another member's.
+    """
+    client.force_login(user)
+    contract = ContractPageFactory.create(active=True)
+    user.b2b_organizations.add(contract.organization)
+    user.b2b_contracts.add(contract)
+    UserB2BContract.objects.filter(user=user, contract_page=contract).update(
+        consented_to_data_sharing=consented
+    )
+
+    other_member = UserFactory.create()
+    other_member.b2b_organizations.add(contract.organization)
+    other_member.b2b_contracts.add(contract)
+    UserB2BContract.objects.filter(user=other_member, contract_page=contract).update(
+        consented_to_data_sharing=consented is not True
+    )
+
+    resp = client.get(reverse("users_api-me"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    [org_data] = resp.json()["b2b_organizations"]
+    [contract_data] = org_data["contracts"]
+    assert contract_data["id"] == contract.id
+    assert contract_data["consented_to_data_sharing"] is consented
+
+
+@pytest.mark.django_db
+def test_get_user_by_me_contract_consent_query_count(client, user):
+    """Consent for all of the user's contracts is read in a single query"""
+    client.force_login(user)
+    org_contract = ContractPageFactory.create(active=True)
+    user.b2b_organizations.add(org_contract.organization)
+    user.b2b_contracts.add(org_contract)
+    for _ in range(3):
+        user.b2b_contracts.add(
+            ContractPageFactory.create(
+                active=True,
+                organization=org_contract.organization,
+                parent=org_contract.organization,
+            )
+        )
+
+    with CaptureQueriesContext(connection) as ctx:
+        resp = client.get(reverse("users_api-me"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert len(resp.json()["b2b_organizations"][0]["contracts"]) == 4
+    membership_queries = [
+        query
+        for query in ctx.captured_queries
+        if 'FROM "b2b_userb2bcontract"' in query["sql"]
+    ]
+    assert len(membership_queries) == 1
 
 
 @pytest.mark.parametrize(
@@ -185,12 +348,8 @@ def test_get_userinfo(client, user, is_anonymous, has_openedx_user, has_edx_user
             "username": user.edx_username,
             "email": user.email,
             "name": user.name,
-            "legal_address": {
-                "first_name": user.legal_address.first_name,
-                "last_name": user.legal_address.last_name,
-                "country": user.legal_address.country,
-                "state": user.legal_address.state,
-            },
+            "global_id": user.global_id,
+            "legal_address": expected_legal_address(user),
             "user_profile": {
                 "gender": user.user_profile.gender,
                 "year_of_birth": user.user_profile.year_of_birth,
@@ -218,6 +377,7 @@ def test_get_userinfo(client, user, is_anonymous, has_openedx_user, has_edx_user
             "grants": list(user.get_all_permissions()),
             "is_active": True,
             "b2b_organizations": b2b_orgs,
+            "compliance_missing_fields": get_missing_export_compliance_fields(user),
         }
 
 
@@ -291,11 +451,9 @@ def test_create_email_change_request_valid_email(user_drf_client, user, mocker):
     code = mock_email.call_args[0][1].code
     assert code
 
-    old_email = user.email
     resp = user_drf_client.patch(
         f"/api/change-emails/{code}/", data={"confirmed": True}
     )
-    assert not UserSocialAuth.objects.filter(uid=old_email, user=user).exists()
     assert resp.status_code == status.HTTP_200_OK
     user.refresh_from_db()
     assert user.email == "abc@example.com"
@@ -326,6 +484,7 @@ def test_update_user_name_change(mocker, user_client, user, valid_address_dict):
     new_name = fuzzy.FuzzyText(prefix="Test-").fuzz()
     mocker.patch("openedx.api.update_edx_user_name")
     mocker.patch("openedx.api.update_edx_user_profile")
+    mocker.patch("users.views.sync_hubspot_user")
     payload = {
         "name": new_name,
         "email": user.email,
@@ -349,6 +508,7 @@ def test_update_user_name_change_edx(mocker, user_client, user, valid_address_di
     new_name = fuzzy.FuzzyText(prefix="Test-").fuzz()
     update_edx_mock = mocker.patch("openedx.api.update_edx_user_name")
     mocker.patch("openedx.api.update_edx_user_profile")
+    mocker.patch("users.views.sync_hubspot_user")
     payload = {
         "name": new_name,
         "email": user.email,
@@ -371,6 +531,7 @@ def test_update_user_no_name_change_edx(mocker, user_client, user, valid_address
     """
     update_edx_mock = mocker.patch("openedx.api.update_edx_user_name")
     update_edx_profile_mock = mocker.patch("openedx.api.update_edx_user_profile")
+    mocker.patch("users.views.sync_hubspot_user")
     resp = user_client.patch(
         reverse("users_api-me"),
         content_type="application/json",
@@ -386,3 +547,66 @@ def test_update_user_no_name_change_edx(mocker, user_client, user, valid_address
     # Checks that update edx user was called not called when there is no change in user's name(Full Name)
     update_edx_mock.assert_not_called()
     update_edx_profile_mock.assert_called()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "flag_enabled,task_raises",  # noqa: PT006
+    [
+        (True, True),  # Flag enabled, task fails -> no error, just log
+        (False, False),  # Flag disabled, task succeeds -> no error
+        (True, False),  # Flag enabled, task succeeds -> no error
+    ],
+)
+def test_update_user_edx_failures_feature_flag(  # noqa: PLR0913
+    mocker,
+    user_client,
+    user,
+    valid_address_dict,
+    flag_enabled,
+    task_raises,
+):
+    """
+    Test that CurrentUserRetrieveUpdateViewSet respects the IGNORE_EDX_FAILURES feature flag
+    when edX task calls succeed or flag is enabled.
+    """
+
+    new_name = fuzzy.FuzzyText(prefix="Test-").fuzz()
+
+    # Mock the FEATURES dict for IGNORE_EDX_FAILURES
+    mocker.patch.dict(
+        settings.FEATURES,
+        {"IGNORE_EDX_FAILURES": flag_enabled},
+    )
+
+    # Mock the edX tasks
+    change_name_task_mock = mocker.patch(
+        "users.views.tasks.change_edx_user_name_async.delay"
+    )
+    update_profile_task_mock = mocker.patch(
+        "users.views.tasks.update_edx_user_profile.delay"
+    )
+
+    # Mock hubspot sync to avoid database errors
+    mocker.patch("users.views.sync_hubspot_user")
+
+    # Configure task to raise exception if task_raises is True
+    if task_raises:
+        change_name_task_mock.side_effect = Exception("Task queue failure")
+        update_profile_task_mock.side_effect = Exception("Task queue failure")
+
+    mocker.patch("users.views.log.exception")
+    payload = {
+        "name": new_name,
+        "email": user.email,
+        "legal_address": valid_address_dict,
+        "user_profile": None,
+    }
+
+    # When flag is enabled or task succeeds, expect 200
+    resp = user_client.patch(
+        reverse("users_api-me"), content_type="application/json", data=payload
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    # Checks that returned response has updated name
+    assert resp.data["name"] == new_name

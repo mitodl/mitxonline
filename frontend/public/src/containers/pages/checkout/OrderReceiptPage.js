@@ -68,6 +68,7 @@ export class OrderReceiptPage extends React.Component<Props> {
         refunds={orderReceipt.refunds}
         cardTitle={`Order Number: ${orderReceipt.reference_number} `}
         discountCode=""
+        isAuthenticated={true}
       />
     ) : null
   }

@@ -9,12 +9,20 @@ import { mutateAsync } from "redux-query"
 import { connectRequest } from "redux-query-react"
 import { createStructuredSelector } from "reselect"
 import { pathOr } from "ramda"
+// $FlowFixMe
+import { Modal, ModalBody, ModalHeader } from "reactstrap"
 
 import type { BasketItem, Discount } from "../../../flow/cartTypes"
+import type { Country, CurrentUser } from "../../../flow/authTypes"
 
 import Loader from "../../../components/Loader"
 import { CartItemCard } from "../../../components/CartItemCard"
 import { OrderSummaryCard } from "../../../components/OrderSummaryCard"
+import AddlProfileFieldsForm from "../../../components/forms/AddlProfileFieldsForm"
+import {
+  findStates,
+  needsComplianceInfo
+} from "../../../components/forms/ProfileFormFields"
 
 import {
   cartQuery,
@@ -25,13 +33,15 @@ import {
   discountSelector,
   applyDiscountCodeMutation
 } from "../../../lib/queries/cart"
+import users, { currentUserSelector } from "../../../lib/queries/users"
 
-import type { RouterHistory } from "react-router"
+import type { Location, RouterHistory } from "react-router"
 import { isSuccessResponse } from "../../../lib/util"
 import { addUserNotification } from "../../../actions"
 
 type Props = {
   history: RouterHistory,
+  location?: Location,
   cartItems: Array<BasketItem>,
   totalPrice: number,
   discountedPrice: number,
@@ -39,16 +49,131 @@ type Props = {
   isLoading: boolean,
   applyDiscountCode: (code: string) => Promise<any>,
   addUserNotification: Function,
-  forceRequest: Function
+  forceRequest: Function,
+  currentUser: ?CurrentUser,
+  countries: Array<Country>,
+  updateProfile: (profileData: Object) => Promise<any>
 }
 
 type CartState = {
-  discountCode: string
+  discountCode: string,
+  checkoutUrl: string
 }
+
+/*
+ * Fields checkout sent the learner back to fix, e.g. a last name CyberSource
+ * refused: /checkout/to_payment redirects to /cart/?profile_incomplete=last_name.
+ */
+export const rejectedFieldsFromLocation = (
+  location: ?Location
+): Array<string> =>
+  (
+    new URLSearchParams(location ? location.search : "").get(
+      "profile_incomplete"
+    ) || ""
+  )
+    .split(",")
+    .filter(Boolean)
 
 export class CartPage extends React.Component<Props, CartState> {
   state = {
-    discountCode: ""
+    discountCode: "",
+    checkoutUrl:  ""
+  }
+
+  componentDidMount() {
+    if (rejectedFieldsFromLocation(this.props.location).length > 0) {
+      this.setState({ checkoutUrl: "/checkout/to_payment" })
+    }
+  }
+
+  handleCheckout(checkoutUrl: string) {
+    if (needsComplianceInfo(this.props.currentUser)) {
+      this.setState({ checkoutUrl })
+    } else {
+      window.location = checkoutUrl
+    }
+  }
+
+  async saveProfile(values: Object, { setSubmitting, setErrors }: Object) {
+    const { currentUser, updateProfile, countries } = this.props
+    const currentYearOfBirth = pathOr(
+      null,
+      ["user_profile", "year_of_birth"],
+      currentUser
+    )
+    const legalAddress = { ...values.legal_address }
+    // Only countries with a state list (the US and Canada) can hold a state.
+    // Clear one left over from before: the dialog can't show it to be
+    // corrected, and CyberSource may reject it.
+    if (
+      countries &&
+      legalAddress.state &&
+      !findStates(legalAddress.country, countries)
+    ) {
+      legalAddress.state = ""
+    }
+    const profileData: Object = { legal_address: legalAddress }
+    // UserSerializer.update recomputes addl_field_flag from the user_profile
+    // payload, so sending year_of_birth alone would clear it.
+    if (
+      String(values.user_profile.year_of_birth) !== String(currentYearOfBirth)
+    ) {
+      profileData.user_profile = {
+        year_of_birth: values.user_profile.year_of_birth
+      }
+    }
+
+    try {
+      const resp = await updateProfile(profileData)
+      if (isSuccessResponse(resp)) {
+        window.location = this.state.checkoutUrl
+      } else if (resp.body && resp.body.errors) {
+        // e.g. {errors: {legal_address: {city: ["..."]}}}
+        setErrors(resp.body.errors)
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  closeComplianceModal = () => this.setState({ checkoutUrl: "" })
+
+  renderComplianceInfoModal() {
+    const { currentUser, countries, location } = this.props
+    const { checkoutUrl } = this.state
+    const rejectedFields = rejectedFieldsFromLocation(location)
+
+    if (!currentUser || !currentUser.is_authenticated) {
+      return null
+    }
+
+    return (
+      <Modal
+        id="compliance-info-dialog"
+        className="upgrade-enrollment-modal"
+        isOpen={Boolean(checkoutUrl)}
+        toggle={this.closeComplianceModal}
+      >
+        <ModalHeader toggle={this.closeComplianceModal}>
+          Provide More Info
+        </ModalHeader>
+        <ModalBody>
+          <p>
+            {rejectedFields.length > 0 ?
+              "We couldn't verify some of your details. Please check the highlighted fields and try again." :
+              "We need a few more details about you before you can place your order."}
+          </p>
+          <AddlProfileFieldsForm
+            onSubmit={this.saveProfile.bind(this)}
+            user={currentUser}
+            countries={countries}
+            requireComplianceFields={true}
+            rejectedFields={rejectedFields}
+          />
+        </ModalBody>
+      </Modal>
+    )
   }
 
   async addDiscount(ev: Object, { setErrors }: any) {
@@ -98,7 +223,7 @@ export class CartPage extends React.Component<Props, CartState> {
   }
 
   renderOrderSummaryCard() {
-    const { totalPrice, discountedPrice, discounts } = this.props
+    const { totalPrice, discountedPrice, discounts, currentUser } = this.props
     const refunds = []
 
     return (
@@ -110,12 +235,19 @@ export class CartPage extends React.Component<Props, CartState> {
         refunds={refunds}
         addDiscount={this.addDiscount.bind(this)}
         discountCode={this.state.discountCode}
+        isAuthenticated={Boolean(currentUser && currentUser.is_authenticated)}
+        onCheckout={this.handleCheckout.bind(this)}
       />
     )
   }
 
   renderFinancialAssistanceOffer() {
-    const { cartItems, discounts } = this.props
+    const { cartItems, discounts, currentUser } = this.props
+
+    if (!currentUser || !currentUser.is_authenticated) {
+      return null
+    }
+
     let userFlexiblePriceExists = false
     // Check if there are any discounts, and if those discounts are for flexible pricing.
     if (
@@ -133,23 +265,16 @@ export class CartPage extends React.Component<Props, CartState> {
       cartItems.length > 0 &&
       userFlexiblePriceExists === false
     ) {
-      if (
-        cartItems[0].product &&
-        cartItems[0].product.purchasable_object &&
-        cartItems[0].product.purchasable_object.course.page &&
-        cartItems[0].product.purchasable_object.course.page
-          .financial_assistance_form_url
-      ) {
-        return (
-          <a
-            href={
-              cartItems[0].product.purchasable_object.course.page
-                .financial_assistance_form_url
-            }
-          >
-            Need financial assistance?
-          </a>
-        )
+      const purchasableObject =
+        cartItems[0].product && cartItems[0].product.purchasable_object
+      const financialAssistanceUrl =
+        purchasableObject &&
+        purchasableObject.course &&
+        purchasableObject.course.page &&
+        purchasableObject.course.page.financial_assistance_form_url
+
+      if (financialAssistanceUrl) {
+        return <a href={financialAssistanceUrl}>Need financial assistance?</a>
       }
     }
   }
@@ -180,7 +305,7 @@ export class CartPage extends React.Component<Props, CartState> {
                   <div>{this.renderFinancialAssistanceOffer()}</div>
                   <div className="text-right ms-auto">
                     <a
-                      href="https://mitxonline.zendesk.com/hc/en-us"
+                      href="https://support.learn.mit.edu/"
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -191,6 +316,7 @@ export class CartPage extends React.Component<Props, CartState> {
                 {this.renderOrderSummaryCard()}
               </div>
             </div>
+            {this.renderComplianceInfoModal()}
           </div>
         </Loader>
       </DocumentTitle>
@@ -201,20 +327,31 @@ export class CartPage extends React.Component<Props, CartState> {
 const applyDiscountCode = (code: string) =>
   mutateAsync(applyDiscountCodeMutation(code))
 
+const updateProfile = (profileData: Object) =>
+  mutateAsync(users.editProfileMutation(profileData))
+
 const mapStateToProps = createStructuredSelector({
   cartItems:       cartSelector,
   totalPrice:      totalPriceSelector,
   discountedPrice: discountedPriceSelector,
   discounts:       discountSelector,
-  isLoading:       pathOr(true, ["queries", cartQueryKey, "isPending"])
+  isLoading:       pathOr(true, ["queries", cartQueryKey, "isPending"]),
+  currentUser:     currentUserSelector,
+  countries:       users.countriesSelector
 })
 
 const mapDispatchToProps = {
   addUserNotification,
-  applyDiscountCode
+  applyDiscountCode,
+  updateProfile
 }
 
-const mapPropsToConfig = () => [cartQuery()]
+// Countries are only needed by the profile modal.
+export const mapPropsToConfig = ({ currentUser, location }: Object) =>
+  needsComplianceInfo(currentUser) ||
+  rejectedFieldsFromLocation(location).length > 0 ?
+    [cartQuery(), users.countriesQuery()] :
+    [cartQuery()]
 
 export default compose(
   connect(mapStateToProps, mapDispatchToProps),

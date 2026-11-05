@@ -68,6 +68,7 @@ class Command(BaseCommand):
                             ),
                         )
                         if created:
+                            enrollment.save_and_log(None)
                             created_count[courseware_id] += 1
 
                 except:  # noqa: PERF203, E722

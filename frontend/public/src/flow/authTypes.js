@@ -40,10 +40,13 @@ export type AuthResponse = {
 }
 
 export type LegalAddress = {
-  first_name: string,
-  last_name: string,
   country: string,
+  first_name?: string,
+  last_name?: string,
   street_address?: Array<string>,
+  street_address_1?: string,
+  street_address_2?: string,
+  city?: string,
   state?: string,
   postal_code?: string,
   company?: string
@@ -87,6 +90,8 @@ export type User = {
   updated_on: string,
   legal_address: ?LegalAddress,
   user_profile: ?UserProfile,
+  global_id: ?string,
+  compliance_missing_fields?: Array<string>,
 }
 
 export type AnonymousUser = {

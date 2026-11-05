@@ -18,7 +18,6 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path, re_path
-from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from oauth2_provider.urls import base_urlpatterns, oidc_urlpatterns
 from wagtail import urls as wagtail_urls
 from wagtail.admin import urls as wagtailadmin_urls
@@ -26,7 +25,13 @@ from wagtail.documents import urls as wagtaildocs_urls
 
 from cms.views import instructor_page
 from cms.wagtail_api.urls import api_router as wagtail_api_router
-from main.views import cms_signin_redirect_to_site_signin, index, refine
+from main.views import (
+    cms_signin_redirect_to_site_signin,
+    dashboard,
+    index,
+    refine,
+    staff_dashboard_signin_redirect_to_site_signin,
+)
 
 urlpatterns = [
     # NOTE: we only bring in base_urlpatterns so applications can only be created via django-admin
@@ -38,14 +43,9 @@ urlpatterns = [
         ),
     ),
     path("admin/", admin.site.urls),
-    path("hijack/", include("hijack.urls")),
     path("robots.txt", include("robots.urls")),
-    re_path(r"^api/schema/$", SpectacularAPIView.as_view(), name="schema"),
-    re_path(
-        r"^api/schema/swagger-ui/$",
-        SpectacularSwaggerView.as_view(url_name="schema"),
-        name="swagger",
-    ),
+    path("", include("openapi.urls")),
+    path("", include("main.urls_healthcheck")),
     path("", include("authentication.urls")),
     path("", include("openedx.urls")),
     path("", include("mail.urls")),
@@ -55,19 +55,16 @@ urlpatterns = [
     path("", include("flexiblepricing.urls")),
     path("", include("mitol.google_sheets.urls")),
     path("", include("b2b.urls")),
-    re_path(r"", include("mitol.scim.urls")),
-    re_path(r"^dashboard/", index, name="user-dashboard"),
-    # social django needs to be here to preempt the login
-    path("", include("social_django.urls", namespace="social")),
-    re_path(r"^staff-dashboard/.*", refine, name="staff-dashboard"),
-    path("signin/", index, name="login"),
-    path("signin/password/", index, name="login-password"),
-    path("signin/forgot-password/", index, name="password-reset"),
-    re_path(
-        r"^signin/forgot-password/confirm/(?P<uid>[0-9A-Za-z_\-]+)/(?P<token>[0-9A-Za-z]{1,13}-[0-9A-Za-z]{1,32})/$",
-        index,
-        name="password-reset-confirm",
+    path("", include("mitol.scim.urls")),
+    path("", include("mitol.mail.urls")),
+    re_path(r"^dashboard/", dashboard, name="user-dashboard"),
+    # Staff dashboard authentication redirect
+    path(
+        "staff-dashboard/",
+        staff_dashboard_signin_redirect_to_site_signin,
+        name="staff-dashboard-login",
     ),
+    re_path(r"^staff-dashboard/.*", refine, name="staff-dashboard"),
     path("create-account/", index, name="signup"),
     path("create-account/confirm-sent/", index, name="confirm-sent"),
     path("create-account/details/", index, name="signup-details"),
@@ -85,10 +82,9 @@ urlpatterns = [
     re_path(r"^cart/.*", index, name="cart"),
     re_path(r"^orders/history/.*", index, name="order-history"),
     re_path(r"^orders/receipt/.*", index, name="order-receipt"),
-    re_path(r"^records/.*", index, name="learner-records"),
+    re_path(r"^records/.*", index, {"noindex": True}, name="learner-records"),
     re_path(r"^catalog/", index, name="catalog"),
-    path("api/instructor/<int:id>/", instructor_page, name="cms_instructor_page"),
-    re_path(r"^health/", include("health_check.urls")),
+    path("api/instructor/<int:pk>/", instructor_page, name="cms_instructor_page"),
     # Wagtail
     re_path(
         r"^cms/login", cms_signin_redirect_to_site_signin, name="wagtailadmin_login"

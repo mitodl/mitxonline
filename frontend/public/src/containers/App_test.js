@@ -10,6 +10,20 @@ import IntegrationTestHelper from "../util/integration_test_helper"
 describe("Top-level App", () => {
   let helper, renderPage, getStoredUserMessageStub, removeStoredUserMessageStub
 
+  const anonymousUser = {
+    id:               null,
+    username:         "",
+    email:            null,
+    legal_address:    null,
+    user_profile:     null,
+    is_anonymous:     true,
+    is_authenticated: false,
+    is_staff:         false,
+    is_superuser:     false,
+    grants:           [],
+    is_active:        false
+  }
+
   beforeEach(() => {
     helper = new IntegrationTestHelper()
     getStoredUserMessageStub = helper.sandbox
@@ -45,27 +59,23 @@ describe("Top-level App", () => {
     const { inner } = await renderPage()
 
     assert.notExists(inner.find(".app").prop("children"))
-    sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+    sinon.assert.calledWith(
+      helper.handleRequestStub,
+      "/api/v0/users/current_user/",
+      "GET"
+    )
   })
 
   it("fetches user data on load and renders user in the header", async () => {
-    helper.handleRequestStub.returns({
-      id:               null,
-      username:         "",
-      email:            null,
-      legal_address:    null,
-      user_profile:     null,
-      is_anonymous:     true,
-      is_authenticated: false,
-      is_staff:         false,
-      is_superuser:     false,
-      grants:           [],
-      is_active:        false
-    })
+    helper.handleRequestStub.returns(anonymousUser)
     const { inner } = await renderPage()
     // So we look to be sure the next child is there, which is <Header />, which is not there otherwise
     assert.exists(inner.find("Header"))
-    sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+    sinon.assert.calledWith(
+      helper.handleRequestStub,
+      "/api/v0/users/current_user/",
+      "GET"
+    )
   })
 
   it("adds a user notification if a stored message is found in cookies", async () => {
@@ -88,28 +98,143 @@ describe("Top-level App", () => {
     sinon.assert.calledOnce(removeStoredUserMessageStub)
   })
 
-  it("does not call cartItemsCountQuery for unauthenticated users", async () => {
-    helper.handleRequestStub.returns({
-      id:               null,
-      username:         "",
-      email:            null,
-      legal_address:    null,
-      user_profile:     null,
-      is_anonymous:     true,
-      is_authenticated: false,
-      is_staff:         false,
-      is_superuser:     false,
-      grants:           [],
-      is_active:        false
-    })
+  it("calls cartItemsCountQuery for unauthenticated users too", async () => {
+    helper.handleRequestStub.returns(anonymousUser)
     await renderPage()
     // Should call /api/users/me to get user data
-    sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
-    // Should NOT call the cart items count API for unauthenticated users
-    sinon.assert.neverCalledWith(
+    sinon.assert.calledWith(
+      helper.handleRequestStub,
+      "/api/v0/users/current_user/",
+      "GET"
+    )
+    // Should also call the cart items count API for unauthenticated users,
+    // so the header badge works for anonymous carts
+    sinon.assert.calledWith(
       helper.handleRequestStub,
       "/api/checkout/basket_items_count/",
       "GET"
     )
+  })
+
+  it("renders notifications but not the header on cart page", async () => {
+    helper.handleRequestStub.returns(anonymousUser)
+    renderPage = helper.configureMountRenderer(
+      App,
+      InnerApp,
+      {},
+      {
+        match:    { url: routes.root },
+        location: {
+          pathname: "/cart/"
+        }
+      }
+    )
+    const { inner } = await renderPage({
+      entities: { currentUser: anonymousUser }
+    })
+    assert.isFalse(inner.find("Header").exists())
+    assert.lengthOf(inner.find("DelayedNotificationContainer"), 1)
+  })
+
+  it("does not render header on checkout page", async () => {
+    helper.handleRequestStub.returns(anonymousUser)
+    renderPage = helper.configureMountRenderer(
+      App,
+      InnerApp,
+      {},
+      {
+        match:    { url: routes.root },
+        location: {
+          pathname: "/checkout/"
+        }
+      }
+    )
+    const { inner } = await renderPage()
+    assert.isFalse(inner.find("Header").exists())
+  })
+
+  it("does not render header on order history page", async () => {
+    helper.handleRequestStub.returns(anonymousUser)
+    renderPage = helper.configureMountRenderer(
+      App,
+      InnerApp,
+      {},
+      {
+        match:    { url: routes.root },
+        location: {
+          pathname: "/orders/history"
+        }
+      }
+    )
+    const { inner } = await renderPage()
+    assert.isFalse(inner.find("Header").exists())
+  })
+
+  it("does not render header on order receipt page", async () => {
+    helper.handleRequestStub.returns(anonymousUser)
+    renderPage = helper.configureMountRenderer(
+      App,
+      InnerApp,
+      {},
+      {
+        match:    { url: routes.root },
+        location: {
+          pathname: "/orders/receipt/123"
+        }
+      }
+    )
+    const { inner } = await renderPage()
+    assert.isFalse(inner.find("Header").exists())
+  })
+
+  it("does not render header on learner record page", async () => {
+    helper.handleRequestStub.returns(anonymousUser)
+    renderPage = helper.configureMountRenderer(
+      App,
+      InnerApp,
+      {},
+      {
+        match:    { url: routes.root },
+        location: {
+          pathname: "/records/1/"
+        }
+      }
+    )
+    const { inner } = await renderPage()
+    assert.isFalse(inner.find("Header").exists())
+  })
+
+  it("does not render header on shared learner record page", async () => {
+    helper.handleRequestStub.returns(anonymousUser)
+    renderPage = helper.configureMountRenderer(
+      App,
+      InnerApp,
+      {},
+      {
+        match:    { url: routes.root },
+        location: {
+          pathname: "/records/shared/test-uuid/"
+        }
+      }
+    )
+    const { inner } = await renderPage()
+    assert.isFalse(inner.find("Header").exists())
+  })
+
+  it("renders header on dashboard page", async () => {
+    helper.handleRequestStub.returns(anonymousUser)
+    renderPage = helper.configureMountRenderer(
+      App,
+      InnerApp,
+      {},
+      {
+        match:    { url: routes.root },
+        location: {
+          pathname: "/dashboard/"
+        }
+      }
+    )
+    const { inner } = await renderPage()
+    assert.exists(inner.find("Header"))
   })
 })

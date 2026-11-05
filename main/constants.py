@@ -10,7 +10,8 @@ USER_MSG_TYPE_COURSE_NON_UPGRADABLE = "course-non-upgradable"
 USER_MSG_TYPE_DISCOUNT_INVALID = "discount-invalid"
 USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY = "required-enrollment-code-empty"
 USER_MSG_TYPE_PROFILE_CREATED = "profile-created"
-
+USER_MSG_TYPE_BASKET_EMPTY = "basket-empty"
+USER_MSG_TYPE_PROFILE_INCOMPLETE = "profile-incomplete"
 
 USER_MSG_TYPE_PAYMENT_DECLINED = "payment-declined"
 USER_MSG_TYPE_PAYMENT_ERROR = "payment-error"
@@ -21,20 +22,29 @@ USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE = "payment-accepted-no-value"
 USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN = "payment-error-unknown"
 
 USER_MSG_TYPE_B2B_DISALLOWED = "b2b-disallowed"
+USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED = "b2b-error-already-enrolled"
+USER_MSG_TYPE_B2B_ERROR_AMBIGUOUS_CONTRACT = "b2b-error-ambiguous-contract"
 USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT = "b2b-error-no-contract"
+USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH = "b2b-error-no-matching-contract"
 USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT = "b2b-error-no-product"
 USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE = "b2b-error-missing-enrollment-code"
 USER_MSG_TYPE_B2B_ERROR_INVALID_ENROLLMENT_CODE = "b2b-error-invalid-enrollment-code"
 USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT = "b2b-error-requires-checkout"
+USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE = "b2b-error-not-enrollable"
 USER_MSG_TYPE_B2B_ENROLL_SUCCESS = "b2b-enroll-success"
+USER_MSG_TYPE_B2B_INVALID_BASKET = "b2b-invalid-basket"
 
 USER_MSG_TYPE_B2B = [
     USER_MSG_TYPE_B2B_DISALLOWED,
+    USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED,
+    USER_MSG_TYPE_B2B_ERROR_AMBIGUOUS_CONTRACT,
     USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT,
+    USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH,
     USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT,
     USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
     USER_MSG_TYPE_B2B_ERROR_INVALID_ENROLLMENT_CODE,
     USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
+    USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE,
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
 ]
 USER_MSG_TYPE_B2B_CHOICES = list(zip(USER_MSG_TYPE_B2B, USER_MSG_TYPE_B2B))
@@ -54,3 +64,14 @@ DISALLOWED_CURRENCY_TYPES = [
 ]
 
 USER_REGISTRATION_FAILED_MSG = "Unable to register at this time, please try again later"
+
+# Maps the value of settings.ENVIRONMENT to the hostname for that environment's Learn instance
+ENV_TO_LEARN_HOSTNAME_MAP = {
+    "production": "learn.mit.edu",
+    "rc": "rc.learn.mit.edu",
+    "ci": "ci.learn.mit.edu",
+}
+
+# Redis cache key templates for B2B org reconciliation
+B2B_USER_ORG_MEMBERSHIP_CACHE = "org-membership-cache-{}"
+B2B_USER_LATEST_SESSION_CACHE = "user-latest-session-auth-time-{}"

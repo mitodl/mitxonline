@@ -1,20 +1,74 @@
 """Models for B2B data."""
 
+import logging
+from decimal import Decimal
+from urllib.parse import urljoin
+
 from django.conf import settings
+from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
-from django.db import models
+from django.db import models, transaction
 from django.http import Http404
+from django.urls import reverse
+from django.utils.functional import cached_property
+from django.utils.html import format_html
 from django.utils.text import slugify
 from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
-from wagtail.admin.panels import FieldPanel, MultiFieldPanel
+from modelcluster.fields import ParentalKey
+from requests.exceptions import HTTPError
+from wagtail.admin.panels import FieldPanel, HelpPanel, InlinePanel, MultiFieldPanel
 from wagtail.fields import RichTextField
-from wagtail.models import Page
+from wagtail.models import ClusterableModel, Orderable, Page, PageManager
 
-from b2b.constants import CONTRACT_INTEGRATION_CHOICES, ORG_INDEX_SLUG
-from b2b.exceptions import TargetCourseRunExistsError
-from b2b.tasks import queue_enrollment_code_check
+from b2b.constants import (
+    CONTRACT_MEMBERSHIP_AUTOS,
+    CONTRACT_MEMBERSHIP_MANAGED,
+    CONTRACT_MEMBERSHIP_TYPE_CHOICES,
+    IDP_LIFECYCLE_CHOICES,
+    IDP_PROTOCOL_CHOICES,
+    IDP_PROTOCOL_SAML,
+    IDP_STATE_DRAFT,
+    ONBOARDING_STATE_CHOICES,
+    ONBOARDING_STATE_REQUESTED,
+    ORG_INDEX_SLUG,
+    PROVISIONING_ACTION_CHOICES,
+    PROVISIONING_ACTION_ORG_UPDATED,
+)
+from courses.models import Program
+from main.models import AuditModel, ValidateOnSaveMixin
+from variants.models import SupportedVariant
+
+log = logging.getLogger(__name__)
+
+REDEMPTION_STATUS_UNASSIGNED = "unassigned"
+REDEMPTION_STATUS_ASSIGNED = "assigned"
+REDEMPTION_STATUS_REDEEMED = "redeemed"
+REDEMPTION_STATUSES = (
+    REDEMPTION_STATUS_UNASSIGNED,
+    REDEMPTION_STATUS_ASSIGNED,
+    REDEMPTION_STATUS_REDEEMED,
+)
+
+EMAIL_STATUS_FAILED_TEMPORARY_SEVERITY = "temporary"
+EMAIL_STATUS_DELIVERED = "delivered"
+EMAIL_STATUS_OPENED = "opened"
+EMAIL_STATUS_CLICKED = "clicked"
+EMAIL_STATUS_ACCEPTED = "accepted"
+EMAIL_STATUS_FAILED = "failed"
+# Pending is a special case in that it does not map to a mailgun event.
+# It is set by us to indicate that we've queued the task but we have not yet received any webhook from mailgun
+EMAIL_STATUS_PENDING = "pending"
+MAILGUN_EMAIL_EVENT_TYPES = (
+    EMAIL_STATUS_DELIVERED,
+    EMAIL_STATUS_ACCEPTED,
+    EMAIL_STATUS_OPENED,
+    EMAIL_STATUS_CLICKED,
+    EMAIL_STATUS_FAILED,
+)
+EMAIL_STATUSES = (*MAILGUN_EMAIL_EVENT_TYPES, EMAIL_STATUS_PENDING)
 
 
 class OrganizationObjectIndexPage(Page):
@@ -53,11 +107,42 @@ class OrganizationIndexPage(OrganizationObjectIndexPage):
     slug = ORG_INDEX_SLUG
 
 
+class StaffDashboardOrganizationPanel(HelpPanel):
+    """Links an organization's Wagtail page to its staff dashboard page."""
+
+    class BoundPanel(HelpPanel.BoundPanel):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.content = format_html(
+                'Edit this organization, its SSO setup and its contracts in the <a href="{}">staff '
+                "dashboard</a>.",
+                f"/staff-dashboard/b2b_organizations/show/{self.instance.org_key}",
+            )
+
+
+class StaffDashboardContractPanel(HelpPanel):
+    """Links a contract's Wagtail page to its staff dashboard page."""
+
+    class BoundPanel(HelpPanel.BoundPanel):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.content = format_html(
+                'Edit this contract, its courseware and its enrollment codes in the <a href="{}">staff '
+                "dashboard</a>. The extra welcome message, the Google Sheet target "
+                "and tab, and the order of its programs are edited here.",
+                f"/staff-dashboard/b2b_organizations/show/{self.instance.organization.org_key}"
+                f"/contracts/{self.instance.pk}",
+            )
+
+
 class OrganizationPage(Page):
     """Stores information about an organization we have a relationship with."""
 
     parent_page_types = ["b2b.OrganizationIndexPage"]
     subpage_types = ["b2b.ContractPage"]
+    # Organizations are created and edited in the staff dashboard, which also
+    # provisions them in Keycloak.
+    is_creatable = False
 
     name = models.CharField(max_length=255, help_text="The name of the organization")
     org_key = models.CharField(
@@ -65,7 +150,17 @@ class OrganizationPage(Page):
         help_text="The short key used for the organization (for edX).",
         unique=True,
     )
-    description = RichTextField(
+    org_key_prefix = models.CharField(
+        max_length=30,
+        help_text=(
+            "Prepended to the org key in courseware IDs, e.g. UAI_. Blank means no prefix."
+        ),
+        blank=True,
+        default="",
+    )
+    # Plain text: it is also written to the Keycloak organization, which shows
+    # it as-is.
+    description = models.TextField(
         blank=True, help_text="Any useful extra information about the organization"
     )
     logo = models.ImageField(
@@ -80,23 +175,125 @@ class OrganizationPage(Page):
         help_text="The UUID for the organization in the SSO provider.",
     )
 
+    # Written only by the provisioning API and the Keycloak reconciler. A
+    # Wagtail revision holds whatever these were when it was saved, so
+    # with_content_json() takes them from the stored row instead.
+    PROVISIONED_FIELDS = (
+        "name",
+        "org_key",
+        "org_key_prefix",
+        "description",
+        "sso_organization_id",
+    )
+
+    # The staff dashboard has no logo upload, so the logo is the one field
+    # still edited here.
     content_panels = [
-        FieldPanel("name"),
-        FieldPanel("description"),
-        FieldPanel("org_key"),
+        StaffDashboardOrganizationPanel(),
+        FieldPanel("name", read_only=True),
+        FieldPanel("description", read_only=True),
+        FieldPanel("org_key", read_only=True),
+        FieldPanel("sso_organization_id", read_only=True),
         FieldPanel("logo"),
-        FieldPanel("sso_organization_id"),
     ]
 
-    promote_panels = []
+    # Use default promote_panels from Page to allow manual slug editing
 
-    def save(self, clean=True, user=None, log_action=False, **kwargs):  # noqa: FBT002
-        """Save the page, and update the slug and title appropriately."""
+    @staticmethod
+    def slug_for_name(name):
+        """Return the slug a new organization with this name is saved under."""
+
+        return slugify(f"org-{name}")
+
+    def save(
+        self,
+        clean=True,  # noqa: FBT002
+        user=None,
+        log_action=False,  # noqa: FBT002
+        *,
+        audit_sso_link=True,
+        **kwargs,
+    ):
+        """
+        Save the page, and update the slug and title appropriately.
+
+        A change to sso_organization_id on an existing organization is
+        written to the provisioning audit trail here, so one made outside the
+        provisioning API (a management command, a shell) is still recorded.
+        Callers that write their own audit record pass audit_sso_link=False.
+        """
 
         self.title = str(self.name)
 
-        self.slug = slugify(f"org-{self.name}")
-        Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
+        if not self.slug:
+            self.slug = self.slug_for_name(self.name)
+
+        # save_revision() saves only the revision fields, with the edited
+        # value in memory and not yet written.
+        update_fields = kwargs.get("update_fields")
+        writes_sso_link = (
+            update_fields is None or "sso_organization_id" in update_fields
+        )
+
+        with transaction.atomic():
+            stored = None
+            if audit_sso_link and writes_sso_link and self.pk:
+                # Locked, so two overlapping saves each record the link they
+                # overwrote.
+                stored = (
+                    OrganizationPage.objects.select_for_update(of=("self",))
+                    .filter(pk=self.pk)
+                    .values("sso_organization_id")
+                    .first()
+                )
+
+            Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
+
+            if stored:
+                self._audit_sso_link_change(stored, user)
+
+    def with_content_json(self, content):
+        """
+        Build the page a revision describes, keeping the provisioned fields.
+
+        Wagtail calls this to load the editor and to publish. Without it,
+        publishing a revision saved before an API write puts the old name,
+        description and Keycloak link back.
+        """
+
+        page = super().with_content_json(content)
+        # Read from the database, not from self: when the editor publishes,
+        # self is the instance it loaded before the form was filled in.
+        stored = (
+            OrganizationPage.objects.filter(pk=self.pk)
+            .values(*self.PROVISIONED_FIELDS)
+            .get()
+        )
+        for field, value in stored.items():
+            setattr(page, field, value)
+        page.title = stored["name"]
+        return page
+
+    def _audit_sso_link_change(self, stored, user):
+        """Record a change to sso_organization_id made outside the provisioning API."""
+
+        # A caller may assign the ID as a str in any form uuid.UUID accepts,
+        # and a save that skips full_clean() leaves it one.
+        before = stored["sso_organization_id"]
+        after = self._meta.get_field("sso_organization_id").to_python(
+            self.sso_organization_id or None
+        )
+        if before == after:
+            return
+
+        OrganizationProvisioningAudit.objects.create(
+            organization=self,
+            org_key=self.org_key,
+            action=PROVISIONING_ACTION_ORG_UPDATED,
+            acting_user=user,
+            data_before={"sso_organization_id": str(before) if before else None},
+            data_after={"sso_organization_id": str(after) if after else None},
+        )
 
     def get_learners(self):
         """Get the learners associated with this organization."""
@@ -104,15 +301,155 @@ class OrganizationPage(Page):
         return (
             get_user_model()
             .objects.filter(
-                b2b_contracts__organization=self,
+                b2b_organizations=self,
             )
             .distinct()
         )
+
+    def attach_user(self, user):
+        """
+        Attach the given user to the org in Keycloak.
+
+        Args:
+        - user (User): the user to add to the org
+        Returns:
+        - bool: success flag
+        """
+
+        from b2b.api import add_user_org_membership  # noqa: PLC0415
+
+        if not self.sso_organization_id:
+            return False
+
+        try:
+            return add_user_org_membership(self, user)
+        except HTTPError:
+            log.exception(
+                "Got HTTP error attempting to attach %s to org %s, skipping", user, self
+            )
+            return False
+
+    def add_user_contracts(self, user):
+        """
+        Add contracts that the user should get automatically to the user.
+
+        Args:
+        - user (User): the user to add contracts to
+        Returns:
+        - int: number of contracts added
+        """
+
+        contracts_qs = self.contracts.filter(
+            membership_type__in=CONTRACT_MEMBERSHIP_AUTOS, active=True
+        )
+
+        for contract in contracts_qs.all():
+            user.b2b_contracts.add(contract)
+
+        return contracts_qs.count()
+
+    def remove_user_contracts(self, user):
+        """
+        Remove managed contracts from the given user.
+
+        Args:
+        - user (User): the user to remove contracts from
+        Returns:
+        - int: number of contracts removed
+        """
+
+        return user.b2b_contracts.through.objects.filter(
+            user_id=user.id,
+            contract_page_id__in=self.contracts.filter(
+                membership_type__in=CONTRACT_MEMBERSHIP_AUTOS
+            ).values_list("id", flat=True),
+        ).delete()
+
+    def reconcile_all_user_contracts(self):
+        """
+        Ensure the automatic contracts' memberships are aligned with the org membership.
+
+        Users in automatic membership contracts (e.g. "managed" type) are added
+        and removed from the contract as org members log into the system. This
+        requires that the users remain active in the system; if they don't, seat
+        counts may be off from reality.
+        """
+
+        reconciliation_result: dict[str, dict] = {}
+
+        for contract in self.contracts.filter(
+            membership_type__in=CONTRACT_MEMBERSHIP_AUTOS
+        ).all():
+            log.info("reconcile_all_user_contracts: Reconciling contract %s", contract)
+            missing_users = self.organization_users.exclude(
+                user__in=contract.b2b_contract_users.values_list("user")
+            ).all()
+
+            for user in missing_users:
+                log.info(
+                    "reconcile_all_user_contracts: Adding missing user %s to contract %s",
+                    user.user,
+                    contract,
+                )
+                user.user.b2b_contracts.add(contract)
+
+            extra_users = contract.b2b_contract_users.exclude(
+                user__in=self.organization_users.values_list("user")
+            ).all()
+
+            for user in extra_users:
+                log.info(
+                    "reconcile_all_user_contracts: Removing extra user %s from contract %s",
+                    user.user,
+                    contract,
+                )
+                user.user.b2b_contracts.remove(contract)
+
+            log.info(
+                "reconcile_all_user_contracts: Added %s and removed %s users from contract %s",
+                len(missing_users),
+                len(extra_users),
+                contract,
+            )
+
+            reconciliation_result[str(contract)] = {
+                "added": missing_users,
+                "removed": extra_users,
+            }
+
+        return reconciliation_result
 
     def __str__(self):
         """Return a reasonable representation of the org as a string."""
 
         return f"{self.name} <{self.org_key}>"
+
+    @cached_property
+    def active_contracts(self):
+        """Returns the active contracts for the organization."""
+
+        return (
+            self._active_contracts
+            if hasattr(self, "_active_contracts")
+            else self.contracts.filter(active=True).all()
+        )
+
+    @property
+    @admin.display(description="Title")
+    def title_linked(self):
+        """Return the title with a link to the page"""
+
+        dj_change_url = reverse("admin:b2b_organizationpage_change", args=(self.id,))
+        wagtail_url = reverse(
+            "wagtailadmin_explore",
+            kwargs={
+                "parent_page_id": self.id,
+            },
+        )
+
+        return format_html(
+            f'{self.title} <a href="{dj_change_url}">Admin</a> | <a href="{wagtail_url}">Wagtail</a>'
+        )
 
     class Meta:
         """Meta options for the OrganizationPage."""
@@ -126,25 +463,147 @@ class OrganizationPage(Page):
         ]
 
 
-class ContractPage(Page):
+class ContractProgramItem(Orderable):
+    """Intermediate model to store programs in a contract with ordering"""
+
+    contract = ParentalKey(
+        "ContractPage", on_delete=models.CASCADE, related_name="contract_programs"
+    )
+    program = models.ForeignKey(
+        Program, on_delete=models.CASCADE, related_name="contract_memberships"
+    )
+
+    panels = [
+        FieldPanel("program"),
+    ]
+
+    class Meta:
+        ordering = ["sort_order"]
+        unique_together = ("contract", "program")
+        verbose_name = "Contract Program Item"
+        verbose_name_plural = "Contract Program Items"
+
+    def __str__(self):
+        return (
+            f"{self.contract.title} - {self.program.title} (order: {self.sort_order})"
+        )
+
+    def save(self, *args, skip_run_creation=False, **kwargs):
+        """
+        Queue async task to create contract runs for new program associations.
+
+        Args:
+            skip_run_creation: Skip task if runs are created synchronously.
+        """
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+
+        if is_new and not skip_run_creation:
+            from b2b.tasks import create_program_contract_runs  # noqa: PLC0415
+
+            create_program_contract_runs.delay(
+                self.contract.id,
+                self.program.id,
+                org_prefix=self.contract.organization.org_key_prefix,
+            )
+            log.info(
+                "Queued contract run creation for program %s in contract %s",
+                self.program.id,
+                self.contract.id,
+            )
+
+
+class ActiveContractManager(models.Manager):
+    """Manager that excludes contracts that aren't valid for use."""
+
+    def get_queryset(self):
+        """Perform the filtering - contract must be active, start before now, end after now."""
+
+        now = now_in_utc()
+
+        return (
+            super()
+            .get_queryset()
+            .filter(active=True)
+            .exclude(models.Q(contract_start__gt=now) | models.Q(contract_end__lt=now))
+        )
+
+
+class ContractPageManager(PageManager):
+    """
+    Default manager for contracts: every contract, except through a relation.
+
+    Wagtail reloads a page through its model's default manager when it saves
+    one (``Page.specific``), so a default manager that hides contracts that
+    aren't valid for use makes them impossible to save. Django also builds
+    related managers (``user.b2b_contracts``, ``run.b2b_contracts``,
+    ``organization.contracts``) from the default manager's class, and the code
+    that reads those relies on them leaving out contracts that aren't valid.
+    A related manager is the one with an ``instance``, so only it filters.
+    """
+
+    def get_queryset(self):
+        """Filter to contracts valid for use when reached through a relation."""
+
+        queryset = super().get_queryset()
+
+        if not hasattr(self, "instance"):
+            return queryset
+
+        now = now_in_utc()
+
+        return queryset.filter(active=True).exclude(
+            models.Q(contract_start__gt=now) | models.Q(contract_end__lt=now)
+        )
+
+
+class ContractPage(Page, ClusterableModel):
     """Stores information about a contract with an organization."""
 
     parent_page_types = ["b2b.OrganizationPage"]
+    # Contracts are created in the staff dashboard, through the contract API.
+    is_creatable = False
+    # Declared first so it is the default manager; see ContractPageManager.
+    objects = ContractPageManager()
+    active_objects = ActiveContractManager()
+
+    # Written only by the contract API, which saves the row without a Wagtail
+    # revision. A revision holds whatever these were when it was saved, so
+    # with_content_json() takes them from the stored row instead. It does the
+    # same for which programs the contract has.
+    PROVISIONED_FIELDS = (
+        "name",
+        "membership_type",
+        "description",
+        "welcome_message",
+        "contract_start",
+        "contract_end",
+        "max_learners",
+        "enrollment_fixed_price",
+        "active",
+    )
 
     name = models.CharField(max_length=255, help_text="The name of the contract.")
     description = RichTextField(
         blank=True, help_text="Any useful extra information about the contract."
     )
-    integration_type = models.CharField(
+    welcome_message = models.CharField(
+        max_length=255, blank=True, help_text="A welcome message for learners."
+    )
+    welcome_message_extra = RichTextField(
+        blank=True, help_text="Additional welcome message content for learners."
+    )
+    membership_type = models.CharField(
         max_length=255,
-        choices=CONTRACT_INTEGRATION_CHOICES,
-        help_text="The type of integration for this contract.",
+        choices=CONTRACT_MEMBERSHIP_TYPE_CHOICES,
+        help_text="The method to use to manage membership in the contract.",
+        default=CONTRACT_MEMBERSHIP_MANAGED,
     )
     organization = models.ForeignKey(
         OrganizationPage,
         on_delete=models.PROTECT,
         related_name="contracts",
-        help_text="The organization this contract is with.",
+        help_text="The organization that owns this contract.",
     )
     contract_start = models.DateField(
         blank=True,
@@ -172,17 +631,72 @@ class ContractPage(Page):
         null=True,
         help_text="The fixed price for enrollment under this contract. (Set to zero or leave blank for free.)",
     )
-    programs = models.ManyToManyField(
-        "courses.Program",
-        help_text="The programs associated with this contract.",
-        related_name="contracts",
+    google_sheet_target = models.CharField(  # noqa: DJ001
+        blank=True,
+        null=True,
+        default="",
+        max_length=1024,
+        help_text="The URL for the Google Sheet to use to send codes and updates.",
+    )
+    google_sheet_target_tab = models.CharField(
+        blank=True,
+        default="Sheet1",
+        max_length=100,
+        help_text="The index or title of the worksheet in the Google Sheet to put the codes.",
+    )
+    variant_options = GenericRelation(
+        "variants.SupportedVariant",
+        object_id_field="object_id",
+        content_type_field="content_type",
     )
 
+    @property
+    def programs(self):
+        """
+        Returns programs in the contract ordered by their order field.
+        This replaces the old ManyToManyField with ordered access via ContractProgramItem.
+        """
+        return Program.objects.filter(contract_memberships__contract=self).order_by(
+            "contract_memberships__sort_order"
+        )
+
+    @cached_property
+    def contract_program_ids(self):
+        """Return the contract's programs in the proper order."""
+
+        return (
+            self._contract_program_ids
+            if hasattr(self, "_contract_program_ids")
+            else self.contract_programs.order_by("sort_order").all()
+        )
+
+    @cached_property
+    def default_variant_options(self):
+        """Return the default variant set for this contract."""
+
+        return self.variant_options.filter(default_variant=True).first()
+
+    def active_variant_options(self):
+        """
+        Return the variant sets runs are created and listed for.
+
+        The default set always counts, even if it was turned off in the admin:
+        an empty list here means "every variant the course has" to
+        create_contract_run.
+        """
+
+        return self.variant_options.filter(
+            models.Q(active=True) | models.Q(default_variant=True)
+        )
+
     content_panels = [
-        FieldPanel("name"),
+        StaffDashboardContractPanel(),
+        FieldPanel("name", read_only=True),
         MultiFieldPanel(
             [
-                FieldPanel("description"),
+                FieldPanel("description", read_only=True),
+                FieldPanel("welcome_message", read_only=True),
+                FieldPanel("welcome_message_extra"),
                 FieldPanel("organization"),
             ],
             heading="Basic Information",
@@ -190,21 +704,33 @@ class ContractPage(Page):
         ),
         MultiFieldPanel(
             [
-                FieldPanel("integration_type"),
-                FieldPanel("max_learners"),
-                FieldPanel("enrollment_fixed_price"),
+                FieldPanel("membership_type", read_only=True),
+                FieldPanel("max_learners", read_only=True),
+                FieldPanel("enrollment_fixed_price", read_only=True),
+                FieldPanel("google_sheet_target"),
+                FieldPanel("google_sheet_target_tab"),
             ],
             heading="Learner Provisioning",
             icon="user",
         ),
         MultiFieldPanel(
             [
-                FieldPanel("active"),
-                FieldPanel("contract_start"),
-                FieldPanel("contract_end"),
+                FieldPanel("active", read_only=True),
+                FieldPanel("contract_start", read_only=True),
+                FieldPanel("contract_end", read_only=True),
             ],
             heading="Availability",
             icon="calendar-alt",
+        ),
+        InlinePanel(
+            "contract_programs",
+            heading="Programs",
+            help_text=(
+                "Order the programs in this contract. Add and remove programs "
+                "in the staff dashboard. On a published page a program added "
+                "or removed here is not saved. On an unpublished page it is "
+                "saved, and adding one creates its contract runs."
+            ),
         ),
     ]
 
@@ -231,9 +757,50 @@ class ContractPage(Page):
 
         self.title = str(self.name)
 
-        self.slug = slugify(f"contract-{self.organization.id}-{self.id}")
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
-        queue_enrollment_code_check.delay(self.id)
+
+    def with_content_json(self, content):
+        """
+        Build the page a revision describes, keeping the provisioned fields.
+
+        Wagtail calls this to load the editor and to publish. Without it,
+        publishing a revision saved before an API write puts the contract's
+        old name, dates, seat cap and price back.
+        """
+
+        page = super().with_content_json(content)
+        # Read from the database, not from self: when the editor publishes,
+        # self is the instance it loaded before the form was filled in.
+        stored = (
+            ContractPage.objects.filter(pk=self.pk)
+            .values(*self.PROVISIONED_FIELDS)
+            .get()
+        )
+        for field, value in stored.items():
+            setattr(page, field, value)
+        page.title = stored["name"]
+
+        # Which programs are in the contract is the API's to say, and a
+        # revision saved before a program was linked would delete the link
+        # when published. Wagtail still orders them, so keep the stored links
+        # in the revision's order, with any it doesn't have after the rest.
+        # Wagtail saves an unpublished page's form straight to the database
+        # without coming through here, so this only protects a live page.
+        revision_position = {
+            item.program_id: position
+            for position, item in enumerate(page.contract_programs.all())
+        }
+        programs = sorted(
+            ContractProgramItem.objects.filter(contract_id=self.pk),
+            key=lambda item: (
+                revision_position.get(item.program_id, len(revision_position)),
+                item.sort_order or 0,
+            ),
+        )
+        for sort_order, item in enumerate(programs):
+            item.sort_order = sort_order
+        page.contract_programs = programs
+        return page
 
     def get_learners(self):
         """Get the learners associated with this organization."""
@@ -264,66 +831,261 @@ class ContractPage(Page):
             else False
         )
 
-    def get_course_runs(self):
-        """Get the runs associated with the contract."""
-
-        from courses.models import CourseRun
+    @property
+    def requires_enrollment_codes(self) -> bool:
+        """Return True if the contract should have enrollment codes."""
 
         return (
-            CourseRun.objects.prefetch_related("course").filter(b2b_contract=self).all()
+            self.enrollment_fixed_price is not None
+            and self.enrollment_fixed_price > Decimal(0)
+        ) or self.membership_type not in CONTRACT_MEMBERSHIP_AUTOS
+
+    def get_course_runs(self, *, b2b_only=False, public_only=False):
+        """
+        Get the runs associated with the contract.
+
+        Set b2b_only to filter out public runs.
+        Set public_only to filter out course runs that aren't public.
+        Set neither to True to retrieve everything.
+        """
+
+        from courses.models import CourseRun  # noqa: PLC0415
+
+        run_qs = (
+            CourseRun.objects.prefetch_related("course")
+            .filter(b2b_contracts=self)
+            .all()
         )
 
-    def get_products(self):
-        """Get the products associated with the contract."""
+        if b2b_only:
+            run_qs = run_qs.filter(b2b_only=True)
 
-        from courses.models import CourseRun
-        from ecommerce.models import Product
+        if public_only:
+            run_qs = run_qs.filter(b2b_only=False)
+
+        return run_qs
+
+    def get_variant_courses(self, *, only_relevant=False):
+        """
+        Get the courses that match up with the configured variants.
+
+        By default, this will return all the courses that have variants that match
+        any of the variant options configured for the contract. Set only_relevant
+        to return just the courses that also have a B2B run for the contract.
+        """
+
+        course_filter = None
+        course_content_type = ContentType.objects.get(
+            app_label="courses", model="course"
+        )
+
+        for variant_set in self.variant_options.all():
+            if course_filter:
+                course_filter = course_filter | variant_set.to_q_filter()
+            else:
+                course_filter = variant_set.to_q_filter()
+
+        sv_qset = (
+            SupportedVariant.objects.filter(content_type=course_content_type)
+            .filter(models.Q(b2b_only=True) | models.Q(default_variant=True))
+            .filter(course_filter)
+        )
+
+        if only_relevant:
+            run_courses = (
+                self.get_course_runs()
+                .distinct("course")
+                .values_list("course__id", flat=True)
+            )
+            sv_qset = sv_qset.filter(object_id__in=run_courses)
+
+        return [sv.variant_object for sv in sv_qset.all()]
+
+    def get_all_variant_runs(self):
+        """
+        Get runs matching the contract's active variant sets.
+
+        The default set is always included. A deactivated set's runs drop out
+        of the list, but stay in the contract.
+        """
+
+        run_qs = self.get_course_runs()
+
+        # If there's no default variant, then the config is bad. Send an empty
+        # list and log an error.
+        if self.variant_options.filter(default_variant=True).count() == 0:
+            log.error(
+                "get_variant_runs couldn't find a default variant set for %s - check contract configuration",
+                self.slug,
+            )
+            return run_qs.none()
+
+        run_qs_filter = self.default_variant_options.to_q_filter()
+
+        for variant_set in self.active_variant_options().filter(default_variant=False):
+            run_qs_filter = run_qs_filter | variant_set.to_q_filter()
+
+        return run_qs.filter(run_qs_filter).all()
+
+    def get_assignments(self):
+        """Get assignments for the contract."""
+
+        return self.code_redemptions.filter(user__isnull=True).exclude(
+            assigned_email=""
+        )
+
+    def get_enrollments(self):
+        """Get the enrollments for the contract's runs"""
+
+        from courses.models import CourseRunEnrollment  # noqa: PLC0415
+
+        return (
+            CourseRunEnrollment.objects.prefetch_related("run", "run__course")
+            .filter(run__b2b_contracts=self, change_status__isnull=True)
+            .all()
+        )
+
+    def get_products(self, *, b2b_only: bool = False, public_only=False):
+        """
+        Get the products associated with the contract.
+
+        Set b2b_only to filter out products for course runs that are public.
+        Set public_only to filter out products for course runs that aren't public.
+        Set neither to True to retrieve everything.
+        """
+
+        from courses.models import CourseRun  # noqa: PLC0415
+        from ecommerce.models import Product  # noqa: PLC0415
 
         content_type = ContentType.objects.get_for_model(CourseRun)
 
         return Product.objects.filter(
             is_active=True,
             content_type=content_type,
-            object_id__in=[cr.id for cr in self.get_course_runs()],
+            object_id__in=self.get_course_runs(
+                b2b_only=b2b_only, public_only=public_only
+            ).values_list("id", flat=True),
         ).all()
+
+    @property
+    def discounts_qs(self):
+        """Get the discount queryset associated with the contract."""
+
+        from ecommerce.models import Discount  # noqa: PLC0415
+
+        return Discount.objects.filter(
+            b2b_contract=self, products__product__in=self.get_products()
+        )
 
     def get_discounts(self):
         """Get the discounts associated with the contract."""
 
-        from ecommerce.models import Discount
+        return self.discounts_qs.all()
 
-        return Discount.objects.filter(products__product__in=self.get_products()).all()
+    def get_unused_discounts(self):
+        """Get discounts that haven't been used yet."""
 
-    def add_program_courses(self, program):
+        return (
+            self.discounts_qs.annotate(
+                order_redemptions_count=models.Count("order_redemptions")
+            )
+            .annotate(contract_redemptions_count=models.Count("contract_redemptions"))
+            .exclude(
+                models.Q(order_redemptions_count__gt=0)
+                | models.Q(contract_redemptions_count__gt=0)
+            )
+            .all()
+        )
+
+    def add_program_courses(  # noqa: PLR0913
+        self,
+        program,
+        order=None,
+        *,
+        skip_edx=False,
+        no_reruns=True,
+        org_prefix=None,
+        ignore_langs=False,
+        only_lang=None,
+        filter_variants=None,
+    ):
         """
-        Add a program, and then queue adding all its courses.
+        Add a program, and then queue adding all its courses, including the
+        courses of programs nested in its requirements.
+
+        This defaults to not allowing re-runs to happen.
 
         Args:
         - program (courses.Program): the program to add
+        Kwargs:
+        - org_prefix (str|None): passed to create_contract_run; None uses the
+          organization's own prefix
 
         Returns:
-        - tuple, courses created and skipped
+        - tuple: Tuple with two integers:
+            - number of course runs created
+            - number of courses with no source run
         """
 
-        from b2b.api import create_contract_run
-
-        managed = 0
-        skipped = 0
+        from b2b.api import create_contract_run  # noqa: PLC0415
 
         # Clear any cached properties to ensure fresh data
         if hasattr(program, "_courses_with_requirements_data"):
             delattr(program, "_courses_with_requirements_data")
 
-        for course, _ in program.courses:
-            try:
-                create_contract_run(self, course)
-                managed += 1
-            except TargetCourseRunExistsError:  # noqa: PERF203
-                skipped += 1
+        managed = 0
+        courses = program.courses_qset_recursive
+        no_source = courses.exclude(
+            models.Q(courseruns__is_source_run=True)
+            | models.Q(courseruns__run_tag="SOURCE")
+        ).count()
 
-        self.programs.add(program)
+        for course in courses.filter(
+            models.Q(courseruns__is_source_run=True)
+            | models.Q(courseruns__run_tag="SOURCE")
+        ).all():
+            created_runs = create_contract_run(
+                self,
+                course,
+                no_reruns=no_reruns,
+                skip_edx=skip_edx,
+                org_prefix=org_prefix,
+                ignore_langs=ignore_langs,
+                only_lang=only_lang,
+                filter_variants=filter_variants,
+            )
+            managed += len(created_runs)
 
-        return (managed, skipped)
+        if order is None:
+            last_item = self.contract_programs.order_by("-sort_order").first()
+            order = (last_item.sort_order + 1) if last_item else 0
+
+        existing_item = ContractProgramItem.objects.filter(
+            contract=self, program=program
+        ).first()
+
+        if not existing_item:
+            item = ContractProgramItem(contract=self, program=program, sort_order=order)
+            item.save(skip_run_creation=True)
+
+        return (managed, no_source)
+
+    @property
+    @admin.display(description="Title")
+    def title_linked(self):
+        """Return the title with a link to the page"""
+
+        dj_change_url = reverse("admin:b2b_contractpage_change", args=(self.id,))
+        wagtail_url = reverse(
+            "wagtailadmin_explore",
+            kwargs={
+                "parent_page_id": self.id,
+            },
+        )
+
+        return format_html(
+            f'{self.title} <a href="{dj_change_url}">Admin</a> | <a href="{wagtail_url}">Wagtail</a>'
+        )
 
     class Meta:
         """Meta options for the ContractPage."""
@@ -339,14 +1101,336 @@ class DiscountContractAttachmentRedemption(TimestampedModel):
         "ecommerce.Discount",
         on_delete=models.DO_NOTHING,
         help_text="The discount that was redemeed.",
+        related_name="contract_redemptions",
     )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.DO_NOTHING,
+        null=True,
+        blank=True,
         help_text="The user that redeemed the discount.",
+        related_name="+",
     )
     contract = models.ForeignKey(
         ContractPage,
         on_delete=models.DO_NOTHING,
         help_text="The contract that the user was attached to.",
+        related_name="code_redemptions",
     )
+
+    assigned_email = models.EmailField(
+        default="",
+        blank=True,
+        help_text="Email to assign discount code to. This may correspond to a user which has not been created yet.",
+    )
+    assigned_name = models.CharField(max_length=255, default="", blank=True)
+
+    # This shouldn't be null much, but can be if a user has been deleted, and for anything assigned before this field was added.
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL
+    )
+    redeemed_on = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the code was claimed. None indicates that it has been assigned, but not yet claimed.",
+    )
+    last_reminder_sent_on = models.DateTimeField(
+        null=True, blank=True, help_text="When the code last had a reminder email sent."
+    )
+    # Need to verify the format for Mailgun message IDs and map event types to statuses.
+    # This is only nullable for one functional reason - we create the DCAR records on assignment and kick a downstream
+    # task for email sending. Between creation and task execution, message ID won't exist.
+    # Might be nice to make this unique, but it'll need to be nullable if so.
+    email_message_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Mailgun message ID for the email sent to the user.",
+    )
+    email_status = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Mailgun status for the email sent to the user.",
+    )
+    email_status_event_timestamp = models.DateTimeField(
+        blank=True,
+        null=True,
+    )
+
+    @property
+    def status(self):
+        # This is used for display in the enrollment code serializer.
+        # A code without a DiscountContractAttachmentRedemption row is considered "unassigned"
+        # A code which has been allocated but not redeemed is "assigned"
+
+        # We could get away w/ just checking user if we make sure we link the user on code redemption.
+        if self.redeemed_on or self.user:
+            return REDEMPTION_STATUS_REDEEMED
+        else:
+            return REDEMPTION_STATUS_ASSIGNED
+
+
+class UserOrganization(models.Model):
+    """The user's organizations memberships."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="user_organizations",
+    )
+    organization = models.ForeignKey(
+        "b2b.OrganizationPage",
+        on_delete=models.CASCADE,
+        related_name="organization_users",
+    )
+    keep_until_seen = models.BooleanField(
+        default=False,
+        help_text="If True, the user will be kept in the organization until the organization is seen in their SSO data.",
+    )
+    is_manager = models.BooleanField(
+        default=False,
+        null=True,
+        blank=True,
+        help_text="If True, the user is a manager of this organization and can access organization dashboard features.",
+    )
+    added_to_keycloak_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When MITx Online added the user to the organization in Keycloak. Empty if it has not managed to yet, or if the membership came from Keycloak.",
+    )
+
+    class Meta:
+        unique_together = ("user", "organization")
+
+    def __str__(self):
+        """Return a reasonable representation of the object as a string."""
+
+        return f"UserOrganization: {self.user} in {self.organization}"
+
+
+class OrganizationOnboarding(TimestampedModel, ValidateOnSaveMixin):
+    """
+    Where an organization is in the B2B onboarding sequence.
+
+    The system of record that did not exist before: onboarding state lived in
+    people's heads and in four separate systems. The state is descriptive, not
+    enforcing - nothing gates on it. A state machine that blocks operators
+    before the operators trust it is a state machine they work around.
+    """
+
+    organization = models.OneToOneField(
+        "b2b.OrganizationPage",
+        on_delete=models.CASCADE,
+        related_name="onboarding",
+    )
+    state = models.CharField(
+        max_length=32,
+        choices=ONBOARDING_STATE_CHOICES,
+        default=ONBOARDING_STATE_REQUESTED,
+    )
+    state_changed_at = models.DateTimeField(default=now_in_utc)
+    notes = models.TextField(
+        blank=True,
+        default="",
+        help_text="Free-form operator notes; holds the reason when state is blocked.",
+    )
+
+    def set_state(self, state, notes=None):
+        """
+        Move to the given onboarding state and stamp when it happened.
+
+        Args:
+        - state (str): the state to move to
+        - notes (str): replacement notes, if any
+        """
+
+        self.state = state
+        self.state_changed_at = now_in_utc()
+        if notes is not None:
+            self.notes = notes
+        self.save()
+
+    def __str__(self):
+        """Return a reasonable representation of the object as a string."""
+
+        return f"OrganizationOnboarding: {self.organization} is {self.state}"
+
+
+class OrganizationIdentityProvider(TimestampedModel, ValidateOnSaveMixin):
+    """
+    An identity provider we provisioned in Keycloak for an organization.
+
+    Keycloak has no field for where an IdP is in its rollout, so the lifecycle
+    state lives here - but it is written through to Keycloak's `enabled` and
+    `hideOnLogin` on every transition (see IDP_STATE_KEYCLOAK_FLAGS) so the two
+    representations cannot drift apart silently.
+    """
+
+    organization = models.ForeignKey(
+        "b2b.OrganizationPage",
+        on_delete=models.CASCADE,
+        related_name="identity_providers",
+    )
+    alias = models.CharField(
+        max_length=255,
+        unique=True,
+        help_text="The Keycloak IdP alias. Realm-wide, not per-organization.",
+    )
+    protocol = models.CharField(max_length=8, choices=IDP_PROTOCOL_CHOICES)
+    lifecycle_state = models.CharField(
+        max_length=16,
+        choices=IDP_LIFECYCLE_CHOICES,
+        default=IDP_STATE_DRAFT,
+    )
+    display_name = models.CharField(max_length=255, blank=True, default="")
+    internal_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Keycloak's internalId for the IdP instance.",
+    )
+    metadata_source = models.TextField(
+        help_text=(
+            "The metadata URL, or the inline XML, the config was parsed from. "
+            "Not blankable: refreshing an IdP re-reads this, so a row without "
+            "one cannot be refreshed."
+        ),
+    )
+    metadata_artifact = models.JSONField(
+        null=True,
+        blank=True,
+        help_text=(
+            "The config map Keycloak parsed out of the metadata. Persisted so a "
+            "partner's metadata endpoint going away can neither destroy config "
+            "nor block a deploy."
+        ),
+    )
+    metadata_fetched_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def service_provider(self):
+        """
+        Return what the partner's IdP needs to know about our side.
+
+        These are Keycloak's broker URLs for this alias, which is what an
+        operator hands the partner's engineers. The SP entity ID is only
+        meaningful for SAML; Keycloak uses the realm URL unless the IdP config
+        sets entityId.
+
+        Returns:
+        - dict: entity_id (SAML only), redirect_uri (the SAML ACS URL or the
+          OIDC redirect URI) and metadata_url (the SAML SP descriptor)
+        """
+
+        realm_url = urljoin(
+            settings.KEYCLOAK_BASE_URL, f"/realms/{settings.KEYCLOAK_REALM_NAME}"
+        )
+        endpoint = f"{realm_url}/broker/{self.alias}/endpoint"
+
+        if self.protocol != IDP_PROTOCOL_SAML:
+            return {"entity_id": None, "redirect_uri": endpoint, "metadata_url": None}
+
+        return {
+            "entity_id": (self.metadata_artifact or {}).get("entityId") or realm_url,
+            "redirect_uri": endpoint,
+            "metadata_url": f"{endpoint}/descriptor",
+        }
+
+    def __str__(self):
+        """Return a reasonable representation of the object as a string."""
+
+        return f"OrganizationIdentityProvider: {self.alias} ({self.lifecycle_state})"
+
+
+class OrganizationProvisioningAudit(AuditModel):
+    """
+    One change made through the provisioning API, and who made it.
+
+    Before the API, a partner's SSO config changed only through a reviewed,
+    merged Pulumi PR, so the review was the record. This is the replacement
+    record. There is no approval step before an IdP goes active, so this is
+    how a change gets reviewed: after the fact.
+
+    Append-only, so nothing deleted elsewhere takes a record with it: the IdP
+    is recorded by alias, the organization's org_key is copied onto every
+    row, and deleting the organization's page only clears the foreign key.
+    Credentials are never written here.
+    """
+
+    organization = models.ForeignKey(
+        "b2b.OrganizationPage",
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="provisioning_audits",
+    )
+    org_key = models.CharField(max_length=30)
+    # main.models.AuditModel cascades, which would delete a staff account's
+    # provisioning history along with the account. PROTECT keeps the record
+    # and who made it; MITx Online retires users by deactivating them, so
+    # this only blocks an outright delete.
+    acting_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, on_delete=models.PROTECT
+    )
+    identity_provider_alias = models.CharField(max_length=255, blank=True, default="")
+    action = models.CharField(max_length=64, choices=PROVISIONING_ACTION_CHOICES)
+
+    class Meta:
+        ordering = ["-created_on", "-id"]
+
+    @classmethod
+    def get_related_field_name(cls):
+        return "organization"
+
+    def save(self, *args, **kwargs):
+        """Refuse to rewrite an audit record."""
+
+        if self.pk is not None:
+            msg = "Provisioning audit records cannot be changed."
+            raise ValueError(msg)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        """Return a reasonable representation of the object as a string."""
+
+        return f"OrganizationProvisioningAudit: {self.action} on {self.org_key}"
+
+
+def is_organization_manager(user, org_id):
+    """
+    Check if a user is a manager of the specified organization.
+
+    Args:
+        user: The user to check
+        org_id: The organization ID to check against
+
+    Returns:
+        bool: True if the user is a manager of the organization, False otherwise
+    """
+    if not user or not user.is_authenticated:
+        return False
+
+    return UserOrganization.objects.filter(
+        user=user, organization_id=org_id, is_manager=True
+    ).exists()
+
+
+class UserB2BContract(TimestampedModel):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="user_b2b_contracts",
+    )
+    contract_page = models.ForeignKey(
+        "b2b.ContractPage",
+        on_delete=models.CASCADE,
+        related_name="b2b_contract_users",
+    )
+    consented_to_data_sharing = models.BooleanField(null=True)
+    consent_modified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ("user", "contract_page")
+
+    def __str__(self):
+        return f"UserB2BContract: {self.user} in {self.contract_page}"

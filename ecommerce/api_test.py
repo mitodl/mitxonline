@@ -1,46 +1,160 @@
 """Tests for Ecommerce api"""
 
+import itertools
+import logging
 import random
-from datetime import datetime
+import uuid
+from datetime import datetime, timedelta
+from decimal import Decimal
+from zoneinfo import ZoneInfo
 
+import freezegun
 import pytest
-import pytz
 import reversion
 from CyberSource.rest import ApiException
 from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
+from django.contrib.contenttypes.models import ContentType
+from django.db import connection
+from django.test import RequestFactory
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from factory import Faker, fuzzy
-from mitol.payment_gateway.api import ProcessorResponse
+from mitol.common.utils.datetime import now_in_utc
+from mitol.payment_gateway.api import CartItem, PaymentGateway, ProcessorResponse
+from mitol.payment_gateway.constants import (
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+    MITOL_PAYMENT_GATEWAY_STRIPE,
+)
 from reversion.models import Version
+from stripe import APIConnectionError, convert_to_stripe_object
+from zeal import zeal_context
 
-from courses.factories import CourseRunEnrollmentFactory
+from b2b.constants import CONTRACT_MEMBERSHIP_CODE
+from b2b.factories import ContractPageFactory
+from compliance.exceptions import ExportComplianceDataError
+from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
+from courses.factories import (
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+    ProgramEnrollmentFactory,
+    ProgramFactory,
+)
+from courses.models import PaidCourseRun
 from ecommerce.api import (
+    ANONYMOUS_BASKET_SESSION_KEY,
+    _retrieve_pending_cybersource_orders,
+    apply_discount_to_basket,
+    apply_user_discounts,
     check_and_process_pending_orders_for_resolution,
+    check_basket_discounts_for_validity,
+    check_for_double_spent_sources,
     check_for_duplicate_discount_redemptions,
+    claim_anonymous_basket,
+    create_verified_program_course_run_enrollment,
+    create_verified_program_course_run_order,
+    create_verified_program_discount,
+    cull_anonymous_baskets,
+    cull_stale_pending_orders,
+    downgrade_enrollments_from_order,
+    downgrade_learner_from_order,
+    establish_basket,
+    establish_basket_for_request,
+    find_order_for_stripe_payment_intent,
+    fulfill_completed_order,
+    fulfill_order_from_cybersource_transaction,
+    generate_checkout_payload,
+    get_anonymous_basket_id,
+    get_auto_apply_discounts_for_basket,
+    log_stripe_event,
     process_cybersource_payment_response,
+    process_stripe_checkout_completed,
+    process_stripe_checkout_expired,
+    process_stripe_refund_updated,
+    quote_user_price,
     refund_order,
     unenroll_learner_from_order,
 )
-from ecommerce.constants import TRANSACTION_TYPE_PAYMENT, TRANSACTION_TYPE_REFUND
+from ecommerce.constants import (
+    DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PERCENT_OFF,
+    PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    REDEMPTION_TYPE_INTERNAL,
+    STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+    STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED,
+    STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
+    STRIPE_EVENT_CHARGE_REFUND_UPDATED,
+    STRIPE_EVENT_CHECKOUT_SESSION_EXPIRED,
+    STRIPE_EVENT_REFUND_UPDATED,
+    STRIPE_OBJECT_CHECKOUT_SESSION,
+    STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
+    STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+    STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+    STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
+    STRIPE_PAYMENT_INTENT_STATUS_CANCELLED,
+    STRIPE_PAYMENT_INTENT_STATUS_PROCESSING,
+    STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_ACTION,
+    STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_CAPTURE,
+    STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_CONFIRMATION,
+    STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_PAYMENT_METHOD,
+    STRIPE_PAYMENT_INTENT_STATUS_SUCCEEDED,
+    STRIPE_PAYMENT_STATUS_NPR,
+    STRIPE_PAYMENT_STATUS_PAID,
+    STRIPE_PAYMENT_STATUS_UNPAID,
+    STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+    TRANSACTION_TYPE_PAYMENT,
+    TRANSACTION_TYPE_REFUND,
+    ZERO_PAYMENT_DATA,
+)
+from ecommerce.exceptions import (
+    VerifiedProgramCourseNotInProgramError,
+    VerifiedProgramNoEnrollmentError,
+    VerifiedProgramNoProductError,
+)
 from ecommerce.factories import (
     DiscountRedemptionFactory,
+    InternalDiscountFactory,
     LineFactory,
     OneTimeDiscountFactory,
     OneTimePerUserDiscountFactory,
     OrderFactory,
+    PaidAmountOffDiscountFactory,
     ProductFactory,
     TransactionFactory,
     UnlimitedUseDiscountFactory,
+    make_purchase,
+)
+from ecommerce.fixtures import (
+    stripe_checkout_session,
+    stripe_event,
+    stripe_payment_intent,
+    stripe_refund,
 )
 from ecommerce.models import (
     Basket,
+    BasketDiscount,
     BasketItem,
+    DiscountProduct,
     DiscountRedemption,
     FulfilledOrder,
+    Line,
     Order,
     OrderStatus,
+    PendingOrder,
+    Product,
+    StripeEventLog,
     Transaction,
+    UserDiscount,
 )
+from flexiblepricing.constants import FlexiblePriceStatus
+from flexiblepricing.factories import (
+    FlexiblePriceFactory,
+    FlexiblePriceTierFactory,
+    approve_flexible_price,
+)
+from main.constants import USER_MSG_TYPE_PROFILE_INCOMPLETE
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.factories import OpenEdxUserFactory
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -113,6 +227,55 @@ def mock_create_run_enrollments(mocker):
     return mocker.patch("courses.api.create_run_enrollments", autospec=True)
 
 
+@pytest.fixture
+def mock_hubspot_order(mocker):
+    """Mock sync_deal_with_hubspot."""
+
+    return mocker.patch("hubspot_sync.api.sync_deal_with_hubspot")
+
+
+@pytest.fixture
+def bootstrapped_verified_program():
+    """
+    Returns a bootstrapped program.
+
+    Bootstrapped means you get back:
+    - a program
+    - a product for the program
+    - a course associated with the program (as a requirement)
+    - a course run
+    - a product for the course run
+
+    Returns:
+    - tuple of the above things in that order
+    """
+    program = ProgramFactory.create()
+    prog_ctype = ContentType.objects.get_for_model(program)
+    with reversion.create_revision():
+        prog_product = Product.objects.create(
+            content_type=prog_ctype,
+            object_id=program.id,
+            price=10,
+        )
+
+    courserun = CourseRunFactory.create()
+    program.add_requirement(courserun.course)
+
+    cr_ctype = ContentType.objects.get_for_model(courserun)
+    with reversion.create_revision():
+        cr_product = Product.objects.create(
+            content_type=cr_ctype, object_id=courserun.id, price=10
+        )
+
+    return (
+        program,
+        prog_product,
+        courserun.course,
+        courserun,
+        cr_product,
+    )
+
+
 def test_cybersource_refund_no_order():
     """Tests that refund_order throws FulfilledOrder.DoesNotExist exception when the order doesn't exist"""
 
@@ -137,6 +300,26 @@ def create_basket(user, products):
     basket_item.save()
 
     return basket
+
+
+def authed_request(user):
+    """Return a RequestFactory with the user attached."""
+
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = user
+    request.session = {}
+
+    return request
+
+
+def create_pending_order(user):
+    """
+    Call generate_checkout_payload to create a PendingOrder with a realistic
+    CyberSource payload.
+    """
+
+    return generate_checkout_payload(authed_request(user))
 
 
 @pytest.mark.parametrize(
@@ -338,7 +521,7 @@ def test_order_refund_failure(mocker, fulfilled_transaction):
     )
 
     with pytest.raises(ApiException):  # noqa: PT012
-        refund_response, message = refund_order(order_id=fulfilled_transaction.order.id)
+        refund_response, _ = refund_order(order_id=fulfilled_transaction.order.id)
         assert refund_response is False
     assert (
         Transaction.objects.filter(
@@ -381,6 +564,31 @@ def test_order_refund_failure_no_exception(mocker, fulfilled_transaction):
     assert not downgrade_task_mock.called
 
 
+def test_order_refund_missing_transaction_id_in_data(mocker, fulfilled_order):
+    """Refund should succeed when transaction_id is absent from Transaction.data but present on the model field."""
+    payment_amount = 10.00
+    # Simulate a legacy record where .data lacks transaction_id
+    transaction = TransactionFactory.create(
+        transaction_id="legacy-txn-id",
+        transaction_type=TRANSACTION_TYPE_PAYMENT,
+        data={"req_amount": payment_amount, "req_currency": "USD"},
+        order=fulfilled_order,
+    )
+    sample_response = ProcessorResponse(
+        state=ProcessorResponse.STATE_PENDING,
+        response_data={"id": "12345"},
+        transaction_id="legacy-txn-id",
+        message="",
+        response_code="",
+    )
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.start_refund",
+        return_value=sample_response,
+    )
+    refund_success, _ = refund_order(order_id=transaction.order.id)
+    assert refund_success is True
+
+
 def test_paypal_refunds(fulfilled_paypal_transaction):
     """PayPal transactions should fail before they get to the payment gateway."""
 
@@ -410,9 +618,118 @@ def test_unenrollment_unenrolls_learner(mocker, user):
     unenroll_mock.assert_called()
 
 
-def test_process_cybersource_payment_response(  # noqa: PLR0913
-    settings, rf, mocker, user_client, user, products
+def test_downgrade_learner_from_order_downgrades_active_enrollment(mocker, user):
+    """
+    downgrade_learner_from_order should force an audit enrollment for runs the
+    learner is still actively enrolled in.
+    """
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    version = Version.objects.get_for_object(product).first()
+    enrollment = CourseRunEnrollmentFactory.create(user=user, active=True)
+    LineFactory.create(
+        order=order, purchased_object=enrollment.run, product_version=version
+    )
+
+    create_run_enrollments_mock = mocker.patch(
+        "ecommerce.api.create_run_enrollments",
+    )
+    downgrade_learner_from_order(order_id=order.id)
+
+    create_run_enrollments_mock.assert_called_once()
+    _, kwargs = create_run_enrollments_mock.call_args
+    assert kwargs["runs"] == [enrollment.run]
+    assert kwargs["mode"] == EDX_ENROLLMENT_AUDIT_MODE
+    assert kwargs["change_status"] == ENROLL_CHANGE_STATUS_REFUNDED
+
+
+def test_downgrade_learner_from_order_skips_unenrolled_learner(mocker, user):
+    """
+    If the learner has unenrolled entirely (inactive enrollment) before the
+    refund is processed, downgrade_learner_from_order should leave their
+    enrollment alone rather than re-enrolling them as audit.
+
+    Regression test for ticket #3696.
+    """
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    version = Version.objects.get_for_object(product).first()
+    enrollment = CourseRunEnrollmentFactory.create(user=user, active=False)
+    LineFactory.create(
+        order=order, purchased_object=enrollment.run, product_version=version
+    )
+
+    create_run_enrollments_mock = mocker.patch(
+        "ecommerce.api.create_run_enrollments",
+    )
+    downgrade_learner_from_order(order_id=order.id)
+
+    create_run_enrollments_mock.assert_not_called()
+
+
+def test_order_purchased_programs(user):
+    """Order.purchased_programs should return only the Program lines on the order."""
+    program = ProgramFactory.create()
+    line = make_purchase(user, program, Decimal("500.00"))
+
+    assert line.order.purchased_programs == [program]
+    assert line.order.purchased_runs == []
+
+
+def test_order_purchased_programs_empty_for_course_run_order(user):
+    """Order.purchased_programs should be empty for a course-run-only order."""
+    run = CourseRunFactory.create()
+    line = make_purchase(user, run, Decimal("500.00"))
+
+    assert line.order.purchased_programs == []
+
+
+def test_downgrade_enrollments_from_order_dispatches_program_downgrade(mocker, user):
+    """
+    downgrade_enrollments_from_order should call
+    downgrade_program_enrollment_and_verified_runs for each purchased
+    program on the order.
+    """
+    program = ProgramFactory.create()
+    line = make_purchase(user, program, Decimal("500.00"))
+
+    downgrade_learner_mock = mocker.patch("ecommerce.api.downgrade_learner_from_order")
+    downgrade_program_mock = mocker.patch(
+        "ecommerce.api.downgrade_program_enrollment_and_verified_runs"
+    )
+
+    downgrade_enrollments_from_order(order_id=line.order.id)
+
+    downgrade_learner_mock.assert_called_once_with(line.order.id)
+    downgrade_program_mock.assert_called_once_with(user, program)
+
+
+def test_downgrade_enrollments_from_order_skips_program_downgrade_for_course_run_order(
+    mocker, user
 ):
+    """
+    A course-run-only order should not trigger any program downgrade -
+    regression coverage that the dispatch change doesn't alter the existing
+    course-run-only refund path.
+    """
+    run = CourseRunFactory.create()
+    line = make_purchase(user, run, Decimal("500.00"))
+
+    downgrade_learner_mock = mocker.patch("ecommerce.api.downgrade_learner_from_order")
+    downgrade_program_mock = mocker.patch(
+        "ecommerce.api.downgrade_program_enrollment_and_verified_runs"
+    )
+
+    downgrade_enrollments_from_order(order_id=line.order.id)
+
+    downgrade_learner_mock.assert_called_once_with(line.order.id)
+    downgrade_program_mock.assert_not_called()
+
+
+@pytest.mark.skip_nplusone_check
+def test_process_cybersource_payment_response(settings, rf, mocker, user, products):
     """Test that ensures the response from Cybersource for an ACCEPTed payment updates the orders state"""
 
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
@@ -422,9 +739,9 @@ def test_process_cybersource_payment_response(  # noqa: PLR0913
     )
     create_basket(user, products)
 
-    resp = user_client.post(reverse("checkout_api-start_checkout"))
+    checkout_payload = create_pending_order(user)
 
-    payload = resp.json()["payload"]
+    payload = checkout_payload["payload"]
     payload = {
         **{f"req_{key}": value for key, value in payload.items()},
         "decision": "ACCEPT",
@@ -446,9 +763,10 @@ def test_process_cybersource_payment_response(  # noqa: PLR0913
     assert result == OrderStatus.FULFILLED
 
 
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize("include_discount", [True, False])
-def test_process_cybersource_payment_decline_response(  # noqa: PLR0913
-    rf, mocker, user_client, user, products, include_discount
+def test_process_cybersource_payment_decline_response(
+    rf, mocker, user, products, include_discount
 ):
     """Test that ensures the response from Cybersource for an DECLINEd payment updates the orders state"""
 
@@ -458,9 +776,9 @@ def test_process_cybersource_payment_decline_response(  # noqa: PLR0913
     )
     create_basket(user, products)
 
-    resp = user_client.post(reverse("checkout_api-start_checkout"))
+    checkout_payload = create_pending_order(user)
 
-    payload = resp.json()["payload"]
+    payload = checkout_payload["payload"]
     payload = {
         **{f"req_{key}": value for key, value in payload.items()},
         "decision": "DECLINE",
@@ -478,7 +796,7 @@ def test_process_cybersource_payment_decline_response(  # noqa: PLR0913
             redeemed_by=user,
             redeemed_discount=discount,
             redeemed_order=order,
-            redemption_date=datetime.now(pytz.timezone(settings.TIME_ZONE)),
+            redemption_date=datetime.now(ZoneInfo(settings.TIME_ZONE)),
         ).save()
         order.refresh_from_db()
 
@@ -510,8 +828,7 @@ def test_check_and_process_pending_orders_for_resolution(mocker, test_type):
 
     # mocking out the create_enrollment and create_paid_courserun calls
     # we don't really care that it hits edX for this
-    mocker.patch("ecommerce.models.Order.create_enrollments", return_value=True)
-    mocker.patch("ecommerce.models.OrderFlow.create_paid_courseruns", return_value=True)
+    mocker.patch("ecommerce.models.OrderFlow.create_enrollments", return_value=True)
 
     test_payload = {
         "utf8": "",
@@ -585,7 +902,9 @@ def test_check_and_process_pending_orders_for_resolution(mocker, test_type):
         return_value=retval,
     )
 
-    (fulfilled, cancelled, errored) = check_and_process_pending_orders_for_resolution()
+    (fulfilled, cancelled, errored) = check_and_process_pending_orders_for_resolution(
+        []
+    )
 
     if test_type == "empty":
         assert not mocked_gateway_func.called
@@ -598,6 +917,180 @@ def test_check_and_process_pending_orders_for_resolution(mocker, test_type):
         order.refresh_from_db()
         assert order.state == OrderStatus.FULFILLED
         assert (fulfilled, cancelled, errored) == (1, 0, 0)
+
+
+@pytest.mark.parametrize(
+    ("scenario", "error"),
+    [
+        ("success", None),
+        ("other_order", "is for order"),
+        ("unsuccessful", "wasn't successful"),
+    ],
+)
+def test_fulfill_order_from_cybersource_transaction(mocker, scenario, error):
+    """
+    The order is fulfilled from the transaction fetched by ID, but only if the
+    transaction is for this order and succeeded.
+    """
+    order = OrderFactory.create(state=OrderStatus.PENDING)
+    mocker.patch("ecommerce.models.OrderFlow.create_enrollments", return_value=True)
+    payload = {
+        "reason_code": "481" if scenario == "unsuccessful" else "100",
+        "req_reference_number": "mitxonline-other-1"
+        if scenario == "other_order"
+        else order.reference_number,
+        "transaction_id": "7895121780166965604127",
+        "req_amount": "10",
+    }
+    mocked_details = mocker.patch(
+        "mitol.payment_gateway.api.CyberSourcePaymentGateway.get_transaction_details",
+        return_value=(None, payload),
+    )
+
+    if error:
+        with pytest.raises(ValueError, match=error):
+            fulfill_order_from_cybersource_transaction(
+                order.reference_number, "7895121780166965604127"
+            )
+    else:
+        fulfill_order_from_cybersource_transaction(
+            order.reference_number, "7895121780166965604127"
+        )
+
+    mocked_details.assert_called_once_with("7895121780166965604127")
+    order.refresh_from_db()
+    if error:
+        assert order.state == OrderStatus.PENDING
+        assert not order.transactions.exists()
+    else:
+        assert order.state == OrderStatus.FULFILLED
+        assert order.transactions.get().transaction_id == "7895121780166965604127"
+
+
+@pytest.mark.parametrize(
+    ("state", "gateway_type"),
+    [
+        (OrderStatus.FULFILLED, MITOL_PAYMENT_GATEWAY_CYBERSOURCE),
+        (OrderStatus.CANCELED, MITOL_PAYMENT_GATEWAY_CYBERSOURCE),
+        (OrderStatus.PENDING, MITOL_PAYMENT_GATEWAY_STRIPE),
+    ],
+)
+def test_fulfill_order_from_cybersource_transaction_wrong_order(
+    mocker, state, gateway_type
+):
+    """Only Pending CyberSource orders can be fulfilled this way."""
+    order = OrderFactory.create(state=state, gateway_type=gateway_type)
+    mocked_details = mocker.patch(
+        "mitol.payment_gateway.api.CyberSourcePaymentGateway.get_transaction_details"
+    )
+
+    with pytest.raises(Order.DoesNotExist):
+        fulfill_order_from_cybersource_transaction(order.reference_number, "123")
+
+    mocked_details.assert_not_called()
+
+
+def test_check_and_process_pending_orders_options(mocker):
+    """
+    Test that the flags for no-check and no-fulfill do what we expect.
+
+    If we set check=False, we shouldn't check the status of the request with
+    the payment processor. If skip_fulfillment=True, we shouldn't try to fulfill
+    the order. These don't depend on each other so they're being tested together.
+    """
+
+    order = OrderFactory.create(state=OrderStatus.PENDING)
+    mocked_gateway_func = mocker.patch(
+        "mitol.payment_gateway.api.CyberSourcePaymentGateway.find_and_get_transactions"
+    )
+    mocked_create_enrollments = mocker.patch(
+        "ecommerce.models.OrderFlow.create_enrollments", return_value=True
+    )
+
+    (fulfilled, cancelled, errored) = check_and_process_pending_orders_for_resolution(
+        [],
+        check_status=False,
+        skip_fulfillment=True,
+    )
+
+    order.refresh_from_db()
+    assert order.state == OrderStatus.FULFILLED
+    assert (fulfilled, cancelled, errored) == (1, 0, 0)
+    mocked_gateway_func.assert_not_called()
+    mocked_create_enrollments.assert_not_called()
+
+
+def _pending_credit_order(user, source_line):
+    """
+    A pending program order carrying a paid-amount-off redemption funded by
+    source_line: the shape checkout leaves behind before payment. The line's
+    price is irrelevant to these tests; only the redemption's FK matters.
+    """
+    line = make_purchase(
+        user, ProgramFactory.create(), Decimal("500.00"), state=OrderStatus.PENDING
+    )
+    DiscountRedemption.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=PaidAmountOffDiscountFactory.create(),
+        redeemed_order=line.order,
+        source_line=source_line,
+    )
+    return line.order
+
+
+def test_fulfillment_logs_a_double_spent_source_and_proceeds(
+    paid_amount_off_source, mocker, caplog
+):
+    """Two pending orders share one source; the second still fulfills, loudly."""
+    mocker.patch("ecommerce.api.sync_hubspot_deal")
+    # Enrollment side effects are another test's concern.
+    mocker.patch("ecommerce.models.OrderFlow.create_enrollments")
+    source_line = paid_amount_off_source.source_line
+    first = _pending_credit_order(paid_amount_off_source.user, source_line)
+    second = _pending_credit_order(paid_amount_off_source.user, source_line)
+
+    with caplog.at_level(logging.ERROR, logger="ecommerce.discount_sources"):
+        # Factory setup logs at INFO before at_level narrows the capture
+        # handler, so the records already collected are not fulfillment's.
+        caplog.clear()
+        fulfill_completed_order(first, ZERO_PAYMENT_DATA)
+        assert [
+            r for r in caplog.records if r.name == "ecommerce.discount_sources"
+        ] == []
+
+        fulfill_completed_order(second, ZERO_PAYMENT_DATA)
+
+    first.refresh_from_db()
+    second.refresh_from_db()
+    assert first.state == OrderStatus.FULFILLED
+    assert second.state == OrderStatus.FULFILLED
+    assert first.reference_number in caplog.text
+    assert second.reference_number in caplog.text
+    assert str(source_line.id) in caplog.text
+
+
+def test_fulfillment_logs_a_source_refunded_after_pricing(
+    paid_amount_off_source, mocker, caplog
+):
+    """The credit is already baked into the price, so log the released source
+    and let the payment settle.
+    """
+    mocker.patch("ecommerce.api.sync_hubspot_deal")
+    mocker.patch("ecommerce.models.OrderFlow.create_enrollments")
+    source_line = paid_amount_off_source.source_line
+    order = _pending_credit_order(paid_amount_off_source.user, source_line)
+    Order.objects.filter(pk=source_line.order_id).update(state=OrderStatus.REFUNDED)
+
+    with caplog.at_level(logging.ERROR, logger="ecommerce.discount_sources"):
+        caplog.clear()
+        fulfill_completed_order(order, ZERO_PAYMENT_DATA)
+
+    order.refresh_from_db()
+    assert order.state == OrderStatus.FULFILLED
+    assert order.reference_number in caplog.text
+    assert source_line.order.reference_number in caplog.text
+    assert str(source_line.id) in caplog.text
 
 
 @pytest.mark.parametrize("peruser", [True, False])
@@ -633,3 +1126,1956 @@ def test_duplicate_redemption_check(peruser):
     seen_ids = check_for_duplicate_discount_redemptions()
 
     assert discount.id in seen_ids
+
+
+def test_duplicate_redemption_monitor_flags_shared_source_lines(
+    paid_amount_off_source, caplog
+):
+    """The safety net reports a source funding two fulfilled redemptions and
+    names the orders to review.
+    """
+    source_line = paid_amount_off_source.source_line
+    orders = OrderFactory.create_batch(2, state=OrderStatus.FULFILLED)
+    for order in orders:
+        DiscountRedemptionFactory.create(
+            redeemed_by=paid_amount_off_source.user,
+            redeemed_discount=PaidAmountOffDiscountFactory.create(),
+            redeemed_order=order,
+            source_line=source_line,
+        )
+
+    with caplog.at_level(logging.ERROR, logger="ecommerce.api"):
+        caplog.clear()
+        double_spent_ids = check_for_double_spent_sources()
+
+    assert double_spent_ids == [source_line.id]
+    assert str(source_line.id) in caplog.text
+    for order in orders:
+        assert order.reference_number in caplog.text
+
+
+def test_create_verified_program_discount():
+    """Test that creating a special discount for programs works"""
+
+    program = ProgramFactory.create()
+    content_type = ContentType.objects.get_for_model(program)
+
+    with reversion.create_revision():
+        Product.objects.create(
+            price=100, content_type=content_type, object_id=program.id
+        )
+
+    discount = create_verified_program_discount(program)
+
+    assert discount
+    assert discount.redemption_type == REDEMPTION_TYPE_INTERNAL
+    assert discount.products.filter(
+        product__content_type=content_type, product__object_id=program.id
+    ).exists()
+    assert create_verified_program_discount(program) == discount
+
+
+def test_create_verified_program_course_run_enrollment(
+    mocker,
+    mock_create_run_enrollments,
+    mock_hubspot_order,
+    bootstrapped_verified_program,
+    user,
+):
+    """Test that creating a verified course run enrollment for a program works
+    and does not send a receipt email.
+    """
+
+    mock_cre_side_effect = mock_create_run_enrollments.side_effect
+    mock_send_receipt = mocker.patch(
+        "ecommerce.tasks.send_ecommerce_order_receipt.delay"
+    )
+
+    (program, _, _, courserun, _) = bootstrapped_verified_program
+
+    ProgramEnrollmentFactory.create(
+        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    request = RequestFactory().get("/")
+    request.user = user
+
+    mock_create_run_enrollments.side_effect = (
+        lambda user, runs, *, mode=EDX_ENROLLMENT_VERIFIED_MODE, **kwargs: (  # noqa: ARG005
+            [
+                CourseRunEnrollmentFactory.create(
+                    run=runs[0], user=user, enrollment_mode=mode
+                )
+            ],
+            False,
+        )
+    )
+
+    cr_enrollment = create_verified_program_course_run_enrollment(
+        request, courserun, program
+    )
+
+    assert cr_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    mock_send_receipt.assert_not_called()
+
+    mock_create_run_enrollments.side_effect = mock_cre_side_effect
+
+
+def test_create_verified_program_course_run_order(
+    mocker,
+    mock_create_run_enrollments,
+    mock_hubspot_order,
+    bootstrapped_verified_program,
+    user,
+):
+    """
+    A program-verified learner gets a run enrollment backed by a fulfilled,
+    zero-value order redeeming the program's discount. The user's basket is
+    left alone and no receipt is sent.
+    """
+
+    mock_send_receipt = mocker.patch(
+        "ecommerce.tasks.send_ecommerce_order_receipt.delay"
+    )
+    (program, prog_product, _, courserun, cr_product) = bootstrapped_verified_program
+    ProgramEnrollmentFactory.create(
+        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    basket = Basket.objects.create(user=user)
+    BasketItem.objects.create(basket=basket, product=prog_product, quantity=1)
+    mock_create_run_enrollments.side_effect = (
+        lambda user, runs, *, mode=EDX_ENROLLMENT_VERIFIED_MODE, **kwargs: (  # noqa: ARG005
+            [
+                CourseRunEnrollmentFactory.create(
+                    run=runs[0], user=user, enrollment_mode=mode
+                )
+            ],
+            True,
+        )
+    )
+
+    enrollment = create_verified_program_course_run_order(user, courserun, program)
+
+    assert enrollment.run == courserun
+    assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    order = Order.objects.get(purchaser=user, lines__purchased_object_id=courserun.id)
+    assert order.state == OrderStatus.FULFILLED
+    assert order.total_price_paid == 0
+    assert order.lines.get().product_version.object_id == str(cr_product.id)
+    assert order.discounts.get().redeemed_discount == create_verified_program_discount(
+        program
+    )
+    assert PaidCourseRun.objects.filter(
+        user=user, course_run=courserun, order=order
+    ).exists()
+    assert list(basket.basket_items.values_list("product", flat=True)) == [
+        prog_product.id
+    ]
+    mock_send_receipt.assert_not_called()
+
+
+def test_create_vpcro_no_product(bootstrapped_verified_program, user):
+    """
+    A run with no active product is refused before an order or the program's
+    discount is created.
+    """
+
+    (program, _, _, courserun, cr_product) = bootstrapped_verified_program
+    ProgramEnrollmentFactory.create(
+        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    cr_product.is_active = False
+    cr_product.save()
+
+    with pytest.raises(VerifiedProgramNoProductError):
+        create_verified_program_course_run_order(user, courserun, program)
+
+    assert not Order.objects.filter(purchaser=user).exists()
+    assert not DiscountProduct.objects.filter(
+        discount__redemption_type=REDEMPTION_TYPE_INTERNAL
+    ).exists()
+
+
+def test_create_vpcro_no_program(bootstrapped_verified_program, user):
+    """
+    Test that creating a verified course run enrollment for a program fails if
+    there's no program enrollment.
+    """
+
+    (program, _, _, courserun, _) = bootstrapped_verified_program
+
+    request = RequestFactory().get("/")
+    request.user = user
+
+    with pytest.raises(VerifiedProgramNoEnrollmentError) as exc:
+        create_verified_program_course_run_enrollment(request, courserun, program)
+
+    assert "No verified enrollment" in str(exc.value)
+
+
+def test_create_vpcro_run_not_in_program(bootstrapped_verified_program, user):
+    """
+    The program's discount prices anything it is attached to, so a run whose
+    course is outside the program's requirements is refused before a basket
+    exists.
+    """
+    (program, _, _, _, _) = bootstrapped_verified_program
+    ProgramEnrollmentFactory.create(
+        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    other_run = CourseRunFactory.create()
+
+    request = RequestFactory().get("/")
+    request.user = user
+
+    with pytest.raises(VerifiedProgramCourseNotInProgramError):
+        create_verified_program_course_run_enrollment(request, other_run, program)
+
+    assert not BasketDiscount.objects.filter(redeemed_by=user).exists()
+
+
+def test_create_vpcro_bad_basket(
+    mocker,
+    mock_hubspot_order,
+    mock_create_run_enrollments,
+    bootstrapped_verified_program,
+):
+    """
+    Test that creating a verified course run enrollment for a program works if
+    the basket has other stuff in. (It should clear the basket.)
+    """
+
+    with reversion.create_revision():
+        some_other_product = ProductFactory.create()
+
+    (program, _, _, courserun, _) = bootstrapped_verified_program
+
+    prog_enrollment = ProgramEnrollmentFactory.create(
+        program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    request = RequestFactory().get("/")
+    request.user = prog_enrollment.user
+
+    user_basket = Basket.objects.create(user=prog_enrollment.user)
+    BasketItem.objects.create(
+        basket=user_basket, product=some_other_product, quantity=1
+    )
+
+    def mock_cre_side_effect(
+        *_, use_user=prog_enrollment.user, use_run=courserun, **kwargs
+    ):
+        """Side effect for mock_create_run_enrollments"""
+
+        return [
+            [
+                CourseRunEnrollmentFactory.create(
+                    user=use_user,
+                    run=use_run,
+                    enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+                )
+            ],
+            True,
+        ]
+
+    mock_create_run_enrollments.side_effect = mock_cre_side_effect
+
+    create_verified_program_course_run_enrollment(request, courserun, program)
+
+    mock_create_run_enrollments.side_effect = None
+
+    assert Order.objects.filter(
+        purchaser=prog_enrollment.user,
+        lines__purchased_object_id=courserun.id,
+        state=OrderStatus.FULFILLED,
+    ).exists()
+
+
+@pytest.mark.parametrize(
+    "better_discount",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "is_valid",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize("_count", range(100))
+def test_apply_discount_to_basket(user, better_discount, is_valid, _count):
+    """
+    Test that applying a discount to a basket works as expected.
+
+    A new discount should only apply if it's valid (not expired, not finaid unless
+    the flag is set, applies to the user/product in the basket) and it provides
+    a better discount than anything else that's applied already.
+    """
+
+    run = CourseRunFactory.create()
+    product = ProductFactory.create(purchasable_object=run)
+    basket, _ = Basket.objects.get_or_create(user=user)
+
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+
+    existing_discount = UnlimitedUseDiscountFactory.create(
+        amount=50, discount_type="percent-off"
+    )
+    BasketDiscount.objects.create(
+        redeemed_by=user,
+        redemption_date=now_in_utc(),
+        redeemed_discount=existing_discount,
+        redeemed_basket=basket,
+    )
+
+    new_discount = UnlimitedUseDiscountFactory.create(
+        amount=(60 if better_discount else 10), discount_type="percent-off"
+    )
+
+    if not is_valid:
+        new_discount.activation_date = now_in_utc() + timedelta(days=30)
+        new_discount.save()
+
+    apply_discount_to_basket(basket, new_discount)
+
+    if better_discount and is_valid:
+        assert basket.discounts.filter(redeemed_discount=new_discount).exists()
+    else:
+        assert basket.discounts.filter(redeemed_discount=existing_discount).exists()
+
+
+def test_apply_discount_to_basket_prefers_a_full_credit_discount(user):
+    """A discount that prices the item at $0.00 must win the best-price comparison."""
+    run = CourseRunFactory.create()
+    product = ProductFactory.create(purchasable_object=run)
+    basket, _ = Basket.objects.get_or_create(user=user)
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+
+    existing_discount = UnlimitedUseDiscountFactory.create(
+        amount=50, discount_type="percent-off"
+    )
+    BasketDiscount.objects.create(
+        redeemed_by=user,
+        redemption_date=now_in_utc(),
+        redeemed_discount=existing_discount,
+        redeemed_basket=basket,
+    )
+    full_credit = UnlimitedUseDiscountFactory.create(
+        amount=100, discount_type="percent-off"
+    )
+
+    apply_discount_to_basket(basket, full_credit)
+
+    assert basket.discounts.get().redeemed_discount == full_credit
+
+
+@pytest.mark.parametrize(
+    ("candidate_amount", "candidate_wins"),
+    [
+        (50, True),
+        (300, False),
+        (200, True),
+    ],
+)
+def test_apply_discount_to_basket_replaces_a_user_discount_only_when_cheaper(
+    user, candidate_amount, candidate_wins
+):
+    """A user-tied discount competes on price like any other: the cheaper of the
+    applied user-tied discount and the candidate ends up applied, and a candidate
+    pricing the item at exactly the applied price replaces it.
+    """
+
+    run = CourseRunFactory.create()
+    # A fixed-price discount never raises the price, so the product has to cost
+    # more than either amount for the two to price the item differently.
+    product = ProductFactory.create(purchasable_object=run, price=500)
+    basket, _ = Basket.objects.get_or_create(user=user)
+
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+
+    user_discount = UnlimitedUseDiscountFactory.create(
+        amount=200, discount_type=DISCOUNT_TYPE_FIXED_PRICE
+    )
+    apply_discount = UnlimitedUseDiscountFactory.create(
+        amount=candidate_amount, discount_type=DISCOUNT_TYPE_FIXED_PRICE
+    )
+
+    UserDiscount.objects.create(user=user, discount=user_discount)
+
+    # Shortcut all the verifications for the user discount and just apply it
+    # since we expect it to be there.
+    BasketDiscount.objects.create(
+        redeemed_by=user,
+        redemption_date=now_in_utc(),
+        redeemed_discount=user_discount,
+        redeemed_basket=basket,
+    )
+
+    apply_discount_to_basket(basket, apply_discount)
+
+    assert basket.discounts.count() == 1
+    assert basket.discounts.get().redeemed_discount == (
+        apply_discount if candidate_wins else user_discount
+    )
+
+
+def test_apply_discount_to_basket_is_order_independent(user):
+    """The basket lands on the cheapest of a financial assistance, a user-tied
+    and an automatic discount whatever order they are applied in.
+    """
+
+    run = CourseRunFactory.create()
+    product = ProductFactory.create(purchasable_object=run, price=100)
+    basket, _ = Basket.objects.get_or_create(user=user)
+    finaid_tier = FlexiblePriceTierFactory(courseware_object=run.course)
+    FlexiblePriceFactory(
+        user=user,
+        courseware_object=run.course,
+        tier=finaid_tier,
+        status=FlexiblePriceStatus.APPROVED,
+    )
+    finaid_tier.discount.discount_type = DISCOUNT_TYPE_FIXED_PRICE
+    finaid_tier.discount.amount = 80
+    finaid_tier.discount.payment_type = PAYMENT_TYPE_FINANCIAL_ASSISTANCE
+    finaid_tier.discount.save()
+
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+
+    user_discount = UnlimitedUseDiscountFactory.create(
+        amount=90, discount_type=DISCOUNT_TYPE_FIXED_PRICE
+    )
+    UserDiscount.objects.create(user=user, discount=user_discount)
+
+    automatic_discount = UnlimitedUseDiscountFactory.create(
+        amount=40, discount_type=DISCOUNT_TYPE_FIXED_PRICE, automatic=True
+    )
+
+    for order in itertools.permutations(
+        [finaid_tier.discount, user_discount, automatic_discount]
+    ):
+        BasketDiscount.objects.filter(redeemed_basket=basket).delete()
+
+        for discount in order:
+            apply_discount_to_basket(basket, discount, allow_finaid=True)
+
+        assert basket.discounts.get().redeemed_discount == automatic_discount
+        # discounted_price is a cached_property reading the basket's discounts,
+        # so it has to be read off an item fetched after this permutation ran.
+        assert BasketItem.objects.get(basket=basket).discounted_price == Decimal(
+            "40.00"
+        )
+
+
+def test_apply_discount_to_basket_refuses_finaid_without_the_flag(user):
+    """A financial assistance discount stays unapplied unless allow_finaid is set."""
+
+    run = CourseRunFactory.create()
+    product = ProductFactory.create(purchasable_object=run)
+    basket, _ = Basket.objects.get_or_create(user=user)
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+
+    finaid_discount = UnlimitedUseDiscountFactory.create(
+        payment_type=PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    )
+
+    apply_discount_to_basket(basket, finaid_discount)
+
+    assert basket.discounts.count() == 0
+
+
+def test_get_auto_apply_discounts(user):  # noqa: PLR0915
+    """
+    Test that the auto-apply discount function works as expected.
+
+    Depending on what the user's basket has in it, we should get back any of:
+    - User discounts (if there's any assigned)
+    - Financial assistance tier discount (if the user has finaid)
+    - Discounts marked as "automatic"
+    - Nothing, if none of these apply
+    """
+
+    run = CourseRunFactory.create()
+    product = ProductFactory.create(purchasable_object=run)
+    basket, _ = Basket.objects.get_or_create(user=user)
+
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+
+    assert discounts.count() == 0
+
+    # test with regular discounts
+    # we'll assign one to the product, but that doesn't make it automatically
+    # applicable (unless automatic=True). we'll add a user to the user one later.
+
+    plain_discount = UnlimitedUseDiscountFactory.create(automatic=False)
+    plain_attached_product_discount = UnlimitedUseDiscountFactory.create(
+        automatic=False
+    )
+    plain_attached_user_discount = UnlimitedUseDiscountFactory.create(automatic=False)
+    DiscountProduct.objects.create(
+        discount=plain_attached_product_discount, product=product
+    )
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+
+    assert discounts.count() == 0
+
+    # set the product discount to auto-apply, we should just see that now
+    plain_attached_product_discount.automatic = True
+    plain_attached_product_discount.save()
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+
+    assert discounts.count() == 1
+    assert plain_discount.id not in discounts.all().values_list("id", flat=True)
+    assert plain_attached_product_discount.id in discounts.all().values_list(
+        "id", flat=True
+    )
+
+    # attach the user, we should see both it and the auto product ones now
+    UserDiscount.objects.create(discount=plain_attached_user_discount, user=user)
+    plain_attached_user_discount.save()
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+
+    assert discounts.count() == 2
+    assert plain_discount.id not in discounts.all().values_list("id", flat=True)
+    assert plain_attached_user_discount.id in discounts.all().values_list(
+        "id", flat=True
+    )
+
+    # make the regular one auto too - now we should have 3
+    plain_discount.automatic = True
+    plain_discount.save()
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+
+    assert discounts.count() == 3
+    assert plain_discount.id in discounts.all().values_list("id", flat=True)
+
+    # add some financial assistance discounts
+    finaid_tier = FlexiblePriceTierFactory(courseware_object=run.course)
+    FlexiblePriceFactory(
+        user=user,
+        courseware_object=run.course,
+        tier=finaid_tier,
+        status=FlexiblePriceStatus.APPROVED,
+    )
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+
+    assert discounts.count() == 4
+    assert finaid_tier.discount.id in discounts.all().values_list("id", flat=True)
+
+    # test with a new basket and a new product, but for the same user
+    # we should get the plain discount and the user discount. we should _also_
+    # get the product discount, because the discount itself is automatic (but
+    # it won't apply, because it won't be valid)
+
+    new_product = ProductFactory.create()
+    basket.delete()
+    basket = Basket.objects.create(user=user)
+    BasketItem.objects.create(basket=basket, product=new_product)
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+
+    assert discounts.count() == 3
+    assert plain_discount.id in discounts.all().values_list("id", flat=True)
+    assert plain_attached_user_discount.id in discounts.all().values_list(
+        "id", flat=True
+    )
+    assert plain_attached_product_discount.id in discounts.all().values_list(
+        "id", flat=True
+    )
+
+    plain_attached_product_discount.automatic = False
+    plain_attached_product_discount.save()
+
+    # test with a new user, a new basket, and a new product
+    # we should only see the plain_discount (because it got set to automatic
+    # earlier and it's not attached to anything in particular)
+
+    new_user = UserFactory.create()
+    new_basket = Basket.objects.create(user=new_user)
+    BasketItem.objects.create(basket=new_basket, product=new_product)
+
+    discounts = get_auto_apply_discounts_for_basket(new_basket.id)
+
+    assert discounts.count() == 1
+    assert plain_discount.id in discounts.all().values_list("id", flat=True)
+
+
+def test_get_auto_apply_discounts_respects_dates(user):
+    """Test that the auto-apply discount function respects dates set on the Discount."""
+
+    run = CourseRunFactory.create()
+    product = ProductFactory.create(purchasable_object=run)
+    basket, _ = Basket.objects.get_or_create(user=user)
+
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+
+    # no dates
+    plain_discount_1 = UnlimitedUseDiscountFactory.create(automatic=True)
+    plain_discount_2 = UnlimitedUseDiscountFactory.create(automatic=True)
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+    assert discounts.count() == 2
+    assert plain_discount_1.id in discounts.all().values_list("id", flat=True)
+    assert plain_discount_2.id in discounts.all().values_list("id", flat=True)
+
+    # expiration only
+    plain_discount_1.expiration_date = now_in_utc() + timedelta(days=30)
+    plain_discount_1.save()
+
+    past_expiry = now_in_utc() - timedelta(days=30)
+    with freezegun.freeze_time(past_expiry):
+        plain_discount_2.expiration_date = past_expiry + timedelta(days=1)
+        plain_discount_2.save()
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+    assert discounts.count() == 1
+    assert plain_discount_1.id in discounts.all().values_list("id", flat=True)
+    assert plain_discount_2.id not in discounts.all().values_list("id", flat=True)
+
+    # activation - since discount 2 expires in the past, we shouldn't get any back now
+    plain_discount_1.activation_date = now_in_utc() + timedelta(days=1)
+    plain_discount_1.save()
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+    assert discounts.count() == 0
+
+
+def test_quote_user_price_picks_the_cheapest_across_discount_classes(user):
+    """
+    Financial assistance, a user-tied discount and an automatic one compete on
+    price alone, so the cheapest of the three wins whatever class it belongs
+    to -- and checkout charges the quoted price.
+    """
+    product = ProductFactory.create(price=Decimal("100.00"))
+    automatic = UnlimitedUseDiscountFactory.create(
+        automatic=True, amount=90, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    user_tied = UnlimitedUseDiscountFactory.create(
+        amount=10, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    UserDiscount.objects.create(discount=user_tied, user=user)
+    finaid = approve_flexible_price(user, product.purchasable_object.course, 20)
+
+    quote = quote_user_price(product, user)
+
+    assert quote.discount == automatic
+    assert quote.price == Decimal("10.00")
+
+    basket = Basket.objects.create(user=user)
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+    for discount in (finaid, user_tied, automatic):
+        apply_discount_to_basket(basket, discount, allow_finaid=True)
+
+    assert basket.basket_items.first().discounted_price == quote.price
+
+
+def test_quote_user_price_reports_no_discount_for_a_full_price_finaid_tier(user):
+    """
+    A candidate that quotes the list price is not worth reporting, so the
+    0%-off top tier leaves the learner at list price with no discount -- and
+    is still reported as the aid they hold.
+    """
+    product = ProductFactory.create(price=Decimal("100.00"))
+    finaid = approve_flexible_price(user, product.purchasable_object.course, 0)
+
+    quote = quote_user_price(product, user)
+
+    assert quote.discount is None
+    assert quote.price == product.price
+    assert quote.flexible_price_discount == finaid
+
+
+def test_quote_user_price_quotes_list_price_without_a_user(django_assert_num_queries):
+    """An anonymous or absent user is quoted list price, sale or no sale,
+    without reading the database at all.
+    """
+    product = ProductFactory.create()
+    UnlimitedUseDiscountFactory.create(
+        automatic=True, amount=50, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+
+    for caller in (AnonymousUser(), None):
+        with django_assert_num_queries(0):
+            quote = quote_user_price(product, caller)
+        assert quote.discount is None
+        assert quote.price == product.price
+        assert quote.flexible_price_discount is None
+        assert quote.source_line is None
+
+
+def test_quote_user_price_breaks_a_price_tie_on_the_lowest_discount_id(user):
+    """
+    Two automatic discounts quoting the same price are separated by id, so the
+    quote names one discount rather than depending on iteration order.
+    """
+    product = ProductFactory.create(price=Decimal("100.00"))
+    first = UnlimitedUseDiscountFactory.create(
+        automatic=True, amount=30, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    UnlimitedUseDiscountFactory.create(
+        automatic=True, amount=30, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+
+    quote = quote_user_price(product, user)
+
+    assert quote.discount == first
+    assert quote.price == Decimal("70.00")
+
+
+def test_quote_user_price_considers_every_user_tied_discount(user):
+    """
+    Checkout's auto-apply queryset offers every user-tied discount the learner
+    holds, so a second, cheaper UserDiscount row beats the first.
+    """
+    product = ProductFactory.create(price=Decimal("100.00"))
+    dearer = UnlimitedUseDiscountFactory.create(
+        amount=10, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    cheaper = UnlimitedUseDiscountFactory.create(
+        amount=40, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    UserDiscount.objects.create(discount=dearer, user=user)
+    UserDiscount.objects.create(discount=cheaper, user=user)
+
+    quote = quote_user_price(product, user)
+
+    assert quote.discount == cheaper
+    assert quote.price == Decimal("60.00")
+
+
+def test_quote_user_price_skips_an_automatic_tied_to_another_learner(user):
+    """
+    An automatic discount carrying a UserDiscount for someone else is refused
+    at checkout, so it is not quoted to this learner either.
+    """
+    product = ProductFactory.create()
+    automatic = UnlimitedUseDiscountFactory.create(
+        automatic=True, amount=50, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    UserDiscount.objects.create(discount=automatic, user=UserFactory.create())
+
+    quote = quote_user_price(product, user)
+
+    assert quote.discount is None
+    assert quote.price == product.price
+
+
+def test_quote_user_price_skips_an_internal_discount(user):
+    """
+    Checkout refuses an internal discount, so a UserDiscount row tying one to
+    this learner must not quote a price the cart will not honor.
+    """
+    product = ProductFactory.create()
+    internal = InternalDiscountFactory.create()
+    DiscountProduct.objects.create(discount=internal, product=product)
+    UserDiscount.objects.create(discount=internal, user=user)
+
+    quote = quote_user_price(product, user)
+
+    assert quote.discount is None
+    assert quote.price == product.price
+
+
+def test_quote_user_price_skips_a_discount_linked_to_another_product(user):
+    """
+    A discount carrying DiscountProduct links is in scope only for the products
+    those links name, so it does not price a product it is not linked to.
+    """
+    product = ProductFactory.create()
+    linked = UnlimitedUseDiscountFactory.create(
+        automatic=True, amount=50, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    DiscountProduct.objects.create(discount=linked, product=ProductFactory.create())
+
+    quote = quote_user_price(product, user)
+
+    assert quote.discount is None
+    assert quote.price == product.price
+
+
+def test_quote_user_price_matches_checkout_for_linked_purchase(paid_amount_off_source):
+    """
+    The quoted price is the price PendingOrder charges for that discount, and
+    the quote names the prior purchase the credit is spent from.
+    """
+    program_product = paid_amount_off_source.program_product
+    user = paid_amount_off_source.user
+
+    quote = quote_user_price(program_product, user)
+    order = PendingOrder.create_from_product(program_product, user, quote.discount)
+
+    assert quote.discount == paid_amount_off_source.discount
+    assert quote.price == Decimal("899.00")
+    assert quote.source_line == paid_amount_off_source.source_line
+    assert order.total_price_paid == quote.price
+
+
+def test_quote_user_price_confines_financial_assistance_to_its_courseware(user):
+    """
+    A tier discount carries no product links, so nothing but the aid lookup
+    confines it: a product the learner was not approved for is quoted list
+    price and reports no aid.
+    """
+    other = ProductFactory.create()
+    approve_flexible_price(user, CourseRunFactory.create().course, 25)
+
+    quote = quote_user_price(other, user)
+
+    assert quote.discount is None
+    assert quote.price == other.price
+    assert quote.flexible_price_discount is None
+
+
+def test_quote_user_price_keeps_an_automatic_that_is_also_a_tier_discount(user):
+    """
+    A discount that qualifies on its own -- here an automatic sale a tier also
+    points at -- prices a product the learner holds no aid for, so being
+    someone's tier discount does not narrow it to that courseware.
+    """
+    plain = ProductFactory.create(price=Decimal("100.00"))
+    shared = UnlimitedUseDiscountFactory.create(
+        automatic=True, amount=25, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    aided_course = CourseRunFactory.create().course
+    tier = FlexiblePriceTierFactory.create(
+        courseware_object=aided_course, discount=shared
+    )
+    FlexiblePriceFactory.create(
+        user=user,
+        courseware_object=aided_course,
+        tier=tier,
+        status=FlexiblePriceStatus.APPROVED,
+    )
+
+    quote = quote_user_price(plain, user)
+
+    assert quote.discount == shared
+    assert quote.price == Decimal("75.00")
+
+
+def test_quote_user_price_query_count_does_not_grow_with_unrelated_discounts(
+    paid_amount_off_source,
+):
+    """
+    One quote costs what the learner's own applicable discounts cost and
+    nothing more. Product scope is a filter on the candidate query rather than
+    a check per candidate, so five automatic discounts on sale elsewhere leave
+    the count untouched -- without that, each one costs queries whether or not
+    it can price this product.
+    """
+    user = paid_amount_off_source.user
+    program_product = paid_amount_off_source.program_product
+    approve_flexible_price(user, CourseRunFactory.create().course, 25)
+    UserDiscount.objects.create(
+        discount=UnlimitedUseDiscountFactory.create(
+            amount=10, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+        ),
+        user=user,
+    )
+
+    def reload_product():
+        return Product.objects.get(id=program_product.id)
+
+    # ContentType.objects.get_for_model caches per process, so the first quote
+    # pays for the lookups behind the source resolve and the second does not.
+    quote_user_price(reload_product(), user)
+
+    alone = reload_product()
+    with zeal_context(), CaptureQueriesContext(connection) as before:
+        quote_user_price(alone, user)
+
+    for _ in range(5):
+        elsewhere = OneTimePerUserDiscountFactory.create(
+            automatic=True, amount=5, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+        )
+        DiscountProduct.objects.create(
+            discount=elsewhere, product=ProductFactory.create()
+        )
+
+    crowded = reload_product()
+    with zeal_context(), CaptureQueriesContext(connection) as after:
+        quote = quote_user_price(crowded, user)
+
+    assert quote.discount == paid_amount_off_source.discount
+    assert quote.price == Decimal("899.00")
+    assert len(after) == len(before)
+
+
+@pytest.mark.parametrize(
+    "no_delay",
+    [
+        True,
+        False,
+    ],
+)
+def test_establish_basket_calls_create_user(mocker, no_delay):
+    """Test that establish_basket calls create_user if there's no edX username."""
+
+    if no_delay:
+        expected_run_mock = mocker.patch("ecommerce.api.create_user")
+        expected_skip_mock = mocker.patch("openedx.tasks.create_user_from_id.delay")
+    else:
+        expected_run_mock = mocker.patch("openedx.tasks.create_user_from_id.delay")
+        expected_skip_mock = mocker.patch("ecommerce.api.create_user")
+
+    user = UserFactory.create(no_openedx_api_auth=True, no_openedx_user=True)
+    request = RequestFactory().get("/")
+    request.user = user
+
+    basket = establish_basket(request, no_delay=no_delay)
+
+    expected_run_mock.assert_called_once()
+    expected_run_mock.reset_mock()
+    expected_skip_mock.assert_not_called()
+
+    OpenEdxUserFactory.create(user=user)
+    if not no_delay:
+        del user.openedx_user
+
+    basket.delete()
+
+    user.refresh_from_db()
+    request.user = user
+
+    assert user.edx_username
+
+    establish_basket(request)
+
+    assert not expected_run_mock.called
+
+
+def test_get_anonymous_basket_id_no_create_does_not_write_session():
+    """Test that create=False never mints or writes an id into the session"""
+    request = RequestFactory().get("/")
+    request.session = {}
+
+    result = get_anonymous_basket_id(request, create=False)
+
+    assert result is None
+    assert ANONYMOUS_BASKET_SESSION_KEY not in request.session
+
+
+def test_get_anonymous_basket_id_create_mints_and_is_idempotent():
+    """Test that create=True mints an id once and reuses it on subsequent calls"""
+    request = RequestFactory().get("/")
+    request.session = {}
+
+    first_id = get_anonymous_basket_id(request, create=True)
+
+    assert first_id is not None
+    assert request.session[ANONYMOUS_BASKET_SESSION_KEY] == first_id
+
+    second_id = get_anonymous_basket_id(request, create=True)
+
+    assert second_id == first_id
+
+
+def test_establish_basket_for_request_authenticated(user):
+    """Test that an authenticated request dispatches to establish_basket"""
+    request = RequestFactory().get("/")
+    request.session = {}
+    request.user = user
+
+    basket = establish_basket_for_request(request)
+
+    assert basket.user_id == user.id
+    assert basket.is_anonymous is False
+
+
+def test_establish_basket_for_request_anonymous_creates_basket():
+    """Test that an anonymous request creates a basket keyed by the session's anonymous id"""
+    request = RequestFactory().get("/")
+    request.session = {}
+    request.user = AnonymousUser()
+
+    basket = establish_basket_for_request(request)
+
+    assert basket.is_anonymous is True
+    assert str(basket.anonymous_id) == request.session[ANONYMOUS_BASKET_SESSION_KEY]
+
+    # A second call with the same session should return the same basket
+    same_basket = establish_basket_for_request(request)
+    assert same_basket.id == basket.id
+
+
+def test_establish_basket_for_request_for_update_locks_basket(mocker):
+    """Test that for_update=True re-fetches the basket with select_for_update"""
+    request = RequestFactory().get("/")
+    request.session = {}
+    request.user = AnonymousUser()
+
+    select_for_update_spy = mocker.spy(Basket.objects, "select_for_update")
+
+    basket = establish_basket_for_request(request, for_update=True)
+
+    select_for_update_spy.assert_called_once()
+    assert basket.is_anonymous is True
+
+
+def test_claim_anonymous_basket_no_session_returns_none(user):
+    """Test that there's nothing to claim if the session has no anonymous basket id"""
+    request = RequestFactory().get("/")
+    request.session = {}
+    request.user = user
+
+    assert claim_anonymous_basket(request) is None
+
+
+def test_claim_anonymous_basket_missing_basket_row_returns_none(user):
+    """Test a stale session id (e.g. the basket was culled) returns None rather than raising"""
+    request = RequestFactory().get("/")
+    request.session = {ANONYMOUS_BASKET_SESSION_KEY: str(uuid.uuid4())}
+    request.user = user
+
+    assert claim_anonymous_basket(request) is None
+
+
+def test_claim_anonymous_basket_claims_and_pops_session(user):
+    """Test the normal claim path: basket is reassigned, anonymous_id cleared, session popped"""
+    anon_request = RequestFactory().get("/")
+    anon_request.session = {}
+    anon_request.user = AnonymousUser()
+    anon_basket = establish_basket_for_request(anon_request)
+
+    claim_request = RequestFactory().get("/")
+    claim_request.session = anon_request.session
+    claim_request.user = user
+
+    claimed = claim_anonymous_basket(claim_request)
+
+    assert claimed.id == anon_basket.id
+    assert claimed.user_id == user.id
+    assert claimed.anonymous_id is None
+    assert ANONYMOUS_BASKET_SESSION_KEY not in claim_request.session
+
+
+def test_claim_anonymous_basket_discards_existing_user_basket(user):
+    """Test that an existing basket for the user is discarded in favor of the anonymous one"""
+    existing_basket = Basket.objects.create(user=user)
+
+    anon_request = RequestFactory().get("/")
+    anon_request.session = {}
+    anon_request.user = AnonymousUser()
+    anon_basket = establish_basket_for_request(anon_request)
+
+    claim_request = RequestFactory().get("/")
+    claim_request.session = anon_request.session
+    claim_request.user = user
+
+    claimed = claim_anonymous_basket(claim_request)
+
+    assert claimed.id == anon_basket.id
+    assert not Basket.objects.filter(pk=existing_basket.pk).exists()
+
+
+def test_claim_anonymous_basket_applies_user_discount_after_conversion(user):
+    """Test that a pre-assigned user discount is applied once the basket is claimed"""
+    product = ProductFactory.create()
+    discount = UnlimitedUseDiscountFactory.create()
+    UserDiscount.objects.create(discount=discount, user=user)
+
+    anon_request = RequestFactory().get("/")
+    anon_request.session = {}
+    anon_request.user = AnonymousUser()
+    anon_basket = establish_basket_for_request(anon_request)
+    BasketItem.objects.create(basket=anon_basket, product=product)
+
+    assert BasketDiscount.objects.filter(redeemed_basket=anon_basket).count() == 0
+
+    claim_request = RequestFactory().get("/")
+    claim_request.session = anon_request.session
+    claim_request.user = user
+
+    claimed = claim_anonymous_basket(claim_request)
+
+    assert (
+        BasketDiscount.objects.filter(
+            redeemed_basket=claimed, redeemed_discount=discount
+        ).count()
+        == 1
+    )
+
+
+def test_cull_anonymous_baskets(settings, user):
+    """Test that only anonymous baskets older than the cutoff are removed"""
+    settings.ANONYMOUS_BASKET_CULL_AGE = 100
+
+    old_anon_basket = Basket.objects.create(anonymous_id=uuid.uuid4())
+    Basket.objects.filter(pk=old_anon_basket.pk).update(
+        updated_on=now_in_utc() - timedelta(seconds=200)
+    )
+
+    recent_anon_basket = Basket.objects.create(anonymous_id=uuid.uuid4())
+
+    old_user_basket = Basket.objects.create(user=user)
+    Basket.objects.filter(pk=old_user_basket.pk).update(
+        updated_on=now_in_utc() - timedelta(seconds=200)
+    )
+
+    cull_anonymous_baskets()
+
+    assert not Basket.objects.filter(pk=old_anon_basket.pk).exists()
+    assert Basket.objects.filter(pk=recent_anon_basket.pk).exists()
+    assert Basket.objects.filter(pk=old_user_basket.pk).exists()
+
+
+def test_cull_stale_pending_orders(settings, user):
+    """
+    Only pending orders older than the cutoff with no payment activity or
+    funded redemptions should be removed.
+    """
+    settings.PENDING_ORDER_CULL_AGE_DAYS = 60
+    old = now_in_utc() - timedelta(days=61)
+
+    def age_order(order, created_on=old):
+        Order.objects.filter(pk=order.pk).update(created_on=created_on)
+        return order
+
+    def make_order(state=OrderStatus.PENDING, *, created_on=old):
+        return age_order(OrderFactory.create(purchaser=user, state=state), created_on)
+
+    def make_pending_line():
+        line = make_purchase(
+            user, CourseRunFactory.create(), Decimal(100), state=OrderStatus.PENDING
+        )
+        age_order(line.order)
+        return line
+
+    stale_line = make_pending_line()
+    stale = stale_line.order
+    stale_redemption = DiscountRedemptionFactory.create(redeemed_order=stale)
+    recent = make_order(created_on=now_in_utc() - timedelta(days=59))
+    old_fulfilled = make_order(OrderStatus.FULFILLED)
+    old_canceled = make_order(OrderStatus.CANCELED)
+    with_transaction = make_order()
+    TransactionFactory.create(order=with_transaction, transaction_id="paid")
+    with_stripe_event = make_order()
+    StripeEventLog.objects.create(
+        event_id="evt_test", event_data={}, related_order=with_stripe_event
+    )
+    funding_line = make_pending_line()
+    DiscountRedemptionFactory.create(source_line=funding_line)
+
+    cull_stale_pending_orders()
+
+    assert not Order.objects.filter(pk=stale.pk).exists()
+    assert not Line.objects.filter(pk=stale_line.pk).exists()
+    assert not DiscountRedemption.objects.filter(pk=stale_redemption.pk).exists()
+    for kept in [
+        recent,
+        old_fulfilled,
+        old_canceled,
+        with_transaction,
+        with_stripe_event,
+        funding_line.order,
+    ]:
+        assert Order.objects.filter(pk=kept.pk).exists()
+
+
+@pytest.mark.parametrize(
+    "stripe_status",
+    [
+        STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
+        STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+        STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+        None,
+    ],
+)
+def test_cull_stale_pending_orders_checks_stripe(mocker, settings, user, stripe_status):
+    """
+    Stale Stripe orders should be checked with Stripe first: only cancelled
+    sessions are culled, paid ones are resolved, and the rest are kept. A
+    status of None means the Stripe lookup failed.
+    """
+    settings.PENDING_ORDER_CULL_AGE_DAYS = 60
+    mock_status = mocker.patch(
+        "ecommerce.api.process_stripe_checkout_session_status",
+        return_value={"status": stripe_status, "transaction": {"id": "cs_test"}},
+        side_effect=None if stripe_status else APIConnectionError("Stripe is down"),
+    )
+    mock_fulfill = mocker.patch("ecommerce.models.OrderFlow.fulfill")
+    mocker.patch("ecommerce.api.sync_hubspot_deal")
+
+    order = OrderFactory.create(
+        purchaser=user, gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE
+    )
+    TransactionFactory.create(
+        order=order,
+        transaction_id="cs_test_stale",
+        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+        data={"object": STRIPE_OBJECT_CHECKOUT_SESSION, "id": "cs_test_stale"},
+    )
+    Order.objects.filter(pk=order.pk).update(
+        created_on=now_in_utc() - timedelta(days=61)
+    )
+
+    if stripe_status:
+        cull_stale_pending_orders()
+    else:
+        with pytest.raises(APIConnectionError):
+            cull_stale_pending_orders()
+
+    mock_status.assert_called_once_with("cs_test_stale")
+    assert Order.objects.filter(pk=order.pk).exists() is not (
+        stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED
+    )
+    if stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
+        mock_fulfill.assert_called_once_with(
+            {"id": "cs_test"}, already_enrolled=False, skip_receipt=False
+        )
+    else:
+        mock_fulfill.assert_not_called()
+
+
+def test_log_stripe_event():
+    """Test that the event logging functionality works as expected."""
+
+    event = stripe_event()
+    log_stripe_event(event)
+
+    assert StripeEventLog.objects.filter(event_id=event.id).exists()
+
+
+def _configure_checkout_session_object(
+    order_line, *, was_successful=True, is_expired=False
+):
+    """
+    Generate and configure a Stripe CheckoutSession for testing.
+
+    This all sets up a Stripe Event with a checkout session that looks
+    right-ish for the order. A lot of this data will be set to whatever
+    is in the sample object, which is fine; we really only care about the
+    reference number and status fields when processing.
+
+    The data is not signed - Stripe passes this in the HTTP headers and that
+    is handled before it gets to what's under test.
+
+    Note that was_successful and is_expired are different states and would
+    be different events. was_successful is ignored if is_expired is True.
+
+    Args:
+    - order_line (Line): the line item to start with
+    - was_successful (bool): if the result should be a successful one or not
+    - is_expired (bool): if the session expired
+    """
+
+    cart_item = CartItem(
+        sku=order_line.courseware,
+        code=order_line.courseware,
+        unitprice=Decimal(order_line.unit_price),
+        name=order_line.courseware,
+    )
+
+    # use the payment gateway to generate the line items to get everything
+    # shaped right, then convert those to StripeObject so they match what
+    # Stripe sends. (also, their to_dict has a "for_json" that fixes
+    # Decimal and other things, but not if it's not a StripeObject.)
+    gateway = PaymentGateway.get_gateway_class(MITOL_PAYMENT_GATEWAY_STRIPE)
+    formatted_line = gateway._generate_line_item(cart_item)  # noqa: SLF001
+    formatted_lines = convert_to_stripe_object([formatted_line])
+
+    event = stripe_event()
+
+    event.type = (
+        "checkout.session.expired" if is_expired else "checkout.session.completed"
+    )
+    event.data.object = stripe_checkout_session()
+    event.data.object.mode = "payment"
+    event.data.object.line_items = formatted_lines
+    event.data.object.client_reference_id = order_line.order.reference_number
+    event.data.object.customer_email = order_line.order.purchaser.email
+    # Stripe expects this in cents.
+    event.data.object.amount_total = int(order_line.order.total_price_paid * 100)
+    event.data.object.amount_subtotal = int(order_line.order.total_price_paid * 100)
+
+    if is_expired:
+        event.data.object.payment_status = STRIPE_PAYMENT_STATUS_UNPAID
+        event.data.object.status = STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED
+    elif was_successful:
+        event.data.object.payment_status = STRIPE_PAYMENT_STATUS_PAID
+        event.data.object.status = STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE
+    else:
+        event.data.object.payment_status = STRIPE_PAYMENT_STATUS_UNPAID
+        event.data.object.status = STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE
+
+    return event
+
+
+class MockedCheckoutSessionClient:
+    """Mocked Stripe CheckoutSession client"""
+
+    session_status = ""
+    payment_status = ""
+    payment_intent_status = ""
+    cancel_reason = ""
+    reference_number = ""
+
+    def __init__(
+        self,
+        session_status,
+        payment_status,
+        payment_intent_status,
+        cancel_reason,
+        ref_no,
+    ):
+        """Set up the session with the noted statuses."""
+
+        self.session_status = session_status
+        self.payment_status = payment_status
+        self.reference_number = ref_no
+        # These get ignored later on if expand doesn't get set.
+        self.payment_intent_status = payment_intent_status
+        self.cancel_reason = cancel_reason
+
+    def retrieve(self, session_id, options=None):
+        """Retrieve the (fake) checkout session."""
+
+        session = stripe_checkout_session()
+        session.id = session_id
+        session.status = self.session_status
+        session.payment_status = self.payment_status
+        session.client_reference_id = self.reference_number
+
+        if (
+            isinstance(options, dict)
+            and "expand" in options
+            and "payment_intent" in options["expand"]
+            and len(self.payment_intent_status) > 0
+        ):
+            session.payment_intent = stripe_payment_intent()
+            session.payment_intent.status = self.payment_intent_status
+            if self.cancel_reason:
+                session.payment_intent.cancellation_reason = self.cancel_reason
+
+        return session
+
+
+@pytest.mark.parametrize(
+    (
+        "cs_status",
+        "cs_payment_status",
+        "pi_status",
+        "pi_cancel_reason",
+        "expected_status",
+    ),
+    [
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            "",
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_PAID,
+            "",
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_NPR,
+            "",
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            "",
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            STRIPE_PAYMENT_INTENT_STATUS_PROCESSING,
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            STRIPE_PAYMENT_INTENT_STATUS_PROCESSING,
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            STRIPE_PAYMENT_INTENT_STATUS_SUCCEEDED,
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_PAID,
+            STRIPE_PAYMENT_INTENT_STATUS_SUCCEEDED,
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            STRIPE_PAYMENT_INTENT_STATUS_CANCELLED,
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_ACTION,
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_CAPTURE,
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_CONFIRMATION,
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
+        ),
+        (
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_UNPAID,
+            STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_PAYMENT_METHOD,
+            "",
+            STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
+        ),
+    ],
+)
+def test_process_stripe_checkout_completed(  # noqa: PLR0913
+    mocker,
+    bootstrapped_verified_program,
+    cs_status,
+    cs_payment_status,
+    pi_status,
+    pi_cancel_reason,
+    expected_status,
+):
+    """
+    Test that the checkout processing works.
+
+    As a side effect, this also tests process_stripe_checkout_session_status.
+    """
+
+    *_, cr_product = bootstrapped_verified_program
+
+    product_version = Version.objects.get_for_object(cr_product).get()
+    order_line = LineFactory.create(
+        product_version=product_version,
+        order__gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+    )
+
+    mocked_cs_client = mocker.patch(
+        "ecommerce.api._get_stripe_checkout_session_v1",
+        side_effect=lambda: MockedCheckoutSessionClient(
+            cs_status,
+            cs_payment_status,
+            pi_status,
+            pi_cancel_reason,
+            order_line.order.reference_number,
+        ),
+    )
+
+    event = _configure_checkout_session_object(order_line)
+
+    updated_order = process_stripe_checkout_completed(event)
+
+    mocked_cs_client.assert_called()
+    assert updated_order
+    assert updated_order.id == order_line.order.id
+    if expected_status in [
+        STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+        STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
+    ]:
+        assert updated_order.state == OrderStatus.PENDING
+    elif expected_status == STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
+        assert updated_order.state == OrderStatus.FULFILLED
+    elif expected_status == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED:
+        assert updated_order.state == OrderStatus.CANCELED
+    else:
+        assert updated_order.state == OrderStatus.ERRORED
+
+
+def test_process_stripe_checkout_expired(bootstrapped_verified_program):
+    """
+    Test that expiry works as expected.
+
+    This works a bit differenty than the completed webhook; a hit here signifies
+    that the order is effectively cancelled so we can do less processing.
+    """
+
+    *_, cr_product = bootstrapped_verified_program
+
+    product_version = Version.objects.get_for_object(cr_product).get()
+    order_line = LineFactory.create(
+        product_version=product_version,
+        order__gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+    )
+
+    event = _configure_checkout_session_object(order_line, is_expired=True)
+
+    updated_order = process_stripe_checkout_expired(event)
+
+    assert updated_order
+    assert updated_order.id == order_line.order.id
+    assert updated_order.state == OrderStatus.CANCELED
+
+
+@pytest.mark.parametrize("test_type", ["empty", "completed", "cancelled"])
+def test_retrieve_pending_cs_orders(mocker, test_type):
+    """Test that pending CyberSource order get pulled successfully."""
+
+    if test_type == "empty":
+        order = []
+        return_value = {}
+    else:
+        order = [OrderFactory.create(state=OrderStatus.PENDING)]
+        return_value = {
+            order[0].reference_number: {
+                "req_reference_number": order[0].reference_number,
+                "reason_code": 100 if test_type == "completed" else 999,
+            }
+        }
+
+    mocked_cs_gateway = mocker.patch(
+        "mitol.payment_gateway.api.CyberSourcePaymentGateway.find_and_get_transactions",
+        return_value=return_value,
+    )
+
+    completed, cancelled = _retrieve_pending_cybersource_orders(order)
+
+    if test_type == "empty":
+        mocked_cs_gateway.asesrt_not_called()
+        assert len(completed.keys()) == 0
+        assert len(cancelled.keys()) == 0
+    else:
+        mocked_cs_gateway.assert_called()
+        assert len(completed.keys()) == (0 if test_type == "cancelled" else 1)
+        assert len(cancelled.keys()) == (0 if test_type == "completed" else 1)
+
+
+def test_apply_user_discounts_validates_against_the_whole_basket(
+    paid_amount_off_source,
+):
+    """A user discount linked to the second basket item is applied, not refused against the first."""
+    request = RequestFactory().get("/")
+    request.user = paid_amount_off_source.user
+    basket = Basket.objects.create(user=paid_amount_off_source.user)
+    BasketItem.objects.create(
+        basket=basket, product=ProductFactory.create(), quantity=1
+    )
+    BasketItem.objects.create(
+        basket=basket, product=paid_amount_off_source.program_product, quantity=1
+    )
+    UserDiscount.objects.create(
+        user=paid_amount_off_source.user, discount=paid_amount_off_source.discount
+    )
+
+    apply_user_discounts(request)
+
+    assert basket.discounts.get().redeemed_discount == paid_amount_off_source.discount
+
+
+def test_revalidation_passes_a_resolvable_program_child_purchase_discount(
+    paid_amount_off_source,
+):
+    """
+    Both revalidation call sites hand the basket's products to is_redeemable_by.
+    Without them a program-child-purchase discount fails closed, and a False from
+    check_basket_discounts_for_validity wipes every basket discount and blocks
+    checkout.
+    """
+    request = RequestFactory().get("/")
+    request.user = paid_amount_off_source.user
+    basket = Basket.objects.create(user=paid_amount_off_source.user)
+    BasketItem.objects.create(
+        basket=basket, product=paid_amount_off_source.program_product, quantity=1
+    )
+    UserDiscount.objects.create(
+        user=paid_amount_off_source.user, discount=paid_amount_off_source.discount
+    )
+
+    apply_user_discounts(request)
+
+    assert basket.discounts.get().redeemed_discount == paid_amount_off_source.discount
+    assert check_basket_discounts_for_validity(request) is True
+
+
+STRIPE_TEST_PAYMENT_INTENT_ID = "pi_1GszsK2eZvKYlo2CfhZyoZLp"
+
+
+def _stripe_payment_transaction_data(data_shape, payment_intent_id):
+    """
+    Return payment transaction data for a Stripe order.
+
+    - event: a checkout.session.completed Event (from the webhook)
+    - session: a CheckoutSession with an unexpanded PaymentIntent
+    - session_expanded: a CheckoutSession with the PaymentIntent expanded
+      (from the pending order check)
+    """
+
+    if data_shape == "event":
+        return {
+            "id": f"evt_{uuid.uuid4().hex}",
+            "object": "event",
+            "data": {
+                "object": {
+                    "id": "cs_test",
+                    "object": "checkout.session",
+                    "payment_intent": payment_intent_id,
+                }
+            },
+        }
+
+    if data_shape == "session":
+        return {
+            "id": f"cs_{uuid.uuid4().hex}",
+            "object": "checkout.session",
+            "payment_intent": payment_intent_id,
+        }
+
+    return {
+        "id": f"cs_{uuid.uuid4().hex}",
+        "object": "checkout.session",
+        "payment_intent": {"id": payment_intent_id, "object": "payment_intent"},
+    }
+
+
+def _create_stripe_order_with_payment(
+    *,
+    state=OrderStatus.FULFILLED,
+    data_shape="event",
+    payment_intent_id=STRIPE_TEST_PAYMENT_INTENT_ID,
+):
+    """Create a Stripe order with a payment transaction for the PaymentIntent."""
+
+    order = OrderFactory.create(
+        state=state,
+        gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+        total_price_paid=Decimal("10.00"),
+    )
+    data = _stripe_payment_transaction_data(data_shape, payment_intent_id)
+    TransactionFactory.create(
+        order=order,
+        transaction_id=data["id"],
+        transaction_type=TRANSACTION_TYPE_PAYMENT,
+        data=data,
+    )
+
+    return order
+
+
+def _configure_refund_event(
+    event_type=STRIPE_EVENT_REFUND_UPDATED,
+    *,
+    status="succeeded",
+    payment_intent_id=STRIPE_TEST_PAYMENT_INTENT_ID,
+    amount=1000,
+):
+    """Generate a Stripe refund event."""
+
+    refund = stripe_refund()
+    refund.status = status
+    refund.payment_intent = payment_intent_id
+    refund.amount = amount
+
+    event = stripe_event()
+    event.id = f"evt_{uuid.uuid4().hex}"
+    event.type = event_type
+    event.data.object = refund
+
+    return event
+
+
+@pytest.mark.parametrize("data_shape", ["event", "session", "session_expanded"])
+def test_find_order_for_stripe_payment_intent(data_shape):
+    """The order should be found no matter how the payment was recorded."""
+
+    order = _create_stripe_order_with_payment(data_shape=data_shape)
+    _create_stripe_order_with_payment(payment_intent_id="pi_someotherintent")
+
+    assert find_order_for_stripe_payment_intent(STRIPE_TEST_PAYMENT_INTENT_ID) == order
+
+
+def test_find_order_for_stripe_payment_intent_no_match():
+    """None should be returned if nothing matches the PaymentIntent."""
+
+    _create_stripe_order_with_payment(payment_intent_id="pi_someotherintent")
+
+    assert find_order_for_stripe_payment_intent(STRIPE_TEST_PAYMENT_INTENT_ID) is None
+
+
+@pytest.mark.parametrize(
+    "event_type", [STRIPE_EVENT_REFUND_UPDATED, STRIPE_EVENT_CHARGE_REFUND_UPDATED]
+)
+@pytest.mark.parametrize("amount", [1000, 500])
+def test_process_stripe_refund_updated(mocker, event_type, amount):
+    """A succeeded refund should refund the order and downgrade the learner."""
+
+    downgrade_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_downgrade_from_order.delay"
+    )
+    order = _create_stripe_order_with_payment()
+    event = _configure_refund_event(event_type, amount=amount)
+
+    result = process_stripe_refund_updated(event)
+
+    assert result == order
+    assert result.state == OrderStatus.REFUNDED
+
+    refund_transaction = order.transactions.get(
+        transaction_type=TRANSACTION_TYPE_REFUND
+    )
+    assert refund_transaction.transaction_id == event.data.object.id
+    assert refund_transaction.amount == Decimal(amount) / 100
+    assert refund_transaction.data == event.data.object.to_dict(for_json=True)
+
+    downgrade_task_mock.assert_called_once_with(order.id)
+
+
+def test_process_stripe_refund_updated_both_events(mocker):
+    """Stripe sends two events per refund; only one should refund the order."""
+
+    downgrade_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_downgrade_from_order.delay"
+    )
+    order = _create_stripe_order_with_payment()
+
+    assert (
+        process_stripe_refund_updated(
+            _configure_refund_event(STRIPE_EVENT_REFUND_UPDATED)
+        )
+        == order
+    )
+    assert (
+        process_stripe_refund_updated(
+            _configure_refund_event(STRIPE_EVENT_CHARGE_REFUND_UPDATED)
+        )
+        is True
+    )
+
+    assert (
+        order.transactions.filter(transaction_type=TRANSACTION_TYPE_REFUND).count() == 1
+    )
+    downgrade_task_mock.assert_called_once_with(order.id)
+
+
+@pytest.mark.parametrize("status", ["pending", "requires_action", "failed", "canceled"])
+def test_process_stripe_refund_updated_not_succeeded(mocker, status):
+    """Refunds that haven't succeeded should be skipped."""
+
+    downgrade_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_downgrade_from_order.delay"
+    )
+    order = _create_stripe_order_with_payment()
+
+    assert process_stripe_refund_updated(_configure_refund_event(status=status)) is True
+
+    order.refresh_from_db()
+    assert order.state == OrderStatus.FULFILLED
+    assert not order.transactions.filter(
+        transaction_type=TRANSACTION_TYPE_REFUND
+    ).exists()
+    downgrade_task_mock.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("order_state", "expected_result"),
+    [
+        (OrderStatus.REFUNDED, True),
+        (OrderStatus.PENDING, False),
+        (OrderStatus.CANCELED, False),
+        (OrderStatus.PARTIALLY_REFUNDED, False),
+    ],
+)
+def test_process_stripe_refund_updated_wrong_order_state(
+    mocker, order_state, expected_result
+):
+    """Orders that aren't fulfilled should be left alone."""
+
+    downgrade_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_downgrade_from_order.delay"
+    )
+    order = _create_stripe_order_with_payment(state=order_state)
+
+    assert process_stripe_refund_updated(_configure_refund_event()) is expected_result
+
+    order.refresh_from_db()
+    assert order.state == order_state
+    assert not order.transactions.filter(
+        transaction_type=TRANSACTION_TYPE_REFUND
+    ).exists()
+    downgrade_task_mock.assert_not_called()
+
+
+@pytest.mark.parametrize("payment_intent_id", [None, "pi_nomatchingorder"])
+def test_process_stripe_refund_updated_no_order(mocker, payment_intent_id):
+    """The refund should fail if there's no order for it."""
+
+    downgrade_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_downgrade_from_order.delay"
+    )
+    order = _create_stripe_order_with_payment()
+
+    assert (
+        process_stripe_refund_updated(
+            _configure_refund_event(payment_intent_id=payment_intent_id)
+        )
+        is False
+    )
+
+    order.refresh_from_db()
+    assert order.state == OrderStatus.FULFILLED
+    downgrade_task_mock.assert_not_called()
+
+
+def test_process_stripe_refund_updated_links_event_log(mocker):
+    """The logged event should be linked to the refunded order."""
+
+    mocker.patch("ecommerce.tasks.perform_downgrade_from_order.delay")
+    order = _create_stripe_order_with_payment()
+    event = _configure_refund_event()
+    log_stripe_event(event)
+
+    process_stripe_refund_updated(event)
+
+    assert StripeEventLog.objects.get(event_id=event.id).related_order == order
+
+
+def test_process_stripe_refund_updated_wrong_event_type():
+    """Non-refund events should be rejected."""
+
+    with pytest.raises(ValueError):  # noqa: PT011
+        process_stripe_refund_updated(
+            _configure_refund_event(STRIPE_EVENT_CHECKOUT_SESSION_EXPIRED)
+        )
+
+
+@pytest.mark.parametrize(
+    "item_b2b_only",
+    [
+        "b2b_only",
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "user_in_contract",
+    [
+        "user_in_contract",
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "b2b_line",
+    [
+        "b2b_line",
+        False,
+    ],
+)
+def test_generate_checkout_payload_b2b_optional_run(
+    bootstrapped_verified_program, item_b2b_only, user_in_contract, b2b_line
+):
+    """
+    Test that we get proper validation if the basket contains B2B-adjacent items.
+
+    The purchasable item can be either B2B-only or not. If it's B2B-only,
+    we need to make sure the basket is OK for B2B purchasing.
+
+    The line items can be attached to a contract. If they are, the basket
+    needs to be checked for the appropriate discount. (The B2B process will
+    add these, so this is checking that someone isn't trying to get around
+    that.)
+
+    If no lines have contracts, and no items are B2B only, then it's not B2B
+    so even if the items _have_ contracts, these will be public enrollments
+    so no further checking.
+
+    This does not apply any discounts so it can check to make sure things
+    fail as expected.
+    """
+
+    from b2b.models import ContractProgramItem  # noqa: PLC0415
+
+    (prog, *_, run, run_prod) = bootstrapped_verified_program
+
+    # Set these to $0 to avoid payment processing
+    with reversion.create_revision():
+        run_prod.price = 0
+        run_prod.save()
+
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_CODE, max_learners=1
+    )
+
+    user = UserFactory.create()
+    if user_in_contract:
+        user.b2b_contracts.add(contract)
+
+    run.b2b_contracts.add(contract)
+    cpi = ContractProgramItem(contract=contract, program=prog, sort_order=0)
+    cpi.save(skip_run_creation=True)
+
+    if item_b2b_only:
+        run.b2b_only = True
+        run.save()
+
+    basket = create_basket(user, [run_prod])
+
+    if b2b_line:
+        basket.basket_items.update(b2b_contract=contract)
+
+    request = authed_request(user)
+
+    result = generate_checkout_payload(request)
+
+    if (b2b_line or item_b2b_only) and not user_in_contract:
+        assert "error" in result
+    else:
+        assert "error" not in result
+
+
+@pytest.mark.parametrize("raise_compliance_data_errors", [False, True])
+def test_generate_checkout_payload_compliance_data_error(
+    mocker, user, products, raise_compliance_data_errors
+):
+    """
+    Profile data the export compliance check can't use comes back as a
+    profile_incomplete payload naming the fields (for the cart), or is raised
+    (for callers whose errors the API exception handler turns into CS_701).
+    """
+    create_basket(user, products)
+    mocker.patch(
+        "ecommerce.models.Basket.has_user_blocked_products",
+        side_effect=ExportComplianceDataError(user, ["last_name"]),
+    )
+    request = authed_request(user)
+
+    if raise_compliance_data_errors:
+        with pytest.raises(ExportComplianceDataError):
+            generate_checkout_payload(request, raise_compliance_data_errors=True)
+    else:
+        assert generate_checkout_payload(request) == {
+            "profile_incomplete": True,
+            "error": USER_MSG_TYPE_PROFILE_INCOMPLETE,
+            "missing_fields": ["last_name"],
+        }
+    assert not PendingOrder.objects.filter(purchaser=user).exists()

@@ -13,7 +13,6 @@ from rich.console import Console
 from rich.table import Table
 
 from b2b.models import ContractPage, OrganizationPage
-from courses.models import CourseRun
 
 log = logging.getLogger(__name__)
 
@@ -240,7 +239,7 @@ class Command(BaseCommand):
         contract_table.add_column("Name", justify="left")
         contract_table.add_column("Slug", justify="left")
         contract_table.add_column("Org Name", justify="left")
-        contract_table.add_column("Integration", justify="left")
+        contract_table.add_column("Membership", justify="left")
         contract_table.add_column("Start", justify="left")
         contract_table.add_column("End", justify="left")
         contract_table.add_column("Active", justify="left")
@@ -253,7 +252,7 @@ class Command(BaseCommand):
                 contract.name,
                 contract.slug,
                 contract.organization.name,
-                contract.integration_type,
+                contract.membership_type,
                 contract.contract_start.strftime("%Y-%m-%d\n%H:%M")
                 if contract.contract_start
                 else "",
@@ -275,8 +274,7 @@ class Command(BaseCommand):
         org_text = kwargs.pop("org_text")
         contract_id = kwargs.pop("contract_id")
 
-        # We only link course runs to contracts. This will need to be updated
-        # if we ever have other types (like program runs or something).
+        # We now attach course runs and programs to contracts.
 
         contract_page_qs = ContractPage.objects
 
@@ -295,13 +293,9 @@ class Command(BaseCommand):
         if contract_id:
             contract_page_qs = contract_page_qs.filter(id=contract_id)
 
-        contracts = contract_page_qs.all()
-
-        courseware = (
-            CourseRun.objects.prefetch_related("b2b_contract")
-            .filter(b2b_contract__in=contracts)
-            .all()
-        )
+        contracts = contract_page_qs.prefetch_related(
+            "contract_programs__program", "course_runs"
+        ).all()
 
         courseware_table = Table(title="Courseware")
         courseware_table.add_column("ID", justify="right")
@@ -312,16 +306,31 @@ class Command(BaseCommand):
         courseware_table.add_column("Start", justify="left")
         courseware_table.add_column("End", justify="left")
 
-        for cw in courseware:
-            courseware_table.add_row(
-                str(cw.id),
-                f"{cw.b2b_contract.organization.name}\n{cw.b2b_contract.name}",
-                "CR",
-                cw.readable_id,
-                cw.title,
-                cw.start_date.strftime("%Y-%m-%d\n%H:%M") if cw.start_date else "",
-                cw.end_date.strftime("%Y-%m-%d\n%H:%M") if cw.end_date else "",
-            )
+        for contract in contracts:
+            # We'll start by listing out the associated programs, and then listing
+            # out the course runs.
+
+            for prog in contract.programs.all():
+                courseware_table.add_row(
+                    str(prog.id),
+                    f"{contract.organization.name}\n{contract.name}",
+                    "PROG",
+                    prog.readable_id,
+                    prog.title,
+                    "---",
+                    "---",
+                )
+
+            for cw in contract.course_runs.all():
+                courseware_table.add_row(
+                    str(cw.id),
+                    f"{contract.organization.name}\n{contract.name}",
+                    "CR",
+                    cw.readable_id,
+                    cw.title,
+                    cw.start_date.strftime("%Y-%m-%d\n%H:%M") if cw.start_date else "",
+                    cw.end_date.strftime("%Y-%m-%d\n%H:%M") if cw.end_date else "",
+                )
 
         self.console.print(courseware_table)
 
@@ -357,7 +366,7 @@ class Command(BaseCommand):
         for learner in learners:
             learners_table.add_row(
                 learner.email,
-                f"{learner.first_name} {learner.last_name}",
+                f"{learner.name}",
             )
         self.console.print(learners_table)
 

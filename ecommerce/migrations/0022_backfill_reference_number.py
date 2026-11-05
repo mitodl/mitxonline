@@ -2,7 +2,7 @@
 
 from django.conf import settings
 from django.db import migrations
-from django.db.models import F, Value
+from django.db.models import CharField, F, Value
 from django.db.models.functions import Concat
 
 from ecommerce.constants import REFERENCE_NUMBER_PREFIX
@@ -16,6 +16,7 @@ def backfill_order_reference_number(apps, schema_editor):
             Value(settings.ENVIRONMENT),
             Value("-"),
             F("id"),
+            output_field=CharField(),
         )
     )
 

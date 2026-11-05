@@ -4,17 +4,16 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime
-from typing import TYPE_CHECKING, Optional, Set, Tuple, TypeVar, Union  # noqa: UP035
+from typing import TYPE_CHECKING, Set, Tuple, TypeVar, Union  # noqa: UP035
 from urllib.parse import quote_plus
+from zoneinfo import ZoneInfo
 
 import dateutil
-import pytz
 import redis_lock
 from django.conf import settings
 from django.core.cache import caches
 from django.core.serializers import serialize
 from django.http import HttpRequest, HttpResponseRedirect
-from django.urls import reverse
 from mitol.common.utils.urls import remove_password_from_url
 from rest_framework import status
 
@@ -27,6 +26,25 @@ if TYPE_CHECKING:
     from rest_framework.response import Response
 
 
+def get_learn_base_url() -> str:
+    """Get the MIT Learn base URL for the current environment."""
+    return settings.MIT_LEARN_BASE_URL
+
+
+def get_learn_product_url(product_type: str, readable_id: str) -> str:
+    """
+    Build the MIT Learn URL for a course or program product page.
+
+    Args:
+        product_type: "courses" or "programs"
+        readable_id: the course or program's readable_id
+
+    Returns:
+        str: the absolute MIT Learn URL for the given product
+    """
+    return f"{get_learn_base_url()}/{product_type}/{readable_id}"
+
+
 def get_js_settings(request: HttpRequest):  # noqa: ARG001
     """
     Get the set of JS settings
@@ -37,7 +55,6 @@ def get_js_settings(request: HttpRequest):  # noqa: ARG001
     Returns:
         dict: the settings object
     """
-    oidc_login_url = reverse("social:begin", kwargs={"backend": "ol-oidc"})
 
     return {
         "gaTrackingID": settings.GA_TRACKING_ID,
@@ -50,9 +67,13 @@ def get_js_settings(request: HttpRequest):  # noqa: ARG001
         "features": {},
         "posthog_api_token": settings.POSTHOG_PROJECT_API_KEY,
         "posthog_api_host": settings.POSTHOG_API_HOST,
-        "unified_ecommerce_url": settings.UNIFIED_ECOMMERCE_URL,
-        "oidc_login_url": oidc_login_url if settings.EXPOSE_OIDC_LOGIN else None,
+        "oidc_login_url": None,
         "api_gateway_enabled": not settings.MITOL_APIGATEWAY_DISABLE_MIDDLEWARE,
+        "mit_learn_dashboard_url": settings.MIT_LEARN_DASHBOARD_URL,
+        "mit_learn_terms_url": settings.MIT_LEARN_TERMS_URL,
+        "mit_learn_privacy_url": settings.MIT_LEARN_PRIVACY_URL,
+        "mit_learn_honor_code_url": settings.MIT_LEARN_HONOR_CODE_URL,
+        "mit_learn_base_url": get_learn_base_url(),
     }
 
 
@@ -185,7 +206,7 @@ def parse_supplied_date(datearg):
     if retDate.utcoffset() is not None:
         retDate = retDate - retDate.utcoffset()
 
-    retDate = retDate.replace(tzinfo=pytz.timezone(TIME_ZONE))
+    retDate = retDate.replace(tzinfo=ZoneInfo(TIME_ZONE))
     return retDate  # noqa: RET504
 
 
@@ -197,15 +218,15 @@ def format_decimal(amount: Decimal):
 def now_datetime_with_tz():
     """Return now with the configured timezone."""
 
-    return datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
+    return datetime.now(tz=ZoneInfo(settings.TIME_ZONE))
 
 
-def date_to_datetime(date: date, tzinfo: Optional[str] = None) -> datetime:
+def date_to_datetime(date: date, tzinfo: str | None = None) -> datetime:
     """Convert a regular date to a datetime with optiona timezone info."""
 
     ret_date = datetime.fromisocalendar(*date.isocalendar())
     if tzinfo:
-        ret_date = ret_date.replace(tzinfo=pytz.timezone(tzinfo))
+        ret_date = ret_date.replace(tzinfo=ZoneInfo(tzinfo))
     return ret_date
 
 

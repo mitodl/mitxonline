@@ -1,0 +1,230 @@
+"""Tests for import_courserun management command"""
+
+from io import StringIO
+from unittest.mock import Mock
+
+import pytest
+from django.core.management import call_command
+
+from courses.factories import (
+    CourseFactory,
+    DepartmentFactory,
+    ProgramFactory,
+)
+from courses.management.commands import import_courserun
+from courses.models import CourseRun
+from variants.models import SupportedVariant
+
+pytestmark = [pytest.mark.django_db]
+
+
+@pytest.fixture
+def mock_edx_course_detail():
+    """Mock edX course detail response"""
+    mock_course = Mock()
+    mock_course.course_id = "course-v1:MITx+6.00x+2023_Fall"
+    mock_course.name = "Introduction to Computer Science"
+    mock_course.start = "2023-09-01T00:00:00Z"
+    mock_course.end = "2023-12-15T00:00:00Z"
+    mock_course.enrollment_start = "2023-08-01T00:00:00Z"
+    mock_course.enrollment_end = "2023-09-15T00:00:00Z"
+    mock_course.is_self_paced.return_value = False
+    return mock_course
+
+
+@pytest.fixture
+def mock_edx_api_client(mock_edx_course_detail):
+    """Mock edX API client"""
+    mock_client = Mock()
+    mock_client.get_detail.return_value = mock_edx_course_detail
+    return mock_client
+
+
+@pytest.fixture
+def department():
+    """Create a department for testing"""
+    return DepartmentFactory.create(name="Computer Science")
+
+
+@pytest.fixture
+def program_with_courses():
+    """Create a program with courses for testing"""
+    program = ProgramFactory.create(readable_id="program-v1:MITx+CS")
+    course1 = CourseFactory.create(readable_id="course-v1:MITx+6.00x")
+    course2 = CourseFactory.create(readable_id="course-v1:MITx+6.001x")
+    program.add_requirement(course1)
+    program.add_requirement(course2)
+    return program
+
+
+class TestImportCourserunCommand:
+    """Test cases for the import_courserun command"""
+
+    def test_program_without_run_tag(self, mocker, program_with_courses):
+        """Test that providing program without run_tag does nothing"""
+        # Mock the API client to prevent it from being initialized
+        mocker.patch(
+            "courses.management.commands.import_courserun.get_edx_api_course_detail_client"
+        )
+
+        command = import_courserun.Command()
+        result = command.handle(program=str(program_with_courses.id))
+        assert result is None
+
+    def test_run_tag_without_program(self, mocker):
+        """Test that providing run_tag without program does nothing"""
+        # Mock the API client to prevent it from being initialized
+        mocker.patch(
+            "courses.management.commands.import_courserun.get_edx_api_course_detail_client"
+        )
+
+        command = import_courserun.Command()
+        result = command.handle(run_tag="2023_Fall")
+        assert result is None
+
+    @pytest.mark.parametrize(
+        ("publish_cms_page", "draft_cms_page", "expected_error"),
+        [
+            (True, True, True),
+            (True, False, False),
+            (False, True, False),
+            (False, False, False),
+        ],
+    )
+    def test_cms_page_flag_validation(
+        self, mocker, publish_cms_page, draft_cms_page, expected_error
+    ):
+        """Test validation of mutually exclusive CMS page flags"""
+        # Mock the API client to prevent it from being initialized
+        mocker.patch(
+            "courses.management.commands.import_courserun.get_edx_api_course_detail_client"
+        )
+
+        command = import_courserun.Command()
+        result = command.handle(
+            publish_cms_page=publish_cms_page, draft_cms_page=draft_cms_page
+        )
+
+        if expected_error:
+            assert result is False
+        else:
+            assert result is None
+
+    def test_use_specific_course_flag_passed_to_api(
+        self, mocker, mock_edx_api_client, mock_edx_course_detail
+    ):
+        """Test that --use-specific-course is forwarded to the import API"""
+
+        mocker.patch(
+            "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
+            return_value=mock_edx_api_client,
+        )
+
+        import_mock = mocker.patch(
+            "courses.management.commands.import_courserun.import_courserun_from_edx"
+        )
+
+        command = import_courserun.Command()
+
+        use_specific_course = "course-v1:MITx+6.00x"
+
+        command.handle(
+            courserun=mock_edx_course_detail.course_id,
+            use_specific_course=use_specific_course,
+        )
+
+        import_mock.assert_called_once()
+        _, kwargs = import_mock.call_args
+        assert kwargs["course_key"] == mock_edx_course_detail.course_id
+        assert kwargs["use_specific_course"] == use_specific_course
+
+    def test_bad_language(self, mocker, mock_edx_api_client, mock_edx_course_detail):
+        """Test that specifying a bad language fails"""
+
+        mocker.patch(
+            "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
+            return_value=mock_edx_api_client,
+        )
+        mocker.patch(
+            "courses.api.get_edx_api_course_detail_client",
+            return_value=mock_edx_api_client,
+        )
+        mocker.patch("courses.api.get_edx_course_modes", return_value=[])
+        std_out = StringIO()
+        std_err = StringIO()
+
+        call_command(
+            "import_courserun",
+            stdout=std_out,
+            stderr=std_err,
+            courserun=mock_edx_course_detail.course_id,
+            language="qq",
+            length="S",
+            industry="E",
+        )
+
+        assert len(std_err.getvalue()) > 0
+        assert not CourseRun.objects.filter(
+            courseware_id=mock_edx_course_detail.course_id
+        ).exists()
+
+    @pytest.mark.parametrize(
+        "valid_variant",
+        [
+            True,
+            False,
+        ],
+    )
+    def test_variant_options(
+        self, mocker, mock_edx_api_client, mock_edx_course_detail, valid_variant
+    ):
+        """Test that the variant options are set properly."""
+
+        mocker.patch(
+            "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
+            return_value=mock_edx_api_client,
+        )
+        mocker.patch(
+            "courses.api.get_edx_api_course_detail_client",
+            return_value=mock_edx_api_client,
+        )
+        mocker.patch("courses.api.get_edx_course_modes", return_value=[])
+
+        if valid_variant:
+            course = CourseFactory.create(readable_id="course-v1:MITx+6.00x")
+            SupportedVariant.objects.create(
+                variant_object=course,
+                language="fr",
+                variant_length="S",
+                variant_industry="E",
+                default_variant=False,
+                b2b_only=False,
+            )
+
+        std_out = StringIO()
+        std_err = StringIO()
+
+        call_command(
+            "import_courserun",
+            stdout=std_out,
+            stderr=std_err,
+            courserun=mock_edx_course_detail.course_id,
+            language="fr",
+            length="S",
+            industry="E",
+        )
+
+        std_err_str = std_err.getvalue()
+        std_out_str = std_out.getvalue()
+
+        assert len(std_err_str) == 0
+        assert "Created new run" in std_out_str
+        if not valid_variant:
+            assert "not a valid variant" in std_out_str
+
+        courserun = CourseRun.objects.get(
+            courseware_id=mock_edx_course_detail.course_id
+        )
+
+        assert courserun.variant_length == "S"
+        assert courserun.variant_industry == "E"

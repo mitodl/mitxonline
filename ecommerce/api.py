@@ -2,135 +2,298 @@
 
 import logging
 import uuid
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from decimal import Decimal
 from urllib.parse import urljoin
 
+import stripe
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q, QuerySet
 from django.urls import reverse
 from ipware import get_client_ip
 from mitol.common.utils.datetime import now_in_utc
+from mitol.olposthog.features import is_enabled
 from mitol.payment_gateway.api import CartItem as GatewayCartItem
 from mitol.payment_gateway.api import Order as GatewayOrder
 from mitol.payment_gateway.api import PaymentGateway, ProcessorResponse
+from mitol.payment_gateway.constants import (
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+    MITOL_PAYMENT_GATEWAY_STRIPE,
+)
 
 from b2b.api import (
     get_active_contracts_from_basket_items,
     is_discount_supplied_for_b2b_purchase,
 )
-from courses.api import create_run_enrollments, deactivate_run_enrollment
+from compliance.exceptions import ExportComplianceDataError
+from courses.api import (
+    create_run_enrollments,
+    deactivate_run_enrollment,
+    downgrade_program_enrollment_and_verified_runs,
+)
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
+from courses.models import CourseRunEnrollment
+from courses.utils import is_uai_course_run, is_xpro_course_run
 from ecommerce.constants import (
+    ADMIN_FULFILLED_PAYMENT_DATA,
     ALL_DISCOUNT_TYPES,
     ALL_PAYMENT_TYPES,
     ALL_REDEMPTION_TYPES,
+    CHECKOUT_CANCEL_ROUTE_MAP,
+    CHECKOUT_SUCCESS_ROUTE_MAP,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    PAYMENT_TYPE_SALES,
+    REDEMPTION_TYPE_INTERNAL,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
     REFUND_SUCCESS_STATES,
+    STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+    STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
+    STRIPE_EVENTS_CHECKOUT_SESSION,
+    STRIPE_EVENTS_REFUND,
+    STRIPE_OBJECT_CHECKOUT_SESSION,
+    STRIPE_OBJECT_REFUND,
+    STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
+    STRIPE_OVERALL_CHECKOUT_STATUS_ERROR,
+    STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+    STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+    STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
+    STRIPE_PAYMENT_INTENT_STATUS_CANCELLED,
+    STRIPE_PAYMENT_INTENT_STATUS_PROCESSING,
+    STRIPE_PAYMENT_INTENT_STATUS_SUCCEEDED,
+    STRIPE_PAYMENT_STATUS_UNPAID,
+    STRIPE_PAYMENT_STATUSES_GOOD,
+    STRIPE_REFUND_STATUS_SUCCEEDED,
+    STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+    TRANSACTION_TYPE_PAYMENT,
     ZERO_PAYMENT_DATA,
+)
+from ecommerce.discount_sources import (
+    double_spent_source_line_ids,
+    fulfilled_paid_amount_off_redemptions,
+    source_line_for,
+)
+from ecommerce.exceptions import (
+    VerifiedProgramCourseNotInProgramError,
+    VerifiedProgramInvalidBasketError,
+    VerifiedProgramInvalidOrderError,
+    VerifiedProgramNoEnrollmentError,
+    VerifiedProgramNoProductError,
 )
 from ecommerce.models import (
     Basket,
     BasketDiscount,
     BasketItem,
     Discount,
+    DiscountProduct,
     DiscountRedemption,
     FulfilledOrder,
+    Line,
     Order,
     OrderStatus,
     PendingOrder,
+    Product,
+    StripeEventLog,
+    Transaction,
     UserDiscount,
 )
 from ecommerce.tasks import perform_downgrade_from_order
 from flexiblepricing.api import determine_courseware_flexible_price_discount
-from hubspot_sync.task_helpers import sync_hubspot_deal
+from hubspot_sync.task_helpers import sync_hubspot_cart_add, sync_hubspot_deal
+from main import features
 from main.constants import (
+    USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
+    USER_MSG_TYPE_B2B_INVALID_BASKET,
+    USER_MSG_TYPE_BASKET_EMPTY,
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
-    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
-    USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY,
+    USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
-from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
-from main.utils import parse_supplied_date, redirect_with_user_message
-from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE
+from main.utils import parse_supplied_date
+from openedx.api import create_user
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.tasks import create_user_from_id
 
 log = logging.getLogger(__name__)
 
 
-def generate_checkout_payload(request):  # noqa: PLR0911
-    """Generate the checkout payload for the current basket."""
+def get_checkout_success_url(gateway_type):
+    """Get the success endpoint for the gateway type."""
 
-    from b2b.api import validate_basket_for_b2b_purchase
+    if gateway_type not in CHECKOUT_SUCCESS_ROUTE_MAP:
+        msg = f"Gateway {gateway_type} has no success route mapped"
+        raise ValidationError(msg)
 
-    basket = establish_basket(request)
+    return urljoin(
+        settings.SITE_BASE_URL, reverse(CHECKOUT_SUCCESS_ROUTE_MAP[gateway_type])
+    )
 
-    if basket.has_user_blocked_products(request.user):
-        return {
-            "country_blocked": True,
-            "response": redirect_with_user_message(
-                reverse("user-dashboard"),
-                {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
-            ),
-        }
 
-    if basket.has_user_purchased_same_courserun(request.user):
-        return {
-            "purchased_same_courserun": True,
-            "response": redirect_with_user_message(
-                reverse("cart"),
-                {"type": USER_MSG_TYPE_ENROLL_DUPLICATED},
-            ),
-        }
+def get_checkout_cancel_url(gateway_type):
+    """Get the cancel endpoint for the gateway type."""
 
-    if basket.has_user_purchased_non_upgradable_courserun():
-        return {
-            "purchased_non_upgradeable_courserun": True,
-            "response": redirect_with_user_message(
-                reverse("cart"),
-                {"type": USER_MSG_TYPE_COURSE_NON_UPGRADABLE},
-            ),
-        }
+    if gateway_type not in CHECKOUT_CANCEL_ROUTE_MAP:
+        msg = f"Gateway {gateway_type} has no cancel route mapped"
+        raise ValidationError(msg)
 
-    if not check_basket_discounts_for_validity(request):
-        # We only allow one discount per basket so clear all of them here.
-        basket.discounts.all().delete()
-        apply_user_discounts(request)
-        return {
-            "invalid_discounts": True,
-            "response": redirect_with_user_message(
-                reverse("cart"),
-                {"type": USER_MSG_TYPE_DISCOUNT_INVALID},
-            ),
-        }
+    return urljoin(
+        settings.SITE_BASE_URL, reverse(CHECKOUT_CANCEL_ROUTE_MAP[gateway_type])
+    )
+
+
+def _validate_basket_steps_for_b2b(basket, request):
+    """
+    Validate the basket for B2B.
+
+    Only run the B2B validation if necessary - the basket either contains a
+    B2B-only item, or a discount code has been applied for a B2B contract.
+    """
+
+    from b2b.api import validate_basket_for_b2b_purchase  # noqa: PLC0415
+
+    item_qs = basket.basket_items.prefetch_related(
+        "product", "product__purchasable_object"
+    ).all()
+    b2b_only_items = [
+        item for item in item_qs if item.product.purchasable_object.b2b_only
+    ]
+    basket_item_contracts = [item.b2b_contract for item in item_qs if item.b2b_contract]
+
+    if len(b2b_only_items) == 0 and len(basket_item_contracts) == 0:
+        # No item in the cart is b2b-only
+        # No basket lines have contracts attached to them
+        # This is not a B2B-related purchase, so skip further validation
+        return {}
 
     active_contracts = get_active_contracts_from_basket_items(basket)
 
     if not is_discount_supplied_for_b2b_purchase(request, active_contracts):
         return {
             "invalid_discounts": True,
-            "response": redirect_with_user_message(
-                reverse("cart"),
-                {"type": USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY},
-            ),
+            "error": USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
         }
 
     if not validate_basket_for_b2b_purchase(request, active_contracts):
         return {
             "invalid_discounts": True,
-            "response": redirect_with_user_message(
-                reverse("cart"),
-                {"type": USER_MSG_TYPE_DISCOUNT_INVALID},
-            ),
+            "error": USER_MSG_TYPE_B2B_INVALID_BASKET,
         }
 
-    order = PendingOrder.create_from_basket(basket)
+    return {}
+
+
+def generate_checkout_payload(  # noqa: PLR0911, C901
+    request,
+    *,
+    skip_discount_check=False,
+    skip_receipt=False,
+    gateway_type=None,
+    raise_compliance_data_errors=False,
+):
+    """
+    Generate the checkout payload for the current basket.
+
+    Set skip_discount_check when generating a payload for a verified program
+    enrollment. The discount in that case is attached to the program, not the
+    courserun that's being purchased, so it's technically "invalid".
+
+    This will use the default configured gateway unless it is able to determine that the current user should use a specific gateway. This can be
+    overridden by specifying gateway_type.
+
+    Args:
+    - request: the incoming http request
+    Kwargs:
+    - skip_discount_check: skip checking discounts for validity (default False)
+    - skip_receipt: skip sending order receipt email (default False)
+    - gateway_type: specify specific gateway type (default None)
+    - raise_compliance_data_errors: raise ExportComplianceDataError rather than
+      returning a profile_incomplete payload (default False)
+    """
+
+    from b2b.api import apply_contract_discounts_to_basket  # noqa: PLC0415
+
+    basket = establish_basket(request)
+
+    if not gateway_type:
+        global_id = request.user.global_id
+        if global_id and is_enabled(
+            features.STRIPE_ENABLE_FEATURE_FLAG,
+            default=False,
+            opt_unique_id=global_id,
+        ):
+            gateway_type = MITOL_PAYMENT_GATEWAY_STRIPE
+        else:
+            gateway_type = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
+
+    try:
+        has_blocked_products = basket.has_user_blocked_products(request.user)
+    except ExportComplianceDataError as exc:
+        if raise_compliance_data_errors:
+            raise
+        # The learner can fix this themselves, unlike a compliance denial.
+        log.info(
+            "Checkout blocked on incomplete profile for user=%s: missing %s",
+            request.user.id,
+            exc.missing_fields,
+        )
+        return {
+            "profile_incomplete": True,
+            "error": USER_MSG_TYPE_PROFILE_INCOMPLETE,
+            "missing_fields": exc.profile_fields,
+        }
+
+    if has_blocked_products:
+        return {
+            "country_blocked": True,
+            "error": USER_MSG_TYPE_ENROLL_BLOCKED,
+        }
+
+    if basket.has_user_purchased_same_courserun(request.user):
+        return {
+            "purchased_same_courserun": True,
+            "error": USER_MSG_TYPE_ENROLL_DUPLICATED,
+        }
+
+    if basket.has_user_purchased_non_upgradable_courserun():
+        return {
+            "purchased_non_upgradeable_courserun": True,
+            "error": USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
+        }
+
+    if not skip_discount_check:
+        # Pick up contract pricing for anything in the basket that's in one of
+        # the user's contracts, if it isn't there already.
+        apply_contract_discounts_to_basket(basket)
+
+    if not skip_discount_check and not check_basket_discounts_for_validity(request):
+        # We only allow one discount per basket so clear all of them here.
+        basket.discounts.all().delete()
+        apply_user_discounts(request)
+        return {
+            "invalid_discounts": True,
+            "error": USER_MSG_TYPE_DISCOUNT_INVALID,
+        }
+
+    b2b_validation_result = _validate_basket_steps_for_b2b(basket, request)
+
+    if b2b_validation_result:
+        return b2b_validation_result
+
+    if not basket.basket_items.count():
+        return {
+            "basket_empty": True,
+            "error": USER_MSG_TYPE_BASKET_EMPTY,
+        }
+
+    order = PendingOrder.create_from_basket(basket, gateway_type=gateway_type)
     total_price = 0
 
     ip = get_client_ip(request)[0]
@@ -159,37 +322,42 @@ def generate_checkout_payload(request):  # noqa: PLR0911
     if total_price == 0:
         with transaction.atomic():
             fulfill_completed_order(
-                order, payment_data=ZERO_PAYMENT_DATA, basket=basket
+                order,
+                payment_data=ZERO_PAYMENT_DATA,
+                basket=basket,
+                skip_receipt=skip_receipt,
             )
 
         order.refresh_from_db()
-        order.create_enrollments()
 
         return {
             "no_checkout": True,
-            "response": redirect_with_user_message(
-                reverse("user-dashboard"),
-                {
-                    "type": USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
-                    "run": order.lines.first().purchased_object.course.title,
-                },
-            ),
+            "order": order,
             "order_id": order.id,
         }
 
-    callback_uri = urljoin(settings.SITE_BASE_URL, reverse("checkout-result-callback"))
     payload = PaymentGateway.start_payment(
-        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
+        gateway_type,
         gateway_order,
-        callback_uri,
-        callback_uri,
+        get_checkout_success_url(gateway_type),
+        get_checkout_cancel_url(gateway_type),
         merchant_fields=[basket.id],
     )
 
-    return payload  # noqa: RET504
+    if gateway_type == MITOL_PAYMENT_GATEWAY_STRIPE:
+        # We will have gotten a CheckoutSession object from start_payment above.
+        # This needs to be logged as a transaction, or we won't be able to find
+        # this again in Stripe if something goes wrong after this step.
+        order_flow = order.get_object_flow()
+        order_flow.create_transaction(
+            payload["payload"].to_dict(for_json=True),
+            reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+        )
+
+    return payload
 
 
-def check_discount_for_products(discount, basket):
+def check_discount_for_products(discount, basket, products=None):
     """
     Checks the validity of the discount against what's in the basket.
 
@@ -200,13 +368,14 @@ def check_discount_for_products(discount, basket):
     Args:
         - basket (Basket): the current basket
         - discount (Discount|string: the discount to apply (if a string, loads the discount code specified)
+        - products (list or None): basket.get_products(), for a caller that already has it
     Returns:
         boolean
     """
     if not isinstance(discount, Discount):
         discount = Discount.objects.filter(discount_code=discount).first()
 
-    basket_products = basket.get_products()
+    basket_products = basket.get_products() if products is None else products
 
     return discount.check_validity_with_products(basket_products)
 
@@ -221,10 +390,14 @@ def check_basket_discounts_for_validity(request):
     """
     basket = establish_basket(request)
 
+    basket_products = basket.get_products()
+
     for basket_discount in basket.discounts.all():
-        if not basket_discount.redeemed_discount.check_validity(
-            basket.user
-        ) or not check_discount_for_products(basket_discount.redeemed_discount, basket):
+        if not basket_discount.redeemed_discount.is_redeemable_by(
+            basket.user, basket_products
+        ) or not check_discount_for_products(
+            basket_discount.redeemed_discount, basket, basket_products
+        ):
             return False
 
     return True
@@ -236,14 +409,25 @@ def apply_user_discounts(request):
     reason, this will just do the first one. More logic needs to be added here
     if/when discounts apply to specific things.)
 
+    Once those are sorted out, this applies the enrollment codes for any
+    contracts the user is in that cover what's in the basket - see
+    b2b.api.apply_contract_discounts_to_basket.
+
     Args:
         - user (User): The currently authenticated user.
 
     Returns:
         None
     """
+    from b2b.api import apply_contract_discounts_to_basket  # noqa: PLC0415
+
     basket = establish_basket(request)
-    user = request.user
+    _apply_user_discounts_to_basket(basket, request.user)
+    apply_contract_discounts_to_basket(basket)
+
+
+def _apply_user_discounts_to_basket(basket, user):
+    """Apply the user's financial assistance or user-tied discount to the basket."""
     discount = None
 
     BasketDiscount.objects.filter(
@@ -253,7 +437,14 @@ def apply_user_discounts(request):
     if BasketDiscount.objects.filter(redeemed_basket=basket).count() > 0:
         return
 
-    product = BasketItem.objects.get(basket=basket).product
+    # For multiple items, check each item for flexible pricing discounts
+    basket_items = BasketItem.objects.filter(basket=basket)
+    if basket_items.count() == 0:
+        return
+
+    # Use the first item's product for flexible pricing determination
+    # This maintains backward compatibility while supporting multiple items
+    product = basket_items.first().product
     flexible_price_discount = determine_courseware_flexible_price_discount(
         product, user
     )
@@ -265,10 +456,11 @@ def apply_user_discounts(request):
             discount = user_discount.discount
 
     if discount:
+        basket_products = basket.get_products()
         # check for product specificity in the discount
         if not check_discount_for_products(
-            discount, basket
-        ) or not discount.check_validity(user):
+            discount, basket, basket_products
+        ) or not discount.is_redeemable_by(user, basket_products):
             return
 
         bd = BasketDiscount(
@@ -282,9 +474,17 @@ def apply_user_discounts(request):
     return
 
 
-def fulfill_completed_order(order, payment_data, basket=None, already_enrolled=False):  # noqa: FBT002
+def fulfill_completed_order(
+    order,
+    payment_data,
+    basket=None,
+    already_enrolled=False,  # noqa: FBT002
+    skip_receipt=False,  # noqa: FBT002
+):
     order_flow = order.get_object_flow()
-    order_flow.fulfill(payment_data, already_enrolled=already_enrolled)
+    order_flow.fulfill(
+        payment_data, already_enrolled=already_enrolled, skip_receipt=skip_receipt
+    )
     sync_hubspot_deal(order)
 
     if basket and basket.compare_to_order(order):
@@ -294,7 +494,7 @@ def fulfill_completed_order(order, payment_data, basket=None, already_enrolled=F
 def get_order_from_cybersource_payment_response(request):
     payment_data = request.POST
     converted_order = PaymentGateway.get_gateway_class(
-        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
+        settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
     ).convert_to_order(payment_data)
     order_id = Order.decode_reference_number(converted_order.reference)
 
@@ -318,14 +518,14 @@ def process_cybersource_payment_response(request, order):
     """
 
     if not PaymentGateway.validate_processor_response(
-        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
+        settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
     ):
         raise PermissionDenied(
             "Could not validate response from the payment processor."  # noqa: EM101
         )
 
     processor_response = PaymentGateway.get_formatted_response(
-        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
+        settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
     )
 
     # Log message if reason_code is anything other than 100 (successful transaction)
@@ -400,17 +600,259 @@ def process_cybersource_payment_response(request, order):
     return return_message
 
 
-def establish_basket(request):
+def establish_basket(request, *, no_delay=False):
     """
-    Gets or creates the user's basket. (This may get some more logic later.)
+    Gets or creates the user's basket. Queue creation of their edX user if necessary.
+
+    Kwargs:
+        no_delay (bool): don't queue the edX user creation
     """
     user = request.user
+
+    if not user.edx_username:
+        if no_delay:
+            create_user(user)
+            # The openedx_user is a cached property, so delete the cached value
+            del user.openedx_user
+        else:
+            create_user_from_id.delay(user.id)
+
     (basket, is_new) = Basket.objects.get_or_create(user=user)
 
     if is_new:
         basket.save()
 
     return basket
+
+
+ANONYMOUS_BASKET_SESSION_KEY = "anonymous_basket_id"
+
+
+def get_anonymous_basket_id(request, *, create=False):
+    """
+    Get the anonymous basket id stored in the request's session, minting one
+    if requested and none exists yet.
+
+    Kwargs:
+        create (bool): mint and store a new id in the session if one isn't
+            already present. Only pass True from call sites that are about to
+            write to the basket - minting an id writes to the session, which
+            forces a Set-Cookie header and defeats caching for anonymous page
+            views that don't need one.
+    """
+    anonymous_id = request.session.get(ANONYMOUS_BASKET_SESSION_KEY)
+
+    if anonymous_id is None and create:
+        anonymous_id = str(uuid.uuid4())
+        request.session[ANONYMOUS_BASKET_SESSION_KEY] = anonymous_id
+
+    return anonymous_id
+
+
+def establish_basket_for_request(request, *, for_update=False):
+    """
+    Get or create the basket for the current request, whether the requester
+    is authenticated or anonymous.
+
+    Kwargs:
+        for_update (bool): re-fetch the basket with select_for_update() so it's
+            locked for the remainder of the caller's transaction. Pass True
+            when the caller is about to mutate basket contents.
+    """
+    if request.user.is_authenticated:
+        basket = establish_basket(request)
+    else:
+        anonymous_id = get_anonymous_basket_id(request, create=True)
+        basket, _ = Basket.objects.get_or_create(anonymous_id=anonymous_id)
+
+    if for_update:
+        basket = Basket.objects.select_for_update().get(pk=basket.pk)
+
+    return basket
+
+
+def claim_anonymous_basket(request):
+    """
+    Convert the anonymous basket identified by the current session into a
+    basket for the now-authenticated request.user.
+
+    If request.user already has a basket, it is discarded in favor of the
+    anonymous basket - the anonymous basket reflects what was just shown on
+    the cart page, and merging would silently change the price the user saw.
+
+    Returns the claimed basket, or None if there's no anonymous basket to
+    claim (e.g. an expired session).
+    """
+    anonymous_id = get_anonymous_basket_id(request, create=False)
+    if anonymous_id is None:
+        return None
+
+    with transaction.atomic():
+        try:
+            anon_basket = Basket.objects.select_for_update().get(
+                anonymous_id=anonymous_id
+            )
+        except Basket.DoesNotExist:
+            return None
+
+        Basket.objects.filter(user=request.user).exclude(pk=anon_basket.pk).delete()
+
+        anon_basket.user = request.user
+        anon_basket.anonymous_id = None
+        anon_basket.save(update_fields=["user", "anonymous_id"])
+
+    del request.session[ANONYMOUS_BASKET_SESSION_KEY]
+    apply_user_discounts(request)
+
+    return anon_basket
+
+
+def cull_anonymous_baskets():
+    """
+    Delete anonymous baskets that haven't been touched in a while (abandoned
+    carts). A basket's anonymous_id is only reachable via its session cookie,
+    so once that cookie could plausibly have expired there's no way for a
+    basket to ever be claimed - it's safe to remove.
+    """
+    cutoff = now_in_utc() - timedelta(seconds=settings.ANONYMOUS_BASKET_CULL_AGE)
+
+    Basket.objects.filter(anonymous_id__isnull=False, updated_on__lt=cutoff).delete()
+
+
+def cull_stale_pending_orders():
+    """
+    Delete PendingOrders that are older than PENDING_ORDER_CULL_AGE_DAYS.
+    Checkout creates a new PendingOrder each time, so abandoned checkouts
+    leave these behind.
+
+    Orders with any record of payment activity (transactions, Stripe events)
+    are kept so they can still be resolved and audited, as are orders whose
+    lines fund a discount redemption (those are protected). The transaction
+    Stripe checkout records for its CheckoutSession before the learner pays
+    doesn't count as payment activity, but that session is checked with Stripe
+    before the order is deleted (see _check_stale_stripe_orders).
+    """
+    cutoff = now_in_utc() - timedelta(days=settings.PENDING_ORDER_CULL_AGE_DAYS)
+
+    payment_transactions = Transaction.objects.filter(order=OuterRef("pk")).exclude(
+        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION
+    )
+
+    stale_orders = (
+        PendingOrder.objects.filter(
+            state=OrderStatus.PENDING,
+            created_on__lt=cutoff,
+            stripeeventlog__isnull=True,
+        )
+        .exclude(Exists(payment_transactions))
+        .exclude(lines__funded_redemptions__isnull=False)
+    )
+
+    keep_ids = _check_stale_stripe_orders(
+        stale_orders.filter(gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE)
+    )
+
+    _, deleted = stale_orders.exclude(id__in=keep_ids).delete()
+    log.info("Culled stale pending orders: %s", deleted)
+
+
+def _check_stale_stripe_orders(orders):  # noqa: C901
+    """
+    Check the CheckoutSession of each stale Stripe order with Stripe, so a
+    paid order whose webhook never got processed isn't deleted.
+
+    Only orders whose session was cancelled (or that have no session to check)
+    can be deleted. Paid orders are fulfilled. Orders in any other state, or
+    whose session couldn't be retrieved, are kept and checked again on the
+    next run.
+
+    Returns:
+    - set of IDs of the orders to keep
+    """
+    session_ids = {
+        txn.order_id: txn.data.get("id")
+        for txn in Transaction.objects.filter(
+            order__in=orders,
+            reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+            data__object=STRIPE_OBJECT_CHECKOUT_SESSION,
+        )
+    }
+
+    keep_ids = set()
+
+    for order in orders:
+        session_id = session_ids.get(order.id)
+
+        if not session_id:
+            continue
+
+        try:
+            session = process_stripe_checkout_session_status(session_id)
+        except stripe.APIConnectionError:
+            log.exception(
+                "Stripe API connection error encountered checking order %s, can't continue.",
+                order.reference_number,
+            )
+            raise
+        except stripe.AuthenticationError:
+            log.exception(
+                "Stripe API authentication error encountered checking order %s, can't continue.",
+                order.reference_number,
+            )
+            raise
+        except stripe.PermissionError:
+            log.exception(
+                "Stripe API permission error encountered checking order %s, can't continue.",
+                order.reference_number,
+            )
+            raise
+        except stripe.RateLimitError:
+            log.exception(
+                "Hit Stripe rate limit checking order %s, can't continue.",
+                order.reference_number,
+            )
+            raise
+        except stripe.StripeError:
+            log.exception(
+                "StripeError encountered checking checkout session %s for stale order %s, can't continue",
+                session_id,
+                order.reference_number,
+            )
+            raise
+
+        if session["status"] == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED:
+            continue
+
+        keep_ids.add(order.id)
+
+        if session["status"] != STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
+            log.info(
+                "Keeping stale order %s: CheckoutSession %s is %s",
+                order.reference_number,
+                session_id,
+                session["status"],
+            )
+            continue
+
+        locked_order = Order.objects.select_for_update().get(pk=order.id)
+        if locked_order.state in [
+            OrderStatus.FULFILLED,
+            OrderStatus.CANCELED,
+            OrderStatus.ERRORED,
+            OrderStatus.REFUNDED,
+            OrderStatus.DECLINED,
+        ]:
+            continue
+
+        log.debug(
+            "Stale order %s was paid in Stripe, fulfilling it",
+            locked_order.reference_number,
+        )
+
+        with transaction.atomic():
+            fulfill_completed_order(locked_order, session["transaction"])
+
+    return keep_ids
 
 
 def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs):  # noqa: RUF013
@@ -453,6 +895,14 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
 
     transaction_dict = order_recent_transaction.data
 
+    # Ensure the payment gateway can find the transaction ID — it may be stored
+    # on the model field but absent from the raw data blob (e.g. legacy records).
+    if "transaction_id" not in transaction_dict:
+        transaction_dict = {
+            **transaction_dict,
+            "transaction_id": order_recent_transaction.transaction_id,
+        }
+
     # Check for a PayPal payment - if there's one, we can't process it
     if "paypal_token" in transaction_dict:
         raise Exception(  # noqa: TRY002
@@ -466,23 +916,15 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
         transaction_dict["req_amount"] = refund_amount
 
     refund_gateway_request = PaymentGateway.create_refund_request(
-        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, transaction_dict
+        settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, transaction_dict
     )
 
     response = PaymentGateway.start_refund(
-        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
+        settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
         refund_gateway_request,
     )
 
-    if response.state in REFUND_SUCCESS_STATES:
-        # Record refund transaction with PaymentGateway's refund response
-        order_flow = order.get_object_flow()
-        order_flow.refund(
-            api_response_data=response.response_data,
-            amount=transaction_dict["req_amount"],
-            reason=refund_reason,
-        )
-    else:
+    if response.state not in REFUND_SUCCESS_STATES:
         log.error(
             "There was an error with the Refund API request %s",
             response.message,
@@ -491,11 +933,54 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
         # success so we manually rollback the transaction in this case.
         raise Exception(f"Payment gateway returned an error: {response.message}")  # noqa: EM102, TRY002
 
+    # Record refund transaction with PaymentGateway's refund response
+    record_order_refund(
+        order,
+        api_response_data=response.response_data,
+        amount=transaction_dict["req_amount"],
+        reason=refund_reason,
+        unenroll=unenroll,
+    )
+
+    return True, message
+
+
+def record_order_refund(
+    order: Order,
+    *,
+    api_response_data: dict,
+    amount,
+    reason: str = "",
+    unenroll: bool = False,
+):
+    """
+    Record a refund that the payment processor has already completed.
+
+    This moves the order into the refunded state, logs the refund transaction,
+    and (optionally) queues the enrollment downgrade. It does not talk to the
+    payment gateway - use refund_order if the refund still needs to be issued.
+
+    Args:
+    - order (Order): the fulfilled order that was refunded
+    - api_response_data (dict): the processor's refund data; must have an "id"
+    - amount (Decimal|str|float): the amount refunded
+    - reason (str): the reason for the refund
+    - unenroll (bool): downgrade the learner's enrollments for the order
+    Returns:
+    - Transaction: the refund transaction
+    """
+
+    refund_transaction = order.get_object_flow().refund(
+        api_response_data=api_response_data,
+        amount=amount,
+        reason=reason,
+    )
+
     # If unenroll requested, perform unenrollment after successful refund
     if unenroll:
         perform_downgrade_from_order.delay(order.id)
 
-    return True, message
+    return refund_transaction
 
 
 def downgrade_learner_from_order(order_id):
@@ -506,14 +991,48 @@ def downgrade_learner_from_order(order_id):
 
     order = Order.objects.get(pk=order_id)
 
+    # Only downgrade runs the learner still has an active enrollment in. If they
+    # unenrolled themselves entirely (e.g. via the dashboard) before the refund
+    # was processed, we leave their enrollment status alone rather than forcing
+    # them back into the course as an audit learner. (See ticket #3696.)
+    active_runs = [
+        run
+        for run in order.purchased_runs
+        if CourseRunEnrollment.objects.filter(user=order.purchaser, run=run).exists()
+    ]
+
+    if not active_runs:
+        return
+
     # Forcing the enrollment here - if the refund comes after the end date
     # for the course for whatever reason, we still want to revert the mode.
     create_run_enrollments(
         user=order.purchaser,
-        runs=order.purchased_runs,
+        runs=active_runs,
         keep_failed_enrollments=True,
         mode=EDX_ENROLLMENT_AUDIT_MODE,
+        change_status=ENROLL_CHANGE_STATUS_REFUNDED,
+        skip_country_block_check=True,
     )
+
+
+def downgrade_enrollments_from_order(order_id):
+    """
+    Downgrade all enrollments tied to a refunded order back to audit -
+    course-run enrollments (via downgrade_learner_from_order) and, for a
+    program purchase, the ProgramEnrollment and the program's course-run
+    enrollments that are verified only because of it (via
+    downgrade_program_enrollment_and_verified_runs).
+
+    An order only ever carries one purchasable-line kind in practice, so
+    each branch is simply a no-op when its kind of line isn't present.
+    """
+    order = Order.objects.get(pk=order_id)
+
+    downgrade_learner_from_order(order_id)
+
+    for program in order.purchased_programs:
+        downgrade_program_enrollment_and_verified_runs(order.purchaser, program)
 
 
 def unenroll_learner_from_order(order_id):
@@ -538,93 +1057,260 @@ def unenroll_learner_from_order(order_id):
                 pass
 
 
-def check_and_process_pending_orders_for_resolution(refnos=None):
+def _retrieve_pending_cybersource_orders(orders):
+    """
+    Retrieve the current status for CyberSource Secure Acceptance orders.
+
+    For these, we look up the CyberSource order info in a batch and then sort
+    them into buckets for further processing.
+    """
+
+    completed = {}
+    cancelled = {}
+
+    if len(orders) == 0:
+        return (
+            completed,
+            cancelled,
+        )
+
+    order_refnos = [order.reference_number for order in orders]
+    gateway = PaymentGateway.get_gateway_class(MITOL_PAYMENT_GATEWAY_CYBERSOURCE)
+
+    results = gateway.find_and_get_transactions(order_refnos)
+
+    if len(results.keys()) == 0:
+        log.info("_retrieve_pending_cybersource_orders: No orders found to resolve.")
+        return (
+            completed,
+            cancelled,
+        )
+
+    for payload in results.values():
+        if int(payload["reason_code"]) == 100:  # noqa: PLR2004
+            completed[payload["req_reference_number"]] = payload
+        else:
+            cancelled[payload["req_reference_number"]] = payload
+
+    return (
+        completed,
+        cancelled,
+    )
+
+
+def _retrieve_pending_stripe_orders(orders):
+    """
+    Retrieve current status for Stripe orders.
+
+    Stripe doesn't have a batch list, so retrieve status individually, and sort
+    into the same buckets as _retrieve_pending_cybersource_orders. We must have
+    a CheckoutSession stored for the order to be able to look it up later.
+    """
+
+    completed = {}
+    cancelled = {}
+
+    # We should be logging the initial checkout session in a specific way
+    # (see generate_checkout_payload) so we can find those transactions for the
+    # order. If there's not one then we skip it, so maybe it can be picked up
+    # later in event processing.
+
+    for order in orders:
+        checkout_session_transactions = order.transactions.filter(
+            reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION
+        )
+
+        if not checkout_session_transactions.exists():
+            log.info(
+                "Order %s (ref %s) has no apparent CheckoutSession logged.",
+                order.id,
+                order.reference_number,
+            )
+            continue
+
+        session_transaction = checkout_session_transactions.first()
+        checkout_session_id = session_transaction.data.get("id")
+
+        if (
+            session_transaction.data.get("object") != STRIPE_OBJECT_CHECKOUT_SESSION
+            or not checkout_session_id
+        ):
+            log.info(
+                "Order %s (ref %s) has no apparent CheckoutSession logged.",
+                order.id,
+                order.reference_number,
+            )
+            continue
+
+        checkout_session = process_stripe_checkout_session_status(checkout_session_id)
+
+        if checkout_session["status"] == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED:
+            cancelled[order.reference_number] = checkout_session["transaction"]
+        elif checkout_session["status"] == STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
+            completed[order.reference_number] = checkout_session["transaction"]
+
+    return (
+        completed,
+        cancelled,
+    )
+
+
+def fulfill_order_from_cybersource_transaction(
+    refno: str, transaction_id: str, *, skip_fulfillment: bool = False
+):
+    """
+    Fulfill a Pending CyberSource order from a specific CyberSource transaction.
+
+    check_and_process_pending_orders_for_resolution finds an order's
+    transaction by searching CyberSource for its reference number. When that
+    search can't find it, the transaction ID (from the CyberSource Business
+    Center) can be used to fetch the transaction directly instead.
+
+    Args:
+    - refno: the order's reference number
+    - transaction_id: the CyberSource transaction (request) ID
+    Keyword Args:
+    - skip_fulfillment: don't fulfill the order, just mark it as Fulfilled
+    Returns:
+    - Order, the fulfilled order
+    Raises:
+    - Order.DoesNotExist if there's no Pending CyberSource order with that
+      reference number
+    - ValueError if the transaction is for another order or wasn't successful
+    """
+    order = PendingOrder.objects.get(
+        reference_number=refno,
+        gateway_type=MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+        state=OrderStatus.PENDING,
+    )
+
+    gateway = PaymentGateway.get_gateway_class(MITOL_PAYMENT_GATEWAY_CYBERSOURCE)
+    _, payload = gateway.get_transaction_details(transaction_id)
+
+    if payload["req_reference_number"] != order.reference_number:
+        msg = (
+            f"Transaction {transaction_id} is for order "
+            f"{payload['req_reference_number']}, not {order.reference_number}"
+        )
+        raise ValueError(msg)
+    if int(payload["reason_code"]) != 100:  # noqa: PLR2004
+        msg = (
+            f"Transaction {transaction_id} wasn't successful "
+            f"(reason code {payload['reason_code']})"
+        )
+        raise ValueError(msg)
+
+    order.get_object_flow().fulfill(payload, skip_fulfillment=skip_fulfillment)
+    sync_hubspot_deal(order)
+    log.info(
+        "Fulfilled order %s from transaction %s.",
+        order.reference_number,
+        transaction_id,
+    )
+    return order
+
+
+def check_and_process_pending_orders_for_resolution(
+    refnos: list[str], *, check_status: bool = True, skip_fulfillment: bool = False
+):
     """
     Checks pending orders for resolution. By default, this will pull all the
     pending orders that are in the system.
 
     Args:
-    - refnos (list or None): check specific reference numbers
+    - refnos: list of reference numbers to check - empty list to check all Pending
+    Keyword Args:
+    - check_status: get the status of the order from the payment processor (default True)
+    - skip_fulfillment: don't fulfill the order, just mark it as Fulfilled
     Returns:
     - Tuple of counts: fulfilled count, cancelled count, error count
 
     """
 
-    gateway = PaymentGateway.get_gateway_class(ECOMMERCE_DEFAULT_PAYMENT_GATEWAY)
+    fulfilled_count = cancel_count = error_count = 0
 
-    if refnos is not None:
+    if len(refnos) > 0:
         pending_orders = PendingOrder.objects.filter(
             state=OrderStatus.PENDING, reference_number__in=refnos
-        ).values_list("reference_number", flat=True)
+        )
     else:
-        pending_orders = PendingOrder.objects.filter(
-            state=OrderStatus.PENDING
-        ).values_list("reference_number", flat=True)
+        pending_orders = PendingOrder.objects.filter(state=OrderStatus.PENDING)
 
     if len(pending_orders) == 0:
         return (0, 0, 0)
 
-    log.info(f"Resolving {len(pending_orders)} orders")  # noqa: G004
+    log.info("Resolving %s orders", len(pending_orders))
 
-    results = gateway.find_and_get_transactions(pending_orders)
+    if check_status:
+        cs_gateway_orders = [
+            pending_order
+            for pending_order in pending_orders
+            if pending_order.gateway_type == MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+        ]
+        stripe_gateway_orders = [
+            pending_order
+            for pending_order in pending_orders
+            if pending_order.gateway_type == MITOL_PAYMENT_GATEWAY_STRIPE
+        ]
 
-    if len(results.keys()) == 0:
-        log.info("No orders found to resolve.")
-        return (0, 0, 0)
+        cs_success, cs_cancel = _retrieve_pending_cybersource_orders(cs_gateway_orders)
+        stripe_success, stripe_cancel = _retrieve_pending_stripe_orders(
+            stripe_gateway_orders
+        )
 
-    fulfilled_count = cancel_count = error_count = 0
+        success_orders = {**cs_success, **stripe_success}
+        cancel_orders = {**cs_cancel, **stripe_cancel}
+    else:
+        cancel_orders = {}
+        success_orders = {}
+        for order in pending_orders:
+            success_orders[order.reference_number] = ADMIN_FULFILLED_PAYMENT_DATA
 
-    for result in results:
-        payload = results[result]
-        if int(payload["reason_code"]) == 100:  # noqa: PLR2004
-            try:
-                order = PendingOrder.objects.filter(
-                    state=OrderStatus.PENDING,
-                    reference_number=payload["req_reference_number"],
-                ).get()
-                order_flow = order.get_object_flow()
-                order_flow.fulfill(payload)
-                sync_hubspot_deal(order)
-                fulfilled_count += 1
+    for refno, payload in success_orders.items():
+        try:
+            order = PendingOrder.objects.filter(
+                state=OrderStatus.PENDING,
+                reference_number=refno,
+            ).get()
+            order_flow = order.get_object_flow()
+            order_flow.fulfill(payload, skip_fulfillment=skip_fulfillment)
+            sync_hubspot_deal(order)
+            fulfilled_count += 1
 
-                log.info(f"Fulfilled order {order.reference_number}.")  # noqa: G004
-            except Exception as e:  # noqa: BLE001
-                log.error(  # noqa: TRY400
-                    f"Couldn't process pending order for fulfillment {payload['req_reference_number']}: {e!s}"  # noqa: G004
-                )
-                error_count += 1
-        else:
-            try:
-                order = PendingOrder.objects.filter(
-                    state=OrderStatus.PENDING,
-                    reference_number=payload["req_reference_number"],
-                ).get()
-                order_flow = order.get_object_flow()
-                order_flow.cancel()
-                order.transactions.create(
-                    transaction_id=payload["transaction_id"],
-                    amount=order.total_price_paid,
-                    data=payload,
-                    reason=f"Cancelled due to processor code {payload['reason_code']}",
-                )
-                order.save()
-                sync_hubspot_deal(order)
-                cancel_count += 1
+            log.info("Fulfilled order %s.", order.reference_number)
+        except Exception:  # noqa: PERF203
+            log.exception(
+                "Couldn't process pending order for fulfillment %s",
+                refno,
+            )
+            error_count += 1
 
-                log.info(f"Cancelled order {order.reference_number}.")  # noqa: G004
-            except Exception as e:  # noqa: BLE001
-                log.error(  # noqa: TRY400
-                    f"Couldn't process pending order for cancellation {payload['req_reference_number']}: {e!s}"  # noqa: G004
-                )
-                error_count += 1
+    for refno, payload in cancel_orders.items():
+        try:
+            order = PendingOrder.objects.filter(
+                state=OrderStatus.PENDING,
+                reference_number=refno,
+            ).get()
+            order_flow = order.get_object_flow()
+            order_flow.cancel(api_response_data=payload)
+            sync_hubspot_deal(order)
+            cancel_count += 1
+
+            log.info("Cancelled order %s.", order.reference_number)
+        except Exception:  # noqa: PERF203
+            log.exception(
+                "Couldn't process pending order for cancellation %s",
+                refno,
+            )
+            error_count += 1
 
     return (fulfilled_count, cancel_count, error_count)
 
 
 def check_for_duplicate_discount_redemptions():
     """
-    Checks for multiple redemptions for discount codes, and makes noise if there
-    are any.
+    Checks for multiple redemptions for discount codes, and makes noise if
+    there are any.
 
     For discounts that are one-time or one-time-per-user redemptions, there's a
     possibility that the code can be redeemed more than once. This will check
@@ -695,6 +1381,45 @@ def check_for_duplicate_discount_redemptions():
     return seen
 
 
+def check_for_double_spent_sources():
+    """
+    The safety net behind OrderFlow.fulfill's source check: log every source
+    line funding a fulfilled paid-amount-off redemption on more than one order,
+    naming the orders to review.
+
+    Returns:
+    - List of the double-spent source line IDs
+    """
+    double_spent = double_spent_source_line_ids()
+    for source_line_id in double_spent:
+        reference_numbers = (
+            fulfilled_paid_amount_off_redemptions()
+            .filter(source_line_id=source_line_id)
+            .order_by("redeemed_order__reference_number")
+            .values_list("redeemed_order__reference_number", flat=True)
+            .distinct()
+        )
+        log.error(
+            "Line %s funds fulfilled paid-amount-off redemptions on more than one "
+            "order (%s); review manually.",
+            source_line_id,
+            ", ".join(reference_numbers),
+        )
+
+    return double_spent
+
+
+def _coerce_supplied_date(value):
+    """
+    Normalize a date reaching generate_discount_code either as a management
+    command's raw string or as a datetime BulkDiscountSerializer already parsed.
+    """
+    if value is None or isinstance(value, datetime):
+        return value
+
+    return parse_supplied_date(value)
+
+
 def generate_discount_code(**kwargs):  # noqa: C901
     """
     Generates a discount code (or a batch of discount codes) as specified by the
@@ -704,7 +1429,7 @@ def generate_discount_code(**kwargs):  # noqa: C901
     UUID - if you want one (the convention is a -), you need to ensure it's
     there in the prefix (and that counts against the limit)
 
-    If you specify redemption_type, specifying one_time or one_time_per_user will not be
+    If you specify redemption_type, specifying one_time or once_per_user will not be
     honored.
 
     Keyword Args:
@@ -713,18 +1438,18 @@ def generate_discount_code(**kwargs):  # noqa: C901
     * redemption_type - one of the valid redemption types (overrules use of the flags)
     * amount - the value of the discount
     * one_time - boolean; discount can only be redeemed once
-    * one_time_per_user - boolean; discount can only be redeemed once per user
+    * once_per_user - boolean; discount can only be redeemed once per user
     * activates - date to activate
     * expires - date to expire the code
-    * count - number of codes to create (requires prefix)
-    * prefix - prefix to append to the codes (max 63 characters)
+    * prefix - prefix to append to generated codes (max 63 characters)
+    * count - how many codes to generate from prefix; defaults to 1
+    * codes - the exact codes to create, instead of generating from a prefix
 
     Returns:
     * List of generated codes, with the following fields:
       code, type, amount, expiration_date
 
     """
-    codes_to_generate = []
     discount_type = kwargs["discount_type"]
     redemption_type = REDEMPTION_TYPE_UNLIMITED
     payment_type = kwargs["payment_type"]
@@ -741,25 +1466,36 @@ def generate_discount_code(**kwargs):  # noqa: C901
             f"Discount amount {amount} not valid for discount type {DISCOUNT_TYPE_PERCENT_OFF}."  # noqa: EM102
         )
 
-    if kwargs["count"] > 1 and "prefix" not in kwargs:
-        raise Exception("You must specify a prefix to create a batch of codes.")  # noqa: EM101, TRY002
+    count = kwargs.get("count")
+    prefix = kwargs.get("prefix")
+    codes = kwargs.get("codes")
 
-    if kwargs["count"] > 1:
-        prefix = kwargs["prefix"]
+    # A caller either names the codes to create or asks for some to be generated
+    # from a prefix. Honoring both at once has no unambiguous reading, so they are
+    # mutually exclusive, and count only means anything in the generated case.
+    if bool(codes) == bool(prefix):
+        msg = "Supply either codes, or a prefix to generate them from."
+        raise Exception(msg)  # noqa: TRY002
+
+    if codes:
+        if count is not None:
+            msg = "count applies only when generating codes from a prefix."
+            raise Exception(msg)  # noqa: TRY002
+
+        codes_to_generate = codes
+    else:
+        count = 1 if count is None else count
+
+        if count < 1:
+            msg = f"count must be at least 1, got {count}."
+            raise Exception(msg)  # noqa: TRY002
 
         # upped the discount code limit to 100 characters - this used to be 13 (50 - 37 for the UUID)
         if len(prefix) > 63:  # noqa: PLR2004
-            raise Exception(  # noqa: TRY002
-                f"Prefix {prefix} is {len(prefix)} - prefixes must be 63 characters or less."  # noqa: EM102
-            )
+            msg = f"Prefix {prefix} is {len(prefix)} - prefixes must be 63 characters or less."
+            raise Exception(msg)  # noqa: TRY002
 
-        for i in range(kwargs["count"]):  # noqa: B007
-            generated_uuid = uuid.uuid4()
-            code = f"{prefix}{generated_uuid}"
-
-            codes_to_generate.append(code)
-    else:
-        codes_to_generate = kwargs["codes"]
+        codes_to_generate = [f"{prefix}{uuid.uuid4()}" for _ in range(count)]
 
     if kwargs.get("one_time"):
         redemption_type = REDEMPTION_TYPE_ONE_TIME
@@ -773,15 +1509,8 @@ def generate_discount_code(**kwargs):  # noqa: C901
     ):
         redemption_type = kwargs["redemption_type"]
 
-    if "expires" in kwargs and kwargs["expires"] is not None:
-        expiration_date = parse_supplied_date(kwargs["expires"])
-    else:
-        expiration_date = None
-
-    if "activates" in kwargs and kwargs["activates"] is not None:
-        activation_date = parse_supplied_date(kwargs["activates"])
-    else:
-        activation_date = None
+    expiration_date = _coerce_supplied_date(kwargs.get("expires"))
+    activation_date = _coerce_supplied_date(kwargs.get("activates"))
 
     generated_codes = []
 
@@ -800,3 +1529,867 @@ def generate_discount_code(**kwargs):  # noqa: C901
         generated_codes.append(discount)
 
     return generated_codes
+
+
+def _active_discounts() -> QuerySet[Discount]:
+    """Every discount inside its activation and expiration window right now."""
+    now = now_in_utc()
+    return Discount.objects.filter(
+        Q(activation_date__lte=now) | Q(activation_date=None),
+        Q(expiration_date__gt=now) | Q(expiration_date=None),
+    )
+
+
+def _discounts_offered_to(user, flexible_price_discounts) -> QuerySet[Discount]:
+    """
+    Every active discount on offer to ``user``: the automatic ones, the ones
+    tied to this learner, and ``flexible_price_discounts``, the
+    financial-assistance tier discounts already determined for the products in
+    question.
+
+    A tier discount carries no product links, so naming its id is what offers
+    it for the product it was determined for and no other.
+
+    Offered is not the same as applicable: an automatic discount may also carry
+    UserDiscount rows naming other learners, and product scope, redemption
+    limits and the program-child-purchase source are all still open. Callers
+    narrow from here.
+    """
+    return _active_discounts().filter(
+        Q(automatic=True)
+        | Q(user_discount_discount__user=user)
+        | Q(pk__in=[discount.id for discount in flexible_price_discounts])
+    )
+
+
+@dataclass(frozen=True)
+class UserPriceQuote:
+    """
+    What this user pays for one product, and why.
+
+    ``flexible_price_discount`` is the learner's approved financial assistance
+    discount whether or not it won the price -- a tier whose redemptions are
+    spent, one another candidate undercuts, and the top tier that prices at
+    list all still answer "is this learner approved for aid", which is a
+    different question from what checkout charges.
+
+    ``source_line`` is the prior purchase a winning paid-amount-off discount
+    spends, so the caller can name the credit without resolving it again.
+    """
+
+    discount: Discount | None
+    price: Decimal
+    flexible_price_discount: Discount | None
+    source_line: Line | None
+
+
+def quote_user_price(product, user) -> UserPriceQuote:
+    """
+    What checkout charges ``user`` for ``product``.
+
+    The cheapest applicable discount wins, which is the rule
+    apply_discount_to_basket applies: it keeps a candidate only when the
+    candidate prices an item at or below the applied price, so no class of
+    discount outranks another.
+
+    The price therefore agrees with what the basket charges for the
+    single-item baskets checkout builds; only the discount named can differ,
+    in two ways. On an exact tie the basket keeps whichever discount it applied
+    last while this names the lowest id. And a discount that beats no other
+    candidate but still quotes the list price is recorded on the basket, while
+    this reports no discount, because the basket's price is the discount's
+    price capped at the list price.
+
+    Applicability restates is_valid_for_basket for a single product: the
+    discount is inside its window, in scope for the product, offered to this
+    learner rather than tied to another, inside its redemption limits, and --
+    for a program-child-purchase discount -- backed by an unconsumed
+    qualifying prior purchase. The first three are the candidate query;
+    discount_product enforces the rest.
+
+    The work is bounded by the discounts that can price this product, not by
+    anything about the request. Checkout's own bound is looser: it checks every
+    discount on offer to the learner, in scope for the basket or not.
+
+    Args:
+        product (Product): the product to price
+        user (User or None): the learner, or None/anonymous for list price
+    Returns:
+        UserPriceQuote
+    """
+    if user is None or user.is_anonymous:
+        return UserPriceQuote(
+            discount=None,
+            price=product.price,
+            flexible_price_discount=None,
+            source_line=None,
+        )
+
+    finaid = determine_courseware_flexible_price_discount(product, user)
+    candidates = (
+        _discounts_offered_to(user, [finaid] if finaid else [])
+        .filter(
+            # A discount carrying DiscountProduct rows applies only to the
+            # products named by them; one carrying none applies to everything.
+            # Scoping in SQL rather than per candidate is what keeps the cost
+            # independent of how many discounts are live for other products.
+            Q(products__isnull=True) | Q(products__product=product)
+        )
+        .filter(
+            # A discount carrying UserDiscount rows is offered only to the
+            # users named by them. The two filters join the rows separately, so
+            # this one excludes a discount tied to another learner even where
+            # _discounts_offered_to admitted it for being automatic.
+            Q(user_discount_discount__isnull=True)
+            | Q(user_discount_discount__user=user)
+        )
+        .distinct()
+        # Ordering is what makes a price tie resolve on the lowest id rather
+        # than on however the database returned the rows.
+        .order_by("id")
+    )
+
+    best, best_price = None, product.price
+    for discount in candidates:
+        price = discount.discount_product(product, user)
+        if price is not None and price < best_price:
+            best, best_price = discount, price
+    return UserPriceQuote(
+        discount=best,
+        price=best_price,
+        flexible_price_discount=finaid,
+        # discount_product resolves a paid-amount-off winner's source to price
+        # it and discards the line; resolving that one discount a second time
+        # is cheaper than threading the line out through every pricing caller.
+        source_line=source_line_for(best, user, [product]) if best else None,
+    )
+
+
+def get_auto_apply_discounts_for_basket(basket_id: int) -> QuerySet[Discount]:
+    """
+    Get the auto-apply discounts that can be applied to a basket.
+
+    This includes the financial assistant discounts for the user and products,
+    if there are any, since those are also automatically applied regardless of
+    the flag on the discount. This does not include B2B discounts because those
+    are applied in a different manner - either through a separate API, or by the
+    learner via the cart interface.
+
+    Args:
+        basket_id (int): The ID of the basket to get the auto-apply discounts for.
+
+    Returns:
+        QuerySet: The auto-apply discounts that can be applied to the basket.
+    """
+    basket = Basket.objects.get(pk=basket_id)
+    flexible_price_discounts = [
+        discount
+        for product in basket.get_products()
+        if (
+            discount := determine_courseware_flexible_price_discount(
+                product, basket.user
+            )
+        )
+    ]
+    return _discounts_offered_to(basket.user, flexible_price_discounts)
+
+
+def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid=False):
+    """
+    Apply a discount to a basket.
+
+    Discount application is subject to rules:
+    - The discount itself must be valid on its face (inside its
+      activation/expiration window, applies to products, tied to no user or to
+      this one, within its redemption limits, and -- for a
+      program-child-purchase discount -- the learner still holds an unconsumed
+      qualifying prior purchase among the basket's products)
+    - The discount is not a discount marked as financial assistance
+      (``payment_type``), unless allow_finaid is set
+    - The discount prices some basket item at or below that item's current
+      discounted price
+
+    For the single-item baskets checkout builds -- ``_create_basket_from_product``
+    and ``create_basket_with_products`` in ecommerce/views/v0 empty the basket
+    before adding, unless ENABLE_MULTIPLE_CART_ITEMS is on, which it is not by
+    default -- the cheapest applicable discount wins whatever order the
+    candidates arrive in: no class of discount outranks another, so a user-tied
+    discount, a financial assistance tier discount, an automatic discount and a
+    typed-in code all compete on price alone, and a candidate that ties the
+    applied price replaces it, which is why the basket view applies the code the
+    learner typed in last. With several items the rule is bullet 3 exactly: a
+    candidate is kept when it prices *some* item at or below the applied price,
+    so which candidates survive, and the basket total, depend on the order they
+    arrive in.
+
+    This function is not for use with B2B or verified program enrollment code
+    redemption. Those use cases have their own redemption code paths because
+    they need different verification steps.
+
+    Args:
+        discount (Discount): The Discount to apply to the basket.
+    Keyword Args:
+        allow_finaid (bool): Allow a financial assistance discount through.
+    """
+    if discount.is_valid_for_basket(basket, allow_finaid=allow_finaid):
+        defaults = {
+            "redeemed_discount": discount,
+            "redemption_date": now_in_utc(),
+        }
+
+        if basket.discounts.count() > 0 and basket.basket_items.count() > 0:
+            found_better = False
+
+            for item in basket.basket_items.all():
+                test_price = discount.discount_product(item.product, basket.user)
+                if test_price is not None and item.discounted_price >= test_price:
+                    found_better = True
+                    break
+
+            if not found_better:
+                return
+
+        BasketDiscount.objects.update_or_create(
+            redeemed_by=basket.user,
+            redeemed_basket=basket,
+            defaults=defaults,
+            create_defaults=defaults,
+        )
+
+
+def create_verified_program_discount(program):
+    """
+    Create discount (enrollment) codes for a program.
+
+    When a learner buys a program, they need to be able to get verified enrollments
+    in the courses that are in the program. We generally do this with enrollment
+    codes - this creates one for the program that is set up to make the order
+    zero-value, so the learner doesn't have to pay for upgraded enrollments.
+
+    This creates a single 100%-off discount with the "internal" redemption type
+    and no redemption cap: learners cannot redeem it, and it prices whatever the
+    verified-enrollment flow attaches it to. Callers are responsible for
+    checking the run belongs to the program before attaching it.
+
+    If a discount already exists for this purpose, this will return it.
+
+    Args:
+    - program (Program): the program to create a discount for
+    Returns:
+    - Discount, the discount that was created
+    """
+
+    content_type = ContentType.objects.get_for_model(program)
+    product = Product.objects.filter(
+        content_type=content_type, object_id=program.id
+    ).get()
+
+    existing_discount_qs = Discount.objects.filter(
+        Q(activation_date__isnull=True) | Q(activation_date__lte=now_in_utc()),
+        Q(expiration_date__isnull=True) | Q(expiration_date__gte=now_in_utc()),
+        products__product=product,
+        redemption_type=REDEMPTION_TYPE_INTERNAL,
+        discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+        amount=100,
+    )
+
+    if existing_discount_qs.exists():
+        return existing_discount_qs.last()
+
+    discount = Discount.objects.create(
+        amount=Decimal(100),
+        automatic=False,
+        discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+        redemption_type=REDEMPTION_TYPE_INTERNAL,
+        payment_type=PAYMENT_TYPE_SALES,
+        discount_code=f"{program.readable_id}-{uuid.uuid4()}",
+        is_bulk=True,
+    )
+
+    DiscountProduct.objects.create(discount=discount, product=product)
+
+    return discount
+
+
+def _get_verified_program_course_run_product_and_discount(user, courserun, program):
+    """
+    Validate a program-verified course run enrollment and return what's needed
+    to make its zero-value order.
+
+    Args:
+    - user: The learner.
+    - courserun: The course run to purchase.
+    - program: The program the learner has a verified enrollment in.
+    Returns:
+    - tuple of (Product, Discount): the run's active product and the program's
+      internal discount
+    Raises:
+    - VerifiedProgramNoEnrollmentError if the learner doesn't have a program
+      enrollment
+    - VerifiedProgramCourseNotInProgramError if the run's course is not in the
+      program's requirements
+    - VerifiedProgramNoProductError if the run has no active Product to purchase
+    """
+
+    if not program.enrollments.filter(
+        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE, active=True
+    ).exists():
+        msg = f"No verified enrollment for {user} for program {program}"
+        raise VerifiedProgramNoEnrollmentError(msg)
+
+    # The program's internal discount prices whatever it is attached to, so
+    # membership is decided here, against the current requirements tree.
+    if not program.courses_qset.filter(courseruns=courserun).exists():
+        msg = f"Course run {courserun} is not in program {program}"
+        raise VerifiedProgramCourseNotInProgramError(msg)
+
+    cr_ctype = ContentType.objects.get_for_model(courserun)
+    try:
+        product = Product.objects.filter(
+            content_type=cr_ctype, object_id=courserun.id, is_active=True
+        ).get()
+    except Product.DoesNotExist as exc:
+        msg = f"No active product for course run {courserun}"
+        raise VerifiedProgramNoProductError(msg) from exc
+
+    try:
+        discount = create_verified_program_discount(program)
+    except Product.DoesNotExist as exc:
+        msg = f"No active product for program {program}"
+        raise VerifiedProgramNoProductError(msg) from exc
+
+    return product, discount
+
+
+def create_verified_program_course_run_order(user, courserun, program):
+    """
+    Create a verified course run enrollment, backed by a zero-value order, for
+    a learner with a verified enrollment in the program.
+
+    This is the same order create_verified_program_course_run_enrollment makes,
+    but built straight from the run's product rather than through the user's
+    basket and checkout, so it needs no request and leaves the basket alone.
+    That makes it safe to call while another order is being fulfilled (e.g.
+    from the process_transaction_line hook when the program is purchased).
+
+    Fulfilling the order runs the usual line hooks, which create the verified
+    enrollment and the PaidCourseRun.
+
+    Args:
+    - user: The learner.
+    - courserun: The course run to purchase.
+    - program: The program to use.
+    Returns:
+    - CourseRunEnrollment
+    Raises:
+    - VerifiedProgramNoEnrollmentError if the learner doesn't have a program
+      enrollment
+    - VerifiedProgramCourseNotInProgramError if the run's course is not in the
+      program's requirements
+    - VerifiedProgramNoProductError if the run has no active Product to purchase
+    - VerifiedProgramInvalidOrderError if the order isn't zero value, or doesn't
+      get fulfilled
+    """
+
+    product, discount = _get_verified_program_course_run_product_and_discount(
+        user, courserun, program
+    )
+
+    with transaction.atomic():
+        try:
+            order = PendingOrder.create_from_product(product, user, discount)
+        except ValueError as exc:
+            msg = f"Product {product} selected to upgrade enrollment for {user} is invalid"
+            raise VerifiedProgramInvalidOrderError(msg) from exc
+
+        if order.total_price_paid > 0:
+            msg = f"Order {order.reference_number} for {user} is not zero-value"
+            raise VerifiedProgramInvalidOrderError(msg)
+
+        fulfill_completed_order(
+            order, payment_data=ZERO_PAYMENT_DATA, skip_receipt=True
+        )
+
+        order.refresh_from_db()
+        if order.state != OrderStatus.FULFILLED:
+            msg = f"Order {order.reference_number} for {user} was not fulfilled"
+            raise VerifiedProgramInvalidOrderError(msg)
+
+    return courserun.enrollments.filter(user=user).get()
+
+
+def create_verified_program_course_run_enrollment(request, courserun, program):
+    """
+    Create a verified course run enrollment in a course that is associated with
+    a program for the specified learner.
+
+    If the learner has a verified enrollment in the program, and they're enrolling
+    in a course run that's for a course within the program, they'll need a
+    matching verified enrollment in the course run too. We want verified
+    enrollments to have corresponding orders within the system. So, this takes
+    the user, run, and program and creates an order and fulfills it.
+
+    Because the learner has already paid for the program, though, we need to make
+    sure they're not paying for the run again. So, the order should be a
+    zero-value one. This will use a discount code for this - if we don't have one
+    already, then we will make one on the fly for the program, and then apply it
+    to the order.
+
+    Courses can belong to multiple programs, so the program must be specified
+    so the function can verify the user's program enrollment.
+
+    Args:
+    - request: The incoming HTTP request.
+    - courserun: The course run to purchase.
+    - program: The program to use.
+    Returns:
+    - CourseRunEnrollment
+    Raises:
+    - VerifiedProgramNoEnrollmentError if the learner doesn't have a program
+      enrollment
+    - VerifiedProgramCourseNotInProgramError if the run's course is not in the
+      program's requirements
+    - VerifiedProgramNoProductError if the run has no active Product to purchase
+    - VerifiedProgramInvalidBasketError if the basket isn't zero value
+    - VerifiedProgramInvalidOrderError if the order doesn't get processed through
+    """
+
+    product, discount = _get_verified_program_course_run_product_and_discount(
+        request.user, courserun, program
+    )
+
+    basket = establish_basket(request)
+
+    if basket.basket_items.count() > 0:
+        # Stuff in the basket - clear it out first.
+        basket.basket_items.all().delete()
+        basket.discounts.all().delete()
+
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=request.user,
+        redeemed_discount=discount,
+        redeemed_basket=basket,
+    )
+
+    # Sync with HubSpot for CourseRun and Program products
+    sync_hubspot_cart_add(
+        request.user,
+        product,
+        is_uai=is_uai_course_run(product.purchasable_object),
+        is_xpro=is_xpro_course_run(product.purchasable_object),
+    )
+
+    if Decimal(
+        sum([basket_item.discounted_price for basket_item in basket.basket_items.all()])
+    ) > Decimal(0):
+        # For some reason the basket's not zero-value.
+        msg = f"Basket for {request.user} is not zero-value"
+        raise VerifiedProgramInvalidBasketError(msg)
+
+    processed_order = generate_checkout_payload(
+        request,
+        skip_discount_check=True,
+        skip_receipt=True,
+        raise_compliance_data_errors=True,
+    )
+
+    if "no_checkout" not in processed_order:
+        # It didn't just clear the order so something went wrong
+        raise VerifiedProgramInvalidOrderError
+
+    return courserun.enrollments.filter(user=request.user).get()
+
+
+def log_stripe_event(event, *, order: Order | None = None):
+    """Log a Stripe event."""
+
+    return StripeEventLog.objects.create(
+        event_id=event.id, event_data=event.to_dict(for_json=True), related_order=order
+    )
+
+
+def process_stripe_checkout_session_event(event: stripe.Event):
+    """
+    Process the Stripe event passed.
+
+    This validates that the event is a CheckoutSession event and strips the
+    CheckoutSession object out of the event.
+    """
+
+    valid_types = STRIPE_EVENTS_CHECKOUT_SESSION
+
+    ev_type = event.type
+    if ev_type not in valid_types:
+        msg = f"Event passed to process_stripe_checkout_session_event is type {ev_type} - not a checkout session event"
+        raise ValueError(msg)
+
+    return event.data.object
+
+
+def _get_stripe_checkout_session_v1():
+    """Return the checkout session v1 client (mostly to make testing easier)."""
+
+    stripe_gateway = PaymentGateway.get_gateway_class(MITOL_PAYMENT_GATEWAY_STRIPE)
+    return stripe_gateway.stripe_client.v1.checkout.sessions
+
+
+def process_stripe_checkout_session_status(checkout_session: dict | str):
+    """
+    Process the provided Stripe CheckoutSession and provide its status.
+
+    The CheckoutSession has some status fields in it, but we also need to look
+    at the PaymentIntent to get the status of the payment itself. This will
+    re-pull the session from the API with expand turned on for PaymentIntent so
+    we get that data. (As is the PaymentGateway calls don't use expand, so there
+    would have needed to be an additional API call to get the PaymentIntent
+    anyway.)
+
+    Args:
+    - checkout_session (dict|str): either a CheckoutSession (as a dict), or the
+      ID of the checkout session to pull
+    Returns:
+    - something, dunno yet
+    """
+
+    stripe_checkout_session_client = _get_stripe_checkout_session_v1()
+
+    if isinstance(checkout_session, dict):
+        session_id = checkout_session.get("id")
+    else:
+        session_id = checkout_session
+
+    if not session_id:
+        msg = "checkout session ID not found"
+        raise ValueError(msg)
+
+    # Call this directly so we can tell the client to expand payment_intent.
+
+    cs = stripe_checkout_session_client.retrieve(
+        session_id,
+        {
+            "expand": [
+                "payment_intent",
+            ],
+        },
+    )
+
+    # The session itself has two status fields: status and payment_status
+    # status is the session status - open, complete, expired
+    # payment_status is payment with relation to the session - no_payment_required, paid, unpaid
+    # The PaymentIntent (if it exists) has the status of whatever actual payment
+    # was received. If cancelled, it also has a cancellation reason.
+
+    session_status = {
+        "status": STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+        "cancel_reason": "",
+        "action_reason": "",
+        "checkout_session_id": cs.id,
+        "payment_intent_id": "",
+        "transaction": cs.to_dict(for_json=True),
+    }
+
+    if not cs.payment_intent:
+        if cs.status == STRIPE_CHECKOUT_SESSION_STATUS_OPEN or (
+            cs.status == STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE
+            and cs.payment_status == STRIPE_PAYMENT_STATUS_UNPAID
+        ):
+            session_status["status"] = STRIPE_OVERALL_CHECKOUT_STATUS_PENDING
+        elif cs.status == STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE and (
+            cs.payment_status in STRIPE_PAYMENT_STATUSES_GOOD
+        ):
+            # "complete" and "paid" is a weird state - we should have a PaymentIntent
+            session_status["status"] = STRIPE_OVERALL_CHECKOUT_STATUS_PAID
+        elif (
+            cs.status == "expired" and cs.payment_status == STRIPE_PAYMENT_STATUS_UNPAID
+        ):
+            session_status["status"] = STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED
+            session_status["cancel_reason"] = "expired-unpaid"
+        else:
+            # weird state again - expired and paid or expired and no-payment-required
+
+            log.warning(
+                "Checkout session %s in weird state: state %s and payment_state %s",
+                cs.id,
+                cs.status,
+                cs.payment_status,
+            )
+            session_status["status"] = STRIPE_OVERALL_CHECKOUT_STATUS_PENDING
+
+        return session_status
+
+    pi = cs.payment_intent
+    session_status["payment_intent_id"] = pi.id
+
+    if pi.status == STRIPE_PAYMENT_INTENT_STATUS_PROCESSING:
+        session_status["status"] = STRIPE_OVERALL_CHECKOUT_STATUS_PENDING
+    elif pi.status == STRIPE_PAYMENT_INTENT_STATUS_SUCCEEDED:
+        session_status["status"] = STRIPE_OVERALL_CHECKOUT_STATUS_PAID
+    elif pi.status == STRIPE_PAYMENT_INTENT_STATUS_CANCELLED:
+        session_status["status"] = STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED
+        session_status["cancel_reason"] = pi.cancellation_reason
+    else:
+        session_status["status"] = STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION
+        session_status["action_reason"] = pi.status
+
+    return session_status
+
+
+def process_stripe_checkout_completed(event):
+    """Process the checkout completed event."""
+
+    checkout_session = process_stripe_checkout_session_event(event)
+
+    order_reference_number = checkout_session.client_reference_id
+    session_id = checkout_session.id
+    status_obj = process_stripe_checkout_session_status(checkout_session.id)
+
+    log.debug(
+        "process_stripe_checkout_completed: processing event %s for checkout session %s (order %s)in overall state %s",
+        event.id,
+        session_id,
+        order_reference_number,
+        status_obj["status"],
+    )
+
+    order = Order.objects.filter(reference_number=order_reference_number).first()
+
+    StripeEventLog.objects.filter(event_id=event.id).update(related_order=order)
+
+    if not order:
+        log.error(
+            "process_stripe_checkout_completed: session %s for order %s has no matching order",
+            session_id,
+            order_reference_number,
+        )
+
+        return False
+
+    if status_obj["status"] == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED:
+        order.get_object_flow().cancel(api_response_data=event.to_dict(for_json=True))
+        order.refresh_from_db()
+    elif status_obj["status"] == STRIPE_OVERALL_CHECKOUT_STATUS_ERROR:
+        log.info(
+            "process_stripe_checkout_completed: session %s for order %s ended unsuccessfully: %s - %s",
+            session_id,
+            order_reference_number,
+            status_obj["status"],
+            status_obj["cancel_reason"],
+        )
+
+        order.get_object_flow().errored(api_response_data=event.to_dict(for_json=True))
+        order.refresh_from_db()
+    elif status_obj["status"] in [
+        STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+        STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
+    ]:
+        log.info(
+            "process_stripe_checkout_completed: session %s for order %s is still in pending state: %s - %s",
+            session_id,
+            order_reference_number,
+            status_obj["status"],
+            status_obj["action_reason"],
+        )
+    else:
+        basket = Basket.objects.filter(user=order.purchaser).first()
+
+        fulfill_completed_order(order, event.to_dict(for_json=True), basket)
+
+        order.refresh_from_db()
+
+    return order
+
+
+def process_stripe_checkout_expired(event):
+    """
+    Process the checkout expired event.
+
+    Checkout sessions last for a finite amount of time; if the user doesn't
+    complete checkout in enough time, it will expire and we'll need to cancel
+    the order. This does less procesing than the completed webhook; we can use
+    the event type as the order state.
+    """
+
+    checkout_session = process_stripe_checkout_session_event(event)
+
+    order_reference_number = checkout_session.client_reference_id
+    session_id = checkout_session.id
+
+    log.debug(
+        "process_stripe_checkout_expired: processing event %s for checkout session %s (order %s)",
+        event.id,
+        session_id,
+        order_reference_number,
+    )
+    log.warning(
+        "process_stripe_checkout_expired: checkout session %s for order %s expired - cancelling the in-flight order",
+        session_id,
+        order_reference_number,
+    )
+
+    order = Order.objects.filter(reference_number=order_reference_number).get()
+    StripeEventLog.objects.filter(event_id=event.id).update(related_order=order)
+
+    order.get_object_flow().cancel(api_response_data=event.to_dict(for_json=True))
+
+    order.refresh_from_db()
+    return order
+
+
+def find_order_for_stripe_payment_intent(payment_intent_id: str) -> Order | None:
+    """
+    Find the order that was paid for with the given Stripe PaymentIntent.
+
+    The PaymentIntent ID isn't stored separately, so this looks through the
+    payment transaction data. Depending on how the order got fulfilled, the
+    transaction data is either the checkout.session.completed Event (so the ID
+    is in data.object.payment_intent) or a CheckoutSession (so the ID is in
+    payment_intent, or payment_intent.id if the PaymentIntent was expanded).
+
+    Args:
+    - payment_intent_id (str): the Stripe PaymentIntent ID
+    Returns:
+    - Order, or None if no order has a transaction for the PaymentIntent
+    """
+
+    payment_transaction = (
+        Transaction.objects.filter(
+            transaction_type=TRANSACTION_TYPE_PAYMENT,
+            order__gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+        )
+        .filter(
+            Q(data__data__object__payment_intent=payment_intent_id)
+            | Q(data__payment_intent=payment_intent_id)
+            | Q(data__payment_intent__id=payment_intent_id)
+        )
+        .select_related("order")
+        .order_by("-created_on")
+        .first()
+    )
+
+    return payment_transaction.order if payment_transaction else None
+
+
+def process_stripe_refund_updated(event: stripe.Event):  # noqa: PLR0911
+    """
+    Process a refund.updated or charge.refund.updated event.
+
+    Refunds for Stripe orders are issued in Stripe, so this records them in
+    MITx Online once they've succeeded: the order is moved to the refunded
+    state, the refund is logged as a transaction, and the learner's enrollments
+    are downgraded. Stripe may send both event types for the same refund, so
+    the order is locked and skipped if it's already been refunded.
+
+    Args:
+    - event (stripe.Event): the refund event
+    Returns:
+    - Order: the order, if it was refunded
+    - True: if there was nothing to do
+    - False: if the refund couldn't be recorded
+    """
+
+    if event.type not in STRIPE_EVENTS_REFUND:
+        msg = (
+            "Event "
+            f"{event.id} passed to process_stripe_refund_updated is type "
+            f"{event.type} - expected one of {STRIPE_EVENTS_REFUND}"
+        )
+        raise ValueError(msg)
+
+    refund = event.data.object.to_dict(for_json=True)
+    refund_id = refund.get("id")
+
+    if refund.get("object") != STRIPE_OBJECT_REFUND:
+        log.error(
+            "process_stripe_refund_updated: event %s has a %s object, not a refund",
+            event.id,
+            refund.get("object"),
+        )
+        return False
+
+    if refund.get("status") != STRIPE_REFUND_STATUS_SUCCEEDED:
+        log.info(
+            "process_stripe_refund_updated: refund %s (event %s) is %s, not %s - skipping",
+            refund_id,
+            event.id,
+            refund.get("status"),
+            STRIPE_REFUND_STATUS_SUCCEEDED,
+        )
+        return True
+
+    payment_intent_id = refund.get("payment_intent")
+
+    if not payment_intent_id:
+        log.error(
+            "process_stripe_refund_updated: refund %s (event %s) has no PaymentIntent",
+            refund_id,
+            event.id,
+        )
+        return False
+
+    order = find_order_for_stripe_payment_intent(payment_intent_id)
+
+    if not order:
+        log.error(
+            "process_stripe_refund_updated: refund %s (event %s) is for PaymentIntent %s, which doesn't match any order",
+            refund_id,
+            event.id,
+            payment_intent_id,
+        )
+        return False
+
+    StripeEventLog.objects.filter(event_id=event.id).update(related_order=order)
+
+    with transaction.atomic():
+        order = Order.objects.select_for_update().get(pk=order.id)
+
+        if order.state == OrderStatus.REFUNDED:
+            log.info(
+                "process_stripe_refund_updated: order %s is already refunded - skipping refund %s (event %s)",
+                order.reference_number,
+                refund_id,
+                event.id,
+            )
+            return True
+
+        if order.state != OrderStatus.FULFILLED:
+            log.error(
+                "process_stripe_refund_updated: can't refund order %s for refund %s (event %s): order is %s, not %s",
+                order.reference_number,
+                refund_id,
+                event.id,
+                order.state,
+                OrderStatus.FULFILLED,
+            )
+            return False
+
+        # Stripe amounts are in cents.
+        refund_amount = Decimal(refund.get("amount") or 0) / 100
+
+        if refund_amount != order.total_price_paid:
+            log.warning(
+                "process_stripe_refund_updated: refund %s for order %s is for %s but the order total is %s",
+                refund_id,
+                order.reference_number,
+                refund_amount,
+                order.total_price_paid,
+            )
+
+        record_order_refund(
+            order,
+            api_response_data=refund,
+            amount=refund_amount,
+            reason=refund.get("reason") or "",
+            unenroll=True,
+        )
+
+    log.info(
+        "process_stripe_refund_updated: refunded order %s for refund %s (event %s)",
+        order.reference_number,
+        refund_id,
+        event.id,
+    )
+
+    order.refresh_from_db()
+    return order

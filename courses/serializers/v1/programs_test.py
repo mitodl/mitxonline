@@ -1,21 +1,33 @@
 from datetime import timedelta
 from decimal import Decimal
+from unittest.mock import ANY
 
 import pytest
+from django.contrib.auth.models import AnonymousUser
 from django.utils.timezone import now
 from mitol.common.utils import now_in_utc
+from rest_framework.exceptions import ValidationError
 
 from cms.serializers import ProgramPageSerializer
+from courses.constants import PROGRAM_DISPLAY_MODE_COURSE
 from courses.factories import (
     CourseFactory,
+    CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     CourseRunGradeFactory,
+    EnrollmentModeFactory,
+    LearnerProgramRecordShareFactory,
+    PartnerSchoolFactory,
+    PartnerSchoolProgramFactory,
+    ProgramEnrollmentFactory,
     ProgramFactory,
+    create_program_with_tracks,
     program_with_empty_requirements,  # noqa: F401
     program_with_requirements,  # noqa: F401
 )
 from courses.models import Department, ProgramRequirement, ProgramRequirementNodeType
+from courses.serializers.v1.base import EnrollmentModeSerializer
 from courses.serializers.v1.courses import CourseWithCourseRunsSerializer
 from courses.serializers.v1.programs import (
     LearnerRecordSerializer,
@@ -23,8 +35,10 @@ from courses.serializers.v1.programs import (
     ProgramRequirementTreeSerializer,
     ProgramSerializer,
 )
+from main import features
 from main.test_utils import assert_drf_json_equal
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -35,14 +49,29 @@ pytestmark = [pytest.mark.django_db]
 )
 def test_serialize_program(mock_context, remove_tree, program_with_empty_requirements):  # noqa: F811
     """Test Program serialization"""
+
+    def sort_course_runs(course):
+        """
+        Sort course runs and enrollment modes in place to ensure consistent ordering for test assertions
+        """
+        course["courseruns"].sort(key=lambda cr: cr["id"])
+        for course_run in course["courseruns"]:
+            course_run["enrollment_modes"].sort(key=lambda em: em["mode_slug"])
+
     run1 = CourseRunFactory.create(
         course__page=None,
         start_date=now() + timedelta(hours=1),
+    )
+    run1.enrollment_modes.add(
+        EnrollmentModeFactory.create(mode=EDX_ENROLLMENT_VERIFIED_MODE)
     )
     course1 = run1.course
     run2 = CourseRunFactory.create(
         course__page=None,
         start_date=now() + timedelta(hours=2),
+    )
+    run2.enrollment_modes.add(
+        EnrollmentModeFactory.create(mode=EDX_ENROLLMENT_VERIFIED_MODE)
     )
     course2 = run2.course
     runs = (  # noqa: F841
@@ -82,20 +111,31 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
         instance=program_with_empty_requirements, context=mock_context
     ).data
 
+    expected_courses = (
+        [
+            CourseWithCourseRunsSerializer(
+                instance=course, context={**mock_context}
+            ).data
+            for course in [course1, course2]
+        ]
+        if not remove_tree
+        else []
+    )
+
+    # Sort course runs and enrollment modes in expected data and actual data to ensure consistent ordering for assertions
+    for course in expected_courses:
+        sort_course_runs(course)
+
+    for course in data["courses"]:
+        sort_course_runs(course)
+
     assert_drf_json_equal(
         data,
         {
             "title": program_with_empty_requirements.title,
             "readable_id": program_with_empty_requirements.readable_id,
             "id": program_with_empty_requirements.id,
-            "courses": [
-                CourseWithCourseRunsSerializer(
-                    instance=course, context={**mock_context}
-                ).data
-                for course in [course1, course2]
-            ]
-            if not remove_tree
-            else [],
+            "courses": expected_courses,
             "requirements": formatted_reqs,
             "req_tree": ProgramRequirementTreeSerializer(
                 program_with_empty_requirements.requirements_root
@@ -104,14 +144,17 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
             "program_type": "Series",
             "departments": [],
             "live": True,
+            "enrollment_modes": EnrollmentModeSerializer(
+                program_with_empty_requirements.enrollment_modes, many=True
+            ).data,
         },
     )
 
 
-def test_program_requirement_tree_serializer_valid():
+def test_program_requirement_tree_serializer_save():
     """Verify that the ProgramRequirementTreeSerializer validates data"""
     program = ProgramFactory.create()
-    course1, course2, course3 = CourseFactory.create_batch(3)
+    course1, course2, _course3 = CourseFactory.create_batch(3)
     root = program.requirements_root
 
     serializer = ProgramRequirementTreeSerializer(
@@ -134,13 +177,127 @@ def test_program_requirement_tree_serializer_valid():
                     "operator": "min_number_of",
                     "operator_value": "1",
                 },
-                "children": [],
+                "children": [
+                    {"id": None, "data": {"node_type": "course", "course": course2.id}}
+                ],
             },
         ],
         context={"program": program},
     )
     serializer.is_valid(raise_exception=True)
     serializer.save()
+
+    root.refresh_from_db()
+    assert ProgramRequirementTreeSerializer(instance=root).data == [
+        {
+            "data": {
+                "node_type": "program_root",
+                "operator": None,
+                "operator_value": None,
+                "program": program.id,
+                "course": None,
+                "required_program": None,
+                "title": "",
+                "elective_flag": False,
+                "description": "",
+            },
+            "id": ANY,
+            "children": [
+                {
+                    "data": {
+                        "node_type": "operator",
+                        "operator": "all_of",
+                        "operator_value": None,
+                        "program": program.id,
+                        "course": None,
+                        "required_program": None,
+                        "title": "Required Courses",
+                        "elective_flag": False,
+                        "description": "",
+                    },
+                    "id": ANY,
+                    "children": [
+                        {
+                            "data": {
+                                "node_type": "course",
+                                "operator": None,
+                                "operator_value": None,
+                                "program": program.id,
+                                "course": course1.id,
+                                "required_program": None,
+                                "title": None,
+                                "elective_flag": False,
+                                "description": "",
+                            },
+                            "id": ANY,
+                        }
+                    ],
+                },
+                {
+                    "data": {
+                        "node_type": "operator",
+                        "operator": "min_number_of",
+                        "operator_value": "1",
+                        "program": program.id,
+                        "course": None,
+                        "required_program": None,
+                        "title": "Elective Courses",
+                        "elective_flag": False,
+                        "description": "",
+                    },
+                    "id": ANY,
+                    "children": [
+                        {
+                            "data": {
+                                "node_type": "course",
+                                "operator": None,
+                                "operator_value": None,
+                                "program": program.id,
+                                "course": course2.id,
+                                "required_program": None,
+                                "title": None,
+                                "elective_flag": False,
+                                "description": "",
+                            },
+                            "id": ANY,
+                        }
+                    ],
+                },
+            ],
+        }
+    ]
+
+
+def test_program_requirement_tree_serializer_rejects_invalid_tree():
+    """The tree serializer validates against the program's display mode"""
+    program = ProgramFactory.create(display_mode=PROGRAM_DISPLAY_MODE_COURSE)
+    required_program = ProgramFactory.create()
+
+    serializer = ProgramRequirementTreeSerializer(
+        instance=program.requirements_root,
+        data=[
+            {
+                "data": {
+                    "node_type": "operator",
+                    "title": "Required Courses",
+                    "operator": "all_of",
+                },
+                "children": [
+                    {
+                        "id": None,
+                        "data": {
+                            "node_type": "program",
+                            "required_program": required_program.id,
+                        },
+                    }
+                ],
+            }
+        ],
+        context={"program": program},
+    )
+
+    assert serializer.is_valid() is False
+    assert "cannot require other programs" in str(serializer.errors)
 
 
 def test_program_requirement_deletion():
@@ -237,6 +394,7 @@ def test_learner_record_serializer(
                                 "program": program.id,
                                 "title": "",
                                 "elective_flag": False,
+                                "description": "",
                             },
                             "id": program.get_requirements_root()
                             .get_children()
@@ -256,6 +414,7 @@ def test_learner_record_serializer(
                                 "program": program.id,
                                 "title": "",
                                 "elective_flag": False,
+                                "description": "",
                             },
                             "id": program.get_requirements_root()
                             .get_children()
@@ -275,6 +434,7 @@ def test_learner_record_serializer(
                                 "program": program.id,
                                 "title": "",
                                 "elective_flag": False,
+                                "description": "",
                             },
                             "id": program.get_requirements_root()
                             .get_children()
@@ -294,6 +454,7 @@ def test_learner_record_serializer(
                         "program": program.id,
                         "title": "Required Courses",
                         "elective_flag": False,
+                        "description": "",
                     },
                     "id": program.get_requirements_root().get_children().first().id,
                 },
@@ -307,6 +468,7 @@ def test_learner_record_serializer(
                         "program": program.id,
                         "title": "Elective Courses",
                         "elective_flag": True,
+                        "description": "",
                     },
                     "id": program.get_requirements_root().get_children().last().id,
                 },
@@ -320,6 +482,7 @@ def test_learner_record_serializer(
                 "program": program.id,
                 "title": "",
                 "elective_flag": False,
+                "description": "",
             },
             "id": program.requirements_root.id,
         }
@@ -355,12 +518,141 @@ def test_learner_record_serializer(
     assert course_0_payload == serialized_data["program"]["courses"][0]
 
 
-def test_program_serializer_returns_default_image():
-    """If the program has no page, we should still get a featured_image_url."""
+def test_learner_record_serializer_raises_without_user(program_with_empty_requirements):  # noqa: F811
+    """Raises ValidationError when context contains no valid user."""
+    with pytest.raises(ValidationError):
+        _ = LearnerRecordSerializer(program_with_empty_requirements, context={}).data
+
+
+def test_learner_record_serializer_raises_with_anonymous_user(
+    mocker,
+    program_with_empty_requirements,  # noqa: F811
+):
+    """Raises ValidationError when the request user is anonymous."""
+    context = {"request": mocker.Mock(user=AnonymousUser())}
+    with pytest.raises(ValidationError):
+        _ = LearnerRecordSerializer(
+            program_with_empty_requirements, context=context
+        ).data
+
+
+def test_learner_record_serializer_user_from_context_key(
+    program_with_empty_requirements,  # noqa: F811
+):
+    """User passed via context['user'] is used when no request is present."""
+    user = UserFactory()
+    data = LearnerRecordSerializer(
+        program_with_empty_requirements, context={"user": user}
+    ).data
+    assert data["user"]["email"] == user.email
+    assert data["user"]["name"] == user.name
+    assert data["user"]["username"] == user.edx_username
+
+
+def test_learner_record_serializer_anonymous_pull_hides_sharing_and_partners(
+    program_with_empty_requirements,  # noqa: F811
+):
+    """anonymous_pull context causes sharing and partner_schools to be empty."""
+    program = program_with_empty_requirements
+    user = UserFactory()
+    LearnerProgramRecordShareFactory(user=user, program=program, is_active=True)
+    PartnerSchoolFactory()
+    data = LearnerRecordSerializer(
+        program, context={"user": user, "anonymous_pull": True}
+    ).data
+    assert data["sharing"] == []
+    assert data["partner_schools"] == []
+
+
+def test_learner_record_serializer_with_certificate(program_with_empty_requirements):  # noqa: F811
+    """Grade and certificate are populated for a course with a non-revoked certificate."""
+    program = program_with_empty_requirements
+    user = UserFactory()
+    course = CourseFactory()
+    program.add_requirement(course)
+    course_run = CourseRunFactory(course=course)
+    certificate = CourseRunCertificateFactory(user=user, course_run=course_run)
+    grade = CourseRunGradeFactory(user=user, course_run=course_run, grade=0.85)
+
+    data = LearnerRecordSerializer(program, context={"user": user}).data
+    course_data = data["program"]["courses"][0]
+
+    assert course_data["certificate"] == {
+        "uuid": str(certificate.uuid),
+        "link": certificate.link,
+    }
+    assert course_data["grade"]["grade"] == round(grade.grade, 2)
+
+
+def test_learner_record_serializer_revoked_certificate_excluded(
+    program_with_empty_requirements,  # noqa: F811
+):
+    """A revoked certificate does not contribute to grade or certificate output."""
+    program = program_with_empty_requirements
+    user = UserFactory()
+    course = CourseFactory()
+    program.add_requirement(course)
+    course_run = CourseRunFactory(course=course)
+    CourseRunCertificateFactory(user=user, course_run=course_run, is_revoked=True)
+    CourseRunGradeFactory(user=user, course_run=course_run)
+
+    data = LearnerRecordSerializer(program, context={"user": user}).data
+    course_data = data["program"]["courses"][0]
+
+    assert course_data["certificate"] is None
+    assert course_data["grade"] is None
+
+
+def test_learner_record_serializer_highest_grade_selected(
+    program_with_empty_requirements,  # noqa: F811
+):
+    """When a course has certificates on multiple runs, the highest grade is shown."""
+    program = program_with_empty_requirements
+    user = UserFactory()
+    course = CourseFactory()
+    program.add_requirement(course)
+    run_low = CourseRunFactory(course=course)
+    run_high = CourseRunFactory(course=course)
+    CourseRunCertificateFactory(user=user, course_run=run_low)
+    CourseRunCertificateFactory(user=user, course_run=run_high)
+    CourseRunGradeFactory(user=user, course_run=run_low, grade=0.5)
+    high_grade = CourseRunGradeFactory(user=user, course_run=run_high, grade=0.9)
+
+    data = LearnerRecordSerializer(program, context={"user": user}).data
+    course_data = data["program"]["courses"][0]
+
+    assert course_data["grade"]["grade"] == round(high_grade.grade, 2)
+
+
+def test_learner_record_serializer_sharing_and_partner_schools(
+    program_with_empty_requirements,  # noqa: F811
+):
+    """Active shares appear in sharing; inactive shares do not. All partner schools appear."""
+    program = program_with_empty_requirements
+    user = UserFactory()
+    active_share = LearnerProgramRecordShareFactory(
+        user=user, program=program, is_active=True
+    )
+    LearnerProgramRecordShareFactory(user=user, program=program, is_active=False)
+    school = PartnerSchoolFactory()
+
+    data = LearnerRecordSerializer(program, context={"user": user}).data
+
+    sharing_uuids = [str(s["share_uuid"]) for s in data["sharing"]]
+    assert str(active_share.share_uuid) in sharing_uuids
+    assert len(data["sharing"]) == 1
+    school_ids = [s["id"] for s in data["partner_schools"]]
+    assert school.id in school_ids
+
+
+def test_program_serializer_returns_null_image_when_no_page():
+    """If the program has no page, feature_image_src should be None (null)."""
 
     program = ProgramFactory.create(page=None)
+    page_data = ProgramSerializer(program).data["page"]
 
-    assert "feature_image_src" in ProgramSerializer(program).data["page"]
+    assert "feature_image_src" in page_data
+    assert page_data["feature_image_src"] is None
 
 
 @pytest.mark.parametrize(
@@ -398,3 +690,214 @@ def test_program_requirement_serializer_valid(data):
     """Verify that the ProgramRequirementSerializer validates data"""
     serializer = ProgramRequirementSerializer(data=data)
     serializer.is_valid(raise_exception=True)
+
+
+def test_learner_record_only_includes_schools_for_that_program(settings):
+    """A learner sharing an SCM record must not see DEDP-only schools."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    scm = ProgramFactory.create()
+    dedp = ProgramFactory.create()
+    user = UserFactory.create()
+    scm_school = PartnerSchoolFactory.create(name="SCM School")
+    dedp_school = PartnerSchoolFactory.create(name="DEDP School")
+    PartnerSchoolProgramFactory.create(partner_school=scm_school, program=scm)
+    PartnerSchoolProgramFactory.create(partner_school=dedp_school, program=dedp)
+
+    data = LearnerRecordSerializer(scm, context={"user": user}).data
+
+    assert [school["name"] for school in data["partner_schools"]] == ["SCM School"]
+
+
+def test_learner_record_schools_are_alphabetical(settings):
+    """The school list is sorted by name regardless of insertion order."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    program = ProgramFactory.create()
+    user = UserFactory.create()
+    for name in ["Zhejiang University", "Arizona State University", "MIT"]:
+        school = PartnerSchoolFactory.create(name=name)
+        PartnerSchoolProgramFactory.create(partner_school=school, program=program)
+
+    data = LearnerRecordSerializer(program, context={"user": user}).data
+
+    assert [school["name"] for school in data["partner_schools"]] == [
+        "Arizona State University",
+        "MIT",
+        "Zhejiang University",
+    ]
+
+
+def test_learner_record_school_with_two_recipients_appears_once(settings):
+    """Two recipient rows for one school must not duplicate the dropdown entry."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    program = ProgramFactory.create()
+    user = UserFactory.create()
+    school = PartnerSchoolFactory.create(name="Reykjavik University")
+    PartnerSchoolProgramFactory.create(
+        partner_school=school, program=program, email="vd@example.com"
+    )
+    PartnerSchoolProgramFactory.create(
+        partner_school=school, program=program, email="cs@example.com"
+    )
+
+    data = LearnerRecordSerializer(program, context={"user": user}).data
+
+    assert [school["name"] for school in data["partner_schools"]] == [
+        "Reykjavik University"
+    ]
+
+
+def test_learner_record_excludes_unassigned_schools(settings):
+    """A school with no program assignment is shown to nobody."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    program = ProgramFactory.create()
+    user = UserFactory.create()
+    PartnerSchoolFactory.create(name="Unassigned School")
+
+    data = LearnerRecordSerializer(program, context={"user": user}).data
+
+    assert data["partner_schools"] == []
+
+
+def test_learner_record_shows_all_schools_when_flag_off(settings):
+    """With the flag off the pre-12321 behavior is preserved exactly."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = False
+    scm = ProgramFactory.create()
+    dedp = ProgramFactory.create()
+    user = UserFactory.create()
+    scm_school = PartnerSchoolFactory.create(name="SCM School")
+    dedp_school = PartnerSchoolFactory.create(name="DEDP School")
+    PartnerSchoolProgramFactory.create(partner_school=scm_school, program=scm)
+    PartnerSchoolProgramFactory.create(partner_school=dedp_school, program=dedp)
+
+    data = LearnerRecordSerializer(scm, context={"user": user}).data
+
+    assert [school["name"] for school in data["partner_schools"]] == [
+        "DEDP School",
+        "SCM School",
+    ]
+
+
+def test_program_requirement_tree_serializer_ignores_other_programs_node_ids():
+    """A submitted node id from another program's tree creates a new node here instead of moving that one"""
+    program, other = ProgramFactory.create_batch(2)
+    other_group = other.requirements_root.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Other Required",
+    )
+
+    serializer = ProgramRequirementTreeSerializer(
+        instance=program.requirements_root,
+        data=[
+            {
+                "id": other_group.id,
+                "data": {
+                    "node_type": "operator",
+                    "title": "Required",
+                    "operator": "all_of",
+                },
+                "children": [],
+            }
+        ],
+        context={"program": program},
+    )
+
+    assert serializer.is_valid(), serializer.errors
+    serializer.save()
+
+    other_group.refresh_from_db()
+    assert other_group.program == other
+    assert program.requirements_root.get_children().get().title == "Required"
+
+
+def _node(node_type, children=(), **data):
+    return {"data": {"node_type": node_type, **data}, "children": list(children)}
+
+
+def test_program_requirement_tree_serializer_replaces_node_whose_type_changed():
+    """A submitted id with another node_type makes a new node; the old one is deleted, clearing enrollments that chose it"""
+    tracked = create_program_with_tracks()
+    track = tracked.track_nodes[0]
+    enrollment = ProgramEnrollmentFactory.create(program=tracked.program, track=track)
+
+    serializer = ProgramRequirementTreeSerializer(
+        instance=tracked.program.requirements_root,
+        data=[
+            {
+                "id": track.id,
+                **_node(
+                    "operator",
+                    [_node("course", course=tracked.core_courses[0].id)],
+                    title="Required",
+                    operator="all_of",
+                ),
+            }
+        ],
+        context={"program": tracked.program},
+    )
+
+    assert serializer.is_valid(), serializer.errors
+    serializer.save()
+
+    assert not ProgramRequirement.objects.filter(id=track.id).exists()
+    enrollment.refresh_from_db()
+    assert enrollment.track is None
+
+
+def test_program_requirement_tree_serializer_saves_track():
+    """A track node saves and reads back with its description and its groups"""
+    program = ProgramFactory.create()
+    course = CourseFactory.create()
+    group = _node(
+        "operator",
+        [_node("course", course=course.id)],
+        title="Required",
+        operator="all_of",
+    )
+    track = _node(
+        "track", [group], title="General Track", description="For generalists."
+    )
+    container = _node(
+        "operator",
+        [track],
+        title="Tracks",
+        operator="min_number_of",
+        operator_value="1",
+        elective_flag=True,
+    )
+
+    serializer = ProgramRequirementTreeSerializer(
+        instance=program.requirements_root,
+        data=[container],
+        context={"program": program},
+    )
+    assert serializer.is_valid(), serializer.errors
+    serializer.save()
+
+    saved = ProgramRequirementTreeSerializer(instance=program.requirements_root).data
+    saved_track = saved[0]["children"][0]["children"][0]
+    assert saved_track["data"]["node_type"] == "track"
+    assert saved_track["data"]["description"] == "For generalists."
+    assert saved_track["children"][0]["children"][0]["data"]["course"] == course.id
+
+
+def test_program_requirement_tree_serializer_validates_the_submitted_tree():
+    """The serializer rejects a repeated course, a rule that reads the submitted keys"""
+    program = ProgramFactory.create()
+    course = CourseFactory.create()
+
+    serializer = ProgramRequirementTreeSerializer(
+        instance=program.requirements_root,
+        data=[
+            _node(
+                "operator",
+                [_node("course", course=course.id)] * 2,
+                title="Required",
+                operator="all_of",
+            )
+        ],
+        context={"program": program},
+    )
+
+    assert serializer.is_valid() is False
+    assert "lists a course more than once" in str(serializer.errors)

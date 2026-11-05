@@ -18,7 +18,7 @@
 # -- Project information -----------------------------------------------------
 
 project = "MITx Online"
-copyright = "2023, OL Engineering"  # noqa: A001
+copyright = "2025, OL Engineering"  # noqa: A001
 author = "OL Engineering"
 
 
@@ -29,6 +29,7 @@ author = "OL Engineering"
 # ones.
 extensions = [
     "sphinxcontrib.mermaid",
+    "myst_parser",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -39,6 +40,15 @@ templates_path = ["_templates"]
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = []
 
+# -- Options for MyST parser -------------------------------------------------
+
+# Extensions to enable.
+myst_enable_extensions = [
+    "colon_fence",
+    "fieldlist",
+]
+# Header anchors. Use auto-generating header anchors for headers up to X deep.
+myst_heading_anchors = 4
 
 # -- Options for HTML output -------------------------------------------------
 

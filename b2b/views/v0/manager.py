@@ -1,0 +1,996 @@
+"""B2B manager dashboard views."""
+
+import logging
+import uuid
+from dataclasses import dataclass
+from decimal import Decimal
+
+from django.db import transaction
+from django.db.models import Count, Prefetch, Q
+from django.shortcuts import get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    extend_schema,
+)
+from mitol.common.utils.datetime import now_in_utc
+from rest_framework import status as http_status
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework_extensions.mixins import NestedViewSetMixin
+
+from b2b.api import (
+    _create_discount_with_product,
+    is_potentially_valid_mailgun_webhook,
+    lock_contract_for_code_assignment,
+)
+from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
+from b2b.models import (
+    EMAIL_STATUS_FAILED,
+    EMAIL_STATUS_PENDING,
+    REDEMPTION_STATUS_ASSIGNED,
+    REDEMPTION_STATUS_REDEEMED,
+    ContractPage,
+    ContractProgramItem,
+    DiscountContractAttachmentRedemption,
+    OrganizationPage,
+)
+from b2b.permissions import IsOrganizationManager
+from b2b.serializers.v0 import (
+    BaseContractPageSerializer,
+    OrganizationPageSerializer,
+)
+from b2b.serializers.v0.manager import (
+    AssignRevokeCodeRequestSerializer,
+    BulkAssignRequestSerializer,
+    BulkAssignResultSerializer,
+    DetailErrorSerializer,
+    ManagerContractDetailSerializer,
+    ManagerCourseRunSerializer,
+    ManagerEnrollmentCodeSerializer,
+    ManagerEnrollmentSerializer,
+    SendTestEmailSerializer,
+)
+from b2b.tasks import (
+    queue_process_mailgun_webhook_for_enrollment_code_emails,
+    queue_send_enrollment_code_assignment_email,
+    queue_send_test_enrollment_code_assignment_email,
+)
+from b2b.utils import is_redeemed_attachment_record
+from courses.models import CourseRun, CourseRunEnrollment
+from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME
+from ecommerce.models import Discount
+from main.versioning import V0Versioning
+
+log = logging.getLogger(__name__)
+
+
+class ManagerContractOrgPagination(PageNumberPagination):
+    page_size = 25
+    page_size_query_param = "page_size"
+
+
+@dataclass
+class CodeAssignment:
+    contract: ContractPage
+    discount: Discount
+    email: str
+    name: str
+    code: str
+
+
+def clear_assignment_email_deliverability_fields(assignment):
+    assignment.email_message_id = ""
+    assignment.email_status = ""
+    assignment.email_status_event_timestamp = None
+    return assignment
+
+
+def create_code_assignments(
+    assignments: list[CodeAssignment], assigning_user
+) -> list[DiscountContractAttachmentRedemption] | None:
+    """
+    Write assignment rows for the given codes.
+
+    Callers hold lock_contract_for_code_assignment for the check that the
+    codes are free through this write, and call queue_code_assignment_emails
+    once that transaction has committed, so the email task never runs ahead
+    of the rows it reads.
+
+    Returns the created rows, or None if they could not be written.
+    """
+
+    assignment_records = []
+    for assignment in assignments:
+        # For bulk_create, we have to set the auto timestamps manually.
+        now = now_in_utc()
+        assignment_record = DiscountContractAttachmentRedemption(
+            discount=assignment.discount,
+            contract=assignment.contract,
+            assigned_email=assignment.email,
+            assigned_name=assignment.name,
+            assigned_by=assigning_user,
+            created_on=now,
+            updated_on=now,
+            email_status=EMAIL_STATUS_PENDING,
+        )
+        # Set the prefetched_redemptions attribute on the discount so that serializers
+        # can return the updated redemption info without needing an extra query.
+        assignment.discount.prefetched_redemptions = [assignment_record]
+        assignment_records.append(assignment_record)
+
+    if not assignment_records:
+        return assignment_records
+
+    try:
+        # A savepoint, so a failed insert does not abort the caller's transaction.
+        with transaction.atomic():
+            DiscountContractAttachmentRedemption.objects.bulk_create(assignment_records)
+    except Exception:
+        log.exception("Error creating code assignments")
+        return None
+
+    return assignment_records
+
+
+def queue_code_assignment_emails(
+    assignment_records: list[DiscountContractAttachmentRedemption],
+) -> None:
+    """Queue the invite email for each newly created assignment row."""
+
+    if assignment_records:
+        queue_send_enrollment_code_assignment_email.delay(
+            [record.id for record in assignment_records]
+        )
+
+
+def _create_discount_codes_for_contract(
+    contract: ContractPage, count_to_provision: int
+) -> list[Discount]:
+    new_discounts = []
+    # Per https://github.com/mitodl/mitxonline/pull/3734#discussion_r3532707128 we expect contracts to have many products
+    # For contract attachment JIT code generation, any product associated w/ the contract should
+    # work for creating the discount code, so we just grab the first one.
+    product = contract.get_products().first()
+    if not product:
+        log.exception(
+            "Contract %s has no product, cannot provision JIT discount codes", contract
+        )
+        return new_discounts
+
+    for _ in range(count_to_provision):
+        discount = _create_discount_with_product(
+            contract, product, Decimal(0), REDEMPTION_TYPE_ONE_TIME
+        )
+        new_discounts.append(discount)
+
+    return new_discounts
+
+
+def bulk_assign_enrollment_codes(
+    contract: ContractPage, email_assignees: list[dict], assigning_user
+) -> tuple[list[CodeAssignment], list[dict]] | None:
+    """
+    Assign a contract's free enrollment codes to people and email them.
+
+    Shared by the manager dashboard and the staff contract API. Emails that
+    already hold or have redeemed a code for the contract are skipped. A code
+    contract with no seat cap gets new codes when it runs out.
+
+    Returns (assignments, errors), or None if the assignments could not be
+    written.
+    """
+
+    with transaction.atomic():
+        lock_contract_for_code_assignment(contract)
+        assignments, errors = _match_free_codes(contract, email_assignees)
+        assignment_records = create_code_assignments(assignments, assigning_user)
+
+    if assignment_records is None:
+        return None
+
+    queue_code_assignment_emails(assignment_records)
+
+    return assignments, errors
+
+
+def _match_free_codes(
+    contract: ContractPage, email_assignees: list[dict]
+) -> tuple[list[CodeAssignment], list[dict]]:
+    """Pair each assignee with a free code. Run under the contract lock."""
+
+    # Emails that have already been assigned a code or have redeemed one for
+    # this contract should not receive another assignment.
+    taken_emails = set()
+    for (
+        assigned_email,
+        user_email,
+    ) in DiscountContractAttachmentRedemption.objects.filter(
+        contract=contract
+    ).values_list("assigned_email", "user__email"):
+        if assigned_email:
+            taken_emails.add(assigned_email.lower())
+        if user_email:
+            taken_emails.add(user_email.lower())
+
+    errors = [
+        {
+            "email": record["email"],
+            "name": record.get("name", ""),
+            "detail": "Email has already been assigned or has redeemed a code.",
+        }
+        for record in email_assignees
+        if record["email"].lower() in taken_emails
+    ]
+    email_assignees = [
+        record
+        for record in email_assignees
+        if record["email"].lower() not in taken_emails
+    ]
+
+    available_discounts = list(
+        contract.get_discounts()
+        .filter(contract_redemptions__isnull=True)
+        .order_by("id")[: len(email_assignees)]
+    )
+
+    assignments = []
+    # If we're in a contract type that uses codes, doesnt have a seat limit and we're out of available discounts
+    # Provision enough on the fly to handle the payload
+    if (
+        contract.membership_type not in CONTRACT_MEMBERSHIP_AUTOS
+        and not contract.max_learners
+        and len(available_discounts) < len(email_assignees)
+    ):
+        # If we are in a contract without a seat limit, provision new discounts for users up to the number required
+        count_to_provision = len(email_assignees) - len(available_discounts)
+        new_discounts = _create_discount_codes_for_contract(
+            contract, count_to_provision
+        )
+        available_discounts.extend(new_discounts)
+
+    for i, record in enumerate(email_assignees):
+        email = record["email"]
+        name = record.get("name", "")
+
+        if i < len(available_discounts):
+            discount = available_discounts[i]
+            assignments.append(
+                CodeAssignment(
+                    code=discount.discount_code,
+                    contract=contract,
+                    discount=discount,
+                    email=email,
+                    name=name,
+                )
+            )
+        else:
+            errors.append(
+                {"email": email, "name": name, "detail": "No available code."}
+            )
+
+    return assignments, errors
+
+
+class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
+    """List organizations available for the current user."""
+
+    versioning_class = V0Versioning
+    permission_classes = [IsAuthenticated]
+    serializer_class = OrganizationPageSerializer
+    pagination_class = ManagerContractOrgPagination
+
+    def get_queryset(self):
+        """Filter to organizations where the user is a manager.
+
+        An optional ``sso_organization_id`` query param narrows the result to a
+        single org by its Keycloak organization UUID. This is what
+        ol-analytics-api uses to ask "does this user manage the org with this
+        UUID?" (a non-empty response means yes) without dereferencing the
+        internal PK. An unparseable UUID yields an empty queryset (fail-safe:
+        reads as "not a manager"), never a 500.
+        """
+
+        queryset = (
+            OrganizationPage.objects.prefetch_related(
+                Prefetch(
+                    "contracts",
+                    queryset=ContractPage.objects.prefetch_related(
+                        "variant_options",
+                        Prefetch(
+                            "contract_programs",
+                            queryset=ContractProgramItem.objects.order_by("sort_order"),
+                            to_attr="contract_program_ids",
+                        ),
+                    ).filter(active=True),
+                    to_attr="_active_contracts",
+                ),
+            )
+            .filter(
+                organization_users__user=self.request.user,
+                organization_users__is_manager=True,
+            )
+            .distinct()
+        )
+
+        sso_organization_id = self.request.query_params.get("sso_organization_id")
+        if sso_organization_id:
+            try:
+                org_uuid = uuid.UUID(sso_organization_id)
+            except (ValueError, TypeError):
+                return queryset.none()
+            queryset = queryset.filter(sso_organization_id=org_uuid)
+
+        return queryset
+
+    @extend_schema(
+        operation_id="b2b_manager_organizations_list",
+        description="List managed organizations",
+        parameters=[
+            OpenApiParameter(
+                name="sso_organization_id",
+                type=OpenApiTypes.UUID,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description=(
+                    "Narrow the result to the single org with this Keycloak "
+                    "organization UUID (sso_organization_id). A non-empty "
+                    "response means the caller manages that org."
+                ),
+            ),
+        ],
+    )
+    def list(self, request, *args, **kwargs):
+        """List the orgs."""
+
+        return super().list(request, *args, **kwargs)
+
+    @extend_schema(
+        operation_id="b2b_manager_organizations_detail",
+        description="Retrieve managed organizations",
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                description="ID of the organization",
+                required=True,
+            ),
+        ],
+    )
+    def retrieve(self, request, *args, **kwargs):
+        """Retrieve an org."""
+
+        return super().retrieve(request, *args, **kwargs)
+
+
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name="parent_lookup_organization",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the parent organization",
+            required=True,
+        ),
+        OpenApiParameter(
+            name="id",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the contract",
+            required=True,
+        ),
+    ]
+)
+class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
+    """List an organization's contracts."""
+
+    versioning_class = V0Versioning
+    permission_classes = [IsAuthenticated, IsOrganizationManager]
+    # While we define this at the class level, we pretty much have to do the pagination manually in view defintions for anything that matters
+    # The queryset we return is for ContractPages - course_run_enrollments and codes lookups are performed almost entirely in view
+    # The result is that we need to call paginate_queryset and get_paginated_response manually since DRF doesn't know how to do it.
+    pagination_class = ManagerContractOrgPagination
+
+    def get_queryset(self):
+        """Get the queryset; add some annotations/etc for computed fields"""
+        qs = (
+            ContractPage.objects.select_related("organization")
+            .prefetch_related("users")
+            .annotate(
+                enrollment_count=Count(
+                    "course_runs__enrollments",
+                    filter=Q(course_runs__enrollments__active=True),
+                    distinct=True,
+                )
+            )
+            .filter(
+                organization__organization_users__user=self.request.user,
+                organization__organization_users__is_manager=True,
+            )
+        )
+        if self.action == "retrieve":
+            qs = qs.prefetch_related(
+                Prefetch(
+                    "code_redemptions",
+                    queryset=DiscountContractAttachmentRedemption.objects.only(
+                        "id", "contract_id", "redeemed_on", "user_id"
+                    ),
+                    to_attr="prefetched_code_redemptions",
+                )
+            )
+        return qs
+
+    def get_serializer_class(self):
+        """Use different serializers for list vs detail views."""
+        if self.action == "list":
+            return BaseContractPageSerializer
+        return ManagerContractDetailSerializer
+
+    @extend_schema(
+        responses=ManagerCourseRunSerializer(many=True),
+        description="List course runs available for a specific contract.",
+    )
+    @action(detail=True, methods=["get"])
+    def course_runs(self, request, **kwargs):  # noqa: ARG002
+        """
+        List course runs available for a specific contract.
+
+        GET /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/course_runs/
+        """
+        contract = self.get_object()
+        course_runs = contract.get_course_runs().order_by("id")
+        return self.get_paginated_response(
+            ManagerCourseRunSerializer(
+                self.paginate_queryset(course_runs), many=True
+            ).data
+        )
+
+    @extend_schema(
+        responses=ManagerEnrollmentSerializer(many=True),
+        parameters=[
+            OpenApiParameter(
+                name="course_run_id",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="Courseware ID to pull enrollments for.",
+                required=True,
+            ),
+        ],
+    )
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="course_runs/(?P<course_run_id>[^/.]+)/enrollments",
+    )
+    def course_run_enrollments(self, request, **kwargs):  # noqa: ARG002
+        """List enrollments for a specific course run within a contract."""
+        contract = self.get_object()
+        course_run_id = kwargs.pop("course_run_id")
+
+        # Get the course run and verify it belongs to this contract
+        course_run = get_object_or_404(
+            CourseRun, courseware_id=course_run_id, b2b_contracts=contract
+        )
+
+        # Get enrollments for this course run
+        enrollments = (
+            CourseRunEnrollment.objects.filter(run=course_run, b2b_contract=contract)
+            .select_related("user")
+            .order_by("-created_on")
+        )
+
+        return self.get_paginated_response(
+            ManagerEnrollmentSerializer(
+                self.paginate_queryset(enrollments), many=True
+            ).data
+        )
+
+    @extend_schema(
+        responses=ManagerEnrollmentCodeSerializer(many=True),
+        description="List enrollment codes for a contract. Only shows codes for contracts that require them (non-auto membership types). Logic varies based on whether contract has learner limits.",
+        parameters=[
+            OpenApiParameter(
+                name="search_term",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter codes by assigned email, user email, user name, or assigned name.",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="status",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter codes by status. Supported values are assigned, redeemed, and failed.",
+                required=False,
+                enum=[
+                    REDEMPTION_STATUS_ASSIGNED,
+                    REDEMPTION_STATUS_REDEEMED,
+                    EMAIL_STATUS_FAILED,
+                ],
+            ),
+        ],
+    )
+    @action(detail=True, methods=["get"])
+    def codes(self, request, **kwargs):  # noqa: ARG002
+        """
+        List enrollment codes for a contract.
+
+        Only shows codes for contracts that require them (non-auto membership types).
+        Logic varies based on whether contract has learner limits.
+
+        """
+        contract = self.get_object()
+        search_term = request.query_params.get("search_term", "").strip()
+        status_filter = request.query_params.get("status", "").strip()
+
+        # Default behavior is to return all codes for which we have an assignment or redemption.
+        prefetch = Prefetch(
+            "contract_redemptions",
+            queryset=DiscountContractAttachmentRedemption.objects.select_related(
+                "user"
+            ).order_by("-created_on")[:1],
+            to_attr="prefetched_redemptions",
+        )
+
+        if search_term or status_filter:
+            # This filter is slightly complicated because we only want to filter on the latest redemption per discount
+            # In practice, we only expect 1 redemption per code for well-formed contracts,
+            # but that's not enforced at the DB so we need to be a bit clever.
+            latest_redemption_ids = (
+                DiscountContractAttachmentRedemption.objects.order_by(
+                    "discount_id", "-created_on"
+                )
+                .distinct("discount_id")
+                .values("pk")
+            )
+            filter_q = Q(contract_redemptions__pk__in=latest_redemption_ids)
+            if search_term:
+                filter_q &= (
+                    Q(contract_redemptions__assigned_email__icontains=search_term)
+                    | Q(contract_redemptions__user__email__icontains=search_term)
+                    | Q(contract_redemptions__user__name__icontains=search_term)
+                    | Q(contract_redemptions__assigned_name__icontains=search_term)
+                )
+            if status_filter == REDEMPTION_STATUS_REDEEMED:
+                filter_q &= Q(contract_redemptions__user__isnull=False) | Q(
+                    contract_redemptions__redeemed_on__isnull=False
+                )
+            elif status_filter == REDEMPTION_STATUS_ASSIGNED:
+                filter_q &= Q(contract_redemptions__user__isnull=True) & Q(
+                    contract_redemptions__redeemed_on__isnull=True
+                )
+            elif status_filter == EMAIL_STATUS_FAILED:
+                # A failed invite email only matters if the code hasn't since
+                # been redeemed some other way - exclude redeemed codes here.
+                # We shouldn't really be in this state under normal operation,
+                # but it could happen if we give a user their code out of band.
+                filter_q &= (
+                    Q(contract_redemptions__email_status=EMAIL_STATUS_FAILED)
+                    & Q(contract_redemptions__user__isnull=True)
+                    & Q(contract_redemptions__redeemed_on__isnull=True)
+                )
+
+            discounts = (
+                contract.get_discounts()
+                .filter(filter_q)
+                .distinct()
+                .prefetch_related(prefetch)
+            )
+        else:
+            discounts = contract.get_discounts().prefetch_related(prefetch)
+
+        discounts = discounts.annotate(
+            num_redemptions=Count("contract_redemptions")
+        ).order_by("-num_redemptions", "id")
+
+        codes_for_output = discounts.filter(num_redemptions__gt=0).all()
+
+        return self.get_paginated_response(
+            ManagerEnrollmentCodeSerializer(
+                self.paginate_queryset(codes_for_output), many=True
+            ).data
+        )
+
+    @extend_schema(
+        description="Assign an available enrollment code to an email address and send an invite email.",
+        request=AssignRevokeCodeRequestSerializer,
+        responses={
+            200: ManagerEnrollmentCodeSerializer,
+            400: DetailErrorSerializer,
+            409: DetailErrorSerializer,
+            500: DetailErrorSerializer,
+        },
+        parameters=[
+            OpenApiParameter(
+                name="code",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="The discount code to assign.",
+                required=True,
+            ),
+        ],
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="codes/(?P<code>[^/.]+)/assign",
+    )
+    def assign_code(self, request, **kwargs):
+        """
+        Assign an enrollment code to an email address.
+
+        POST /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/assign/
+        """
+
+        """
+        This endpoint creates a DiscountContractAttachmentRedemption record to assign the code to the email address, and sends an invite email to the assignee.
+        It's worth noting that "assigning" a code mostly just affects the count of seats filled against limits.
+        Since we explicitly do not check that a redemption user matches the assigned email and we don't necessarily want to require preassignment
+        This feature is mostly useful for tracking who a code is intended for and sending reminder emails, rather than being a strict gate on who can redeem a code.
+        """
+        contract = self.get_object()
+        code = kwargs.get("code")
+
+        serializer = AssignRevokeCodeRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"detail": "Invalid request data."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        email = serializer.validated_data["email"]
+        name = serializer.validated_data.get("name", "")
+
+        discount = contract.get_discounts().filter(discount_code=code).first()
+        if not discount:
+            return Response(
+                {"detail": "Code not found for this contract."},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+
+        assignment = CodeAssignment(
+            code=code, contract=contract, discount=discount, email=email, name=name
+        )
+
+        with transaction.atomic():
+            lock_contract_for_code_assignment(contract)
+            if discount.contract_redemptions.exists():
+                return Response(
+                    {"detail": "Code has already been assigned or redeemed."},
+                    status=http_status.HTTP_409_CONFLICT,
+                )
+            assignment_records = create_code_assignments([assignment], request.user)
+
+        if assignment_records is None:
+            return Response(
+                {"detail": "Error assigning codes."},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        queue_code_assignment_emails(assignment_records)
+
+        return Response(
+            ManagerEnrollmentCodeSerializer(discount).data,
+            status=http_status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        description="Revoke the assignment for a specific enrollment code, returning it to the unassigned pool.",
+        request=None,
+        responses={
+            200: ManagerEnrollmentCodeSerializer,
+            404: DetailErrorSerializer,
+            409: DetailErrorSerializer,
+        },
+        parameters=[
+            OpenApiParameter(
+                name="code",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="The discount code to revoke.",
+                required=True,
+            ),
+        ],
+    )
+    @action(
+        detail=True,
+        methods=["delete"],
+        url_path="codes/(?P<code>[^/.]+)/revoke",
+    )
+    def revoke_code(self, request, **kwargs):  # noqa: ARG002
+        """
+        Revoke the assignment for a specific enrollment code.
+
+        DELETE /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/revoke/
+
+        Removes the DiscountContractAttachmentRedemption record for the specified code.
+        """
+
+        # Note that revoke is subject to change. See the following for more details.
+        # https://github.com/mitodl/hq/issues/11375#issuecomment-4673754197
+        contract = self.get_object()
+        code = kwargs.get("code")
+
+        discount = contract.get_discounts().filter(discount_code=code).first()
+        if not discount:
+            return Response(
+                {"detail": "Code not found for this contract."},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+
+        assignment_record = discount.contract_redemptions.first()
+        if not assignment_record:
+            return Response(
+                {"detail": "No assignment exists for this code."},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+
+        if is_redeemed_attachment_record(assignment_record):
+            return Response(
+                {"detail": "Cannot revoke a code that has already been redeemed."},
+                status=http_status.HTTP_409_CONFLICT,
+            )
+        assignment_record.delete()
+        discount.discount_code = str(uuid.uuid4())
+        discount.save()
+
+        return Response(
+            ManagerEnrollmentCodeSerializer(discount).data,
+            status=http_status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        description="Send a reminder email to the user assigned to a specific enrollment code who has not yet claimed it.",
+        request=None,
+        responses={
+            200: ManagerEnrollmentCodeSerializer,
+            404: DetailErrorSerializer,
+            409: DetailErrorSerializer,
+        },
+        parameters=[
+            OpenApiParameter(
+                name="code",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="The discount code to send a reminder for.",
+                required=True,
+            ),
+        ],
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="codes/(?P<code>[^/.]+)/remind",
+    )
+    def send_reminder_for_code_assignment(self, request, **kwargs):  # noqa: ARG002
+        """
+        Send a reminder email to the assignee of a specific enrollment code.
+
+        POST /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/remind/
+        """
+        contract = self.get_object()
+        code = kwargs.get("code")
+
+        discount = contract.get_discounts().filter(discount_code=code).first()
+        if not discount:
+            return Response(
+                {"detail": "Code not found for this contract."},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+
+        assignment_record = discount.contract_redemptions.first()
+        if not assignment_record:
+            return Response(
+                {"detail": "Assignment for email does not exist"},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+
+        if is_redeemed_attachment_record(assignment_record):
+            return Response(
+                {
+                    "detail": "Cannot send a reminder email to an already claimed assignment."
+                },
+                status=http_status.HTTP_409_CONFLICT,
+            )
+
+        if not assignment_record.assigned_email:
+            return Response(
+                {
+                    "detail": "Cannot send a reminder email for an assignment with no assigned email."
+                },
+                status=http_status.HTTP_409_CONFLICT,
+            )
+
+        # Just send the email reminder and update the last sent timestamp
+        clear_assignment_email_deliverability_fields(assignment_record)
+        assignment_record.email_status = EMAIL_STATUS_PENDING
+        assignment_record.save()
+        queue_send_enrollment_code_assignment_email.delay([assignment_record.id])
+
+        # Set prefetched_redemptions so the serializer returns the current assignment status.
+        discount.prefetched_redemptions = [assignment_record]
+
+        return Response(
+            ManagerEnrollmentCodeSerializer(discount).data,
+            status=http_status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        description="Bulk-assign enrollment codes from a list of (email, name) records. "
+        "One available code is assigned per record and an invite email is sent to each "
+        "successfully assigned address. Returns lists of assigned codes and any errors.",
+        request=BulkAssignRequestSerializer,
+        responses={
+            200: BulkAssignResultSerializer,
+            400: DetailErrorSerializer,
+            500: DetailErrorSerializer,
+        },
+    )
+    @action(detail=True, methods=["post"], url_path="codes/bulk_assign")
+    def bulk_assign(self, request, **kwargs):  # noqa: ARG002
+        """
+        Bulk-assign enrollment codes from an uploaded file.
+
+        POST /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/bulk_assign/
+        """
+        contract = self.get_object()
+
+        serializer = BulkAssignRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"detail": "Invalid request data."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        result = bulk_assign_enrollment_codes(
+            contract, serializer.validated_data, request.user
+        )
+        if result is None:
+            return Response(
+                {"detail": "Error assigning codes."},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        assignments, errors = result
+        return Response(
+            {
+                "assigned": ManagerEnrollmentCodeSerializer(
+                    [a.discount for a in assignments], many=True
+                ).data,
+                "errors": errors,
+            },
+            status=http_status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        description="Reassign the assignment for a specific enrollment code",
+        request=AssignRevokeCodeRequestSerializer,
+        responses={
+            200: ManagerEnrollmentCodeSerializer,
+            400: DetailErrorSerializer,
+            404: DetailErrorSerializer,
+            409: DetailErrorSerializer,
+        },
+        parameters=[
+            OpenApiParameter(
+                name="code",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="The discount code to reassign.",
+                required=True,
+            ),
+        ],
+    )
+    @action(
+        detail=True,
+        methods=["put"],
+        url_path="codes/(?P<code>[^/.]+)/reassign",
+    )
+    def reassign_code(self, request, **kwargs):
+        """
+        Reassign specific enrollment code to a new email address.
+
+        PUT /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/reassign/
+
+        Removes the DiscountContractAttachmentRedemption record for the specified code and reassigns it to a new email address.
+        """
+
+        contract = self.get_object()
+        code = kwargs.get("code")
+        serializer = AssignRevokeCodeRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"detail": "Invalid request data."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        email = serializer.validated_data["email"]
+        name = serializer.validated_data.get("name", "")
+
+        discount = contract.get_discounts().filter(discount_code=code).first()
+        if not discount:
+            return Response(
+                {"detail": "Code not found for this contract."},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+        assignment_record = discount.contract_redemptions.first()
+        if not assignment_record:
+            # May not be worth throwing out this error - we could just create the record and move on with our lives
+            return Response(
+                {"detail": "No assignment exists for this code."},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+        if is_redeemed_attachment_record(assignment_record):
+            return Response(
+                {"detail": "Cannot reassign a code that has already been redeemed."},
+                status=http_status.HTTP_409_CONFLICT,
+            )
+        discount.discount_code = str(uuid.uuid4())
+        discount.save()
+        assignment_record.assigned_email = email
+        assignment_record.assigned_name = name
+        assignment_record.assigned_by = request.user
+        assignment_record.last_reminder_sent_on = None
+        clear_assignment_email_deliverability_fields(assignment_record)
+        assignment_record.email_status = EMAIL_STATUS_PENDING
+        assignment_record.save()
+        queue_send_enrollment_code_assignment_email.delay([assignment_record.id])
+        discount.prefetched_redemptions = [assignment_record]
+
+        return Response(
+            ManagerEnrollmentCodeSerializer(discount).data,
+            status=http_status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        description="Send test assignment email to specified email address. This does not include an enrollment code.",
+        request=SendTestEmailSerializer,
+        responses={200: None, 400: DetailErrorSerializer},
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="codes/send_test_email",
+    )
+    def send_test_email(self, request, **kwargs):  # noqa: ARG002
+        """
+        Send test assignment email to specified email address. The email will contain placeholder values for the code, but representative data for all other content.
+
+        PUT /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/send_test_email/
+        """
+
+        contract = self.get_object()
+        serializer = SendTestEmailSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"detail": "Invalid request data."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        email = serializer.validated_data["email"]
+        queue_send_test_enrollment_code_assignment_email.delay(email, contract.id)
+
+        return Response(status=http_status.HTTP_200_OK)
+
+
+class ProcessMailgunWebhook(APIView):
+    permission_classes = []
+
+    @csrf_exempt
+    def post(self, request):
+        # Need to validate that this is proper json.
+        payload = request.data
+        if not is_potentially_valid_mailgun_webhook(payload):
+            # Mailgun would retry on a 400, but we wanna drop the majority of webhooks without even queueing anything
+            log.info("Got invalid mailgun webhook payload")
+            return Response(status=200)
+
+        queue_process_mailgun_webhook_for_enrollment_code_emails.delay(payload)
+
+        return Response(status=http_status.HTTP_200_OK)

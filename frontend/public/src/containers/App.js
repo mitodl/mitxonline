@@ -2,7 +2,7 @@
 import React from "react"
 import { compose } from "redux"
 import { connect } from "react-redux"
-import { Switch, Route } from "react-router"
+import { Switch, Route, matchPath } from "react-router"
 import { connectRequest } from "redux-query-react"
 import { createStructuredSelector } from "reselect"
 import urljoin from "url-join"
@@ -16,6 +16,7 @@ import {
 import { addUserNotification } from "../actions"
 
 import Header from "../components/Header"
+import DelayedNotificationContainer from "../components/DelayedNotificationContainer"
 import PrivateRoute from "../components/PrivateRoute"
 
 import LoginPages from "./pages/login/LoginPages"
@@ -67,6 +68,48 @@ export class App extends React.Component<Props, void> {
     }
   }
 
+  isEcomServiceMode() {
+    const { location } = this.props
+    const searchParams = new URLSearchParams(location.search)
+    return searchParams.has("ecom-service")
+  }
+
+  isCheckoutRelatedPage() {
+    const { match, location } = this.props
+    return (
+      !!matchPath(location.pathname, {
+        path:  urljoin(match.url, String(routes.cart)),
+        exact: false
+      }) ||
+      !!matchPath(location.pathname, {
+        path:  urljoin(match.url, String(routes.orderHistory)),
+        exact: false
+      }) ||
+      !!matchPath(location.pathname, {
+        path:  urljoin(match.url, String(routes.orderReceipt)),
+        exact: false
+      }) ||
+      !!matchPath(location.pathname, {
+        path:  "/checkout/",
+        exact: false
+      })
+    )
+  }
+
+  isLearnerRecordsPage() {
+    const { match, location } = this.props
+    return (
+      !!matchPath(location.pathname, {
+        path:  urljoin(match.url, String(routes.learnerRecords)),
+        exact: false
+      }) ||
+      !!matchPath(location.pathname, {
+        path:  urljoin(match.url, String(routes.sharedLearnerRecord)),
+        exact: false
+      })
+    )
+  }
+
   render() {
     const { match, currentUser, cartItemsCount, location } = this.props
     if (!currentUser) {
@@ -74,13 +117,25 @@ export class App extends React.Component<Props, void> {
       return <div className="app" />
     }
 
+    const showHeader =
+      !this.isEcomServiceMode() &&
+      !this.isCheckoutRelatedPage() &&
+      !this.isLearnerRecordsPage()
+
     return (
       <div className="app" aria-flowto="notifications-container">
-        <Header
-          currentUser={currentUser}
-          cartItemsCount={currentUser.is_authenticated ? cartItemsCount : 0}
-          location={location}
-        />
+        {showHeader ? (
+          <Header
+            currentUser={currentUser}
+            cartItemsCount={cartItemsCount}
+            location={location}
+          />
+        ) : (
+          // Notifications normally render inside the header. Without it,
+          // messages set by a redirect (e.g. a declined payment returning to
+          // the cart) would be read from the cookie and never shown.
+          <DelayedNotificationContainer />
+        )}
         <div id="main" className="main-page-content">
           <Switch>
             <Route
@@ -168,16 +223,7 @@ const mapDispatchToProps = {
   addUserNotification
 }
 
-const mapPropsToConfig = props => {
-  const queries = [users.currentUserQuery()]
-
-  // Add cart query for authenticated users
-  if (props.currentUser && props.currentUser.is_authenticated) {
-    queries.push(cartItemsCountQuery())
-  }
-
-  return queries
-}
+const mapPropsToConfig = () => [users.currentUserQuery(), cartItemsCountQuery()]
 export default compose(
   connect(mapStateToProps, mapDispatchToProps),
   connectRequest(mapPropsToConfig)

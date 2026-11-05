@@ -1,46 +1,61 @@
 """Tests for course models"""
 
+import logging
+import random
 from datetime import timedelta
 
 import pytest
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, connection, transaction
+from django.db.models import Prefetch
+from django.test.utils import CaptureQueriesContext
 from mitol.common.utils.datetime import now_in_utc
 from wagtail.models import Page
 
+from b2b.factories import ContractPageFactory
+from b2b.models import ContractPage
 from cms.factories import (
     CertificatePageFactory,
     CoursePageFactory,
     ProgramPageFactory,
     ResourcePageFactory,
 )
+from cms.models import CertificatePage
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.factories import (
     CourseFactory,
     CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
+    PartnerSchoolFactory,
+    PartnerSchoolProgramFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
-    ProgramRequirementFactory,
+    create_program_with_tracks,
     program_with_empty_requirements,  # noqa: F401
     program_with_requirements,  # noqa: F401
+    program_with_tracks,  # noqa: F401
 )
 from courses.models import (
     Course,
+    CourseRun,
     CourseRunEnrollment,
     PaidCourseRun,
+    PartnerSchool,
     Program,
     ProgramRequirement,
     ProgramRequirementNodeType,
     limit_to_certificate_pages,
 )
+from courses.utils import get_dated_courseruns
 from ecommerce.factories import OrderFactory, ProductFactory
 from ecommerce.models import OrderStatus
 from main.test_utils import format_as_iso8601
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
+log = logging.getLogger(__name__)
 
 
 def test_program_num_courses():
@@ -64,13 +79,92 @@ def test_program_num_courses():
     assert program.num_courses == 2
 
 
+def test_course_certificates_disabled_defaults_false():
+    """Course.certificates_disabled should default to False"""
+    course = CourseFactory.create()
+    assert course.certificates_disabled is False
+
+
+def test_program_certificates_disabled_defaults_false():
+    """Program.certificates_disabled should default to False"""
+    program = ProgramFactory.create()
+    assert program.certificates_disabled is False
+
+
 def test_courseware_url(settings):
     """Test that the courseware_url property yields the correct values"""
-    settings.OPENEDX_BASE_REDIRECT_URL = "http://example.com"
-    course_run = CourseRunFactory.build(courseware_url_path="/path")
-    course_run_no_path = CourseRunFactory.build(courseware_url_path=None)
-    assert course_run.courseware_url == "http://example.com/path"
-    assert course_run_no_path.courseware_url is None
+    settings.OPENEDX_COURSE_BASE_URL = "http://example.com"
+    course_run = CourseRunFactory.build(
+        courseware_id="course-v1:MITx+18.01x+3T2023", has_courseware_url=True
+    )
+    course_run_no_url = CourseRunFactory.build(
+        courseware_id="course-v1:MITx+18.01x+3T2023", has_courseware_url=False
+    )
+    assert (
+        course_run.courseware_url
+        == "http://example.com/learn/course/course-v1:MITx+18.01x+3T2023/home"
+    )
+    assert course_run_no_url.courseware_url is None
+
+
+def test_courseware_url_with_trailing_slash_base_url(settings):
+    """Test that the courseware_url handles base URL with trailing slash"""
+    settings.OPENEDX_COURSE_BASE_URL = "http://example.com/"
+    course_run = CourseRunFactory.build(
+        courseware_id="course-v1:MITx+6.002x+1T2023", has_courseware_url=True
+    )
+    # urljoin handles trailing slash correctly
+    assert (
+        course_run.courseware_url
+        == "http://example.com/learn/course/course-v1:MITx+6.002x+1T2023/home"
+    )
+
+
+def test_courseware_url_default_has_courseware_url_true(settings):
+    """Test that has_courseware_url defaults to True for new course runs"""
+    settings.OPENEDX_COURSE_BASE_URL = "http://example.com"
+    course_run = CourseRunFactory.build(
+        courseware_id="course-v1:MITx+18.01x+1T2023"
+        # has_courseware_url not specified, should default to True
+    )
+    assert course_run.has_courseware_url is True
+    assert (
+        course_run.courseware_url
+        == "http://example.com/learn/course/course-v1:MITx+18.01x+1T2023/home"
+    )
+
+
+def test_courseware_url_none_when_has_courseware_url_false(settings):
+    """Test that courseware_url is None when has_courseware_url is explicitly False"""
+    settings.OPENEDX_COURSE_BASE_URL = "http://example.com"
+    course_run = CourseRunFactory.build(
+        courseware_id="course-v1:MITx+18.01x+1T2023", has_courseware_url=False
+    )
+    # Even with a valid courseware_id, should return None
+    assert course_run.courseware_url is None
+
+
+def test_get_courseware_url_utility_function(settings):
+    """Test the get_courseware_url utility function directly"""
+    from courses.utils import get_courseware_url  # noqa: PLC0415
+
+    settings.OPENEDX_COURSE_BASE_URL = "https://edx.example.com"
+
+    # Test with valid courseware_id
+    url = get_courseware_url("course-v1:MITx+18.01x+3T2023")
+    assert (
+        url == "https://edx.example.com/learn/course/course-v1:MITx+18.01x+3T2023/home"
+    )
+
+
+def test_get_courseware_url_with_none(settings):
+    """Test that get_courseware_url returns None for empty/None courseware_id"""
+    from courses.utils import get_courseware_url  # noqa: PLC0415
+
+    settings.OPENEDX_COURSE_BASE_URL = "https://edx.example.com"
+
+    assert get_courseware_url(None) is None
+    assert get_courseware_url("") is None
 
 
 @pytest.mark.parametrize("end_days,expected", [[-1, True], [1, False], [None, False]])  # noqa: PT006, PT007
@@ -84,10 +178,21 @@ def test_course_run_past(end_days, expected):
 
 
 @pytest.mark.parametrize(
-    "upgrade_deadline_days,expected",  # noqa: PT006
-    [[-1, False], [1, True], [None, True]],  # noqa: PT007
+    "upgrade_deadline_days,has_product,has_verified_mode,expected",  # noqa: PT006
+    [
+        [-1, True, True, False],  # noqa: PT007
+        [1, True, True, True],  # noqa: PT007
+        [None, True, True, True],  # noqa: PT007
+        [None, False, True, False],  # noqa: PT007
+        [1, False, True, False],  # noqa: PT007
+        [1, True, False, False],  # noqa: PT007
+        [None, True, False, False],  # noqa: PT007
+        [None, False, False, False],  # noqa: PT007
+    ],
 )
-def test_course_run_upgradeable(upgrade_deadline_days, expected):
+def test_course_run_upgradeable(
+    upgrade_deadline_days, has_product, has_verified_mode, expected
+):
     """
     Test that CourseRun.is_upgradable returns the expected boolean value
     """
@@ -97,10 +202,13 @@ def test_course_run_upgradeable(upgrade_deadline_days, expected):
         if upgrade_deadline_days is None
         else (now + timedelta(days=upgrade_deadline_days))
     )
-    assert (
-        CourseRunFactory.create(upgrade_deadline=upgrade_deadline).is_upgradable
-        is expected
-    )
+    course_run = CourseRunFactory.create(upgrade_deadline=upgrade_deadline)
+    if has_product:
+        ProductFactory.create(purchasable_object=course_run)
+    if not has_verified_mode:
+        course_run.enrollment_modes.clear()
+
+    assert course_run.is_upgradable is expected
 
 
 @pytest.mark.parametrize(
@@ -326,6 +434,53 @@ def test_readable_id_invalid(readable_id_value):
         course.save()
 
 
+def test_course_readable_id_rejects_courserun_courseware_id():
+    """
+    A Course's readable_id should never be set to a full CourseRun
+    courseware_id (e.g. the course key with a run tag appended). Saving one
+    should raise a ValidationError instead of silently persisting a
+    course-run-shaped readable_id that would 404 once linked at /courses/.
+    """
+    existing_run = CourseRunFactory.create()
+    course = CourseFactory.build(readable_id=existing_run.courseware_id)
+    with pytest.raises(ValidationError):
+        course.save()
+
+
+def test_course_readable_id_allows_resaving_unchanged_legacy_collision():
+    """
+    A pre-existing Course row that already collides with a CourseRun's
+    courseware_id (grandfathered in from before this validation existed)
+    should still be saveable for unrelated field changes, as long as its
+    readable_id itself isn't part of the change.
+    """
+    existing_run = CourseRunFactory.create()
+    course = CourseFactory.create()
+    # Simulate a pre-existing bad readable_id without going through clean().
+    Course.objects.filter(pk=course.pk).update(readable_id=existing_run.courseware_id)
+    course.refresh_from_db()
+
+    course.title = "Updated Title"
+    course.save()
+
+    course.refresh_from_db()
+    assert course.title == "Updated Title"
+
+
+def test_course_readable_id_rejects_changing_to_existing_courserun_courseware_id():
+    """
+    Changing an existing Course's readable_id to match a CourseRun's
+    courseware_id should still be rejected, even for a Course row that
+    already existed prior to the change.
+    """
+    existing_run = CourseRunFactory.create()
+    course = CourseFactory.create()
+
+    course.readable_id = existing_run.courseware_id
+    with pytest.raises(ValidationError):
+        course.save()
+
+
 def test_get_program_run_enrollments(user):
     """
     Test that the get_program_run_enrollments helper method for CourseRunEnrollment returns
@@ -376,13 +531,16 @@ def test_audit(user, is_program):
         "user": enrollment.user.id,
         "username": enrollment.user.edx_username,
         "enrollment_mode": enrollment.enrollment_mode,
+        "b2b_contract": None,
     }
     if not is_program:
         expected["edx_enrolled"] = enrollment.edx_enrolled
         expected["run"] = enrollment.run.id
         expected["edx_emails_subscription"] = True
+        expected["edx_enrollment_retry_count"] = enrollment.edx_enrollment_retry_count
     else:
         expected["program"] = enrollment.program.id
+        expected["track"] = None
     assert (
         enrollment.get_audit_class().objects.get(enrollment=enrollment).data_after
         == expected
@@ -419,7 +577,7 @@ def test_course_run_certificate_start_end_dates_and_page_revision(mocker):
     Test that the CourseRunCertificate start_end_dates property works properly
     """
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     certificate = CourseRunCertificateFactory.create(
         course_run__course__page__certificate_page__product_name="product_name"
@@ -433,6 +591,49 @@ def test_course_run_certificate_start_end_dates_and_page_revision(mocker):
     )
 
 
+def test_course_run_certificate_clean_allows_missing_page_revision(mocker):
+    """Revoking a certificate can clear certificate_page_revision before save."""
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    certificate = CourseRunCertificateFactory.create(
+        course_run__course__page__certificate_page__product_name="product_name"
+    )
+    certificate.certificate_page_revision = None
+
+    # Should not raise when revision is intentionally unset.
+    certificate.clean()
+
+
+def test_course_run_certificate_save_without_course_page(mocker):
+    """Saving should not fail if the course has no CMS page."""
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    user = UserFactory.create()
+    course = CourseFactory.create(page=None)
+    course_run = CourseRunFactory.create(course=course)
+
+    certificate = CourseRunCertificateFactory.create(user=user, course_run=course_run)
+
+    assert certificate.certificate_page_revision is None
+
+
+def test_course_run_certificate_save_without_certificate_child_page(mocker):
+    """Saving should not fail if the course page has no live certificate child page."""
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    certificate = CourseRunCertificateFactory.create()
+    course_page = certificate.course_run.course.page
+    CertificatePage.objects.descendant_of(course_page).delete()
+
+    certificate.certificate_page_revision = None
+    certificate.save()
+
+    assert certificate.certificate_page_revision is None
+
+
 def test_program_certificate_start_end_dates_and_page_revision(user, mocker):
     """
     Test that the ProgramCertificate start_end_dates property works properly.
@@ -440,7 +641,7 @@ def test_program_certificate_start_end_dates_and_page_revision(user, mocker):
     The end date is the date the user received the program certificate.
     """
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     now = now_in_utc()
     start_date = now + timedelta(days=1)
@@ -481,6 +682,7 @@ def test_program_requirements(program_with_requirements):  # noqa: F811
         "title": "",
         "program": program_with_requirements.program.id,
         "elective_flag": False,
+        "description": "",
     }
 
     assert program_with_requirements.root_node.dump_bulk() == [
@@ -604,6 +806,43 @@ def test_courses_in_program(program_with_requirements):  # noqa: F811
         + program_with_requirements.elective_courses
         + program_with_requirements.mut_exclusive_courses
     )
+
+
+def test_program_requirement_properties_use_prefetched_all_requirements(
+    program_with_requirements,  # noqa: F811
+):
+    """Requirement properties should reuse prefetched requirement data."""
+    program = Program.objects.prefetch_related(
+        Prefetch(
+            "all_requirements",
+            queryset=ProgramRequirement.objects.select_related("course"),
+        )
+    ).get(pk=program_with_requirements.program.pk)
+
+    with CaptureQueriesContext(connection) as context:
+        course_pairs = program.courses
+        required_course_list = program.required_courses
+        elective_course_list = program.elective_courses
+
+    assert len(context) == 0
+    assert [course.id for course, _ in course_pairs] == [
+        course.id
+        for course in (
+            program_with_requirements.required_courses
+            + program_with_requirements.elective_courses
+            + program_with_requirements.mut_exclusive_courses
+        )
+    ]
+    assert [course.id for course in required_course_list] == [
+        course.id for course in program_with_requirements.required_courses
+    ]
+    assert [course.id for course in elective_course_list] == [
+        course.id
+        for course in (
+            program_with_requirements.elective_courses
+            + program_with_requirements.mut_exclusive_courses
+        )
+    ]
 
 
 def test_program_requirements_is_operator():
@@ -932,6 +1171,35 @@ def test_program_elective_programs_property():
     assert required_program not in elective_programs
 
 
+def test_program_courses_qset_recursive():
+    """courses_qset_recursive includes the courses of nested programs at any depth"""
+    parent_program = ProgramFactory.create()
+    required_program = ProgramFactory.create()
+    elective_program = ProgramFactory.create()
+    grandchild_program = ProgramFactory.create()
+    direct_course, required_course, elective_course, grandchild_course, _ = (
+        CourseFactory.create_batch(5)
+    )
+
+    parent_program.add_requirement(direct_course)
+    parent_program.add_program_requirement(required_program)
+    parent_program.add_program_elective(elective_program)
+    required_program.add_requirement(required_course)
+    required_program.add_program_requirement(grandchild_program)
+    elective_program.add_requirement(elective_course)
+    grandchild_program.add_requirement(grandchild_course)
+    # A program nested twice is walked once
+    elective_program.add_program_requirement(grandchild_program)
+
+    assert set(parent_program.courses_qset_recursive) == {
+        direct_course,
+        required_course,
+        elective_course,
+        grandchild_course,
+    }
+    assert set(parent_program.courses_qset) == {direct_course}
+
+
 def test_program_requirement_node_types():
     """Test that the new PROGRAM node type works correctly"""
     parent_program = ProgramFactory.create()
@@ -1001,7 +1269,7 @@ def test_active_products_for_expired_course_run():
     course_run = CourseRunFactory.create(enrollment_end=now - timedelta(days=10))
     ProductFactory.create(purchasable_object=course_run)
 
-    assert course_run.course.active_products is None
+    assert course_run.course.active_products == []
 
 
 def test_related_programs():
@@ -1024,39 +1292,1003 @@ def test_related_programs():
     assert related_program == second_related_program
 
 
-def test_program_minimum_elective_courses_requirement():
-    """Tests to make sure the related programs functionality in the model works."""
-    minimum_elective_required = 5
-    program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(program)
-    root_node = program.requirements_root
+def test_courserun_qs_b2b_flags():
+    """Test that the CourseRunQuerySet B2B flags work as expected."""
 
-    root_node.add_child(
+    past_start_date = now_in_utc() - timedelta(days=1)
+
+    CourseRunFactory.create_batch(
+        3, start_date=past_start_date, end_date=None, live=True
+    )
+    CourseRunFactory.create_batch(
+        3,
+        start_date=past_start_date,
+        end_date=None,
+        live=True,
+        b2b_only=True,
+    )
+
+    assert CourseRun.objects.filter(start_date=past_start_date).live().count() == 3
+    assert (
+        CourseRun.objects.filter(start_date=past_start_date)
+        .live(include_b2b=True)
+        .count()
+        == 6
+    )
+    assert CourseRun.objects.filter(start_date=past_start_date).available().count() == 3
+    assert (
+        CourseRun.objects.filter(start_date=past_start_date)
+        .available(include_b2b=True)
+        .count()
+        == 6
+    )
+    assert CourseRun.objects.filter(start_date=past_start_date).count() == 6
+    assert (
+        CourseRun.objects.filter(start_date=past_start_date).exclude_b2b().count() == 3
+    )
+
+
+def test_program_requirements_root_node_collation():
+    """Ensure we can create a bunch of programs ()"""
+    ProgramFactory.create_batch(100)
+
+
+def test_course_creation_without_department():
+    """
+    Test that a Course can be created without any departments
+    """
+    course = Course.objects.create(
+        title="No Dept Course", readable_id="course-v1:PyT+NoDept+1", live=True
+    )
+    assert course.departments.count() == 0
+    # Should be retrievable and have no departments
+    retrieved = Course.objects.get(pk=course.pk)
+    assert retrieved.departments.count() == 0
+
+
+def test_create_program_without_department():
+    """Test that a Program can be created without any departments."""
+
+    program = Program.objects.create(
+        title="Test Program", readable_id="program-v1:TEST+P1", live=True
+    )
+    assert program.departments.count() == 0
+    # Fetch from DB to ensure no departments are attached
+    program_from_db = Program.objects.get(pk=program.pk)
+    assert program_from_db.departments.count() == 0
+
+
+# ---- Language field tests ----
+
+
+def test_courserun_language_unique_constraint():
+    """Two runs for the same course+run_tag cannot share a language."""
+
+    course = CourseFactory.create()
+    CourseRunFactory.create(
+        course=course,
+        run_tag="R1",
+        language="en",
+        courseware_id="course-v1:X+Y+R1-en",
+    )
+    with pytest.raises(ValidationError):
+        CourseRunFactory.create(
+            course=course,
+            run_tag="R1",
+            language="en",
+            courseware_id="course-v1:X+Y+R1-en2",
+        )
+
+
+def test_courserun_language_null_not_constrained():
+    """Multiple runs with language="" should not trigger the constraint."""
+    course = CourseFactory.create()
+    CourseRunFactory.create(
+        course=course,
+        run_tag="R1",
+        language="",
+        courseware_id="course-v1:X+Y+R1a",
+    )
+    # Should not raise
+    run2 = CourseRunFactory.create(
+        course=course,
+        run_tag="R1",
+        language="",
+        courseware_id="course-v1:X+Y+R1b",
+    )
+    assert run2.pk is not None
+
+
+def test_courserun_different_tags_same_language_allowed():
+    """The same language can appear on runs with different run_tags."""
+    course = CourseFactory.create()
+    run1 = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        courseware_id="course-v1:X+Y+1T2026-en",
+    )
+    run2 = CourseRunFactory.create(
+        course=course,
+        run_tag="2T2026",
+        language="en",
+        courseware_id="course-v1:X+Y+2T2026-en",
+    )
+    assert run1.language == run2.language == "en"
+    assert run1.run_tag != run2.run_tag
+
+
+@pytest.mark.parametrize(
+    "primary",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "include_translations",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "b2b",
+    [
+        True,
+        False,
+    ],
+)
+def test_course_next_run_multiple_languages(primary, include_translations, b2b):
+    """
+    Test that the first_unexpired_run call works correctly with multiple languages.
+
+    This should only return the primary language or runs where the language is
+    not set. Otherwise, the learner may get put in a run in a random language.
+    """
+
+    if b2b:
+        contract = ContractPageFactory.create()
+
+    course = CourseFactory.create()
+    main_run = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en" if primary else "",
+        courseware_id=f"{course.readable_id}+1T2026_EN",
+        is_primary_language=primary,
+    )
+    if include_translations:
+        secondary_run_1 = CourseRunFactory.create(
+            course=course,
+            run_tag="1T2026",
+            language="fr",
+            courseware_id=f"{course.readable_id}+1T2026_FR",
+            is_primary_language=False,
+            start_date=main_run.start_date,
+            end_date=main_run.end_date,
+            enrollment_start=main_run.enrollment_start,
+            enrollment_end=main_run.enrollment_end,
+        )
+        secondary_run_2 = CourseRunFactory.create(
+            course=course,
+            run_tag="1T2026",
+            language="es",
+            courseware_id=f"{course.readable_id}+1T2026_SP",
+            is_primary_language=False,
+            start_date=main_run.start_date,
+            end_date=main_run.end_date,
+            enrollment_start=main_run.enrollment_start,
+            enrollment_end=main_run.enrollment_end,
+        )
+
+    if b2b:
+        main_run.b2b_contracts.add(contract)
+        main_run.b2b_only = True
+        main_run.save()
+
+        nc_run = CourseRunFactory.create(
+            course=course,
+            run_tag="1T2026",
+            language="de_DE",
+            courseware_id=f"{course.readable_id}+1T2026_DE",
+            is_primary_language=False,
+            start_date=main_run.start_date,
+            end_date=main_run.end_date,
+            enrollment_start=main_run.enrollment_start,
+            enrollment_end=main_run.enrollment_end,
+        )
+
+        if include_translations:
+            secondary_run_1.b2b_contracts.add(contract)
+            secondary_run_1.b2b_only = True
+            secondary_run_2.b2b_contracts.add(contract)
+            secondary_run_2.b2b_only = True
+            secondary_run_1.save()
+            secondary_run_2.save()
+
+        first_unexpired_run = course.get_first_unexpired_b2b_run([contract.id])
+    else:
+        first_unexpired_run = course.first_unexpired_run
+
+    if primary or not include_translations:
+        assert first_unexpired_run == main_run
+
+    if not primary and include_translations:
+        assert first_unexpired_run in [main_run, secondary_run_1, secondary_run_2]
+
+    if b2b:
+        assert first_unexpired_run != nc_run
+
+
+@pytest.mark.parametrize("filter_name", ["org_id", "contract_id"])
+def test_get_filtered_runs_includes_runs_from_b2b_contracts(filter_name):
+    """Runs linked through the B2B contracts relation are returned when filtered."""
+    course = CourseFactory.create()
+    contract = ContractPageFactory.create()
+    other_contract = ContractPageFactory.create()
+    course_run = CourseRunFactory.create(course=course, b2b_only=True)
+    course_run.b2b_contracts.add(contract)
+    course_run.b2b_contracts.add(other_contract)
+
+    filter_value = contract.organization_id if filter_name == "org_id" else contract.id
+
+    assert course_run in course.get_filtered_runs(
+        courserun_is_enrollable=None, **{filter_name: filter_value}
+    )
+
+    if filter_name == "contract_id":
+        assert course_run in course.get_filtered_runs(
+            courserun_is_enrollable=None,
+            contract_id=other_contract.id,
+        )
+
+
+def test_get_filtered_runs_reuses_prefetched_courseruns(django_assert_num_queries):
+    """A courseruns prefetch is reused rather than re-queried."""
+    course = CourseFactory.create()
+    course_run = CourseRunFactory.create(course=course)
+    course = Course.objects.prefetch_related("courseruns").get(pk=course.pk)
+
+    with django_assert_num_queries(0):
+        runs = course.get_filtered_runs(courserun_is_enrollable=None)
+
+    assert runs == [course_run]
+
+
+@pytest.mark.parametrize("filter_name", ["org_id", "contract_id"])
+def test_get_filtered_runs_excludes_inactive_b2b_contracts(filter_name):
+    """
+    An inactive contract must not match through the M2M.
+
+    ``b2b_contracts`` reads ContractPage's default manager
+    (ActiveContractManager), so the prefetch has always been filtered to
+    active, in-window contracts. This is the guard on narrowing that prefetch
+    with the right manager.
+    """
+    course = CourseFactory.create()
+    contract = ContractPageFactory.create(active=True)
+    course_run = CourseRunFactory.create(course=course, b2b_only=True)
+    course_run.b2b_contracts.add(contract)
+
+    filter_value = contract.organization_id if filter_name == "org_id" else contract.id
+    assert course.get_filtered_runs(
+        courserun_is_enrollable=None, **{filter_name: filter_value}
+    ) == [course_run]
+
+    contract.active = False
+    contract.save()
+    course = Course.objects.get(pk=course.pk)
+
+    assert (
+        course.get_filtered_runs(
+            courserun_is_enrollable=None, **{filter_name: filter_value}
+        )
+        == []
+    )
+
+
+# Test for course run constraints
+# As a default we expect uniqueness on course, courseware_id, and run_tag
+# We also shouldn't allow:
+# ..... >1 language per run_tag and course
+# ...or >1 language per run_tag, courseware ID, and course
+# ...or >1 is_primary_language=True per course and run tag
+# ...or >1 language per B2B contract, run tag, and course
+# ...or >1 is_primary_language per B2B contract, run tag, and course
+# ...or >1 language per source run, run tag, and course
+# ...or >1 is_primary_language per source run, run tag, and course
+
+# This was written assuming the run tags in edX would be where we'd have the
+# language descriptor but we seem to be doing that in the course number instead.
+
+
+def test_run_language_constraints_regular_duplication():
+    """Test that the basic constraint works as we expect."""
+
+    start_date = now_in_utc() - timedelta(days=15)
+    course_number = random.randint(1, 3000)  # noqa: S311
+
+    course = CourseFactory.create(
+        readable_id=f"course-v1:INTL+TestCourse.{course_number}"
+    )
+
+    regular_course = CourseRun.objects.create(
+        course=course,
+        courseware_id=f"{course.readable_id}+9T9099",
+        title=course.title,
+        run_tag="9T9099",
+        start_date=start_date,
+        enrollment_start=start_date,
+        live=True,
+        language="",
+        is_primary_language=False,
+    )
+
+    assert regular_course.id
+
+    with pytest.raises(IntegrityError) as exc:
+        CourseRun.objects.create(
+            course=course,
+            courseware_id=f"{course.readable_id}+9T9099",
+            title=course.title,
+            run_tag="9T9099",
+            start_date=start_date,
+            enrollment_start=start_date,
+            live=True,
+            language="",
+            is_primary_language=False,
+        )
+
+    assert "violates unique constraint" in str(exc)
+
+
+def _generate_lang_run_data():
+    """Generate some run data for the language runs"""
+
+    start_date = now_in_utc() - timedelta(days=15)
+    course_number = random.randint(1, 3000)  # noqa: S311
+
+    course = CourseFactory.create(
+        readable_id=f"course-v1:INTL+TestCourse.{course_number}"
+    )
+
+    run_dict = {
+        "course": course,
+        "title": course.title,
+        "run_tag": "9T9099",
+        "start_date": start_date,
+        "enrollment_start": start_date,
+        "live": True,
+        "is_source_run": False,
+    }
+
+    return (
+        course,
+        run_dict,
+    )
+
+
+def _create_run(run_data):
+    """Create a run from the data, attaching any contracts in b2b_contracts."""
+
+    run_data = {**run_data}
+    contracts = run_data.pop("b2b_contracts", [])
+    run = CourseRun.all_objects.create(**run_data)
+    run.b2b_contracts.add(*contracts)
+    return run
+
+
+def _run_primary_lang_run_test(  # noqa: PLR0913
+    course,
+    run_dict,
+    langs,
+    extra_primary_lang,
+    set_language_field,
+    set_primary,
+    *,
+    courseware_suffix="",
+):
+    """The main test logic for the below tests - will get run 3 times in total."""
+
+    run_data = {
+        **run_dict,
+        "courseware_id": f"{course.readable_id}{courseware_suffix}+9T9099",
+        "language": "en" if set_language_field else "",
+        "is_primary_language": set_primary,
+    }
+    log.info("run_data is: %s", run_data)
+
+    regular_course = _create_run(run_data)
+
+    assert regular_course.id
+
+    for lang, suffix in langs:
+        run_data = {
+            **run_dict,
+            "courseware_id": f"{course.readable_id}{courseware_suffix}+9T9099{suffix}",
+            "language": lang if set_language_field else "",
+            "is_primary_language": False,
+        }
+        log.info("run_data is: %s", run_data)
+
+        _create_run(run_data)
+
+    if set_primary and set_language_field:
+        # Also test what happens if we try to make another primary language
+        # If the language field isn't set, though, the constraint shouldn't be triggered.
+        run_data = {
+            **run_dict,
+            "courseware_id": f"{course.readable_id}{courseware_suffix}+9T9099{extra_primary_lang[1]}",
+            "language": extra_primary_lang[0] if set_language_field else "",
+            "is_primary_language": True,
+        }
+        log.info("run_data is: %s", run_data)
+
+        with pytest.raises(ValidationError) as exc, transaction.atomic():
+            _create_run(run_data)
+
+        assert "primary-language run" in str(exc)
+
+
+@pytest.mark.parametrize(
+    "set_language_field",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "set_primary",
+    [
+        True,
+        False,
+    ],
+)
+def test_run_language_constraints_regular_languages(set_language_field, set_primary):
+    """Test that the constraints on language for regular runs works as we expect."""
+
+    langs = [
+        (
+            "es",
+            "_ES",
+        ),
+        (
+            "de",
+            "_DE",
+        ),
+    ]
+    extra_primary_lang = (
+        "fr",
+        "_FR",
+    )
+
+    def _run_b2b_test():
+        contract = ContractPageFactory.create()
+        run_dict = starting_run_dict
+        run_dict["b2b_contracts"] = [contract]
+        run_dict["b2b_only"] = True
+        run_dict["is_source_run"] = False
+
+        _run_primary_lang_run_test(
+            course,
+            run_dict,
+            langs,
+            extra_primary_lang,
+            set_language_field,
+            set_primary,
+            courseware_suffix=f"_{contract.organization.org_key}",
+        )
+
+        assert (
+            CourseRun.all_objects.filter(course=course, b2b_contracts=contract).count()
+            == 3
+        )
+
+    course, starting_run_dict = _generate_lang_run_data()
+    run_dict = starting_run_dict
+
+    _run_primary_lang_run_test(
+        course, run_dict, langs, extra_primary_lang, set_language_field, set_primary
+    )
+
+    assert CourseRun.all_objects.filter(course=course).count() == 3
+
+    # Run the above test again, but this time set up a source course.
+    # The source course constraints should be separate from the regular run ones
+    # so this should do the same things.
+
+    run_dict = starting_run_dict
+    run_dict["is_source_run"] = True
+    _run_primary_lang_run_test(
+        course,
+        run_dict,
+        langs,
+        extra_primary_lang,
+        set_language_field,
+        set_primary,
+        courseware_suffix="_SRC",
+    )
+
+    assert CourseRun.all_objects.filter(course=course, is_source_run=True).count() == 3
+
+    if set_language_field and set_primary:
+        # We should have two of these - one for the regular runs, and one for the source runs.
+        assert (
+            CourseRun.all_objects.filter(
+                course=course, language="en", is_primary_language=True
+            ).count()
+            == 2
+        )
+
+    # The penultimate time - unset source run, but add a B2B contract.
+
+    _run_b2b_test()
+
+    if set_language_field and set_primary:
+        # We should have two of these - one for the regular runs, and one for the source runs.
+        assert (
+            CourseRun.all_objects.filter(
+                course=course, language="en", is_primary_language=True
+            ).count()
+            == 3
+        )
+
+    # Final run - add another B2B contract.
+
+    _run_b2b_test()
+
+    if set_language_field and set_primary:
+        # We should have two of these - one for the regular runs, and one for the source runs.
+        assert (
+            CourseRun.all_objects.filter(
+                course=course, language="en", is_primary_language=True
+            ).count()
+            == 4
+        )
+
+
+def test_nonvariant_filter():
+    """Test that the nonvariant filter in CourseRunQuerySet works as expected."""
+
+    cr1 = CourseRunFactory.create()
+    CourseRunFactory.create(course=cr1.course, variant_industry="HC")
+    CourseRunFactory.create(course=cr1.course, variant_length="S")
+    CourseRunFactory.create(course=cr1.course, language="fr")
+    CourseRunFactory.create(course=cr1.course, language="pt", variant_industry="HC")
+
+    assert CourseRun.objects.filter(course=cr1.course).count() == 5
+    assert CourseRun.objects.filter(course=cr1.course).nonvariant().count() == 2
+    assert CourseRun.all_objects.filter(course=cr1.course).count() == 5
+    assert CourseRun.all_objects.filter(course=cr1.course).nonvariant().count() == 2
+
+
+def test_partner_school_emails_for_program_uses_link_email():
+    """emails_for_program returns the per-program address, not the school default."""
+    school = PartnerSchoolFactory.create(email="default@example.com")
+    program = ProgramFactory.create()
+    PartnerSchoolProgramFactory.create(
+        partner_school=school, program=program, email="scm@example.com"
+    )
+
+    assert school.emails_for_program(program) == ["scm@example.com"]
+
+
+def test_partner_school_emails_for_program_returns_all_recipients():
+    """A school may notify several addresses for one program (Reykjavik under SDS)."""
+    school = PartnerSchoolFactory.create(email="default@example.com")
+    program = ProgramFactory.create()
+    PartnerSchoolProgramFactory.create(
+        partner_school=school, program=program, email="vd@example.com"
+    )
+    PartnerSchoolProgramFactory.create(
+        partner_school=school, program=program, email="cs@example.com"
+    )
+
+    assert sorted(school.emails_for_program(program)) == [
+        "cs@example.com",
+        "vd@example.com",
+    ]
+
+
+def test_partner_school_emails_for_program_falls_back_to_school_email():
+    """A link with a blank email falls back to the school's own address."""
+    school = PartnerSchoolFactory.create(email="default@example.com")
+    program = ProgramFactory.create()
+    PartnerSchoolProgramFactory.create(partner_school=school, program=program, email="")
+
+    assert school.emails_for_program(program) == ["default@example.com"]
+
+
+def test_partner_school_emails_for_program_ignores_other_programs():
+    """A link for a different program must not leak into this program's recipients."""
+    school = PartnerSchoolFactory.create(email="default@example.com")
+    scm = ProgramFactory.create()
+    dedp = ProgramFactory.create()
+    PartnerSchoolProgramFactory.create(
+        partner_school=school, program=scm, email="scm@example.com"
+    )
+
+    assert school.emails_for_program(dedp) == ["default@example.com"]
+
+
+def test_partner_school_alt_email_is_stored_but_not_a_recipient():
+    """alt_email round-trips to the database but is never a send target."""
+    school = PartnerSchoolFactory.create(email="default@example.com")
+    program = ProgramFactory.create()
+    link = PartnerSchoolProgramFactory.create(
+        partner_school=school,
+        program=program,
+        email="primary@example.com",
+        alt_email="alternative@example.com",
+    )
+    link.refresh_from_db()
+
+    assert link.alt_email == "alternative@example.com"
+    assert school.emails_for_program(program) == ["primary@example.com"]
+
+
+def test_partner_school_alt_email_alone_does_not_make_a_recipient():
+    """A link with only alt_email set falls back to the school default."""
+    school = PartnerSchoolFactory.create(email="default@example.com")
+    program = ProgramFactory.create()
+    PartnerSchoolProgramFactory.create(
+        partner_school=school,
+        program=program,
+        email="",
+        alt_email="alternative@example.com",
+    )
+
+    assert school.emails_for_program(program) == ["default@example.com"]
+
+
+def test_partner_school_default_ordering_is_alphabetical():
+    """PartnerSchool queries come back sorted by name."""
+    PartnerSchoolFactory.create(name="Zhejiang University")
+    PartnerSchoolFactory.create(name="Arizona State University")
+    PartnerSchoolFactory.create(name="Massachusetts Institute of Technology")
+
+    names = list(PartnerSchool.objects.values_list("name", flat=True))
+
+    assert names == sorted(names)
+
+
+def test_b2b_contract_group_uniqueness_within_same_contract():
+    """Two runs in the same contract can't share a run tag/language/variant."""
+    contract = ContractPageFactory.create()
+    course = CourseFactory.create()
+
+    first = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en",
+    )
+    first.b2b_contracts.add(contract)
+
+    second = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en-copy",
+    )
+
+    with pytest.raises(ValidationError):
+        second.b2b_contracts.add(contract)
+
+
+def test_b2b_contract_group_uniqueness_across_different_contracts():
+    """The same run tag/language is fine when the runs are in different contracts."""
+    course = CourseFactory.create()
+    first_contract = ContractPageFactory.create()
+    second_contract = ContractPageFactory.create()
+
+    first = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en",
+    )
+    first.b2b_contracts.add(first_contract)
+
+    second = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en-copy",
+    )
+    second.b2b_contracts.add(second_contract)
+
+    assert second.b2b_contracts.count() == 1
+
+
+def test_b2b_contract_group_uniqueness_checks_every_contract():
+    """A collision in any one of a run's contracts is enough to fail."""
+    course = CourseFactory.create()
+    shared_contract = ContractPageFactory.create()
+    other_contract = ContractPageFactory.create()
+
+    first = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en",
+    )
+    first.b2b_contracts.add(shared_contract)
+
+    second = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en-copy",
+    )
+    second.b2b_contracts.add(other_contract)
+
+    with pytest.raises(ValidationError):
+        second.b2b_contracts.add(shared_contract)
+
+
+def test_b2b_contract_group_uniqueness_primary_language():
+    """Only one primary-language run is allowed per contract group."""
+    contract = ContractPageFactory.create()
+    course = CourseFactory.create()
+
+    first = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_primary_language=True,
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en",
+    )
+    first.b2b_contracts.add(contract)
+
+    second = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="es",
+        is_primary_language=True,
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-es",
+    )
+
+    with pytest.raises(ValidationError):
+        second.b2b_contracts.add(contract)
+
+
+def test_b2b_contract_group_uniqueness_reverse_add():
+    """Adding runs from the contract side is validated too."""
+    contract = ContractPageFactory.create()
+    course = CourseFactory.create()
+
+    first = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en",
+    )
+    first.b2b_contracts.add(contract)
+
+    second = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en-copy",
+    )
+
+    with pytest.raises(ValidationError):
+        contract.course_runs.add(second)
+
+
+def test_b2b_contract_group_uniqueness_public_runs():
+    """Two public (contract-less) runs still can't share a group."""
+    course = CourseFactory.create()
+
+    CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en",
+    )
+
+    with pytest.raises(ValidationError):
+        CourseRunFactory.create(
+            course=course,
+            run_tag="1T2026",
+            language="en",
+            is_source_run=True,
+            courseware_id=f"{course.readable_id}+1T2026-en-copy",
+        )
+
+
+@pytest.mark.parametrize(
+    "run_kwargs",
+    [
+        pytest.param({"past_start": True}, id="past_start"),
+        pytest.param({"in_progress": True}, id="in_progress"),
+        pytest.param({"in_future": True}, id="in_future"),
+        pytest.param({"completed": True}, id="ended"),
+        pytest.param({"in_progress": True, "is_self_paced": True}, id="self_paced"),
+        pytest.param(
+            {"in_progress": True, "is_primary_language": False, "language": "fr"},
+            id="non_primary_other_language",
+        ),
+        pytest.param(
+            {"in_progress": True, "is_primary_language": False, "language": "en"},
+            id="non_primary_english",
+        ),
+    ],
+)
+def test_first_unexpired_run_matches_prefetched_and_unprefetched(run_kwargs):
+    """
+    ``first_unexpired_run`` must agree whether or not ``courseruns`` is prefetched.
+
+    It now selects the run in Python off the prefetch cache instead of running
+    two queries, which is only safe because ``CourseRun.is_enrollable`` is
+    exactly equivalent to ``CourseRunQuerySet.get_enrollable_filter()``. This
+    asserts that equivalence through the public property rather than trusting
+    it, so the two can't drift apart.
+    """
+    course = CourseFactory.create()
+    CourseRunFactory.create(course=course, **run_kwargs)
+
+    unprefetched = Course.objects.get(pk=course.pk).first_unexpired_run
+
+    prefetched = (
+        Course.objects.filter(pk=course.pk)
+        .prefetch_related(
+            Prefetch("courseruns", queryset=CourseRun.objects.order_by("id"))
+        )
+        .get()
+    )
+    with CaptureQueriesContext(connection) as ctx:
+        from_cache = prefetched.first_unexpired_run
+
+    assert from_cache == unprefetched
+    # The point of the rewrite: reading it off the prefetch costs nothing.
+    assert len(ctx.captured_queries) == 0, ctx.captured_queries
+
+
+def test_first_unexpired_run_prefers_unended_then_earliest_start():
+    """
+    Ordering must match ``order_by("start_date", "-is_primary_language")``.
+
+    Runs that have not ended win over ended ones; among those, the earliest
+    start wins, and a primary-language run beats a non-primary one on a tie.
+    """
+    course = CourseFactory.create()
+    # An ended run and a later-starting one, so the in-progress run is the only
+    # correct answer under "prefer unended, then earliest start".
+    CourseRunFactory.create(course=course, completed=True)
+    CourseRunFactory.create(course=course, in_future=True)
+    earlier = CourseRunFactory.create(course=course, in_progress=True)
+
+    selected = Course.objects.get(pk=course.pk).first_unexpired_run
+    assert selected == earlier
+
+
+def test_first_unexpired_run_excludes_b2b_runs():
+    """B2B-only runs are never the public ``next_run_id``."""
+    course = CourseFactory.create()
+    run = CourseRunFactory.create(course=course, in_progress=True, b2b_only=True)
+    run.b2b_contracts.add(ContractPageFactory.create())
+
+    assert Course.objects.get(pk=course.pk).first_unexpired_run is None
+
+
+def test_has_dated_courseruns_matches_get_dated_courseruns():
+    """
+    ``has_dated_courseruns`` must agree with the queryset it replaced.
+
+    ``get_availability`` used to run ``get_dated_courseruns(...).count()`` per
+    course; this property answers the same question off the prefetch cache.
+    """
+    course = CourseFactory.create()
+    CourseRunFactory.create(course=course, in_progress=True, is_self_paced=True)
+
+    fresh = Course.objects.get(pk=course.pk)
+    expected = get_dated_courseruns(fresh.courseruns).exists()
+    assert fresh.has_dated_courseruns == expected
+
+    CourseRunFactory.create(course=course, in_progress=True, is_self_paced=False)
+    fresh = Course.objects.get(pk=course.pk)
+    assert get_dated_courseruns(fresh.courseruns).exists() is True
+    assert fresh.has_dated_courseruns is True
+
+
+@pytest.mark.parametrize(
+    ("parent_attr", "extra"),
+    [
+        ("root_node", {}),
+        ("tracks_node", {"operator": ProgramRequirement.Operator.ALL_OF}),
+    ],
+    ids=["wrong_depth", "operator_set"],
+)
+def test_program_requirement_track_node_constraint(
+    program_with_tracks,  # noqa: F811
+    parent_attr,
+    extra,
+):
+    """The node constraint rejects a track outside depth 3 or with operator fields"""
+    parent = getattr(program_with_tracks, parent_attr)
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        parent.add_child(
+            node_type=ProgramRequirementNodeType.TRACK, title="Stray Track", **extra
+        )
+
+
+def test_program_courses_lists_a_course_in_two_groups_once_as_required(
+    program_with_tracks,  # noqa: F811
+):
+    """A course in a track and a later required group is listed once, as required"""
+    shared = program_with_tracks.track_courses[0][0]
+    program_with_tracks.root_node.add_child(
         node_type=ProgramRequirementNodeType.OPERATOR,
         operator=ProgramRequirement.Operator.ALL_OF,
-        title="Required Courses",
-    )
-    root_node.add_child(
-        node_type=ProgramRequirementNodeType.OPERATOR,
-        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
-        operator_value=minimum_elective_required,
-        title="Elective Courses",
-        elective_flag=True,
-    )
+        title="More Core",
+    ).add_child(node_type=ProgramRequirementNodeType.COURSE, course=shared)
+    program = Program.objects.get(pk=program_with_tracks.program.pk)
 
-    assert program.minimum_elective_courses_requirement == minimum_elective_required
+    assert [course for course, _ in program.courses].count(shared) == 1
+    assert shared in program.required_courses
+    assert shared not in program.elective_courses
 
 
-def test_program_minimum_elective_courses_requirement_no_elective_node():
-    """Tests to make sure the related programs functionality in the model works."""
-    program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(program)
-    root_node = program.requirements_root
-
-    root_node.add_child(
-        node_type=ProgramRequirementNodeType.OPERATOR,
-        operator=ProgramRequirement.Operator.ALL_OF,
-        title="Required Courses",
+@pytest.mark.parametrize("wrong_node", ["group", "other_program_track"])
+def test_program_enrollment_clean_rejects_wrong_track(
+    program_with_tracks,  # noqa: F811
+    wrong_node,
+):
+    """clean() rejects a node that is not a track, and a track of another program"""
+    enrollment = ProgramEnrollmentFactory.create(program=program_with_tracks.program)
+    enrollment.track = (
+        program_with_tracks.tracks_node
+        if wrong_node == "group"
+        else create_program_with_tracks().track_nodes[0]
     )
 
-    assert program.minimum_elective_courses_requirement is None
+    with pytest.raises(ValidationError) as exc:
+        enrollment.full_clean()
+
+    assert "track" in exc.value.message_dict
+
+
+def test_program_requirement_track_delete_clears_enrollment_track(
+    program_with_tracks,  # noqa: F811
+):
+    """Deleting a track node leaves enrollments that chose it with no track"""
+    track = program_with_tracks.track_nodes[0]
+    enrollment = ProgramEnrollmentFactory.create(
+        program=program_with_tracks.program, track=track
+    )
+
+    track.delete()
+
+    enrollment.refresh_from_db()
+    assert enrollment.track is None
+
+
+@pytest.mark.parametrize("active", [True, False])
+def test_course_run_has_b2b_contracts(active):
+    """has_b2b_contracts should count inactive contracts too."""
+    assert CourseRunFactory.build().has_b2b_contracts is False
+    assert CourseRunFactory.create().has_b2b_contracts is False
+
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
+    # Saving an inactive ContractPage through the factory trips Wagtail's
+    # reload via the (active-only) default manager, so flip it directly.
+    ContractPage.objects.filter(pk=contract.pk).update(active=active)
+
+    assert run.has_b2b_contracts is True
+    assert run.contract_group_ids == {contract.id}

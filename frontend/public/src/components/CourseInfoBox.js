@@ -7,6 +7,7 @@ import {
   formatPrettyShortDate
 } from "../lib/util"
 import { getFirstRelevantRun } from "../lib/courseApi"
+import { learnProductUrl } from "../lib/urls"
 import moment from "moment-timezone"
 
 import type { BaseCourseRun } from "../flow/courseTypes"
@@ -355,7 +356,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                   {" "}
                   <a
                     className="info-link"
-                    href={`/programs/${elem.readable_id}/`}
+                    href={learnProductUrl("programs", elem.readable_id)}
                   >
                     {elem.title}
                   </a>

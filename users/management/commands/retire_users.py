@@ -8,7 +8,6 @@ from urllib.parse import urlparse
 
 from django.contrib.auth import get_user_model
 from django.core.management import BaseCommand
-from social_django.models import UserSocialAuth
 from user_util import user_util
 
 from authentication.utils import block_user_email
@@ -148,12 +147,6 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"Email changed from {email} to {user.email} and password is not useable now"
             )
-
-            # reset user social auth
-            auth_deleted_count = UserSocialAuth.objects.filter(user=user).delete()
-
-            if auth_deleted_count:
-                self.stdout.write(f"For  user: '{user}' SocialAuth rows deleted")
 
             self.stdout.write(
                 self.style.SUCCESS(f"User: '{user}' is retired from MITx Online")

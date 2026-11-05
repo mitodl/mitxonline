@@ -1,5 +1,6 @@
 """User models"""
 
+import logging
 import uuid
 from datetime import timedelta
 from functools import cached_property
@@ -18,10 +19,11 @@ from mitol.common.models import TimestampedModel, UserGlobalIdMixin
 from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import chunks
 
-from b2b.models import OrganizationPage
 from cms.constants import CMS_EDITORS_GROUP_NAME
 from openedx.constants import OPENEDX_REPAIR_GRACE_PERIOD_MINS, OPENEDX_USERNAME_MAX_LEN
 from openedx.models import OpenEdxUser
+
+log = logging.getLogger(__name__)
 
 MALE = "m"
 FEMALE = "f"
@@ -279,6 +281,9 @@ class User(
     is_staff = models.BooleanField(
         default=False, help_text="The user can access the admin site"
     )
+    is_etl = models.BooleanField(
+        default=False, help_text="The user is used by the Learn ETL process"
+    )
     # When we have deprecated direct login, default the is_active flag to True
     # and remove the related code in authentication/pipeline/user.py.
     is_active = models.BooleanField(
@@ -305,6 +310,13 @@ class User(
         blank=True,
         related_name="users",
         help_text="The contracts the user is associated with.",
+        through="b2b.UserB2BContract",
+    )
+    b2b_organizations = models.ManyToManyField(
+        "b2b.OrganizationPage",
+        through="b2b.UserOrganization",
+        related_name="+",
+        help_text="The organizations the user is associated with.",
     )
 
     objects = UserManager()
@@ -330,28 +342,19 @@ class User(
         """Returns the edx username"""
         if self.pk is None:
             return None
-        return self.openedx_users.first()
+        # Sorted in Python off `.all()` so that a caller's
+        # `prefetch_related("openedx_users")` serves this. `first()` looks
+        # equivalent but costs a query per serialized row on list endpoints:
+        # OpenEdxUser declares no Meta.ordering, so `first()` re-orders by pk,
+        # and that clone drops the prefetched result cache. Sorting by pk here
+        # applies the same order it would have.
+        openedx_users = sorted(self.openedx_users.all(), key=lambda user: user.pk)
+        return openedx_users[0] if openedx_users else None
 
     @property
     def edx_username(self) -> str | None:
         """Returns the edx username"""
         return getattr(self.openedx_user, "edx_username", None)
-
-    @property
-    def first_name(self):
-        return self.legal_address.first_name
-
-    @first_name.setter
-    def first_name(self, value):
-        self.legal_address.first_name = value
-
-    @property
-    def last_name(self):
-        return self.legal_address.last_name
-
-    @last_name.setter
-    def last_name(self, value):
-        self.legal_address.last_name = value
 
     @property
     def is_editor(self) -> bool:
@@ -363,15 +366,8 @@ class User(
         )
 
     @cached_property
-    def b2b_organizations(self):
-        """Return the organizations the user is associated with."""
-        return OrganizationPage.objects.filter(
-            pk__in=self.b2b_contracts.values_list("organization", flat=True).distinct()
-        ).all()
-
-    @cached_property
     def b2b_organization_sso_ids(self):
-        """Similar to b2b_organizations, but returns just the UUIDs."""
+        """Just the UUIDs for the organizations the user is in."""
         return list(
             self.b2b_organizations.filter(
                 sso_organization_id__isnull=False
@@ -380,10 +376,10 @@ class User(
 
     @property
     def should_skip_onboarding(self):
+        user_profile = getattr(self, "user_profile", None)
         return (
-            self.user_profile.completed_onboarding
-            or self.courserunenrollment_set(manager="all_objects").exists()
-        )
+            user_profile is not None and user_profile.completed_onboarding
+        ) or self.courserunenrollment_set(manager="all_objects").exists()
 
     @property
     def openedx_user_exists(self):
@@ -465,13 +461,16 @@ class LegalAddress(TimestampedModel):
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="legal_address"
     )
-
     first_name = models.CharField(max_length=60, blank=True)
     last_name = models.CharField(max_length=60, blank=True)
     country = models.CharField(
         max_length=2, blank=True, validators=[validate_iso_3166_1_code]
     )  # ISO-3166-1
     state = models.CharField(max_length=255, blank=True, null=True)  # noqa: DJ001
+    postal_code = models.CharField(max_length=20, blank=True)
+    street_address_1 = models.CharField(max_length=255, blank=True)
+    street_address_2 = models.CharField(max_length=255, blank=True)
+    city = models.CharField(max_length=255, blank=True)
 
     @property
     def us_state(self):

@@ -6,8 +6,6 @@ export NODE_ENV
 
 if [[ -n $COVERAGE ]]; then
 	export CMD="npx nyc --reporter=html mocha"
-elif [[ -n $CODECOV ]]; then
-	export CMD="npx nyc --reporter=lcovonly -R spec mocha"
 elif [[ -n $WATCH ]]; then
 	export CMD="npx mocha --watch"
 else

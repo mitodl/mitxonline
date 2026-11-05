@@ -46,7 +46,7 @@ class Command(BaseCommand):
             # an end_date) or those that are not expired yet, in case the user has not specified any
             # course run id.
             now = now_in_utc()
-            runs = CourseRun.objects.live().filter(
+            runs = CourseRun.objects.live(include_b2b=True).filter(
                 Q(expiration_date__isnull=True) | Q(expiration_date__gt=now)
             )
 

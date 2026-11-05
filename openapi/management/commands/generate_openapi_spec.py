@@ -30,6 +30,11 @@ class Command(BaseCommand):
             default=False,
             help="Fail the command if there are any warnings",
         )
+        parser.add_argument(
+            "--only-version",
+            dest="only_version",
+            help="Only generate the specified version",
+        )
 
         super().add_arguments(parser)
 
@@ -37,7 +42,14 @@ class Command(BaseCommand):
         """Run the command"""
 
         directory = options["directory"]
-        for version in settings.REST_FRAMEWORK["ALLOWED_VERSIONS"]:
+        versions = (
+            [options["only_version"]]
+            if "only_version" in options
+            and options["only_version"] in settings.REST_FRAMEWORK["ALLOWED_VERSIONS"]
+            else settings.REST_FRAMEWORK["ALLOWED_VERSIONS"]
+        )
+
+        for version in versions:
             filename = version + ".yaml"
             filepath = Path(directory) / filename
             management.call_command(

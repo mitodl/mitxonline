@@ -5,7 +5,6 @@ MITx Online Commands
    :maxdepth: 2
    :caption: Contents:
 
-   check_program_requirements
    configure_instance
    configure_tiers
    create_courseware
@@ -14,6 +13,7 @@ MITx Online Commands
    create_user
    generate_discount_code
    import_courserun
+   seed_local_instance
 
 Indices and tables
 ==================

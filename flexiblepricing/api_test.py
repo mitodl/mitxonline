@@ -3,11 +3,11 @@
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import ddt
 import freezegun
 import pytest
-import pytz
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
@@ -22,7 +22,6 @@ from courses.factories import (
     CourseFactory,
     CourseRunFactory,
     ProgramFactory,
-    ProgramRequirementFactory,
     ProgramRunFactory,
 )
 from courses.models import (
@@ -170,7 +169,6 @@ def create_courseware(create_tiers=True, past=False):  # noqa: FBT002
     """
     end_date = None
     program = ProgramFactory.create(live=True)
-    ProgramRequirementFactory.add_root(program)
     root_node = program.requirements_root
 
     root_node.add_child(
@@ -447,6 +445,8 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
             else ContentType.objects.get(app_label="courses", model="course")
         )
 
+        courseware_tier = determine_tier_courseware(courseware_object, income_usd)
+
         if not FlexiblePrice.objects.filter(
             user=user,
             courseware_content_type=content_type,
@@ -457,12 +457,11 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
                 country_of_income=country_code,
                 user=user,
                 courseware_object=courseware_object,
+                tier=courseware_tier,
                 status=FlexiblePriceStatus.APPROVED
                 if expected
                 else FlexiblePriceStatus.PENDING_MANUAL_APPROVAL,
             )
-
-        courseware_tier = determine_tier_courseware(courseware_object, income_usd)
         discount = self.create_run_and_product_and_discount(user, courseware_object)
 
         return courseware_tier, discount
@@ -539,13 +538,11 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
 
         expired_delta = timedelta(days=30)
         discount.activation_date = (
-            datetime.now(pytz.timezone(TIME_ZONE)) - expired_delta - expired_delta
+            datetime.now(ZoneInfo(TIME_ZONE)) - expired_delta - expired_delta
         )
-        discount.expiration_date = (
-            datetime.now(pytz.timezone(TIME_ZONE)) - expired_delta
-        )
+        discount.expiration_date = datetime.now(ZoneInfo(TIME_ZONE)) - expired_delta
         with freezegun.freeze_time(
-            datetime.now(pytz.timezone(TIME_ZONE)) - expired_delta * 3
+            datetime.now(ZoneInfo(TIME_ZONE)) - expired_delta * 3
         ):
             discount.save()
             discount.refresh_from_db()
@@ -584,7 +581,7 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
         user = UserFactory.create()
 
         # Step 1: course that belongs to a program - should get back the program tiers
-        course, course_tiers, program, program_tiers = create_courseware()
+        course, _course_tiers, program, _program_tiers = create_courseware()
         course.program = program
         course.save()
         course.refresh_from_db()
@@ -719,7 +716,7 @@ def test_create_finaid_form(courseware_type, force_course, gen_slug, gen_title):
     if test_kwargs["title"] is not None:
         assert generated_page.title == test_kwargs["title"]
 
-    assert generated_page.get_parent() == page
+    assert generated_page.get_parent().specific == page
 
     if (
         courseware_type == "course"

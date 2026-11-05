@@ -1,10 +1,11 @@
 from decimal import Decimal
 
 import pytest
+import responses
 import reversion
 
 from ecommerce.factories import ProductFactory
-from ecommerce.serializers_test import create_order_receipt
+from ecommerce.serializers.serializers_test import create_order_receipt
 
 pytestmark = [pytest.mark.django_db]
 
@@ -15,6 +16,7 @@ def products():
         return ProductFactory.create_batch(5)
 
 
+@pytest.mark.skip_nplusone_check
 def test_mail_api_task_called(  # noqa: PLR0913
     settings, mocker, user, products, user_client, django_capture_on_commit_callbacks
 ):
@@ -36,6 +38,8 @@ def test_mail_api_task_called(  # noqa: PLR0913
     assert mock_delayed_send_ecommerce_order_receipt.call_args[0][0] == order.id
 
 
+@pytest.mark.skip_nplusone_check
+@responses.activate
 def test_mail_api_receipt_generation(  # noqa: PLR0913
     settings, mocker, user, products, user_client, django_capture_on_commit_callbacks
 ):
@@ -46,6 +50,7 @@ def test_mail_api_receipt_generation(  # noqa: PLR0913
     """
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     mock_send_message = mocker.patch("mitol.mail.api.send_message")
+    responses.get("https://fonts.googleapis.com/css")
 
     with django_capture_on_commit_callbacks(execute=True):
         order = create_order_receipt(mocker, user, products, user_client)
@@ -54,16 +59,15 @@ def test_mail_api_receipt_generation(  # noqa: PLR0913
 
     rendered_template = mock_send_message.call_args[0][0]
 
-    assert (
-        f"{order.purchaser.legal_address.first_name} {order.purchaser.legal_address.last_name}"
-        in rendered_template.body
-    )
+    assert f"{order.purchaser.name}" in rendered_template.body
     assert order.reference_number in rendered_template.body
 
     lines = order.lines.all()
     assert str(lines[0].unit_price) in rendered_template.body
 
 
+@pytest.mark.skip_nplusone_check
+@responses.activate
 def test_mail_api_refund_email_generation(
     settings, mocker, user, products, user_client
 ):
@@ -73,6 +77,7 @@ def test_mail_api_refund_email_generation(
     """
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     order = create_order_receipt(mocker, user, products, user_client)
+    responses.get("https://fonts.googleapis.com/css")
 
     mock_send_message = mocker.patch("mitol.mail.api.send_message")
 
@@ -87,9 +92,6 @@ def test_mail_api_refund_email_generation(
 
     rendered_template = mock_send_message.call_args[0][0]
 
-    assert (
-        f"{order.purchaser.legal_address.first_name} {order.purchaser.legal_address.last_name}"
-        in rendered_template.body
-    )
+    assert f"{order.purchaser.name}" in rendered_template.body
     assert order.reference_number in rendered_template.body
     assert str(refund_amount.quantize(Decimal("0.01"))) in rendered_template.body

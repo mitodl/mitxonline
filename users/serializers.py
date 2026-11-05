@@ -9,9 +9,10 @@ from drf_spectacular.utils import extend_schema_field
 from requests import HTTPError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from rest_framework import serializers
-from social_django.models import UserSocialAuth
 
-from b2b.serializers.v0 import ContractPageSerializer, OrganizationPageSerializer
+from b2b.api import get_user_b2b_organizations
+from b2b.serializers.v0 import UserOrganizationPageSerializer
+from compliance.api import get_missing_export_compliance_fields
 from hubspot_sync.task_helpers import sync_hubspot_user
 
 # from ecommerce.api import fetch_and_serialize_unused_coupons  # noqa: ERA001
@@ -22,7 +23,12 @@ from openedx.constants import OPENEDX_USERNAME_MAX_LEN
 from openedx.exceptions import EdxApiRegistrationValidationException
 from openedx.models import OpenEdxUser
 from openedx.tasks import change_edx_user_email_async
-from users.models import ChangeEmailRequest, LegalAddress, User, UserProfile
+from users.models import (
+    ChangeEmailRequest,
+    LegalAddress,
+    User,
+    UserProfile,
+)
 
 log = logging.getLogger()
 
@@ -60,7 +66,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def validate_year_of_birth(self, value):
         """Validates the year of birth field"""
-        from users.utils import determine_approx_age
+        from users.utils import determine_approx_age  # noqa: PLC0415
 
         if not (value and determine_approx_age(value) >= 13):  # noqa: PLR2004
             raise serializers.ValidationError("Year of Birth provided is under 13")  # noqa: EM101
@@ -93,40 +99,24 @@ class LegalAddressSerializer(serializers.ModelSerializer):
 
     # NOTE: the model defines these as allowing empty values for backwards compatibility
     #       so we override them here to require them for new writes
+    country = serializers.CharField(max_length=2)
     first_name = serializers.CharField(max_length=60, required=False, allow_blank=True)
     last_name = serializers.CharField(max_length=60, required=False, allow_blank=True)
-    country = serializers.CharField(max_length=2)
+    street_address_1 = serializers.CharField(
+        max_length=255, required=False, allow_blank=True
+    )
+    street_address_2 = serializers.CharField(
+        max_length=255, required=False, allow_blank=True
+    )
+    city = serializers.CharField(max_length=255, required=False, allow_blank=True)
     state = serializers.CharField(
         max_length=10, required=False, allow_blank=True, allow_null=True
     )
-
-    def validate_first_name(self, value):
-        """Validates the first name of the user"""
-        if value == "":
-            raise serializers.ValidationError("First name cannot be blank")  # noqa: EM101
-        if value and not USER_GIVEN_NAME_RE.match(value):
-            raise serializers.ValidationError("First name is not valid")  # noqa: EM101
-        return value
-
-    def validate_last_name(self, value):
-        """Validates the last name of the user"""
-        if value == "":
-            raise serializers.ValidationError("Last name cannot be blank")  # noqa: EM101
-        if value and not USER_GIVEN_NAME_RE.match(value):
-            raise serializers.ValidationError("Last name is not valid")  # noqa: EM101
-        return value
+    postal_code = serializers.CharField(max_length=20, required=False, allow_blank=True)
 
     def validate(self, data):
         """Validate the legal address data"""
         errors = {}
-
-        # For POST operations (not partial updates), require first_name and last_name
-        request = self.context.get("request", None)
-        if request and request.method == "POST":
-            if "first_name" not in data or data.get("first_name") is None:
-                errors["first_name"] = "This field is required."
-            if "last_name" not in data or data.get("last_name") is None:
-                errors["last_name"] = "This field is required."
 
         if errors:
             raise serializers.ValidationError(errors)
@@ -151,10 +141,14 @@ class LegalAddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = LegalAddress
         fields = (
+            "country",
             "first_name",
             "last_name",
-            "country",
+            "street_address_1",
+            "street_address_2",
+            "city",
             "state",
+            "postal_code",
         )
 
 
@@ -206,33 +200,6 @@ class StaffDashboardUserSerializer(serializers.ModelSerializer):
         )
 
 
-class UserOrganizationSerializer(OrganizationPageSerializer):
-    """
-    Serializer for user organization data.
-
-    Slightly different from the OrganizationPageSerializer; we only need
-    the user's orgs and contracts.
-    """
-
-    contracts = serializers.SerializerMethodField()
-
-    @extend_schema_field(ContractPageSerializer(many=True))
-    def get_contracts(self, instance):
-        """Get the contracts for the organization for the user"""
-        contracts = (
-            self.context["user"]
-            .b2b_contracts.filter(
-                organization=instance,
-            )
-            .all()
-        )
-        return ContractPageSerializer(contracts, many=True).data
-
-    class Meta(OrganizationPageSerializer.Meta):
-        fields = (*OrganizationPageSerializer.Meta.fields, "contracts")
-        read_only_fields = (*OrganizationPageSerializer.Meta.fields, "contracts")
-
-
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for users"""
 
@@ -252,6 +219,7 @@ class UserSerializer(serializers.ModelSerializer):
     b2b_organizations = serializers.SerializerMethodField()
     is_anonymous = serializers.BooleanField(read_only=True)
     is_authenticated = serializers.BooleanField(read_only=True)
+    compliance_missing_fields = serializers.SerializerMethodField()
 
     def validate_email(self, value):
         if (
@@ -272,16 +240,23 @@ class UserSerializer(serializers.ModelSerializer):
     def get_grants(self, instance):
         return instance.get_all_permissions()
 
-    @extend_schema_field(UserOrganizationSerializer(many=True))
+    @extend_schema_field(UserOrganizationPageSerializer(many=True))
     def get_b2b_organizations(self, instance):
         """Get the organizations for the user"""
         if instance.is_anonymous:
             return []
 
-        organizations = instance.b2b_organizations
-        return UserOrganizationSerializer(
-            organizations, many=True, context={"user": instance}
+        return UserOrganizationPageSerializer(
+            get_user_b2b_organizations(instance), many=True
         ).data
+
+    @extend_schema_field(list[str])
+    def get_compliance_missing_fields(self, instance):
+        """Get the profile fields missing for an export compliance check"""
+        if instance.is_anonymous:
+            return []
+
+        return get_missing_export_compliance_fields(instance)
 
     def validate(self, data):
         request = self.context.get("request", None)
@@ -443,6 +418,8 @@ class UserSerializer(serializers.ModelSerializer):
             "grants",
             "is_active",
             "b2b_organizations",
+            "global_id",
+            "compliance_missing_fields",
         )
         read_only_fields = (
             "is_anonymous",
@@ -455,6 +432,7 @@ class UserSerializer(serializers.ModelSerializer):
             "grants",
             "global_id",
             "b2b_organizations",
+            "compliance_missing_fields",
         )
 
 
@@ -525,15 +503,8 @@ class ChangeEmailRequestUpdateSerializer(serializers.ModelSerializer):
         # change request has been confirmed
         if result.confirmed:
             user = result.user
-            old_email = user.email
             user.email = result.new_email
             user.save()
-            # delete social_auth entry to avoid old email account access
-            try:
-                user_social_auth = UserSocialAuth.objects.get(uid=old_email, user=user)
-                user_social_auth.delete()
-            except UserSocialAuth.DoesNotExist:
-                pass
             change_edx_user_email_async.delay(user.id)
 
         return result

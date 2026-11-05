@@ -1,6 +1,7 @@
 """MITx Online serializers"""
 
 from rest_framework import serializers
+from wagtail.rich_text import expand_db_html
 
 
 class WriteableSerializerMethodField(serializers.SerializerMethodField):
@@ -33,3 +34,9 @@ class StrictFieldsSerializer(serializers.Serializer):
                 raise ValidationError(dict.fromkeys(unknown_keys, "Invalid field"))  # noqa: F821
 
         return data
+
+
+class RichTextSerializer(serializers.CharField):
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        return expand_db_html(representation)

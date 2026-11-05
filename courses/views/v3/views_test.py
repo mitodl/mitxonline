@@ -1,0 +1,1204 @@
+"""
+Tests for courses api views v3
+"""
+
+from datetime import timedelta
+
+import pytest
+from django.core.cache.backends.locmem import LocMemCache
+from django.db.models import Q
+from django.urls import reverse
+from faker import Faker
+from mitol.common.utils import now_in_utc
+from rest_framework import status
+from rest_framework.test import APIClient
+
+from compliance.api import ExportComplianceResult
+from compliance.exceptions import ExportComplianceDataError, ExportComplianceError
+from courses.conftest import B2BCourses, UserWithEnrollmentsAndCerts
+from courses.constants import (
+    ENROLL_CHANGE_STATUS_UNENROLLED,
+)
+from courses.factories import (
+    CourseRunCertificateFactory,
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+    ProgramCertificateFactory,
+    ProgramEnrollmentFactory,
+    ProgramFactory,
+    create_program_with_tracks,
+    program_with_tracks,  # noqa: F401
+)
+from courses.models import (
+    CourseRunAccessRole,
+    CourseRunEnrollment,
+    PaidProgram,
+    ProgramEnrollment,
+)
+from courses.serializers.v3.programs import SimpleProgramSerializer
+from courses.test_utils import maybe_serialize_course_cert, maybe_serialize_program_cert
+from courses.throttles import EnrollmentEligibilityThrottle
+from ecommerce.factories import OrderFactory
+from ecommerce.models import OrderStatus
+from main.test_utils import drf_datetime
+from openedx.exceptions import EdxApiCourseOutlineError
+from users.factories import UserFactory
+
+pytestmark = [
+    pytest.mark.django_db,
+    pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True),
+    pytest.mark.parametrize("course_catalog_program_count", [20], indirect=True),
+    pytest.mark.usefixtures("b2b_courses", "course_catalog_data"),
+]
+fake = Faker()
+
+
+@pytest.fixture
+def personal_enrollment_in_contract_run(
+    b2b_courses: B2BCourses,
+    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
+):
+    """
+    Attach the run's contract to each of the user's enrollments in contract runs,
+    except one, which stays a personal enrollment in a run that is also in a contract.
+    """
+    in_contract_runs = [
+        enrollment
+        for enrollment in user_with_enrollments_and_certificates.run_enrollments
+        if enrollment.run in b2b_courses.course_runs
+    ]
+    if len(in_contract_runs) < 2:
+        return pytest.fail("Need at least 2 enrollments in contract runs")
+
+    personal, *contract_enrollments = in_contract_runs
+    for enrollment in contract_enrollments:
+        enrollment.b2b_contract = enrollment.run.b2b_contracts.get()
+        enrollment.save()
+    return personal
+
+
+def test_user_enrollments_detail(
+    user_drf_client,
+    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
+):
+    """Test that user enrollments can be filtered by B2B organization ID"""
+    enrollment = user_with_enrollments_and_certificates.run_enrollments[0]
+    resp = user_drf_client.get(
+        reverse("v3:user_enrollments_api-detail", kwargs={"pk": enrollment.id})
+    )
+    upgrade_product = (
+        enrollment.run.products.filter(is_active=True).first()
+        if enrollment.run.is_upgradable
+        else None
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == {
+        "id": enrollment.id,
+        "run": {
+            "id": enrollment.run.id,
+            "course_id": enrollment.run.course.id,
+            "is_archived": enrollment.run.is_enrollable and enrollment.run.is_past,
+            "is_enrollable": enrollment.run.is_enrollable,
+            "is_self_paced": enrollment.run.is_self_paced,
+            "is_upgradable": enrollment.run.is_upgradable,
+            "live": enrollment.run.live,
+            "run_tag": enrollment.run.run_tag,
+            "start_date": drf_datetime(enrollment.run.start_date),
+            "title": enrollment.run.title,
+            "upgrade_deadline": drf_datetime(enrollment.run.upgrade_deadline),
+            "certificate_available_date": drf_datetime(
+                enrollment.run.certificate_available_date
+            ),
+            "course_number": enrollment.run.course_number,
+            "courseware_id": enrollment.run.courseware_id,
+            "courseware_url": enrollment.run.courseware_url,
+            "end_date": drf_datetime(enrollment.run.end_date)
+            if enrollment.run.end_date
+            else None,
+            "enrollment_end": drf_datetime(enrollment.run.enrollment_end),
+            "enrollment_modes": [],
+            "upgrade_product_id": upgrade_product.id if upgrade_product else None,
+            "upgrade_product_price": str(upgrade_product.price)
+            if upgrade_product
+            else None,
+            "upgrade_product_is_active": upgrade_product.is_active
+            if upgrade_product
+            else None,
+            "enrollment_start": drf_datetime(enrollment.run.enrollment_start),
+            "expiration_date": drf_datetime(enrollment.run.expiration_date),
+            "course": {
+                "id": enrollment.run.course_id,
+                "readable_id": enrollment.run.course.readable_id,
+                "include_in_learn_catalog": enrollment.run.course.include_in_learn_catalog,
+                "title": "Test page",
+                "type": "course",
+            },
+            "is_primary_language": enrollment.run.is_primary_language,
+            "language": enrollment.run.language,
+            "language_label": enrollment.run.language_label,
+            "variant_industry": enrollment.run.variant_industry,
+            "variant_industry_label": enrollment.run.variant_industry_label,
+            "variant_length": enrollment.run.variant_length,
+            "variant_length_label": enrollment.run.variant_length_label,
+        },
+        "edx_emails_subscription": enrollment.edx_emails_subscription,
+        "grades": [
+            {
+                "grade": grade.grade,
+                "letter_grade": grade.letter_grade,
+                "passed": grade.passed,
+                "set_by_admin": grade.set_by_admin,
+                "grade_percent": grade.grade_percent,
+            }
+            for grade in enrollment.grades
+        ],
+        "b2b_contract_id": enrollment.b2b_contract_id,
+        "b2b_organization_id": enrollment.b2b_contract.organization_id
+        if enrollment.b2b_contract
+        else None,
+        "enrollment_mode": enrollment.enrollment_mode,
+        "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+        "has_course_staff_role": False,
+    }
+
+
+@pytest.mark.usefixtures("personal_enrollment_in_contract_run")
+def test_user_enrollments_list(
+    user_drf_client,
+    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
+):
+    """Test that user enrollments can be filtered by B2B organization ID"""
+    resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == [
+        {
+            "id": enrollment.id,
+            "run": {
+                "id": enrollment.run.id,
+                "course_id": enrollment.run.course.id,
+                "is_archived": enrollment.run.is_enrollable and enrollment.run.is_past,
+                "is_enrollable": enrollment.run.is_enrollable,
+                "is_self_paced": enrollment.run.is_self_paced,
+                "is_upgradable": enrollment.run.is_upgradable,
+                "live": enrollment.run.live,
+                "run_tag": enrollment.run.run_tag,
+                "start_date": drf_datetime(enrollment.run.start_date),
+                "title": enrollment.run.title,
+                "upgrade_deadline": drf_datetime(enrollment.run.upgrade_deadline),
+                "certificate_available_date": drf_datetime(
+                    enrollment.run.certificate_available_date
+                ),
+                "course_number": enrollment.run.course_number,
+                "courseware_id": enrollment.run.courseware_id,
+                "courseware_url": enrollment.run.courseware_url,
+                "end_date": drf_datetime(enrollment.run.end_date)
+                if enrollment.run.end_date
+                else None,
+                "enrollment_end": drf_datetime(enrollment.run.enrollment_end),
+                "enrollment_modes": [],
+                "upgrade_product_id": upgrade_product.id if upgrade_product else None,
+                "upgrade_product_price": str(upgrade_product.price)
+                if upgrade_product
+                else None,
+                "upgrade_product_is_active": upgrade_product.is_active
+                if upgrade_product
+                else None,
+                "enrollment_start": drf_datetime(enrollment.run.enrollment_start),
+                "expiration_date": drf_datetime(enrollment.run.expiration_date),
+                "course": {
+                    "id": enrollment.run.course_id,
+                    "readable_id": enrollment.run.course.readable_id,
+                    "include_in_learn_catalog": enrollment.run.course.include_in_learn_catalog,
+                    "title": "Test page",
+                    "type": "course",
+                },
+                "is_primary_language": enrollment.run.is_primary_language,
+                "language": enrollment.run.language,
+                "language_label": enrollment.run.language_label,
+                "variant_industry": enrollment.run.variant_industry,
+                "variant_industry_label": enrollment.run.variant_industry_label,
+                "variant_length": enrollment.run.variant_length,
+                "variant_length_label": enrollment.run.variant_length_label,
+            },
+            "edx_emails_subscription": enrollment.edx_emails_subscription,
+            "grades": [
+                {
+                    "grade": grade.grade,
+                    "letter_grade": grade.letter_grade,
+                    "passed": grade.passed,
+                    "set_by_admin": grade.set_by_admin,
+                    "grade_percent": grade.grade_percent,
+                }
+                for grade in enrollment.grades
+            ],
+            "b2b_contract_id": enrollment.b2b_contract_id,
+            "b2b_organization_id": enrollment.b2b_contract.organization_id
+            if enrollment.b2b_contract
+            else None,
+            "enrollment_mode": enrollment.enrollment_mode,
+            "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+            "has_course_staff_role": False,
+        }
+        for enrollment in user_with_enrollments_and_certificates.run_enrollments
+        for upgrade_product in [
+            enrollment.run.products.filter(is_active=True).first()
+            if enrollment.run.is_upgradable
+            else None
+        ]
+    ]
+
+
+def test_user_enrollments_list_filter_org_id(
+    user_drf_client,
+    personal_enrollment_in_contract_run,
+    b2b_courses: B2BCourses,
+    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
+):
+    """org_id returns the enrollments made through that organization's contracts"""
+    personal_run_org_id = (
+        personal_enrollment_in_contract_run.run.b2b_contracts.get().organization_id
+    )
+    for org in b2b_courses.organizations:
+        resp = user_drf_client.get(
+            reverse("v3:user_enrollments_api-list"), {"org_id": org.id}
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        returned_ids = [enrollment["id"] for enrollment in resp.json()]
+        assert returned_ids == [
+            enrollment.id
+            for enrollment in user_with_enrollments_and_certificates.run_enrollments
+            if enrollment.b2b_contract
+            and enrollment.b2b_contract.organization_id == org.id
+        ]
+        if org.id == personal_run_org_id:
+            assert personal_enrollment_in_contract_run.id not in returned_ids
+
+    resp = user_drf_client.get(
+        reverse("v3:user_enrollments_api-list"), {"org_id": 99999}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == []
+
+
+def test_user_enrollments_list_filter_exclude_b2b(
+    user_drf_client,
+    personal_enrollment_in_contract_run,
+    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
+):
+    """exclude_b2b drops enrollments made through a contract, whatever the run is in"""
+    resp = user_drf_client.get(
+        reverse("v3:user_enrollments_api-list"), {"exclude_b2b": True}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert personal_enrollment_in_contract_run.id in [e["id"] for e in resp.json()]
+    assert resp.json() == [
+        {
+            "id": enrollment.id,
+            "run": {
+                "id": enrollment.run.id,
+                "course_id": enrollment.run.course.id,
+                "is_archived": enrollment.run.is_enrollable and enrollment.run.is_past,
+                "is_enrollable": enrollment.run.is_enrollable,
+                "is_self_paced": enrollment.run.is_self_paced,
+                "is_upgradable": enrollment.run.is_upgradable,
+                "live": enrollment.run.live,
+                "run_tag": enrollment.run.run_tag,
+                "start_date": drf_datetime(enrollment.run.start_date),
+                "title": enrollment.run.title,
+                "upgrade_deadline": drf_datetime(enrollment.run.upgrade_deadline),
+                "certificate_available_date": drf_datetime(
+                    enrollment.run.certificate_available_date
+                ),
+                "course_number": enrollment.run.course_number,
+                "courseware_id": enrollment.run.courseware_id,
+                "courseware_url": enrollment.run.courseware_url,
+                "end_date": drf_datetime(enrollment.run.end_date)
+                if enrollment.run.end_date
+                else None,
+                "enrollment_end": drf_datetime(enrollment.run.enrollment_end),
+                "enrollment_modes": [],
+                "upgrade_product_id": upgrade_product.id if upgrade_product else None,
+                "upgrade_product_price": str(upgrade_product.price)
+                if upgrade_product
+                else None,
+                "upgrade_product_is_active": upgrade_product.is_active
+                if upgrade_product
+                else None,
+                "enrollment_start": drf_datetime(enrollment.run.enrollment_start),
+                "expiration_date": drf_datetime(enrollment.run.expiration_date),
+                "course": {
+                    "id": enrollment.run.course_id,
+                    "readable_id": enrollment.run.course.readable_id,
+                    "include_in_learn_catalog": enrollment.run.course.include_in_learn_catalog,
+                    "title": "Test page",
+                    "type": "course",
+                },
+                "is_primary_language": enrollment.run.is_primary_language,
+                "language": enrollment.run.language,
+                "language_label": enrollment.run.language_label,
+                "variant_industry": enrollment.run.variant_industry,
+                "variant_industry_label": enrollment.run.variant_industry_label,
+                "variant_length": enrollment.run.variant_length,
+                "variant_length_label": enrollment.run.variant_length_label,
+            },
+            "edx_emails_subscription": enrollment.edx_emails_subscription,
+            "grades": [
+                {
+                    "grade": grade.grade,
+                    "letter_grade": grade.letter_grade,
+                    "passed": grade.passed,
+                    "set_by_admin": grade.set_by_admin,
+                    "grade_percent": grade.grade_percent,
+                }
+                for grade in enrollment.grades
+            ],
+            "b2b_contract_id": None,
+            "b2b_organization_id": None,
+            "enrollment_mode": enrollment.enrollment_mode,
+            "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+            "has_course_staff_role": False,
+        }
+        for enrollment in user_with_enrollments_and_certificates.run_enrollments
+        for upgrade_product in [
+            enrollment.run.products.filter(is_active=True).first()
+            if enrollment.run.is_upgradable
+            else None
+        ]
+        if enrollment.b2b_contract is None
+    ]
+
+    resp = user_drf_client.get(
+        reverse("v3:user_enrollments_api-list"), {"exclude_b2b": False}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == [
+        {
+            "id": enrollment.id,
+            "run": {
+                "id": enrollment.run.id,
+                "course_id": enrollment.run.course.id,
+                "is_archived": enrollment.run.is_enrollable and enrollment.run.is_past,
+                "is_enrollable": enrollment.run.is_enrollable,
+                "is_self_paced": enrollment.run.is_self_paced,
+                "is_upgradable": enrollment.run.is_upgradable,
+                "live": enrollment.run.live,
+                "run_tag": enrollment.run.run_tag,
+                "start_date": drf_datetime(enrollment.run.start_date),
+                "title": enrollment.run.title,
+                "upgrade_deadline": drf_datetime(enrollment.run.upgrade_deadline),
+                "certificate_available_date": drf_datetime(
+                    enrollment.run.certificate_available_date
+                ),
+                "course_number": enrollment.run.course_number,
+                "courseware_id": enrollment.run.courseware_id,
+                "courseware_url": enrollment.run.courseware_url,
+                "end_date": drf_datetime(enrollment.run.end_date)
+                if enrollment.run.end_date
+                else None,
+                "enrollment_end": drf_datetime(enrollment.run.enrollment_end),
+                "enrollment_modes": [],
+                "upgrade_product_id": upgrade_product.id if upgrade_product else None,
+                "upgrade_product_price": str(upgrade_product.price)
+                if upgrade_product
+                else None,
+                "upgrade_product_is_active": upgrade_product.is_active
+                if upgrade_product
+                else None,
+                "enrollment_start": drf_datetime(enrollment.run.enrollment_start),
+                "expiration_date": drf_datetime(enrollment.run.expiration_date),
+                "course": {
+                    "id": enrollment.run.course_id,
+                    "readable_id": enrollment.run.course.readable_id,
+                    "include_in_learn_catalog": enrollment.run.course.include_in_learn_catalog,
+                    "title": "Test page",
+                    "type": "course",
+                },
+                "is_primary_language": enrollment.run.is_primary_language,
+                "language": enrollment.run.language,
+                "language_label": enrollment.run.language_label,
+                "variant_industry": enrollment.run.variant_industry,
+                "variant_industry_label": enrollment.run.variant_industry_label,
+                "variant_length": enrollment.run.variant_length,
+                "variant_length_label": enrollment.run.variant_length_label,
+            },
+            "edx_emails_subscription": enrollment.edx_emails_subscription,
+            "grades": [
+                {
+                    "grade": grade.grade,
+                    "letter_grade": grade.letter_grade,
+                    "passed": grade.passed,
+                    "set_by_admin": grade.set_by_admin,
+                    "grade_percent": grade.grade_percent,
+                }
+                for grade in enrollment.grades
+            ],
+            "b2b_contract_id": enrollment.b2b_contract_id,
+            "b2b_organization_id": enrollment.b2b_contract.organization_id
+            if enrollment.b2b_contract
+            else None,
+            "enrollment_mode": enrollment.enrollment_mode,
+            "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+            "has_course_staff_role": False,
+        }
+        for enrollment in user_with_enrollments_and_certificates.run_enrollments
+        for upgrade_product in [
+            enrollment.run.products.filter(is_active=True).first()
+            if enrollment.run.is_upgradable
+            else None
+        ]
+    ]
+
+
+def test_user_enrollments_list_query_count_guard(
+    user_drf_client,
+    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
+    django_assert_max_num_queries,
+):
+    """List endpoint should stay bounded in query count with denormalized upgrade fields."""
+    with django_assert_max_num_queries(20):
+        resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
+    assert resp.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.parametrize(
+    ("role", "expected"),
+    [
+        ("staff", True),
+        ("instructor", True),
+        ("data_researcher", False),
+    ],
+)
+def test_user_enrollments_list_has_course_staff_role(
+    user_drf_client, user, role, expected
+):
+    """
+    The list endpoint reports whether the user is course staff on each run, so
+    the dashboard can offer the courseware link before the run starts. Only the
+    roles Open edX itself lets in early count.
+    """
+    enrollment = CourseRunEnrollmentFactory.create(user=user)
+    CourseRunAccessRole.objects.create(user=user, run=enrollment.run, role=role)
+
+    resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    [result] = [row for row in resp.json() if row["id"] == enrollment.id]
+    assert result["has_course_staff_role"] is expected
+
+
+def test_user_enrollments_detail_has_course_staff_role(user_drf_client, user):
+    """
+    Retrieve reports the role too.
+
+    It shares `get_queryset` with list today, so this is a guard against a
+    future `get_object`/`retrieve` override that skips the annotation.
+    """
+    enrollment = CourseRunEnrollmentFactory.create(user=user)
+    CourseRunAccessRole.objects.create(user=user, run=enrollment.run, role="staff")
+
+    resp = user_drf_client.get(
+        reverse("v3:user_enrollments_api-detail", kwargs={"pk": enrollment.id})
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["has_course_staff_role"] is True
+
+
+def test_user_enrollments_list_course_staff_role_is_per_run(user_drf_client, user):
+    """A role on one run does not mark the user's other enrollments"""
+    staffed, other = CourseRunEnrollmentFactory.create_batch(2, user=user)
+    CourseRunAccessRole.objects.create(user=user, run=staffed.run, role="staff")
+
+    resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    flags = {row["id"]: row["has_course_staff_role"] for row in resp.json()}
+    assert flags[staffed.id] is True
+    assert flags[other.id] is False
+
+
+def test_user_enrollments_list_course_staff_role_is_per_user(user_drf_client, user):
+    """Another user's role on the same run does not mark this user's enrollment"""
+    enrollment = CourseRunEnrollmentFactory.create(user=user)
+    CourseRunAccessRole.objects.create(
+        user=UserFactory.create(), run=enrollment.run, role="staff"
+    )
+
+    resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    [result] = [row for row in resp.json() if row["id"] == enrollment.id]
+    assert result["has_course_staff_role"] is False
+
+
+def test_program_enrollments(
+    user_drf_client,
+    user_with_enrollments_and_certificates,
+    django_assert_max_num_queries,
+):
+    """
+    Tests the program enrollments API, which should show the user's enrollment
+    in programs with the course runs that apply.
+    """
+    user = user_with_enrollments_and_certificates.user
+
+    program_enrollments = (
+        ProgramEnrollment.objects.filter(user=user)
+        .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
+        .order_by("-id")
+    )
+
+    assert len(program_enrollments) > 0
+
+    with django_assert_max_num_queries(4):
+        resp = user_drf_client.get(reverse("v3:user_program_enrollments_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+
+    assert resp.json() == [
+        {
+            "program": SimpleProgramSerializer(
+                instance=program_enrollment.program
+            ).data,
+            "certificate": maybe_serialize_program_cert(
+                program_enrollment.program, user
+            ),
+            "enrollment_mode": program_enrollment.enrollment_mode,
+            "track": None,
+        }
+        for program_enrollment in program_enrollments
+    ]
+
+
+def test_program_enrollments_future_program_cert(user_drf_client, user):
+    """
+    Test that v3 program enrollments returns null for a ProgramCertificate with a
+    future issue_date, treating it as though no certificate exists.
+    """
+    program = ProgramFactory.create(live=True)
+    ProgramEnrollmentFactory.create(user=user, program=program)
+    ProgramCertificateFactory.create(
+        user=user,
+        program=program,
+        issue_date=now_in_utc() + timedelta(days=1),
+    )
+
+    resp = user_drf_client.get(reverse("v3:user_program_enrollments_api-list"))
+    assert resp.status_code == status.HTTP_200_OK
+
+    enrollment_data = next(e for e in resp.json() if e["program"]["id"] == program.id)
+    assert enrollment_data["certificate"] is None
+
+
+def test_user_enrollments_future_course_cert(user_drf_client, user):
+    """
+    Test that v3 course enrollments returns null for a CourseRunCertificate with a
+    future issue_date, treating it as though no certificate exists.
+    """
+    run = CourseRunFactory.create()
+    enrollment = CourseRunEnrollmentFactory.create(user=user, run=run)
+    CourseRunCertificateFactory.create(
+        user=user,
+        course_run=run,
+        issue_date=now_in_utc() + timedelta(days=1),
+    )
+
+    resp = user_drf_client.get(
+        reverse("v3:user_enrollments_api-detail", kwargs={"pk": enrollment.id})
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["certificate"] is None
+
+    list_resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
+    assert list_resp.status_code == status.HTTP_200_OK
+    enrollment_data = next(e for e in list_resp.json() if e["id"] == enrollment.id)
+    assert enrollment_data["certificate"] is None
+
+
+def test_create_program_enrollment(user_drf_client, user):
+    """POST with a valid live program_id creates a new enrollment."""
+    program = ProgramFactory.create(live=True)
+
+    resp = user_drf_client.post(
+        reverse("v3:user_program_enrollments_api-list"),
+        data={"program_id": program.id},
+        format="json",
+    )
+
+    assert resp.status_code == status.HTTP_201_CREATED
+    data = resp.json()
+    assert data["program"]["readable_id"] == program.readable_id
+    assert data["program"]["id"] == program.id
+    assert data["enrollment_mode"] == "audit"
+    assert data["certificate"] is None
+
+    # Verify the enrollment exists in the DB
+    assert ProgramEnrollment.objects.filter(
+        user=user, program=program, active=True
+    ).exists()
+
+
+def test_create_program_enrollment_already_active(user_drf_client, user):
+    """POST for a program the user is already enrolled in returns 200."""
+    program = ProgramFactory.create(live=True)
+    ProgramEnrollmentFactory.create(user=user, program=program)
+
+    resp = user_drf_client.post(
+        reverse("v3:user_program_enrollments_api-list"),
+        data={"program_id": program.id},
+        format="json",
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["program"]["readable_id"] == program.readable_id
+
+    # No duplicate enrollment created
+    assert ProgramEnrollment.objects.filter(user=user, program=program).count() == 1
+
+
+def test_create_program_enrollment_reactivate(user_drf_client, user):
+    """POST for a program with an inactive enrollment reactivates it and returns 201."""
+    program = ProgramFactory.create(live=True)
+    enrollment = ProgramEnrollmentFactory.create(
+        user=user, program=program, active=False
+    )
+    enrollment.active = False
+    enrollment.change_status = ENROLL_CHANGE_STATUS_UNENROLLED
+    enrollment.save()
+
+    resp = user_drf_client.post(
+        reverse("v3:user_program_enrollments_api-list"),
+        data={"program_id": program.id},
+        format="json",
+    )
+
+    assert resp.status_code == status.HTTP_201_CREATED
+    enrollment.refresh_from_db()
+    assert enrollment.active is True
+
+
+def test_create_program_enrollment_nonlive_program(user_drf_client):
+    """POST with a non-live program returns 400."""
+    program = ProgramFactory.create(live=False)
+
+    resp = user_drf_client.post(
+        reverse("v3:user_program_enrollments_api-list"),
+        data={"program_id": program.id},
+        format="json",
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_create_program_enrollment_not_found(user_drf_client):
+    """POST with a nonexistent program_id returns 400."""
+    resp = user_drf_client.post(
+        reverse("v3:user_program_enrollments_api-list"),
+        data={"program_id": 99999},
+        format="json",
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_create_program_enrollment_export_compliance_blocked(
+    mocker, user_drf_client, user
+):
+    """POST should fail closed when the export compliance check rejects the user."""
+    program = ProgramFactory.create(live=True)
+    exc = ExportComplianceError(user, "REJECT", "102")
+    mocker.patch("courses.views.v3.create_program_enrollments", side_effect=exc)
+
+    resp = user_drf_client.post(
+        reverse("v3:user_program_enrollments_api-list"),
+        data={"program_id": program.id},
+        format="json",
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_700.",
+        "reason_code": "CS_700",
+    }
+    assert not ProgramEnrollment.objects.filter(user=user, program=program).exists()
+
+
+def test_create_program_enrollment_export_compliance_missing_data(
+    mocker, user_drf_client, user
+):
+    """Missing profile data carries the fixable-data code and the fields to fix."""
+    program = ProgramFactory.create(live=True)
+    exc = ExportComplianceDataError(user, ["country"])
+    mocker.patch("courses.views.v3.create_program_enrollments", side_effect=exc)
+
+    resp = user_drf_client.post(
+        reverse("v3:user_program_enrollments_api-list"),
+        data={"program_id": program.id},
+        format="json",
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
+        "missing_fields": ["country"],
+    }
+    assert not ProgramEnrollment.objects.filter(user=user, program=program).exists()
+
+
+def test_create_program_enrollment_unauthenticated():
+    """POST without authentication returns 401 or 403."""
+    program = ProgramFactory.create(live=True)
+    client = APIClient()
+
+    resp = client.post(
+        reverse("v3:user_program_enrollments_api-list"),
+        data={"program_id": program.id},
+        format="json",
+    )
+
+    assert resp.status_code in (
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_403_FORBIDDEN,
+    )
+
+
+def test_destroy_program_enrollment_program_not_found(user_drf_client):
+    """DELETE for a nonexistent program returns 404."""
+    resp = user_drf_client.delete(
+        reverse("v3:user_program_enrollments_api-detail", kwargs={"program_id": 999999})
+    )
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_destroy_program_enrollment_no_enrollment_is_idempotent(user_drf_client):
+    """DELETE when the user has no enrollment is idempotent - returns 204 with no body."""
+    program = ProgramFactory.create()
+
+    resp = user_drf_client.delete(
+        reverse(
+            "v3:user_program_enrollments_api-detail", kwargs={"program_id": program.id}
+        )
+    )
+    assert resp.status_code == status.HTTP_204_NO_CONTENT
+    assert not resp.content
+
+
+def test_destroy_program_enrollment(user_drf_client, user):
+    """DELETE deactivates the enrollment and returns 204 with no body."""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    program = enrollment.program
+
+    resp = user_drf_client.delete(
+        reverse(
+            "v3:user_program_enrollments_api-detail", kwargs={"program_id": program.id}
+        )
+    )
+    assert resp.status_code == status.HTTP_204_NO_CONTENT
+    assert not resp.content
+
+    enrollment.refresh_from_db()
+    assert enrollment.active is False
+    assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
+
+
+def test_destroy_program_enrollment_paid_fails(user_drf_client, user):
+    """DELETE a paid program enrollment fails"""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    program = enrollment.program
+
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+    PaidProgram.objects.create(user=user, program=program, order=order)
+
+    resp = user_drf_client.delete(
+        reverse(
+            "v3:user_program_enrollments_api-detail", kwargs={"program_id": program.id}
+        )
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "message": "Cannot unenroll from a purchased program, contact support."
+    }
+
+    enrollment.refresh_from_db()
+    assert enrollment.active is True
+
+
+def test_course_outline_v3_public_success(mocker):
+    """GET course outline endpoint should succeed without authentication."""
+    client = APIClient()
+    expected_outline = {
+        "course_id": "course-v1:OpenedX+DemoX+DemoCourse",
+        "blocks": [],
+    }
+    mocked_get_outline = mocker.patch(
+        "courses.views.v3.get_edx_course_outline", return_value=expected_outline
+    )
+    resp = client.get(
+        reverse(
+            "v3:course_outline",
+            kwargs={"course_id": "course-v1:OpenedX+DemoX+DemoCourse"},
+        )
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == expected_outline
+    mocked_get_outline.assert_called_once_with("course-v1:OpenedX+DemoX+DemoCourse")
+
+
+def test_course_outline_v3_authenticated_success(user_drf_client, mocker):
+    """Authenticated request should return proxied Open edX outline data."""
+    expected_outline = {
+        "course_id": "course-v1:OpenedX+DemoX+DemoCourse",
+        "blocks": [],
+    }
+    mocked_get_outline = mocker.patch(
+        "courses.views.v3.get_edx_course_outline", return_value=expected_outline
+    )
+
+    resp = user_drf_client.get(
+        reverse(
+            "v3:course_outline",
+            kwargs={"course_id": "course-v1:OpenedX+DemoX+DemoCourse"},
+        )
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == expected_outline
+    mocked_get_outline.assert_called_once_with("course-v1:OpenedX+DemoX+DemoCourse")
+
+
+def test_course_outline_v3_invalid_course_id():
+    """Invalid course IDs should return 400 before upstream call."""
+    client = APIClient()
+    resp = client.get(
+        reverse("v3:course_outline", kwargs={"course_id": "not-a-course-key"})
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Invalid course_id format. Expected an Open edX course key."
+    }
+
+
+@pytest.mark.parametrize(
+    ("exception_instance", "expected_detail"),
+    [
+        (
+            EdxApiCourseOutlineError("boom"),
+            "Unable to fetch course outline from Open edX.",
+        ),
+        (
+            EdxApiCourseOutlineError("bad json"),
+            "Unable to fetch course outline from Open edX.",
+        ),
+    ],
+)
+def test_course_outline_v3_upstream_failures(
+    user_drf_client, mocker, exception_instance, expected_detail
+):
+    """Upstream errors should be mapped to 502 responses with safe messages."""
+    mocker.patch(
+        "courses.views.v3.get_edx_course_outline",
+        side_effect=exception_instance,
+    )
+    resp = user_drf_client.get(
+        reverse(
+            "v3:course_outline",
+            kwargs={"course_id": "course-v1:OpenedX+DemoX+DemoCourse"},
+        )
+    )
+    assert resp.status_code == status.HTTP_502_BAD_GATEWAY
+    assert resp.json() == {"detail": expected_detail}
+
+
+class TestEnrollmentEligibility:
+    """Tests for the /enrollment-eligible/ endpoints."""
+
+    @pytest.fixture(autouse=True)
+    def private_throttle_cache(self, mocker):
+        """
+        Give the throttle a per-test cache.
+
+        The real one is the shared ``redis`` cache, so without this the
+        counters leak between tests and across xdist workers.
+        """
+        mocker.patch.object(
+            EnrollmentEligibilityThrottle,
+            "cache",
+            LocMemCache("enrollment-eligibility-throttle-test", {}),
+        )
+
+    @pytest.fixture
+    def pinned_throttle_rate(self, mocker):
+        """
+        Pin the throttle to 2/min for this test.
+
+        Mutating ``settings.REST_FRAMEWORK`` in place would not work - it does
+        not fire ``setting_changed``, so DRF never reloads ``api_settings``.
+        """
+        mocker.patch.object(
+            EnrollmentEligibilityThrottle,
+            "THROTTLE_RATES",
+            {"enrollment_eligibility": "2/min"},
+        )
+
+    @pytest.fixture
+    def endpoints(self):
+        """The two eligibility URLs, keyed by the kind of thing they check."""
+        return {
+            "run": lambda obj: reverse(
+                "v3:course_run_enrollment_eligible", kwargs={"run_id": obj.id}
+            ),
+            "program": lambda obj: reverse(
+                "v3:program_enrollment_eligible", kwargs={"program_id": obj.id}
+            ),
+        }
+
+    @staticmethod
+    def _courseware_object(kind):
+        return CourseRunFactory.create() if kind == "run" else ProgramFactory.create()
+
+    @pytest.mark.parametrize("kind", ["run", "program"])
+    def test_eligible(self, user_drf_client, endpoints, kind):
+        """An accepted compliance check reports the user as enrollable."""
+        courseware_object = self._courseware_object(kind)
+
+        resp = user_drf_client.post(endpoints[kind](courseware_object))
+
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.json() == {
+            "enrollable": True,
+            "reason_code": None,
+            "missing_fields": [],
+        }
+
+    @pytest.mark.parametrize("kind", ["run", "program"])
+    def test_blocked_by_compliance(self, mocker, user_drf_client, endpoints, kind):
+        """A rejected compliance check reports CS_700."""
+        courseware_object = self._courseware_object(kind)
+        mocker.patch(
+            "courses.api.verify_user_with_exports",
+            return_value=ExportComplianceResult(
+                decision="DECLINED",
+                reason_code=102,
+                request_id="req-123",
+                raw={},
+            ),
+        )
+
+        resp = user_drf_client.post(endpoints[kind](courseware_object))
+
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.json() == {
+            "enrollable": False,
+            "reason_code": "CS_700",
+            "missing_fields": [],
+        }
+
+    @pytest.mark.parametrize("kind", ["run", "program"])
+    def test_blocked_by_missing_profile_data(
+        self, mocker, user, user_drf_client, endpoints, kind
+    ):
+        """An incomplete profile reports CS_701, not CS_700, and the fields to fix."""
+        courseware_object = self._courseware_object(kind)
+        mocker.patch(
+            "courses.api.verify_user_with_exports",
+            side_effect=ExportComplianceDataError(
+                user, ["postal_code", "administrative_area"]
+            ),
+        )
+
+        resp = user_drf_client.post(endpoints[kind](courseware_object))
+
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.json() == {
+            "enrollable": False,
+            "reason_code": "CS_701",
+            "missing_fields": ["postal_code", "state"],
+        }
+
+    @pytest.mark.parametrize("kind", ["run", "program"])
+    def test_does_not_enroll(self, user, user_drf_client, endpoints, kind):
+        """Asking the question must not create an enrollment."""
+        courseware_object = self._courseware_object(kind)
+
+        user_drf_client.post(endpoints[kind](courseware_object))
+
+        assert not CourseRunEnrollment.objects.filter(user=user).exists()
+        assert not ProgramEnrollment.objects.filter(user=user).exists()
+
+    @pytest.mark.parametrize(
+        ("url_name", "kwarg"),
+        [
+            ("v3:course_run_enrollment_eligible", "run_id"),
+            ("v3:program_enrollment_eligible", "program_id"),
+        ],
+    )
+    def test_unknown_id_is_404(self, user_drf_client, url_name, kwarg):
+        """An id that matches nothing is a 404."""
+        resp = user_drf_client.post(reverse(url_name, kwargs={kwarg: 9999999}))
+
+        assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.parametrize("kind", ["run", "program"])
+    def test_unauthenticated(self, endpoints, kind):
+        """Anonymous callers are rejected before any compliance work happens."""
+        courseware_object = self._courseware_object(kind)
+
+        resp = APIClient().post(endpoints[kind](courseware_object))
+
+        assert resp.status_code in (
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    @pytest.mark.parametrize("kind", ["run", "program"])
+    def test_get_not_allowed(self, user_drf_client, endpoints, kind):
+        """These are POST-only - the check has side effects."""
+        courseware_object = self._courseware_object(kind)
+
+        resp = user_drf_client.get(endpoints[kind](courseware_object))
+
+        assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+
+    @pytest.mark.usefixtures("pinned_throttle_rate")
+    def test_throttled_after_rate_exceeded(self, user_drf_client, endpoints):
+        """The third call in a window is throttled."""
+        run = CourseRunFactory.create()
+        url = endpoints["run"](run)
+
+        assert user_drf_client.post(url).status_code == status.HTTP_200_OK
+        assert user_drf_client.post(url).status_code == status.HTTP_200_OK
+        assert (
+            user_drf_client.post(url).status_code == status.HTTP_429_TOO_MANY_REQUESTS
+        )
+
+    @pytest.mark.usefixtures("pinned_throttle_rate")
+    def test_throttle_budget_is_shared_across_both_endpoints(
+        self, user_drf_client, endpoints
+    ):
+        """Runs and programs draw on one per-user budget, not one each."""
+        run = CourseRunFactory.create()
+        program = ProgramFactory.create()
+
+        assert (
+            user_drf_client.post(endpoints["run"](run)).status_code
+            == status.HTTP_200_OK
+        )
+        assert (
+            user_drf_client.post(endpoints["program"](program)).status_code
+            == status.HTTP_200_OK
+        )
+        assert (
+            user_drf_client.post(endpoints["run"](run)).status_code
+            == status.HTTP_429_TOO_MANY_REQUESTS
+        )
+
+
+def _program_enrollment_url(program):
+    return reverse(
+        "v3:user_program_enrollments_api-detail", kwargs={"program_id": program.id}
+    )
+
+
+def test_program_enrollments_include_track(
+    user_drf_client, user, django_assert_max_num_queries
+):
+    """The list carries each enrollment's chosen track with no query per enrollment"""
+    enrollments = [
+        ProgramEnrollmentFactory.create(
+            user=user, program=tracked.program, track=tracked.track_nodes[0]
+        )
+        for tracked in (create_program_with_tracks(), create_program_with_tracks())
+    ]
+
+    with django_assert_max_num_queries(4):
+        resp = user_drf_client.get(reverse("v3:user_program_enrollments_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert [enrollment["track"] for enrollment in resp.json()] == [
+        {"id": enrollment.track.id, "title": enrollment.track.title}
+        for enrollment in reversed(enrollments)
+    ]
+
+
+def test_update_program_enrollment_track(
+    user_drf_client,
+    user,
+    program_with_tracks,  # noqa: F811
+):
+    """PATCH sets, changes and clears the enrollment's track"""
+    enrollment = ProgramEnrollmentFactory.create(
+        user=user, program=program_with_tracks.program
+    )
+    url = _program_enrollment_url(enrollment.program)
+
+    for track in [*program_with_tracks.track_nodes, None]:
+        resp = user_drf_client.patch(
+            url, {"track": track.id if track else None}, format="json"
+        )
+
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.json()["track"] == (
+            {"id": track.id, "title": track.title} if track else None
+        )
+        enrollment.refresh_from_db()
+        assert enrollment.track == track
+
+
+def test_update_program_enrollment_track_without_field(
+    user_drf_client,
+    user,
+    program_with_tracks,  # noqa: F811
+):
+    """A PATCH that omits track leaves the chosen track alone"""
+    track = program_with_tracks.track_nodes[0]
+    enrollment = ProgramEnrollmentFactory.create(
+        user=user, program=program_with_tracks.program, track=track
+    )
+
+    resp = user_drf_client.patch(_program_enrollment_url(enrollment.program), {})
+
+    assert resp.status_code == status.HTTP_200_OK
+    enrollment.refresh_from_db()
+    assert enrollment.track == track
+
+
+@pytest.mark.parametrize("wrong_node", ["group", "other_program_track"])
+def test_update_program_enrollment_track_rejects_wrong_node(
+    user_drf_client,
+    user,
+    program_with_tracks,  # noqa: F811
+    wrong_node,
+):
+    """PATCH rejects a node that is not a track, and a track of another program"""
+    enrollment = ProgramEnrollmentFactory.create(
+        user=user, program=program_with_tracks.program
+    )
+    node = (
+        program_with_tracks.tracks_node
+        if wrong_node == "group"
+        else create_program_with_tracks().track_nodes[0]
+    )
+
+    resp = user_drf_client.patch(
+        _program_enrollment_url(enrollment.program), {"track": node.id}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert "track" in resp.json()["errors"]
+    enrollment.refresh_from_db()
+    assert enrollment.track is None
+
+
+def test_update_program_enrollment_track_without_enrollment(
+    user_drf_client,
+    program_with_tracks,  # noqa: F811
+):
+    """PATCH is a 404 when the user has no active enrollment in the program"""
+    resp = user_drf_client.patch(
+        _program_enrollment_url(program_with_tracks.program),
+        {"track": program_with_tracks.track_nodes[0].id},
+        format="json",
+    )
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND

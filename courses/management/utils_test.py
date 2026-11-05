@@ -6,42 +6,24 @@ import pytest
 from django.contrib.auth import get_user_model
 from mitol.common.utils.datetime import now_in_utc
 
+from compliance.api import ExportComplianceResult
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
-    ProgramEnrollmentFactory,
 )
-from courses.management.utils import EnrollmentChangeCommand
+from courses.management.utils import (
+    EnrollmentChangeCommand,
+    bulk_enroll_learners,
+    enroll_learner_in_run,
+)
+from courses.models import CourseRunEnrollment
+from main import features
 from main.test_utils import MockHttpError
+from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE
 from openedx.exceptions import EdxApiEnrollErrorException, UnknownEdxApiEnrollException
 from users.factories import UserFactory
 
 User = get_user_model()
-
-
-@pytest.mark.django_db
-def test_fetch_enrollment():
-    """Test that method return enrollment and enrolled object"""
-    user = UserFactory()
-    run_enrollment = CourseRunEnrollmentFactory(user=user)
-    program_enrollment = ProgramEnrollmentFactory(user=user)
-
-    run_command_options = {"run": run_enrollment.run.courseware_id}
-    program_command_options = {"program": program_enrollment.program.readable_id}
-
-    enrollment_obj, enrolled_obj = EnrollmentChangeCommand.fetch_enrollment(
-        user=user, command_options=run_command_options
-    )
-
-    assert enrolled_obj == run_enrollment.run
-    assert enrollment_obj == run_enrollment
-
-    enrollment_obj, enrolled_obj = EnrollmentChangeCommand.fetch_enrollment(
-        user=user, command_options=program_command_options
-    )
-
-    assert enrolled_obj == program_enrollment.program
-    assert enrollment_obj == program_enrollment
 
 
 @pytest.mark.django_db
@@ -81,3 +63,373 @@ def test_create_run_enrollment_edx_failure(
         assert new_enrollment == expected_enrollment
     else:
         assert new_enrollment is None
+
+
+@pytest.mark.django_db()
+class TestEnrollLearnerInRun:
+    """Tests for the enroll_learner_in_run utility function"""
+
+    def test_creates_openedx_user_if_missing(self, mocker):
+        """Should create the learner's edX account first if they don't have one"""
+        user = UserFactory.create(no_openedx_user=True)
+        run = CourseRunFactory.create()
+        mock_create_user = mocker.patch("courses.management.utils.create_user")
+        enrollment = CourseRunEnrollmentFactory.build(user=user, run=run)
+        mocker.patch(
+            "courses.management.utils.create_run_enrollments",
+            return_value=([enrollment], True),
+        )
+
+        enroll_learner_in_run(user, run)
+
+        mock_create_user.assert_called_once_with(user)
+
+    def test_skips_openedx_user_creation_if_exists(self, mocker):
+        """Should not try to create an edX account if the learner already has one"""
+        user = UserFactory.create()  # has a synced openedx_user by default
+        run = CourseRunFactory.create()
+        mock_create_user = mocker.patch("courses.management.utils.create_user")
+        enrollment = CourseRunEnrollmentFactory.build(user=user, run=run)
+        mocker.patch(
+            "courses.management.utils.create_run_enrollments",
+            return_value=([enrollment], True),
+        )
+
+        enroll_learner_in_run(user, run)
+
+        mock_create_user.assert_not_called()
+
+    def test_successful_enrollment(self, mocker):
+        """Should return the created enrollment and a success message"""
+        user = UserFactory.create()
+        run = CourseRunFactory.create()
+        mocker.patch("courses.management.utils.create_user")
+        enrollment = CourseRunEnrollmentFactory.build(user=user, run=run)
+        mocker.patch(
+            "courses.management.utils.create_run_enrollments",
+            return_value=([enrollment], True),
+        )
+
+        result, message = enroll_learner_in_run(user, run)
+
+        assert result == enrollment
+        assert user.email in message
+        assert run.courseware_id in message
+
+    def test_edx_failure_still_reports_success_with_note(self, mocker):
+        """Should still return the enrollment but note the edX failure"""
+        user = UserFactory.create()
+        run = CourseRunFactory.create()
+        mocker.patch("courses.management.utils.create_user")
+        enrollment = CourseRunEnrollmentFactory.build(user=user, run=run)
+        mocker.patch(
+            "courses.management.utils.create_run_enrollments",
+            return_value=([enrollment], False),
+        )
+
+        result, message = enroll_learner_in_run(user, run)
+
+        assert result == enrollment
+        assert "edX enrollment failed" in message
+
+    def test_failed_enrollment(self, mocker):
+        """Should return None and a failure message when no enrollment is created"""
+        user = UserFactory.create()
+        run = CourseRunFactory.create()
+        mocker.patch("courses.management.utils.create_user")
+        mocker.patch(
+            "courses.management.utils.create_run_enrollments",
+            return_value=([], False),
+        )
+
+        result, message = enroll_learner_in_run(user, run)
+
+        assert result is None
+        assert "Failed to enroll" in message
+
+    def test_openedx_connection_failure_does_not_raise(self, mocker):
+        """
+        Should catch (not propagate) an exception raised by create_user, e.g. when
+        edX is unreachable. create_user re-raises unless IGNORE_EDX_FAILURES is set,
+        so this must be caught here or it kills the entire bulk_enroll_learners loop.
+        """
+        user = UserFactory.create(no_openedx_user=True)
+        run = CourseRunFactory.create()
+        mocker.patch(
+            "courses.management.utils.create_user",
+            side_effect=ConnectionError("edX is unreachable"),
+        )
+        mock_create_run_enrollments = mocker.patch(
+            "courses.management.utils.create_run_enrollments"
+        )
+
+        result, message = enroll_learner_in_run(user, run)
+
+        assert result is None
+        assert "Failed to enroll" in message
+        assert "edX is unreachable" in message
+        mock_create_run_enrollments.assert_not_called()
+
+    def test_create_run_enrollments_failure_does_not_raise(self, mocker):
+        """Should catch (not propagate) an unexpected exception from create_run_enrollments"""
+        user = UserFactory.create()
+        run = CourseRunFactory.create()
+        mocker.patch("courses.management.utils.create_user")
+        mocker.patch(
+            "courses.management.utils.create_run_enrollments",
+            side_effect=ConnectionError("edX is unreachable"),
+        )
+
+        result, message = enroll_learner_in_run(user, run)
+
+        assert result is None
+        assert "Failed to enroll" in message
+
+    def test_mode_passed_through(self, mocker):
+        """Should pass the mode and keep_failed_enrollments through to create_run_enrollments"""
+        user = UserFactory.create()
+        run = CourseRunFactory.create()
+        mocker.patch("courses.management.utils.create_user")
+        enrollment = CourseRunEnrollmentFactory.build(user=user, run=run)
+        mock_create_run_enrollments = mocker.patch(
+            "courses.management.utils.create_run_enrollments",
+            autospec=True,
+            return_value=([enrollment], True),
+        )
+
+        enroll_learner_in_run(user, run, mode="verified", keep_failed_enrollments=True)
+
+        mock_create_run_enrollments.assert_called_once_with(
+            user,
+            [run],
+            keep_failed_enrollments=True,
+            mode="verified",
+            skip_compliance_check=False,
+            skip_enrollment_emails=False,
+        )
+
+
+@pytest.mark.django_db()
+class TestBulkEnrollLearnersUtil:
+    """Tests for the bulk_enroll_learners utility function"""
+
+    def test_successful_enrollment(self, mocker):
+        """Should enroll a valid user/run pair successfully"""
+        user = UserFactory.create()
+        run = CourseRunFactory.create()
+        enrollment = CourseRunEnrollmentFactory.build(user=user, run=run)
+        mocker.patch(
+            "courses.management.utils.enroll_learner_in_run",
+            return_value=(enrollment, f"Enrolled {user.email} in {run.courseware_id}"),
+        )
+
+        result = bulk_enroll_learners([(user.email, run.courseware_id)])
+
+        assert result["succeeded"] == 1
+        assert result["failed"] == 0
+        assert result["skipped"] == 0
+
+    def test_user_not_found(self):
+        """Should skip when user doesn't exist"""
+        run = CourseRunFactory.create()
+        result = bulk_enroll_learners([("nonexistent@example.com", run.courseware_id)])
+
+        assert result["skipped"] == 1
+        assert result["succeeded"] == 0
+
+    def test_course_run_not_found(self):
+        """Should skip when course run doesn't exist"""
+        user = UserFactory.create()
+        result = bulk_enroll_learners([(user.email, "course-v1:fake+fake+fake")])
+
+        assert result["skipped"] == 1
+        assert result["succeeded"] == 0
+
+    def test_enrollment_failure(self, mocker):
+        """Should count as failed when enroll_learner_in_run returns None"""
+        user = UserFactory.create()
+        run = CourseRunFactory.create()
+        mocker.patch(
+            "courses.management.utils.enroll_learner_in_run",
+            return_value=(None, "Failed to enroll"),
+        )
+
+        result = bulk_enroll_learners([(user.email, run.courseware_id)])
+
+        assert result["failed"] == 1
+        assert result["succeeded"] == 0
+
+    def test_mode_and_keep_failed_passed(self, mocker):
+        """Should pass mode and keep_failed_enrollments to enroll_learner_in_run"""
+        user = UserFactory.create()
+        run = CourseRunFactory.create()
+        enrollment = CourseRunEnrollmentFactory.build(user=user, run=run)
+        mock_enroll = mocker.patch(
+            "courses.management.utils.enroll_learner_in_run",
+            autospec=True,
+            return_value=(enrollment, "Enrolled"),
+        )
+
+        bulk_enroll_learners(
+            [(user.email, run.courseware_id)],
+            mode="verified",
+            keep_failed_enrollments=True,
+        )
+
+        mock_enroll.assert_called_once_with(
+            user,
+            run,
+            mode="verified",
+            keep_failed_enrollments=True,
+            skip_compliance_check=False,
+            skip_enrollment_emails=False,
+        )
+
+    def test_one_bad_row_does_not_abort_the_batch(self, mocker):
+        """
+        A row whose edX call raises (e.g. edX unreachable) should be recorded as
+        failed, not propagate and abort processing of the remaining entries.
+        Regression test: enroll_learner_in_run previously had no try/except
+        around create_user(), so this would raise straight out of the loop.
+        """
+        good_user = UserFactory.create()
+        bad_user = UserFactory.create(no_openedx_user=True)
+        run = CourseRunFactory.create()
+        enrollment = CourseRunEnrollmentFactory.build(user=good_user, run=run)
+
+        def create_user_side_effect(user):
+            if user == bad_user:
+                msg = "edX is unreachable"
+                raise ConnectionError(msg)
+
+        mocker.patch(
+            "courses.management.utils.create_user",
+            side_effect=create_user_side_effect,
+        )
+        mocker.patch(
+            "courses.management.utils.create_run_enrollments",
+            return_value=([enrollment], True),
+        )
+
+        result = bulk_enroll_learners(
+            [
+                (bad_user.email, run.courseware_id),
+                (good_user.email, run.courseware_id),
+            ]
+        )
+
+        assert result["failed"] == 1
+        assert result["succeeded"] == 1
+
+    def test_course_run_cached_across_entries(self, mocker):
+        """Should only query for a given courseware_id once across multiple entries"""
+        user1 = UserFactory.create()
+        user2 = UserFactory.create()
+        run = CourseRunFactory.create()
+        mocker.patch(
+            "courses.management.utils.enroll_learner_in_run",
+            return_value=(
+                CourseRunEnrollmentFactory.build(user=user1, run=run),
+                "Enrolled",
+            ),
+        )
+        mock_filter = mocker.patch(
+            "courses.management.utils.CourseRun.objects.filter",
+            wraps=None,
+        )
+        mock_filter.return_value.first.return_value = run
+
+        bulk_enroll_learners(
+            [
+                (user1.email, run.courseware_id),
+                (user2.email, run.courseware_id),
+            ]
+        )
+
+        mock_filter.assert_called_once_with(courseware_id=run.courseware_id)
+
+    def test_skip_compliance_check_passed(self, mocker):
+        """skip_compliance_check should reach create_run_enrollments for every entry"""
+        users = UserFactory.create_batch(2)
+        run = CourseRunFactory.create()
+        mock_create_run_enrollments = mocker.patch(
+            "courses.management.utils.create_run_enrollments",
+            autospec=True,
+            return_value=(
+                [CourseRunEnrollmentFactory.build(user=users[0], run=run)],
+                True,
+            ),
+        )
+
+        bulk_enroll_learners(
+            [(user.email, run.courseware_id) for user in users],
+            skip_compliance_check=True,
+        )
+
+        assert mock_create_run_enrollments.call_count == len(users)
+        mock_create_run_enrollments.assert_has_calls(
+            [
+                mocker.call(
+                    user,
+                    [run],
+                    keep_failed_enrollments=False,
+                    mode=EDX_DEFAULT_ENROLLMENT_MODE,
+                    skip_compliance_check=True,
+                    skip_enrollment_emails=False,
+                )
+                for user in users
+            ]
+        )
+
+    def test_compliance_rejection_fails_closed(self, settings, mocker):
+        """A rejection should surface as a failed entry and enroll nobody"""
+        settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = True
+        user = UserFactory.create()
+        run = CourseRunFactory.create()
+        mocker.patch(
+            "courses.api.verify_user_with_exports",
+            return_value=ExportComplianceResult(
+                decision="REJECT",
+                reason_code=102,
+                request_id="req-123",
+                raw={},
+            ),
+        )
+        patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        summary = bulk_enroll_learners([(user.email, run.courseware_id)])
+
+        assert summary["failed"] == 1
+        assert summary["succeeded"] == 0
+        # enroll_learner_in_run collapses every exception into a failed row.
+        _, _, _, message = summary["details"][0]
+        assert "Export compliance check did not accept enrollment" in message
+        patched_edx_enroll.assert_not_called()
+        assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+    def test_skip_compliance_check_enrolls_rejected_user(self, settings, mocker):
+        """The same REJECT setup enrolls the user when the bypass is on"""
+        settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = True
+        user = UserFactory.create()
+        run = CourseRunFactory.create()
+        # REJECT so the outcome assertions fail on a regressed bypass too.
+        patched_verify = mocker.patch(
+            "courses.api.verify_user_with_exports",
+            return_value=ExportComplianceResult(
+                decision="REJECT",
+                reason_code=102,
+                request_id="req-123",
+                raw={},
+            ),
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+        mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+        summary = bulk_enroll_learners(
+            [(user.email, run.courseware_id)], skip_compliance_check=True
+        )
+
+        assert summary["succeeded"] == 1
+        patched_verify.assert_not_called()
+        assert CourseRunEnrollment.objects.filter(user=user, run=run).exists()

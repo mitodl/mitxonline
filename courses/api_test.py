@@ -1,72 +1,141 @@
 """Courses API tests"""
 
-from datetime import timedelta
+import logging
+from copy import deepcopy
+from datetime import datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
+from urllib.parse import quote
+from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 import factory
+import faker
 import pytest
+import responses
 import reversion
+from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.test import RequestFactory
+from django.db import connection
+from django.test import RequestFactory, override_settings
+from django.test.utils import CaptureQueriesContext
 from edx_api.course_detail import CourseDetail, CourseMode, CourseModes
 from mitol.common.utils.datetime import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
-from reversion.models import Version
+from rest_framework import status
 
 from b2b.api import create_b2b_enrollment
-from b2b.constants import CONTRACT_INTEGRATION_NONSSO
+from b2b.constants import CONTRACT_MEMBERSHIP_CODE
 from b2b.factories import (
     ContractPageFactory,
     OrganizationIndexPageFactory,
     OrganizationPageFactory,
 )
+from cms.factories import (
+    CertificatePageFactory,
+    CourseIndexPageFactory,
+    CoursePageFactory,
+)
+from cms.models import CoursePage, ProgramPage
+from compliance.api import ExportComplianceResult, verify_user_with_exports
+from compliance.exceptions import (
+    ExportComplianceCheckError,
+    ExportComplianceDataError,
+    ExportComplianceError,
+)
+from compliance.factories import ExportComplianceLogFactory
+from compliance.models import ExportComplianceDecision
 from courses.api import (
+    VERIFIABLE_CREDENTIAL_STATUS_DISABLED,
+    VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA,
+    VERIFIABLE_CREDENTIAL_STATUS_ENABLED,
+    VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA,
+    _has_earned_program_cert,
+    check_course_modes,
+    check_enrollment_eligibility,
+    create_local_enrollment,
     create_program_enrollments,
     create_run_enrollments,
     deactivate_run_enrollment,
     defer_enrollment,
+    downgrade_learner,
+    downgrade_program_enrollment_and_verified_runs,
     generate_course_run_certificates,
+    generate_missing_program_certificates,
+    generate_openedx_course_url,
     generate_program_certificate,
+    get_audit_program_enrollments_for_upgrade,
+    get_certificate_grade_eligible_runs,
+    get_eligible_program_certificate_candidates,
+    get_verifiable_credentials_payload,
+    import_courserun_from_edx,
     manage_course_run_certificate_access,
     manage_program_certificate_access,
     override_user_grade,
+    partner_schools_for_program,
     process_course_run_grade_certificate,
+    pull_course_modes,
+    rerun_course_run,
+    summarize_verifiable_credential_certificate_statuses,
     sync_course_mode,
     sync_course_runs,
+    undo_program_course_run_verification,
+    upgrade_audit_run_enrollments_for_program_purchase,
+    upgrade_program_enrollment_if_eligible,
 )
 from courses.constants import (
+    ALL_ENROLL_CHANGE_STATUSES,
+    COURSE_VARIANT_INDUSTRY,
+    COURSE_VARIANT_LENGTH,
     ENROLL_CHANGE_STATUS_DEFERRED,
     ENROLL_CHANGE_STATUS_REFUNDED,
     ENROLL_CHANGE_STATUS_UNENROLLED,
 )
+from courses.exceptions import CountryBlockedError
 from courses.factories import (
+    BlockedCountryFactory,
     CourseFactory,
     CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     CourseRunGradeFactory,
+    DepartmentFactory,
+    EnrollmentModeFactory,
+    PartnerSchoolFactory,
+    PartnerSchoolProgramFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
-    ProgramRequirementFactory,
     program_with_empty_requirements,  # noqa: F401
     program_with_requirements,  # noqa: F401
+    program_with_tracks,  # noqa: F401
 )
 
 # pylint: disable=redefined-outer-name
 from courses.models import (
+    CourseRunCertificate,
     CourseRunEnrollment,
+    CourseRunEnrollmentAudit,
+    EnrollmentMode,
     PaidCourseRun,
     ProgramCertificate,
     ProgramEnrollment,
+    ProgramEnrollmentAudit,
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
-from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
-from ecommerce.models import Basket, OrderStatus
+from ecommerce.constants import REDEMPTION_TYPE_INTERNAL
+from ecommerce.factories import (
+    DiscountFactory,
+    DiscountRedemptionFactory,
+    LineFactory,
+    OrderFactory,
+    ProductFactory,
+)
+from ecommerce.models import Basket, Order, OrderStatus
+from main import features
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
 from main.test_utils import MockHttpError
 from openedx.constants import (
@@ -79,8 +148,10 @@ from openedx.exceptions import (
     NoEdxApiAuthError,
     UnknownEdxApiEnrollException,
 )
+from users.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
+FAKE = faker.Factory.create()
 
 
 @pytest.fixture
@@ -123,6 +194,117 @@ def passed_grade_with_enrollment(user):
 def courses_api_logs(mocker):
     """Logger fixture for tasks"""
     return mocker.patch("courses.api.log")
+
+
+@pytest.fixture
+def default_mode_records():
+    """Returns the default modes we expect."""
+
+    return [
+        EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_AUDIT_MODE),
+        EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE),
+    ]
+
+
+def _mock_edx_course_detail(coursekey, settings):
+    """Make a fake course detail record for the given key."""
+
+    fake_date = FAKE.date_time(tzinfo=ZoneInfo(settings.TIME_ZONE))
+
+    return {
+        "blocks_url": f"http://192.168.33.10:8000/api/courses/v1/blocks/?course_id={quote(coursekey)}",
+        "effort": "7 hours",
+        "end": str(fake_date + timedelta(days=90)),
+        "enrollment_start": str(fake_date - timedelta(days=45)),
+        "enrollment_end": None,
+        "id": coursekey,
+        "media": {
+            "course_image": {
+                "uri": "/asset-v1:edX+DemoX+Demo_Course+type@asset+block@images_course_image.jpg"
+            },
+            "course_video": {"uri": None},
+        },
+        "name": FAKE.words(nb=3),
+        "number": "DemoX",
+        "org": "edX",
+        "short_description": "",
+        "start": str(fake_date - timedelta(days=30)),
+        "start_display": (fake_date - timedelta(days=30)).strftime("%B %w, %Y"),
+        "start_type": "timestamp",
+        "course_id": coursekey,
+        "overview": "<h2>About This Course</h2>\n   <p>Include your long course description here. The long course description should contain 150-400 words.</p>\n",
+        "pacing": "self",
+    }
+
+
+@pytest.mark.parametrize(
+    "enrollment_mode", [EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE]
+)
+def test_create_local_enrollment_new(user, enrollment_mode):
+    """
+    create_local_enrollment should create a new CourseRunEnrollment with edx_enrolled=True
+    and the specified mode, without calling the edX API.
+    """
+    run = CourseRunFactory.create()
+
+    enrollment, created = create_local_enrollment(user, run, mode=enrollment_mode)
+
+    assert created is True
+    assert enrollment.user == user
+    assert enrollment.run == run
+    assert enrollment.active is True
+    assert enrollment.edx_enrolled is True
+    assert enrollment.enrollment_mode == enrollment_mode
+    assert enrollment.change_status is None
+
+
+@pytest.mark.parametrize(
+    ("existing_active", "existing_edx_enrolled"),
+    [
+        (False, False),
+        (True, True),
+    ],
+)
+def test_create_local_enrollment_existing_enrollment(
+    user,
+    existing_active,
+    existing_edx_enrolled,
+):
+    """create_local_enrollment should be idempotent and reactivate when needed."""
+    run = CourseRunFactory.create()
+    existing = CourseRunEnrollmentFactory.create(
+        user=user,
+        run=run,
+        active=existing_active,
+        edx_enrolled=existing_edx_enrolled,
+    )
+
+    enrollment, created = create_local_enrollment(user, run)
+
+    assert created is False
+    assert enrollment.id == existing.id
+    assert enrollment.active is True
+    assert enrollment.edx_enrolled is True
+
+
+def test_create_local_enrollment_writes_audit_on_creation(user):
+    """
+    create_local_enrollment should write a CourseRunEnrollmentAudit row when a
+    brand-new enrollment is created. Without this, the very first event in an
+    enrollment's lifecycle would be missing from the audit table.
+    """
+    run = CourseRunFactory.create()
+
+    enrollment, created = create_local_enrollment(user, run)
+
+    assert created is True
+    audit_rows = CourseRunEnrollmentAudit.objects.filter(enrollment=enrollment)
+    assert audit_rows.count() == 1
+    audit_row = audit_rows.first()
+    assert audit_row.acting_user is None
+    assert audit_row.data_after["id"] == enrollment.id
+    assert audit_row.data_after["active"] is True
+    assert audit_row.data_after["edx_enrolled"] is True
 
 
 @pytest.mark.parametrize(
@@ -177,6 +359,32 @@ def test_create_run_enrollments(
             patched_send_enrollment_email.assert_any_call(enrollment)
 
 
+def test_create_run_enrollments_writes_audit_on_creation(mocker, user):
+    """
+    create_run_enrollments should write a CourseRunEnrollmentAudit row for every
+    newly-created enrollment.
+    """
+    runs = CourseRunFactory.create_batch(2)
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    successful_enrollments, edx_request_success = create_run_enrollments(user, runs)
+
+    assert edx_request_success is True
+    assert len(successful_enrollments) == len(runs)
+    for enrollment in successful_enrollments:
+        audit_rows = CourseRunEnrollmentAudit.objects.filter(enrollment=enrollment)
+        assert audit_rows.count() == 1, (
+            f"expected exactly one audit row for the newly-created enrollment {enrollment.id}, "
+            f"found {audit_rows.count()}"
+        )
+        audit_row = audit_rows.first()
+        assert audit_row.acting_user is None
+        assert audit_row.data_after["id"] == enrollment.id
+        assert audit_row.data_after["active"] is True
+
+
 @pytest.mark.parametrize("is_active", [True, False])
 def test_create_run_enrollments_upgrade(
     mocker,
@@ -187,8 +395,6 @@ def test_create_run_enrollments_upgrade(
     """
     create_run_enrollments should call the edX API to create/update enrollments, and set the enrollment mode properly
     in the event of an upgrade e.g a user moving from Audit to Verified mode
-
-    In addition, tests to make sure there's a ProgramEnrollment for the course.
     """
     test_enrollment = CourseRunEnrollmentFactory.create(
         user=user,
@@ -203,7 +409,7 @@ def test_create_run_enrollments_upgrade(
     )
     mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
 
-    successful_enrollments, edx_request_success = create_run_enrollments(
+    _, edx_request_success = create_run_enrollments(
         user, runs=[test_enrollment.run], mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
     patched_edx_enroll.assert_called_once_with(
@@ -216,7 +422,7 @@ def test_create_run_enrollments_upgrade(
     assert edx_request_success is True
     test_enrollment.refresh_from_db()
     assert test_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
-    assert ProgramEnrollment.objects.filter(
+    assert not ProgramEnrollment.objects.filter(
         user=user, program=program_with_empty_requirements
     ).exists()
 
@@ -229,7 +435,7 @@ def test_create_run_enrollments_multiple_programs(
     """
     create_run_enrollments should enroll the user into any Programs which have the CourseRun's Course defined as a requirement or elective.
 
-    In addition, tests to make sure there's a ProgramEnrollment for the course.
+    In addition, tests to make sure a ProgramEnrollment is created for the course.
     """
     test_enrollment = CourseRunEnrollmentFactory.create(
         user=user,
@@ -239,7 +445,6 @@ def test_create_run_enrollments_multiple_programs(
     )
     program_with_empty_requirements.add_requirement(test_enrollment.run.course)
     program2 = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(program2)
     root_node = program2.requirements_root
 
     root_node.add_child(
@@ -264,10 +469,10 @@ def test_create_run_enrollments_multiple_programs(
         user, runs=[test_enrollment.run], mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
 
-    assert ProgramEnrollment.objects.filter(
+    assert not ProgramEnrollment.objects.filter(
         user=user, program=program_with_empty_requirements
     ).exists()
-    assert ProgramEnrollment.objects.filter(user=user, program=program2).exists()
+    assert not ProgramEnrollment.objects.filter(user=user, program=program2).exists()
 
 
 @pytest.mark.parametrize(
@@ -383,31 +588,83 @@ def test_create_run_enrollments_creation_fail(mocker, user):
     assert edx_request_success is True
 
 
-def test_create_program_enrollments(user):
+@pytest.mark.parametrize(
+    "mode",
+    [
+        EDX_ENROLLMENT_AUDIT_MODE,
+        EDX_ENROLLMENT_VERIFIED_MODE,
+    ],
+)
+def test_create_program_enrollments_creation(user, mode):
     """
-    create_program_enrollments should create or reactivate local enrollment records
+    create_program_enrollments should create local enrollment records for a user with no
+    existing program enrollments.
     """
     num_programs = 2
     programs = ProgramFactory.create_batch(num_programs)
-    # Create an existing deactivate enrollment to test that it gets reactivated
-    ProgramEnrollmentFactory.create(
-        user=user,
-        program=programs[0],
-        change_status=ENROLL_CHANGE_STATUS_REFUNDED,
-        active=False,
-    )
 
     successful_enrollments = create_program_enrollments(
-        user,
-        programs,
+        user, programs, enrollment_mode=mode
     )
     assert len(successful_enrollments) == num_programs
-    enrollments = ProgramEnrollment.objects.order_by("program__id").all()
+    enrollments = ProgramEnrollment.objects.filter(user=user).order_by("program__id")
     assert len(enrollments) == len(programs)
     for program, enrollment in zip(programs, enrollments):
         assert enrollment.change_status is None
         assert enrollment.active is True
         assert enrollment.program == program
+        assert enrollment.enrollment_mode == mode
+
+
+def test_create_program_enrollments_writes_audit_on_creation(user):
+    """
+    create_program_enrollments should write a ProgramEnrollmentAudit row for
+    every newly-created enrollment.
+    """
+    programs = ProgramFactory.create_batch(2)
+
+    successful_enrollments = create_program_enrollments(user, programs)
+
+    assert len(successful_enrollments) == len(programs)
+    for enrollment in successful_enrollments:
+        audit_rows = ProgramEnrollmentAudit.objects.filter(enrollment=enrollment)
+        assert audit_rows.count() == 1, (
+            f"expected exactly one audit row for the newly-created enrollment {enrollment.id}, "
+            f"found {audit_rows.count()}"
+        )
+        audit_row = audit_rows.first()
+        assert audit_row.acting_user is None
+        assert audit_row.data_after["id"] == enrollment.id
+        assert audit_row.data_after["active"] is True
+
+
+@pytest.mark.parametrize("active", [True, False])
+@pytest.mark.parametrize("change_status", [None, *ALL_ENROLL_CHANGE_STATUSES])
+def test_create_program_enrollments_reactivation(user, active, change_status):
+    """
+    create_program_enrollments should reactivate existing enrollments when change_status
+    is not None, irrespective of active=True/False.
+    """
+    program = ProgramFactory.create()
+    ProgramEnrollmentFactory.create(
+        user=user,
+        program=program,
+        change_status=change_status,
+        active=active,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+    )
+
+    successful_enrollments = create_program_enrollments(
+        user,
+        [program],
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+    )
+
+    assert len(successful_enrollments) == 1
+    enrollment = ProgramEnrollment.all_objects.get(user=user, program=program)
+    expected_active = True if change_status is not None else active
+    assert enrollment.change_status is None
+    assert enrollment.active is expected_active
 
 
 def test_create_program_enrollments_creation_fail(mocker, user):
@@ -416,7 +673,11 @@ def test_create_program_enrollments_creation_fail(mocker, user):
     creation of local enrollment records
     """
     programs = ProgramFactory.create_batch(2)
-    enrollment = ProgramEnrollmentFactory.build(program=programs[1])
+    # Use .create() (not .build()) so the enrollment has a primary key.
+    # `create_program_enrollments` now calls `enrollment.save_and_log(None)`
+    # when get_or_create reports created=True, which writes an audit row
+    # via a ForeignKey to the enrollment and therefore requires a saved PK.
+    enrollment = ProgramEnrollmentFactory.create(user=user, program=programs[1])
     mocker.patch(
         "courses.api.ProgramEnrollment.all_objects.get_or_create",
         side_effect=[Exception(), (enrollment, True)],
@@ -433,6 +694,1121 @@ def test_create_program_enrollments_creation_fail(mocker, user):
     assert successful_enrollments == [enrollment]
 
 
+class TestUpgradeAuditRunEnrollmentsForProgramPurchase:
+    """Tests for upgrade_audit_run_enrollments_for_program_purchase"""
+
+    @pytest.fixture
+    def program_setup(self, user, program_with_empty_requirements):  # noqa: F811
+        """Set up a program with a course run the user is enrolled in."""
+        program = program_with_empty_requirements
+        run = CourseRunFactory.create()
+        program.add_requirement(run.course)
+        return SimpleNamespace(program=program, run=run, user=user)
+
+    def test_upgrades_audit_enrollment(self, mocker, program_setup):
+        """Eligible audit-track enrollments are upgraded to verified."""
+        CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert len(result) == 1
+        enrollment = result[0]
+        enrollment.refresh_from_db()
+        assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+
+    def test_skips_country_blocked_run(self, mocker, program_setup):
+        """A blocked course is left on audit instead of failing the whole upgrade."""
+        BlockedCountryFactory.create(
+            course=program_setup.run.course,
+            country=program_setup.user.legal_address.country,
+        )
+        enrollment = CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert result == []
+        enrollment.refresh_from_db()
+        assert enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+
+    def test_skips_verified_enrollment(self, mocker, program_setup):
+        """Existing verified-track enrollments are left unchanged."""
+        CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert result == []
+
+    def test_skips_inactive_enrollment(self, mocker, program_setup):
+        """Inactive audit enrollments are not upgraded."""
+        CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=False,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert result == []
+
+    def test_skips_past_upgrade_deadline(self, mocker, program_setup, dates):
+        """Runs whose upgrade deadline has passed are skipped."""
+        program_setup.run.upgrade_deadline = dates.past_10_days
+        program_setup.run.save()
+        CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert result == []
+
+    def test_upgrades_when_no_upgrade_deadline(self, mocker, program_setup):
+        """Runs with no upgrade deadline are eligible."""
+        program_setup.run.upgrade_deadline = None
+        program_setup.run.save()
+        CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert len(result) == 1
+
+    def test_skips_non_live_run(self, mocker, program_setup):
+        """Runs that are not live are skipped."""
+        program_setup.run.live = False
+        program_setup.run.save()
+        CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert result == []
+
+    def test_skips_audit_only_run(self, mocker, program_setup):
+        """Runs without a verified enrollment mode are skipped."""
+        from courses.factories import EnrollmentModeFactory  # noqa: PLC0415
+
+        program_setup.run.enrollment_modes.set(
+            [EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)]
+        )
+        CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert result == []
+
+    def test_upgrades_only_program_courses(self, mocker, user, program_setup):
+        """Only runs belonging to the purchased program's courses are upgraded."""
+        unrelated_run = CourseRunFactory.create()
+        CourseRunEnrollmentFactory.create(
+            user=user,
+            run=unrelated_run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            user, program_setup.program
+        )
+
+        assert result == []
+
+    def test_returns_empty_when_no_enrollments(self, mocker, program_setup):
+        """Returns empty list when user has no course run enrollments in the program."""
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert result == []
+
+    def test_mixed_enrollments_upgrades_only_audit(
+        self,
+        mocker,
+        user,
+        program_with_empty_requirements,  # noqa: F811
+    ):
+        """When the user has a mix of audit and verified enrollments, only audit ones are upgraded."""
+        program = program_with_empty_requirements
+        audit_run = CourseRunFactory.create()
+        verified_run = CourseRunFactory.create()
+        program.add_requirement(audit_run.course)
+        program.add_requirement(verified_run.course)
+
+        CourseRunEnrollmentFactory.create(
+            user=user,
+            run=audit_run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+        verified_enrollment = CourseRunEnrollmentFactory.create(
+            user=user,
+            run=verified_run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(user, program)
+
+        assert len(result) == 1
+        assert result[0].run == audit_run
+        verified_enrollment.refresh_from_db()
+        assert verified_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+
+    @pytest.mark.parametrize("run_has_product", [True, False])
+    def test_upgrade_creates_program_order(
+        self, mocker, program_setup, run_has_product
+    ):
+        """
+        Each upgrade is backed by a fulfilled zero-value order redeeming the
+        program's discount, unless the run can't be purchased, in which case
+        the enrollment is upgraded without one.
+        """
+        mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+        with reversion.create_revision():
+            ProductFactory.create(purchasable_object=program_setup.program)
+            if run_has_product:
+                ProductFactory.create(purchasable_object=program_setup.run)
+        ProgramEnrollmentFactory.create(
+            user=program_setup.user,
+            program=program_setup.program,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+        enrollment = CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert result == [enrollment]
+        enrollment.refresh_from_db()
+        assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        paid_run = PaidCourseRun.objects.filter(
+            user=program_setup.user, course_run=program_setup.run
+        ).first()
+        if not run_has_product:
+            assert paid_run is None
+            return
+        assert paid_run.order.state == OrderStatus.FULFILLED
+        assert paid_run.order.total_price_paid == 0
+        assert (
+            paid_run.order.discounts.get().redeemed_discount.discount_code.startswith(
+                program_setup.program.readable_id
+            )
+        )
+
+    def test_inactive_program_product_does_not_interrupt_paid_order_fulfillment(
+        self, mocker, program_setup
+    ):
+        """An inactive program product falls back to the orderless enrollment upgrade."""
+        mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+        with reversion.create_revision():
+            program_product = ProductFactory.create(
+                purchasable_object=program_setup.program
+            )
+            ProductFactory.create(purchasable_object=program_setup.run)
+        program_product.is_active = False
+        program_product.save()
+        ProgramEnrollmentFactory.create(
+            user=program_setup.user,
+            program=program_setup.program,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+        enrollment = CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert result == [enrollment]
+        enrollment.refresh_from_db()
+        assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        assert not PaidCourseRun.objects.filter(
+            user=program_setup.user, course_run=program_setup.run
+        ).exists()
+        assert not Order.objects.filter(purchaser=program_setup.user).exists()
+
+
+class TestDowngradeProgramEnrollmentAndVerifiedRuns:
+    """Tests for downgrade_program_enrollment_and_verified_runs"""
+
+    @pytest.fixture
+    def program_setup(self, user, program_with_empty_requirements):  # noqa: F811
+        """Set up a program with a verified program enrollment and one course run."""
+        program = program_with_empty_requirements
+        run = CourseRunFactory.create()
+        program.add_requirement(run.course)
+        program_enrollment = ProgramEnrollmentFactory.create(
+            user=user,
+            program=program,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+        return SimpleNamespace(
+            program=program,
+            run=run,
+            user=user,
+            program_enrollment=program_enrollment,
+        )
+
+    @staticmethod
+    def _paid_course_run(user, run, *, total_price_paid, discount_code=None):
+        """
+        Create a fulfilled PaidCourseRun for run/user at the given amount.
+
+        If discount_code is given, the order redeems a Discount with that
+        code (used to simulate program-linked vs. unrelated $0 orders).
+        """
+        order = OrderFactory.create(
+            purchaser=user,
+            state=OrderStatus.FULFILLED,
+            total_price_paid=total_price_paid,
+        )
+        if discount_code is not None:
+            discount = DiscountFactory.create(discount_code=discount_code)
+            DiscountRedemptionFactory.create(
+                redeemed_by=user,
+                redeemed_discount=discount,
+                redeemed_order=order,
+            )
+        return PaidCourseRun.objects.create(user=user, course_run=run, order=order)
+
+    def test_downgrades_verified_program_enrollment(self, mocker, program_setup):
+        """A verified ProgramEnrollment is downgraded to audit."""
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        downgraded_enrollment, _ = downgrade_program_enrollment_and_verified_runs(
+            program_setup.user, program_setup.program
+        )
+
+        assert downgraded_enrollment == program_setup.program_enrollment
+        program_setup.program_enrollment.refresh_from_db()
+        assert (
+            program_setup.program_enrollment.enrollment_mode
+            == EDX_ENROLLMENT_AUDIT_MODE
+        )
+        assert (
+            program_setup.program_enrollment.change_status
+            == ENROLL_CHANGE_STATUS_REFUNDED
+        )
+        assert program_setup.program_enrollment.active is True
+
+    def test_downgrades_auto_upgraded_run_enrollment(self, mocker, program_setup):
+        """
+        A course-run enrollment verified only via the free program-purchase
+        auto-upgrade (no PaidCourseRun at all) is downgraded.
+        """
+        run_enrollment = CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+
+        _, downgraded_runs = downgrade_program_enrollment_and_verified_runs(
+            program_setup.user, program_setup.program
+        )
+
+        assert downgraded_runs == [run_enrollment]
+        run_enrollment.refresh_from_db()
+        assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        assert run_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
+        assert run_enrollment.active is True
+
+    def test_downgrades_zero_value_verified_run_enrollment(self, mocker, program_setup):
+        """
+        A course-run enrollment backed by a PaidCourseRun whose order was
+        fulfilled at $0 by redeeming *this program's* internal enrollment-code
+        discount (create_verified_program_course_run_enrollment's
+        program-linked checkout) is still downgraded - a PaidCourseRun
+        existing is not, by itself, proof of an independent purchase.
+        """
+        run_enrollment = CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        self._paid_course_run(
+            program_setup.user,
+            program_setup.run,
+            total_price_paid=Decimal("0.00"),
+            discount_code=f"{program_setup.program.readable_id}-{uuid4()}",
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+
+        _, downgraded_runs = downgrade_program_enrollment_and_verified_runs(
+            program_setup.user, program_setup.program
+        )
+
+        assert downgraded_runs == [run_enrollment]
+        run_enrollment.refresh_from_db()
+        assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        assert run_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
+        assert run_enrollment.active is True
+
+    def test_preserves_independently_purchased_run_enrollment(
+        self, mocker, program_setup
+    ):
+        """
+        A course-run enrollment backed by a PaidCourseRun whose order was
+        genuinely paid (total_price_paid > 0) is left verified.
+        """
+        run_enrollment = CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        self._paid_course_run(
+            program_setup.user, program_setup.run, total_price_paid=Decimal("100.00")
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        _, downgraded_runs = downgrade_program_enrollment_and_verified_runs(
+            program_setup.user, program_setup.program
+        )
+
+        assert downgraded_runs == []
+        run_enrollment.refresh_from_db()
+        assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        assert run_enrollment.change_status is None
+
+    def test_preserves_zero_value_run_enrollment_with_unrelated_discount(
+        self, mocker, program_setup
+    ):
+        """
+        A course-run enrollment backed by a PaidCourseRun whose order was
+        fulfilled at $0 by redeeming some other discount (not this program's
+        internal enrollment code) is left verified - it wasn't upgraded
+        because of this program purchase, so it shouldn't be downgraded
+        because of this program's refund.
+        """
+        run_enrollment = CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        self._paid_course_run(
+            program_setup.user,
+            program_setup.run,
+            total_price_paid=Decimal("0.00"),
+            discount_code="UNRELATED-FLEXIBLE-PRICING-DISCOUNT",
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        _, downgraded_runs = downgrade_program_enrollment_and_verified_runs(
+            program_setup.user, program_setup.program
+        )
+
+        assert downgraded_runs == []
+        run_enrollment.refresh_from_db()
+        assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+
+    @pytest.mark.parametrize(
+        "is_b2b_enrollment",
+        [
+            True,
+            False,
+        ],
+    )
+    def test_preserves_b2b_run_enrollment(
+        self, mocker, program_setup, is_b2b_enrollment
+    ):
+        """A verified enrollment in a B2B-contracted run is left alone if it's B2B."""
+        contract = ContractPageFactory.create()
+        program_setup.run.b2b_contracts.add(contract)
+        run_enrollment = CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+            b2b_contract=contract if is_b2b_enrollment else None,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        _, downgraded_runs = downgrade_program_enrollment_and_verified_runs(
+            program_setup.user, program_setup.program
+        )
+
+        if is_b2b_enrollment:
+            assert downgraded_runs == []
+            run_enrollment.refresh_from_db()
+            assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+            assert run_enrollment.change_status is None
+        else:
+            assert run_enrollment in downgraded_runs
+            run_enrollment.refresh_from_db()
+            assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+            assert run_enrollment.change_status is not None
+
+    def test_leaves_inactive_program_enrollment_alone(self, mocker, program_setup):
+        """
+        An already-inactive ProgramEnrollment (learner unenrolled entirely
+        before the refund) is not reactivated/downgraded.
+        """
+        program_setup.program_enrollment.active = False
+        program_setup.program_enrollment.change_status = ENROLL_CHANGE_STATUS_UNENROLLED
+        program_setup.program_enrollment.save()
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        downgraded_enrollment, _ = downgrade_program_enrollment_and_verified_runs(
+            program_setup.user, program_setup.program
+        )
+
+        assert downgraded_enrollment is None
+        program_setup.program_enrollment.refresh_from_db()
+        assert program_setup.program_enrollment.active is False
+        assert (
+            program_setup.program_enrollment.enrollment_mode
+            == EDX_ENROLLMENT_VERIFIED_MODE
+        )
+        assert (
+            program_setup.program_enrollment.change_status
+            == ENROLL_CHANGE_STATUS_UNENROLLED
+        )
+
+    def test_leaves_inactive_run_enrollment_alone(self, mocker, program_setup):
+        """
+        An already-inactive CourseRunEnrollment (learner unenrolled from the
+        course before the refund) is not reactivated/downgraded.
+        """
+        run_enrollment = CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=False,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        _, downgraded_runs = downgrade_program_enrollment_and_verified_runs(
+            program_setup.user, program_setup.program
+        )
+
+        assert downgraded_runs == []
+        run_enrollment.refresh_from_db()
+        assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        assert run_enrollment.change_status is None
+
+    def test_mixed_runs_downgrades_only_the_unpaid_ones(
+        self,
+        mocker,
+        user,
+        program_with_empty_requirements,  # noqa: F811
+    ):
+        """
+        Of three verified course-run enrollments in the same program - one
+        independently paid for, one auto-upgraded for free, and one verified
+        via a $0 program-linked order - only the latter two downgrade.
+        """
+        program = program_with_empty_requirements
+        paid_run = CourseRunFactory.create()
+        free_run = CourseRunFactory.create()
+        zero_value_run = CourseRunFactory.create()
+        program.add_requirement(paid_run.course)
+        program.add_requirement(free_run.course)
+        program.add_requirement(zero_value_run.course)
+        ProgramEnrollmentFactory.create(
+            user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        )
+
+        paid_enrollment = CourseRunEnrollmentFactory.create(
+            user=user,
+            run=paid_run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        free_enrollment = CourseRunEnrollmentFactory.create(
+            user=user,
+            run=free_run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        zero_value_enrollment = CourseRunEnrollmentFactory.create(
+            user=user,
+            run=zero_value_run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        self._paid_course_run(user, paid_run, total_price_paid=Decimal("100.00"))
+        self._paid_course_run(
+            user,
+            zero_value_run,
+            total_price_paid=Decimal("0.00"),
+            discount_code=f"{program.readable_id}-{uuid4()}",
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+
+        _, downgraded_runs = downgrade_program_enrollment_and_verified_runs(
+            user, program
+        )
+
+        assert {enrollment.run for enrollment in downgraded_runs} == {
+            free_run,
+            zero_value_run,
+        }
+        paid_enrollment.refresh_from_db()
+        free_enrollment.refresh_from_db()
+        zero_value_enrollment.refresh_from_db()
+        assert paid_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        assert free_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        assert zero_value_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        assert paid_enrollment.change_status is None
+        assert free_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
+        assert zero_value_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
+
+
+def test_create_run_enrollments_verifies_exports_for_verified_mode(
+    mocker, user, django_capture_on_commit_callbacks
+):
+    """Verified course enrollments should require an accepted export check."""
+    run = CourseRunFactory.create()
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="COMPLETED",
+            reason_code=100,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    with django_capture_on_commit_callbacks(execute=True):
+        successful_enrollments, edx_request_success = create_run_enrollments(
+            user, [run], mode=EDX_ENROLLMENT_VERIFIED_MODE
+        )
+
+    patched_verify.assert_called_once_with(user, run)
+    patched_edx_enroll.assert_called_once_with(
+        user,
+        [run],
+        mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
+    assert edx_request_success is True
+    assert len(successful_enrollments) == 1
+
+
+def test_create_run_enrollments_verifies_exports_for_audit_mode(mocker, user):
+    """Audit course enrollments should also require an accepted export check."""
+    run = CourseRunFactory.create()
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="COMPLETED",
+            reason_code=100,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    create_run_enrollments(user, [run], mode=EDX_ENROLLMENT_AUDIT_MODE)
+
+    patched_verify.assert_called_once_with(user, run)
+    patched_edx_enroll.assert_called_once()
+
+
+def test_create_run_enrollments_rejects_nonaccepted_exports(mocker, user):
+    """Verified course enrollments should fail closed when exports are not accepted."""
+    run = CourseRunFactory.create()
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="REJECT",
+            reason_code=102,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+    with pytest.raises(
+        ExportComplianceError, match="Export compliance check did not accept"
+    ):
+        create_run_enrollments(user, [run], mode=EDX_ENROLLMENT_VERIFIED_MODE)
+
+    patched_verify.assert_called_once_with(user, run)
+    patched_edx_enroll.assert_not_called()
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+def test_create_run_enrollments_skips_exports_check_when_feature_disabled(
+    settings, mocker, user
+):
+    """The export compliance check should be skipped entirely when the feature flag is off."""
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = False
+    run = CourseRunFactory.create()
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="REJECT",
+            reason_code=102,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+    successful_enrollments, _ = create_run_enrollments(
+        user, [run], mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    patched_verify.assert_not_called()
+    patched_edx_enroll.assert_called_once()
+    assert len(successful_enrollments) == 1
+
+
+# [True] pins the bypass; [False] pins that the warning still fires.
+@pytest.mark.parametrize("compliance_enabled", [True, False])
+def test_create_run_enrollments_skips_exports_check_when_requested(
+    settings, mocker, caplog, user, compliance_enabled
+):
+    """skip_compliance_check=True bypasses the check and logs the warning."""
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = compliance_enabled
+    run = CourseRunFactory.create()
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="REJECT",
+            reason_code=102,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    with caplog.at_level(logging.WARNING, logger="courses.api"):
+        successful_enrollments, _ = create_run_enrollments(
+            user, [run], mode=EDX_ENROLLMENT_AUDIT_MODE, skip_compliance_check=True
+        )
+
+    patched_verify.assert_not_called()
+    patched_edx_enroll.assert_called_once()
+    assert len(successful_enrollments) == 1
+    assert any(
+        record.name == "courses.api"
+        and record.levelno == logging.WARNING
+        and record.getMessage()
+        == f"Skipping export compliance check for user={user.id} run={run.courseware_id}"
+        for record in caplog.records
+    )
+
+
+def test_create_run_enrollments_skip_enrollment_emails(
+    mocker, user, django_capture_on_commit_callbacks
+):
+    """skip_enrollment_emails=True suppresses both the new-enrollment email
+    and the reactivation email, without affecting the enrollments created.
+    """
+    new_run, reactivated_run = CourseRunFactory.create_batch(2)
+    CourseRunEnrollmentFactory.create(
+        user=user,
+        run=reactivated_run,
+        change_status=ENROLL_CHANGE_STATUS_REFUNDED,
+        active=False,
+    )
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    patched_send_enrollment_email = mocker.patch(
+        "courses.api.mail_api.send_course_run_enrollment_email"
+    )
+    patched_subscribe_emails = mocker.patch(
+        "courses.tasks.subscribe_edx_course_emails.delay"
+    )
+
+    with django_capture_on_commit_callbacks(execute=True):
+        successful_enrollments, edx_request_success = create_run_enrollments(
+            user, [new_run, reactivated_run], skip_enrollment_emails=True
+        )
+
+    assert edx_request_success is True
+    assert len(successful_enrollments) == 2
+    patched_send_enrollment_email.assert_not_called()
+    patched_subscribe_emails.assert_not_called()
+
+
+def test_create_run_enrollments_raises_for_blocked_country(mocker, user):
+    """create_run_enrollments should raise CountryBlockedError before calling edX when the user's country is blocked."""
+    run = CourseRunFactory.create()
+    BlockedCountryFactory.create(course=run.course, country=user.legal_address.country)
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+    with pytest.raises(CountryBlockedError):
+        create_run_enrollments(user, [run])
+
+    patched_edx_enroll.assert_not_called()
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+def test_create_run_enrollments_raises_when_later_run_blocked(mocker, user):
+    """Every run is screened, not just the first one."""
+    run1, run2 = CourseRunFactory.create_batch(2)
+    BlockedCountryFactory.create(course=run2.course, country=user.legal_address.country)
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+    with pytest.raises(CountryBlockedError):
+        create_run_enrollments(user, [run1, run2])
+
+    patched_edx_enroll.assert_not_called()
+    assert not CourseRunEnrollment.objects.filter(user=user).exists()
+
+
+def test_create_run_enrollments_skips_country_check_when_requested(
+    mocker, user, django_capture_on_commit_callbacks
+):
+    """skip_country_block_check bypasses the country block."""
+    run = CourseRunFactory.create()
+    BlockedCountryFactory.create(course=run.course, country=user.legal_address.country)
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    with django_capture_on_commit_callbacks(execute=True):
+        successful_enrollments, _ = create_run_enrollments(
+            user, [run], skip_country_block_check=True
+        )
+
+    assert len(successful_enrollments) == 1
+
+
+def test_downgrade_learner_skips_country_block(mocker, user):
+    """Refund downgrades must still work for a learner whose country is blocked."""
+    run = CourseRunFactory.create()
+    BlockedCountryFactory.create(course=run.course, country=user.legal_address.country)
+    enrollment = CourseRunEnrollmentFactory.create(
+        user=user, run=run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    patched_create = mocker.patch(
+        "courses.api.create_run_enrollments", return_value=([enrollment], True)
+    )
+
+    downgrade_learner(enrollment)
+
+    assert patched_create.call_args.kwargs["skip_country_block_check"] is True
+
+
+def test_country_blocked_error_message(user):
+    """The exception stringifies to a readable message."""
+    course = CourseFactory.create()
+    message = str(CountryBlockedError(user, course))
+    assert course.readable_id in message
+    assert str(user.id) in message
+
+
+def test_create_run_enrollments_allows_when_country_not_blocked(
+    mocker, user, django_capture_on_commit_callbacks
+):
+    """create_run_enrollments should proceed normally when no countries are blocked for the course."""
+    run = CourseRunFactory.create()
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    with django_capture_on_commit_callbacks(execute=True):
+        successful_enrollments, edx_request_success = create_run_enrollments(
+            user, [run]
+        )
+
+    assert edx_request_success is True
+    assert len(successful_enrollments) == 1
+
+
+def test_create_program_enrollments_verifies_exports_for_verified_mode(mocker, user):
+    """Verified program enrollments should require an accepted export check."""
+    program = ProgramFactory.create()
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="COMPLETED",
+            reason_code=100,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+
+    successful_enrollments = create_program_enrollments(
+        user,
+        [program],
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
+
+    patched_verify.assert_called_once_with(user, program)
+    assert len(successful_enrollments) == 1
+    assert successful_enrollments[0].program == program
+
+
+def test_create_program_enrollments_verifies_exports_for_default_mode(mocker, user):
+    """Default program enrollments should also require an accepted export check."""
+    program = ProgramFactory.create()
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="COMPLETED",
+            reason_code=100,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+
+    successful_enrollments = create_program_enrollments(
+        user,
+        [program],
+    )
+
+    patched_verify.assert_called_once_with(user, program)
+    assert len(successful_enrollments) == 1
+    assert successful_enrollments[0].program == program
+
+
+def test_create_program_enrollments_rejects_nonaccepted_exports(mocker, user):
+    """Verified program enrollments should fail closed when exports are not accepted."""
+    program = ProgramFactory.create()
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="REVIEW",
+            reason_code=480,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+
+    with pytest.raises(
+        ExportComplianceError, match="Export compliance check did not accept"
+    ):
+        create_program_enrollments(
+            user,
+            [program],
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+
+    patched_verify.assert_called_once_with(user, program)
+    assert not ProgramEnrollment.objects.filter(user=user, program=program).exists()
+
+
+def _courseware_object(kind):
+    """Build the courseware object for an eligibility test."""
+    return CourseRunFactory.create() if kind == "run" else ProgramFactory.create()
+
+
+@pytest.mark.parametrize("courseware_kind", ["run", "program"])
+def test_check_enrollment_eligibility_accepted(mocker, user, courseware_kind):
+    """An accepted compliance decision means the user may enroll."""
+    courseware_object = _courseware_object(courseware_kind)
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="COMPLETED",
+            reason_code=100,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+
+    eligibility = check_enrollment_eligibility(user, courseware_object)
+
+    assert eligibility.enrollable is True
+    assert eligibility.reason_code is None
+    patched_verify.assert_called_once_with(user, courseware_object)
+
+
+@pytest.mark.parametrize("courseware_kind", ["run", "program"])
+def test_check_enrollment_eligibility_rejected(mocker, user, courseware_kind):
+    """A non-accepted compliance decision blocks enrollment with CS_700."""
+    courseware_object = _courseware_object(courseware_kind)
+    mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="DECLINED",
+            reason_code=102,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+
+    eligibility = check_enrollment_eligibility(user, courseware_object)
+
+    assert eligibility.enrollable is False
+    assert eligibility.reason_code == ExportComplianceError.error_code
+    assert eligibility.reason_code == "CS_700"
+
+
+def test_check_enrollment_eligibility_missing_profile_data(mocker, user):
+    """A profile too incomplete to run the check gets its own code, not CS_700."""
+    run = CourseRunFactory.create()
+    mocker.patch(
+        "courses.api.verify_user_with_exports",
+        side_effect=ExportComplianceDataError(
+            user, ["postal_code", "administrative_area"]
+        ),
+    )
+
+    eligibility = check_enrollment_eligibility(user, run)
+
+    assert eligibility.enrollable is False
+    assert eligibility.reason_code == ExportComplianceDataError.error_code
+    assert eligibility.reason_code == "CS_701"
+    assert eligibility.missing_fields == ["postal_code", "state"]
+
+
+def test_check_enrollment_eligibility_unrecognized_failure_fails_closed(mocker, user):
+    """An unrecognized compliance failure blocks enrollment without a code."""
+    run = CourseRunFactory.create()
+    mocker.patch(
+        "courses.api.verify_user_with_exports",
+        side_effect=ExportComplianceCheckError("something new"),
+    )
+
+    eligibility = check_enrollment_eligibility(user, run)
+
+    assert eligibility.enrollable is False
+    assert eligibility.reason_code is None
+
+
+def test_check_enrollment_eligibility_skips_check_when_feature_disabled(
+    settings, mocker, user
+):
+    """With the flag off the user is eligible and CyberSource is never consulted."""
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = False
+    run = CourseRunFactory.create()
+    patched_verify = mocker.patch("courses.api.verify_user_with_exports")
+
+    eligibility = check_enrollment_eligibility(user, run)
+
+    assert eligibility.enrollable is True
+    assert eligibility.reason_code is None
+    patched_verify.assert_not_called()
+
+
+def test_check_enrollment_eligibility_reuses_cached_log(
+    mocker, user, export_compliance_keypair
+):
+    """A cached compliance log answers the question without calling CyberSource."""
+    run = CourseRunFactory.create()
+    ExportComplianceLogFactory.create(
+        user=user,
+        courseware_object=run,
+        decision=ExportComplianceDecision.DECLINED,
+        reason_code="MATCH-DPL",
+    )
+    # Unpatch the autouse mock so the real cache lookup in compliance.api runs.
+    mocker.patch("courses.api.verify_user_with_exports", verify_user_with_exports)
+    patched_client = mocker.patch("compliance.api.get_cybersource_client")
+
+    eligibility = check_enrollment_eligibility(user, run)
+
+    assert eligibility.enrollable is False
+    assert eligibility.reason_code == "CS_700"
+    patched_client.assert_not_called()
+
+
+def test_check_enrollment_eligibility_does_not_enroll(mocker, user):
+    """The check must never create an enrollment as a side effect."""
+    run = CourseRunFactory.create()
+    mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="COMPLETED",
+            reason_code=100,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+    assert check_enrollment_eligibility(user, run).enrollable is True
+
+    patched_edx_enroll.assert_not_called()
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
 class TestDeactivateEnrollments:
     """Test cases for functions that deactivate enrollments"""
 
@@ -442,15 +1818,11 @@ class TestDeactivateEnrollments:
         send_unenrollment_email = mocker.patch(
             "courses.api.mail_api.send_course_run_unenrollment_email"
         )
-        sync_hubspot_line_by_line_id = mocker.patch(
-            "hubspot_sync.task_helpers.sync_hubspot_line_by_line_id"
-        )
         log_exception = mocker.patch("courses.api.log.exception")
         return SimpleNamespace(
             edx_unenroll=edx_unenroll,
             send_unenrollment_email=send_unenrollment_email,
             log_exception=log_exception,
-            sync_hubspot_line_by_line_id=sync_hubspot_line_by_line_id,
         )
 
     def test_deactivate_run_enrollment(self, patches):
@@ -459,22 +1831,12 @@ class TestDeactivateEnrollments:
         local enrollment record to inactive
         """
         enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
-        with reversion.create_revision():
-            product = ProductFactory.create(purchasable_object=enrollment.run)
-        version = Version.objects.get_for_object(product).first()
-        order = OrderFactory.create(
-            state=OrderStatus.PENDING, purchaser=enrollment.user
-        )
-        LineFactory.create(
-            order=order, purchased_object=enrollment.run, product_version=version
-        )
 
         returned_enrollment = deactivate_run_enrollment(
             enrollment, change_status=ENROLL_CHANGE_STATUS_REFUNDED
         )
         patches.edx_unenroll.assert_called_once_with(enrollment)
         patches.send_unenrollment_email.assert_called_once_with(enrollment)
-        patches.sync_hubspot_line_by_line_id.assert_called_once()
         enrollment.refresh_from_db()
         assert enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
         assert enrollment.active is False
@@ -488,15 +1850,6 @@ class TestDeactivateEnrollments:
         If a flag is provided, deactivate_run_enrollment should set local enrollment record to inactive even if the API call fails
         """
         enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
-        with reversion.create_revision():
-            product = ProductFactory.create(purchasable_object=enrollment.run)
-        version = Version.objects.get_for_object(product).first()
-        order = OrderFactory.create(
-            state=OrderStatus.PENDING, purchaser=enrollment.user
-        )
-        LineFactory.create(
-            order=order, purchased_object=enrollment.run, product_version=version
-        )
         patches.edx_unenroll.side_effect = Exception
 
         deactivate_run_enrollment(
@@ -504,30 +1857,11 @@ class TestDeactivateEnrollments:
             change_status=ENROLL_CHANGE_STATUS_REFUNDED,
             keep_failed_enrollments=keep_failed_enrollments,
         )
-        if not keep_failed_enrollments:
-            patches.sync_hubspot_line_by_line_id.assert_not_called()
-        else:
-            patches.sync_hubspot_line_by_line_id.assert_called_once()
         patches.edx_unenroll.assert_called_once_with(enrollment)
         patches.send_unenrollment_email.assert_not_called()
         patches.log_exception.assert_called_once()
         enrollment.refresh_from_db()
         assert enrollment.active is not keep_failed_enrollments
-
-    def test_deactivate_run_enrollment_line_does_not_exist(
-        self,
-        patches,
-    ):
-        """
-        If the enrollment does not have an associated Line object, don't call sync_line_item_with_hubspot()
-        """
-        enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
-
-        deactivate_run_enrollment(
-            enrollment,
-            change_status=ENROLL_CHANGE_STATUS_REFUNDED,
-        )
-        patches.sync_hubspot_line_by_line_id.assert_not_called()
 
 
 @pytest.mark.parametrize("keep_failed_enrollments", [True, False])
@@ -599,6 +1933,8 @@ def test_defer_enrollment(  # noqa: PLR0913
                         change_status=None,
                         keep_failed_enrollments=keep_failed_enrollments,
                         mode=EDX_ENROLLMENT_VERIFIED_MODE,
+                        skip_compliance_check=True,
+                        skip_country_block_check=True,
                     ),
                     call(
                         user=existing_enrollment.user,
@@ -606,6 +1942,8 @@ def test_defer_enrollment(  # noqa: PLR0913
                         change_status=ENROLL_CHANGE_STATUS_DEFERRED,
                         keep_failed_enrollments=keep_failed_enrollments,
                         mode=EDX_ENROLLMENT_AUDIT_MODE,
+                        skip_compliance_check=True,
+                        skip_country_block_check=True,
                     ),
                 ]
             )
@@ -624,6 +1962,167 @@ def test_defer_enrollment(  # noqa: PLR0913
             assert patched_deactivate_run_enrollment.call_count == 1
         else:
             assert patched_deactivate_run_enrollment.call_count == 0
+
+
+def test_defer_enrollment_skips_live_compliance_check(settings, mocker, course):
+    """
+    A support-initiated deferral goes through for a learner whose profile can't
+    be screened yet, and never calls CyberSource (hq#13766).
+    """
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = True
+    from_run, to_run = CourseRunFactory.create_batch(2, course=course)
+    existing_enrollment = CourseRunEnrollmentFactory.create(
+        run=from_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    user = existing_enrollment.user
+    user.legal_address.street_address_1 = ""
+    user.legal_address.save()
+    patched_verify = mocker.patch("courses.api.verify_user_with_exports")
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    _, to_enrollment = defer_enrollment(
+        user, from_run.courseware_id, to_run.courseware_id, force=True
+    )
+
+    patched_verify.assert_not_called()
+    assert to_enrollment.run == to_run
+    assert to_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+
+
+def test_defer_enrollment_blocked_by_prior_decline(settings, mocker, course):
+    """A learner CyberSource declined can't be deferred into a new run."""
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = True
+    from_run, to_run = CourseRunFactory.create_batch(2, course=course)
+    existing_enrollment = CourseRunEnrollmentFactory.create(
+        run=from_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    user = existing_enrollment.user
+    audit_enrollment = CourseRunEnrollmentFactory.create(
+        user=user, run=to_run, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+    ExportComplianceLogFactory.create(
+        user=user, decision=ExportComplianceDecision.DECLINED
+    )
+    patched_verify = mocker.patch("courses.api.verify_user_with_exports")
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    with pytest.raises(ExportComplianceError):
+        defer_enrollment(user, from_run.courseware_id, to_run.courseware_id, force=True)
+
+    patched_verify.assert_not_called()
+    existing_enrollment.refresh_from_db()
+    assert existing_enrollment.active is True
+    assert existing_enrollment.change_status is None
+    audit_enrollment.refresh_from_db()
+    assert audit_enrollment.active is True
+
+
+@pytest.mark.parametrize("active", [True, False])
+def test_defer_enrollment_without_target_and_prior_decline(
+    settings, mocker, course, active
+):
+    """
+    With no target run, a declined learner's active enrollment is still
+    downgraded, but an inactive one isn't reactivated.
+    """
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = True
+    existing_enrollment = CourseRunEnrollmentFactory.create(
+        run=CourseRunFactory.create(course=course),
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=active,
+    )
+    user = existing_enrollment.user
+    ExportComplianceLogFactory.create(
+        user=user, decision=ExportComplianceDecision.DECLINED
+    )
+    patched_verify = mocker.patch("courses.api.verify_user_with_exports")
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    if active:
+        deferred_enrollment, _ = defer_enrollment(
+            user, existing_enrollment.run.courseware_id, None
+        )
+        assert deferred_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        assert deferred_enrollment.change_status == ENROLL_CHANGE_STATUS_DEFERRED
+    else:
+        with pytest.raises(ExportComplianceError):
+            defer_enrollment(user, existing_enrollment.run.courseware_id, None)
+        existing_enrollment.refresh_from_db()
+        assert existing_enrollment.active is False
+
+    patched_verify.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("compliance_enabled", "compliance_decision"),
+    [
+        (True, ExportComplianceDecision.INVALID_REQUEST),
+        (False, ExportComplianceDecision.INVALID_REQUEST),
+        (False, ExportComplianceDecision.DECLINED),
+    ],
+)
+def test_defer_enrollment_compliance_flag_skipped(
+    settings,
+    mocker,
+    course,
+    compliance_enabled,
+    compliance_decision,
+):
+    """With no decline on file the deferral proceeds, flag on or off."""
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = compliance_enabled
+    from_run, to_run = CourseRunFactory.create_batch(2, course=course)
+    existing_enrollment = CourseRunEnrollmentFactory.create(
+        run=from_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    ExportComplianceLogFactory.create(
+        user=existing_enrollment.user, decision=compliance_decision
+    )
+    patched_verify = mocker.patch("courses.api.verify_user_with_exports")
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    _, to_enrollment = defer_enrollment(
+        existing_enrollment.user,
+        from_run.courseware_id,
+        to_run.courseware_id,
+        force=True,
+    )
+
+    patched_verify.assert_not_called()
+    assert to_enrollment.run == to_run
+
+
+def test_defer_enrollment_compliance_flag_enabled(settings, mocker, course):
+    """If the learner has a denial on file, then decline the deferement."""
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = True
+    from_run, to_run = CourseRunFactory.create_batch(2, course=course)
+    existing_enrollment = CourseRunEnrollmentFactory.create(
+        run=from_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    ExportComplianceLogFactory.create(
+        user=existing_enrollment.user, decision=ExportComplianceDecision.DECLINED
+    )
+    mocker.patch("courses.api.verify_user_with_exports")
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    with pytest.raises(ExportComplianceError) as exc:
+        defer_enrollment(
+            existing_enrollment.user,
+            from_run.courseware_id,
+            to_run.courseware_id,
+            force=True,
+        )
+
+    assert "did not accept enrollment" in str(exc)
 
 
 def test_defer_enrollment_validation(mocker, user):
@@ -694,6 +2193,8 @@ def test_defer_enrollment_validation(mocker, user):
                 change_status=None,
                 keep_failed_enrollments=True,
                 mode=EDX_ENROLLMENT_VERIFIED_MODE,
+                skip_compliance_check=True,
+                skip_country_block_check=True,
             ),
             call(
                 user=user,
@@ -701,6 +2202,8 @@ def test_defer_enrollment_validation(mocker, user):
                 change_status=ENROLL_CHANGE_STATUS_DEFERRED,
                 keep_failed_enrollments=True,
                 mode=EDX_ENROLLMENT_AUDIT_MODE,
+                skip_compliance_check=True,
+                skip_country_block_check=True,
             ),
         ]
     )
@@ -772,8 +2275,10 @@ def test_sync_course_runs(settings, mocker, mocked_api_response, expect_success)
     """
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
 
-    mock_course_list = mocker.patch("courses.api.get_edx_api_course_list_client")
-    mock_client = mock_course_list.return_value
+    mock_client = Mock()
+    mocker.patch(
+        "courses.api.get_edx_api_course_list_client", return_value=(mock_client, False)
+    )
 
     if isinstance(mocked_api_response, list):
         mock_client.get_courses.return_value = mocked_api_response
@@ -806,7 +2311,339 @@ def test_sync_course_runs(settings, mocker, mocked_api_response, expect_success)
         assert course_run2.is_self_paced == mocked_api_response[1].is_self_paced()
     else:
         assert success_count == 0
-        assert failure_count == 1
+        # An API error fails the whole batch, so both runs count as failures
+        assert failure_count == (2 if isinstance(mocked_api_response, Exception) else 1)
+
+
+@patch("courses.signals.transaction.on_commit", side_effect=lambda callback: callback())
+@patch("cms.tasks.queue_fastly_surrogate_key_purge.delay")
+def test_sync_course_runs_skips_unchanged(
+    mock_purge_delay, mock_on_commit, settings, mocker
+):
+    """
+    A run whose edX values match what's already stored is not re-saved, so it
+    triggers no additional full-column UPDATE and no additional Fastly purge.
+    """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+
+    course_run = CourseRunFactory.create(courseware_id="course-v1:MITx+6.00.1x+3T2015")
+    course_detail = CourseDetail(
+        {
+            "id": "course-v1:MITx+6.00.1x+3T2015",
+            "start": "2015-09-15T05:00:00Z",
+            "end": "2015-12-31T05:00:00Z",
+            "enrollment_start": "2015-09-01T00:00:00Z",
+            "enrollment_end": None,
+            "name": "Introduction to Computer Science",
+            "pacing": "instructor",
+        }
+    )
+
+    mock_client = Mock()
+    mock_client.get_courses.return_value = [course_detail]
+    mocker.patch(
+        "courses.api.get_edx_api_course_list_client", return_value=(mock_client, False)
+    )
+
+    # Ignore any purges enqueued by the factory setup above so we only measure
+    # purges caused by the sync calls themselves.
+    mock_purge_delay.reset_mock()
+
+    # First pass writes the edX values and enqueues exactly one purge.
+    success_count, failure_count = sync_course_runs([course_run])
+    assert (success_count, failure_count) == (1, 0)
+    assert mock_purge_delay.call_count == 1
+
+    # Second pass with identical edX data is a no-op: no save, no new purge.
+    mock_purge_delay.reset_mock()
+    success_count, failure_count = sync_course_runs([course_run])
+    assert (success_count, failure_count) == (0, 0)
+    assert mock_purge_delay.call_count == 0
+
+
+def _course_list_http_error(
+    status_code, retry_after=None, wait_in_body=None, body=None
+):
+    """
+    Build the HTTPError the edX course list client raises for a failed request.
+    edX reports a throttle's wait in the body's developer_message, not the
+    Retry-After header.
+    """
+    headers = {"Retry-After": retry_after} if retry_after else {}
+    response = Mock(status_code=status_code, headers=headers)
+    if body is not None:
+        response.json.return_value = body
+    elif wait_in_body is None:
+        response.json.side_effect = ValueError
+    else:
+        # DRF uses ngettext, so a 1-second wait reads "1 second."
+        unit = "second" if wait_in_body == 1 else "seconds"
+        response.json.return_value = {
+            "developer_message": f"Request was throttled. Expected available in {wait_in_body} {unit}."
+        }
+    return HTTPError(response=response)
+
+
+def _course_detail(courseware_id, name="Synced title"):
+    """Build a CourseDetail the edX course list API would return for a run"""
+    return CourseDetail(
+        {
+            "id": courseware_id,
+            "start": "2015-09-15T05:00:00Z",
+            "end": "2015-12-31T05:00:00Z",
+            "enrollment_start": None,
+            "enrollment_end": None,
+            "name": name,
+        }
+    )
+
+
+def _fake_get_courses(*results):
+    """
+    Build a side_effect for CourseList.get_courses that returns each result in
+    turn. The real method is a generator, so an error is raised while the
+    results are iterated, not when it's called.
+    """
+    results = iter(results)
+
+    def get_courses(course_keys, **kwargs):
+        result = next(results)
+        if isinstance(result, Exception):
+            raise result
+        yield from result
+
+    return get_courses
+
+
+@pytest.mark.parametrize(
+    ("retry_after", "wait_in_body", "body", "expected_wait"),
+    [
+        ("7", None, None, 7),
+        (None, 12, None, 12),
+        (None, 1, None, 1),
+        (None, 3600, None, 60),
+        (None, None, None, 60),
+        (None, None, ["not", "a", "dict"], 60),
+        ("3600", None, None, 60),
+        ("²", None, None, 60),
+        ("soon", None, None, 60),
+    ],
+)
+def test_sync_course_runs_retries_rate_limited_batch(  # noqa: PLR0913
+    settings, mocker, retry_after, wait_in_body, body, expected_wait
+):
+    """
+    A batch that edX rate-limits (429) is retried after waiting as long as edX
+    asks, capped at one throttle window, or a full window when edX doesn't say,
+    and then syncs.
+    """
+    settings.OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES = 3
+    settings.OPENEDX_COURSE_LIST_THROTTLE_WAIT_SECONDS = 60
+    mock_sleep = mocker.patch("time.sleep")
+    course_run = CourseRunFactory.create(courseware_id="course-v1:MITx+6.00.1x+3T2015")
+    mock_client = Mock()
+    mocker.patch(
+        "courses.api.get_edx_api_course_list_client", return_value=(mock_client, False)
+    )
+    mock_client.get_courses.side_effect = _fake_get_courses(
+        _course_list_http_error(429, retry_after, wait_in_body, body),
+        [_course_detail(course_run.courseware_id)],
+    )
+
+    assert sync_course_runs([course_run]) == (1, 0)
+
+    mock_sleep.assert_called_once_with(expected_wait)
+    assert mock_client.get_courses.call_count == 2
+    first_call, retry_call = mock_client.get_courses.call_args_list
+    assert first_call.kwargs["course_keys"] == [course_run.courseware_id]
+    assert retry_call.kwargs["course_keys"] == first_call.kwargs["course_keys"]
+    course_run.refresh_from_db()
+    assert course_run.title == "Synced title"
+
+
+def test_sync_course_runs_without_retries(settings, mocker):
+    """
+    With retries turned off, each batch is still requested once and a
+    rate-limited batch counts as a failure
+    """
+    settings.OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES = 0
+    mock_sleep = mocker.patch("time.sleep")
+    course_run = CourseRunFactory.create(courseware_id="course-v1:MITx+6.00.1x+3T2015")
+    mock_client = Mock()
+    mocker.patch(
+        "courses.api.get_edx_api_course_list_client", return_value=(mock_client, False)
+    )
+    mock_client.get_courses.side_effect = _fake_get_courses(
+        _course_list_http_error(429)
+    )
+
+    assert sync_course_runs([course_run]) == (0, 1)
+
+    assert mock_client.get_courses.call_count == 1
+    mock_sleep.assert_not_called()
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+def test_sync_course_runs_falls_back_to_static_token_on_auth_error(
+    settings, mocker, caplog, status_code
+):
+    """
+    If edX rejects the client-credentials JWT, e.g. because its app is owned by a
+    non-staff user, the sync switches to the static service worker token, logs
+    an error, and uses that token for this and every later batch
+    """
+    mocker.patch("courses.api.COURSE_LIST_BATCH_SIZE", 1)
+    runs = [
+        CourseRunFactory.create(courseware_id="course-v1:MITx+FIRST+1T2026"),
+        CourseRunFactory.create(courseware_id="course-v1:MITx+SECOND+1T2026"),
+    ]
+    jwt_client, static_client = Mock(), Mock()
+    jwt_client.get_courses.side_effect = _fake_get_courses(
+        _course_list_http_error(status_code)
+    )
+    static_client.get_courses.side_effect = _fake_get_courses(
+        *[[_course_detail(run.courseware_id)] for run in runs]
+    )
+    mocker.patch(
+        "courses.api.get_edx_api_course_list_client",
+        side_effect=lambda *, use_jwt=True: (
+            (jwt_client, True) if use_jwt else (static_client, False)
+        ),
+    )
+
+    with caplog.at_level(logging.ERROR, logger="courses.api"):
+        assert sync_course_runs(runs) == (2, 0)
+
+    assert jwt_client.get_courses.call_count == 1
+    assert [
+        c.kwargs["course_keys"] for c in static_client.get_courses.call_args_list
+    ] == [[run.courseware_id] for run in runs]
+    assert any("static service worker token" in r.getMessage() for r in caplog.records)
+
+
+def test_sync_course_runs_static_token_also_rejected(settings, mocker, caplog):
+    """
+    If the static token is rejected too, every batch counts as failed, and the
+    sync switches tokens only once instead of retrying the JWT for each batch
+    """
+    mocker.patch("courses.api.COURSE_LIST_BATCH_SIZE", 1)
+    runs = [
+        CourseRunFactory.create(courseware_id="course-v1:MITx+FIRST+1T2026"),
+        CourseRunFactory.create(courseware_id="course-v1:MITx+SECOND+1T2026"),
+    ]
+    jwt_client, static_client = Mock(), Mock()
+    jwt_client.get_courses.side_effect = _fake_get_courses(
+        *[_course_list_http_error(403) for _ in runs]
+    )
+    static_client.get_courses.side_effect = _fake_get_courses(
+        *[_course_list_http_error(403) for _ in runs]
+    )
+    mock_get_client = mocker.patch(
+        "courses.api.get_edx_api_course_list_client",
+        side_effect=lambda *, use_jwt=True: (
+            (jwt_client, True) if use_jwt else (static_client, False)
+        ),
+    )
+
+    with caplog.at_level(logging.ERROR, logger="courses.api"):
+        assert sync_course_runs(runs) == (0, 2)
+
+    assert mock_get_client.call_count == 2
+    assert jwt_client.get_courses.call_count == 1
+    assert static_client.get_courses.call_count == 2
+    assert sum("client-credentials JWT" in r.getMessage() for r in caplog.records) == 1
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+def test_sync_course_runs_static_token_rejected_without_jwt(
+    settings, mocker, caplog, status_code
+):
+    """
+    When no JWT is in use (none configured, or it couldn't be obtained), a
+    401/403 for the static token fails the batch without a token switch: one
+    request per batch and no log blaming the JWT
+    """
+    mocker.patch("courses.api.COURSE_LIST_BATCH_SIZE", 1)
+    runs = [
+        CourseRunFactory.create(courseware_id="course-v1:MITx+FIRST+1T2026"),
+        CourseRunFactory.create(courseware_id="course-v1:MITx+SECOND+1T2026"),
+    ]
+    static_client = Mock()
+    static_client.get_courses.side_effect = _fake_get_courses(
+        *[_course_list_http_error(status_code) for _ in runs]
+    )
+    mock_get_client = mocker.patch(
+        "courses.api.get_edx_api_course_list_client",
+        return_value=(static_client, False),
+    )
+
+    with caplog.at_level(logging.ERROR, logger="courses.api"):
+        assert sync_course_runs(runs) == (0, 2)
+
+    assert mock_get_client.call_count == 1
+    assert static_client.get_courses.call_count == 2
+    assert not any("client-credentials JWT" in r.getMessage() for r in caplog.records)
+
+
+@pytest.mark.parametrize(
+    "first_batch_error",
+    [
+        _course_list_http_error(429),
+        _course_list_http_error(500),
+        ConnectionError(),
+        KeyError("start"),
+    ],
+)
+def test_sync_course_runs_continues_after_failed_batch(
+    settings, mocker, caplog, first_batch_error
+):
+    """
+    When one batch of course keys fails, even after retrying a 429, every run in
+    it counts as a failure, all of its keys are logged once with a traceback,
+    and the batches after it are still fetched and synced.
+    """
+    settings.OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES = 2
+    mock_sleep = mocker.patch("time.sleep")
+    first_batch = CourseRunFactory.build_batch(100)
+    for index, run in enumerate(first_batch):
+        run.courseware_id = f"course-v1:MITx+FIRST.{index}+1T2026"
+    second_batch_run = CourseRunFactory.create(
+        courseware_id="course-v1:MITx+SECOND.0+1T2026"
+    )
+    course_detail = _course_detail(second_batch_run.courseware_id)
+
+    def get_courses(course_keys, **kwargs):
+        # Like edx-api-client: one request per 100 keys, yielded lazily
+        for start in range(0, len(course_keys), 100):
+            if second_batch_run.courseware_id not in course_keys[start : start + 100]:
+                raise first_batch_error
+            yield course_detail
+
+    mock_client = Mock()
+    mocker.patch(
+        "courses.api.get_edx_api_course_list_client", return_value=(mock_client, False)
+    )
+    mock_client.get_courses.side_effect = get_courses
+
+    with caplog.at_level(logging.WARNING, logger="courses.api"):
+        assert sync_course_runs([*first_batch, second_batch_run]) == (1, 100)
+
+    batch_error_logs = [r for r in caplog.records if r.levelno == logging.ERROR]
+    assert len(batch_error_logs) == 1
+    assert batch_error_logs[0].exc_info is not None
+    assert all(
+        run.courseware_id in batch_error_logs[0].getMessage() for run in first_batch
+    )
+    # The failed batch's keys were already logged, so they aren't reported
+    # again as courses edX sent no data for
+    assert not any("No data received" in r.getMessage() for r in caplog.records)
+
+    second_batch_run.refresh_from_db()
+    assert second_batch_run.title == "Synced title"
+    is_rate_limited = getattr(first_batch_error, "response", None) is not None and (
+        first_batch_error.response.status_code == 429
+    )
+    assert mock_sleep.call_count == (2 if is_rate_limited else 0)
 
 
 @pytest.mark.parametrize(
@@ -850,7 +2687,9 @@ def test_sync_course_mode(settings, mocker, mocked_api_response, expect_success)
     responding with an error.
     """
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
-    mocker.patch.object(CourseModes, "get_mode", side_effect=[mocked_api_response])
+    mocker.patch.object(
+        CourseModes, "get_course_modes", side_effect=[mocked_api_response]
+    )
     course_run = CourseRunFactory.create()
 
     success_count, failure_count = sync_course_mode([course_run])
@@ -883,7 +2722,9 @@ def test_sync_course_mode(settings, mocker, mocked_api_response, expect_success)
         [1.0, False, True, False, False, False],  # noqa: PT007
     ],
 )
+@patch("courses.signals.upsert_custom_properties")
 def test_course_run_certificate(  # noqa: PLR0913
+    mock_upsert_custom_properties,
     user,
     passed_grade_with_enrollment,
     grade,
@@ -901,7 +2742,7 @@ def test_course_run_certificate(  # noqa: PLR0913
         "hubspot_sync.task_helpers.sync_hubspot_user",
     )
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     passed_grade_with_enrollment.grade = grade
     passed_grade_with_enrollment.passed = passed
@@ -916,12 +2757,17 @@ def test_course_run_certificate(  # noqa: PLR0913
     )
     if created:
         patched_sync_hubspot_user.assert_called_once_with(user)
+    else:
+        patched_sync_hubspot_user.assert_not_called()
     assert bool(certificate) is exp_certificate
     assert created is exp_created
     assert deleted is exp_deleted
 
 
-def test_course_run_certificate_idempotent(passed_grade_with_enrollment, mocker, user):
+@patch("courses.signals.upsert_custom_properties")
+def test_course_run_certificate_idempotent(
+    mock_upsert_custom_properties, passed_grade_with_enrollment, mocker, user
+):
     """
     Test that the certificate generation is idempotent
     """
@@ -929,7 +2775,7 @@ def test_course_run_certificate_idempotent(passed_grade_with_enrollment, mocker,
         "hubspot_sync.task_helpers.sync_hubspot_user",
     )
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     # Certificate is created the first time
     certificate, created, deleted = process_course_run_grade_certificate(
@@ -949,13 +2795,22 @@ def test_course_run_certificate_idempotent(passed_grade_with_enrollment, mocker,
     assert not created
     assert not deleted
 
+    # No additional HubSpot sync for the no-op second call
+    patched_sync_hubspot_user.assert_called_once_with(user)
 
-def test_course_run_certificate_not_passing(passed_grade_with_enrollment, mocker):
+
+@patch("courses.signals.upsert_custom_properties")
+def test_course_run_certificate_not_passing(
+    mock_upsert_custom_properties, passed_grade_with_enrollment, mocker
+):
     """
     Test that the certificate is not generated if the grade is set to not passed
     """
+    patched_sync_hubspot_user = mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     # Initially the certificate is created
     certificate, created, deleted = process_course_run_grade_certificate(
@@ -964,6 +2819,7 @@ def test_course_run_certificate_not_passing(passed_grade_with_enrollment, mocker
     assert certificate
     assert created
     assert not deleted
+    assert patched_sync_hubspot_user.call_count == 1
 
     # Now that the grade indicates score 0.0, certificate should be deleted
     passed_grade_with_enrollment.grade = 0.0
@@ -973,6 +2829,158 @@ def test_course_run_certificate_not_passing(passed_grade_with_enrollment, mocker
     assert not certificate
     assert not created
     assert deleted
+    assert patched_sync_hubspot_user.call_count == 2
+
+
+def test_course_run_certificate_no_sync_when_nothing_deleted(
+    passed_grade_with_enrollment, mocker
+):
+    """No HubSpot sync should happen when the delete branch deletes nothing"""
+    patched_sync_hubspot_user = mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+    passed_grade_with_enrollment.grade = 0.0
+
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment
+    )
+    assert certificate is None
+    assert not created
+    assert not deleted
+    patched_sync_hubspot_user.assert_not_called()
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_course_run_certificate_defer_hubspot_sync(
+    mock_upsert_custom_properties, passed_grade_with_enrollment, mocker
+):
+    """defer_hubspot_sync=True should skip the per-user HubSpot sync entirely"""
+    patched_sync_hubspot_user = mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment, defer_hubspot_sync=True
+    )
+    assert certificate
+    assert created
+    assert not deleted
+
+    passed_grade_with_enrollment.grade = 0.0
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment, defer_hubspot_sync=True
+    )
+    assert deleted
+    patched_sync_hubspot_user.assert_not_called()
+
+
+@pytest.mark.parametrize("should_force_create", [True, False])
+def test_course_run_certificate_no_course_page(
+    passed_grade_with_enrollment, should_force_create
+):
+    """No certificate should be created when the course has no CMS page at all."""
+    course = passed_grade_with_enrollment.course_run.course
+    # Deleted via a queryset, not `course.page`, so we don't leave a stale
+    # cached reverse-OneToOne reference on the `course` instance that the
+    # function under test also operates on.
+    CoursePage.objects.filter(course=course).delete()
+
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment, should_force_create=should_force_create
+    )
+    assert certificate is None
+    assert created is False
+    assert deleted is False
+    assert not CourseRunCertificate.objects.exists()
+
+
+@pytest.mark.parametrize("should_force_create", [True, False])
+def test_course_run_certificate_no_certificate_child_page(
+    passed_grade_with_enrollment, should_force_create
+):
+    """No certificate should be created when the course page has no certificate child page."""
+    course = passed_grade_with_enrollment.course_run.course
+    course.course_page.certificate_page.delete()
+
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment, should_force_create=should_force_create
+    )
+    assert certificate is None
+    assert created is False
+    assert deleted is False
+    assert not CourseRunCertificate.objects.exists()
+
+
+@pytest.mark.parametrize("should_force_create", [True, False])
+def test_course_run_certificate_unpublished_certificate_page(
+    passed_grade_with_enrollment, should_force_create
+):
+    """No certificate should be created when the certificate page exists but is unpublished."""
+    course = passed_grade_with_enrollment.course_run.course
+    certificate_page = course.course_page.certificate_page
+    certificate_page.live = False
+    certificate_page.save()
+
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment, should_force_create=should_force_create
+    )
+    assert certificate is None
+    assert created is False
+    assert deleted is False
+    assert not CourseRunCertificate.objects.exists()
+
+
+@pytest.mark.parametrize("should_force_create", [True, False])
+def test_course_run_certificate_certificates_disabled(
+    passed_grade_with_enrollment, should_force_create
+):
+    """No certificate should be created when certificates are disabled for the course."""
+    course = passed_grade_with_enrollment.course_run.course
+    course.certificates_disabled = True
+    course.save()
+
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment, should_force_create=should_force_create
+    )
+    assert certificate is None
+    assert created is False
+    assert deleted is False
+    assert not CourseRunCertificate.objects.exists()
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_course_run_certificate_deletable_after_certificate_page_removed(
+    mock_upsert_custom_properties, passed_grade_with_enrollment, mocker
+):
+    """
+    An existing certificate must still be deletable (grade -> 0.0) even after
+    its certificate page has been removed or the course flag has been set,
+    so revocation is never blocked by the creation gate.
+    """
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment
+    )
+    assert certificate
+    assert created
+    assert not deleted
+
+    course = passed_grade_with_enrollment.course_run.course
+    course.certificates_disabled = True
+    course.save()
+
+    passed_grade_with_enrollment.grade = 0.0
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment
+    )
+    assert certificate is None
+    assert created is False
+    assert deleted is True
+    assert not CourseRunCertificate.objects.exists()
 
 
 def test_generate_course_certificates_no_valid_course_run(settings, courses_api_logs):
@@ -990,6 +2998,15 @@ def test_generate_course_certificates_no_valid_course_run(settings, courses_api_
         certificate_available_date=now_in_utc()
         - timedelta(days=settings.CERTIFICATE_CREATION_WINDOW_IN_DAYS + 1),
     )
+    # Expand the batch to include variants - expecting this to fail, so variants
+    # are industry/length variants. (These would be OK for certs otherwise.)
+    CourseRunFactory.create_batch(
+        2,
+        completed=True,
+        certificate_available_date=now_in_utc(),
+        variant_industry=FAKE.random_element(COURSE_VARIANT_INDUSTRY[1:])[0],
+        variant_length=FAKE.random_element(COURSE_VARIANT_LENGTH[1:])[0],
+    )
     generate_course_run_certificates()
     assert (
         "No course runs matched the certificates generation criteria"
@@ -997,8 +3014,12 @@ def test_generate_course_certificates_no_valid_course_run(settings, courses_api_
     )
 
 
+@patch("courses.signals.upsert_custom_properties")
 def test_generate_course_certificates_self_paced_course(
-    mocker, courses_api_logs, passed_grade_with_enrollment
+    mock_upsert_custom_properties,
+    mocker,
+    courses_api_logs,
+    passed_grade_with_enrollment,
 ):
     """Test that certificates are generated for self paced course runs independent of course run end date"""
     course_run = passed_grade_with_enrollment.course_run
@@ -1006,7 +3027,7 @@ def test_generate_course_certificates_self_paced_course(
     course_run.is_self_paced = True
     course_run.save()
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     mocker.patch(
         "courses.api.ensure_course_run_grade",
@@ -1018,7 +3039,7 @@ def test_generate_course_certificates_self_paced_course(
     )
     generate_course_run_certificates()
     assert (
-        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1} users"
+        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1} users, failed certificates for {0} users"
         in courses_api_logs.info.call_args[0][0]
     )
 
@@ -1031,7 +3052,9 @@ def test_generate_course_certificates_self_paced_course(
         (False, None),
     ],
 )
+@patch("courses.signals.upsert_custom_properties")
 def test_course_certificates_with_course_end_date_self_paced_combination(  # noqa: PLR0913
+    mock_upsert_custom_properties,
     mocker,
     settings,
     courses_api_logs,
@@ -1051,7 +3074,7 @@ def test_course_certificates_with_course_end_date_self_paced_combination(  # noq
         "hubspot_sync.task_helpers.sync_hubspot_user",
     )
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     mocker.patch(
         "courses.api.exception_logging_generator",
@@ -1065,22 +3088,37 @@ def test_course_certificates_with_course_end_date_self_paced_combination(  # noq
 
     generate_course_run_certificates()
     assert (
-        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1 if end_date else 0} users"
+        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1 if end_date else 0} users, failed certificates for {0} users"
         in courses_api_logs.info.call_args[0][0]
     )
 
 
-def test_generate_course_certificates_with_course_end_date(
-    mocker, courses_api_logs, passed_grade_with_enrollment, settings
+@pytest.mark.parametrize(
+    "is_translation",
+    [
+        True,
+        False,
+    ],
+)
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_course_certificates_with_course_end_date(  # noqa: PLR0913
+    mock_upsert_custom_properties,
+    mocker,
+    courses_api_logs,
+    passed_grade_with_enrollment,
+    settings,
+    is_translation,
 ):
     """Test that certificates are generated for passed grades when there are valid course runs for certificates"""
     course_run = passed_grade_with_enrollment.course_run
     course_run.certificate_available_date = now_in_utc()
+    course_run.language = "fr" if is_translation else "en"
+    course_run.is_primary_language = not is_translation
     course_run.save()
 
     user = passed_grade_with_enrollment.user
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     mocker.patch(
         "courses.api.ensure_course_run_grade",
@@ -1092,15 +3130,283 @@ def test_generate_course_certificates_with_course_end_date(
     )
     generate_course_run_certificates()
     assert (
-        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1} users"
+        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1} users, failed certificates for {0} users"
         in courses_api_logs.info.call_args[0][0]
     )
 
 
-def test_course_run_certificates_access(mocker):
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_course_certificates_failure_isolation(
+    mock_upsert_custom_properties,
+    mocker,
+    courses_api_logs,
+):
+    """A certificate failure for one user should not stop processing for others."""
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    course_run = CourseRunFactory.create(certificate_available_date=now_in_utc())
+
+    run_user_1 = UserFactory.create()
+    run_user_2 = UserFactory.create()
+
+    grade_1 = CourseRunGradeFactory.create(
+        course_run=course_run, user=run_user_1, grade=0.5, passed=True
+    )
+    grade_2 = CourseRunGradeFactory.create(
+        course_run=course_run, user=run_user_2, grade=0.5, passed=True
+    )
+
+    mocker.patch(
+        "courses.api.exception_logging_generator",
+        return_value=[(grade_1, run_user_1), (grade_2, run_user_2)],
+    )
+    mocker.patch(
+        "courses.api.ensure_course_run_grade",
+        side_effect=[
+            (grade_1, True, False),
+            (grade_2, True, False),
+        ],
+    )
+    mock_process = mocker.patch(
+        "courses.api.process_course_run_grade_certificate",
+        side_effect=[RuntimeError("simulated cert failure"), (None, False, False)],
+    )
+
+    generate_course_run_certificates(course_run=course_run, force=True)
+
+    assert mock_process.call_count == 2
+    assert "failed certificates for 1 users" in courses_api_logs.info.call_args[0][0]
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_course_certificates_batches_hubspot_sync(
+    mock_upsert_custom_properties,
+    mocker,
+):
+    """The bulk path should batch-sync only the users whose certificates changed"""
+    mocker.patch("hubspot_sync.api.upsert_custom_properties")
+    patched_batch_sync = mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_users_batch"
+    )
+    course_run = CourseRunFactory.create(certificate_available_date=now_in_utc())
+
+    created_user = UserFactory.create()
+    deleted_user = UserFactory.create()
+    unchanged_user = UserFactory.create()
+    grades = {
+        run_user: CourseRunGradeFactory.create(
+            course_run=course_run, user=run_user, grade=0.5, passed=True
+        )
+        for run_user in (created_user, deleted_user, unchanged_user)
+    }
+
+    mocker.patch(
+        "courses.api.exception_logging_generator",
+        return_value=[(grade, run_user) for run_user, grade in grades.items()],
+    )
+    mocker.patch(
+        "courses.api.ensure_course_run_grade",
+        side_effect=[(grade, False, True) for grade in grades.values()],
+    )
+    mock_process = mocker.patch(
+        "courses.api.process_course_run_grade_certificate",
+        side_effect=[
+            (mocker.Mock(), True, False),  # created
+            (None, False, True),  # deleted
+            (None, False, False),  # unchanged
+        ],
+    )
+
+    generate_course_run_certificates(course_run=course_run, force=True)
+
+    assert all(
+        call.kwargs["defer_hubspot_sync"] is True
+        for call in mock_process.call_args_list
+    )
+    patched_batch_sync.assert_called_once_with({created_user.id, deleted_user.id})
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_course_certificates_single_user_syncs_immediately(
+    mock_upsert_custom_properties,
+    mocker,
+    user,
+):
+    """The single-user path (e.g. webhook) should keep the real-time per-user sync"""
+    mocker.patch("hubspot_sync.api.upsert_custom_properties")
+    patched_batch_sync = mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_users_batch"
+    )
+    course_run = CourseRunFactory.create(certificate_available_date=now_in_utc())
+    grade = CourseRunGradeFactory.create(
+        course_run=course_run, user=user, grade=0.5, passed=True
+    )
+
+    mocker.patch(
+        "courses.api.exception_logging_generator",
+        return_value=[(grade, user)],
+    )
+    mocker.patch(
+        "courses.api.ensure_course_run_grade",
+        return_value=(grade, True, False),
+    )
+    mock_process = mocker.patch(
+        "courses.api.process_course_run_grade_certificate",
+        return_value=(mocker.Mock(), True, False),
+    )
+
+    generate_course_run_certificates(user=user, course_run=course_run, force=True)
+
+    assert mock_process.call_args.kwargs["defer_hubspot_sync"] is False
+    patched_batch_sync.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("enrollment_mode", "grade", "passed", "should_create_cert"),
+    [
+        (EDX_ENROLLMENT_VERIFIED_MODE, 0.80, True, True),
+        (EDX_ENROLLMENT_VERIFIED_MODE, 0.30, False, False),
+        (EDX_ENROLLMENT_AUDIT_MODE, 0.80, True, False),
+    ],
+)
+@patch("courses.signals.upsert_custom_properties")
+def test_webhook_certificate_status(  # noqa: PLR0913
+    mock_upsert_custom_properties,
+    mocker,
+    user,
+    enrollment_mode,
+    grade,
+    passed,
+    should_create_cert,
+):
+    """Test that the webhook path creates a certificate based on enrollment mode and grade"""
+    enrollment = CourseRunEnrollmentFactory.create(
+        user=user, enrollment_mode=enrollment_mode
+    )
+    course_run = enrollment.run
+    grade_obj = CourseRunGradeFactory.create(
+        course_run=course_run, user=user, grade=grade, passed=passed
+    )
+
+    mocker.patch("hubspot_sync.api.upsert_custom_properties")
+    mocker.patch(
+        "courses.api.get_edx_grades_with_users",
+        return_value=iter([(grade_obj, user)]),
+    )
+    mocker.patch(
+        "courses.api.ensure_course_run_grade",
+        return_value=(grade_obj, True, False),
+    )
+
+    generate_course_run_certificates(user=user, course_run=course_run, force=True)
+
+    assert (
+        CourseRunCertificate.objects.filter(user=user, course_run=course_run).exists()
+        == should_create_cert
+    )
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_webhook_certificate_already_exists(
+    mock_upsert_custom_properties,
+    mocker,
+    passed_grade_with_enrollment,
+):
+    """Test that the webhook path returns certificate_exists when certificate already created"""
+    course_run = passed_grade_with_enrollment.course_run
+    user = passed_grade_with_enrollment.user
+
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    mocker.patch(
+        "courses.api.get_edx_grades_with_users",
+        return_value=iter([(passed_grade_with_enrollment, user)]),
+    )
+    mocker.patch(
+        "courses.api.ensure_course_run_grade",
+        return_value=(passed_grade_with_enrollment, False, False),
+    )
+
+    # First call creates the certificate
+    generate_course_run_certificates(user=user, course_run=course_run, force=True)
+    assert CourseRunCertificate.objects.filter(
+        user=user, course_run=course_run
+    ).exists()
+
+    # Mock the grade fetch again for second call
+    mocker.patch(
+        "courses.api.get_edx_grades_with_users",
+        return_value=iter([(passed_grade_with_enrollment, user)]),
+    )
+
+    # Second call should not create a duplicate certificate
+    generate_course_run_certificates(user=user, course_run=course_run, force=True)
+    assert (
+        CourseRunCertificate.objects.filter(user=user, course_run=course_run).count()
+        == 1
+    )
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_webhook_certificate_bypasses_certificate_available_date(
+    mock_upsert_custom_properties,
+    mocker,
+    passed_grade_with_enrollment,
+):
+    """Test that the webhook path creates a certificate even when certificate_available_date is in the future"""
+    course_run = passed_grade_with_enrollment.course_run
+    user = passed_grade_with_enrollment.user
+
+    # Set certificate_available_date to far in the future
+    course_run.is_self_paced = False
+    course_run.certificate_available_date = now_in_utc() + timedelta(days=365)
+    course_run.save()
+
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    mocker.patch(
+        "courses.api.get_edx_grades_with_users",
+        return_value=iter([(passed_grade_with_enrollment, user)]),
+    )
+    mocker.patch(
+        "courses.api.ensure_course_run_grade",
+        return_value=(passed_grade_with_enrollment, True, False),
+    )
+
+    generate_course_run_certificates(user=user, course_run=course_run, force=True)
+
+    assert CourseRunCertificate.objects.filter(
+        user=user, course_run=course_run
+    ).exists()
+
+
+def test_webhook_no_grade_from_edx(
+    mocker,
+    user,
+):
+    """Test that the webhook path handles the case when no grade is found in edX"""
+    course_run = CourseRunFactory.create()
+
+    mocker.patch(
+        "courses.api.get_edx_grades_with_users",
+        return_value=iter([]),
+    )
+
+    generate_course_run_certificates(user=user, course_run=course_run, force=True)
+
+    assert not CourseRunCertificate.objects.filter(
+        user=user, course_run=course_run
+    ).exists()
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_course_run_certificates_access(mock_upsert_custom_properties, mocker):
     """Tests that the revoke and unrevoke for a course run certificates sets the states properly"""
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     test_certificate = CourseRunCertificateFactory.create(is_revoked=False)
 
@@ -1146,7 +3452,7 @@ def test_override_user_grade(grade, letter_grade, should_force_pass, is_passed):
     test_grade.refresh_from_db()
     assert test_grade.grade == grade
     assert test_grade.passed is is_passed
-    assert test_grade.letter_grade is letter_grade
+    assert test_grade.letter_grade == letter_grade
     assert test_grade.set_by_admin is True
 
 
@@ -1203,17 +3509,56 @@ def test_create_run_enrollments_upgrade_edx_request_failure(mocker, user):
     assert successful_enrollments[0].edx_enrolled == False  # noqa: E712
 
 
+@pytest.mark.parametrize(
+    "has_enrollment",
+    [
+        True,
+        False,
+    ],
+)
+def test_generate_program_certificate_not_verified(
+    user,
+    program_with_requirements,  # noqa: F811
+    has_enrollment,
+    caplog,
+):
+    """Test that certificate generation fails if the user doesn't have a verified enrollment."""
+
+    # This should fail early - before the check for course enrollments.
+
+    assert not program_with_requirements.program.enrollments.filter(user=user).exists()
+
+    if has_enrollment:
+        ProgramEnrollment.objects.create(
+            program=program_with_requirements.program,
+            user=user,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        )
+
+    result = generate_program_certificate(
+        user=user,
+        program=program_with_requirements.program,
+    )
+
+    assert result == (None, False)
+    assert "Skipping program enrollment certificate" not in caplog.messages
+
+
 def test_generate_program_certificate_failure_missing_certificates(
     user,
     program_with_requirements,  # noqa: F811
+    default_mode_records,
 ):
     """
     Test that generate_program_certificate return (None, False) and not create program certificate
     if there is not any course_run certificate for the given course.
     """
     course = CourseFactory.create()
-    CourseRunFactory.create_batch(3, course=course)
-    ProgramRequirementFactory.add_root(program_with_requirements.program)
+    courseruns = CourseRunFactory.create_batch(3, course=course)
+    for run in courseruns:
+        run.enrollment_modes.set(default_mode_records)
+        run.save()
+
     program_with_requirements.program.add_requirement(course)
 
     result = generate_program_certificate(
@@ -1223,20 +3568,33 @@ def test_generate_program_certificate_failure_missing_certificates(
     assert len(ProgramCertificate.objects.all()) == 0
 
 
-def test_generate_program_certificate_failure_not_all_passed(
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_program_certificate_failure_not_all_passed(  # noqa: PLR0913
+    mock_upsert_custom_properties,
+    caplog,
     user,
     program_with_requirements,  # noqa: F811
     mocker,
+    default_mode_records,
 ):
     """
     Test that generate_program_certificate return (None, False) and not create program certificate
     if there is not any course_run certificate for the given course.
     """
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=program_with_requirements.program,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
     )
     courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
+    for run in course_runs:
+        run.enrollment_modes.set(default_mode_records)
+        run.save()
+
     CourseRunCertificateFactory.create_batch(
         2, user=user, course_run=factory.Iterator(course_runs)
     )
@@ -1248,9 +3606,13 @@ def test_generate_program_certificate_failure_not_all_passed(
     result = generate_program_certificate(user=user, program=program)
     assert result == (None, False)
     assert len(ProgramCertificate.objects.all()) == 0
+    assert "Skipping program enrollment certificate" not in caplog.messages
 
 
-def test_generate_program_certificate_success_single_requirement_course(user, mocker):
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_program_certificate_success_single_requirement_course(
+    mock_upsert_custom_properties, user, mocker, default_mode_records
+):
     """
     Test that generate_program_certificate generates a program certificate for a Program with a single required Course.
     """
@@ -1258,11 +3620,15 @@ def test_generate_program_certificate_success_single_requirement_course(user, mo
         "hubspot_sync.task_helpers.sync_hubspot_user",
     )
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     course = CourseFactory.create()
     program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(program)
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=program,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
     root_node = program.requirements_root
 
     root_node.add_child(
@@ -1272,6 +3638,11 @@ def test_generate_program_certificate_success_single_requirement_course(user, mo
     )
     program.add_requirement(course)
     course_run = CourseRunFactory.create(course=course)
+    course_run.enrollment_modes.set(default_mode_records)
+    course_run.save()
+    CourseRunEnrollmentFactory.create(
+        run=course_run, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
     CourseRunGradeFactory.create(course_run=course_run, user=user, passed=True, grade=1)
 
     CourseRunCertificateFactory.create(user=user, course_run=course_run)
@@ -1283,7 +3654,10 @@ def test_generate_program_certificate_success_single_requirement_course(user, mo
     patched_sync_hubspot_user.assert_called_once_with(user)
 
 
-def test_generate_program_certificate_success_multiple_required_courses(user, mocker):
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_program_certificate_success_multiple_required_courses(
+    mock_upsert_custom_properties, user, mocker, default_mode_records
+):
     """
     Test that generate_program_certificate generate a program certificate
     """
@@ -1291,11 +3665,15 @@ def test_generate_program_certificate_success_multiple_required_courses(user, mo
         "hubspot_sync.task_helpers.sync_hubspot_user",
     )
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     courses = CourseFactory.create_batch(3)
     program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(program)
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=program,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
     root_node = program.requirements_root
 
     root_node.add_child(
@@ -1306,6 +3684,16 @@ def test_generate_program_certificate_success_multiple_required_courses(user, mo
     for course in courses:
         program.add_requirement(course)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
+    for run in course_runs:
+        run.enrollment_modes.set(default_mode_records)
+        run.save()
+
+    CourseRunEnrollmentFactory.create_batch(
+        3,
+        run=factory.Iterator(course_runs),
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
     CourseRunCertificateFactory.create_batch(
         3, user=user, course_run=factory.Iterator(course_runs)
     )
@@ -1317,18 +3705,25 @@ def test_generate_program_certificate_success_multiple_required_courses(user, mo
     patched_sync_hubspot_user.assert_called_once_with(user)
 
 
-def test_generate_program_certificate_success_minimum_electives_not_met(user, mocker):
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_program_certificate_success_minimum_electives_not_met(
+    mock_upsert_custom_properties, user, mocker, default_mode_records
+):
     """
     Test that generate_program_certificate does not generate a program certificate if minimum electives have not been met.
     """
     courses = CourseFactory.create_batch(3)
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
 
     # Create Program with 2 minimum elective courses.
     program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(program)
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=program,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
     root_node = program.requirements_root
 
     root_node.add_child(
@@ -1351,7 +3746,14 @@ def test_generate_program_certificate_success_minimum_electives_not_met(user, mo
 
     required_course1_course_run = CourseRunFactory.create(course=required_course1)
     elective_course1_course_run = CourseRunFactory.create(course=elective_course1)
-    elective_course2_course_run = CourseRunFactory.create(course=elective_course2)  # noqa: F841
+    elective_course2_course_run = CourseRunFactory.create(course=elective_course2)
+
+    required_course1_course_run.enrollment_modes.set(default_mode_records)
+    required_course1_course_run.save()
+    elective_course1_course_run.enrollment_modes.set(default_mode_records)
+    elective_course1_course_run.save()
+    elective_course2_course_run.enrollment_modes.set(default_mode_records)
+    elective_course2_course_run.save()
 
     # User has a certificate for required_course1 and elective_course1 only. No certificate for elective_course2.
     CourseRunCertificateFactory.create(
@@ -1361,15 +3763,26 @@ def test_generate_program_certificate_success_minimum_electives_not_met(user, mo
         user=user, course_run=elective_course1_course_run
     )
 
-    certificate, created = generate_program_certificate(user=user, program=program)
+    _, created = generate_program_certificate(user=user, program=program)
     assert created is False
     assert len(ProgramCertificate.objects.all()) == 0
 
 
-def test_force_generate_program_certificate_success(
+@pytest.mark.parametrize(
+    "has_program_enrollment",
+    [
+        True,
+        False,
+    ],
+)
+@patch("courses.signals.upsert_custom_properties")
+def test_force_generate_program_certificate_success(  # noqa: PLR0913
+    mock_upsert_custom_properties,
     user,
     program_with_requirements,  # noqa: F811
     mocker,
+    has_program_enrollment,
+    caplog,
 ):
     """
     Test that force creating a program certificate with generate_program_certificate generates
@@ -1379,8 +3792,16 @@ def test_force_generate_program_certificate_success(
         "hubspot_sync.task_helpers.sync_hubspot_user",
     )
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
+
+    if has_program_enrollment:
+        ProgramEnrollment.objects.create(
+            user=user,
+            program=program_with_requirements.program,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+
     courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
     CourseRunCertificateFactory.create_batch(
@@ -1399,6 +3820,9 @@ def test_force_generate_program_certificate_success(
     assert len(ProgramCertificate.objects.all()) == 1
     patched_sync_hubspot_user.assert_called_once_with(user)
 
+    if not has_program_enrollment:
+        assert "Skipping program enrollment certificate" not in caplog.messages
+
 
 def test_generate_program_certificate_already_exist(
     user,
@@ -1408,6 +3832,11 @@ def test_generate_program_certificate_already_exist(
     Test that generate_program_certificate return (None, False) and not create program certificate
     if program certificate already exist.
     """
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=program_with_empty_requirements,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
     program_certificate = ProgramCertificateFactory.create(
         program=program_with_empty_requirements, user=user
     )
@@ -1418,9 +3847,130 @@ def test_generate_program_certificate_already_exist(
     assert len(ProgramCertificate.objects.all()) == 1
 
 
+def test_generate_program_certificate_existing_revoked_returns_existing(
+    user,
+    program_with_empty_requirements,  # noqa: F811
+):
+    """Existing revoked certificates should be returned instead of re-created."""
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=program_with_empty_requirements,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
+    program_certificate = ProgramCertificateFactory.create(
+        program=program_with_empty_requirements,
+        user=user,
+        is_revoked=True,
+    )
+
+    result = generate_program_certificate(
+        user=user, program=program_with_empty_requirements
+    )
+
+    assert result == (program_certificate, False)
+    assert (
+        ProgramCertificate.all_objects.filter(
+            user=user,
+            program=program_with_empty_requirements,
+        ).count()
+        == 1
+    )
+
+
+@pytest.mark.parametrize("force_create", [True, False])
+def test_generate_program_certificate_no_program_page(
+    user,
+    program_with_empty_requirements,  # noqa: F811
+    force_create,
+):
+    """No program certificate should be created when the program has no CMS page at all."""
+    program = program_with_empty_requirements
+    ProgramEnrollment.objects.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    # Deleted via a queryset, not `program.page`, so we don't leave a stale
+    # cached reverse-OneToOne reference on the `program` instance that the
+    # function under test also operates on.
+    ProgramPage.objects.filter(program=program).delete()
+
+    result = generate_program_certificate(
+        user=user, program=program, force_create=force_create
+    )
+    assert result == (None, False)
+    assert not ProgramCertificate.all_objects.exists()
+
+
+@pytest.mark.parametrize("force_create", [True, False])
+def test_generate_program_certificate_no_certificate_child_page(
+    user,
+    program_with_empty_requirements,  # noqa: F811
+    force_create,
+):
+    """No program certificate should be created when the program page has no certificate child page."""
+    program = program_with_empty_requirements
+    ProgramEnrollment.objects.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    program.program_page.certificate_page.delete()
+
+    result = generate_program_certificate(
+        user=user, program=program, force_create=force_create
+    )
+    assert result == (None, False)
+    assert not ProgramCertificate.all_objects.exists()
+
+
+@pytest.mark.parametrize("force_create", [True, False])
+def test_generate_program_certificate_unpublished_certificate_page(
+    user,
+    program_with_empty_requirements,  # noqa: F811
+    force_create,
+):
+    """No program certificate should be created when the certificate page exists but is unpublished."""
+    program = program_with_empty_requirements
+    ProgramEnrollment.objects.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    certificate_page = program.program_page.certificate_page
+    certificate_page.live = False
+    certificate_page.save()
+
+    result = generate_program_certificate(
+        user=user, program=program, force_create=force_create
+    )
+    assert result == (None, False)
+    assert not ProgramCertificate.all_objects.exists()
+
+
+@pytest.mark.parametrize("force_create", [True, False])
+def test_generate_program_certificate_certificates_disabled(
+    user,
+    program_with_empty_requirements,  # noqa: F811
+    force_create,
+):
+    """No program certificate should be created when certificates are disabled for the program."""
+    program = program_with_empty_requirements
+    ProgramEnrollment.objects.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    program.certificates_disabled = True
+    program.save()
+
+    result = generate_program_certificate(
+        user=user, program=program, force_create=force_create
+    )
+    assert result == (None, False)
+    assert not ProgramCertificate.all_objects.exists()
+
+
 def test_program_certificates_access():
     """Tests that the revoke and unrevoke for a program certificates sets the states properly"""
     test_certificate = ProgramCertificateFactory.create(is_revoked=False)
+    ProgramEnrollment.objects.create(
+        user=test_certificate.user,
+        program=test_certificate.program,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
 
     # Revoke a program certificate
     manage_program_certificate_access(
@@ -1442,9 +3992,12 @@ def test_program_certificates_access():
     assert test_certificate.is_revoked is False
 
 
+@patch("courses.signals.upsert_custom_properties")
 def test_generate_program_certificate_failure_not_all_passed_nested_elective_stipulation(
+    mock_upsert_custom_properties,
     user,
     mocker,
+    default_mode_records,
 ):
     """
     Test that generate_program_certificate returns (None, False) and does not create a program certificate
@@ -1452,12 +4005,19 @@ def test_generate_program_certificate_failure_not_all_passed_nested_elective_sti
     """
     courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
+    for run in course_runs:
+        run.enrollment_modes.set(default_mode_records)
+        run.save()
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     # Create Program
     program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(program)
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=program,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
     root_node = program.requirements_root
 
     root_node.add_child(
@@ -1500,138 +4060,202 @@ def test_generate_program_certificate_failure_not_all_passed_nested_elective_sti
     assert len(ProgramCertificate.objects.all()) == 0
 
 
-def test_program_enrollment_unenrollment_re_enrollment(
-    mocker,
+@pytest.mark.parametrize(
+    (
+        "has_main_enroll",
+        "has_sub_enroll",
+        "sub_is_audit_only",
+        "sub_course_passed",
+    ),
+    [
+        (
+            True,
+            True,
+            False,
+            True,
+        ),
+        (
+            True,
+            True,
+            False,
+            False,
+        ),
+        (
+            True,
+            False,
+            False,
+            True,
+        ),
+        (
+            True,
+            False,
+            False,
+            False,
+        ),
+        (False, True, False, True),
+        (
+            False,
+            False,
+            False,
+            True,
+        ),
+        (
+            True,
+            True,
+            True,
+            True,
+        ),
+        (
+            True,
+            True,
+            True,
+            False,
+        ),
+    ],
+)
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_program_certificate_with_subprogram_requirement(  # noqa: PLR0913
+    mock_upsert_custom_properties,
     user,
-    program_with_empty_requirements,  # noqa: F811
+    mocker,
+    default_mode_records,
+    has_main_enroll,
+    has_sub_enroll,
+    sub_is_audit_only,
+    sub_course_passed,
 ):
     """
-    create_run_enrollments should always enroll a learner into a program even
-    if the learner has previously unenrolled from the program.
-    """
-
-    # Create a program_enrollment that mocks what exists after a learner unenrolls from
-    # a program.
-    ProgramEnrollmentFactory(
-        user=user,
-        program=program_with_empty_requirements,
-        change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
-    )
-    course_run = CourseRunFactory.create()
-    program_with_empty_requirements.add_requirement(course_run.course)
-    mocker.patch("courses.api.enroll_in_edx_course_runs")
-    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
-    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
-
-    create_run_enrollments(user, runs=[course_run], mode=EDX_ENROLLMENT_VERIFIED_MODE)
-    assert ProgramEnrollment.objects.filter(
-        user=user, program=program_with_empty_requirements, change_status=None
-    ).exists()
-
-
-def test_generate_program_certificate_with_subprogram_requirement(user, mocker):
-    """
-    Test that generate_program_certificate considers sub-program (nested program) requirements
-    when determining if a user has earned a program certificate.
+    Test that generate_program_certificate considers sub-program (nested program)
+    requirements when determining if a user has earned a program certificate.
     """
     patched_sync_hubspot_user = mocker.patch(
         "hubspot_sync.task_helpers.sync_hubspot_user",
     )
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
 
     # Create a sub-program that the user will complete
-    sub_program = ProgramFactory.create()
+    modes = (
+        [EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)]
+        if sub_is_audit_only
+        else [
+            EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_AUDIT_MODE),
+            EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE),
+        ]
+    )
+    sub_program = ProgramFactory.create(enrollment_modes=modes)
     sub_course = CourseFactory.create()
-    ProgramRequirementFactory.add_root(sub_program)
     sub_program.add_requirement(sub_course)
+
+    if has_sub_enroll:
+        ProgramEnrollment.objects.create(
+            user=user,
+            program=sub_program,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+            if sub_is_audit_only
+            else EDX_ENROLLMENT_VERIFIED_MODE,
+        )
 
     # Create the main program that requires the sub-program
     main_program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(main_program)
     main_program.add_program_requirement(sub_program)
+
+    if has_main_enroll:
+        ProgramEnrollment.objects.create(
+            user=user,
+            program=main_program,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
 
     # User completes the sub-program course and gets a certificate
     sub_course_run = CourseRunFactory.create(course=sub_course)
+    sub_course_run.enrollment_modes.set(default_mode_records)
+    sub_course_run.save()
+    CourseRunEnrollmentFactory.create(
+        run=sub_course_run, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
     CourseRunGradeFactory.create(
         course_run=sub_course_run, user=user, passed=True, grade=1
     )
     CourseRunCertificateFactory.create(user=user, course_run=sub_course_run)
 
-    # Generate sub-program certificate (user has completed sub-program requirements)
+    # Test sub-program certificate (user has completed sub-program requirements)
     sub_certificate, sub_created = generate_program_certificate(
         user=user, program=sub_program
     )
-    assert sub_created is True
-    assert isinstance(sub_certificate, ProgramCertificate)
+    if has_sub_enroll:
+        if sub_is_audit_only:
+            assert sub_created is False
+        else:
+            assert sub_created is True
+            assert isinstance(sub_certificate, ProgramCertificate)
 
     # Now try to generate main program certificate
-    # It should succeed because the user has a certificate for the required sub-program
+    # It should succeed if the user has a certificate for the required sub-program
     main_certificate, main_created = generate_program_certificate(
         user=user, program=main_program
     )
-    assert main_created is True
-    assert isinstance(main_certificate, ProgramCertificate)
-    assert len(ProgramCertificate.objects.all()) == 2
-    patched_sync_hubspot_user.assert_called()
+    if has_main_enroll and has_sub_enroll and sub_course_passed:
+        # Should only get a certificate if we had a cert (or a passing grade!)
+        # in the sub. So, we'd have to have been enrolled there, too.
+        assert main_created is True
+        assert isinstance(main_certificate, ProgramCertificate)
+        if sub_is_audit_only:
+            # No certificate for sub if it's not eligible for one
+            # But we should still get one for the root course
+            assert len(ProgramCertificate.objects.all()) == 1
+        else:
+            assert len(ProgramCertificate.objects.all()) == 2
+        patched_sync_hubspot_user.assert_called()
+
+    if not has_main_enroll or not has_sub_enroll:
+        assert (
+            ProgramCertificate.objects.filter(
+                program__in=[main_program, sub_program], user=user
+            ).count()
+            < 2
+        )
 
 
-def test_generate_program_certificate_with_subprogram_requirement_missing_certificate(
-    user, mocker
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_program_certificate_with_revoked_subprogram_certificate(
+    mock_upsert_custom_properties, user, mocker
 ):
-    """
-    Test that generate_program_certificate does NOT generate a certificate when the required
-    sub-program certificate is missing.
-    """
-    mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
-    )
-
-    # Create a sub-program
-    sub_program = ProgramFactory.create()
-    sub_course = CourseFactory.create()
-    ProgramRequirementFactory.add_root(sub_program)
-    sub_program.add_requirement(sub_course)
-
-    # Create the main program that requires the sub-program
-    main_program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(main_program)
-    main_program.add_program_requirement(sub_program)
-
-    # User does NOT complete the sub-program course (no certificate)
-    # Try to generate main program certificate
-    # It should fail because the user does not have a certificate for the required sub-program
-    main_certificate, main_created = generate_program_certificate(
-        user=user, program=main_program
-    )
-    assert main_created is False
-    assert main_certificate is None
-    assert len(ProgramCertificate.objects.all()) == 0
-
-
-def test_generate_program_certificate_with_revoked_subprogram_certificate(user, mocker):
     """
     Test that generate_program_certificate does NOT consider revoked sub-program certificates
     when determining if a user has earned a program certificate.
     """
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
 
     # Create a sub-program
     sub_program = ProgramFactory.create()
     sub_course = CourseFactory.create()
-    ProgramRequirementFactory.add_root(sub_program)
     sub_program.add_requirement(sub_course)
+
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=sub_program,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
 
     # Create the main program that requires the sub-program
     main_program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(main_program)
     main_program.add_program_requirement(sub_program)
+
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=main_program,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
 
     # User completes the sub-program and gets a certificate, but it gets revoked
     sub_course_run = CourseRunFactory.create(course=sub_course)
+    CourseRunEnrollmentFactory.create(
+        run=sub_course_run, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
     CourseRunGradeFactory.create(
         course_run=sub_course_run, user=user, passed=True, grade=1
     )
@@ -1642,6 +4266,7 @@ def test_generate_program_certificate_with_revoked_subprogram_certificate(user, 
         user=user, program=sub_program
     )
     assert sub_created is True
+    assert isinstance(sub_certificate, ProgramCertificate)
     sub_certificate.is_revoked = True
     sub_certificate.save()
 
@@ -1655,6 +4280,108 @@ def test_generate_program_certificate_with_revoked_subprogram_certificate(user, 
     # Only the revoked sub-program certificate should exist
     assert len(ProgramCertificate.objects.filter(is_revoked=False)) == 0
     assert len(ProgramCertificate.all_objects.all()) == 1
+
+
+def test_generate_program_certificate_audit_courses(user, default_mode_records):
+    """
+    Test that the certificates generate OK if the program has courses that are
+    audit-only.
+
+    Worth noting: simply having a passing grade in a course that you're auditing,
+    when the course has a verified mode in it, should not grant you a certificate.
+    """
+
+    program = ProgramFactory.create()
+    program.requirements_root.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+
+    cert_course = CourseFactory.create()
+    cert_course_run = CourseRunFactory.create(course=cert_course)
+    cert_course_run.enrollment_modes.set(default_mode_records)
+    cert_course.save()
+
+    audit_course = CourseFactory.create()
+    audit_course_run = CourseRunFactory.create(course=audit_course, enrollment_modes=[])
+    # Potential flakiness: if the fixture is changed and these aren't in the right
+    # order, this will be wrong.
+    audit_course_run.enrollment_modes.add(default_mode_records[0])
+    audit_course.save()
+
+    program.add_requirement(cert_course)
+    program.add_requirement(audit_course)
+
+    # Add some additional course runs for the audit course.
+    # This test missed a case - if the course had a mix of runs that were both
+    # audit-only and not, the certificates wouldn't be generated.
+
+    audit_verified_course_run = CourseRunFactory.create(course=audit_course)
+    audit_verified_course_run.enrollment_modes.set(default_mode_records)
+    audit_verified_course_run.save()
+
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=program,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
+    CourseRunEnrollment.objects.create(
+        user=user,
+        run=cert_course_run,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
+    CourseRunEnrollment.objects.create(
+        user=user,
+        run=audit_course_run,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+    )
+
+    CourseRunGradeFactory.create(
+        course_run=cert_course_run,
+        user=user,
+        passed=True,
+    )
+    audit_grade = CourseRunGradeFactory.create(
+        course_run=audit_course_run,
+        user=user,
+        passed=False,
+    )
+
+    # This should fail - you have neither a cert in the cert run, nor a passing
+    # grade in the audit course, so you don't meet the requirements.
+    result = generate_program_certificate(user, program)
+    assert result == (None, False)
+
+    audit_grade.passed = True
+    audit_grade.save()
+
+    # This should also fail - you don't have a cert in the cert run, but a passing
+    # grade in the audit course. You need both, so you don't meet the requirements.
+    result = generate_program_certificate(user, program)
+    assert result == (None, False)
+
+    audit_grade.passed = False
+    audit_grade.save()
+
+    CourseRunCertificateFactory.create(
+        user=user,
+        course_run=cert_course_run,
+    )
+
+    # This should also fail - you have a cert in the cert run, but no passing
+    # grade in the audit course, so you still don't meet the requirements.
+    result = generate_program_certificate(user, program)
+    assert result == (None, False)
+
+    audit_grade.passed = True
+    audit_grade.save()
+
+    # This should succeed - you have a cert in the cert run, and a passing grade
+    # in the audit run, so you're good now.
+    cert, created = generate_program_certificate(user, program)
+    assert created
+    assert isinstance(cert, ProgramCertificate)
 
 
 @pytest.mark.parametrize(
@@ -1715,8 +4442,10 @@ def test_sync_course_runs_bulk(settings, mocker, mocked_api_response, expect_suc
     """
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
 
-    mock_course_list = mocker.patch("courses.api.get_edx_api_course_list_client")
-    mock_client = mock_course_list.return_value
+    mock_client = Mock()
+    mocker.patch(
+        "courses.api.get_edx_api_course_list_client", return_value=(mock_client, False)
+    )
 
     if isinstance(mocked_api_response, list):
         mock_client.get_courses.return_value = mocked_api_response
@@ -1749,7 +4478,8 @@ def test_sync_course_runs_bulk(settings, mocker, mocked_api_response, expect_suc
         assert course_run2.is_self_paced == mocked_api_response[1].is_self_paced()
     else:
         assert success_count == 0
-        assert failure_count == 1
+        # An API error fails the whole batch, so both runs count as failures
+        assert failure_count == (2 if isinstance(mocked_api_response, Exception) else 1)
 
 
 def test_deactivate_run_enrollment_removes_paid_course_run(mocker):
@@ -1758,7 +4488,6 @@ def test_deactivate_run_enrollment_removes_paid_course_run(mocker):
     """
     mocker.patch("courses.api.unenroll_edx_course_run")
     mocker.patch("courses.api.mail_api.send_course_run_unenrollment_email")
-    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_line_by_line_id")
 
     mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
     mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
@@ -1804,7 +4533,6 @@ def test_b2b_re_enrollment_after_multiple_unenrollments(mocker, user):
     mocker.patch("courses.api.unenroll_edx_course_run")
     mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
     mocker.patch("courses.api.mail_api.send_course_run_unenrollment_email")
-    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_line_by_line_id")
     mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
 
     mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
@@ -1817,9 +4545,9 @@ def test_b2b_re_enrollment_after_multiple_unenrollments(mocker, user):
     contract = ContractPageFactory.create(
         organization=org,
         enrollment_fixed_price=Decimal("0.00"),
-        integration_type=CONTRACT_INTEGRATION_NONSSO,
+        membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
-    course_run = CourseRunFactory.create(b2b_contract=contract)
+    course_run = CourseRunFactory.create(b2b_contracts=[contract])
     with reversion.create_revision():
         product = ProductFactory.create(
             purchasable_object=course_run, price=contract.enrollment_fixed_price
@@ -1860,3 +4588,1787 @@ def test_b2b_re_enrollment_after_multiple_unenrollments(mocker, user):
 
     enrollment.refresh_from_db()
     assert enrollment.active is True
+
+
+@pytest.mark.parametrize(
+    "audit_exists",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "verified_exists",
+    [
+        True,
+        False,
+    ],
+)
+def test_check_course_modes(mocker, audit_exists, verified_exists):
+    """Test that the course mode check function works properly."""
+
+    run = CourseRunFactory.create()
+
+    # clear all of these - the appropriate ones should be created later
+    EnrollmentMode.objects.all().delete()
+
+    return_modes = []
+    audit_mode = CourseMode(
+        {
+            "course_id": run.courseware_id,
+            "mode_slug": "audit",
+            "mode_display_name": "Audit",
+        }
+    )
+    verified_mode = CourseMode(
+        {
+            "course_id": run.courseware_id,
+            "mode_slug": "verified",
+            "mode_display_name": "Verified",
+        }
+    )
+
+    if audit_exists:
+        return_modes.append(audit_mode)
+
+    if verified_exists:
+        return_modes.append(verified_mode)
+
+    mocked_get_modes = mocker.patch(
+        "edx_api.course_detail.CourseModes.get_course_modes", return_value=return_modes
+    )
+
+    mocked_create_mode = mocker.patch(
+        "edx_api.course_detail.CourseModes.create_course_mode",
+        side_effect=lambda mode_slug, *args, **kwargs: (  # noqa: ARG005
+            audit_mode if mode_slug == "audit" else verified_mode
+        ),
+    )
+
+    audit_created, verified_created = check_course_modes(run)
+
+    mocked_get_modes.assert_called()
+    assert audit_created != audit_exists
+    assert verified_created != verified_exists
+
+    assert (
+        EnrollmentMode.objects.filter(
+            mode_slug__in=[EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE]
+        ).count()
+        == 2
+    )
+
+    if not audit_exists:
+        mocked_create_mode.assert_any_call(
+            course_id=run.courseware_id,
+            mode_slug="audit",
+            mode_display_name="Audit",
+            description="Audit",
+            currency="USD",
+            expiration_datetime=None,
+            min_price=0,
+        )
+        assert run.enrollment_modes.filter(mode_slug=EDX_ENROLLMENT_AUDIT_MODE).exists()
+
+    if not verified_exists:
+        mocked_create_mode.assert_any_call(
+            course_id=run.courseware_id,
+            mode_slug="verified",
+            mode_display_name="Verified",
+            description="Verified",
+            currency="USD",
+            expiration_datetime=str(run.upgrade_deadline),
+            min_price=10,
+        )
+        assert run.enrollment_modes.filter(
+            mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+        ).exists()
+
+
+@pytest.mark.parametrize(
+    "has_live",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    (
+        "has_b2b",
+        "has_b2b_live",
+    ),
+    [
+        (True, False),
+        (True, True),
+        (False, False),
+    ],
+)
+def test_get_certificate_grade_eligible_runs(has_live, has_b2b, has_b2b_live):
+    """Test that the eligible run call returns B2B courses as well as regular ones."""
+
+    run = CourseRunFactory.create(certificate_available_date=None, live=has_live)
+
+    if has_b2b:
+        b2b_contract = ContractPageFactory.create()
+        b2b_run = CourseRunFactory.create(
+            certificate_available_date=None,
+            b2b_contracts=[b2b_contract],
+            live=has_b2b_live,
+        )
+
+    eligible_courses = get_certificate_grade_eligible_runs(now=now_in_utc())
+
+    if has_live and has_b2b and has_b2b_live:
+        assert eligible_courses.count() == 2
+        assert run in eligible_courses
+        assert b2b_run in eligible_courses
+    elif has_live and ((has_b2b and not has_b2b_live) or not has_b2b):
+        assert eligible_courses.count() == 1
+        assert run in eligible_courses
+    elif has_b2b and has_b2b_live and not has_live:
+        assert eligible_courses.count() == 1
+        assert b2b_run in eligible_courses
+    else:
+        assert eligible_courses.count() == 0
+
+
+@responses.activate
+def _run_test_import_courserun_from_edx(  # noqa: PLR0913
+    settings,
+    live,
+    use_specific_course,
+    create_depts,
+    block_countries,
+    price,
+    create_cms_page,
+    publish_cms_page,
+    include_in_learn_catalog,
+    ingest_content_files_for_ai,
+    is_source_run,
+):
+    """
+    Test that importing a course run from edX works as expected.
+
+    This is the test body - there's some grouping functions below that test
+    groups of related functionality, so the test is easier to read/comprehend,
+    and so we can run less total tests. (Parametrizing all of these individually
+    ended up with 2^10 tests.)
+    """
+
+    test_course_key = "course-v1:MITxT+123.45"
+    test_course_run_key = f"{test_course_key}+2T2022"
+    mocked_detail = _mock_edx_course_detail(test_course_run_key, settings)
+    department = "FakeDepartment" if create_depts else DepartmentFactory.create()
+    price = Decimal(FAKE.random_number(digits=3)) if price else None
+    block_countries = (
+        [
+            "US",
+            "CA",
+        ]
+        if block_countries
+        else None
+    )
+
+    if create_cms_page:
+        CourseIndexPageFactory.create()
+
+    if use_specific_course:
+        use_specific_course = CourseFactory.create().readable_id
+
+    responses.get(
+        url=f"{settings.OPENEDX_API_BASE_URL}/api/courses/v1/courses/{test_course_run_key}/",
+        json=mocked_detail,
+        status=status.HTTP_200_OK,
+    )
+    # sometimes in CI this gets run without the trailing slash
+    responses.get(
+        url=f"{settings.OPENEDX_API_BASE_URL}/api/courses/v1/courses/{test_course_run_key}",
+        json=mocked_detail,
+        status=status.HTTP_200_OK,
+    )
+
+    pulled_modes = [
+        CourseMode(
+            {
+                "course_id": test_course_run_key,
+                "mode_slug": EDX_ENROLLMENT_AUDIT_MODE,
+                "mode_display_name": "Audit",
+            }
+        ),
+        CourseMode(
+            {
+                "course_id": test_course_run_key,
+                "mode_slug": EDX_ENROLLMENT_VERIFIED_MODE,
+                "mode_display_name": "Verified",
+            }
+        ),
+    ]
+
+    with patch("courses.api.get_edx_course_modes", return_value=pulled_modes):
+        (courserun, page, product) = import_courserun_from_edx(
+            course_key=test_course_run_key,
+            live=live,
+            use_specific_course=use_specific_course,
+            create_depts=create_depts,
+            block_countries=block_countries,
+            price=price,
+            create_cms_page=create_cms_page,
+            publish_cms_page=publish_cms_page,
+            include_in_learn_catalog=include_in_learn_catalog,
+            ingest_content_files_for_ai=ingest_content_files_for_ai,
+            is_source_run=is_source_run,
+            departments=[department],
+        )  # pyright: ignore[reportGeneralTypeIssues]
+
+    assert courserun.courseware_id == test_course_run_key
+    assert (
+        courserun.course.readable_id == use_specific_course
+        if use_specific_course
+        else test_course_key
+    )
+    assert courserun.live == live
+    assert courserun.is_source_run == is_source_run
+
+    if not use_specific_course:
+        if create_depts:
+            assert courserun.course.departments.filter(name=department).exists()
+        else:
+            course_dept = courserun.course.departments.first()
+            assert course_dept == department
+
+        if create_cms_page:
+            assert page
+            assert page.ingest_content_files_for_ai == ingest_content_files_for_ai
+            assert page.include_in_learn_catalog == include_in_learn_catalog
+            assert page.live == publish_cms_page
+
+    if price:
+        assert product
+        assert product.price == price
+
+    if block_countries:
+        for blocked_country in courserun.course.blocked_countries.all():
+            assert blocked_country.country.code in block_countries
+
+
+@pytest.mark.parametrize(
+    (
+        "live",
+        "is_source_run",
+        "create_depts",
+        "block_countries",
+        "price",
+    ),
+    [
+        (True, True, True, True, True),
+        (False, False, False, False, False),
+    ],
+)
+def test_import_courserun_from_edx_basic(  # noqa: PLR0913
+    settings, live, is_source_run, create_depts, block_countries, price
+):
+    """
+    Test the more basic options for import_courserun_from_edx.
+
+    These are all unrelated, so setting these flags or specifying these values
+    don't affect anything else in the import.
+    """
+
+    _run_test_import_courserun_from_edx(
+        settings=settings,
+        live=live,
+        use_specific_course=False,
+        create_depts=create_depts,
+        block_countries=block_countries,
+        price=price,
+        create_cms_page=False,
+        publish_cms_page=False,
+        include_in_learn_catalog=False,
+        ingest_content_files_for_ai=False,
+        is_source_run=is_source_run,
+    )
+
+
+@pytest.mark.parametrize(
+    (
+        "use_specific_course",
+        "create_cms_page",
+        "publish_cms_page",
+        "include_in_learn_catalog",
+        "ingest_content_files_for_ai",
+    ),
+    [
+        (True, False, False, False, False),
+        (
+            False,
+            True,
+            False,
+            False,
+            False,
+        ),
+        (
+            False,
+            True,
+            True,
+            True,
+            True,
+        ),
+    ],
+)
+def test_import_courserun_from_edx_specific_course_pages(  # noqa: PLR0913
+    settings,
+    use_specific_course,
+    create_cms_page,
+    publish_cms_page,
+    include_in_learn_catalog,
+    ingest_content_files_for_ai,
+):
+    """
+    Test the specific course functionality and the page creation functionality.
+
+    These are related - if you specify a specific course, it should ignore any
+    of the CMS-related flags.
+    """
+
+    _run_test_import_courserun_from_edx(
+        settings=settings,
+        live=True,
+        use_specific_course=use_specific_course,
+        create_depts=False,
+        block_countries=False,
+        price=False,
+        create_cms_page=create_cms_page,
+        publish_cms_page=publish_cms_page,
+        include_in_learn_catalog=include_in_learn_catalog,
+        ingest_content_files_for_ai=ingest_content_files_for_ai,
+        is_source_run=False,
+    )
+
+
+@responses.activate
+def test_import_courserun_from_edx_pulls_enrollment_modes(settings):
+    """Imported course runs should store enrollment modes from edX."""
+    test_course_key = "course-v1:MITxT+123.45"
+    test_course_run_key = f"{test_course_key}+2T2022"
+    mocked_detail = _mock_edx_course_detail(test_course_run_key, settings)
+    department = DepartmentFactory.create()
+
+    responses.get(
+        url=f"{settings.OPENEDX_API_BASE_URL}/api/courses/v1/courses/{test_course_run_key}/",
+        json=mocked_detail,
+        status=status.HTTP_200_OK,
+    )
+    responses.get(
+        url=f"{settings.OPENEDX_API_BASE_URL}/api/courses/v1/courses/{test_course_run_key}",
+        json=mocked_detail,
+        status=status.HTTP_200_OK,
+    )
+
+    audit_mode = CourseMode(
+        {
+            "course_id": test_course_run_key,
+            "mode_slug": "audit",
+            "mode_display_name": "Audit",
+        }
+    )
+    verified_mode = CourseMode(
+        {
+            "course_id": test_course_run_key,
+            "mode_slug": "verified",
+            "mode_display_name": "Verified",
+        }
+    )
+
+    with patch(
+        "courses.api.get_edx_course_modes", return_value=[audit_mode, verified_mode]
+    ):
+        courserun, _page, _product = import_courserun_from_edx(
+            course_key=test_course_run_key,
+            live=True,
+            create_depts=False,
+            departments=[department],
+        )
+
+    assert courserun.enrollment_modes.filter(
+        mode_slug=EDX_ENROLLMENT_AUDIT_MODE
+    ).exists()
+    assert courserun.enrollment_modes.filter(
+        mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+    ).exists()
+
+
+@responses.activate
+def test_import_courserun_from_edx_calls_pull_course_modes(settings, mocker):
+    """Import should invoke enrollment mode sync for the new course run."""
+    test_course_key = "course-v1:MITxT+123.45"
+    test_course_run_key = f"{test_course_key}+2T2022"
+    mocked_detail = _mock_edx_course_detail(test_course_run_key, settings)
+    department = DepartmentFactory.create()
+
+    responses.get(
+        url=f"{settings.OPENEDX_API_BASE_URL}/api/courses/v1/courses/{test_course_run_key}/",
+        json=mocked_detail,
+        status=status.HTTP_200_OK,
+    )
+    responses.get(
+        url=f"{settings.OPENEDX_API_BASE_URL}/api/courses/v1/courses/{test_course_run_key}",
+        json=mocked_detail,
+        status=status.HTTP_200_OK,
+    )
+
+    mocked_pull_course_modes = mocker.patch(
+        "courses.api.pull_course_modes", return_value=([], 0)
+    )
+
+    courserun, _page, _product = import_courserun_from_edx(
+        course_key=test_course_run_key,
+        live=True,
+        create_depts=False,
+        departments=[department],
+    )
+
+    mocked_pull_course_modes.assert_called_once_with(courserun)
+
+
+@pytest.mark.parametrize(
+    "add_pre_path",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "add_suffix",
+    [
+        True,
+        False,
+    ],
+)
+def test_generate_openedx_course_url(settings, add_pre_path, add_suffix):
+    """Test that course home URL generation works as expected."""
+
+    course_key = "course-v1:TestX+12.345q+9T2199"
+    settings.OPENEDX_COURSE_BASE_URL = FAKE.url()
+
+    if add_pre_path:
+        settings.OPENEDX_COURSE_BASE_URL += FAKE.uri_path(3)
+
+    settings.OPENEDX_COURSE_BASE_URL_SUFFIX = FAKE.uri_path(1) if add_suffix else None
+
+    generated_url = generate_openedx_course_url(course_key)
+
+    assert course_key in generated_url
+    assert settings.OPENEDX_COURSE_BASE_URL in generated_url
+
+    if add_suffix and settings.OPENEDX_COURSE_BASE_URL_SUFFIX:
+        assert settings.OPENEDX_COURSE_BASE_URL_SUFFIX in generated_url
+    else:
+        assert not settings.OPENEDX_COURSE_BASE_URL_SUFFIX
+
+
+FAKE_PROOF_PAYLOAD = {
+    "type": "DataIntegrityProof",
+    "created": "2025-12-12T17:52:25Z",
+    "verificationMethod": "did:key:z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS#z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS",
+    "cryptosuite": "eddsa-rdfc-2022",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z5UBb8q7StJLsA839GjyMrFsB6atZRkeXx2MCmgaB6D4mDvQQujcxxzysF3F6d8MZgWQh4ftUCRbWCBWibyRMCwR8",
+}
+
+
+def return_signed_credential(payload):
+    return_value = deepcopy(payload)
+    return_value["proof"] = FAKE_PROOF_PAYLOAD
+    return return_value
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_course_run_certificate_verifiable_credentials(
+    mock_upsert_custom_properties, passed_grade_with_enrollment, mocker, user
+):
+    mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+
+    mocker.patch(
+        "courses.api.request_verifiable_credential",
+        side_effect=return_signed_credential,
+    )
+    mock_certificate_page = Mock()
+    mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
+    mock_certificate_page.should_provision_verifiable_credential = True
+    mock_certificate_page.verifiable_credential_description = None
+    mocker.patch("courses.api.get_certificate_page", return_value=mock_certificate_page)
+    passed_grade_with_enrollment.course_run.course.page.what_you_learn = (
+        "Some learning content"
+    )
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment
+    )
+    assert certificate
+    assert created
+    assert not deleted
+    assert certificate.verifiable_credential
+    assert (
+        certificate.verifiable_credential.credential_data["proof"] == FAKE_PROOF_PAYLOAD
+    )
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_program_certificate_verifiable_credentials(
+    mock_upsert_custom_properties,
+    user,
+    program_with_requirements,  # noqa: F811
+    mocker,
+):
+    mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    mocker.patch(
+        "courses.api.request_verifiable_credential",
+        side_effect=return_signed_credential,
+    )
+
+    mock_certificate_page = Mock()
+    mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
+    mock_certificate_page.should_provision_verifiable_credential = True
+    mock_certificate_page.product_name = "Test Program Certificate"
+    mock_certificate_page.verifiable_credential_description = None
+    mocker.patch("courses.api.get_certificate_page", return_value=mock_certificate_page)
+    courses = CourseFactory.create_batch(3)
+    course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
+    CourseRunCertificateFactory.create_batch(
+        2, user=user, course_run=factory.Iterator(course_runs)
+    )
+    program = program_with_requirements.program
+    ProgramEnrollmentFactory.create(user=user, program=program)
+    program.add_requirement(courses[0])
+    program.add_requirement(courses[1])
+    program.add_requirement(courses[2])
+
+    certificate, created = generate_program_certificate(
+        user=user, program=program, force_create=True
+    )
+    assert created is True
+    assert isinstance(certificate, ProgramCertificate)
+    assert len(ProgramCertificate.objects.all()) == 1
+    assert certificate.verifiable_credential
+    assert (
+        certificate.verifiable_credential.credential_data["proof"] == FAKE_PROOF_PAYLOAD
+    )
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_course_run_certificate_verifiable_credentials_feature_flag_disabled(
+    mock_upsert_custom_properties, passed_grade_with_enrollment, mocker, user
+):
+    mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    mocker.patch(
+        "courses.api.should_provision_verifiable_credential", return_value=False
+    )
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment
+    )
+    assert certificate
+    assert created
+    assert not deleted
+    assert certificate.verifiable_credential is None
+
+
+@override_settings(MIT_LEARN_BASE_URL="https://learn.mit.edu")
+@patch("courses.api.CourseRunEnrollment.all_objects.get")
+@patch("courses.api.get_thumbnail_url")
+@patch("courses.signals.upsert_custom_properties")
+def test_course_run_certificate_verifiable_credentials_signing_payload(
+    mock_upsert_custom_properties,
+    mock_get_thumbnail_url,
+    mock_enrollment_get,
+    settings,
+    mocker,
+):
+    """Test that get_verifiable_credentials_payload generates the expected payload structure"""
+
+    mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+
+    # Mock enrollment created_on date
+    mock_enrollment = Mock()
+    mock_enrollment.created_on = datetime(
+        2024, 1, 15, 10, 30, 0, tzinfo=ZoneInfo("UTC")
+    )
+    mock_enrollment_get.return_value = mock_enrollment
+
+    # Mock thumbnail URL
+    mock_get_thumbnail_url.return_value = "https://example.com/thumbnail.jpg"
+
+    # Set environment for hostname mapping
+    settings.ENVIRONMENT = "production"
+    settings.VERIFIABLE_CREDENTIAL_DID = (
+        "z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS"
+    )
+
+    # Create certificate with controlled values
+    course_run_cert = CourseRunCertificateFactory.create(
+        uuid=UUID("12345678-1234-5678-1234-567812345678"),
+        issue_date=datetime(2024, 6, 1, 12, 0, 0, tzinfo=ZoneInfo("UTC")),
+    )
+
+    # Set controlled values on related objects
+    course_run_cert.user.name = "John Doe"
+    course_run_cert.user.save()
+
+    course_run_cert.course_run.title = "Introduction to Python"
+    course_run_cert.course_run.save()
+
+    course_run_cert.course_run.course.readable_id = "course-v1:MITx+6.00.1x"
+    course_run_cert.course_run.course.save()
+
+    course_run_cert.course_run.course.page.what_you_learn = (
+        "Learn Python programming fundamentals"
+    )
+    course_run_cert.course_run.course.page.save()
+
+    mock_certificate_page = Mock()
+    mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
+    mock_certificate_page.verifiable_credential_description = None
+    payload = get_verifiable_credentials_payload(course_run_cert, mock_certificate_page)
+
+    # Assert the expected payload structure
+    expected_payload = {
+        "@context": [
+            "https://www.w3.org/ns/credentials/v2",
+            "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
+            "https://w3id.org/security/suites/ed25519-2020/v1",
+        ],
+        "id": "urn:uuid:12345678-1234-5678-1234-567812345678",
+        "type": ["VerifiableCredential", "OpenBadgeCredential"],
+        "issuer": {
+            "id": "did:key:z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS",
+            "type": ["Profile"],
+            "name": "MIT Learn",
+            "image": {
+                "id": "https://learn.mit.edu/images/mit-red.png",
+                "type": "Image",
+                "caption": "MIT Learn logo",
+            },
+        },
+        "validFrom": "2024-06-01T12:00:00Z",
+        "credentialSubject": {
+            "type": ["AchievementSubject"],
+            "activityStartDate": "2024-01-15T10:30:00Z",
+            "activityEndDate": "2024-06-01T12:00:00Z",
+            "identifier": [
+                {
+                    "type": "IdentityObject",
+                    "identityHash": "John Doe",
+                    "identityType": "name",
+                    "hashed": False,
+                    "salt": "not-used",
+                }
+            ],
+            "achievement": {
+                "id": "https://learn.mit.edu/courses/course-v1:MITx+6.00.1x",
+                "achievementType": "Course",
+                "type": ["Achievement"],
+                "criteria": {
+                    "narrative": mock_certificate_page.verifiable_credential_criteria
+                },
+                "description": "John Doe has successfully completed all modules and earned a Course Certificate in Introduction to Python.",
+                "name": "Introduction to Python",
+                "image": {
+                    "id": "https://example.com/thumbnail.jpg",
+                    "type": "Image",
+                    "caption": "MIT Learn Certificate logo",
+                },
+            },
+        },
+    }
+
+    assert payload == expected_payload
+
+
+@override_settings(MIT_LEARN_BASE_URL="https://learn.mit.edu")
+@patch("courses.api.ProgramEnrollment.all_objects.get")
+@patch("courses.api.get_thumbnail_url")
+def test_program_certificate_verifiable_credentials_signing_payload(
+    mock_get_thumbnail_url, mock_enrollment_get, settings, mocker
+):
+    """Test that get_verifiable_credentials_payload generates the expected payload structure for programs"""
+    mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+
+    # Mock enrollment created_on date
+    mock_enrollment = Mock()
+    mock_enrollment.created_on = datetime(
+        2024, 2, 20, 14, 45, 0, tzinfo=ZoneInfo("UTC")
+    )
+    mock_enrollment_get.return_value = mock_enrollment
+
+    # Mock thumbnail URL
+    mock_get_thumbnail_url.return_value = "https://example.com/program-thumbnail.jpg"
+
+    # Set environment for hostname mapping
+    settings.ENVIRONMENT = "production"
+    settings.VERIFIABLE_CREDENTIAL_DID = (
+        "z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS"
+    )
+
+    # Create program certificate with controlled values
+    program_cert = ProgramCertificateFactory.create(
+        uuid=UUID("87654321-4321-8765-4321-876543218765"),
+        issue_date=datetime(2024, 7, 15, 16, 30, 0, tzinfo=ZoneInfo("UTC")),
+    )
+
+    # Set controlled values on related objects
+    program_cert.user.name = "Jane Smith"
+    program_cert.user.save()
+
+    program_cert.program.title = "Data Science MicroMasters"
+    program_cert.program.readable_id = "program-v1:MITx+DataScienceMM"
+    program_cert.program.save()
+
+    # Create courses and add them to the program
+    course1 = CourseFactory.create()
+    course2 = CourseFactory.create()
+    course3 = CourseFactory.create()
+
+    program_cert.program.add_requirement(course1)
+    program_cert.program.add_requirement(course2)
+    program_cert.program.add_requirement(course3)
+
+    mock_certificate_page = Mock()
+    mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
+    mock_certificate_page.verifiable_credential_description = None
+    # The verifiable credential name should come from the CMS "Certificate Title"
+    # (product_name), not the program title.
+    mock_certificate_page.product_name = "Universal AI"
+    payload = get_verifiable_credentials_payload(program_cert, mock_certificate_page)
+
+    # Assert the expected payload structure
+    expected_payload = {
+        "@context": [
+            "https://www.w3.org/ns/credentials/v2",
+            "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
+            "https://w3id.org/security/suites/ed25519-2020/v1",
+        ],
+        "id": "urn:uuid:87654321-4321-8765-4321-876543218765",
+        "type": ["VerifiableCredential", "OpenBadgeCredential"],
+        "issuer": {
+            "id": "did:key:z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS",
+            "type": ["Profile"],
+            "name": "MIT Learn",
+            "image": {
+                "id": "https://learn.mit.edu/images/mit-red.png",
+                "type": "Image",
+                "caption": "MIT Learn logo",
+            },
+        },
+        "validFrom": "2024-07-15T16:30:00Z",
+        "credentialSubject": {
+            "type": ["AchievementSubject"],
+            "activityStartDate": "2024-02-20T14:45:00Z",
+            "activityEndDate": "2024-07-15T16:30:00Z",
+            "identifier": [
+                {
+                    "type": "IdentityObject",
+                    "identityHash": "Jane Smith",
+                    "identityType": "name",
+                    "hashed": False,
+                    "salt": "not-used",
+                }
+            ],
+            "achievement": {
+                "id": "https://learn.mit.edu/programs/program-v1:MITx+DataScienceMM",
+                "achievementType": "Program",
+                "type": ["Achievement"],
+                "criteria": {
+                    "narrative": mock_certificate_page.verifiable_credential_criteria
+                },
+                "description": "Jane Smith has successfully completed all modules and earned a Program Certificate in Universal AI.",
+                "name": "Universal AI",
+                "image": {
+                    "id": "https://example.com/program-thumbnail.jpg",
+                    "type": "Image",
+                    "caption": "MIT Learn Certificate logo",
+                },
+            },
+        },
+    }
+
+    assert payload == expected_payload
+
+
+@pytest.mark.parametrize("product_name", ["", "   "])
+@patch("courses.api.ProgramEnrollment.all_objects.get")
+@patch("courses.api.get_thumbnail_url")
+def test_program_verifiable_credential_name_falls_back_to_program_title(
+    mock_get_thumbnail_url, mock_enrollment_get, product_name, settings, mocker
+):
+    """The VC name falls back to the program title when product_name is blank."""
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_user")
+    mocker.patch("hubspot_sync.api.upsert_custom_properties")
+
+    mock_enrollment = Mock()
+    mock_enrollment.created_on = datetime(
+        2024, 2, 20, 14, 45, 0, tzinfo=ZoneInfo("UTC")
+    )
+    mock_enrollment_get.return_value = mock_enrollment
+    mock_get_thumbnail_url.return_value = ""
+
+    settings.ENVIRONMENT = "production"
+
+    program_cert = ProgramCertificateFactory.create()
+    program_cert.program.title = "Data Science MicroMasters"
+    program_cert.program.save()
+
+    mock_certificate_page = Mock()
+    mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
+    mock_certificate_page.verifiable_credential_description = None
+    mock_certificate_page.product_name = product_name
+
+    payload = get_verifiable_credentials_payload(program_cert, mock_certificate_page)
+
+    achievement = payload["credentialSubject"]["achievement"]
+    assert achievement["name"] == "Data Science MicroMasters"
+    assert "Data Science MicroMasters" in achievement["description"]
+
+
+@pytest.mark.parametrize("is_program", [True, False])
+@pytest.mark.parametrize(
+    ("flag_enabled", "description", "expect_custom_description"),
+    [
+        (True, "A custom credential description.", True),
+        (True, "", False),
+        (False, "", False),
+        (False, "A custom credential description.", False),
+    ],
+)
+def test_verifiable_credentials_payload_description(  # noqa: PLR0913
+    mocker, settings, is_program, flag_enabled, description, expect_custom_description
+):
+    """
+    The achievement description should come from the certificate page's
+    verifiable_credential_description when the feature flag is enabled and the
+    field is populated, and fall back to the generated description otherwise.
+    """
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_user")
+    mocker.patch("hubspot_sync.api.upsert_custom_properties")
+    mock_enrollment = Mock()
+    mock_enrollment.created_on = datetime(
+        2024, 1, 15, 10, 30, 0, tzinfo=ZoneInfo("UTC")
+    )
+    mocker.patch(
+        "courses.api.CourseRunEnrollment.all_objects.get",
+        return_value=mock_enrollment,
+    )
+    mocker.patch(
+        "courses.api.ProgramEnrollment.all_objects.get",
+        return_value=mock_enrollment,
+    )
+    mocker.patch("courses.api.get_thumbnail_url", return_value="")
+    settings.ENVIRONMENT = "production"
+
+    if is_program:
+        certificate = ProgramCertificateFactory.create()
+        certificate_name = certificate.program.title
+        achievement_type = "Program"
+    else:
+        certificate = CourseRunCertificateFactory.create()
+        certificate_name = certificate.course_run.title
+        achievement_type = "Course"
+
+    mock_certificate_page = Mock()
+    mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
+    mock_certificate_page.verifiable_credential_description = description
+    mock_certificate_page.product_name = ""
+
+    mock_is_enabled = mocker.patch("courses.api.is_enabled", return_value=flag_enabled)
+
+    payload = get_verifiable_credentials_payload(certificate, mock_certificate_page)
+
+    mock_is_enabled.assert_any_call(features.ENABLE_CREDENTIAL_METADATA_AUTHORING)
+    expected_description = (
+        description
+        if expect_custom_description
+        else f"{certificate.user.name} has successfully completed all modules and earned a {achievement_type} Certificate in {certificate_name}."
+    )
+    assert (
+        payload["credentialSubject"]["achievement"]["description"]
+        == expected_description
+    )
+
+
+@pytest.mark.parametrize(
+    "keep_failed_enrollments,flag_enabled,expected_behavior",  # noqa: PT006
+    [
+        (
+            None,
+            True,
+            True,
+        ),  # Feature flag enabled, parameter None -> keep failed enrollments
+        (
+            None,
+            False,
+            False,
+        ),  # Feature flag disabled, parameter None -> don't keep failed enrollments
+        (True, False, True),  # Explicit True overrides feature flag being False
+        (False, True, False),  # Explicit False overrides feature flag being True
+    ],
+)
+def test_create_run_enrollments_feature_flag(
+    mocker,
+    user,
+    keep_failed_enrollments,
+    flag_enabled,
+    expected_behavior,
+):
+    """
+    Test that create_run_enrollments respects the IGNORE_EDX_FAILURES feature flag
+    when keep_failed_enrollments parameter is None.
+    """
+
+    num_runs = 2
+    runs = CourseRunFactory.create_batch(num_runs)
+
+    # Mock the feature flag
+    mocker.patch.dict(
+        settings.FEATURES,
+        {"IGNORE_EDX_FAILURES": flag_enabled},
+    )
+
+    # Mock the edX enrollment to fail
+    exception_cls = EdxApiEnrollErrorException
+    inner_exception = MockHttpError()
+    mocker.patch(
+        "courses.api.enroll_in_edx_course_runs",
+        side_effect=exception_cls(user, runs[0], inner_exception),
+    )
+    mocker.patch("courses.api.log.exception")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+
+    successful_enrollments, edx_request_success = create_run_enrollments(
+        user,
+        runs,
+        keep_failed_enrollments=keep_failed_enrollments,
+    )
+
+    # Verify behavior based on expected_behavior flag
+    expected_enrollments = num_runs if expected_behavior else 0
+    assert len(successful_enrollments) == expected_enrollments
+    assert edx_request_success is False
+
+
+@pytest.mark.parametrize(
+    "keep_failed_enrollments,flag_enabled,expected_behavior",  # noqa: PT006
+    [
+        (
+            None,
+            True,
+            True,
+        ),  # Feature flag enabled, parameter None -> keep failed enrollments
+        (
+            None,
+            False,
+            False,
+        ),  # Feature flag disabled, parameter None -> don't keep failed enrollments
+        (True, False, True),  # Explicit True overrides feature flag being False
+        (False, True, False),  # Explicit False overrides feature flag being True
+    ],
+)
+def test_deactivate_run_enrollment_feature_flag(
+    mocker,
+    keep_failed_enrollments,
+    flag_enabled,
+    expected_behavior,
+):
+    """
+    Test that deactivate_run_enrollment respects the IGNORE_EDX_FAILURES feature flag
+    when keep_failed_enrollments parameter is None.
+    """
+
+    # Create test enrollment
+    enrollment = CourseRunEnrollmentFactory()
+
+    # Mock the feature flag
+    mocker.patch.dict(
+        settings.FEATURES,
+        {"IGNORE_EDX_FAILURES": flag_enabled},
+    )
+
+    # Mock the unenroll to fail
+    mocker.patch(
+        "courses.api.unenroll_edx_course_run",
+        side_effect=Exception("edX API failure"),
+    )
+    mocker.patch("courses.api.log.exception")
+
+    result = deactivate_run_enrollment(
+        enrollment,
+        change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
+        keep_failed_enrollments=keep_failed_enrollments,
+    )
+
+    # Verify behavior based on expected_behavior flag
+    # When flag is enabled (expected_behavior=True), enrollment should be deactivated despite failure
+    # When flag is disabled (expected_behavior=False), function returns None
+    if expected_behavior:
+        assert result is not None
+        assert not result.active
+        assert result.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
+    else:
+        assert result is None
+
+
+@pytest.mark.parametrize(
+    "no_initial_modes",
+    [
+        True,
+        False,
+    ],
+)
+def test_pull_course_modes(mocker, no_initial_modes):
+    """Test that we can pull the course modes from edX and store them."""
+
+    run = CourseRunFactory.create()
+
+    if no_initial_modes:
+        EnrollmentMode.objects.all().delete()
+
+    return_modes = [
+        CourseMode(
+            {
+                "course_id": run.courseware_id,
+                "mode_slug": "audit",
+                "mode_display_name": "Audit",
+            }
+        ),
+        CourseMode(
+            {
+                "course_id": run.courseware_id,
+                "mode_slug": "verified",
+                "mode_display_name": "Verified",
+            }
+        ),
+        CourseMode(
+            {
+                "course_id": run.courseware_id,
+                "mode_slug": "bonus",
+                "mode_display_name": "Bonus Mode!",
+            }
+        ),
+    ]
+
+    mocked_get_modes = mocker.patch(
+        "edx_api.course_detail.CourseModes.get_course_modes", return_value=return_modes
+    )
+
+    returned_modes, created_count = pull_course_modes(run)
+
+    assert created_count == 3 if no_initial_modes else 1
+    mocked_get_modes.assert_called()
+
+    expected_modes = [
+        returned_mode
+        for returned_mode in returned_modes
+        if returned_mode.mode_slug in ["audit", "verified", "bonus"]
+    ]
+    assert len(expected_modes) == 3
+
+
+def test_upgrade_program_enrollment_if_eligible_upgrades_when_requirements_met(
+    user,
+    program_with_requirements,  # noqa: F811
+):
+    """Upgrade succeeds when all required courses and enough electives are verified."""
+    program = program_with_requirements.program
+    program_enrollment = ProgramEnrollmentFactory.create(
+        user=user,
+        program=program,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+    )
+
+    for course in program.required_courses:
+        run = CourseRunFactory.create(course=course)
+        CourseRunEnrollmentFactory.create(
+            user=user,
+            run=run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+
+    for course in program_with_requirements.elective_courses[:2]:
+        run = CourseRunFactory.create(course=course)
+        CourseRunEnrollmentFactory.create(
+            user=user,
+            run=run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+
+    _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
+
+    program_enrollment.refresh_from_db()
+    assert upgraded is True
+    assert program_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+
+
+def _verify_courses(user, courses):
+    """Give the user an active verified run enrollment in each course."""
+    for course in courses:
+        CourseRunEnrollmentFactory.create(
+            user=user,
+            run=CourseRunFactory.create(course=course),
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+
+
+@pytest.mark.parametrize("with_required_program", [False, True])
+def test_upgrade_program_enrollment_if_eligible_query_count(
+    user,
+    program_with_requirements,  # noqa: F811
+    with_required_program,
+):
+    """The upgrade path uses a fixed number of queries, however the tree is nested."""
+    program = program_with_requirements.program
+    program_enrollment = ProgramEnrollmentFactory.create(
+        user=user,
+        program=program,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+    )
+    _verify_courses(user, program_with_requirements.required_courses)
+    _verify_courses(user, program_with_requirements.elective_courses[:2])
+
+    if with_required_program:
+        required_program = ProgramFactory.create()
+        required_program_course = CourseFactory.create()
+        required_program.add_requirement(required_program_course)
+        program.add_program_requirement(required_program)
+        _verify_courses(user, [required_program_course])
+
+    program_enrollment = get_audit_program_enrollments_for_upgrade().get(
+        pk=program_enrollment.pk
+    )
+
+    with CaptureQueriesContext(connection) as context:
+        _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
+
+    assert len(context) == 13
+    assert upgraded is True
+
+
+@pytest.mark.parametrize("verify_whole_group", [False, True])
+def test_upgrade_program_enrollment_if_eligible_requires_whole_nested_group(
+    user, verify_whole_group
+):
+    """
+    A course inside a nested all-of group under the elective operator does not
+    count on its own; the whole group has to be verified.
+    """
+    program = ProgramFactory.create()
+    core_course = CourseFactory.create()
+    program.add_requirement(core_course)
+    groups_node = program.requirements_root.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=1,
+        title="Choose a group",
+        elective_flag=True,
+    )
+    group_courses = []
+    for title in ("Group A", "Group B"):
+        group_node = groups_node.add_child(
+            node_type=ProgramRequirementNodeType.OPERATOR,
+            operator=ProgramRequirement.Operator.ALL_OF,
+            title=title,
+        )
+        courses = CourseFactory.create_batch(2)
+        for course in courses:
+            group_node.add_child(
+                node_type=ProgramRequirementNodeType.COURSE, course=course
+            )
+        group_courses.append(courses)
+    program_enrollment = ProgramEnrollmentFactory.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+    _verify_courses(user, [core_course])
+    _verify_courses(
+        user, group_courses[0] if verify_whole_group else group_courses[0][:1]
+    )
+
+    _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
+
+    assert upgraded is verify_whole_group
+
+
+@pytest.mark.parametrize("required_program_satisfied", [False, True])
+def test_upgrade_program_enrollment_if_eligible_requires_required_program(
+    user, required_program_satisfied
+):
+    """A required program node counts only when its own tree is satisfied."""
+    required_program = ProgramFactory.create()
+    required_program_course = CourseFactory.create()
+    required_program.add_requirement(required_program_course)
+    program = ProgramFactory.create()
+    program_course = CourseFactory.create()
+    program.add_requirement(program_course)
+    program.add_program_requirement(required_program)
+    program_enrollment = ProgramEnrollmentFactory.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+    _verify_courses(user, [program_course])
+    if required_program_satisfied:
+        _verify_courses(user, [required_program_course])
+
+    _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
+
+    assert upgraded is required_program_satisfied
+
+
+@pytest.mark.parametrize("verified_per_group", [1, 2])
+def test_upgrade_program_enrollment_if_eligible_checks_each_elective_group(
+    user, verified_per_group
+):
+    """
+    Each elective group has to reach its own minimum; verified courses in one
+    group do not count towards another.
+    """
+    program = ProgramFactory.create()
+    required_courses = CourseFactory.create_batch(2)
+    for course in required_courses:
+        program.add_requirement(course)
+    elective_groups = []
+    for _ in range(2):
+        group_node = program.requirements_root.add_child(
+            node_type=ProgramRequirementNodeType.OPERATOR,
+            operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+            operator_value=2,
+            elective_flag=True,
+        )
+        courses = CourseFactory.create_batch(3)
+        for course in courses:
+            group_node.add_child(
+                node_type=ProgramRequirementNodeType.COURSE, course=course
+            )
+        elective_groups.append(courses)
+    program_enrollment = ProgramEnrollmentFactory.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+    _verify_courses(user, required_courses)
+    for courses in elective_groups:
+        _verify_courses(user, courses[:verified_per_group])
+
+    _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
+
+    assert upgraded is (verified_per_group == 2)
+
+
+def test_upgrade_program_enrollment_if_eligible_returns_false_when_electives_missing(
+    user,
+    program_with_requirements,  # noqa: F811
+):
+    """Upgrade should return False (without crashing) if elective minimum is not met."""
+    program = program_with_requirements.program
+    program_enrollment = ProgramEnrollmentFactory.create(
+        user=user,
+        program=program,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+    )
+
+    for course in program.required_courses:
+        run = CourseRunFactory.create(course=course)
+        CourseRunEnrollmentFactory.create(
+            user=user,
+            run=run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+
+    if program.elective_courses:
+        run = CourseRunFactory.create(course=program.elective_courses[0])
+        CourseRunEnrollmentFactory.create(
+            user=user,
+            run=run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+
+    _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
+
+    program_enrollment.refresh_from_db()
+    assert upgraded is False
+    assert program_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("scenario", "should_include"),
+    [
+        ("verified_only", True),
+        ("audit_mode", False),
+        ("has_certificate", False),
+        ("non_live_program", False),
+    ],
+)
+def test_get_eligible_program_certificate_candidates(scenario, should_include):
+    """Test various filter scenarios for eligible program certificate candidates."""
+    qs = get_eligible_program_certificate_candidates()
+
+    if scenario == "verified_only":
+        # Verified enrollment should be included
+        enrollment = ProgramEnrollmentFactory.create(
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+            program=ProgramFactory.create(live=True),
+        )
+    elif scenario == "audit_mode":
+        # Audit enrollments must not appear
+        enrollment = ProgramEnrollmentFactory.create(
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+            program=ProgramFactory.create(live=True),
+        )
+    elif scenario == "has_certificate":
+        # Enrollments with existing certificate must be excluded
+        program = ProgramFactory.create(live=True)
+        enrollment = ProgramEnrollmentFactory.create(
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+            program=program,
+        )
+        ProgramCertificateFactory.create(user=enrollment.user, program=program)
+    elif scenario == "non_live_program":
+        # Enrollments in non-live programs must not appear
+        enrollment = ProgramEnrollmentFactory.create(
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+            program=ProgramFactory.create(live=False),
+        )
+
+    ids = list(qs.values_list("id", flat=True))
+    if should_include:
+        assert enrollment.id in ids
+    else:
+        assert enrollment.id not in ids
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_missing_program_certificates_creates_cert(
+    mock_upsert, mocker, user, default_mode_records
+):
+    """
+    The missing certificate is created and the created counter reflects that.
+    """
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_user")
+
+    program = ProgramFactory.create(live=True)
+    program.requirements_root.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    course = CourseFactory.create()
+    program.add_requirement(course)
+    course_run = CourseRunFactory.create(course=course)
+    course_run.enrollment_modes.set(default_mode_records)
+    course_run.save()
+    CourseRunEnrollmentFactory.create(
+        run=course_run, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    ProgramEnrollment.objects.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    CourseRunCertificateFactory.create(user=user, course_run=course_run)
+
+    stats = generate_missing_program_certificates()
+
+    assert stats["created"] >= 1
+    assert ProgramCertificate.objects.filter(user=user, program=program).count() == 1
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_missing_program_certificates_idempotent(
+    mock_upsert, mocker, user, default_mode_records
+):
+    """
+    Running the task twice must not create duplicate certificates.
+    """
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_user")
+
+    program = ProgramFactory.create(live=True)
+    program.requirements_root.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    course = CourseFactory.create()
+    program.add_requirement(course)
+    course_run = CourseRunFactory.create(course=course)
+    course_run.enrollment_modes.set(default_mode_records)
+    course_run.save()
+    CourseRunEnrollmentFactory.create(
+        run=course_run, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    ProgramEnrollment.objects.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    CourseRunCertificateFactory.create(user=user, course_run=course_run)
+
+    first = generate_missing_program_certificates()
+    second = generate_missing_program_certificates()
+
+    assert first["created"] >= 1
+    assert second["created"] == 0
+    assert ProgramCertificate.objects.filter(user=user, program=program).count() == 1
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_missing_program_certificates_failure_isolation(mock_upsert, mocker):
+    """
+    An exception raised for one enrollment must not prevent the others from
+    being processed.
+    """
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_user")
+
+    ProgramEnrollmentFactory.create(
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+        program=ProgramFactory.create(live=True),
+    )
+    ProgramEnrollmentFactory.create(
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+        program=ProgramFactory.create(live=True),
+    )
+
+    call_count = 0
+
+    def _side_effect(user, program, force_create=False):  # noqa: FBT002
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            msg = "simulated transient error"
+            raise RuntimeError(msg)
+        return None, False
+
+    mock_generate = mocker.patch(
+        "courses.api.generate_program_certificate", side_effect=_side_effect
+    )
+
+    stats = generate_missing_program_certificates()
+
+    assert stats["failed"] == 1
+    assert stats["processed"] == 2
+    assert mock_generate.call_count == 2
+
+
+def test_partner_schools_for_program_unfiltered_when_flag_off(settings):
+    """With the flag off every active school is returned, preserving old behavior."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = False
+    scm = ProgramFactory.create()
+    dedp = ProgramFactory.create()
+    scm_school = PartnerSchoolFactory.create(name="SCM School")
+    dedp_school = PartnerSchoolFactory.create(name="DEDP School")
+    PartnerSchoolProgramFactory.create(partner_school=scm_school, program=scm)
+    PartnerSchoolProgramFactory.create(partner_school=dedp_school, program=dedp)
+
+    result = partner_schools_for_program(scm)
+
+    assert sorted(school.name for school in result) == ["DEDP School", "SCM School"]
+
+
+def test_partner_schools_for_program_filtered_when_flag_on(settings):
+    """With the flag on only the program's own schools are returned."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    scm = ProgramFactory.create()
+    dedp = ProgramFactory.create()
+    scm_school = PartnerSchoolFactory.create(name="SCM School")
+    dedp_school = PartnerSchoolFactory.create(name="DEDP School")
+    PartnerSchoolProgramFactory.create(partner_school=scm_school, program=scm)
+    PartnerSchoolProgramFactory.create(partner_school=dedp_school, program=dedp)
+
+    result = partner_schools_for_program(scm)
+
+    assert [school.name for school in result] == ["SCM School"]
+
+
+def test_partner_schools_for_program_deduplicates_multi_recipient_school(settings):
+    """A school with two recipient rows appears once when the flag is on."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    program = ProgramFactory.create()
+    school = PartnerSchoolFactory.create(name="Reykjavik University")
+    PartnerSchoolProgramFactory.create(
+        partner_school=school, program=program, email="vd@example.com"
+    )
+    PartnerSchoolProgramFactory.create(
+        partner_school=school, program=program, email="cs@example.com"
+    )
+
+    result = partner_schools_for_program(program)
+
+    assert [school.name for school in result] == ["Reykjavik University"]
+
+
+def test_partner_schools_for_program_excludes_unassigned_when_flag_on(settings):
+    """An untagged school is invisible once filtering is live."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    program = ProgramFactory.create()
+    PartnerSchoolFactory.create(name="Unassigned School")
+
+    assert list(partner_schools_for_program(program)) == []
+
+
+def _pass_courses(user, courses):
+    """Give the user an active run enrollment and a certificate in each course."""
+    for course in courses:
+        run = CourseRunFactory.create(course=course)
+        CourseRunEnrollmentFactory.create(user=user, run=run)
+        CourseRunCertificateFactory.create(user=user, course_run=run)
+
+
+@pytest.mark.parametrize("whole_track", [False, True])
+def test_has_earned_program_cert_with_tracks(
+    user,
+    program_with_tracks,  # noqa: F811
+    whole_track,
+):
+    """Core plus one whole track earns the certificate; one course from each track does not"""
+    general, methods = program_with_tracks.track_courses
+    _pass_courses(user, program_with_tracks.core_courses)
+    _pass_courses(user, general if whole_track else general[:1] + methods[:1])
+
+    assert _has_earned_program_cert(user, program_with_tracks.program) is whole_track
+
+
+def _create_certificate_page(*, enabled, criteria):
+    return CertificatePageFactory.create(
+        parent=CoursePageFactory.create(certificate_page=None),
+        should_provision_verifiable_credential=enabled,
+        verifiable_credential_criteria=criteria,
+    )
+
+
+@pytest.mark.parametrize(
+    ("enabled", "criteria", "expected_status"),
+    [
+        (True, "criteria", VERIFIABLE_CREDENTIAL_STATUS_ENABLED),
+        (True, None, VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA),
+        (False, "criteria", VERIFIABLE_CREDENTIAL_STATUS_DISABLED),
+        (False, None, VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA),
+    ],
+)
+def test_summarize_verifiable_credential_certificate_statuses(
+    enabled, criteria, expected_status
+):
+    """Each combination of enabled flag and criteria should map to the expected status"""
+    page = _create_certificate_page(enabled=enabled, criteria=criteria)
+
+    assert summarize_verifiable_credential_certificate_statuses() == {
+        expected_status: [f"{page.title} - {page.id}"]
+    }
+
+
+def test_summarize_verifiable_credential_certificate_statuses_return_objects():
+    """return_objects=True should return the pages themselves instead of strings"""
+    page = _create_certificate_page(enabled=True, criteria="criteria")
+
+    assert summarize_verifiable_credential_certificate_statuses(
+        return_objects=True
+    ) == {VERIFIABLE_CREDENTIAL_STATUS_ENABLED: [page]}
+
+
+def test_summarize_verifiable_credential_certificate_statuses_ids():
+    """Only pages matching the given ids should be included"""
+    page = _create_certificate_page(enabled=True, criteria="criteria")
+    _create_certificate_page(enabled=True, criteria="criteria")
+
+    assert summarize_verifiable_credential_certificate_statuses(
+        return_objects=True, ids=[page.id]
+    ) == {VERIFIABLE_CREDENTIAL_STATUS_ENABLED: [page]}
+
+    # Should filter out pages that aren't in the ID list given
+    assert (
+        summarize_verifiable_credential_certificate_statuses(
+            return_objects=True, ids=[]
+        )
+        == {}
+    )
+
+
+@pytest.mark.parametrize("upgrade_deadline", [None, now_in_utc() + timedelta(days=60)])
+def test_rerun_course_run_upgrade_deadline(mocker, upgrade_deadline):
+    """
+    A rerun gets the upgrade deadline it's given, never the base run's: that
+    deadline belongs to an earlier session.
+    """
+    mocked_clone = mocker.patch("courses.api.process_course_run_clone")
+    base_run = CourseRunFactory.create(upgrade_deadline=now_in_utc())
+
+    new_run = rerun_course_run(base_run, "9T2099", upgrade_deadline=upgrade_deadline)
+
+    new_run.refresh_from_db()
+    assert new_run.upgrade_deadline == upgrade_deadline
+    mocked_clone.assert_called_once_with(new_run, base_run.courseware_id)
+
+
+class TestUndoProgramCourseRunVerification:
+    """Tests for undo_program_course_run_verification"""
+
+    @pytest.fixture
+    def mock_edx(self, mocker):
+        """Mock the edX enrollment call made by the downgrade."""
+        return mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+    @pytest.fixture
+    def enrollment(self, user):
+        """An active verified course run enrollment."""
+        return CourseRunEnrollmentFactory.create(
+            user=user,
+            run=CourseRunFactory.create(),
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+
+    @staticmethod
+    def _run_order(enrollment, *, total_price_paid=0, redemption_type=None):
+        """
+        Create a fulfilled order with a line for the enrollment's run and its
+        PaidCourseRun, redeeming a discount of redemption_type if given.
+        """
+        product = enrollment.run.products.first()
+        if product is None:
+            with reversion.create_revision():
+                product = ProductFactory.create(purchasable_object=enrollment.run)
+        order = OrderFactory.create(
+            purchaser=enrollment.user,
+            state=OrderStatus.FULFILLED,
+            total_price_paid=total_price_paid,
+        )
+        LineFactory.create(
+            order=order,
+            product_version=reversion.models.Version.objects.get_for_object(
+                product
+            ).last(),
+            purchased_object=enrollment.run,
+        )
+        if redemption_type is not None:
+            DiscountRedemptionFactory.create(
+                redeemed_by=enrollment.user,
+                redeemed_discount=DiscountFactory.create(
+                    redemption_type=redemption_type
+                ),
+                redeemed_order=order,
+            )
+        PaidCourseRun.objects.create(
+            user=enrollment.user, course_run=enrollment.run, order=order
+        )
+        return order
+
+    def test_cancels_entitlement_order_and_downgrades(self, mock_edx, enrollment):
+        """The program entitlement order is canceled and the enrollment downgraded"""
+        order = self._run_order(enrollment, redemption_type=REDEMPTION_TYPE_INTERNAL)
+
+        orders, edx_success = undo_program_course_run_verification(enrollment)
+
+        assert orders == [order]
+        assert edx_success is True
+        order.refresh_from_db()
+        enrollment.refresh_from_db()
+        assert order.state == OrderStatus.CANCELED
+        assert enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        assert enrollment.active is True
+        assert not PaidCourseRun.objects.filter(order=order).exists()
+        mock_edx.assert_called_once()
+        assert mock_edx.call_args.kwargs["mode"] == EDX_ENROLLMENT_AUDIT_MODE
+
+    def test_unenrolled_enrollment_is_downgraded_locally_only(
+        self, mocker, mock_edx, enrollment
+    ):
+        """
+        After the learner unenrolled, the order is still canceled and the mode
+        set to audit, but the enrollment stays inactive and edX isn't called.
+        """
+        order = self._run_order(enrollment, redemption_type=REDEMPTION_TYPE_INTERNAL)
+        mocker.patch("courses.api.unenroll_edx_course_run")
+        mocker.patch("courses.api.mail_api.send_course_run_unenrollment_email")
+        deactivate_run_enrollment(
+            enrollment, change_status=ENROLL_CHANGE_STATUS_UNENROLLED
+        )
+
+        orders, edx_success = undo_program_course_run_verification(enrollment)
+
+        assert orders == [order]
+        assert edx_success is True
+        order.refresh_from_db()
+        enrollment.refresh_from_db()
+        assert order.state == OrderStatus.CANCELED
+        assert enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        assert enrollment.active is False
+        assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
+        mock_edx.assert_not_called()
+
+    def test_refuses_non_verified_enrollment(self, mock_edx, enrollment):
+        """Only a verified enrollment can be undone"""
+        order = self._run_order(enrollment, redemption_type=REDEMPTION_TYPE_INTERNAL)
+        enrollment.enrollment_mode = EDX_ENROLLMENT_AUDIT_MODE
+        enrollment.save()
+
+        with pytest.raises(ValueError, match="is not verified"):
+            undo_program_course_run_verification(enrollment)
+
+        order.refresh_from_db()
+        assert order.state == OrderStatus.FULFILLED
+        mock_edx.assert_not_called()
+
+    def test_refuses_without_entitlement_order(self, mock_edx, enrollment):
+        """An enrollment with no program entitlement order is refused"""
+        self._run_order(enrollment, total_price_paid=0, redemption_type="one-time")
+
+        with pytest.raises(ValueError, match="no program entitlement order"):
+            undo_program_course_run_verification(enrollment)
+
+        mock_edx.assert_not_called()
+
+    def test_refuses_when_also_backed_by_a_real_purchase(self, mock_edx, enrollment):
+        """An enrollment also backed by a paid order is left verified"""
+        entitlement_order = self._run_order(
+            enrollment, redemption_type=REDEMPTION_TYPE_INTERNAL
+        )
+        paid_order = self._run_order(enrollment, total_price_paid=Decimal("100.00"))
+
+        with pytest.raises(ValueError, match=paid_order.reference_number):
+            undo_program_course_run_verification(enrollment)
+
+        entitlement_order.refresh_from_db()
+        enrollment.refresh_from_db()
+        assert entitlement_order.state == OrderStatus.FULFILLED
+        assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        mock_edx.assert_not_called()
+
+    def test_refuses_b2b_enrollment(self, mock_edx, enrollment):
+        """A B2B-provisioned enrollment is refused"""
+        self._run_order(enrollment, redemption_type=REDEMPTION_TYPE_INTERNAL)
+        enrollment.b2b_contract = ContractPageFactory.create()
+        enrollment.save()
+
+        with pytest.raises(ValueError, match="B2B-provisioned"):
+            undo_program_course_run_verification(enrollment)
+
+        mock_edx.assert_not_called()

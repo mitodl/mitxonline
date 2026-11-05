@@ -1,0 +1,942 @@
+"""Management command to work with B2B enrollment codes."""
+
+import csv
+import json
+import logging
+import uuid
+from pathlib import Path
+
+from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
+from django.core.management import BaseCommand, CommandError
+from django.db import transaction
+from django.db.models import Count, Prefetch, Q
+from mitol.common.utils import now_in_utc
+from rich.console import Console
+from rich.table import Table
+
+from b2b.api import (
+    ensure_contract_run_pricing,
+    ensure_contract_run_products,
+    ensure_enrollment_codes_exist,
+    get_contract_products_with_bad_pricing,
+    get_contract_runs_without_products,
+    lock_contract_for_code_assignment,
+)
+from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
+from b2b.contracts import (
+    expected_enrollment_code_count,
+    expire_unused_enrollment_codes,
+)
+from b2b.management.utils import get_contract_by_id_or_slug
+from b2b.models import ContractPage, DiscountContractAttachmentRedemption
+from courses.models import CourseRun
+from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME, REDEMPTION_TYPE_UNLIMITED
+from ecommerce.models import Discount, DiscountRedemption, OrderStatus
+
+log = logging.getLogger(__name__)
+
+
+def is_valid_uuid(test_uuid: str) -> bool:
+    """Determine if the string is a UUID or not."""
+
+    try:
+        uuid.UUID(str(test_uuid))
+    except ValueError:
+        return False
+
+    return True
+
+
+class Command(BaseCommand):
+    """Operations for B2B enrollment codes."""
+
+    help = "Operations to manage B2B enrollment codes - check validity, create/update, etc."
+    operations = [
+        "check",
+        "generate",
+        "validate",
+        "expire",
+    ]
+    output_options = [
+        "fancy",
+        "csv",
+        "json",
+    ]
+
+    def _add_b2b_obj_args(self, parser):
+        """Add B2B object arguments to the parser."""
+
+        parser.add_argument(
+            "--contract",
+            help="The contract to manage (either ID or slug).",
+            type=str,
+        )
+        parser.add_argument(
+            "--organization",
+            "--org",
+            help="The organization to pull contracts to manage from (either ID, slug, or UUID).",
+            type=str,
+        )
+
+    def _get_contract_list(self, *, allow_everything=False, **kwargs):
+        """Get the contract list based on the arguments passed."""
+        contracts = []
+
+        contract_id = kwargs.pop("contract", False)
+        org_id = kwargs.pop("organization", False)
+        if contract_id:
+            self.stdout.write(f"Filtering by contract: {contract_id}")
+            contract = get_contract_by_id_or_slug(contract_id)
+
+            if not contract:
+                msg = f"Identifier {contract_id} not found."
+                raise CommandError(msg)
+
+            contracts = ContractPage.objects.filter(id=contract.id)
+        elif org_id:
+            self.stdout.write(f"Filtering by organization: {org_id}")
+            if org_id.isdecimal():
+                contracts = ContractPage.objects.filter(organization__id=org_id).all()
+            elif is_valid_uuid(org_id):
+                contracts = ContractPage.objects.filter(
+                    organization__sso_organization_id=org_id
+                ).all()
+            else:
+                contracts = ContractPage.objects.filter(
+                    Q(organization__slug=org_id) | Q(organization__org_key=org_id)
+                ).all()
+        elif allow_everything:
+            self.stdout.write(
+                self.style.WARNING(
+                    "No contract or org specified - operating on all contracts."
+                )
+            )
+            contracts = ContractPage.objects.all()
+
+        if len(contracts) == 0:
+            self.stdout.write(self.style.WARNING("No contracts found."))
+
+        return contracts
+
+    def _output_code_data(
+        self, output_format, output_data, *, filename=None, table_name="Table"
+    ):
+        """Handle the output for the check command."""
+
+        if len(output_data) == 0:
+            self.stdout.write(self.style.ERROR("Nothing to output."))
+            return
+
+        if output_format not in ["csv", "json"]:
+            # Output using Rich - this goes straight to the console.
+            console = Console()
+            table = Table(title=table_name)
+
+            for col_name in output_data[0]:
+                table.add_column(col_name, overflow="fold")
+
+            for row in output_data:
+                table.add_row(*row.values())
+
+            console.print(table)
+            return
+
+        with Path(filename).open("w+") if filename else self.stdout as outfile:
+            if output_format == "json":
+                json.dump(output_data, outfile)
+            else:
+                writer = csv.DictWriter(outfile, output_data[0].keys())
+
+                writer.writeheader()
+                for row in output_data:
+                    writer.writerow(row)
+
+        if filename:
+            self.stdout.write(
+                self.style.SUCCESS(f"Wrote {output_format} output to {filename}.")
+            )
+
+    def _output_contract_stats_table(self, contract):
+        """Gather stats on code usage for the specified contract."""
+
+        usage_data = {
+            "Seat Limit": str(contract.max_learners)
+            if contract.max_learners
+            else "Unlim",
+            "Assignments": str(contract.get_assignments().count()),
+            "Attachments": str(contract.get_learners().count()),
+            "Run Count": str(contract.get_course_runs().count()),
+            "Enrollments": str(contract.get_enrollments().count()),
+            "Total Codes": str(contract.get_discounts().count()),
+            "Redeemed for Attachment": str(0),
+            "Redeemed for Enrollment": str(0),
+        }
+
+        usage_data["Redeemed for Enrollment"] = str(
+            DiscountRedemption.objects.filter(
+                redeemed_discount__in=contract.get_discounts(),
+                redeemed_order__state=OrderStatus.FULFILLED,
+            ).count()
+        )
+        usage_data["Redeemed for Attachment"] = str(
+            DiscountContractAttachmentRedemption.objects.filter(
+                contract=contract
+            ).count()
+        )
+
+        self._output_code_data(
+            "fancy", [usage_data], table_name=f"Stats for {contract}"
+        )
+
+        if contract.max_learners and contract.is_overfull():
+            self.stdout.write(
+                self.style.ERROR(f"Contract {contract} is overcommitted.")
+            )
+
+    def _format_enrollment_codes(
+        self, contract, discounts, *, include_redemption_info=True
+    ):
+        """Format the enrollment codes for output."""
+
+        codes = []
+        content_type = ContentType.objects.get_for_model(CourseRun)
+        contract_products = contract.get_products()
+
+        for discount in discounts:
+            assignment = getattr(discount, "contract_assignments", [])
+            assignment = assignment[0] if len(assignment) > 0 else None
+
+            code = {
+                "Contract": str(contract),
+                "Course Run": "",
+                "Enrollment Code": discount.discount_code,
+                "Assigned To": f"{assignment.assigned_name} <{assignment.assigned_email}>"
+                if assignment
+                else "",
+                "Attach Redemption": "",
+                "Enroll Redemption": "",
+                "Attach Link": f"{settings.MIT_LEARN_ATTACH_URL}{discount.discount_code}/",
+            }
+
+            if include_redemption_info:
+                attach_qs = discount.contract_redemptions.filter(
+                    contract=contract, user__isnull=False
+                )
+                if attach_qs.count():
+                    code["Attach Redemption"] = ",".join(
+                        [dcr.user.email for dcr in attach_qs.all()]
+                    )
+
+                enroll_qs = discount.order_redemptions
+                if enroll_qs.count():
+                    code["Enroll Redemption"] = ",".join(
+                        [ecr.redeemed_by.email for ecr in enroll_qs.all()]
+                    )
+
+            codes.extend(
+                [
+                    {**code, "Course Run": dp.product.purchasable_object.courseware_id}
+                    for dp in discount.products.filter(
+                        product__content_type=content_type,
+                        product__in=contract_products,
+                    ).all()
+                ]
+            )
+
+        return codes
+
+    def _validate_contract_products(self, contract, *, fix=False):
+        """Validate the products for the given contract."""
+
+        public_runs_no_products = get_contract_runs_without_products(
+            contract, public_only=True
+        )
+
+        if public_runs_no_products.count() > 0:
+            public_runs_no_product_keys = ", ".join(
+                [public_run.courseware_id for public_run in public_runs_no_products]
+            )
+            msg = f"Contract {contract} contains public course runs with no products (or no active products): {public_runs_no_product_keys}"
+            raise CommandError(msg)
+
+        if get_contract_runs_without_products(contract).count() > 0:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Contract {contract} has associated course runs that are missing products."
+                )
+            )
+
+            if fix:
+                new_products = ensure_contract_run_products(contract)
+
+                self.stdout.write(
+                    self.style.SUCCESS(f"Added {len(new_products)} products.")
+                )
+            else:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Dry-run: would have added {get_contract_runs_without_products(contract).count()} products."
+                    )
+                )
+
+        public_products = contract.get_products(public_only=True)
+
+        if public_products.count() > 0:
+            public_run_keys = [
+                public_product.purchasable_object.courseware_id
+                for public_product in public_products
+            ]
+            public_run_keys = ", ".join(public_run_keys)
+
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Contract {contract} has associated course runs and products that are public - will not update the price for these: {public_run_keys}"
+                )
+            )
+
+    def _validate_contract_pricing(self, contract, *, fix=False):
+        """Validate the contract product pricing"""
+
+        if get_contract_products_with_bad_pricing(contract).count() > 0:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Contract {contract} has course runs with products that have incorrect pricing."
+                )
+            )
+
+            if fix:
+                fixed_products = ensure_contract_run_pricing(contract)
+
+                self.stdout.write(
+                    self.style.SUCCESS(f"Updated {fixed_products} products.")
+                )
+            else:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Dry-run: would have updated {get_contract_products_with_bad_pricing(contract).count()} products."
+                    )
+                )
+
+    def _validate_contract_codes(self, contract, *, fix=False):
+        """Validate/update the enrollment codes for the contract"""
+
+        if (
+            contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS
+            and not contract.enrollment_fixed_price
+        ):
+            # This is a managed contract with no price - people are added to
+            # this automatically, so there shouldn't be any unredeemed codes.
+
+            # Step 4: remove any unused codes, since we shouldn't have any.
+            # There may be redeemed codes, because this contract may have
+            # changed types or prices at some point. Those are left alone.
+
+            total_codes = contract.get_discounts()
+            unredeemed_codes = contract.get_unused_discounts()
+
+            if total_codes.count() > unredeemed_codes.count():
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Contract {contract} has too many codes: {unredeemed_codes.count()} available out of {total_codes.count()} total, expecting 0."
+                    )
+                )
+
+                removed_codes = ",".join(
+                    [code.discount_code for code in unredeemed_codes]
+                )
+
+                # Remove unredeemed codes.
+                if fix:
+                    unredeemed_codes.delete()
+                    self.stdout.write(
+                        self.style.SUCCESS(f"Removed codes: {removed_codes}")
+                    )
+                else:
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"Dry-run: would have removed codes: {removed_codes}"
+                        )
+                    )
+        else:
+            # This contract requires enrollment codes. Check to make sure
+            # we have the proper amount and that they're set up correctly.
+
+            # Step 4: figure out what codes should be there
+
+            expected_amount = (
+                0
+                if not contract.enrollment_fixed_price
+                else contract.enrollment_fixed_price
+            )
+
+            expected_codes_count = expected_enrollment_code_count(contract)
+            code_redemption_type = (
+                REDEMPTION_TYPE_ONE_TIME
+                if contract.max_learners
+                else REDEMPTION_TYPE_UNLIMITED
+            )
+
+            total_code_count = contract.get_discounts().count()
+
+            self.stdout.write(
+                f"Found {total_code_count} enrollment codes, expected {expected_codes_count}"
+            )
+
+            if expected_codes_count != total_code_count:
+                # We either have too many or too few codes.
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Code count for {contract} is not what is expected: expected {expected_codes_count}, got {total_code_count}"
+                    )
+                )
+
+                if fix:
+                    ensure_enrollment_codes_exist(contract)
+
+            # Step 5: make sure the codes are the right type and amount
+
+            bad_settings_codes_qs = contract.get_discounts().exclude(
+                redemption_type=code_redemption_type, amount=expected_amount
+            )
+
+            if bad_settings_codes_qs.count() > 0:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Contract {contract} has {bad_settings_codes_qs.count()} codes with bad settings"
+                    )
+                )
+
+                bad_codes = bad_settings_codes_qs.all()
+
+                if fix:
+                    for code in bad_codes:
+                        code.redemption_type = code_redemption_type
+                        code.amount = expected_amount
+
+                    updated_count = Discount.objects.bulk_update(
+                        bad_codes, ["redemption_type", "amount"]
+                    )
+
+                    self.stdout.write(f"Updated {updated_count} codes.")
+                else:
+                    self.stdout.write(
+                        f"Dry-run: would have updated {bad_codes.count()} codes."
+                    )
+
+    def handle_output(self, **kwargs):  # noqa: C901
+        """Output code information."""
+
+        contracts = self._get_contract_list(allow_everything=True, **kwargs)
+
+        if kwargs.pop("stats", False):
+            # Display usage for the contract(s). This is basically an overview
+            # report.
+
+            self.stdout.write(f"Generating stats for {len(contracts)} contracts...")
+
+            for contract in contracts:
+                self._output_contract_stats_table(contract)
+
+            return
+
+        if kwargs.pop("assignments", False):
+            # Display just assignments, in a manner similar to --usage.
+
+            code_assignments = []
+
+            for contract in contracts:
+                code_assignments.extend(
+                    [
+                        {
+                            "Contract": str(contract),
+                            "Code": str(dcar.discount.discount_code),
+                            "Assigned To": str(dcar.assigned_name),
+                            "Assigned Email": str(dcar.assigned_email),
+                            "Assignment Date": str(dcar.created_on),
+                        }
+                        for dcar in contract.get_assignments().all()
+                    ]
+                )
+
+            self._output_code_data(
+                kwargs.pop("output_format", "fancy"),
+                code_assignments,
+                filename=kwargs.pop("filename", None),
+                table_name="Code Assignments",
+            )
+
+            return
+
+        if kwargs.pop("usage", False):
+            # Display just code redemptions per contract.
+            # This will be one big table with a flag specifying if the code is
+            # used for attach or enroll. Codes may be listed twice because they
+            # may be used for attach _and_ enroll.
+
+            code_usage = []
+
+            for contract in contracts:
+                attachments = [
+                    {
+                        "Contract": str(contract),
+                        "Code": str(dcar.discount.discount_code),
+                        "Redeemed By": str(dcar.user.email),
+                        "Redemption Date": str(dcar.created_on),
+                        "Type": "attach",
+                    }
+                    for dcar in DiscountContractAttachmentRedemption.objects.prefetch_related(
+                        "discount", "user"
+                    )
+                    .filter(contract=contract, user__isnull=False)
+                    .all()
+                ]
+                enrollments = [
+                    {
+                        "Contract": str(contract),
+                        "Code": str(dr.redeemed_discount.discount_code),
+                        "Redeemed By": str(dr.redeemed_by.email),
+                        "Redemption Date": str(dr.redemption_date),
+                        "Type": "enroll",
+                    }
+                    for dr in DiscountRedemption.objects.prefetch_related(
+                        "redeemed_discount", "redeemed_by"
+                    )
+                    .filter(redeemed_discount__in=contract.get_discounts())
+                    .all()
+                ]
+                code_usage.extend(attachments)
+                code_usage.extend(enrollments)
+
+            self._output_code_data(
+                kwargs.pop("output_format", "fancy"),
+                code_usage,
+                filename=kwargs.pop("filename", None),
+                table_name="Code Usage",
+            )
+
+            return
+
+        # If usage or stats flags aren't set, list out the codes.
+        # Codes will be listed for attachment to the contract.
+        # - If the "all" flag is set, then we output all the codes along with the
+        #   course runs they belong to, with flags for usage for attachment or
+        #   enrollment.
+        # - Otherwise, only an appropriate number of codes is gathered that have
+        #   not been used yet. If the contract has a learner limit, only a sufficient
+        #   number of codes to fill the contract will be delivered. (e.g. for 100
+        #   seats, 19 occupied, you'd get back 81 codes.)
+
+        codes = []
+        include_redemption_info = kwargs.pop("include_redemption_info", True)
+
+        if kwargs.pop("all", False):
+            for contract in contracts:
+                discounts = contract.get_discounts().prefetch_related(
+                    Prefetch(
+                        "contract_redemptions",
+                        queryset=DiscountContractAttachmentRedemption.objects.exclude(
+                            assigned_email=""
+                        ),
+                        to_attr="contract_assignments",
+                    )
+                )
+
+                codes.extend(self._format_enrollment_codes(contract, discounts))
+
+            self._output_code_data(
+                kwargs.pop("output_format", "fancy"),
+                codes,
+                table_name="Enrollment Codes",
+                filename=kwargs.pop("filename", None),
+            )
+
+            return
+
+        for contract in contracts:
+            remaining_discounts = 1
+
+            if contract.max_learners:
+                attached_learner_count = contract.get_learners().count()
+                remaining_discounts = contract.max_learners - attached_learner_count
+
+            annotated_discounts = (
+                contract.get_discounts()
+                .prefetch_related(
+                    Prefetch(
+                        "contract_redemptions",
+                        queryset=DiscountContractAttachmentRedemption.objects.exclude(
+                            assigned_email=""
+                        ),
+                        to_attr="contract_assignments",
+                    )
+                )
+                .annotate(
+                    actual_redemption_count=Count(
+                        "contract_redemptions",
+                        filter=Q(contract_redemptions__user__isnull=False),
+                    )
+                )
+                .filter(actual_redemption_count=0)
+                .all()[:remaining_discounts]
+            )
+
+            codes.extend(
+                self._format_enrollment_codes(
+                    contract,
+                    annotated_discounts,
+                    include_redemption_info=include_redemption_info,
+                )
+            )
+
+        self._output_code_data(
+            kwargs.pop("output_format", "fancy"),
+            codes,
+            table_name="Enrollment Codes",
+            filename=kwargs.pop("filename", None),
+        )
+
+        return
+
+    def handle_validate(self, **kwargs):
+        """Validate and fix enrollment codes."""
+
+        contracts = self._get_contract_list(**kwargs, allow_everything=False)
+        fix = kwargs.get("fix", False)
+
+        for contract in contracts:
+            self.stdout.write(f"Contract {contract} is type {contract.membership_type}")
+
+            # Step 1: check for products for the associated course runs
+            self._validate_contract_products(contract, fix=fix)
+
+            # Step 2: make sure the products have the right pricing
+            self._validate_contract_pricing(contract, fix=fix)
+
+            # Step 3: check if the contract should have codes
+            self._validate_contract_codes(contract, fix=fix)
+
+        self.stdout.write(self.style.SUCCESS(f"Checked {len(contracts)} contracts."))
+
+    def handle_expire(self, **kwargs):
+        """Expire (delete) unused enrollment codes."""
+
+        contracts = self._get_contract_list(**kwargs, allow_everything=False)
+        dry_run = kwargs.pop("expire", True)
+
+        if len(contracts) > 0:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"WARNING: Expiring codes from {len(contracts)} contracts."
+                )
+            )
+
+        if not dry_run:
+            self.stdout.write(
+                self.style.WARNING(
+                    "WARNING: Expire mode active - will deactivate/delete codes."
+                )
+            )
+
+        removed_codes = []
+
+        for contract in contracts:
+            removed_codes.extend(
+                [str(contract), code, "deleted" if deleted else "detached"]
+                for code, deleted in expire_unused_enrollment_codes(
+                    contract, dry_run=dry_run
+                )
+            )
+
+        self.stdout.write(self.style.SUCCESS(f"{len(removed_codes)} codes removed."))
+
+        [self.stdout.write(",".join(code)) for code in removed_codes]
+
+    def handle_assign(self, **kwargs):  # noqa: C901, PLR0915
+        """Handle assignments for the specified contract."""
+
+        if kwargs.get("all", False):
+            self.stderr.write("Sorry, can't assign codes for all contracts.")
+            return
+
+        contracts = self._get_contract_list(**kwargs, allow_everything=False)
+        dry_run = not kwargs.pop("commit", False)
+
+        if dry_run:
+            self.stdout.write(
+                self.style.WARNING("Commit flag not set - no changes will be written.")
+            )
+
+        file = kwargs.pop("input_file", None)
+
+        assignees = []
+
+        if file:
+            with Path.open(file) as csvfile:
+                csvreader = csv.reader(csvfile)
+                for email, name, *_ in csvreader:
+                    self.stdout.write(f"Found {email} - {name}")
+                    assignees.append([email, name])
+        else:
+            assignees.append(
+                [kwargs.pop("assigned_email", False), kwargs.pop("assigned_name", "")]
+            )
+
+            if not assignees[0][0]:
+                self.stderr.write(
+                    "No input file specified, and no email supplied either. Can't continue."
+                )
+                return
+
+        if len(assignees) == 0:
+            self.stderr.write("Nothing to work with.")
+            return
+
+        if kwargs.pop("revoke", False):
+            # We're revoking these, not assigning them, so find the applicable
+            # redemption records, clear the assignment, and regen the code.
+
+            revocatables = []
+
+            for contract in contracts:
+                self.stdout.write(
+                    f"Getting assignments for revocation for {contract.title}..."
+                )
+
+                revocatables.extend(
+                    contract.code_redemptions.filter(
+                        user__isnull=True, assigned_email__in=[a[0] for a in assignees]
+                    ).all()
+                )
+
+            self.stdout.write(f"Revoking {len(revocatables)} assignments...")
+
+            with transaction.atomic():
+                for revocatable in revocatables:
+                    revocatable.assigned_email = ""
+                    revocatable.assigned_name = ""
+                    revocatable.discount.discount_code = uuid.uuid4()
+
+                    if not dry_run:
+                        revocatable.save()
+
+                self.stdout.write(
+                    self.style.SUCCESS(f"Cleared {len(revocatables)} assignments.")
+                )
+
+            return
+
+        for contract in contracts:
+            self.stdout.write(f"Processing assignments for {contract.title}...")
+
+            if (
+                contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS
+                or contract.max_learners == ""
+                or contract.max_learners < 1
+            ):
+                self.stderr.write(
+                    f"Contract {contract.title} doesn't use per-seat codes, skipping"
+                )
+                continue
+
+            if len(assignees) > contract.max_learners:
+                self.stderr.write(
+                    f"Too many assignees ({len(assignees)}) for the number of seats in the contract ({contract.max_learners}), skipping"
+                )
+                continue
+
+            # Held from the free-code check through the insert, so this can't
+            # pick a code that a manager's bulk assign is handing out.
+            with transaction.atomic():
+                lock_contract_for_code_assignment(contract)
+
+                already_assigned = list(
+                    contract.discounts_qs.filter(
+                        contract_redemptions__assigned_email__in=[
+                            a[0] for a in assignees
+                        ]
+                    ).values_list("contract_redemptions__assigned_email", flat=True)
+                )
+
+                if len(already_assigned) > 0:
+                    already_done = " ".join(already_assigned)
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"{len(already_assigned)} codes already assigned to these users: {already_done}"
+                        )
+                    )
+
+                unused_codes = contract.get_unused_discounts().exclude(
+                    pk__in=contract.get_assignments().values_list(
+                        "discount_id", flat=True
+                    )
+                )
+
+                if unused_codes.count() < len(assignees) - len(already_assigned):
+                    self.stderr.write(
+                        f"Not enough free codes for {len(assignees)} new assignee(s) in contract {contract.title} ({unused_codes.count()}), skipping"
+                    )
+                    continue
+
+                unused_codes = list(unused_codes)
+
+                now = now_in_utc()
+
+                code_assignments = [
+                    DiscountContractAttachmentRedemption(
+                        contract=contract,
+                        assigned_name=a[1],
+                        assigned_email=a[0],
+                        created_on=now,
+                        discount=unused_codes.pop(),
+                    )
+                    for a in assignees
+                    if a[0] not in already_assigned
+                ]
+
+                if not dry_run:
+                    self.stdout.write(
+                        f"Committing {len(code_assignments)} new assignments for {contract.title}"
+                    )
+                    DiscountContractAttachmentRedemption.objects.bulk_create(
+                        code_assignments
+                    )
+
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Processed {len(code_assignments)} assignments for {contract}."
+                )
+            )
+
+    def add_arguments(self, parser):
+        """Add arguments to the command."""
+
+        subparser = parser.add_subparsers(
+            title="Operation",
+            help="The operation to perform.",
+            dest="operation",
+        )
+
+        output_parser = subparser.add_parser(
+            "output",
+            help="Output enrollment codes for a contract or organization.",
+        )
+        validate_parser = subparser.add_parser(
+            "validate",
+            help="Validate and fix enrollment codes for a contract or organization.",
+            aliases=[
+                "fix",
+                "check",
+            ],
+        )
+        expire_parser = subparser.add_parser(
+            "expire",
+            help="Expire enrollment codes for a contract or organization, optionally creating new ones.",
+        )
+        assign_parser = subparser.add_parser(
+            "assign", help="Assign codes to people, or clear existing assignments."
+        )
+
+        self._add_b2b_obj_args(output_parser)
+        self._add_b2b_obj_args(validate_parser)
+        self._add_b2b_obj_args(expire_parser)
+        self._add_b2b_obj_args(assign_parser)
+
+        output_parser.add_argument(
+            "--format",
+            type=str,
+            default="fancy",
+            choices=self.output_options,
+            help="Output format (json, csv, fancy) (not for stats).",
+            dest="output_format",
+        )
+        output_parser.add_argument(
+            "--filename", type=str, help="Output to file (not for stats)."
+        )
+        output_parser.add_argument(
+            "--stats",
+            action="store_true",
+            help="Output statistics about code usage.",
+        )
+        output_parser.add_argument(
+            "--usage",
+            action="store_true",
+            help="Output redemptions/usage for codes.",
+        )
+        output_parser.add_argument(
+            "--assignments",
+            action="store_true",
+            help="Output assignments for codes.",
+        )
+        output_parser.add_argument(
+            "--all",
+            action="store_true",
+            help="Output all codes, rather than a usable subset.",
+        )
+        output_parser.add_argument(
+            "--no-redemptions",
+            default=True,
+            action="store_false",
+            dest="include_redemption_info",
+            help="Don't include user data for code redemptions. (Cleaner output for sending to clients. Does not apply to --all.)",
+        )
+
+        validate_parser.add_argument(
+            "--fix",
+            help="Fix the codes - otherwise, this will just tell you if the code set is invalid.",
+            action="store_true",
+        )
+
+        expire_parser.add_argument(
+            "--expire",
+            help="Actually expire the codes. (Default is to not make changes.)",
+            action="store_false",
+            default=True,
+        )
+
+        assign_parser.add_argument(
+            "--name",
+            type=str,
+            dest="assigned_name",
+            help="The name of the assignee. Valid only with --email.",
+        )
+        assign_parser.add_argument(
+            "--email",
+            type=str,
+            dest="assigned_email",
+            help="The email address of the assignee. Required if only assigning a single code or revoking an assignment.",
+        )
+        assign_parser.add_argument(
+            "--file",
+            "--csv",
+            type=str,
+            dest="input_file",
+            help="The file to read for assignments (CSV in 'email,name' format).",
+        )
+        assign_parser.add_argument(
+            "--revoke",
+            action="store_true",
+            help="Revoke the user(s). This will regenerate the code as well.",
+        )
+        assign_parser.add_argument(
+            "--commit",
+            action="store_true",
+            help="Commit the requested changes. Otherwise, this will be a dry run.",
+        )
+
+    def handle(self, *args, **kwargs):
+        """Dispatch the requested subcommand."""
+
+        op = kwargs.pop("operation")
+
+        if op == "output":
+            self.handle_output(*args, **kwargs)
+        elif op in ["validate", "fix", "check"]:
+            self.handle_validate(*args, **kwargs)
+        elif op == "expire":
+            self.handle_expire(*args, **kwargs)
+        elif op == "assign":
+            self.handle_assign(*args, **kwargs)
+        else:
+            msg = f"Invalid subcommand {op}"
+            raise CommandError(msg)

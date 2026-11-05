@@ -23,7 +23,7 @@ urlpatterns = [
         RegisterExtraDetailsView.as_view(),
         name="profile-extra-api",
     ),
-    path(r"login/", GatewayLoginView.as_view(), name="gateway-login"),
+    path("login/", GatewayLoginView.as_view(), name="gateway-login"),
     re_path(
         r"^logout\/?$",
         OpenedxAndApiGatewayLogoutView.as_view(),

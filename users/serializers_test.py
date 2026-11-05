@@ -3,7 +3,7 @@
 import pytest
 import responses
 from django.contrib.auth.models import AnonymousUser
-from django.test.client import RequestFactory
+from django.test import RequestFactory
 from pytest_lazy_fixtures import lf
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
@@ -37,8 +37,6 @@ def test_validate_legal_address(valid_address_dict):
 @pytest.mark.parametrize(
     "field,value,error",  # noqa: PT006
     [
-        ["first_name", "", "First name cannot be blank"],  # noqa: PT007
-        ["last_name", "", "Last name cannot be blank"],  # noqa: PT007
         ["country", "", "This field may not be blank."],  # noqa: PT007
         ["country", None, "This field may not be null."],  # noqa: PT007
     ],
@@ -363,34 +361,6 @@ def test_user_create_required_fields_not_post(valid_address_dict, settings):
     request.user = AnonymousUser()
     serializer = UserSerializer(data=base_data, context={"request": request})
     assert serializer.is_valid() is True
-
-
-def test_legal_address_serializer_invalid_name(valid_address_dict):
-    """Test that LegalAddressSerializer raises an exception if any if the first or last name is not valid"""
-
-    # To make sure that this test isn't flaky, Checking all the character and sequences that should match our name regex
-
-    # Case 1: Make sure that invalid character(s) doesn't exist within the name
-    for invalid_character in "~!@&)(+:'.?/,`-":
-        # Replace the invalid character on 3 different places within name for rigorous testing of this case
-        valid_address_dict["first_name"] = (
-            f"{invalid_character}First{invalid_character} Name{invalid_character}"
-        )
-        valid_address_dict["last_name"] = (
-            f"{invalid_character}Last{invalid_character} Name{invalid_character}"
-        )
-        serializer = LegalAddressSerializer(data=valid_address_dict)
-        with pytest.raises(ValidationError):
-            serializer.is_valid(raise_exception=True)
-
-    # Case 2: Make sure that name doesn't start with valid special character(s)
-    # These characters are valid for a name but they shouldn't be at the start
-    for valid_character in '^/$#*=[]`%_;<>{}"|':
-        valid_address_dict["first_name"] = f"{valid_character}First"
-        valid_address_dict["last_name"] = f"{valid_character}Last"
-        serializer = LegalAddressSerializer(data=valid_address_dict)
-        with pytest.raises(ValidationError):
-            serializer.is_valid(raise_exception=True)
 
 
 @pytest.mark.parametrize("invalid_profile", [True, False])

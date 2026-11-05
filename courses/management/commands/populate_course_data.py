@@ -72,6 +72,7 @@ def create_courses_from_data_list(course_data_list):
                 min_weekly_hours=course_data["min_weekly_hours"],
                 max_weekly_hours=course_data["max_weekly_hours"],
                 length=course_data["length"],
+                include_in_learn_catalog=True,
             )
             course_cms_page.custom_tabs = ["content", "instructors", "faq"]
             course_index = CourseIndexPage.objects.first()
@@ -94,7 +95,7 @@ def create_courses_from_data_list(course_data_list):
             )
             if run["is_upgradable"]:
                 with reversion.create_revision():
-                    product, created = Product.objects.update_or_create(
+                    _, created = Product.objects.update_or_create(
                         object_id=course_run.id,
                         content_type=course_run_content_type,
                         is_active=True,

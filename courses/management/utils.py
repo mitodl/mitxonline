@@ -1,19 +1,28 @@
 """Utility functions/classes for course management commands"""
 
 import json
+import logging
 
-from django.core.management.base import BaseCommand, CommandError
+from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand
 from mitol.common.utils.collections import has_equal_properties
 
 from courses import mail_api
-from courses.models import CourseRun, CourseRunEnrollment, Program, ProgramEnrollment
+from courses.api import create_run_enrollments, deactivate_run_enrollment
+from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
+from courses.models import CourseRun, CourseRunEnrollment, ProgramEnrollment
 from main import settings
-from openedx.api import enroll_in_edx_course_runs
+from openedx.api import create_user, enroll_in_edx_course_runs
+from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE
 from openedx.exceptions import (
     EdxApiEnrollErrorException,
     NoEdxApiAuthError,
     UnknownEdxApiEnrollException,
 )
+from users.api import fetch_user
+
+User = get_user_model()
+log = logging.getLogger(__name__)
 
 
 def enrollment_summary(enrollment):
@@ -58,6 +67,286 @@ def create_or_update_enrollment(model_cls, defaults=None, **kwargs):
     return enrollment, created
 
 
+def unenroll_learner_from_run(
+    user, course_run, *, keep_failed_enrollments=False, send_notification=True
+):
+    """
+    Unenroll a single learner from a course run in both edX and MITx Online.
+
+    Args:
+        user (User): The user to unenroll
+        course_run (CourseRun): The course run to unenroll from
+        keep_failed_enrollments (bool): If True, keeps the local enrollment record
+            even if the edX unenrollment fails.
+        send_notification (bool): If True, sends unenrollment email to the learner.
+
+    Returns:
+        tuple[CourseRunEnrollment | None, str]: (enrollment_result, message)
+            enrollment_result is the deactivated enrollment on success, None on failure.
+            message is a human-readable status string.
+    """
+    enrollment = CourseRunEnrollment.objects.filter(user=user, run=course_run).first()
+    if enrollment is None or not enrollment.active:
+        return (
+            None,
+            f"No active enrollment for {user.email} in {course_run.courseware_id}",
+        )
+
+    result = deactivate_run_enrollment(
+        enrollment,
+        change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
+        keep_failed_enrollments=keep_failed_enrollments,
+        send_notification=send_notification,
+    )
+    if result:
+        return (
+            result,
+            f"Unenrolled: {user.email} from {course_run.courseware_id}",
+        )
+    return (
+        None,
+        f"Failed to unenroll {user.email} from {course_run.courseware_id}",
+    )
+
+
+def enroll_learner_in_run(  # noqa: PLR0913
+    user,
+    course_run,
+    *,
+    mode=EDX_DEFAULT_ENROLLMENT_MODE,
+    keep_failed_enrollments=False,
+    skip_compliance_check=False,
+    skip_enrollment_emails=False,
+):
+    """
+    Enroll a single learner in a course run in both edX and MITx Online.
+
+    Creates the learner's edX account first if they don't already have one,
+    matching the behavior of the `create_enrollment` management command.
+
+    Args:
+        user (User): The user to enroll
+        course_run (CourseRun): The course run to enroll in
+        mode (str): The enrollment mode (default: audit)
+        keep_failed_enrollments (bool): If True, keeps the local enrollment record
+            even if the edX enrollment fails.
+        skip_compliance_check (bool): If True, bypasses the export compliance
+            check. Operator-run commands only.
+        skip_enrollment_emails (bool): If True, don't send the learner the
+            enrollment confirmation email.
+
+    Returns:
+        tuple[CourseRunEnrollment | None, str]: (enrollment_result, message)
+            enrollment_result is the created/updated enrollment on success, None on failure.
+            message is a human-readable status string.
+    """
+    try:
+        if not user.openedx_user_exists:
+            create_user(user)
+            user.refresh_from_db()
+
+        successful_enrollments, edx_request_success = create_run_enrollments(
+            user,
+            [course_run],
+            keep_failed_enrollments=keep_failed_enrollments,
+            mode=mode,
+            skip_compliance_check=skip_compliance_check,
+            skip_enrollment_emails=skip_enrollment_emails,
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        # create_user() re-raises edX failures (e.g. unreachable edX) unless
+        # IGNORE_EDX_FAILURES is set, so this must be caught here to keep a
+        # single bad row from aborting the rest of a bulk enrollment run.
+        log.exception("Failed to enroll %s in %s", user.email, course_run.courseware_id)
+        return (
+            None,
+            f"Failed to enroll {user.email} in {course_run.courseware_id}: {exc}",
+        )
+
+    if not successful_enrollments:
+        return (
+            None,
+            f"Failed to enroll {user.email} in {course_run.courseware_id}",
+        )
+
+    status = "" if edx_request_success else " (edX enrollment failed)"
+    return (
+        successful_enrollments[0],
+        f"Enrolled {user.email} in {course_run.courseware_id}{status}",
+    )
+
+
+def bulk_enroll_learners(
+    entries,
+    *,
+    mode=EDX_DEFAULT_ENROLLMENT_MODE,
+    keep_failed_enrollments=False,
+    skip_compliance_check=False,
+    skip_enrollment_emails=False,
+):
+    """
+    Enroll multiple learners in course runs in both edX and MITx Online.
+
+    Resolves users and course runs from string identifiers, logs progress,
+    and returns a summary of results.
+
+    Args:
+        entries (list[tuple[str, str]]): List of (user_identifier, courseware_id) tuples.
+            user_identifier can be email, username, or user id.
+        mode (str): The enrollment mode to use for all enrollments (default: audit).
+        keep_failed_enrollments (bool): If True, keeps local enrollment records
+            even if the edX enrollment fails.
+        skip_compliance_check (bool): If True, bypasses the export compliance
+            check. Operator-run commands only.
+        skip_enrollment_emails (bool): If True, don't send learners the
+            enrollment confirmation email.
+
+    Returns:
+        dict: Summary with keys 'succeeded', 'failed', 'skipped' (int counts)
+            and 'details' (list of (user_identifier, courseware_id, status, message) tuples).
+    """
+    run_cache = {}
+    succeeded = 0
+    failed = 0
+    skipped = 0
+    details = []
+
+    for user_identifier, cw_id in entries:
+        # Resolve user
+        try:
+            user = fetch_user(user_identifier)
+        except User.DoesNotExist:
+            msg = f"User not found: {user_identifier}"
+            log.warning(msg)
+            skipped += 1
+            details.append((user_identifier, cw_id, "skipped", msg))
+            continue
+
+        # Resolve course run (with caching)
+        if cw_id not in run_cache:
+            run_cache[cw_id] = CourseRun.objects.filter(courseware_id=cw_id).first()
+        course_run = run_cache[cw_id]
+        if course_run is None:
+            msg = f"Course run not found: {cw_id}"
+            log.warning(msg)
+            skipped += 1
+            details.append((user_identifier, cw_id, "skipped", msg))
+            continue
+
+        # Perform enrollment
+        result, message = enroll_learner_in_run(
+            user,
+            course_run,
+            mode=mode,
+            keep_failed_enrollments=keep_failed_enrollments,
+            skip_compliance_check=skip_compliance_check,
+            skip_enrollment_emails=skip_enrollment_emails,
+        )
+        if result:
+            log.info(message)
+            succeeded += 1
+            details.append((user_identifier, cw_id, "succeeded", message))
+        else:
+            log.error(message)
+            failed += 1
+            details.append((user_identifier, cw_id, "failed", message))
+
+    log.info(
+        "Bulk enroll complete: %d succeeded, %d failed, %d skipped",
+        succeeded,
+        failed,
+        skipped,
+    )
+    return {
+        "succeeded": succeeded,
+        "failed": failed,
+        "skipped": skipped,
+        "details": details,
+    }
+
+
+def bulk_unenroll_learners(
+    entries, *, keep_failed_enrollments=False, send_notification=True
+):
+    """
+    Unenroll multiple learners from course runs in both edX and MITx Online.
+
+    Resolves users and course runs from string identifiers, logs progress,
+    and returns a summary of results.
+
+    Args:
+        entries (list[tuple[str, str]]): List of (user_identifier, courseware_id) tuples.
+            user_identifier can be email, username, or user id.
+        keep_failed_enrollments (bool): If True, keeps local enrollment records
+            even if the edX unenrollment fails.
+        send_notification (bool): If True, sends unenrollment email to each learner.
+
+    Returns:
+        dict: Summary with keys 'succeeded', 'failed', 'skipped' (int counts)
+            and 'details' (list of (user_identifier, courseware_id, status, message) tuples).
+    """
+    run_cache = {}
+    succeeded = 0
+    failed = 0
+    skipped = 0
+    details = []
+
+    for user_identifier, cw_id in entries:
+        # Resolve user
+        try:
+            user = fetch_user(user_identifier)
+        except User.DoesNotExist:
+            msg = f"User not found: {user_identifier}"
+            log.warning(msg)
+            skipped += 1
+            details.append((user_identifier, cw_id, "skipped", msg))
+            continue
+
+        # Resolve course run (with caching)
+        if cw_id not in run_cache:
+            run_cache[cw_id] = CourseRun.objects.filter(courseware_id=cw_id).first()
+        course_run = run_cache[cw_id]
+        if course_run is None:
+            msg = f"Course run not found: {cw_id}"
+            log.warning(msg)
+            skipped += 1
+            details.append((user_identifier, cw_id, "skipped", msg))
+            continue
+
+        # Perform unenrollment
+        result, message = unenroll_learner_from_run(
+            user,
+            course_run,
+            keep_failed_enrollments=keep_failed_enrollments,
+            send_notification=send_notification,
+        )
+        if result:
+            log.info(message)
+            succeeded += 1
+            details.append((user_identifier, cw_id, "succeeded", message))
+        elif "No active enrollment" in message:
+            log.warning(message)
+            skipped += 1
+            details.append((user_identifier, cw_id, "skipped", message))
+        else:
+            log.error(message)
+            failed += 1
+            details.append((user_identifier, cw_id, "failed", message))
+
+    log.info(
+        "Bulk unenroll complete: %d succeeded, %d failed, %d skipped",
+        succeeded,
+        failed,
+        skipped,
+    )
+    return {
+        "succeeded": succeeded,
+        "failed": failed,
+        "skipped": skipped,
+        "details": details,
+    }
+
+
 class EnrollmentChangeCommand(BaseCommand):
     """Base class for management commands that change enrollment status"""
 
@@ -72,52 +361,6 @@ class EnrollmentChangeCommand(BaseCommand):
 
     def handle(self, *args, **options):
         pass
-
-    @staticmethod
-    def fetch_enrollment(user, command_options):
-        """
-        Fetches the appropriate enrollment model object paired with an object of the
-        Program/Course that the user is enrolled in.
-
-        Args:
-            user (User): An enrolled User
-            command_options (dict): A dict of command parameters
-        Returns:
-            tuple: (ProgramEnrollment, Program) or (CourseRunEnrollment, CourseRun)
-        """
-        program_property = command_options.get("program")
-        run_property = command_options.get("run")
-        force = command_options.get("force")
-
-        if program_property and run_property:
-            raise CommandError(
-                "Either 'program' or 'run' should be provided, not both."  # noqa: EM101
-            )
-        if not program_property and not run_property:
-            raise CommandError("Either 'program' or 'run' must be provided.")  # noqa: EM101
-
-        query_params = {"user": user}
-
-        if program_property:
-            query_params["program"] = enrolled_obj = Program.objects.get(
-                readable_id=program_property
-            )
-            enrollment = ProgramEnrollment.all_objects.filter(**query_params).first()
-        else:
-            query_params["run"] = enrolled_obj = CourseRun.objects.get(
-                courseware_id=run_property
-            )
-            enrollment = CourseRunEnrollment.all_objects.filter(**query_params).first()
-
-        if not enrollment:
-            raise CommandError(f"Enrollment not found for: {enrolled_obj}")  # noqa: EM102
-        if not enrollment.active and not force:
-            raise CommandError(
-                f"The given enrollment is not active ({enrollment.id}).\n"  # noqa: EM102
-                "Add the -f/--force flag if you want to change the status anyway."
-            )
-
-        return enrollment, enrolled_obj
 
     def create_program_enrollment(
         self,

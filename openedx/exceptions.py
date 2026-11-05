@@ -128,3 +128,15 @@ class EdxApiRegistrationValidationException(Exception):  # noqa: N818
 
 class OpenEdxUserMissingError(Exception):
     """We tried to do something that requires an Open edX user, and there isn't one."""
+
+
+class EdxApiCourseOutlineError(Exception):
+    """Base exception for Open edX course outline fetch errors."""
+
+
+class EdxApiNotificationPreferencesError(Exception):
+    """The Open edX notification preferences API rejected a request"""
+
+    def __init__(self, msg, status_code=None):
+        self.status_code = status_code
+        super().__init__(msg)

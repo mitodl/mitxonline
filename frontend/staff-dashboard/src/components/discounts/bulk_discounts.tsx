@@ -1,10 +1,4 @@
-import {
-  Form,
-  Input,
-  InputNumber,
-  Select,
-  DatePicker,
-} from "@pankod/refine-antd";
+import { Form, Input, InputNumber, Select, DatePicker } from "antd";
 import dayjs from 'dayjs';
 
 interface IBulkDiscountFormProps {

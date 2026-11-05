@@ -1,0 +1,760 @@
+"""Serializers for the staff-only B2B provisioning API (v0)."""
+
+import bleach
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import RegexValidator
+from rest_framework import serializers
+
+from b2b.constants import (
+    CONTRACT_SETUP_STATUS_CHOICES,
+    IDP_LIFECYCLE_CHOICES,
+    IDP_PROTOCOL_CHOICES,
+    IDP_PROTOCOL_OIDC,
+    IDP_PROTOCOL_SAML,
+    ONBOARDING_STATE_CHOICES,
+    ORG_KEY_PATTERN,
+    ORG_KEY_PATTERN_MESSAGE,
+)
+from b2b.models import (
+    ContractPage,
+    ContractProgramItem,
+    OrganizationIdentityProvider,
+    OrganizationOnboarding,
+    OrganizationPage,
+    OrganizationProvisioningAudit,
+)
+from openedx.constants import COURSE_RUN_CLONE_STATUS_CHOICES
+from variants.models import SupportedVariant
+
+
+class OrganizationOnboardingSerializer(serializers.ModelSerializer):
+    """Where an organization is in the onboarding sequence."""
+
+    class Meta:
+        model = OrganizationOnboarding
+        fields = ["state", "state_changed_at", "notes"]
+        read_only_fields = ["state_changed_at"]
+
+
+class IdentityProviderServiceProviderSerializer(serializers.Serializer):
+    """
+    Our side of an IdP integration: what the partner configures their IdP with.
+
+    redirect_uri is the SAML assertion consumer service (ACS) URL for a SAML
+    IdP, and the OAuth redirect URI for an OIDC one.
+    """
+
+    entity_id = serializers.CharField(
+        allow_null=True, help_text="The SAML SP entity ID. Null for OIDC."
+    )
+    redirect_uri = serializers.CharField(
+        help_text="The SAML ACS URL, or the OIDC redirect URI."
+    )
+    metadata_url = serializers.CharField(
+        allow_null=True, help_text="The SAML SP metadata descriptor. Null for OIDC."
+    )
+
+
+class OrganizationIdentityProviderSerializer(serializers.ModelSerializer):
+    """
+    An identity provider we provisioned for an organization.
+
+    metadata_artifact is what Keycloak parsed out of the partner's metadata.
+    Credentials are never written to it, so this is safe to serve.
+    """
+
+    service_provider = IdentityProviderServiceProviderSerializer(read_only=True)
+
+    class Meta:
+        model = OrganizationIdentityProvider
+        fields = [
+            "id",
+            "alias",
+            "protocol",
+            "display_name",
+            "lifecycle_state",
+            "internal_id",
+            "metadata_source",
+            "metadata_artifact",
+            "metadata_fetched_at",
+            "service_provider",
+            "created_on",
+            "updated_on",
+        ]
+        read_only_fields = fields
+
+
+class ProvisionedOrganizationSerializer(serializers.ModelSerializer):
+    """
+    An organization as the provisioning API sees it.
+
+    `domains` and `redirect_url` live only in Keycloak, so they are populated
+    from the representation the view fetched rather than from our database.
+    """
+
+    onboarding = OrganizationOnboardingSerializer(read_only=True)
+    identity_providers = OrganizationIdentityProviderSerializer(
+        many=True, read_only=True
+    )
+    domains = serializers.SerializerMethodField()
+    redirect_url = serializers.SerializerMethodField()
+
+    def get_domains(self, instance) -> list[str] | None:
+        """Return the organization's Keycloak domains, if they were fetched."""
+
+        keycloak_org = getattr(instance, "keycloak_organization", None)
+        if keycloak_org is None:
+            return None
+        return [domain.name for domain in keycloak_org.domains or []]
+
+    def get_redirect_url(self, instance) -> str | None:
+        """Return the organization's Keycloak redirect URL, if it was fetched."""
+
+        keycloak_org = getattr(instance, "keycloak_organization", None)
+        return keycloak_org.redirect_url if keycloak_org else None
+
+    class Meta:
+        model = OrganizationPage
+        fields = [
+            "id",
+            "name",
+            "org_key",
+            "org_key_prefix",
+            "description",
+            "slug",
+            "sso_organization_id",
+            "domains",
+            "redirect_url",
+            "onboarding",
+            "identity_providers",
+        ]
+        read_only_fields = fields
+
+
+class CreateOrganizationSerializer(serializers.Serializer):
+    """Request body for provisioning a new organization."""
+
+    name = serializers.CharField(max_length=255)
+    org_key = serializers.CharField(
+        max_length=30,
+        validators=[RegexValidator(ORG_KEY_PATTERN, ORG_KEY_PATTERN_MESSAGE)],
+    )
+    org_key_prefix = serializers.CharField(
+        max_length=30,
+        required=False,
+        allow_blank=True,
+        validators=[RegexValidator(ORG_KEY_PATTERN, ORG_KEY_PATTERN_MESSAGE)],
+    )
+    domains = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
+    description = serializers.CharField(required=False, allow_blank=True, default="")
+    redirect_url = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class UpdateOrganizationSerializer(serializers.Serializer):
+    """
+    Request body for updating an organization.
+
+    org_key is rejected rather than silently ignored. It is in every B2B
+    courseware ID via create_contract_run_key, so a caller who thinks they
+    changed it and did not is worse off than one who got an error.
+    """
+
+    name = serializers.CharField(max_length=255, required=False)
+    description = serializers.CharField(required=False, allow_blank=True)
+    redirect_url = serializers.CharField(required=False, allow_blank=True)
+    domains = serializers.ListField(child=serializers.CharField(), required=False)
+
+    def validate(self, attrs):
+        """Reject any attempt to change the immutable org key."""
+
+        if "org_key" in self.initial_data:
+            msg = (
+                "org_key is immutable: it is part of every courseware ID for "
+                "this organization."
+            )
+            raise serializers.ValidationError({"org_key": msg})
+        return attrs
+
+
+class ParseMetadataSerializer(serializers.Serializer):
+    """
+    Request body for parsing IdP metadata without creating anything.
+
+    Exactly one of metadata_url or metadata_xml.
+    """
+
+    protocol = serializers.ChoiceField(choices=IDP_PROTOCOL_CHOICES)
+    metadata_url = serializers.URLField(required=False, allow_blank=True)
+    metadata_xml = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        """Require exactly one metadata source."""
+
+        has_url = bool(attrs.get("metadata_url"))
+        has_xml = bool(attrs.get("metadata_xml"))
+
+        if has_url == has_xml:
+            msg = "Supply exactly one of metadata_url or metadata_xml."
+            raise serializers.ValidationError(msg)
+
+        return attrs
+
+
+class CreateIdentityProviderSerializer(serializers.Serializer):
+    """Request body for provisioning an identity provider."""
+
+    alias = serializers.CharField(max_length=255)
+    protocol = serializers.ChoiceField(choices=IDP_PROTOCOL_CHOICES)
+    display_name = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, default=""
+    )
+    metadata_url = serializers.URLField(required=False, allow_blank=True)
+    metadata_xml = serializers.CharField(required=False, allow_blank=True)
+    discovery_url = serializers.URLField(required=False, allow_blank=True)
+    client_id = serializers.CharField(required=False, allow_blank=True)
+    client_secret = serializers.CharField(required=False, allow_blank=True)
+    attribute_map = serializers.DictField(
+        child=serializers.CharField(), required=False, default=dict
+    )
+    attribute_name_map = serializers.DictField(
+        child=serializers.CharField(), required=False, default=dict
+    )
+
+    def validate(self, attrs):
+        """Check that the protocol has the inputs it needs, and only those."""
+
+        protocol = attrs["protocol"]
+
+        if protocol == IDP_PROTOCOL_OIDC:
+            if not attrs.get("discovery_url"):
+                msg = "discovery_url is required for an OIDC identity provider."
+                raise serializers.ValidationError({"discovery_url": msg})
+            if not attrs.get("client_id") or not attrs.get("client_secret"):
+                msg = (
+                    "client_id and client_secret are required for an OIDC "
+                    "identity provider."
+                )
+                raise serializers.ValidationError(msg)
+            # The saga takes one metadata source regardless of protocol; for
+            # OIDC that source is the discovery document.
+            attrs["metadata_url"] = attrs["discovery_url"]
+        elif protocol == IDP_PROTOCOL_SAML:
+            if bool(attrs.get("metadata_url")) == bool(attrs.get("metadata_xml")):
+                msg = (
+                    "Supply exactly one of metadata_url or metadata_xml for a "
+                    "SAML identity provider."
+                )
+                raise serializers.ValidationError(msg)
+
+            # SAML only. Nothing maps a SAML assertion's attributes onto the
+            # user unless we say so, so a SAML IdP with no mappers brokers
+            # users with no email or name. ol-infrastructure treats them as
+            # required too: onboard_saml_org falls back to scanning the
+            # metadata for common friendly names when none are given, while
+            # onboard_oidc_org creates no mappers at all - the OIDC IdPs
+            # Pulumi runs in production today have none.
+            if not attrs.get("attribute_map") and not attrs.get("attribute_name_map"):
+                msg = (
+                    "Supply attribute_map or attribute_name_map for a SAML "
+                    "identity provider."
+                )
+                raise serializers.ValidationError(msg)
+
+        return attrs
+
+
+class UpdateIdentityProviderSerializer(serializers.Serializer):
+    """
+    Request body for updating an identity provider.
+
+    The protocol comes from the instance, through the context, because which
+    fields make sense depends on it: a client secret on a SAML IdP would be
+    written into its Keycloak config and never read.
+
+    alias and protocol are rejected rather than ignored. Keycloak refuses an
+    alias change outright, and changing the protocol is a different identity
+    provider, not an edit to this one.
+    """
+
+    # Only the display name may be blanked. A blank anywhere else is an empty
+    # form field rather than an instruction: blanking client_secret would take
+    # the partner's login down, and blanking a metadata source would leave an
+    # IdP that cannot be refreshed.
+    display_name = serializers.CharField(
+        max_length=255, required=False, allow_blank=True
+    )
+    metadata_url = serializers.URLField(required=False)
+    metadata_xml = serializers.CharField(required=False)
+    discovery_url = serializers.URLField(required=False)
+    client_id = serializers.CharField(required=False)
+    client_secret = serializers.CharField(required=False)
+    attribute_map = serializers.DictField(child=serializers.CharField(), required=False)
+    attribute_name_map = serializers.DictField(
+        child=serializers.CharField(), required=False
+    )
+
+    def _validate_oidc(self, attrs):
+        """Check an OIDC identity provider's fields."""
+
+        if any(field in attrs for field in ("metadata_url", "metadata_xml")):
+            msg = (
+                "Send discovery_url rather than metadata_url or metadata_xml "
+                "for an OIDC identity provider."
+            )
+            raise serializers.ValidationError(msg)
+
+        # attribute_name_map matches a SAML attribute's Name rather than its
+        # FriendlyName. OIDC has only claims, so both maps would build the same
+        # claim mapper under the same name, and the second create collides
+        # after the replacement has already deleted the old set.
+        if "attribute_name_map" in attrs:
+            msg = (
+                "attribute_name_map belongs to a SAML identity provider. Send "
+                "OIDC claim mappings in attribute_map."
+            )
+            raise serializers.ValidationError({"attribute_name_map": msg})
+
+        if "discovery_url" in attrs:
+            # The saga takes one metadata source regardless of protocol; for
+            # OIDC that source is the discovery document.
+            attrs["metadata_url"] = attrs["discovery_url"]
+
+    def _validate_saml(self, attrs):
+        """Check a SAML identity provider's fields."""
+
+        if any(
+            field in attrs for field in ("discovery_url", "client_id", "client_secret")
+        ):
+            msg = (
+                "discovery_url, client_id and client_secret belong to an OIDC "
+                "identity provider."
+            )
+            raise serializers.ValidationError(msg)
+
+        if "metadata_url" in attrs and "metadata_xml" in attrs:
+            msg = "Supply at most one of metadata_url or metadata_xml."
+            raise serializers.ValidationError(msg)
+
+        maps = ("attribute_map", "attribute_name_map")
+        supplied = [field for field in maps if field in attrs]
+
+        if not supplied:
+            return
+
+        # SAML splits its mappers across the two maps - friendly names in one,
+        # attribute names in the other - and the pair replaces the whole set.
+        # Sending one alone therefore deletes the other's mappers, which is
+        # never what an operator editing one mapping meant. Make the caller
+        # state the whole set, empty map included.
+        if len(supplied) != len(maps):
+            missing = next(field for field in maps if field not in supplied)
+            msg = (
+                "Send attribute_map and attribute_name_map together for a SAML "
+                "identity provider: the pair replaces the whole mapper set, so "
+                f"omitting {missing} would delete the mappers it holds. Send it "
+                "as an empty object if there are none."
+            )
+            raise serializers.ValidationError({missing: msg})
+
+        # Each mapper is named after its user attribute, so one attribute in
+        # both maps is two mappers with the same name.
+        duplicated = sorted(attrs["attribute_map"].keys() & attrs["attribute_name_map"])
+        if duplicated:
+            msg = (
+                "Map each user attribute once, by FriendlyName or by Name: "
+                f"{', '.join(duplicated)} is in both attribute_map and "
+                "attribute_name_map."
+            )
+            raise serializers.ValidationError(msg)
+
+        # An edit that leaves both empty is a SAML IdP with no mappers - one
+        # that brokers users with no email or name. Creation refuses that; so
+        # does this.
+        if not any(attrs.get(field) for field in maps):
+            msg = (
+                "A SAML identity provider needs at least one attribute "
+                "mapper. Supply attribute_map or attribute_name_map."
+            )
+            raise serializers.ValidationError(msg)
+
+    def validate(self, attrs):
+        """Check the fields against the identity provider's protocol."""
+
+        for immutable in ("alias", "protocol"):
+            if immutable in self.initial_data:
+                msg = (
+                    f"{immutable} cannot be changed. Delete the identity "
+                    "provider and create a new one - which unlinks every user "
+                    "brokered through it."
+                )
+                raise serializers.ValidationError({immutable: msg})
+
+        if self.context["protocol"] == IDP_PROTOCOL_OIDC:
+            self._validate_oidc(attrs)
+        else:
+            self._validate_saml(attrs)
+
+        attrs.pop("discovery_url", None)
+
+        if not attrs:
+            msg = "Supply at least one field to update."
+            raise serializers.ValidationError(msg)
+
+        return attrs
+
+
+class IdentityProviderTransitionSerializer(serializers.Serializer):
+    """Request body for moving an identity provider's lifecycle state."""
+
+    state = serializers.ChoiceField(choices=IDP_LIFECYCLE_CHOICES)
+
+
+class SetOnboardingStateSerializer(serializers.Serializer):
+    """Request body for recording an organization's onboarding state."""
+
+    state = serializers.ChoiceField(choices=ONBOARDING_STATE_CHOICES)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class ContractProgramSerializer(serializers.ModelSerializer):
+    """A program in a contract, in the contract's order."""
+
+    readable_id = serializers.CharField(source="program.readable_id")
+    title = serializers.CharField(source="program.title")
+
+    class Meta:
+        model = ContractProgramItem
+        fields = ["readable_id", "title", "sort_order"]
+        read_only_fields = fields
+
+
+class ProvisionedContractSerializer(serializers.ModelSerializer):
+    """A contract as the staff contract API sees it."""
+
+    programs = ContractProgramSerializer(
+        source="contract_programs", many=True, read_only=True
+    )
+
+    class Meta:
+        model = ContractPage
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "organization",
+            "membership_type",
+            "description",
+            "welcome_message",
+            "contract_start",
+            "contract_end",
+            "active",
+            "max_learners",
+            "enrollment_fixed_price",
+            "programs",
+        ]
+        read_only_fields = fields
+
+
+# Everything the API writes but `active`, which a new contract gets from the
+# model's default.
+CONTRACT_WRITABLE_FIELDS = [
+    field for field in ContractPage.PROVISIONED_FIELDS if field != "active"
+]
+
+# The text markup Wagtail's rich text editor stores for the description. The
+# staff dashboard edits it as text, so nothing else has filtered it by the
+# time it gets here. Wagtail's <embed/> (an image or media) is left out:
+# bleach rewrites the self-closing tag Wagtail's parser looks for, so an
+# embed is dropped from a description edited through the API.
+CONTRACT_DESCRIPTION_TAGS = frozenset(
+    {"p", "br", "b", "i", "strong", "em", "h2", "h3", "h4", "ol", "ul", "li", "hr", "a"}
+)
+CONTRACT_DESCRIPTION_ATTRIBUTES = {
+    "*": ["data-block-key"],
+    "a": ["href", "linktype", "id"],
+}
+CONTRACT_DESCRIPTION_PROTOCOLS = frozenset({"http", "https", "mailto", "tel"})
+
+
+class ContractDescriptionMixin:
+    """Strip markup Wagtail's rich text editor would not have stored."""
+
+    def validate_description(self, value):
+        """Return the description with only rich text markup left in it."""
+
+        return bleach.clean(
+            value,
+            tags=CONTRACT_DESCRIPTION_TAGS,
+            attributes=CONTRACT_DESCRIPTION_ATTRIBUTES,
+            protocols=CONTRACT_DESCRIPTION_PROTOCOLS,
+            strip=True,
+        )
+
+
+class CreateContractSerializer(ContractDescriptionMixin, serializers.ModelSerializer):
+    """
+    Request body for creating a contract.
+
+    membership_type is required even though the model has a default, as it is
+    for b2b_contract create: how learners join a contract is chosen, not
+    defaulted.
+    """
+
+    class Meta:
+        model = ContractPage
+        fields = CONTRACT_WRITABLE_FIELDS
+        extra_kwargs = {"membership_type": {"required": True}}
+
+
+class UpdateContractSerializer(ContractDescriptionMixin, serializers.ModelSerializer):
+    """
+    Request body for updating a contract.
+
+    Enrollment codes are not changed here. The view queues the code check
+    afterwards for a contract that uses codes.
+    """
+
+    class Meta:
+        model = ContractPage
+        fields = [*CONTRACT_WRITABLE_FIELDS, "active"]
+
+
+class ContractCoursewareSerializer(serializers.Serializer):
+    """
+    Request body for adding courseware to a contract.
+
+    A course run already in another contract is left there and reported as
+    skipped; there is no option to move it.
+    """
+
+    courseware_id = serializers.CharField(
+        help_text="Readable ID of a program, course or course run."
+    )
+
+
+class RemoveContractCoursewareSerializer(serializers.Serializer):
+    """Request body for removing courseware from a contract."""
+
+    courseware_id = serializers.CharField(
+        help_text="Readable ID of a program, course or course run."
+    )
+    remove_program_runs = serializers.BooleanField(
+        default=False,
+        help_text="For a program, also remove its courses' runs from the contract.",
+    )
+
+
+class CoursewareAdditionSerializer(serializers.Serializer):
+    """What adding courseware to a contract did."""
+
+    runs_added = serializers.IntegerField()
+    courses_without_source_run = serializers.IntegerField()
+    skipped_reason = serializers.CharField(allow_blank=True)
+
+
+class RemovedContractRunSerializer(serializers.Serializer):
+    """A contract run that was removed from a contract."""
+
+    courseware_id = serializers.CharField()
+    unlinked = serializers.BooleanField(
+        help_text="False when the run stays linked because learners are enrolled."
+    )
+
+
+class ContractVariantCourseSerializer(serializers.Serializer):
+    """One of the contract's courses that a variant set matches."""
+
+    course_id = serializers.IntegerField(source="course.id")
+    readable_id = serializers.CharField(source="course.readable_id")
+    title = serializers.CharField(source="course.title")
+    has_source_run = serializers.BooleanField(
+        help_text="Whether the course has a source run for this variant to clone."
+    )
+    contract_run = serializers.CharField(
+        source="contract_run.courseware_id",
+        allow_null=True,
+        default=None,
+        help_text="The contract's run for this variant, if it has one.",
+    )
+
+
+class ContractVariantUnsupportedCourseSerializer(serializers.Serializer):
+    """One of the contract's courses that a variant set does not match."""
+
+    course_id = serializers.IntegerField(source="course.id")
+    readable_id = serializers.CharField(source="course.readable_id")
+    title = serializers.CharField(source="course.title")
+    contract_run = serializers.CharField(
+        source="contract_run.courseware_id",
+        allow_null=True,
+        default=None,
+        help_text="The contract's run for this variant, if it has one anyway.",
+    )
+
+
+class ContractVariantSetSerializer(serializers.Serializer):
+    """
+    One of a contract's variant sets, with the contract's courses it matches.
+
+    A listed course with a source run and no contract run gets a run for this
+    set when its courseware is next added to the contract, if the set is
+    active. A course in unsupported_courses has no active variant set of its
+    own with this language, length and industry, so adding its courseware
+    doesn't pick a source run for this set.
+    """
+
+    id = serializers.IntegerField(source="variant.id")
+    language = serializers.CharField(source="variant.language")
+    variant_length = serializers.CharField(source="variant.variant_length")
+    variant_industry = serializers.CharField(source="variant.variant_industry")
+    variant_length_label = serializers.CharField(
+        source="variant.variant_length_label", read_only=True
+    )
+    variant_industry_label = serializers.CharField(
+        source="variant.variant_industry_label", read_only=True
+    )
+    default_variant = serializers.BooleanField(source="variant.default_variant")
+    active = serializers.BooleanField(source="variant.active")
+    b2b_only = serializers.BooleanField(source="variant.b2b_only")
+    courses = ContractVariantCourseSerializer(many=True)
+    unsupported_courses = ContractVariantUnsupportedCourseSerializer(many=True)
+
+
+class ContractVariantSyncCourseSerializer(serializers.Serializer):
+    """A course and one of the contract's variant sets."""
+
+    course_id = serializers.IntegerField(source="course.id")
+    readable_id = serializers.CharField(source="course.readable_id")
+    variant_id = serializers.IntegerField(source="variant.id")
+    language = serializers.CharField(source="variant.language")
+    variant_length = serializers.CharField(
+        source="variant.variant_length", allow_blank=True
+    )
+    variant_industry = serializers.CharField(
+        source="variant.variant_industry", allow_blank=True
+    )
+
+
+class ContractVariantSyncRunSerializer(serializers.Serializer):
+    """A contract run created for a variant set."""
+
+    courseware_id = serializers.CharField()
+    course_id = serializers.IntegerField()
+    readable_id = serializers.CharField(source="course.readable_id")
+    language = serializers.CharField()
+    variant_length = serializers.CharField(allow_blank=True)
+    variant_industry = serializers.CharField(allow_blank=True)
+
+
+class ContractVariantSyncSerializer(serializers.Serializer):
+    """What creating a contract's missing variant runs did."""
+
+    runs_created = ContractVariantSyncRunSerializer(many=True)
+    missing_source_runs = ContractVariantSyncCourseSerializer(
+        many=True,
+        help_text="Courses that support a set and have no source run for it.",
+    )
+    failed = ContractVariantSyncCourseSerializer(
+        many=True,
+        help_text="Courses with a source run for a set whose run was not created.",
+    )
+
+
+class CreateContractVariantSetSerializer(serializers.ModelSerializer):
+    """
+    Request body for adding a variant set to a contract.
+
+    The set is never the default: every contract already has one.
+    """
+
+    class Meta:
+        model = SupportedVariant
+        fields = ["language", "variant_length", "variant_industry", "b2b_only"]
+        extra_kwargs = {"language": {"required": True, "allow_blank": False}}
+
+    def validate_language(self, value):
+        """Apply the model's language check, which runs in save() otherwise."""
+
+        try:
+            SupportedVariant(language=value).clean_language()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages) from exc
+        return value
+
+
+class UpdateContractVariantSetSerializer(serializers.Serializer):
+    """Request body for changing a contract's variant set."""
+
+    active = serializers.BooleanField(required=False)
+    b2b_only = serializers.BooleanField(required=False)
+
+
+class ContractRunSetupSerializer(serializers.Serializer):
+    """The edX clone status of one contract run."""
+
+    courseware_id = serializers.CharField()
+    clone_status = serializers.ChoiceField(
+        choices=COURSE_RUN_CLONE_STATUS_CHOICES, allow_null=True
+    )
+    clone_attempts = serializers.IntegerField()
+    clone_error = serializers.CharField(allow_blank=True)
+
+
+class ContractEnrollmentCodeSetupSerializer(serializers.Serializer):
+    """How many enrollment codes a contract needs and has."""
+
+    expected = serializers.IntegerField()
+    existing = serializers.IntegerField()
+
+
+class ContractSetupStatusSerializer(serializers.Serializer):
+    """How far a contract's setup has got."""
+
+    status = serializers.ChoiceField(choices=CONTRACT_SETUP_STATUS_CHOICES)
+    runs = ContractRunSetupSerializer(many=True)
+    enrollment_codes = ContractEnrollmentCodeSetupSerializer()
+    variants = ContractVariantSetSerializer(
+        many=True,
+        help_text="Which of the contract's courses have a run for each of its "
+        "variant sets. A missing run does not change the status.",
+    )
+
+
+class ExpiredEnrollmentCodeSerializer(serializers.Serializer):
+    """An unused enrollment code taken out of a contract."""
+
+    code = serializers.CharField()
+    deleted = serializers.BooleanField(
+        help_text="False when the code still applies to products outside the contract."
+    )
+
+
+class ProvisioningAuditActorSerializer(serializers.Serializer):
+    """The staff user who made a provisioning change."""
+
+    id = serializers.IntegerField()
+    username = serializers.CharField()
+    email = serializers.EmailField()
+
+
+class OrganizationProvisioningAuditSerializer(serializers.ModelSerializer):
+    """One recorded provisioning change."""
+
+    actor = ProvisioningAuditActorSerializer(
+        source="acting_user", read_only=True, allow_null=True
+    )
+
+    class Meta:
+        model = OrganizationProvisioningAudit
+        fields = [
+            "id",
+            "action",
+            "identity_provider_alias",
+            "actor",
+            "data_before",
+            "data_after",
+            "created_on",
+        ]
+        read_only_fields = fields

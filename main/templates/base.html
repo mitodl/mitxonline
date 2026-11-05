@@ -1,4 +1,4 @@
-{% load static hijack js_interop %}
+{% load static js_interop %}
 {% load wagtailcore_tags startswith noindex_meta banner %}
 {% load render_bundle from webpack_loader %}
 <!DOCTYPE html>
@@ -33,8 +33,7 @@
     <a href="#main" class="visually-hidden visually-hidden-focusable">Skip to main content</a>
     {% include "partials/gtm_body.html" %}
 
-    {% include 'hijack/notification.html' %}
-    {% if not request.path|startswith:'/certificate/' %}
+    {% if not request.path|startswith:'/certificate/' and not request.path|startswith:'/cart/' and not request.path|startswith:'/checkout/' and not request.path|startswith:'/orders/' and 'ecom-service' not in request.GET %}
       {% banner %}
       {% block headercontent %}
         <div id="header"></div>
@@ -48,25 +47,13 @@
     {% block contact-us %}
     {% endblock %}
   </div>
+    {% if 'ecom-service' not in request.GET and not request.path|startswith:'/cart/' and not request.path|startswith:'/checkout/' and not request.path|startswith:'/orders/' %}
     {% block footer %}
         {% include "footer.html" %}
     {% endblock %}
+    {% endif %}
     {% render_bundle 'django' %}
     {% block scripts %}
-      {# Script to defer youtube video rendering #}
-      <script type="text/javascript">
-        document.addEventListener('DOMContentLoaded', function () {
-          const iframes = Array.from(document.getElementsByTagName('iframe'));
-            iframes.forEach(function (iframe) {
-              const data_src = iframe.getAttribute('data-src')
-                /* Making sure that we only change attributes of those iframes that have youtube embed as a source url.
-                By replacing the src with data-src we let the iframe run the youtube scripts and load the video.*/
-              if (data_src && data_src.indexOf("youtube.com/embed") !== -1) {
-                iframe.setAttribute('src', data_src);
-              }
-          });
-        });
-        </script>
     {% endblock %}
   </body>
 </html>

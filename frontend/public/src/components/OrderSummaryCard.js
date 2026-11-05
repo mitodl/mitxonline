@@ -15,7 +15,9 @@ type Props = {
   refunds: Array<Refund>,
   addDiscount?: Function,
   discountCode: string,
-  cardTitle?: string
+  cardTitle?: string,
+  isAuthenticated: boolean,
+  onCheckout?: (checkoutUrl: string) => void
 }
 
 type FormValues = {
@@ -87,7 +89,7 @@ export class OrderSummaryCard extends React.Component<Props, State> {
   }
 
   renderAppliedCoupons() {
-    const { discounts } = this.props
+    const { discounts, totalPrice, discountedPrice } = this.props
 
     if (discounts === null || discounts.length === 0) {
       return null
@@ -103,6 +105,15 @@ export class OrderSummaryCard extends React.Component<Props, State> {
 
     case "dollars-off":
       discountAmountText = `-${formatLocalePrice(discountAmount)}`
+      break
+
+    case "paid-amount-off":
+      // The API stores this discount's amount as 0: its value is the price
+      // already paid for a purchase in the program, resolved per learner and
+      // only visible here as the gap between the two basket prices.
+      discountAmountText = `-${formatLocalePrice(
+        totalPrice - discountedPrice
+      )}`
       break
 
     default:
@@ -124,6 +135,21 @@ export class OrderSummaryCard extends React.Component<Props, State> {
     )
   }
 
+  getCheckoutUrl() {
+    return this.props.isAuthenticated ?
+      "/checkout/to_payment" :
+      "/checkout/anonymous/"
+  }
+
+  goToCheckout() {
+    const { onCheckout } = this.props
+    if (onCheckout) {
+      onCheckout(this.getCheckoutUrl())
+    } else {
+      window.location = this.getCheckoutUrl()
+    }
+  }
+
   handlePlaceOrder = async () => {
     const formik = this.formikRef.current
     const { discounts } = this.props
@@ -134,7 +160,7 @@ export class OrderSummaryCard extends React.Component<Props, State> {
       discounts.length > 0 &&
       (!formik || !formik.values.couponCode || !formik.values.couponCode.trim())
     ) {
-      window.location = "/checkout/to_payment"
+      this.goToCheckout()
       return
     }
 
@@ -145,7 +171,7 @@ export class OrderSummaryCard extends React.Component<Props, State> {
       await formik.submitForm()
     } else {
       // No coupon code, proceed directly to payment
-      window.location = "/checkout/to_payment"
+      this.goToCheckout()
     }
   }
 
@@ -166,7 +192,8 @@ export class OrderSummaryCard extends React.Component<Props, State> {
       addDiscount,
       discountCode,
       cardTitle,
-      refunds
+      refunds,
+      isAuthenticated
     } = this.props
 
     const fmtPrice = formatLocalePrice(totalPrice)
@@ -203,7 +230,7 @@ export class OrderSummaryCard extends React.Component<Props, State> {
             </div>
           </div>
 
-          {!orderFulfilled ? (
+          {!orderFulfilled && isAuthenticated ? (
             <Formik
               innerRef={this.formikRef}
               initialValues={{ couponCode: initialCouponCode }}
@@ -222,7 +249,7 @@ export class OrderSummaryCard extends React.Component<Props, State> {
 
                     if (this.state.submittingPlaceOrder) {
                       // Redirect only if there were no errors and this was from Place Order button
-                      window.location = "/checkout/to_payment"
+                      this.goToCheckout()
                     }
                   }
 
@@ -250,13 +277,14 @@ export class OrderSummaryCard extends React.Component<Props, State> {
           {(totalPrice > 0 || discounts) && !orderFulfilled ? (
             <div className="cart-text-smaller">
               By placing my order I agree to the{" "}
-              <a href="/terms-of-service/" target="_blank" rel="noreferrer">
-                Terms of Service
+              <a
+                href="https://learn.mit.edu/terms/"
+                target="_blank"
+                rel="noreferrer"
+              >
+                MIT Learn Terms of Service
               </a>
-              , and{" "}
-              <a href="/privacy-policy/" target="_blank" rel="noreferrer">
-                Privacy Policy.
-              </a>
+              .
             </div>
           ) : null}
         </div>

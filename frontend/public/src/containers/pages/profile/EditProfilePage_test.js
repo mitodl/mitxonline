@@ -62,7 +62,7 @@ describe("EditProfilePage", () => {
       await inner.find("EditProfileForm").prop("onSubmit")(values, actions)
       sinon.assert.calledWith(
         helper.handleRequestStub,
-        "/api/users/me",
+        "/api/v0/users/me",
         "PATCH",
         {
           body:        values,

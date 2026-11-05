@@ -1,10 +1,9 @@
 """Utils tests"""
 
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 import pytest
-import pytz
-from django.urls import reverse
 from mitol.common.utils.urls import remove_password_from_url
 
 from main.models import AuditModel
@@ -13,6 +12,8 @@ from main.utils import (
     date_to_datetime,
     get_field_names,
     get_js_settings,
+    get_learn_base_url,
+    get_learn_product_url,
     get_partitioned_set_difference,
     parse_supplied_date,
 )
@@ -32,18 +33,15 @@ def test_get_field_names():
     }
 
 
-@pytest.mark.parametrize("include_oidc_login", [True, False])
-def test_get_js_settings(settings, rf, include_oidc_login):
+def test_get_js_settings(settings, rf):
     """Test get_js_settings"""
     settings.GA_TRACKING_ID = "fake"
     settings.ENVIRONMENT = "test"
     settings.VERSION = "4.5.6"
     settings.EMAIL_SUPPORT = "support@text.com"
     settings.RECAPTCHA_SITE_KEY = "fake_key"
-    settings.EXPOSE_OIDC_LOGIN = include_oidc_login
 
     request = rf.get("/")
-    oidc_login_url = reverse("social:begin", kwargs={"backend": "ol-oidc"})
 
     assert get_js_settings(request) == {
         "gaTrackingID": "fake",
@@ -56,10 +54,60 @@ def test_get_js_settings(settings, rf, include_oidc_login):
         "features": {},
         "posthog_api_token": settings.POSTHOG_PROJECT_API_KEY,
         "posthog_api_host": settings.POSTHOG_API_HOST,
-        "unified_ecommerce_url": settings.UNIFIED_ECOMMERCE_URL,
-        "oidc_login_url": oidc_login_url if include_oidc_login else None,
+        "oidc_login_url": None,
         "api_gateway_enabled": not settings.MITOL_APIGATEWAY_DISABLE_MIDDLEWARE,
+        "mit_learn_dashboard_url": settings.MIT_LEARN_DASHBOARD_URL,
+        "mit_learn_terms_url": settings.MIT_LEARN_TERMS_URL,
+        "mit_learn_privacy_url": settings.MIT_LEARN_PRIVACY_URL,
+        "mit_learn_honor_code_url": settings.MIT_LEARN_HONOR_CODE_URL,
+        "mit_learn_base_url": settings.MIT_LEARN_BASE_URL,
     }
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "https://learn.mit.edu",
+        "https://rc.learn.mit.edu",
+        "http://open.odl.local:8065",
+    ],
+)
+def test_get_learn_base_url(settings, base_url):
+    """Test that get_learn_base_url returns the configured MIT_LEARN_BASE_URL setting"""
+    settings.MIT_LEARN_BASE_URL = base_url
+    assert get_learn_base_url() == base_url
+
+
+@pytest.mark.parametrize(
+    ("base_url", "expected_url"),
+    [
+        (
+            "https://learn.mit.edu",
+            "https://learn.mit.edu/courses/course-v1:MITx+DEDP",
+        ),
+        (
+            "https://rc.learn.mit.edu",
+            "https://rc.learn.mit.edu/courses/course-v1:MITx+DEDP",
+        ),
+        (
+            "https://ci.learn.mit.edu",
+            "https://ci.learn.mit.edu/courses/course-v1:MITx+DEDP",
+        ),
+    ],
+)
+def test_get_learn_product_url_courses(settings, base_url, expected_url):
+    """Test that get_learn_product_url builds the correct course URL from the base URL"""
+    settings.MIT_LEARN_BASE_URL = base_url
+    assert get_learn_product_url("courses", "course-v1:MITx+DEDP") == expected_url
+
+
+def test_get_learn_product_url_programs(settings):
+    """Test that get_learn_product_url builds the correct program URL"""
+    settings.MIT_LEARN_BASE_URL = "https://learn.mit.edu"
+    assert (
+        get_learn_product_url("programs", "program-v1:MITx+DEDP")
+        == "https://learn.mit.edu/programs/program-v1:MITx+DEDP"
+    )
 
 
 def test_get_partitioned_set_difference():
@@ -82,7 +130,7 @@ def test_parse_supplied_data():
     assert successful_return.year == 2022
     assert successful_return.month == 7
     assert successful_return.day == 1
-    assert successful_return.tzinfo == pytz.timezone(TIME_ZONE)
+    assert successful_return.tzinfo == ZoneInfo(TIME_ZONE)
 
     with pytest.raises(Exception):  # noqa: B017, PT011
         parse_supplied_date("this date isn't a date at all")
@@ -97,7 +145,7 @@ def test_date_to_datetime():
     assert successful_return.year == 2022
     assert successful_return.month == 7
     assert successful_return.day == 1
-    assert successful_return.tzinfo == pytz.timezone(TIME_ZONE)
+    assert successful_return.tzinfo == ZoneInfo(TIME_ZONE)
 
     with pytest.raises(AttributeError):
         date_to_datetime("this date isn't a date at all", TIME_ZONE)

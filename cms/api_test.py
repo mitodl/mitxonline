@@ -6,12 +6,16 @@ import pytest
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from mitol.common.utils.datetime import now_in_utc
 from wagtail.models import Page
 from wagtail_factories import PageFactory
 
+from cms import utils as cms_utils
 from cms.api import (
     RESOURCE_PAGE_TITLES,
+    _FinancialAssistanceForms,
     create_default_courseware_page,
     create_featured_items,
     ensure_home_page_and_site,
@@ -20,9 +24,15 @@ from cms.api import (
     ensure_resource_pages,
     get_home_page,
     get_wagtail_img_src,
+    resolve_financial_assistance_form_urls,
 )
 from cms.exceptions import WagtailSpecificPageError
-from cms.factories import CoursePageFactory, HomePageFactory, ProgramPageFactory
+from cms.factories import (
+    CoursePageFactory,
+    FlexiblePricingFormFactory,
+    HomePageFactory,
+    ProgramPageFactory,
+)
 from cms.models import (
     CourseIndexPage,
     CoursePage,
@@ -33,6 +43,14 @@ from cms.models import (
     ResourcePage,
 )
 from courses.factories import CourseFactory, CourseRunFactory, ProgramFactory
+from courses.models import Program, default_program_queryset
+from main.utils import get_learn_product_url
+
+# resolve_financial_assistance_form_urls does a fixed number of queries:
+# course pages, programs, related programs, program pages, live forms. This is
+# an upper bound; the property that matters is that it does not scale with the
+# number of courses asked for.
+FINANCIAL_ASSISTANCE_QUERY_COUNT = 6
 
 
 @pytest.mark.django_db
@@ -89,6 +107,7 @@ def test_ensure_home_page_and_site():
     assert home_page_qset.count() == 1
 
 
+@pytest.mark.django_db
 def test_get_wagtail_img_src(settings):
     """get_wagtail_img_src should return the correct image URL"""
     settings.MEDIA_URL = "/mediatest/"
@@ -200,7 +219,9 @@ def test_home_page_featured_products(mocker):
             "description": course_page.description,
             "feature_image": course_page.feature_image,
             "start_date": run.start_date if run is not None else None,
-            "url_path": course_page.get_url(),
+            "url_path": get_learn_product_url(
+                "courses", course_page.product.readable_id
+            ),
             "is_program": False,
             "is_self_paced": run.is_self_paced if run is not None else None,
             "program_type": None,
@@ -293,9 +314,9 @@ def test_create_featured_items():
     # pytest does not clear cache thus if we have a cache value set, it will persist between tests and test runs
     # thus we need to clear the cache before running the test
     redis_cache = caches["redis"]
-    featured_courses = redis_cache.get("CMS_homepage_featured_courses")
+    featured_courses = redis_cache.get(cms_utils.get_featured_items_cache_key())
     if featured_courses is not None:
-        redis_cache.delete("CMS_homepage_featured_courses")
+        redis_cache.delete(cms_utils.get_featured_items_cache_key())
 
     now = now_in_utc()
     future_date = now + timedelta(days=1)
@@ -356,7 +377,7 @@ def test_create_featured_items():
     )
 
     create_featured_items()
-    cache_value = redis_cache.get("CMS_homepage_featured_courses")
+    cache_value = redis_cache.get(cms_utils.get_featured_items_cache_key())
 
     assert len(cache_value) == 4
     assert set(cache_value) == {
@@ -376,22 +397,38 @@ def test_create_featured_items():
 
 @pytest.mark.django_db
 def test_create_featured_items_no_courses():
-    """Test create_featured_items with no courses at all"""
+    """Test create_featured_items with no courses leaves stale cache intact"""
     redis_cache = caches["redis"]
-    redis_cache.delete("CMS_homepage_featured_courses")
+    stale_value = [999]
+    redis_cache.set(cms_utils.get_featured_items_cache_key(), stale_value)
 
     result = create_featured_items()
-    cache_value = redis_cache.get("CMS_homepage_featured_courses")
+    cache_value = redis_cache.get(cms_utils.get_featured_items_cache_key())
+
+    # Returns empty list but does NOT wipe stale cache data
+    assert result == []
+    assert cache_value == stale_value
+
+
+@pytest.mark.django_db
+def test_create_featured_items_no_courses_no_prior_cache():
+    """Test create_featured_items with no courses and no prior cache entry"""
+    redis_cache = caches["redis"]
+    redis_cache.delete(cms_utils.get_featured_items_cache_key())
+
+    result = create_featured_items()
+    cache_value = redis_cache.get(cms_utils.get_featured_items_cache_key())
 
     assert result == []
-    assert cache_value == []
+    assert cache_value is None
 
 
 @pytest.mark.django_db
 def test_create_featured_items_no_enrollable_courses():
-    """Test create_featured_items with courses but no enrollable runs"""
+    """Test create_featured_items with courses but no enrollable runs leaves stale cache intact"""
     redis_cache = caches["redis"]
-    redis_cache.delete("CMS_homepage_featured_courses")
+    stale_value = [888]
+    redis_cache.set(cms_utils.get_featured_items_cache_key(), stale_value)
 
     # Create course with no enrollable runs
     course = CourseFactory.create(page=None, live=True)
@@ -399,17 +436,18 @@ def test_create_featured_items_no_enrollable_courses():
     CourseRunFactory.create(course=course, live=False, past_enrollment_end=True)
 
     result = create_featured_items()
-    cache_value = redis_cache.get("CMS_homepage_featured_courses")
+    cache_value = redis_cache.get(cms_utils.get_featured_items_cache_key())
 
+    # Returns empty list but does NOT wipe stale cache data
     assert result == []
-    assert cache_value == []
+    assert cache_value == stale_value
 
 
 @pytest.mark.django_db
 def test_create_featured_items_many_self_paced_courses():
     """Test create_featured_items limits self-paced courses to 2"""
     redis_cache = caches["redis"]
-    redis_cache.delete("CMS_homepage_featured_courses")
+    redis_cache.delete(cms_utils.get_featured_items_cache_key())
 
     now = now_in_utc()
     further_future_date = now + timedelta(days=2)
@@ -440,7 +478,7 @@ def test_create_featured_items_many_self_paced_courses():
 def test_create_featured_items_many_regular_courses():
     """Test create_featured_items limits regular courses to 20"""
     redis_cache = caches["redis"]
-    redis_cache.delete("CMS_homepage_featured_courses")
+    redis_cache.delete(cms_utils.get_featured_items_cache_key())
 
     now = now_in_utc()
     future_date = now + timedelta(days=1)
@@ -473,7 +511,7 @@ def test_create_featured_items_many_regular_courses():
 def test_create_featured_items_course_run_at_exact_time():
     """Test create_featured_items with course run starting exactly at now"""
     redis_cache = caches["redis"]
-    redis_cache.delete("CMS_homepage_featured_courses")
+    redis_cache.delete(cms_utils.get_featured_items_cache_key())
 
     now = now_in_utc()
     further_future_date = now + timedelta(days=2)
@@ -492,7 +530,7 @@ def test_create_featured_items_course_run_at_exact_time():
     )
 
     result = create_featured_items()
-    cache_value = redis_cache.get("CMS_homepage_featured_courses")
+    cache_value = redis_cache.get(cms_utils.get_featured_items_cache_key())
 
     assert len(result) == 1
     assert result[0] == exact_time_course
@@ -503,7 +541,7 @@ def test_create_featured_items_course_run_at_exact_time():
 def test_create_featured_items_mixed_course_types():
     """Test create_featured_items with mix of self-paced, future, and started courses"""
     redis_cache = caches["redis"]
-    redis_cache.delete("CMS_homepage_featured_courses")
+    redis_cache.delete(cms_utils.get_featured_items_cache_key())
 
     now = now_in_utc()
     future_date = now + timedelta(days=1)
@@ -557,10 +595,10 @@ def test_create_featured_items_mixed_course_types():
 
 
 @pytest.mark.django_db
-def test_create_featured_items_cache_expiration():
-    """Test that cache is set with correct expiration time"""
+def test_create_featured_items_cache_no_expiry():
+    """Test that cache is set with timeout=None so it never auto-expires"""
     redis_cache = caches["redis"]
-    redis_cache.delete("CMS_homepage_featured_courses")
+    redis_cache.delete(cms_utils.get_featured_items_cache_key())
 
     # Create a simple course to have something to cache
     course = CourseFactory.create(page=None, live=True)
@@ -576,10 +614,236 @@ def test_create_featured_items_cache_expiration():
 
     create_featured_items()
 
-    # Verify cache is set
-    cache_value = redis_cache.get("CMS_homepage_featured_courses")
+    # Verify cache is still set and correct
+    cache_value = redis_cache.get(cms_utils.get_featured_items_cache_key())
     assert cache_value is not None
     assert len(cache_value) == 1
 
-    # Note: TTL testing would require mocking or actual time measurement
-    # which might be flaky, so we just verify the cache is set
+    redis_client = redis_cache.client.get_client()
+    # redis returns -1 for a key being present with no expiry
+    # see https://redis.io/docs/latest/commands/ttl/
+    # note that the actual key in redis is prefixed with ":1:"
+    # we use the raw client, not the one provided by redis_django,
+    # because the latter rewrites the return values
+    ttl = redis_client.ttl(f":1:{cms_utils.get_featured_items_cache_key()}")
+    assert ttl == -1, (
+        f"Key `{cms_utils.get_featured_items_cache_key()}` is missing"
+        if ttl == -2
+        else f"Unexpected ttl value `{ttl}` for `{cms_utils.get_featured_items_cache_key()}`"
+    )
+
+
+def _url_for(course, program_queryset=None):
+    """The resolved financial assistance form URL for one course."""
+    return resolve_financial_assistance_form_urls(
+        [course.id], program_queryset=program_queryset
+    )[course.id]
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_child_form():
+    """
+    A form that is a child page of the course page.
+
+    Exercises the treebeard path arithmetic standing in for Wagtail's
+    ``get_children()``.
+    """
+    page = CoursePageFactory()
+    page.product.program = None
+    form = FlexiblePricingFormFactory(parent=page)
+
+    assert _url_for(page.product).endswith(f"{form.slug}/")
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_course_specific_form():
+    """A form linked to the course via ``selected_course``."""
+    page = CoursePageFactory()
+    form = FlexiblePricingFormFactory(
+        parent=CoursePageFactory(), selected_course=page.product
+    )
+
+    assert _url_for(page.product).endswith(f"{form.slug}/")
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_own_program_form():
+    """A form linked to one of the course's own programs."""
+    program = ProgramFactory()
+    page = CoursePageFactory()
+    program.add_requirement(page.product)
+    form = FlexiblePricingFormFactory(
+        parent=CoursePageFactory(), selected_program=program
+    )
+
+    assert _url_for(page.product).endswith(f"{form.slug}/")
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_related_program_form():
+    """A form linked to a program *related* to the course's program."""
+    program = ProgramFactory()
+    related = ProgramFactory()
+    program.add_related_program(related)
+    page = CoursePageFactory()
+    program.add_requirement(page.product)
+    form = FlexiblePricingFormFactory(
+        parent=CoursePageFactory(), selected_program=related
+    )
+
+    assert _url_for(page.product).endswith(f"{form.slug}/")
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_absent_when_no_form():
+    """No form anywhere yields an empty string."""
+    page = CoursePageFactory()
+    page.product.program = None
+
+    assert _url_for(page.product) == ""
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_skips_programs_outside_the_scope():
+    """
+    A program the caller filtered out cannot supply the URL.
+
+    The regression this guards: the v2 course list scopes its ``programs``
+    prefetch to live, non-b2b programs, and the URL is chosen by walking a
+    course's programs - so the two have to be asked the same question. Before
+    this was threaded through, a course in a ``live=False`` program served that
+    program's form.
+    """
+    program = ProgramFactory(live=False)
+    page = CoursePageFactory()
+    program.add_requirement(page.product)
+    FlexiblePricingFormFactory(parent=CoursePageFactory(), selected_program=program)
+
+    live_only = Program.objects.filter(live=True)
+
+    assert _url_for(page.product, program_queryset=live_only) == ""
+    # Same data, no scope: the form is reachable, so the assertion above is
+    # about the scope rather than about the form being missing.
+    assert _url_for(page.product, program_queryset=Program.objects.all()) != ""
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_default_scope_excludes_b2b_programs():
+    """
+    With no scope named, b2b-only programs are out.
+
+    ``default_program_queryset()`` is what both this resolver and the
+    ``programs`` prefetch fall back to, so a b2b-only program must not supply a
+    URL to a caller that never asked about b2b.
+    """
+    program = ProgramFactory(b2b_only=True)
+    page = CoursePageFactory()
+    program.add_requirement(page.product)
+    FlexiblePricingFormFactory(parent=CoursePageFactory(), selected_program=program)
+
+    assert _url_for(page.product) == ""
+    assert _url_for(page.product, program_queryset=Program.objects.all()) != ""
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_scope_is_not_reentered_by_related_programs():
+    """
+    A scoped-out program does not sneak back in as somebody's related program.
+
+    Related programs are deliberately unscoped - they are reached *through* a
+    course's own programs, which are scoped - so this pins down that the
+    scoping happens at the only place it can: the course's own programs.
+    """
+    scoped_out = ProgramFactory(live=False)
+    related = ProgramFactory()
+    scoped_out.add_related_program(related)
+    page = CoursePageFactory()
+    scoped_out.add_requirement(page.product)
+    FlexiblePricingFormFactory(parent=CoursePageFactory(), selected_program=related)
+
+    assert (
+        _url_for(page.product, program_queryset=Program.objects.filter(live=True)) == ""
+    )
+
+
+@pytest.mark.django_db
+def test_financial_assistance_forms_load_is_scoped_to_the_request():
+    """
+    The forms query must not grow with the number of live forms on the site.
+
+    The query count tests below cannot catch this: fetching the whole form table
+    is still exactly one query, so a regression back to that would leave every
+    other test in this file passing. What matters here is how many rows come
+    back, which is why this asserts on the loaded buckets rather than on timing
+    or query count.
+
+    A form is reachable from a course only via one of the three lookups
+    ``url_for`` performs - tied to the course, tied to one of its programs, or a
+    child of one of the pages in play. Forms hung off unrelated course pages
+    satisfy none of them.
+    """
+    page = CoursePageFactory()
+    FlexiblePricingFormFactory(parent=page)
+    course_ids = [page.product.id]
+
+    def loaded_form_pks():
+        forms = _FinancialAssistanceForms(course_ids, default_program_queryset())
+        return {
+            form.pk
+            for bucket in (
+                forms.forms_by_parent_path,
+                forms.forms_by_course_id,
+                forms.forms_by_program_id,
+            )
+            for rows in bucket.values()
+            for form in rows
+        }
+
+    before = loaded_form_pks()
+    assert before, "the course's own form should load"
+
+    for _ in range(5):
+        FlexiblePricingFormFactory(parent=CoursePageFactory())
+
+    assert loaded_form_pks() == before
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_query_count_is_flat(django_assert_max_num_queries):
+    """
+    The resolver's query count must not grow with the number of courses.
+
+    That is the whole reason it exists: the cascade costs 4-8 queries per course
+    when resolved one at a time. Asserting that two cardinalities cost the same
+    tests that property directly, and unlike a fixed number it cannot be thrown
+    off by which test happens to warm Wagtail's cached site-root paths.
+    """
+
+    def make_courses(count):
+        courses = []
+        for _ in range(count):
+            page = CoursePageFactory()
+            FlexiblePricingFormFactory(parent=page)
+            # A program with a related program, so the whole cascade runs - a
+            # course with no programs short-circuits two of the queries.
+            program = ProgramFactory()
+            program.add_related_program(ProgramFactory())
+            program.add_requirement(page.product)
+            courses.append(page.product)
+        return [course.id for course in courses]
+
+    one = make_courses(1)
+    many = make_courses(10)
+
+    # The first get_url() in the process fetches the site root paths and caches
+    # them; warm that here so it lands in neither measurement.
+    resolve_financial_assistance_form_urls(one)
+
+    with CaptureQueriesContext(connection) as one_ctx:
+        assert resolve_financial_assistance_form_urls(one)
+    with django_assert_max_num_queries(FINANCIAL_ASSISTANCE_QUERY_COUNT) as many_ctx:
+        urls = resolve_financial_assistance_form_urls(many)
+
+    assert len(urls) == len(many)
+    assert all(url for url in urls.values())
+    assert len(many_ctx.captured_queries) == len(one_ctx.captured_queries)

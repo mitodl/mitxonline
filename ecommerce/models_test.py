@@ -1,42 +1,89 @@
 import random
+import uuid
 from datetime import timedelta
 from decimal import Decimal
 
 import pytest
 import reversion
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
+from django.db.models import ProtectedError
+from django.test.utils import CaptureQueriesContext
+from django.urls import reverse
+from freezegun import freeze_time
 from mitol.common.utils import now_in_utc
+from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
 from reversion.models import Version
 
+from b2b.factories import ContractPageFactory
+from compliance.api import ExportComplianceResult
+from compliance.exceptions import ExportComplianceDataError
+from courses.factories import (
+    BlockedCountryFactory,
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+    ProgramEnrollmentFactory,
+    ProgramFactory,
+)
+from courses.models import (
+    CourseRunEnrollment,
+    CourseRunEnrollmentAudit,
+    ProgramEnrollment,
+)
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
+    PAYMENT_TYPE_SALES,
+    REDEMPTION_TYPE_INTERNAL,
+    REDEMPTION_TYPE_ONE_TIME,
+    REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+    REDEMPTION_TYPE_UNLIMITED,
+    REFUND_WINDOW_DAYS,
+    ZERO_PAYMENT_DATA,
 )
+from ecommerce.discount_sources import resolve_program_child_purchase
 from ecommerce.factories import (
     BasketFactory,
     BasketItemFactory,
+    DiscountFactory,
+    DiscountRedemptionFactory,
+    InternalDiscountFactory,
+    LineFactory,
     OneTimeDiscountFactory,
     OneTimePerUserDiscountFactory,
     OrderFactory,
+    PaidAmountOffDiscountFactory,
     ProductFactory,
+    ProgramProductFactory,
     SetLimitDiscountFactory,
     UnlimitedUseDiscountFactory,
+    make_purchase,
 )
+from ecommerce.fixtures import stripe_event
+from ecommerce.hooks.process_transaction_line import _link_b2b_course_run_contracts
 from ecommerce.models import (
     Basket,
     BasketDiscount,
     BasketItem,
+    Discount,
+    DiscountProduct,
     DiscountRedemption,
     FulfilledOrder,
     Line,
     Order,
+    OrderRefundStatus,
     OrderStatus,
     PendingOrder,
     Product,
+    RefundRequest,
+    RefundRequestStatus,
+    StripeEventLog,
     Transaction,
+    UserDiscount,
 )
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -93,11 +140,11 @@ def test_one_time_discount(user, onetime_discount):
     again.
     """
 
-    assert onetime_discount.check_validity(user) is True
+    assert onetime_discount.is_redeemable_by(user) is True
 
     perform_discount_redemption(user, onetime_discount)
 
-    assert onetime_discount.check_validity(user) is False
+    assert onetime_discount.is_redeemable_by(user) is False
 
 
 def test_one_time_per_user_discount(users, onetime_per_user_discount):
@@ -107,11 +154,11 @@ def test_one_time_per_user_discount(users, onetime_per_user_discount):
     """
 
     for user in users:
-        assert onetime_per_user_discount.check_validity(user) is True
+        assert onetime_per_user_discount.is_redeemable_by(user) is True
 
         perform_discount_redemption(user, onetime_per_user_discount)
 
-        assert onetime_per_user_discount.check_validity(user) is False
+        assert onetime_per_user_discount.is_redeemable_by(user) is False
 
 
 def test_unlimited_discounts(users, unlimited_discount):
@@ -123,11 +170,11 @@ def test_unlimited_discounts(users, unlimited_discount):
 
     for user in users:
         for i in range(random.randrange(1, 15, 1)):  # noqa: S311, B007
-            assert unlimited_discount.check_validity(user) is True
+            assert unlimited_discount.is_redeemable_by(user) is True
 
             perform_discount_redemption(user, unlimited_discount)
 
-            assert unlimited_discount.check_validity(user) is True
+            assert unlimited_discount.is_redeemable_by(user) is True
 
 
 def test_set_limit_discount_single_user(user, set_limited_use_discount):
@@ -138,11 +185,11 @@ def test_set_limit_discount_single_user(user, set_limited_use_discount):
     """
 
     for i in range(set_limited_use_discount.max_redemptions):  # noqa: B007
-        assert set_limited_use_discount.check_validity(user) is True
+        assert set_limited_use_discount.is_redeemable_by(user) is True
 
         perform_discount_redemption(user, set_limited_use_discount)
 
-    assert set_limited_use_discount.check_validity(user) is False
+    assert set_limited_use_discount.is_redeemable_by(user) is False
 
 
 def test_set_limit_discount_multiple_users(users, set_limited_use_discount):
@@ -154,14 +201,32 @@ def test_set_limit_discount_multiple_users(users, set_limited_use_discount):
 
     for user in users:
         for i in range(int(set_limited_use_discount.max_redemptions / 2)):  # noqa: B007
-            assert set_limited_use_discount.check_validity(user) is True
+            assert set_limited_use_discount.is_redeemable_by(user) is True
 
             perform_discount_redemption(user, set_limited_use_discount)
 
     if set_limited_use_discount.max_redemptions % 2:
         perform_discount_redemption(user, set_limited_use_discount)
 
-    assert set_limited_use_discount.check_validity(user) is False
+    assert set_limited_use_discount.is_redeemable_by(user) is False
+
+
+def test_contract_code_redemption_requires_membership(user):
+    """
+    A contract's code is redeemable, and prices a product, only for the
+    contract's members.
+    """
+    contract = ContractPageFactory.create()
+    discount = UnlimitedUseDiscountFactory.create(b2b_contract=contract)
+    product = ProductFactory.create()
+
+    assert discount.is_redeemable_by(user) is False
+    assert discount.discount_product(product, user) is None
+
+    user.b2b_contracts.add(contract)
+
+    assert discount.is_redeemable_by(user) is True
+    assert discount.discount_product(product, user) is not None
 
 
 def test_basket_discount_conversion(user, unlimited_discount):
@@ -210,7 +275,9 @@ def test_order_refund(settings):
     with reversion.create_revision():
         basket_item = BasketItemFactory.create()
 
-    order = PendingOrder.create_from_basket(basket_item.basket)
+    order = PendingOrder.create_from_basket(
+        basket_item.basket, gateway_type=settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
+    )
     order_flow = order.get_object_flow()
     order_flow.fulfill({"result": "Payment succeeded", "transaction_id": "12345"})
 
@@ -261,6 +328,35 @@ def test_basket_order_equivalency(user, basket, unlimited_discount):
     assert basket.compare_to_order(order) is False
 
 
+def test_basket_is_anonymous():
+    """Test that is_anonymous reflects whether the basket has a user or an anonymous_id"""
+    user_basket = BasketFactory.create()
+    anonymous_basket = BasketFactory.create(user=None, anonymous_id=uuid.uuid4())
+
+    assert user_basket.is_anonymous is False
+    assert anonymous_basket.is_anonymous is True
+
+
+def test_basket_requires_exactly_one_of_user_or_anonymous_id():
+    """Test the CheckConstraint rejects baskets with both or neither of user/anonymous_id set"""
+    user = UserFactory.create()
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Basket.objects.create(user=user, anonymous_id=uuid.uuid4())
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Basket.objects.create(user=None, anonymous_id=None)
+
+
+def test_compare_to_order_anonymous_basket(user):
+    """Test that an anonymous basket never compares equal to an order"""
+    anonymous_basket = BasketFactory.create(user=None, anonymous_id=uuid.uuid4())
+    order = Order(purchaser=user, state=OrderStatus.FULFILLED, total_price_paid=10)
+    order.save()
+
+    assert anonymous_basket.compare_to_order(order) is False
+
+
 def test_product_delete_protection_inactive():
     """Test that deleting product(s) instead de-activates it"""
     single_product = ProductFactory.create()
@@ -292,15 +388,25 @@ def test_product_managers():
     )
 
 
-def test_product_multiple_active_for_single_purchasable_object():
-    """Test that creating multiple Products with the same course/program
-    and are active is not allowed
+def test_product_multiple_for_single_purchasable_object():
+    """Test that creating multiple Products with the same course/program is not allowed,
+    regardless of active state.
     """
     first_product = ProductFactory.create()
     try:
         with transaction.atomic():
             ProductFactory.create(purchasable_object=first_product.purchasable_object)
         pytest.fail("Two active Products for the same purchasable_object were allowed.")
+    except IntegrityError:
+        pass
+
+    first_product.delete()
+    try:
+        with transaction.atomic():
+            ProductFactory.create(purchasable_object=first_product.purchasable_object)
+        pytest.fail(
+            "A Product was created for a purchasable_object that already has an inactive Product."
+        )
     except IntegrityError:
         pass
 
@@ -319,6 +425,25 @@ def test_order_update_reference_number(user):
     assert (
         existing_order.reference_number == existing_order._generate_reference_number()  # noqa: SLF001
     )
+
+
+def test_order_reference_number_is_immutable(settings, user):
+    """
+    Once set, an order's reference_number should survive later saves even if the
+    generation scheme changes - it's the identifier we share with the payment
+    gateway and look the order up by on the callback.
+    """
+    order = Order(purchaser=user, total_price_paid=10)
+    order.save()
+
+    original_reference_number = order.reference_number
+
+    settings.ENVIRONMENT = "some-other-environment"
+    order.total_price_paid = 20
+    order.save()
+    order.refresh_from_db()
+
+    assert order.reference_number == original_reference_number
 
 
 def test_duplicated_product_lines_validation(basket):
@@ -375,6 +500,30 @@ def test_create_transaction_with_no_transaction_id():
 
 
 @pytest.mark.parametrize(
+    "payment_data",
+    [
+        # Secure Acceptance response uses req_amount
+        {"transaction_id": "cs-txn-1", "req_amount": "175.00", "req_currency": "USD"},
+        # REST API response uses amount
+        {"transaction_id": "cs-txn-2", "amount": "175.00", "req_currency": "USD"},
+    ],
+)
+def test_create_transaction_cybersource_amount(payment_data):
+    """CyberSource SA responses (req_amount) and REST responses (amount) both store the correct amount."""
+
+    order = OrderFactory.create(
+        state=OrderStatus.FULFILLED,
+        total_price_paid=Decimal("175.00"),
+        gateway_type=MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+    )
+    order_flow = order.get_object_flow()
+    order_flow.create_transaction(payment_data)
+
+    txn = Transaction.objects.get(transaction_id=payment_data["transaction_id"])
+    assert txn.amount == Decimal("175.00")
+
+
+@pytest.mark.parametrize(
     "discount_type, less_than_zero_or_discount",  # noqa: PT006
     [
         [DISCOUNT_TYPE_DOLLARS_OFF, False],  # noqa: PT007
@@ -419,169 +568,151 @@ def test_discount_product_calculation(
         ).quantize(Decimal("0.01"))
 
 
-def test_pending_order_is_reused(basket):
+@pytest.mark.parametrize("reuse", [True, False])
+def test_pending_order_with_multiple_product_versions(basket, reuse):
     """
-    Test that creating a second PendingOrder's with the same associated Product is
-    not possible, the existing PendingOrder is reused.
+    Test that creating a PendingOrder with a basket item for a product with
+    multiple versions works as expected
     """
 
     with reversion.create_revision():
-        product = ProductFactory.create()
+        product = ProductFactory.create(price=500)
+
+    with reversion.create_revision():
+        product.price = 900
+        product.save()
+
+    assert Version.objects.get_for_object(product).count() == 2
 
     basket_item = BasketItem(product=product, basket=basket, quantity=1)
     basket_item.save()
     order = PendingOrder.create_from_basket(basket)
     order.save()
-    assert Order.objects.filter(state=OrderStatus.PENDING).count() == 1
-    order = PendingOrder.create_from_basket(basket)
-    order.save()
-    # Verify that the existing PendingOrder is reused and a duplicate is not created.
-    # This is to ensure that we also reuse the HubSpot Deal associated with Orders.
-    assert Order.objects.filter(state=OrderStatus.PENDING).count() == 1
+
+    assert order.total_price_paid == 900
+
+    if reuse:
+        with reversion.create_revision():
+            product.price = 750
+            product.save()
+
+        order = PendingOrder.create_from_basket(basket)
+        order.save()
+
+        # Unlike the test below, we get a new order because the product changed.
+
+        assert Order.objects.filter(state=OrderStatus.PENDING).count() == 2
+        assert order.total_price_paid == 750
 
 
-@pytest.mark.parametrize(
-    "apply_discount", ["to_order", "to_basket", "to_second_basket"]
-)
-def test_pending_order_is_reused_but_discounts_cleared(
-    basket, unlimited_discount, apply_discount
-):
-    """
-    If a pending order is reused and had discounts, then we want those discounts
-    to clear.
-    """
-
+def test_pending_orders_from_same_basket_are_fresh_snapshots(basket):
+    """Later basket changes do not modify an earlier order."""
+    contract = ContractPageFactory.create()
+    updated_contract = ContractPageFactory.create()
+    discount = DiscountFactory.create(
+        amount=Decimal("10"), discount_type=DISCOUNT_TYPE_DOLLARS_OFF
+    )
+    updated_discount = DiscountFactory.create(
+        amount=Decimal("20"), discount_type=DISCOUNT_TYPE_DOLLARS_OFF
+    )
     with reversion.create_revision():
-        product = ProductFactory.create()
+        product = ProductFactory.create(price=Decimal("100.00"))
+    basket_item = BasketItemFactory.create(
+        basket=basket, product=product, b2b_contract=contract
+    )
+    BasketDiscount.objects.create(
+        redeemed_basket=basket,
+        redeemed_by=basket.user,
+        redeemed_discount=discount,
+        redemption_date=now_in_utc(),
+    )
 
-    basket_item = BasketItem(product=product, basket=basket, quantity=1)
+    first_order = PendingOrder.create_from_basket(basket)
+    first_line = first_order.lines.get()
+    first_reference_number = first_order.reference_number
+    identical_order = PendingOrder.create_from_basket(basket)
+    assert first_order.id != identical_order.id
+    assert first_order.reference_number != identical_order.reference_number
+
+    BasketDiscount.objects.filter(redeemed_basket=basket).delete()
+    BasketDiscount.objects.create(
+        redeemed_basket=basket,
+        redeemed_by=basket.user,
+        redeemed_discount=updated_discount,
+        redemption_date=now_in_utc(),
+    )
+    basket_item.b2b_contract = updated_contract
     basket_item.save()
+    second_order = PendingOrder.create_from_basket(basket)
 
-    if apply_discount == "to_basket":
-        basket_discount = BasketDiscount(
-            redemption_date=now_in_utc(),
-            redeemed_by=basket.user,
-            redeemed_discount=unlimited_discount,
-            redeemed_basket=basket,
-        )
-        basket_discount.save()
-        basket.refresh_from_db()
-
-    order = PendingOrder.create_from_basket(basket)
-    order.save()
-    assert Order.objects.filter(state=OrderStatus.PENDING).count() == 1
-
-    if apply_discount == "to_order":
-        redemption = DiscountRedemption(
-            redeemed_discount=unlimited_discount,
-            redemption_date=now_in_utc(),
-            redeemed_order=order,
-            redeemed_by=order.purchaser,
-        )
-        redemption.save()
-
-    order.refresh_from_db()
-    if apply_discount != "to_second_basket":
-        assert order.discounts.count() == 1
-    else:
-        assert order.discounts.count() == 0
-
-    if apply_discount == "to_second_basket":
-        a_different_discount = UnlimitedUseDiscountFactory.create()
-
-        basket_discount = BasketDiscount(
-            redemption_date=now_in_utc(),
-            redeemed_by=basket.user,
-            redeemed_discount=a_different_discount,
-            redeemed_basket=basket,
-        )
-        basket_discount.save()
-
-    order = PendingOrder.create_from_basket(basket)
-    order.save()
-    order.refresh_from_db()
-
-    # Verify that the existing PendingOrder is reused and a duplicate is not created.
-    # This is to ensure that we also reuse the HubSpot Deal associated with Orders.
-    # Also ensure the discounts aren't reattached to the order if we just attached
-    # the discount to the order - if it's in the basket, it should be reattached, but we should only get one
-    assert Order.objects.filter(state=OrderStatus.PENDING).count() == 1
-    if apply_discount == "to_order":
-        assert order.discounts.count() == 0
-    else:
-        order.discounts.count() == 1  # noqa: B015
-
-        # A different discount gets attached if there's a second basket so make
-        # sure the right one is there
-        if apply_discount == "to_second_basket":
-            assert order.discounts.first().redeemed_discount == a_different_discount
-        else:
-            assert order.discounts.first().redeemed_discount == unlimited_discount
+    first_order.refresh_from_db()
+    first_line.refresh_from_db()
+    assert first_order.id != second_order.id
+    assert first_order.reference_number != second_order.reference_number
+    assert first_order.reference_number == first_reference_number
+    assert first_line.b2b_contract == contract
+    assert first_line.discounted_unit_price == Decimal("90.00")
+    assert first_order.discounts.get().redeemed_discount == discount
+    assert second_order.lines.get().b2b_contract == updated_contract
+    assert second_order.lines.get().discounted_unit_price == Decimal("80.00")
+    assert second_order.discounts.get().redeemed_discount == updated_discount
 
 
-def test_new_pending_order_is_created_if_product_is_different():
-    """
-    Test that creating a second PendingOrder with a different associated Product
-    results in the creation of a new PendingOrder instead of reusing the existing
-    PendingOrder.
-    """
-    with reversion.create_revision():
-        products = ProductFactory.create_batch(2)
-
+def test_pending_order_from_same_product_is_fresh():
+    """Repeated product checkouts create distinct orders and reference numbers."""
     user = UserFactory.create()
-    order = PendingOrder.create_from_product(product=products[0], user=user)
-    order.save()
-    assert order.lines.count() == 1
-
-    order = PendingOrder.create_from_product(product=products[1], user=user)
-    order.save()
-    assert order.lines.count() == 1
-    assert Order.objects.filter(state=OrderStatus.PENDING).count() == 2
-
-
-def test_pending_order_is_reused_if_multiple_exist(basket):
-    """
-    Test that an existing PendingOrder is reused even if there are
-    multiple existing PendingOrders which match the current PendingOrder.
-    """
-
     with reversion.create_revision():
         product = ProductFactory.create()
-    product_version = Version.objects.get_for_object(product).first()
 
-    # Create 2 PendingOrders
-    order1 = Order.objects.create(
-        state=OrderStatus.PENDING,
-        purchaser=basket.user,
-        total_price_paid=0,
+    first_order = PendingOrder.create_from_product(product, user)
+    second_order = PendingOrder.create_from_product(product, user)
+
+    assert first_order.id != second_order.id
+    assert first_order.reference_number != second_order.reference_number
+
+
+def test_duplicate_basket_products_create_one_order_line(basket):
+    """A repeated basket item for one purchasable object is charged only once."""
+    with reversion.create_revision():
+        product = ProductFactory.create(price=Decimal("100.00"))
+    BasketItemFactory.create(basket=basket, product=product)
+    BasketItemFactory.create(basket=basket, product=product)
+
+    order = PendingOrder.create_from_basket(basket)
+
+    assert order.lines.count() == 1
+    assert order.total_price_paid == Decimal("100.00")
+
+
+def test_duplicate_basket_products_with_conflicting_contracts_are_rejected(basket):
+    """Duplicate basket entries must agree on their contract."""
+    product = ProductFactory.create()
+    BasketItemFactory.create(
+        basket=basket, product=product, b2b_contract=ContractPageFactory.create()
     )
-    Line.objects.create(
-        order=order1,
-        purchased_object_id=product.object_id,
-        purchased_content_type_id=product.content_type_id,
-        product_version=product_version,
-        quantity=1,
+    BasketItemFactory.create(
+        basket=basket, product=product, b2b_contract=ContractPageFactory.create()
     )
-    order2 = Order.objects.create(
-        state=OrderStatus.PENDING,
-        purchaser=basket.user,
-        total_price_paid=0,
-    )
-    Line.objects.create(
-        order=order2,
-        purchased_object_id=product.object_id,
-        purchased_content_type_id=product.content_type_id,
-        product_version=product_version,
-        quantity=1,
-    )
+
+    with pytest.raises(ValidationError, match="conflicting contracts"):
+        PendingOrder.create_from_basket(basket)
+
+    assert not Order.objects.filter(purchaser=basket.user).exists()
+
+
+def test_pending_order_with_bad_product_versions(basket):
+    """
+    Test that creating a PendingOrder with a basket item for a product with
+    bad (i.e. no) versions works as expected
+    """
+
+    product = ProductFactory.create(price=500)
+    assert Version.objects.get_for_object(product).count() == 0
 
     basket_item = BasketItem(product=product, basket=basket, quantity=1)
     basket_item.save()
-    order = PendingOrder.create_from_basket(basket)
-    order.save()
-    # Verify that one of the existing PendingOrder's is reused insteading of
-    # creating a third.
-    assert Order.objects.filter(state=OrderStatus.PENDING).count() == 2
+    with pytest.raises(ValueError, match=r".*is improperly constructed: no versions"):
+        PendingOrder.create_from_basket(basket)
 
 
 def test_discount_expires_in_past(unlimited_discount):
@@ -618,3 +749,1505 @@ def test_discount_expires_before_activation(unlimited_discount):
 
     test_discount.expiration_date = None
     test_discount.save()
+
+
+@pytest.mark.parametrize("is_none", [True, False])
+def test_discount_with_product_value_is_valid_for_basket(is_none):
+    """Test that a discount is valid for a basket."""
+    basket_item = BasketItemFactory.create()
+
+    product = None if is_none else basket_item.product
+    discount = UnlimitedUseDiscountFactory.create(amount=10)
+    if product:
+        DiscountProduct.objects.create(discount=discount, product=product)
+    assert discount.is_valid_for_basket(basket_item.basket)
+
+
+@pytest.mark.parametrize("is_none", [True, False])
+def test_discount_with_user_value_is_valid_for_basket(is_none):
+    """Test that a discount is valid for a basket."""
+    basket_item = BasketItemFactory.create()
+
+    discount = UnlimitedUseDiscountFactory.create(amount=10)
+    if not is_none:
+        user_discount = UserDiscount.objects.create(
+            discount=discount,
+            user=basket_item.basket.user,
+        )
+        basket_item.basket.user.user_discount_user.add(user_discount)
+    assert discount.is_valid_for_basket(basket_item.basket)
+
+
+def test_discount_with_null_max_redemptions_is_valid_for_basket():
+    """A NULL max_redemptions means unlimited, not a TypeError."""
+    basket_item = BasketItemFactory.create()
+    discount = UnlimitedUseDiscountFactory.create(max_redemptions=None)
+
+    assert discount.is_valid_for_basket(basket_item.basket)
+
+
+def test_discount_with_unfulfilled_redemption_is_valid_for_basket():
+    """Redemptions on unfulfilled orders don't consume the limit, matching is_redeemable_by."""
+    basket_item = BasketItemFactory.create()
+    discount = UnlimitedUseDiscountFactory.create(max_redemptions=1)
+    order = OrderFactory.create(
+        purchaser=basket_item.basket.user, state=OrderStatus.PENDING
+    )
+    DiscountRedemption.objects.create(
+        redeemed_discount=discount,
+        redeemed_by=basket_item.basket.user,
+        redeemed_order=order,
+        redemption_date=now_in_utc(),
+    )
+
+    assert discount.is_valid_for_basket(basket_item.basket)
+
+
+@pytest.mark.parametrize("is_none", [True, False])
+def test_discount_with_max_redemptions_is_valid_for_basket(is_none):
+    """Test that a discount is valid for a basket."""
+    basket_item = BasketItemFactory.create()
+
+    discount = UnlimitedUseDiscountFactory.create(
+        max_redemptions=2,
+        amount=10,
+    )
+    if not is_none:
+        order = OrderFactory.create(purchaser=basket_item.basket.user)
+        DiscountRedemption.objects.create(
+            redeemed_discount=discount,
+            redeemed_by=basket_item.basket.user,
+            redeemed_order=order,
+            redemption_date=now_in_utc(),
+        )
+    assert discount.is_valid_for_basket(basket_item.basket)
+
+
+@pytest.mark.parametrize("is_none", [True, False])
+def test_discount_with_activation_date_in_past_is_valid_for_basket(is_none):
+    """Test that a discount is valid for a basket."""
+    basket_item = BasketItemFactory.create()
+    activation_date = None if is_none else now_in_utc() - timedelta(days=100)
+    discount = UnlimitedUseDiscountFactory.create(
+        activation_date=activation_date,
+        amount=10,
+    )
+    assert discount.is_valid_for_basket(basket_item.basket)
+
+
+@pytest.mark.parametrize("is_none", [True, False])
+def test_discount_with_expiration_date_in_future_is_valid_for_basket(is_none):
+    """Test that a discount is valid for a basket."""
+    basket_item = BasketItemFactory.create()
+    expiration_date = None if is_none else now_in_utc() + timedelta(days=100)
+    discount = UnlimitedUseDiscountFactory.create(
+        expiration_date=expiration_date,
+        amount=10,
+    )
+    assert discount.is_valid_for_basket(basket_item.basket)
+
+
+def test_discount_with_unmatched_product_value_is_not_valid_for_basket():
+    """Test that a discount is not valid for a basket."""
+    basket_item = BasketItemFactory.create()
+
+    product = ProductFactory.create()
+    discount = UnlimitedUseDiscountFactory.create(
+        amount=10,
+    )
+    DiscountProduct.objects.create(
+        discount=discount,
+        product=product,
+    )
+    assert not discount.is_valid_for_basket(basket_item.basket)
+
+
+def test_discount_with_unmatched_user_value_is_not_valid_for_basket():
+    """Test that a discount is not valid for a basket."""
+    basket_item = BasketItemFactory.create()
+
+    discount = UnlimitedUseDiscountFactory.create(
+        amount=10,
+    )
+    user = UserFactory.create()
+    UserDiscount.objects.create(discount=discount, user=user)
+    assert not discount.is_valid_for_basket(basket_item.basket)
+
+
+def test_discount_with_max_redemptions_is_not_valid_for_basket():
+    """Test that a discount is not valid for a basket."""
+    basket_item = BasketItemFactory.create()
+
+    discount = UnlimitedUseDiscountFactory.create(
+        max_redemptions=1,
+        amount=10,
+    )
+
+    order = OrderFactory.create(
+        purchaser=basket_item.basket.user, state=OrderStatus.FULFILLED
+    )
+    DiscountRedemption.objects.create(
+        redeemed_discount=discount,
+        redeemed_by=basket_item.basket.user,
+        redeemed_order=order,
+        redemption_date=now_in_utc(),
+    )
+    assert not discount.is_valid_for_basket(basket_item.basket)
+
+
+def test_discount_with_activation_date_in_future_is_not_valid_for_basket():
+    """Test that a discount is not valid for a basket."""
+    basket_item = BasketItemFactory.create()
+    activation_date = now_in_utc() + timedelta(days=100)
+    discount = UnlimitedUseDiscountFactory.create(
+        activation_date=activation_date,
+        amount=10,
+    )
+    assert not discount.is_valid_for_basket(basket_item.basket)
+
+
+def test_discount_with_expiration_date_in_past_is_not_valid_for_basket():
+    """Test that a discount is not valid for a basket."""
+    basket_item = BasketItemFactory.create()
+    expiration_date = now_in_utc() - timedelta(days=100)
+
+    with freeze_time(now_in_utc() - timedelta(days=101)):
+        discount = UnlimitedUseDiscountFactory.create(
+            expiration_date=expiration_date,
+            amount=10,
+        )
+
+    assert not discount.is_valid_for_basket(basket_item.basket)
+
+
+def test_one_time_discount_with_fulfilled_redemption_is_not_valid_for_basket():
+    """A one-time discount already redeemed on a fulfilled order can't be reused."""
+    basket_item = BasketItemFactory.create()
+    discount = OneTimeDiscountFactory.create()
+    order = OrderFactory.create(
+        purchaser=basket_item.basket.user, state=OrderStatus.FULFILLED
+    )
+    DiscountRedemption.objects.create(
+        redeemed_discount=discount,
+        redeemed_by=basket_item.basket.user,
+        redeemed_order=order,
+        redemption_date=now_in_utc(),
+    )
+    assert not discount.is_valid_for_basket(basket_item.basket)
+
+
+def test_one_time_discount_with_pending_redemption_is_valid_for_basket():
+    """A one-time discount redeemed only on a pending order hasn't been consumed yet."""
+    basket_item = BasketItemFactory.create()
+    discount = OneTimeDiscountFactory.create()
+    order = OrderFactory.create(
+        purchaser=basket_item.basket.user, state=OrderStatus.PENDING
+    )
+    DiscountRedemption.objects.create(
+        redeemed_discount=discount,
+        redeemed_by=basket_item.basket.user,
+        redeemed_order=order,
+        redemption_date=now_in_utc(),
+    )
+    assert discount.is_valid_for_basket(basket_item.basket)
+
+
+def test_one_time_per_user_discount_redeemed_by_basket_user_is_not_valid_for_basket():
+    """A one-time-per-user discount already redeemed by this user can't be reused by them."""
+    basket_item = BasketItemFactory.create()
+    discount = OneTimePerUserDiscountFactory.create()
+    order = OrderFactory.create(
+        purchaser=basket_item.basket.user, state=OrderStatus.FULFILLED
+    )
+    DiscountRedemption.objects.create(
+        redeemed_discount=discount,
+        redeemed_by=basket_item.basket.user,
+        redeemed_order=order,
+        redemption_date=now_in_utc(),
+    )
+    assert not discount.is_valid_for_basket(basket_item.basket)
+
+
+def test_one_time_per_user_discount_redeemed_by_other_user_is_valid_for_basket():
+    """A one-time-per-user discount redeemed by someone else is still available to this user."""
+    basket_item = BasketItemFactory.create()
+    discount = OneTimePerUserDiscountFactory.create()
+    other_user = UserFactory.create()
+    order = OrderFactory.create(purchaser=other_user, state=OrderStatus.FULFILLED)
+    DiscountRedemption.objects.create(
+        redeemed_discount=discount,
+        redeemed_by=other_user,
+        redeemed_order=order,
+        redemption_date=now_in_utc(),
+    )
+    assert discount.is_valid_for_basket(basket_item.basket)
+
+
+@pytest.mark.skip_nplusone_check
+def test_process_transaction_line_hooks(mocker, user, user_drf_client):
+    """Test that the hooks get called after the order is completed."""
+
+    mocked_create_run_enrollment = mocker.patch(
+        "ecommerce.hooks.process_transaction_line._create_courserun_enrollment"
+    )
+    mocked_create_program_enrollment = mocker.patch(
+        "ecommerce.hooks.process_transaction_line._create_program_enrollment"
+    )
+
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    discount = UnlimitedUseDiscountFactory.create(
+        amount=100, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    basket = BasketFactory.create(user=user)
+    BasketItem.objects.create(basket=basket, product=product)
+    BasketDiscount.objects.create(
+        redeemed_by=basket.user,
+        redemption_date=now_in_utc(),
+        redeemed_basket=basket,
+        redeemed_discount=discount,
+    )
+
+    result = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+
+    assert result.status_code == 200
+
+    assert mocked_create_run_enrollment.called
+    assert not mocked_create_program_enrollment.called
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize(
+    ("skip_receipt", "email_sent"),
+    [(True, False), (False, True)],
+)
+def test_fulfill_skip_receipt(
+    mocker, fake, django_capture_on_commit_callbacks, skip_receipt, email_sent
+):
+    """Test that fulfill respects the skip_receipt flag for sending receipt email."""
+    mocker.patch("courses.api.create_run_enrollments", autospec=True)
+    mock_send_receipt = mocker.patch(
+        "ecommerce.tasks.send_ecommerce_order_receipt.delay"
+    )
+
+    pending_order = OrderFactory.create(state=OrderStatus.PENDING)
+    order_flow = pending_order.get_object_flow()
+
+    with django_capture_on_commit_callbacks(execute=True):
+        order_flow.fulfill(
+            ZERO_PAYMENT_DATA,
+            skip_receipt=skip_receipt,
+        )
+
+    if email_sent:
+        mock_send_receipt.assert_called_once_with(pending_order.id)
+    else:
+        mock_send_receipt.assert_not_called()
+
+
+def test_stripe_event_log_resave():
+    """Test that resaving a StripeEventLog works as expected."""
+
+    event = stripe_event()
+    logged_event = StripeEventLog.objects.create(
+        event_id=event.id, event_data=event.to_dict(for_json=True)
+    )
+
+    assert event.id == logged_event.event_id
+    assert not logged_event.related_order
+
+    order = OrderFactory.create()
+
+    logged_event.event_id = "some_other_id"
+    logged_event.event_data = {
+        "some other stuff": "and things",
+    }
+    logged_event.related_order = order
+    logged_event.save()
+
+    logged_event.refresh_from_db()
+
+    assert event.id == logged_event.event_id
+    assert logged_event.related_order == order
+    assert logged_event.event_data == event.to_dict(for_json=True)
+
+
+def _line_for(price, *, quantity=1, discounted_unit_price=None):
+    """
+    Build a fulfilled order carrying one line at the given product price.
+
+    discounted_unit_price defaults to the undiscounted price.
+    """
+    with reversion.create_revision():
+        product = ProductFactory.create(price=price)
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+    return Line.objects.create(
+        order=order,
+        purchased_object_id=product.object_id,
+        purchased_content_type_id=product.content_type_id,
+        product_version=Version.objects.get_for_object(product).first(),
+        quantity=quantity,
+        discounted_unit_price=(
+            price if discounted_unit_price is None else discounted_unit_price
+        ),
+    )
+
+
+def test_discounted_price_survives_a_discount_edited_after_purchase(user):
+    """The price read back does not move when the discount is edited."""
+    discount = DiscountFactory.create(
+        amount=Decimal("25"), discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    with reversion.create_revision():
+        product = ProductFactory.create(price=Decimal("100.00"))
+    order = PendingOrder.create_from_product(product, user, discount=discount)
+    line = order.lines.get()
+    assert line.discounted_price == Decimal("75.00")
+
+    discount.amount = Decimal("50")
+    discount.save()
+
+    assert Line.objects.get(pk=line.pk).discounted_price == Decimal("75.00")
+
+
+def test_record_discounted_unit_price_stores_the_per_unit_price():
+    """Recording stores a per-unit price; discounted_price reflects it at once."""
+    line = _line_for(
+        Decimal("100.00"), quantity=3, discounted_unit_price=Decimal("30.00")
+    )
+    assert line.discounted_price == Decimal("90.00")
+
+    line.record_discounted_unit_price()
+
+    assert line.discounted_unit_price == Decimal("100.00")
+    assert line.discounted_price == Decimal("300.00")
+
+
+def test_recording_an_unchanged_price_does_not_rewrite_the_line():
+    """Re-pricing at the same value skips the save, leaving updated_on alone."""
+    line = _line_for(Decimal("100.00"), discounted_unit_price=Decimal("1.00"))
+    line.record_discounted_unit_price()
+    line = Line.objects.get(pk=line.pk)
+    before = line.updated_on
+
+    line.record_discounted_unit_price()
+
+    assert Line.objects.get(pk=line.pk).updated_on == before
+
+
+def test_discounted_price_reads_back_at_two_decimal_places():
+    """A re-read line renders discounted_price at two decimal places."""
+    line = _line_for(Decimal("999.00"))
+
+    line = Line.objects.get(pk=line.pk)
+    assert str(line.discounted_price) == "999.00"
+
+
+def test_pending_order_records_the_discounted_price_it_charges(user):
+    """Pricing stamps the discounted unit price and sums the order total from it."""
+    discount = DiscountFactory.create(
+        amount=Decimal("25"), discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    with reversion.create_revision():
+        product = ProductFactory.create(price=Decimal("100.00"))
+
+    order = PendingOrder.create_from_product(product, user, discount=discount)
+
+    line = order.lines.get()
+    assert line.discounted_unit_price == Decimal("75.00")
+    assert order.total_price_paid == Decimal("75.00")
+
+
+def test_pricing_reads_the_line_product_version_not_the_live_product(user):
+    """A line pinned to an older version is priced at that version's price."""
+    with reversion.create_revision():
+        product = ProductFactory.create(price=Decimal("100.00"))
+    original_version = Version.objects.get_for_object(product).first()
+    with reversion.create_revision():
+        product.price = Decimal("200.00")
+        product.save()
+
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+    line = Line.objects.create(
+        order=order,
+        purchased_object_id=product.object_id,
+        purchased_content_type_id=product.content_type_id,
+        product_version=original_version,
+        quantity=1,
+        discounted_unit_price=Decimal("200.00"),
+    )
+
+    assert line.record_discounted_unit_price() == Decimal("100.00")
+
+
+def _add_purchased_run(order, start_date):
+    """Attach a purchased course run to an order, the way a real purchase does."""
+    run = CourseRunFactory.create(start_date=start_date)
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run)
+    LineFactory.create(
+        order=order,
+        purchased_object=run,
+        product_version=Version.objects.get_for_object(product).last(),
+    )
+    return run
+
+
+def test_refund_deadline_defaults_to_purchase_date():
+    """With no run starting after the purchase, the window runs from the purchase."""
+    order = OrderFactory.create()
+    _add_purchased_run(order, order.created_on - timedelta(days=30))
+
+    assert order.refund_deadline == order.created_on + timedelta(
+        days=REFUND_WINDOW_DAYS
+    )
+
+
+def test_refund_deadline_extends_to_later_course_start():
+    """A run starting after the purchase pushes the deadline out to its start date."""
+    order = OrderFactory.create()
+    start_date = order.created_on + timedelta(days=60)
+    _add_purchased_run(order, start_date)
+
+    assert order.refund_deadline == start_date + timedelta(days=REFUND_WINDOW_DAYS)
+
+
+def test_refund_deadline_uses_the_latest_run():
+    """With several qualifying runs, the latest start date wins."""
+    order = OrderFactory.create()
+    for offset in (30, 90, 60):
+        _add_purchased_run(order, order.created_on + timedelta(days=offset))
+
+    assert order.refund_deadline == order.created_on + timedelta(
+        days=90 + REFUND_WINDOW_DAYS
+    )
+
+
+@pytest.mark.parametrize("days_since_purchase", [0, REFUND_WINDOW_DAYS - 1])
+def test_within_refund_window_until_it_closes(days_since_purchase):
+    """The window stays open right up to the deadline."""
+    order = OrderFactory.create()
+
+    with freeze_time(order.created_on + timedelta(days=days_since_purchase)):
+        assert order.is_within_refund_window
+
+
+def test_not_within_refund_window_after_it_closes():
+    """The window is shut once the deadline passes."""
+    order = OrderFactory.create()
+
+    with freeze_time(order.created_on + timedelta(days=REFUND_WINDOW_DAYS, seconds=1)):
+        assert not order.is_within_refund_window
+
+
+def test_refund_window_extends_for_a_course_starting_after_purchase():
+    """
+    A purchase made well before the course starts stays in window into the
+    course, even though the purchase-date window has long closed.
+    """
+    order = OrderFactory.create()
+    start_date = order.created_on + timedelta(days=60)
+    _add_purchased_run(order, start_date)
+
+    with freeze_time(start_date + timedelta(days=REFUND_WINDOW_DAYS - 1)):
+        assert order.is_within_refund_window
+
+    with freeze_time(start_date + timedelta(days=REFUND_WINDOW_DAYS, seconds=1)):
+        assert not order.is_within_refund_window
+
+
+def test_is_refund_eligible_means_the_in_window_self_service_case():
+    """
+    `is_refund_eligible` is `refund_status == eligible`, not "is the window
+    open" — being in window is necessary but not sufficient.
+    """
+    fulfilled = OrderFactory.create(state=OrderStatus.FULFILLED)
+    assert fulfilled.is_refund_eligible
+
+    pending = OrderFactory.create(state=OrderStatus.PENDING)
+    assert pending.is_within_refund_window
+    assert not pending.is_refund_eligible
+
+
+def test_is_refund_eligible_false_once_a_request_exists(user):
+    """A learner with a request outstanding cannot make another."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    assert order.is_refund_eligible
+
+    RefundRequest.objects.create(order=order, user=user, consent_given=True)
+    del order.latest_refund_request  # clear the cached_property
+
+    assert not order.is_refund_eligible
+
+
+def test_latest_refund_request_is_the_newest_not_the_last_inserted(
+    user, django_assert_num_queries
+):
+    """
+    The newest request wins even when it was not the last row written, and a
+    prefetched order answers without a query.
+
+    A learner can accumulate requests once one has been denied, and the
+    property is read once per row by the order-history endpoint.
+    """
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    start = now_in_utc()
+    with freeze_time(start):
+        RefundRequest.objects.create(order=order, user=user, consent_given=True)
+    with freeze_time(start + timedelta(days=2)):
+        newest = RefundRequest.objects.create(
+            order=order, user=user, consent_given=True
+        )
+    with freeze_time(start + timedelta(days=1)):
+        RefundRequest.objects.create(order=order, user=user, consent_given=True)
+
+    assert Order.objects.get(pk=order.pk).latest_refund_request == newest
+
+    prefetched = Order.objects.prefetch_related("refund_requests").get(pk=order.pk)
+    with django_assert_num_queries(0):
+        assert prefetched.latest_refund_request == newest
+
+
+def test_refund_status_eligible():
+    """A fulfilled order inside the window can be refunded on request."""
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+
+    assert order.refund_status == OrderRefundStatus.ELIGIBLE
+
+
+def test_refund_status_window_closed():
+    """Past the window the learner may still ask, but through a review."""
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+
+    with freeze_time(order.created_on + timedelta(days=REFUND_WINDOW_DAYS, seconds=1)):
+        assert order.refund_status == OrderRefundStatus.WINDOW_CLOSED
+
+
+@pytest.mark.parametrize(
+    "state",
+    [OrderStatus.PENDING, OrderStatus.CANCELED, OrderStatus.DECLINED],
+)
+def test_refund_status_ineligible_for_unfulfilled_orders(state):
+    """Only a fulfilled order can be refunded."""
+    order = OrderFactory.create(state=state)
+
+    assert order.refund_status == OrderRefundStatus.INELIGIBLE
+
+
+@pytest.mark.skip_nplusone_check
+def test_refund_status_ineligible_for_b2b_orders():
+    """B2B contract orders are handled off the self-service path."""
+    contract = ContractPageFactory.create()
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run)
+    LineFactory.create(
+        order=order,
+        purchased_object=run,
+        product_version=Version.objects.get_for_object(product).last(),
+        b2b_contract=contract,
+    )
+
+    assert order.refund_status == OrderRefundStatus.INELIGIBLE
+
+
+@pytest.mark.parametrize(
+    ("request_status", "expected"),
+    [
+        (RefundRequestStatus.PENDING, OrderRefundStatus.REQUESTED),
+        # Nothing marks the refund itself as done, so an approved request still
+        # reads as outstanding until the order state changes.
+        (RefundRequestStatus.APPROVED, OrderRefundStatus.REQUESTED),
+        (RefundRequestStatus.DENIED, OrderRefundStatus.DENIED),
+    ],
+)
+def test_refund_status_reflects_an_existing_request(user, request_status, expected):
+    """An existing request outranks the learner's eligibility to make one."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    RefundRequest.objects.create(
+        order=order, user=user, consent_given=True, status=request_status
+    )
+
+    assert order.refund_status == expected
+
+
+def test_refund_status_uses_the_latest_request(user):
+    """A fresh request after a denial supersedes it."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    RefundRequest.objects.create(
+        order=order, user=user, consent_given=True, status=RefundRequestStatus.DENIED
+    )
+    RefundRequest.objects.create(
+        order=order, user=user, consent_given=True, status=RefundRequestStatus.PENDING
+    )
+
+    assert order.refund_status == OrderRefundStatus.REQUESTED
+
+
+@pytest.mark.parametrize(
+    "state", [OrderStatus.REFUNDED, OrderStatus.PARTIALLY_REFUNDED]
+)
+def test_refund_status_completed_outranks_everything(user, state):
+    """Once the money is back, no other state matters."""
+    order = OrderFactory.create(purchaser=user, state=state)
+    RefundRequest.objects.create(
+        order=order, user=user, consent_given=True, status=RefundRequestStatus.PENDING
+    )
+
+    assert order.refund_status == OrderRefundStatus.COMPLETED
+
+
+def test_refund_status_review_required_when_the_order_funded_a_credit():
+    """Refunding it would keep the credit alive — those requests need a human."""
+    line = _line_for(Decimal("100.00"))
+    order = line.order
+
+    assert order.refund_status == OrderRefundStatus.ELIGIBLE
+
+    redemption = DiscountRedemptionFactory.create(
+        redeemed_discount=PaidAmountOffDiscountFactory.create(),
+        source_line=line,
+        redeemed_order=OrderFactory.create(state=OrderStatus.PENDING),
+    )
+    # A pending consumer has not consumed anything yet.
+    assert order.refund_status == OrderRefundStatus.ELIGIBLE
+
+    redemption.redeemed_order.state = OrderStatus.FULFILLED
+    redemption.redeemed_order.save()
+
+    # funds_fulfilled_redemption is cached per instance, so ask a fresh one.
+    order = Order.objects.get(id=order.id)
+    assert order.refund_status == OrderRefundStatus.REVIEW_REQUIRED
+    assert order.is_refund_eligible is False
+
+    # Review outranks the window: window_closed would hide the credit from support.
+    with freeze_time(order.created_on + timedelta(days=REFUND_WINDOW_DAYS, seconds=1)):
+        assert order.refund_status == OrderRefundStatus.REVIEW_REQUIRED
+
+
+def test_refund_status_ignores_redemptions_that_spent_nothing_of_this_order():
+    """
+    Only a paid-amount-off redemption on another order counts: a standard
+    redemption may legally carry a source_line, and an order's own redemption is
+    not a credit it funded for someone else.
+    """
+    line = _line_for(Decimal("100.00"))
+    order = line.order
+
+    DiscountRedemptionFactory.create(
+        source_line=line,
+        redeemed_order=OrderFactory.create(state=OrderStatus.FULFILLED),
+    )
+    DiscountRedemptionFactory.create(
+        redeemed_discount=PaidAmountOffDiscountFactory.create(),
+        source_line=line,
+        redeemed_order=order,
+    )
+
+    assert order.refund_status == OrderRefundStatus.ELIGIBLE
+
+
+def test_refund_reviewed_on_is_none_while_pending(user):
+    """A request nobody has acted on has no review date."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    RefundRequest.objects.create(order=order, user=user, consent_given=True)
+
+    assert order.refund_reviewed_on is None
+
+
+@pytest.mark.parametrize(
+    "status", [RefundRequestStatus.APPROVED, RefundRequestStatus.DENIED]
+)
+def test_refund_reviewed_on_is_set_once_decided(user, status):
+    """Deciding a request stamps it, and that is the review date."""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    request = RefundRequest.objects.create(
+        order=order, user=user, consent_given=True, status=status
+    )
+
+    assert order.refund_reviewed_on == request.updated_on
+
+
+def test_refund_reviewed_on_is_none_without_a_request():
+    """An order nobody has asked to refund has no review date."""
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+
+    assert order.refund_reviewed_on is None
+
+
+def test_a_source_line_is_protected_once_it_funds_a_redemption():
+    """PROTECT: deleting purchase history out from under a redemption is an error."""
+    line = _line_for(Decimal("100.00"))
+    DiscountRedemptionFactory.create(source_line=line)
+
+    with pytest.raises(ProtectedError):
+        line.delete()
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        pytest.param(
+            {
+                "amount": 0,
+                "discount_type": DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+                "redemption_type": REDEMPTION_TYPE_UNLIMITED,
+                "automatic": True,
+            },
+            id="paid-amount-off-without-program-child-purchase",
+        ),
+        pytest.param(
+            {
+                "amount": 10,
+                "discount_type": DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+                "redemption_type": REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+                "automatic": True,
+            },
+            id="nonzero-amount",
+        ),
+        pytest.param(
+            {
+                "amount": 0,
+                "discount_type": DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+                "redemption_type": REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+                "automatic": False,
+            },
+            id="not-automatic",
+        ),
+    ],
+)
+def test_db_constraint_rejects_a_malformed_discount_shape(row):
+    """The DB backstop holds even for writes that skip model validation."""
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Discount.objects.bulk_create(
+            [Discount(discount_code="constraint-bypass", **row)]
+        )
+
+
+def test_db_constraint_allows_program_child_purchase_redemption_with_standard_type():
+    """The type constraint is one-way on purpose: a standard calculation may
+    pair with the program-child-purchase redemption rules (future fractional offers).
+    """
+    Discount.objects.bulk_create(
+        [
+            Discount(
+                amount=10,
+                discount_code="reverse-pairing",
+                discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+                redemption_type=REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+                automatic=True,
+            )
+        ]
+    )
+
+    assert Discount.objects.filter(discount_code="reverse-pairing").exists()
+
+
+def test_internal_discount_cannot_be_automatic():
+    """
+    Auto-apply selects discounts by flag rather than by a caller's decision, so
+    the DB backstop holds even for writes that skip model validation.
+    """
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Discount.objects.bulk_create(
+            [
+                Discount(
+                    amount=100,
+                    discount_code="internal-automatic",
+                    discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+                    redemption_type=REDEMPTION_TYPE_INTERNAL,
+                    automatic=True,
+                )
+            ]
+        )
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        pytest.param(
+            {"redemption_type": REDEMPTION_TYPE_UNLIMITED}, id="wrong-redemption-type"
+        ),
+        pytest.param({"amount": 10}, id="nonzero-amount"),
+        pytest.param({"automatic": False}, id="not-automatic"),
+    ],
+)
+def test_paid_amount_off_discount_shape_is_enforced_on_save(override):
+    """Saving a malformed paid-amount-off discount raises instead of hitting the DB constraint."""
+    with pytest.raises(ValidationError):
+        PaidAmountOffDiscountFactory.create(**override)
+
+
+def test_internal_discount_shape_is_enforced_on_save():
+    """
+    Saving an automatic internal discount raises instead of hitting the DB
+    constraint, which is what lets the admin and the staff API report it.
+    """
+    with pytest.raises(ValidationError):
+        InternalDiscountFactory.create(automatic=True)
+
+
+def test_program_child_purchase_discount_only_links_program_products():
+    """
+    Enforced on the link row rather than only on Discount.save(), so every write
+    path is covered — Django admin's DiscountProduct form included.
+    """
+    discount = PaidAmountOffDiscountFactory.create()
+
+    with pytest.raises(ValidationError):
+        DiscountProduct.objects.create(
+            discount=discount, product=ProductFactory.create()
+        )
+
+
+def test_program_child_purchase_discount_links_a_program_product():
+    """The intended attach path stays open."""
+    discount = PaidAmountOffDiscountFactory.create()
+
+    DiscountProduct.objects.create(
+        discount=discount, product=ProgramProductFactory.create()
+    )
+
+    discount.clean()
+
+
+def test_converting_a_discount_with_a_courserun_product_is_rejected():
+    """
+    An existing discount cannot become program-child-purchase while a course-run
+    product is still attached. The cross-table clause lives in clean() (and the
+    serializers), not save(), so save() stays row-local.
+    """
+    discount = DiscountFactory.create()
+    DiscountProduct.objects.create(discount=discount, product=ProductFactory.create())
+
+    discount.discount_type = DISCOUNT_TYPE_PAID_AMOUNT_OFF
+    discount.redemption_type = REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE
+    discount.amount = 0
+    discount.automatic = True
+
+    with pytest.raises(ValidationError):
+        discount.clean()
+
+
+def test_program_child_purchase_discount_tolerates_a_product_less_link_row():
+    """DiscountProduct.product is nullable, and a null row is not a non-program product."""
+    discount = PaidAmountOffDiscountFactory.create()
+    DiscountProduct.objects.create(discount=discount, product=None)
+
+    discount.clean()
+
+
+def test_program_child_purchase_discount_is_not_redeemable_without_products(user):
+    """
+    Without product context there is nothing to resolve a source against, and a
+    program-child-purchase discount is automatic-only — so the code-redemption
+    path and the CMS finaid quote, which pass no products, can never attach one.
+    """
+    discount = PaidAmountOffDiscountFactory.create()
+
+    assert discount.is_redeemable_by(user) is False
+
+
+def test_discount_product_quotes_the_resolved_credit(paid_amount_off_source):
+    """Discount.discount_product carries the per-user resolution."""
+    quoted = paid_amount_off_source.discount.discount_product(
+        paid_amount_off_source.program_product, paid_amount_off_source.user
+    )
+
+    assert quoted == Decimal("899.00")
+
+
+def test_discount_product_quotes_full_price_without_a_user(paid_amount_off_source):
+    """With no user there is nothing to resolve against, so the quote is the list price."""
+    quoted = paid_amount_off_source.discount.discount_product(
+        paid_amount_off_source.program_product
+    )
+
+    assert quoted == Decimal("999.00")
+
+
+def test_discount_product_declines_without_a_source(paid_amount_off_source):
+    """No source, no quote — the guard and the price agree."""
+    quoted = paid_amount_off_source.discount.discount_product(
+        paid_amount_off_source.program_product, UserFactory.create()
+    )
+
+    assert quoted is None
+
+
+def test_is_redeemable_by_requires_a_resolvable_source(paid_amount_off_source):
+    """A program-child-purchase discount is redeemable only with an available source."""
+    discount = paid_amount_off_source.discount
+    products = [paid_amount_off_source.program_product]
+
+    assert discount.is_redeemable_by(paid_amount_off_source.user, products) is True
+    assert discount.is_redeemable_by(UserFactory.create(), products) is False
+
+
+def test_is_redeemable_by_still_honors_max_redemptions(paid_amount_off_source):
+    """The program-child-purchase guard falls through to the limit checks, not past them."""
+    discount = paid_amount_off_source.discount
+    discount.max_redemptions = 1
+    discount.save()
+    DiscountRedemptionFactory.create(
+        redeemed_discount=discount,
+        redeemed_order=OrderFactory.create(state=OrderStatus.FULFILLED),
+    )
+
+    assert (
+        discount.is_redeemable_by(
+            paid_amount_off_source.user, [paid_amount_off_source.program_product]
+        )
+        is False
+    )
+
+
+def test_is_redeemable_by_fails_closed_without_linked_products(paid_amount_off_source):
+    """A program-child-purchase discount with no DiscountProduct rows resolves nothing."""
+    unlinked = PaidAmountOffDiscountFactory.create()
+
+    assert (
+        unlinked.is_redeemable_by(
+            paid_amount_off_source.user, [paid_amount_off_source.program_product]
+        )
+        is False
+    )
+
+
+def test_is_redeemable_by_checks_the_product_in_hand_not_every_link(
+    paid_amount_off_source,
+):
+    """A source for one linked program does not unlock a different linked program."""
+    with reversion.create_revision():
+        other_program_product = ProgramProductFactory.create()
+    DiscountProduct.objects.create(
+        discount=paid_amount_off_source.discount, product=other_program_product
+    )
+
+    assert (
+        paid_amount_off_source.discount.is_redeemable_by(
+            paid_amount_off_source.user, [other_program_product]
+        )
+        is False
+    )
+
+
+def test_is_redeemable_by_keys_eligibility_on_the_redemption_type(
+    paid_amount_off_source,
+):
+    """
+    A percent-off discount with the program-child-purchase redemption type is
+    gated by the same source check: the arm reads the redemption type, so a
+    stranger is refused instead of falling through to unlimited semantics.
+    """
+    percent_off = DiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+        redemption_type=REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+        automatic=True,
+    )
+    DiscountProduct.objects.create(
+        discount=percent_off, product=paid_amount_off_source.program_product
+    )
+
+    assert (
+        percent_off.is_redeemable_by(
+            paid_amount_off_source.user, [paid_amount_off_source.program_product]
+        )
+        is True
+    )
+
+
+def test_is_valid_for_basket_inherits_the_program_child_purchase_guard(
+    paid_amount_off_source,
+):
+    """
+    The auto-apply/attach path hands the basket's products to the guard: the
+    learner holding the source passes, a stranger does not.
+    """
+    own_basket = BasketFactory.create(user=paid_amount_off_source.user)
+    BasketItem.objects.create(
+        basket=own_basket, product=paid_amount_off_source.program_product, quantity=1
+    )
+    stranger_basket = BasketFactory.create(user=UserFactory.create())
+    BasketItem.objects.create(
+        basket=stranger_basket,
+        product=paid_amount_off_source.program_product,
+        quantity=1,
+    )
+
+    assert paid_amount_off_source.discount.is_valid_for_basket(own_basket) is True
+    assert paid_amount_off_source.discount.is_valid_for_basket(stranger_basket) is False
+
+
+def test_internal_discount_is_not_redeemable_by_anyone(user):
+    """
+    Only application code that has checked eligibility attaches one, so every
+    code-redemption route has to be refused even though the type has no
+    redemption limit of its own.
+    """
+    discount = InternalDiscountFactory.create()
+
+    assert discount.is_redeemable_by(user) is False
+
+
+def test_friendly_format_for_paid_amount_off():
+    """The label carries no amount — the true value is per-user."""
+    discount = PaidAmountOffDiscountFactory.create()
+
+    assert discount.friendly_format() == "the amount paid for a prior purchase"
+
+
+def test_basket_pricing_applies_the_resolved_paid_amount_off_credit(
+    paid_amount_off_source,
+):
+    """The cart shows the program at price minus what the child purchase cost."""
+    basket = BasketFactory.create(user=paid_amount_off_source.user)
+    item = BasketItem.objects.create(
+        basket=basket, product=paid_amount_off_source.program_product, quantity=1
+    )
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=paid_amount_off_source.user,
+        redeemed_discount=paid_amount_off_source.discount,
+        redeemed_basket=basket,
+    )
+
+    assert item.discounted_price == Decimal("899.00")
+
+
+def test_an_ordinary_basket_never_touches_the_resolver(user):
+    """Without a paid-amount-off discount, pricing does not even load the user."""
+    basket = BasketFactory.create(user=user)
+    item = BasketItem.objects.create(
+        basket=basket, product=ProductFactory.create(), quantity=1
+    )
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=DiscountFactory.create(),
+        redeemed_basket=basket,
+    )
+    item = BasketItem.objects.get(id=item.id)
+
+    with CaptureQueriesContext(connection) as queries:
+        item.discounted_price  # noqa: B018
+
+    assert not [q["sql"] for q in queries if "users_user" in q["sql"]]
+
+
+def test_line_pricing_reads_the_persisted_source_line(paid_amount_off_source):
+    """
+    Order pricing uses the frozen FK, not a fresh resolve: the source stays
+    credited even after another fulfilled order has consumed it.
+    """
+    DiscountRedemptionFactory.create(
+        redeemed_by=paid_amount_off_source.user,
+        redeemed_discount=PaidAmountOffDiscountFactory.create(),
+        redeemed_order=OrderFactory.create(
+            purchaser=paid_amount_off_source.user, state=OrderStatus.FULFILLED
+        ),
+        source_line=paid_amount_off_source.source_line,
+    )
+    order = OrderFactory.create(
+        purchaser=paid_amount_off_source.user, state=OrderStatus.PENDING
+    )
+    DiscountRedemptionFactory.create(
+        redeemed_by=paid_amount_off_source.user,
+        redeemed_discount=paid_amount_off_source.discount,
+        redeemed_order=order,
+        source_line=paid_amount_off_source.source_line,
+    )
+
+    assert Line.compute_discounted_unit_price_for(
+        order, paid_amount_off_source.program_product_version
+    ) == Decimal("899.00")
+
+
+def test_a_source_line_on_a_standard_discount_is_ignored(paid_amount_off_source):
+    """A percent-off redemption may legally carry a source_line; pricing must
+    ignore it rather than hand a resolved amount to a type with no field for one.
+    """
+    order = OrderFactory.create(
+        purchaser=paid_amount_off_source.user, state=OrderStatus.PENDING
+    )
+    DiscountRedemptionFactory.create(
+        redeemed_by=paid_amount_off_source.user,
+        redeemed_discount=DiscountFactory.create(
+            amount=Decimal("10"), discount_type=DISCOUNT_TYPE_PERCENT_OFF
+        ),
+        redeemed_order=order,
+        source_line=paid_amount_off_source.source_line,
+    )
+
+    assert Line.compute_discounted_unit_price_for(
+        order, paid_amount_off_source.program_product_version
+    ) == Decimal("899.10")
+
+
+def test_pending_order_persists_the_resolved_source_line(paid_amount_off_source):
+    """The redemption freezes which purchase funded it, and pricing uses it."""
+    order = PendingOrder.create_from_product(
+        paid_amount_off_source.program_product,
+        paid_amount_off_source.user,
+        paid_amount_off_source.discount,
+    )
+
+    redemption = order.discounts.get()
+    assert redemption.source_line == paid_amount_off_source.source_line
+    assert order.total_price_paid == Decimal("899.00")
+
+
+def test_pending_order_records_a_source_only_for_paid_amount_off(
+    paid_amount_off_source,
+):
+    """
+    A percent-off discount with the program-child-purchase redemption type is
+    eligibility-only: it prices as percent-off and freezes no source line.
+    """
+    percent_off = DiscountFactory.create(
+        amount=20,
+        discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+        redemption_type=REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
+        automatic=True,
+    )
+    DiscountProduct.objects.create(
+        discount=percent_off, product=paid_amount_off_source.program_product
+    )
+
+    order = PendingOrder.create_from_product(
+        paid_amount_off_source.program_product,
+        paid_amount_off_source.user,
+        percent_off,
+    )
+
+    assert order.discounts.get().source_line is None
+    assert order.total_price_paid == Decimal("799.20")
+
+
+def test_a_non_fulfilled_program_order_re_arms_the_source(paid_amount_off_source):
+    """Emergent but intended: a redemption on a refunded order stops counting,
+    so the source funds a fresh purchase.
+    """
+    order = PendingOrder.create_from_product(
+        paid_amount_off_source.program_product,
+        paid_amount_off_source.user,
+        paid_amount_off_source.discount,
+    )
+    Order.objects.filter(pk=order.pk).update(state=OrderStatus.FULFILLED)
+
+    assert (
+        resolve_program_child_purchase(
+            paid_amount_off_source.user, paid_amount_off_source.program_product
+        )
+        is None
+    )
+
+    Order.objects.filter(pk=order.pk).update(state=OrderStatus.REFUNDED)
+
+    assert (
+        resolve_program_child_purchase(
+            paid_amount_off_source.user, paid_amount_off_source.program_product
+        ).source_line
+        == paid_amount_off_source.source_line
+    )
+
+
+def test_chaining_credits_each_dollar_at_most_once(user):
+    """Course funds the vertical; the vertical's own paid amount funds the parent."""
+    parent = ProgramFactory.create()
+    vertical = ProgramFactory.create()
+    parent.add_requirement(vertical)
+    run = CourseRunFactory.create()
+    vertical.add_requirement(run.course)
+
+    # Buy the course at $100.
+    make_purchase(user, run, Decimal("100.00"))
+
+    # Buy the vertical ($300 list) with the course credited: pay $200.
+    with reversion.create_revision():
+        vertical_product = ProgramProductFactory.create(
+            purchasable_object=vertical, price=Decimal("300.00")
+        )
+    vertical_discount = PaidAmountOffDiscountFactory.create()
+    DiscountProduct.objects.create(discount=vertical_discount, product=vertical_product)
+    vertical_order = PendingOrder.create_from_product(
+        vertical_product, user, vertical_discount
+    )
+    assert vertical_order.total_price_paid == Decimal("200.00")
+    Order.objects.filter(pk=vertical_order.pk).update(state=OrderStatus.FULFILLED)
+
+    # The parent program credits what was actually paid for the vertical.
+    with reversion.create_revision():
+        parent_product = ProgramProductFactory.create(purchasable_object=parent)
+
+    assert resolve_program_child_purchase(user, parent_product).amount == Decimal(
+        "200.00"
+    )
+
+
+@pytest.mark.parametrize(
+    "blocked_country",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "compliance",
+    [
+        True,
+        False,
+    ],
+)
+def test_has_user_blocked_products(mocker, blocked_country, compliance):
+    """Test that the blocked countries check works as expected."""
+
+    mocked_compliance_check = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        side_effect=lambda *_: ExportComplianceResult(
+            decision="DECLINED" if compliance else "COMPLETED",
+            reason_code=0,
+            request_id="request_id",
+            raw={},
+        ),
+    )
+
+    courserun = CourseRunFactory.create()
+    product = ProductFactory.create(purchasable_object=courserun)
+    basket_item = BasketItemFactory.create(product=product)
+    user = basket_item.basket.user
+
+    # Pin both countries: the factories pick them at random and occasionally
+    # collide, which blocks the user in the not-blocked cases.
+    blocked_country_record = BlockedCountryFactory.create(
+        course=courserun.course, country="IR"
+    )
+
+    user.legal_address.country = (
+        blocked_country_record.country if blocked_country else "FR"
+    )
+    user.save()
+
+    assert basket_item.basket.has_user_blocked_products(user) == (
+        blocked_country or compliance
+    )
+    mocked_compliance_check.assert_called_once_with(user, courserun)
+
+
+def test_has_user_blocked_products_with_invalid_profile_data(mocker):
+    """
+    A profile the compliance check can't use isn't a block - it raises, so the
+    caller can tell the user which fields to fix.
+    """
+    basket_item = BasketItemFactory.create()
+    user = basket_item.basket.user
+    mocker.patch(
+        "courses.api.verify_user_with_exports",
+        side_effect=ExportComplianceDataError(user, ["last_name"]),
+    )
+
+    with pytest.raises(ExportComplianceDataError):
+        basket_item.basket.has_user_blocked_products(user)
+
+
+def test_basket_get_products_contracts(user):
+    """get_products_contracts should pair each basket product with its B2B contract."""
+
+    contract = ContractPageFactory.create()
+    b2b_item = BasketItemFactory.create(basket__user=user, b2b_contract=contract)
+    regular_item = BasketItemFactory.create(basket=b2b_item.basket)
+
+    assert sorted(
+        b2b_item.basket.get_products_contracts(), key=lambda pair: pair[0].id
+    ) == sorted(
+        [(b2b_item.product, contract), (regular_item.product, None)],
+        key=lambda pair: pair[0].id,
+    )
+
+
+def test_create_from_basket_copies_b2b_contract_to_lines(user):
+    """Creating an order from a basket should carry each item's contract onto its line."""
+
+    contract = ContractPageFactory.create()
+    b2b_run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
+    with reversion.create_revision():
+        b2b_product = ProductFactory.create(purchasable_object=b2b_run)
+        regular_product = ProductFactory.create()
+
+    basket = BasketFactory.create(user=user)
+    BasketItem.objects.create(basket=basket, product=b2b_product, b2b_contract=contract)
+    BasketItem.objects.create(basket=basket, product=regular_product)
+
+    order = PendingOrder.create_from_basket(basket)
+
+    assert order.lines.get(purchased_object_id=b2b_run.id).b2b_contract == contract
+    assert (
+        order.lines.get(purchased_object_id=regular_product.object_id).b2b_contract
+        is None
+    )
+
+
+@pytest.mark.parametrize("line_has_contract", [True, False])
+def test_link_b2b_course_run_contracts(mocker, user, line_has_contract):
+    """
+    The verified enrollment for the purchased run should get the line's contract,
+    with an audit row recording the change.
+
+    Enrollments that don't belong to the purchase - another user's enrollment in
+    the same run, or the purchaser's enrollment in a different run of the same
+    contract - should be left alone.
+    """
+
+    mocked_process_add_org_membership = mocker.patch(
+        "b2b.api.process_add_org_membership"
+    )
+
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
+    other_run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
+    other_user = UserFactory.create()
+
+    expected_contract = contract if line_has_contract else None
+    enrollment = CourseRunEnrollmentFactory.create(
+        user=user,
+        run=run,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        b2b_contract=None,
+    )
+    other_run_enrollment = CourseRunEnrollmentFactory.create(
+        user=user, run=other_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    other_user_enrollment = CourseRunEnrollmentFactory.create(
+        user=other_user, run=run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    line = make_purchase(user, run, Decimal("0.00"))
+    line.b2b_contract = contract if line_has_contract else None
+    line.save()
+
+    _link_b2b_course_run_contracts(line)
+
+    enrollment.refresh_from_db()
+    other_run_enrollment.refresh_from_db()
+    other_user_enrollment.refresh_from_db()
+
+    assert enrollment.b2b_contract == expected_contract
+
+    if line_has_contract:
+        audit = CourseRunEnrollmentAudit.objects.get(enrollment=enrollment)
+        assert audit.data_after["b2b_contract"] == getattr(
+            expected_contract, "id", None
+        )
+        mocked_process_add_org_membership.assert_called()
+
+    assert other_run_enrollment.b2b_contract is None
+    assert other_user_enrollment.b2b_contract is None
+
+
+def test_link_b2b_course_run_contracts_skips_unchanged_contract(user):
+    """A purchase that doesn't change the enrollment's contract shouldn't add an audit row."""
+
+    run = CourseRunFactory.create()
+    enrollment = CourseRunEnrollmentFactory.create(
+        user=user, run=run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    line = make_purchase(user, run, Decimal("0.00"))
+
+    _link_b2b_course_run_contracts(line)
+
+    assert not CourseRunEnrollmentAudit.objects.filter(enrollment=enrollment).exists()
+
+
+def test_link_b2b_course_run_contracts_ignores_audit_enrollment(user):
+    """Only the verified enrollment should be linked to the contract."""
+
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
+    enrollment = CourseRunEnrollmentFactory.create(
+        user=user, run=run, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+
+    line = make_purchase(user, run, Decimal("0.00"))
+    line.b2b_contract = contract
+    line.save()
+
+    _link_b2b_course_run_contracts(line)
+
+    enrollment.refresh_from_db()
+    assert enrollment.b2b_contract is None
+
+
+def test_link_b2b_course_run_contracts_skips_programs(user):
+    """Program lines aren't handled by this hook, so enrollments are left alone."""
+
+    contract = ContractPageFactory.create()
+    program = ProgramFactory.create(b2b_only=True)
+    program_enrollment = ProgramEnrollmentFactory.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    line = make_purchase(user, program, Decimal("0.00"))
+    line.b2b_contract = contract
+    line.save()
+
+    assert _link_b2b_course_run_contracts(line) is None
+
+    program_enrollment.refresh_from_db()
+    assert program_enrollment.b2b_contract is None
+    assert not CourseRunEnrollment.all_objects.filter(user=user).exists()
+    assert ProgramEnrollment.all_objects.filter(user=user).count() == 1
+
+
+@pytest.mark.skip_nplusone_check
+def test_fulfill_links_b2b_contract_to_enrollment(
+    mocker, user, django_capture_on_commit_callbacks
+):
+    """
+    Fulfilling an order with a B2B line should run the hooks in order: create the
+    enrollment, then link it to the line's contract.
+    """
+
+    mocker.patch("openedx.api.enroll_in_edx_course_runs")
+    mocker.patch("ecommerce.tasks.send_ecommerce_order_receipt.delay")
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
+    mocker.patch("b2b.api.process_add_org_membership")
+
+    contract = ContractPageFactory.create()
+    other_contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(
+        b2b_only=True, b2b_contracts=[contract, other_contract]
+    )
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run, price=Decimal(0))
+
+    basket = BasketFactory.create(user=user)
+    BasketItem.objects.create(basket=basket, product=product, b2b_contract=contract)
+    order = PendingOrder.create_from_basket(basket)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        order.get_object_flow().fulfill(ZERO_PAYMENT_DATA, skip_receipt=True)
+
+    enrollment = CourseRunEnrollment.objects.get(user=user, run=run)
+    assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    assert enrollment.b2b_contract == contract
+
+
+def _enrollment_code(run, **kwargs):
+    """Make a discount shaped like a B2B enrollment code for the run's product."""
+
+    discount = Discount.objects.create(
+        discount_code=uuid.uuid4(),
+        amount=0,
+        redemption_type=REDEMPTION_TYPE_ONE_TIME,
+        **{
+            "discount_type": DISCOUNT_TYPE_FIXED_PRICE,
+            "payment_type": PAYMENT_TYPE_SALES,
+            "is_bulk": True,
+            **kwargs,
+        },
+    )
+    product = run.products.first() or ProductFactory.create(purchasable_object=run)
+    DiscountProduct.objects.create(discount=discount, product=product)
+
+    return discount

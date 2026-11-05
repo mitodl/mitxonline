@@ -2,46 +2,81 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import re
-from collections import namedtuple
-from datetime import timedelta
+import time
+from collections import Counter, defaultdict, namedtuple
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from decimal import Decimal
 from traceback import format_exc
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
+import requests
+import reversion
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Prefetch, Q
+from django_countries import countries
+from edx_api.course_list.constants import BATCH_SIZE as COURSE_LIST_BATCH_SIZE
 from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
     first_or_none,
     has_equal_properties,
 )
+from mitol.olposthog.features import is_enabled
+from opaque_keys.edx.keys import CourseKey
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
-from rest_framework.status import HTTP_404_NOT_FOUND
+from rest_framework.status import (
+    HTTP_401_UNAUTHORIZED,
+    HTTP_403_FORBIDDEN,
+    HTTP_404_NOT_FOUND,
+    HTTP_429_TOO_MANY_REQUESTS,
+)
 
+from cms.api import create_default_courseware_page
+from compliance.api import (
+    get_unresolved_export_compliance_decline,
+    verify_user_with_exports,
+)
+from compliance.exceptions import (
+    ExportComplianceCheckError,
+    ExportComplianceDataError,
+    ExportComplianceError,
+)
 from courses import mail_api
 from courses.constants import (
     COURSE_KEY_PATTERN,
     ENROLL_CHANGE_STATUS_DEFERRED,
+    ENROLL_CHANGE_STATUS_REFUNDED,
     ENROLL_CHANGE_STATUS_UNENROLLED,
     PROGRAM_TEXT_ID_PREFIX,
 )
+from courses.exceptions import CountryBlockedError, EnrollmentError
 from courses.models import (
+    BlockedCountry,
     Course,
     CourseRun,
     CourseRunCertificate,
     CourseRunEnrollment,
     CourseRunGrade,
+    Department,
+    EnrollmentMode,
     PaidCourseRun,
+    PartnerSchool,
     Program,
     ProgramCertificate,
     ProgramEnrollment,
     ProgramRequirement,
+    VerifiableCredential,
 )
+from courses.requirement_tree import is_requirement_tree_satisfied
+from courses.serializers.base import get_thumbnail_url
 from courses.tasks import subscribe_edx_course_emails
 from courses.utils import (
     exception_logging_generator,
@@ -49,12 +84,18 @@ from courses.utils import (
     is_grade_valid,
     is_letter_grade_valid,
 )
-from ecommerce.models import OrderStatus
+from ecommerce.constants import REDEMPTION_TYPE_INTERNAL
+from ecommerce.models import Order, OrderStatus, Product
+from main import features
+from main.utils import get_learn_product_url
 from openedx.api import (
+    create_edx_course_mode,
     enroll_in_edx_course_runs,
+    get_edx_api_course_detail_client,
     get_edx_api_course_list_client,
-    get_edx_api_course_mode_client,
+    get_edx_course_modes,
     get_edx_grades_with_users,
+    process_course_run_clone,
     unenroll_edx_course_run,
 )
 from openedx.constants import (
@@ -65,14 +106,19 @@ from openedx.constants import (
 from openedx.exceptions import (
     EdxApiEnrollErrorException,
     NoEdxApiAuthError,
+    OpenEdxUserMissingError,
     UnknownEdxApiEnrollException,
 )
 
 if TYPE_CHECKING:
     from django.db.models.query import QuerySet
+    from edx_api.course_detail.models import CourseMode
+
+    from cms.models import CertificatePage
 
 
 log = logging.getLogger(__name__)
+
 UserEnrollments = namedtuple(  # noqa: PYI024
     "UserEnrollments",
     [
@@ -83,6 +129,20 @@ UserEnrollments = namedtuple(  # noqa: PYI024
         "past_non_program_runs",
     ],
 )
+
+# Enabled and has criteria populated
+VERIFIABLE_CREDENTIAL_STATUS_ENABLED = "ENABLED"
+# Disabled and has criteria populated
+VERIFIABLE_CREDENTIAL_STATUS_DISABLED = "DISABLED"
+# Enabled but has no criteria populated. This is an unusual state to be in and may indicate a misconfiguration
+VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA = "NO_CRITERIA"
+# Disabled and has no criteria populated. This is the standard state of certificates which are not supposed to have VCs
+VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA = "DISABLED_NO_CRITERIA"
+
+
+class InvalidCertificateError(Exception):
+    def __init__(self):
+        super().__init__("Invalid input for verifiable credential generation.")
 
 
 def get_relevant_course_run_qset(
@@ -107,13 +167,60 @@ def get_user_relevant_program_course_run_qset(
     return enrollable_run_qset.order_by("enrollment_start")
 
 
-def create_run_enrollments(  # noqa: C901
+def create_local_enrollment(
+    user, run, *, mode=EDX_DEFAULT_ENROLLMENT_MODE, reactivate=True
+):
+    """
+    Creates a local-only CourseRunEnrollment record without calling the edX API.
+    Reactivates the enrollment if it already exists but is inactive, and ensures
+    edx_enrolled is set to True.
+
+    This is intended for cases where the user is already enrolled in edX (e.g.
+    via a webhook notification) and we only need to mirror that state locally.
+
+    Args:
+        user (User): The user to enroll
+        run (CourseRun): The course run to enroll in
+        mode (str): The enrollment mode (default: audit)
+        reactivate (bool): Whether an existing inactive enrollment should be
+            brought back. Pass False when the caller is reacting to something
+            that is not an enrollment event -- a course access role grant, say
+            -- so that an enrollment somebody deliberately deactivated is left
+            alone instead of being resurrected.
+
+    Returns:
+        (CourseRunEnrollment, bool): The enrollment object and whether it was newly created
+    """
+    enrollment, created = CourseRunEnrollment.all_objects.get_or_create(
+        user=user,
+        run=run,
+        defaults={
+            "change_status": None,
+            "edx_enrolled": True,
+            "enrollment_mode": mode,
+        },
+    )
+    if created:
+        enrollment.save_and_log(None)
+    if not created and not enrollment.active and reactivate:
+        enrollment.reactivate_and_save()
+    if not enrollment.edx_enrolled:
+        enrollment.edx_enrolled = True
+        enrollment.save_and_log(None)
+
+    return enrollment, created
+
+
+def create_run_enrollments(  # noqa: C901, PLR0913
     user,
     runs,
     *,
     change_status=None,
-    keep_failed_enrollments=False,
+    keep_failed_enrollments=None,
     mode=EDX_DEFAULT_ENROLLMENT_MODE,
+    skip_compliance_check=False,
+    skip_country_block_check=False,
+    skip_enrollment_emails=False,
 ):
     """
     Creates local records of a user's enrollment in course runs, and attempts to enroll them
@@ -131,38 +238,59 @@ def create_run_enrollments(  # noqa: C901
         change_status (str): The status of the enrollment
         keep_failed_enrollments: (boolean): If True, keeps the local enrollment record
             in the database even if the enrollment fails in edX.
+            If None, defaults to the value of the IGNORE_EDX_FAILURES feature flag.
         mode (str): The course mode
+        skip_compliance_check (bool): If True, bypass the export compliance
+            check. Operator-run management commands and support-initiated
+            flows such as defer_enrollment only.
+        skip_country_block_check (bool): If True, bypass the country block check.
+            Refund downgrade callers and support-initiated deferrals only —
+            never bypass for new enrollments.
+        skip_enrollment_emails (bool): If True, don't send the learner the
+            enrollment confirmation email. Operator-run management commands only.
 
     Returns:
         (list of CourseRunEnrollment, bool): A list of enrollment objects that were successfully
             created in mitxonline, paired with a boolean indicating whether or not the edX enrollment API call was successful
             for all of the given course runs
     """
+    if not skip_country_block_check:
+        for run in runs:
+            if run.course.is_country_blocked(user):
+                log.warning(
+                    "Country block prevents enrollment for user=%s run=%s",
+                    user.id,
+                    run.courseware_id,
+                )
+                raise CountryBlockedError(user, run.course)
+    # Unlike the country check above, the compliance check only screens runs[0].
+
     successful_enrollments = []
+    edx_request_success = True
+
+    if len(runs) == 0:
+        return (successful_enrollments, edx_request_success)
+
+    # Pre-existing: only runs[0] is screened, so runs[1:] go unscreened for the
+    # two multi-run callers (upgrade_audit_run_enrollments_for_program_purchase,
+    # ecommerce.api.downgrade_learner_from_order).
+    if skip_compliance_check:
+        log.warning(
+            "Skipping export compliance check for user=%s run=%s",
+            user.id,
+            runs[0].courseware_id,
+        )
+    else:
+        _verify_exports_compliance_for_enrollment(user, runs[0])
+
+    if keep_failed_enrollments is None:
+        keep_failed_enrollments = settings.FEATURES.get(
+            features.IGNORE_EDX_FAILURES, False
+        )
 
     def send_enrollment_emails():
         subscribe_edx_course_emails.delay(enrollment.id)
 
-    def _enroll_learner_into_associated_programs():
-        """
-        Enrolls the learner into all programs for which the course they are enrolling into
-        is associated as a requirement or elective.  If a program enrollment already exists
-        then the change_status of that program_enrollment is checked to ensure it equals None.
-        """
-        for program in run.course.programs:
-            if not program.live:
-                continue
-            program_enrollment, _ = ProgramEnrollment.objects.get_or_create(
-                user=user,
-                program=program,
-                defaults=dict(  # noqa: C408
-                    change_status=None,
-                ),
-            )
-            if program_enrollment.change_status is not None:
-                program_enrollment.reactivate_and_save()
-
-    edx_request_success = True
     if not runs[0].is_fake_course_run:
         # Make the API call to enroll the user in edX only if the run is not a fake course run
         try:
@@ -174,6 +302,7 @@ def create_run_enrollments(  # noqa: C901
         except (
             UnknownEdxApiEnrollException,
             NoEdxApiAuthError,
+            OpenEdxUserMissingError,
             RequestsConnectionError,
             EdxApiEnrollErrorException,
             HTTPError,
@@ -200,13 +329,8 @@ def create_run_enrollments(  # noqa: C901
                 ),
             )
 
-            _enroll_learner_into_associated_programs()
-
-            # If the run is associated with a B2B contract, add the contract
-            # to the user's contract list
-            if run.b2b_contract:
-                user.b2b_contracts.add(run.b2b_contract)
-                user.save()
+            if created:
+                enrollment.save_and_log(None)
 
             if not created:
                 enrollment_mode_changed = mode != enrollment.enrollment_mode
@@ -231,7 +355,8 @@ def create_run_enrollments(  # noqa: C901
                     if enrollment_mode_changed:
                         enrollment.enrollment_mode = mode
                     enrollment.reactivate_and_save()
-                    transaction.on_commit(send_enrollment_emails)
+                    if not skip_enrollment_emails:
+                        transaction.on_commit(send_enrollment_emails)
         except:  # pylint: disable=bare-except  # noqa: PERF203, E722
             mail_api.send_enrollment_failure_message(user, run, details=format_exc())
             log.exception(
@@ -241,13 +366,19 @@ def create_run_enrollments(  # noqa: C901
             )
         else:
             successful_enrollments.append(enrollment)
-            if enrollment.edx_enrolled and not is_enrollment_downgraded:
+            if (
+                enrollment.edx_enrolled
+                and not is_enrollment_downgraded
+                and not skip_enrollment_emails
+            ):
                 # Do not send enrollment email if the user was downgraded.
                 mail_api.send_course_run_enrollment_email(enrollment)
     return successful_enrollments, edx_request_success
 
 
-def create_program_enrollments(user, programs):
+def create_program_enrollments(
+    user, programs, *, enrollment_mode=EDX_DEFAULT_ENROLLMENT_MODE
+):
     """
     Creates local records of a user's enrollment in programs
 
@@ -255,19 +386,33 @@ def create_program_enrollments(user, programs):
         user (User): The user to enroll
         programs (iterable of Program): The course runs to enroll in
 
+    Kwargs:
+        enrollment_mode (str): The mode the enrollment should be in
+
     Returns:
         list of ProgramEnrollment: A list of enrollment objects that were successfully created
     """
     successful_enrollments = []
     for program in programs:
+        _verify_exports_compliance_for_enrollment(user, program)
+
         try:
             enrollment, created = ProgramEnrollment.all_objects.get_or_create(
                 user=user,
                 program=program,
+                defaults={
+                    "enrollment_mode": enrollment_mode,
+                },
             )
-            if not created and not enrollment.active:
+            if created:
+                enrollment.save_and_log(None)
+
+            if not created and enrollment.change_status is not None:
                 enrollment.reactivate_and_save()
-        except:  # pylint: disable=bare-except  # noqa: PERF203, E722
+
+            if not created and enrollment.enrollment_mode != enrollment_mode:
+                enrollment.update_mode_and_save(enrollment_mode)
+        except:  # pylint: disable=bare-except  # noqa: E722
             mail_api.send_enrollment_failure_message(
                 user, program, details=format_exc()
             )
@@ -281,10 +426,438 @@ def create_program_enrollments(user, programs):
     return successful_enrollments
 
 
+def reconcile_verified_program_enrollments(
+    user, courserun_id, root_program, verified_program_enrollments, programs
+):
+    """
+    Create audit/verified program enrollments as needed to reconcile the
+    learner's verified enrollment state before enrolling them in the course run.
+
+    Raises:
+        EnrollmentError: if reconciliation failed
+        ExportComplianceCheckError: if the export compliance check failed
+    """
+    if len(verified_program_enrollments) == 0:
+        # No verified enrollments, so it doesn't matter - the user will get an
+        # audit one. (But make the audit enrollment to not confuse the course run
+        # process later.)
+        create_program_enrollments(
+            user, programs, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+        )
+    elif (
+        len(verified_program_enrollments) == 1
+        and verified_program_enrollments[0].program == root_program
+    ):
+        # The verified enrollment that's here is for the root program, so we can
+        # create a verified enrollment for the other program.
+        create_program_enrollments(
+            user, programs, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        )
+    elif (
+        len(verified_program_enrollments) == 1
+        and verified_program_enrollments[0].program != root_program
+    ):
+        # The verified enrollment that's here is _not_ for the root program, so
+        # we should stop.
+        log.error(
+            "reconcile_verified_program_enrollments: user %s enrolling in %s has no verified enrollment in %s",
+            user,
+            courserun_id,
+            root_program,
+        )
+        raise EnrollmentError
+
+
+def upgrade_audit_run_enrollments_for_program_purchase(user, program):
+    """
+    When a user purchases a program, upgrade any eligible audit-track course run
+    enrollments in the program's courses to verified track.
+
+    A run is eligible if: it is live, supports verified enrollment mode, the
+    upgrade deadline has not passed (or there is no deadline), and the user
+    has an active audit-track enrollment in it.
+
+    Verified-track enrollments are left unchanged. If the user has a mix of
+    verified and audit enrollments, only the audit-track ones are upgraded.
+
+    Each upgrade is backed by a zero-value order that redeems the program's
+    internal discount, the same as if the learner had enrolled in the run
+    after buying the program (see
+    ecommerce.api.create_verified_program_course_run_order). If that order
+    can't be made - most commonly because the run has no active product - the
+    enrollment is upgraded without one.
+
+    Args:
+        user (User): The user who purchased the program
+        program (Program): The program that was purchased
+
+    Returns:
+        list of CourseRunEnrollment: Enrollments that were successfully upgraded
+    """
+    now = now_in_utc()
+
+    eligible_runs = list(
+        CourseRun.objects.filter(
+            course__in_programs__program=program,
+            live=True,
+            enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+            enrollments__user=user,
+            enrollments__enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            enrollments__active=True,
+        )
+        .filter(Q(upgrade_deadline__isnull=True) | Q(upgrade_deadline__gt=now))
+        .distinct()
+    )
+
+    # The learner has already paid, so a blocked course must not fail the whole
+    # upgrade (or the order fulfillment); leave those runs on the audit track.
+    unblocked_runs = []
+    for run in eligible_runs:
+        if run.course.is_country_blocked(user):
+            log.warning(
+                "Not upgrading user=%s run=%s after program purchase: country blocked",
+                user.id,
+                run.courseware_id,
+            )
+        else:
+            unblocked_runs.append(run)
+    eligible_runs = unblocked_runs
+
+    if not eligible_runs:
+        return []
+
+    from ecommerce.api import create_verified_program_course_run_order  # noqa: PLC0415
+    from ecommerce.exceptions import (  # noqa: PLC0415
+        VerifiedProgramCourseNotInProgramError,
+        VerifiedProgramInvalidOrderError,
+        VerifiedProgramNoEnrollmentError,
+        VerifiedProgramNoProductError,
+    )
+
+    upgraded_enrollments = []
+    runs_without_orders = []
+
+    for run in eligible_runs:
+        try:
+            upgraded_enrollments.append(
+                create_verified_program_course_run_order(user, run, program)
+            )
+        except (  # noqa: PERF203
+            VerifiedProgramCourseNotInProgramError,
+            VerifiedProgramInvalidOrderError,
+            VerifiedProgramNoEnrollmentError,
+            VerifiedProgramNoProductError,
+        ):
+            log.exception(
+                "Couldn't create a program order for user %s, run %s, program %s; "
+                "upgrading the enrollment without one",
+                user.id,
+                run.courseware_id,
+                program.readable_id,
+            )
+            runs_without_orders.append(run)
+
+    if runs_without_orders:
+        orderless_enrollments, _ = create_run_enrollments(
+            user,
+            runs_without_orders,
+            mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            keep_failed_enrollments=True,
+        )
+        upgraded_enrollments.extend(orderless_enrollments)
+
+    return upgraded_enrollments
+
+
+def _verify_exports_compliance_for_enrollment(user, courseware_object) -> None:
+    """Verify users with CyberSource before creating enrollments."""
+    if not is_enabled(
+        features.EXPORT_COMPLIANCE_CHECK_ENABLED,
+        default=False,
+        opt_unique_id=user.global_id,
+    ):
+        return
+
+    result = verify_user_with_exports(user, courseware_object)
+    if result.accepted:
+        return
+
+    log.warning(
+        "Export compliance check did not accept enrollment for user=%s: "
+        "decision=%r, reason_code=%r",
+        user.id,
+        result.decision,
+        result.reason_code,
+    )
+    raise ExportComplianceError(user, result.decision, result.reason_code)
+
+
+def _verify_no_export_compliance_decline(user, courseware_object) -> None:
+    """Refuse a user CyberSource declined, without running a new check."""
+    if not is_enabled(
+        features.EXPORT_COMPLIANCE_CHECK_ENABLED,
+        default=False,
+        opt_unique_id=user.global_id,
+    ):
+        return
+
+    decline = get_unresolved_export_compliance_decline(user)
+    if decline is not None:
+        log.warning(
+            "Prior export compliance decline blocks enrollment for user=%s "
+            "courseware_object=%s: reason_code=%r",
+            user.id,
+            courseware_object,
+            decline.reason_code,
+        )
+        raise ExportComplianceError(user, decline.decision, decline.reason_code)
+
+
+@dataclass(frozen=True)
+class EnrollmentEligibility:
+    """Whether a user may enroll in a courseware object, and why not if they can't."""
+
+    enrollable: bool
+    reason_code: str | None = None
+    missing_fields: list[str] = dataclasses.field(default_factory=list)
+
+
+def check_enrollment_eligibility(user, courseware_object) -> EnrollmentEligibility:
+    """
+    Report whether `user` may enroll in `courseware_object` without enrolling them.
+
+    Only covers export compliance - this says nothing about whether the run is
+    open for enrollment, live, or already enrolled in.
+
+    Runs the same check the enrollment path runs, so it reuses a cached
+    compliance result when there is one and falls through to a live CyberSource
+    call (logging an ExportComplianceLog record) when there isn't.
+
+    Args:
+        user (User): The user to check
+        courseware_object (CourseRun or Program): What they want to enroll in
+
+    Returns:
+        EnrollmentEligibility: `enrollable` plus a support-facing `reason_code`
+            when the user is blocked.
+    """
+    try:
+        _verify_exports_compliance_for_enrollment(user, courseware_object)
+    except (ExportComplianceError, ExportComplianceDataError) as exc:
+        # CS_700 for a rejection; CS_701 for profile data the learner can fix,
+        # along with the profile fields to fix.
+        return EnrollmentEligibility(
+            enrollable=False,
+            reason_code=exc.error_code,
+            missing_fields=getattr(exc, "profile_fields", []),
+        )
+    except ExportComplianceCheckError:
+        # A compliance failure mode this endpoint has no code for yet. Fail
+        # closed rather than 500, but do not invent a code for it.
+        log.exception(
+            "Unrecognized export compliance failure for user=%s courseware_object=%s",
+            user.id,
+            courseware_object,
+        )
+        return EnrollmentEligibility(enrollable=False)
+
+    return EnrollmentEligibility(enrollable=True)
+
+
+def downgrade_learner(enrollment):
+    """
+    Downgrades given enrollment from verified to audit.
+    """
+
+    # Forcing the enrollment here - if the refund comes after the end date
+    # for the course for whatever reason, we still want to revert the mode.
+    return create_run_enrollments(
+        user=enrollment.user,
+        runs=[enrollment.run],
+        keep_failed_enrollments=True,
+        mode=EDX_ENROLLMENT_AUDIT_MODE,
+        skip_country_block_check=True,
+    )
+
+
+def undo_program_course_run_verification(enrollment):
+    """
+    Undo a course run enrollment's verification that came from a program
+    entitlement.
+
+    A learner with a verified program enrollment gets verified in the
+    program's course runs through a zero-value order that redeems the
+    program's internal discount (see
+    ecommerce.api.create_verified_program_course_run_order). This cancels
+    those orders for the enrollment's run, deletes their PaidCourseRun rows,
+    and downgrades the enrollment to audit, locally and in edX.
+
+    An inactive enrollment (e.g. the learner unenrolled, which already removed
+    the edX enrollment and the PaidCourseRun but left the order fulfilled) has
+    its orders canceled and its mode set to audit locally only - it stays
+    inactive and edX isn't called, so the learner isn't re-enrolled.
+
+    Args:
+        enrollment (CourseRunEnrollment): the verified enrollment to undo
+
+    Returns:
+        tuple[list of Order, bool]: the canceled orders, and whether the edX
+        downgrade succeeded (the local downgrade stands either way; always
+        True for an inactive enrollment, since edX isn't called)
+
+    Raises:
+        ValueError: if the enrollment isn't verified, is
+            B2B-provisioned, isn't backed by a program entitlement order, or is
+            also backed by some other fulfilled order (e.g. a real purchase of
+            the run)
+    """
+    user, run = enrollment.user, enrollment.run
+    if enrollment.enrollment_mode != EDX_ENROLLMENT_VERIFIED_MODE:
+        msg = f"{user.email}'s enrollment in {run.courseware_id} is not verified"
+        raise ValueError(msg)
+    if enrollment.b2b_contract_id or run.b2b_contracts.exists():
+        msg = f"{run.courseware_id} is B2B-provisioned; its verification comes from the contract"
+        raise ValueError(msg)
+
+    run_orders = Order.objects.filter(
+        purchaser=user,
+        state=OrderStatus.FULFILLED,
+        lines__purchased_content_type=ContentType.objects.get_for_model(CourseRun),
+        lines__purchased_object_id=run.id,
+    ).distinct()
+    entitlement_orders = list(
+        run_orders.filter(
+            total_price_paid=0,
+            discounts__redeemed_discount__redemption_type=REDEMPTION_TYPE_INTERNAL,
+        )
+    )
+    if not entitlement_orders:
+        msg = f"{user.email}'s enrollment in {run.courseware_id} has no program entitlement order"
+        raise ValueError(msg)
+    other_orders = run_orders.exclude(id__in=[order.id for order in entitlement_orders])
+    if other_orders.exists():
+        references = ", ".join(order.reference_number for order in other_orders)
+        msg = (
+            f"{user.email}'s enrollment in {run.courseware_id} is also backed by "
+            f"order(s) {references}, which aren't program entitlements"
+        )
+        raise ValueError(msg)
+
+    with transaction.atomic():
+        for order in entitlement_orders:
+            order.get_object_flow().cancel()
+        PaidCourseRun.objects.filter(
+            user=user, course_run=run, order__in=entitlement_orders
+        ).delete()
+        if enrollment.active:
+            _, edx_success = downgrade_learner(enrollment)
+        else:
+            enrollment.update_mode_and_save(EDX_ENROLLMENT_AUDIT_MODE, no_user=True)
+            edx_success = True
+
+    return entitlement_orders, edx_success
+
+
+def downgrade_program_enrollment_and_verified_runs(user, program):
+    """
+    Downgrade a user's ProgramEnrollment to audit, and downgrade the
+    program's course-run enrollments that are verified only because of the
+    program purchase.
+
+    A course run's verified enrollment is left alone (not downgraded) if
+    either:
+    - it's a B2B-provisioned run (has a b2b_contracts entry) - governed by
+      its contract, not this payment, or
+    - the learner has a separate PaidCourseRun for it backed by a fulfilled
+      order that isn't attributable to this program purchase - either a
+      genuine, independent purchase of that specific run (total_price_paid
+      > 0), or a $0 order redeeming some other discount not tied to this
+      program.
+
+    Otherwise the run is downgraded, whether its verified mode came from
+    upgrade_audit_run_enrollments_for_program_purchase (no order at all) or
+    from a $0 order redeeming this program's internal enrollment-code
+    discount (see create_verified_program_course_run_enrollment, which
+    creates a real but zero-value order for a program-verified learner
+    enrolling directly in one of the program's runs). That discount's code
+    is always generated as f"{program.readable_id}-{uuid}" (see
+    create_verified_program_discount), so a fulfilled $0 order is only
+    treated as program-linked when one of its redeemed discount codes
+    starts with the program's readable_id.
+
+    Args:
+        user (User): The user whose program enrollment is being downgraded
+        program (Program): The program that was refunded
+
+    Returns:
+        tuple[ProgramEnrollment | None, list of CourseRunEnrollment]: the
+        downgraded program enrollment (None if there wasn't one to downgrade),
+        and the course-run enrollments that were downgraded.
+    """
+    program_enrollment = ProgramEnrollment.all_objects.filter(
+        user=user, program=program
+    ).first()
+
+    downgraded_program_enrollment = None
+    if (
+        program_enrollment is not None
+        and program_enrollment.active
+        and program_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    ):
+        downgraded_program_enrollments = create_program_enrollments(
+            user, [program], enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+        )
+        downgraded_program_enrollment = first_or_none(downgraded_program_enrollments)
+        if downgraded_program_enrollment is not None:
+            # create_program_enrollments has no change_status kwarg, so tag
+            # the refund onto the enrollment directly - active stays True,
+            # this is audit-trail/reporting only (e.g. HubSpot sync), not a
+            # deactivation.
+            downgraded_program_enrollment.change_status = ENROLL_CHANGE_STATUS_REFUNDED
+            downgraded_program_enrollment.save_and_log(None)
+
+    verified_run_enrollments = CourseRunEnrollment.get_program_run_enrollments(
+        user=user, program=program
+    ).filter(enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE, b2b_contract__isnull=True)
+
+    eligible_runs = []
+    for run_enrollment in verified_run_enrollments:
+        run = run_enrollment.run
+        if (
+            PaidCourseRun.objects.filter(
+                user=user,
+                course_run=run,
+                order__state=OrderStatus.FULFILLED,
+            )
+            .exclude(
+                order__total_price_paid=0,
+                order__discounts__redeemed_discount__discount_code__startswith=program.readable_id,
+            )
+            .exists()
+        ):
+            continue
+        eligible_runs.append(run)
+
+    if not eligible_runs:
+        return downgraded_program_enrollment, []
+
+    downgraded_run_enrollments, _ = create_run_enrollments(
+        user,
+        eligible_runs,
+        mode=EDX_ENROLLMENT_AUDIT_MODE,
+        change_status=ENROLL_CHANGE_STATUS_REFUNDED,
+        keep_failed_enrollments=True,
+        skip_country_block_check=True,
+    )
+
+    return downgraded_program_enrollment, downgraded_run_enrollments
+
+
 def deactivate_run_enrollment(
     run_enrollment,
     change_status,
-    keep_failed_enrollments=False,  # noqa: FBT002
+    keep_failed_enrollments=None,
+    send_notification=True,  # noqa: FBT002
 ):
     """
     Helper method to deactivate a CourseRunEnrollment
@@ -294,12 +867,18 @@ def deactivate_run_enrollment(
         change_status (str): The change status to set on the enrollment when deactivating
         keep_failed_enrollments: (boolean): If True, keeps the local enrollment record
             in the database even if the enrollment fails in edX.
+            If None, defaults to the value of the IGNORE_EDX_FAILURES feature flag.
+        send_notification (bool): If True, sends unenrollment email to the learner.
+            Defaults to True.
 
     Returns:
         CourseRunEnrollment: The deactivated enrollment
     """
-    from ecommerce.models import Line
-    from hubspot_sync.task_helpers import sync_hubspot_line_by_line_id
+
+    if keep_failed_enrollments is None:
+        keep_failed_enrollments = settings.FEATURES.get(
+            features.IGNORE_EDX_FAILURES, False
+        )
 
     try:
         unenroll_edx_course_run(run_enrollment)
@@ -314,7 +893,8 @@ def deactivate_run_enrollment(
         edx_unenrolled = False
     else:
         edx_unenrolled = True
-        mail_api.send_course_run_unenrollment_email(run_enrollment)
+        if send_notification:
+            mail_api.send_course_run_unenrollment_email(run_enrollment)
     if edx_unenrolled:
         run_enrollment.edx_enrolled = False
         run_enrollment.edx_emails_subscription = False
@@ -324,17 +904,6 @@ def deactivate_run_enrollment(
         user=run_enrollment.user, course_run=run_enrollment.run
     ).delete()
 
-    # Find an associated Line and update HubSpot.
-    content_type = ContentType.objects.get(app_label="courses", model="courserun")
-    line = Line.objects.filter(
-        purchased_object_id=run_enrollment.run.id,
-        purchased_content_type=content_type,
-        order__state__in=[OrderStatus.FULFILLED, OrderStatus.PENDING],
-        order__purchaser=run_enrollment.user,
-    )
-    if line:
-        line_id = line.first().id
-        sync_hubspot_line_by_line_id(line_id)
     return run_enrollment
 
 
@@ -373,12 +942,18 @@ def defer_enrollment(  # noqa: C901
     )
 
     if to_run is None:
+        if not from_enrollment.active:
+            # create_run_enrollments reactivates an inactive enrollment, so this
+            # grants access like enrolling in a new run would.
+            _verify_no_export_compliance_decline(user, from_enrollment.run)
         deferred_enrollments, _ = create_run_enrollments(
             user=user,
             runs=[from_enrollment.run],
             change_status=ENROLL_CHANGE_STATUS_DEFERRED,
             keep_failed_enrollments=keep_failed_enrollments,
             mode=EDX_ENROLLMENT_AUDIT_MODE,
+            skip_compliance_check=True,
+            skip_country_block_check=True,
         )
         return first_or_none(deferred_enrollments), None
 
@@ -405,10 +980,13 @@ def defer_enrollment(  # noqa: C901
             f"Cannot defer to a course run of a different course ('{from_enrollment.run.course.title}' -> '{to_run.course.title}'). "  # noqa: EM102
             "Set force=True to defer anyway."
         )
-    if to_run.upgrade_deadline and to_run.upgrade_deadline < now_in_utc():
-        raise ValidationError(
-            f"Cannot defer to a course run whose upgrade deadline has passed (run: {to_run.courseware_id})."  # noqa: EM102
-        )
+
+    # Support-initiated, so the learner isn't there to complete their profile:
+    # skip the live check (hq#13766). Their next self-service enrollment goes
+    # through the normal check (possibly using a cached result). This happens
+    # before the existing deferment check so even if the learner already has a
+    # deferment we catch that they failed the export check.
+    _verify_no_export_compliance_decline(user, to_run)
 
     if already_deferred_from:
         # check if user was already enrolled in verified track
@@ -440,6 +1018,8 @@ def defer_enrollment(  # noqa: C901
         change_status=None,
         keep_failed_enrollments=keep_failed_enrollments,
         mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        skip_compliance_check=True,
+        skip_country_block_check=True,
     )
     if not enroll_success and not keep_failed_enrollments:
         raise Exception(  # noqa: TRY002
@@ -452,6 +1032,8 @@ def defer_enrollment(  # noqa: C901
             change_status=ENROLL_CHANGE_STATUS_DEFERRED,
             keep_failed_enrollments=keep_failed_enrollments,
             mode=EDX_ENROLLMENT_AUDIT_MODE,
+            skip_compliance_check=True,
+            skip_country_block_check=True,
         )
         if not enroll_success and not keep_failed_enrollments:
             raise Exception(  # noqa: TRY002
@@ -531,6 +1113,52 @@ def _filter_valid_course_keys(runs):
     return valid_course_keys, runs_by_course_id
 
 
+def _sync_course_run_from_edx(run, course_detail):
+    """
+    Apply edX course detail values to a CourseRun, saving only when something
+    actually changed.
+
+    Skipping the save when nothing differs avoids a pointless full-column
+    UPDATE and, more importantly, the Fastly purge that the run's post_save
+    signal would otherwise trigger for its parent course on every sync pass.
+
+    Args:
+        run (CourseRun): the run to update.
+        course_detail (CourseDetail): the incoming edX course detail.
+
+    Returns:
+        bool: True if the run was changed and saved, False if it was unchanged.
+    """
+    # Only sync the certificate date if it's set in edX, otherwise fall back
+    # to the course's end date.
+    certificate_available_date = (
+        course_detail.certificate_available_date or course_detail.end
+    )
+    incoming_values = {
+        "title": course_detail.name,
+        "start_date": course_detail.start,
+        "end_date": course_detail.end,
+        "enrollment_start": course_detail.enrollment_start,
+        "enrollment_end": course_detail.enrollment_end,
+        "is_self_paced": course_detail.is_self_paced(),
+        "certificate_available_date": certificate_available_date,
+    }
+
+    if all(getattr(run, field) == value for field, value in incoming_values.items()):
+        return False
+
+    # Reset the expiration_date so it is calculated automatically and does not
+    # raise a validation error now that the start or end date has changed.
+    if run.start_date != course_detail.start or run.end_date != course_detail.end:
+        run.expiration_date = None
+
+    for field, value in incoming_values.items():
+        setattr(run, field, value)
+
+    run.save()
+    return True
+
+
 def sync_course_runs(runs):
     """
     Sync course run dates and title from Open edX using course list API
@@ -539,9 +1167,12 @@ def sync_course_runs(runs):
         runs ([CourseRun]): list of CourseRun objects.
 
     Returns:
-        tuple: (success_count, failure_count) - counts of successful and failed syncs
+        tuple: (success_count, failure_count) where success_count is the number
+        of runs that had changed edX values and were saved (runs already in sync
+        are skipped and counted as neither success nor failure), and
+        failure_count is the number of runs that errored while syncing.
     """
-    api_client = get_edx_api_course_list_client()
+    api_client, using_jwt = get_edx_api_course_list_client()
 
     success_count = 0
     failure_count = 0
@@ -552,12 +1183,26 @@ def sync_course_runs(runs):
         log.warning("No valid course keys found to sync")
         return 0, len(runs)
 
-    try:
-        received_course_ids = set()
-        for course_detail in api_client.get_courses(
-            course_keys=valid_course_ids,
-            username=settings.OPENEDX_SERVICE_WORKER_USERNAME,
-        ):
+    received_course_ids = set()
+    failed_course_ids = set()
+    # Fetch one batch at a time so a failed batch doesn't stop the rest.
+    for start in range(0, len(valid_course_ids), COURSE_LIST_BATCH_SIZE):
+        batch = valid_course_ids[start : start + COURSE_LIST_BATCH_SIZE]
+        try:
+            try:
+                course_details = _get_course_list_batch(api_client, batch)
+            except HTTPError as e:
+                # Switch before refetching, so later batches use the static
+                # token whatever this refetch returns.
+                api_client, using_jwt = _static_client_if_jwt_rejected(e, using_jwt)
+                course_details = _get_course_list_batch(api_client, batch)
+        except Exception:  # pylint: disable=broad-except
+            failure_count += len(batch)
+            failed_course_ids.update(batch)
+            log.exception("Bulk course list API error for course keys %s", batch)
+            continue
+
+        for course_detail in course_details:
             received_course_ids.add(course_detail.course_id)
 
             if course_detail.course_id not in runs_by_course_id:
@@ -570,66 +1215,236 @@ def sync_course_runs(runs):
             run = runs_by_course_id[course_detail.course_id]
 
             try:
-                # Reset the expiration_date so it is calculated automatically and
-                # does not raise a validation error now that the start or end date
-                # has changed.
-                if (
-                    run.start_date != course_detail.start
-                    or run.end_date != course_detail.end
-                ):
-                    run.expiration_date = None
-
-                run.title = course_detail.name
-                run.start_date = course_detail.start
-                run.end_date = course_detail.end
-                run.enrollment_start = course_detail.enrollment_start
-                run.enrollment_end = course_detail.enrollment_end
-                run.is_self_paced = course_detail.is_self_paced()
-                # Only sync the date if it's set in edX, Otherwise set it to course's end date
-                if course_detail.certificate_available_date:
-                    run.certificate_available_date = (
-                        course_detail.certificate_available_date
-                    )
+                if _sync_course_run_from_edx(run, course_detail):
+                    success_count += 1
+                    log.info("Updated course run: %s", run.courseware_id)
                 else:
-                    run.certificate_available_date = course_detail.end
-
-                run.save()
-                success_count += 1
-                log.info("Updated course run: %s", run.courseware_id)
+                    log.debug("No changes for course run: %s", run.courseware_id)
 
             except Exception as e:  # pylint: disable=broad-except  # noqa: BLE001
                 # Report any validation or otherwise model errors
                 log.error("%s: %s", str(e), run.courseware_id)  # noqa: TRY400
                 failure_count += 1
 
-        missing_course_ids = set(valid_course_ids) - received_course_ids
-        if missing_course_ids:
-            log.warning(
-                "No data received for requested courses: %s",
-                list(missing_course_ids),
-            )
-
-    except HTTPError as e:
-        failure_count += 1
-        log.error("Bulk course list API error: %s", str(e))  # noqa: TRY400
-    except Exception as e:  # pylint: disable=broad-except  # noqa: BLE001
-        failure_count += 1
-        log.error("Unexpected error in bulk sync: %s", str(e))  # noqa: TRY400
+    # Failed batches were already logged above
+    missing_course_ids = set(valid_course_ids) - received_course_ids - failed_course_ids
+    if missing_course_ids:
+        log.warning(
+            "No data received for requested courses: %s",
+            list(missing_course_ids),
+        )
 
     return success_count, failure_count
 
 
-def sync_course_mode(runs: list[CourseRun]) -> list[str]:
+def _get_course_list_batch(api_client, course_keys):
     """
-    Updates course run upgrade expiration dates from Open edX
+    Fetch course details for one batch of course keys, waiting and retrying
+    when edX rate-limits the request (HTTP 429).
+
+    Args:
+        api_client (CourseList): the edX course list client
+        course_keys (list of str): the course keys in this batch
+
+    Returns:
+        list of CourseDetail: the course details edX returned for the batch
+    """
+    max_retries = settings.OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES
+    for attempt in range(max_retries + 1):
+        try:
+            return list(
+                api_client.get_courses(
+                    course_keys=course_keys,
+                    username=settings.OPENEDX_SERVICE_WORKER_USERNAME,
+                )
+            )
+        except HTTPError as e:  # noqa: PERF203
+            response = e.response
+            if (
+                response is None
+                or response.status_code != HTTP_429_TOO_MANY_REQUESTS
+                or attempt == max_retries
+            ):
+                raise
+            wait_seconds = _course_list_retry_wait_seconds(response)
+            log.warning(
+                "Course list API rate-limited us, retrying in %s seconds", wait_seconds
+            )
+            time.sleep(wait_seconds)
+    msg = "unreachable"  # the loop either returns or raises
+    raise AssertionError(msg)
+
+
+def _static_client_if_jwt_rejected(error, using_jwt):
+    """
+    Get the static service worker token's course list client if edX rejected
+    the client-credentials JWT (401/403), e.g. because its app is owned by a
+    non-staff user. Any other error is re-raised.
+
+    Args:
+        error (HTTPError): the error from fetching a batch of course details
+        using_jwt (bool): whether that fetch used the client-credentials JWT
+
+    Returns:
+        tuple: (CourseList, bool) the static token's client, and False
+    """
+    if (
+        not using_jwt
+        or error.response is None
+        or error.response.status_code not in (HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN)
+    ):
+        raise error
+    log.error(
+        "Course list API rejected the client-credentials JWT (HTTP %s), "
+        "using the static service worker token instead",
+        error.response.status_code,
+    )
+    return get_edx_api_course_list_client(use_jwt=False)
+
+
+def _course_list_retry_wait_seconds(response):
+    """
+    How long to wait before retrying a rate-limited course list request.
+
+    edX's course list API drops the throttle's Retry-After header (its
+    DeveloperErrorViewMixin rebuilds the error response), but keeps the wait in
+    the body's developer_message, e.g. "Request was throttled. Expected
+    available in 12 seconds." Use Retry-After if it's ever sent, then that
+    message, and otherwise a full throttle window. Never wait longer than one
+    window.
+    """
+    max_wait = settings.OPENEDX_COURSE_LIST_THROTTLE_WAIT_SECONDS
+    retry_after = response.headers.get("Retry-After", "")
+    if not retry_after.isdecimal():
+        try:
+            message = response.json().get("developer_message", "")
+        except (ValueError, AttributeError):
+            message = ""
+        match = re.search(r"available in (\d+) second", str(message))
+        retry_after = match.group(1) if match else ""
+    try:
+        return min(int(retry_after), max_wait)
+    except ValueError:
+        return max_wait
+
+
+def pull_course_modes(run: CourseRun) -> tuple[list[CourseMode], int]:
+    """
+    Pull the course modes for the given run and store them locally.
+
+    We only generally care about "audit" and "verified", but this will store any
+    others that happen to be configured as well.
+
+    Args:
+        run (CourseRun): CourseRun object to retrieve modes for
+    Returns:
+        tuple of edX modes retrieved and count of modes created
+    """
+
+    modes = get_edx_course_modes(course_id=run.courseware_id)
+    new_mode_count = 0
+
+    for edx_mode in modes:
+        mxo_mode, created = EnrollmentMode.objects.get_or_create(
+            mode_slug=edx_mode.mode_slug,
+            defaults={
+                "mode_display_name": edx_mode.mode_display_name,
+                "requires_payment": edx_mode.mode_slug == EDX_ENROLLMENT_VERIFIED_MODE,
+            },
+        )
+
+        run.enrollment_modes.add(mxo_mode)
+
+        if created:
+            new_mode_count += 1
+
+    run.save()
+
+    return (modes, new_mode_count)
+
+
+def check_course_modes(run: CourseRun) -> tuple[bool, bool]:
+    """
+    Check that the course has the course modes we expect.
+
+    We expect an `audit` and a `verified` mode in our course runs. If these don't
+    exist for the given course, this will create them on both the edX side and
+    on the MITx Online side. (If the default audit and verified modes don't exist,
+    then we'll make those too.)
+
+    Args:
+        runs (CourseRun): CourseRun object to check
+
+    Returns:
+        (audit_created: bool, verified_created: bool): Tuple of mode status - true for created, false for found
+    """
+
+    modes, _ = pull_course_modes(run)
+
+    found_audit, found_verified = (False, False)
+
+    mxo_audit_mode, _ = EnrollmentMode.objects.get_or_create(
+        mode_slug=EDX_ENROLLMENT_AUDIT_MODE,
+        defaults={
+            "mode_display_name": EDX_ENROLLMENT_AUDIT_MODE,
+            "requires_payment": False,
+        },
+    )
+    mxo_verified_mode, _ = EnrollmentMode.objects.get_or_create(
+        mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+        defaults={
+            "mode_display_name": EDX_ENROLLMENT_VERIFIED_MODE,
+            "requires_payment": True,
+        },
+    )
+
+    for mode in modes:
+        if mode.mode_slug == EDX_ENROLLMENT_AUDIT_MODE:
+            found_audit = True
+
+        if mode.mode_slug == EDX_ENROLLMENT_VERIFIED_MODE:
+            found_verified = True
+
+    if not found_audit:
+        create_edx_course_mode(
+            course_id=run.courseware_id,
+            mode_slug=EDX_ENROLLMENT_AUDIT_MODE,
+            mode_display_name="Audit",
+            description="Audit",
+            expiration_datetime=None,
+            currency="USD",
+        )
+        run.enrollment_modes.add(mxo_audit_mode)
+
+    if not found_verified:
+        create_edx_course_mode(
+            course_id=run.courseware_id,
+            mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+            mode_display_name="Verified",
+            description="Verified",
+            currency="USD",
+            min_price=10,
+            expiration_datetime=run.upgrade_deadline if run.upgrade_deadline else None,
+        )
+        run.enrollment_modes.add(mxo_verified_mode)
+
+    if not (found_audit or found_verified):
+        run.save()
+
+    # these are created flags, not found flags
+    return (not found_audit, not found_verified)
+
+
+def sync_course_mode(runs: list[CourseRun]) -> list[int]:
+    """
+    Sync the course runs' upgrade deadline with the expiration date in its verified mode.
 
     Args:
         runs ([CourseRun]): list of CourseRun objects.
 
     Returns:
-        [str], [str]: Lists of success and error logs respectively
+        [int, int]: Count of successful and failed operations
     """
-    api_client = get_edx_api_course_mode_client()
 
     success_count = 0
     failure_count = 0
@@ -637,9 +1452,7 @@ def sync_course_mode(runs: list[CourseRun]) -> list[str]:
     # Iterate all eligible runs and sync if possible
     for run in runs:
         try:
-            course_modes = api_client.get_mode(
-                course_id=run.courseware_id,
-            )
+            course_modes, _ = pull_course_modes(run)
         except HTTPError as e:  # noqa: PERF203
             failure_count += 1
             if e.response.status_code == HTTP_404_NOT_FOUND:
@@ -655,7 +1468,7 @@ def sync_course_mode(runs: list[CourseRun]) -> list[str]:
         else:
             for course_mode in course_modes:
                 if (
-                    course_mode.mode_slug == "verified"
+                    course_mode.mode_slug == EDX_ENROLLMENT_VERIFIED_MODE
                     and run.upgrade_deadline != course_mode.expiration_datetime
                 ):
                     run.upgrade_deadline = course_mode.expiration_datetime
@@ -671,7 +1484,7 @@ def sync_course_mode(runs: list[CourseRun]) -> list[str]:
                         log.error("%s: %s", str(e), run.courseware_id)  # noqa: TRY400
                         failure_count += 1
 
-    return success_count, failure_count
+    return [success_count, failure_count]
 
 
 def is_program_text_id(item_text_id):
@@ -687,18 +1500,25 @@ def is_program_text_id(item_text_id):
     return item_text_id.startswith(PROGRAM_TEXT_ID_PREFIX)
 
 
-def process_course_run_grade_certificate(course_run_grade, should_force_create=False):  # noqa: FBT002
+def process_course_run_grade_certificate(
+    course_run_grade,
+    should_force_create=False,  # noqa: FBT002
+    *,
+    defer_hubspot_sync=False,
+):
     """
     Ensure that the course run certificate is in line with the values in the course run grade
 
     Args:
         course_run_grade (courses.models.CourseRunGrade): The course run grade for which to generate/delete the certificate
         should_force_create (bool): If True, it will force the certificate creation without matching criteria
+        defer_hubspot_sync (bool): If True, skip the per-user HubSpot sync; the
+            caller is responsible for batch-syncing users whose certificates changed
     Returns:
         Tuple[ CourseRunCertificate, bool, bool ]: A Tuple containing None or CourseRunCertificate object,
             A bool representing if the certificate is created, A bool representing if a certificate is deleted
     """
-    from hubspot_sync.task_helpers import sync_hubspot_user
+    from hubspot_sync.task_helpers import sync_hubspot_user  # noqa: PLC0415
 
     user = course_run_grade.user
     course_run = course_run_grade.course_run
@@ -711,15 +1531,42 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
         delete_count, _ = CourseRunCertificate.objects.filter(
             user=user, course_run=course_run
         ).delete()
-        sync_hubspot_user(user)
+        if delete_count > 0 and not defer_hubspot_sync:
+            sync_hubspot_user(user)
         return None, False, (delete_count > 0)
 
     elif should_create:
+        course = course_run.course
+        if course.certificates_disabled:
+            log.warning(
+                "Skipping certificate creation for user=%s run=%s: "
+                "certificates are disabled for course %s",
+                user.id,
+                course_run.courseware_id,
+                course.readable_id,
+            )
+            return None, False, False
+        course_page = course.course_page
+        if not course_page or not course_page.certificate_page:
+            # course_page.certificate_page is a plain (uncached) property, so
+            # this re-checks live status on every call instead of trusting
+            # the Course.certificate_page cached_property, which would go
+            # stale across a batch that reuses the same Course/CourseRun
+            # object for many users (e.g. the certificate generation cron).
+            log.warning(
+                "Skipping certificate creation for user=%s run=%s: no live certificate page",
+                user.id,
+                course_run.courseware_id,
+            )
+            return None, False, False
         try:
             certificate, created = CourseRunCertificate.objects.get_or_create(
                 user=user, course_run=course_run
             )
-            sync_hubspot_user(user)
+            if created and not defer_hubspot_sync:
+                sync_hubspot_user(user)
+            if not certificate.verifiable_credential_id:
+                create_verifiable_credential(certificate)
             return certificate, created, False  # noqa: TRY300
         except IntegrityError:
             log.warning(
@@ -735,70 +1582,138 @@ def get_certificate_grade_eligible_runs(now):
     # Get all the course runs eligible for certificates generation
     # For a valid run it would be live, certificate_available_date would be in future or within a month of passing
     # the certificate_available_date.
+    # Changes for variants: if the run is a variant for anything _other_ than a
+    # language, make it ineligible for a certificate.
 
-    course_runs = CourseRun.objects.live().filter(
-        Q(certificate_available_date__isnull=True)
-        | Q(
-            certificate_available_date__gt=now
-            - timedelta(days=settings.CERTIFICATE_CREATION_WINDOW_IN_DAYS)
+    course_runs = (
+        CourseRun.objects.live(include_b2b=True)
+        .nonvariant()
+        .filter(
+            Q(certificate_available_date__isnull=True)
+            | Q(
+                certificate_available_date__gt=now
+                - timedelta(days=settings.CERTIFICATE_CREATION_WINDOW_IN_DAYS)
+            )
         )
     )
     return course_runs  # noqa: RET504
 
 
-def generate_course_run_certificates():
+def generate_course_run_certificates(  # noqa: C901
+    user=None,
+    course_run=None,
+    force=False,  # noqa: FBT002
+):
     """
-    Hits the edX grades API for eligible course runs and generates the certificates and grades for users for course runs
-    """
-    now = now_in_utc()
-    course_runs = get_certificate_grade_eligible_runs(now)
+    Hits the edX grades API and generates the certificates and grades for users for course runs.
 
-    if course_runs is None or course_runs.count() == 0:
-        log.info("No course runs matched the certificates generation criteria")
-        return
+    Each parameter works independently:
+    - If course_run is provided, only that course run is processed (skipping course runs eligibility filtering).
+    - If user is provided, only that user's grade/certificate is processed.
+    - If force is True, certificate date/eligibility checks are bypassed.
+
+    When called without arguments (periodic task path), it fetches all eligible course runs and
+    processes grades/certificates for all users in each run.
+
+    Args:
+        user (User or None): If provided, process only this user's grade/certificate.
+        course_run (CourseRun or None): If provided, process only this course run.
+        force (bool): If True, bypass certificate_available_date and eligibility checks.
+
+    Returns:
+        None
+    """
+    from hubspot_sync.task_helpers import sync_hubspot_users_batch  # noqa: PLC0415
+
+    now = now_in_utc()
+    # Batch HubSpot syncs only on bulk invocations (periodic task / whole-run
+    # processing); single-user calls (e.g. the edX webhook) keep the
+    # real-time per-user sync.
+    defer_hubspot_sync = user is None
+
+    if course_run:
+        course_runs = [course_run]
+    else:
+        course_runs = get_certificate_grade_eligible_runs(now)
+
+        if course_runs is None or course_runs.count() == 0:
+            log.info("No course runs matched the certificates generation criteria")
+            return
 
     for run in course_runs:
         edx_grade_user_iter = exception_logging_generator(
-            get_edx_grades_with_users(run)
+            get_edx_grades_with_users(run, user=user)
         )
-        created_grades_count, updated_grades_count, generated_certificates_count = (
-            0,
-            0,
-            0,
-        )
-        for edx_grade, user in edx_grade_user_iter:
-            course_run_grade, created, updated = ensure_course_run_grade(
-                user=user, course_run=run, edx_grade=edx_grade, should_update=True
-            )
+        stats = Counter()
+        changed_cert_user_ids = set()
+        for edx_grade, run_user in edx_grade_user_iter:
+            try:
+                course_run_grade, created, updated = ensure_course_run_grade(
+                    user=run_user,
+                    course_run=run,
+                    edx_grade=edx_grade,
+                    should_update=True,
+                )
+            except ValidationError:
+                msg = f"Can't save grade {edx_grade} for {run_user} in {run}, skipping certificate generation"
+                log.exception(msg)
+                continue
 
             if created:
-                created_grades_count += 1
+                stats["created_grades"] += 1
             elif updated:
-                updated_grades_count += 1
+                stats["updated_grades"] += 1
 
             # Check certificate generation eligibility
+            # When force is True: bypass checks (e.g. webhook path where edX already
+            #   determined the certificate is ready)
+            # Otherwise:
             #   1. For self_paced course runs we generate certificates right away irrespective
-            #   of certificate_available_date
-            #   2. For others course runs we generate the certificates if the certificate_available_date of course run
-            #   has passed
-            if run.is_self_paced or (
-                run.certificate_available_date and run.certificate_available_date <= now
-            ):
-                _, created, deleted = process_course_run_grade_certificate(
-                    course_run_grade=course_run_grade
+            #      of certificate_available_date
+            #   2. For other course runs we generate certificates if the certificate_available_date
+            #      has passed
+            if (
+                force
+                or run.is_self_paced
+                or (
+                    run.certificate_available_date
+                    and run.certificate_available_date <= now
                 )
+            ):
+                try:
+                    _, created, deleted = process_course_run_grade_certificate(
+                        course_run_grade=course_run_grade,
+                        defer_hubspot_sync=defer_hubspot_sync,
+                    )
+                except Exception:
+                    stats["failed_certificates"] += 1
+                    log.exception(
+                        "Error creating certificate for user=%s and course_run=%s",
+                        run_user.id,
+                        run.courseware_id,
+                    )
+                    continue
 
                 if deleted:
+                    changed_cert_user_ids.add(run_user.id)
                     log.warning(
-                        "Certificate deleted for user %s and course_run %s", user, run
+                        "Certificate deleted for user %s and course_run %s",
+                        run_user,
+                        run,
                     )
                 elif created:
+                    changed_cert_user_ids.add(run_user.id)
                     log.warning(
-                        "Certificate created for user %s and course_run %s", user, run
+                        "Certificate created for user %s and course_run %s",
+                        run_user,
+                        run,
                     )
-                    generated_certificates_count += 1
+                    stats["generated_certificates"] += 1
+
+        if defer_hubspot_sync:
+            sync_hubspot_users_batch(changed_cert_user_ids)
         log.info(
-            f"Finished processing course run {run}: created grades for {created_grades_count} users, updated grades for {updated_grades_count} users, generated certificates for {generated_certificates_count} users"  # noqa: G004
+            f"Finished processing course run {run}: created grades for {stats['created_grades']} users, updated grades for {stats['updated_grades']} users, generated certificates for {stats['generated_certificates']} users, failed certificates for {stats['failed_certificates']} users"  # noqa: G004
         )
 
 
@@ -875,53 +1790,66 @@ def override_user_grade(
 
 def _has_earned_program_cert(user, program):
     """
-    Checks if a user has earned all the course certificates required
-    for a given program.
+    Return True if the user has satisfied the program's requirement tree.
+
+    A course counts when the user, actively enrolled in one of its runs, holds an
+    unrevoked certificate for that run or a passing grade in a run that does not
+    offer the verified mode. A required program counts through the user's
+    unrevoked certificate in it when it has a paid enrollment mode, and otherwise
+    when the user satisfies its own tree.
 
     Args:
         user (User): a Django user.
         program (programs.models.Program): program where the user is enrolled.
-
-    Returns:
-        bool: True if a user has earned all the course certificates required
-              for a given program else False
     """
-    program_course_ids = [course[0].id for course in program.courses]
 
-    passed_courses = Course.objects.filter(
-        id__in=program_course_ids,
+    user_courseruns = (
+        CourseRun.objects.filter(
+            enrollments__user=user,
+            enrollments__active=True,
+            enrollments__change_status__isnull=True,
+        )
+        .nonvariant()
+        .filter(course__in=program.courses_qset)
+    )
+
+    cert_courses = Course.objects.filter(
+        courseruns__in=user_courseruns,
         courseruns__courseruncertificates__user=user,
         courseruns__courseruncertificates__is_revoked=False,
     )
-    root = ProgramRequirement.get_root_nodes().get(program=program)
+    grade_courses = Course.objects.filter(
+        courseruns__in=user_courseruns.exclude(
+            enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+        ),
+        courseruns__grades__user=user,
+        courseruns__grades__passed=True,
+    )
+    passed_course_ids = {
+        *cert_courses.values_list("id", flat=True),
+        *grade_courses.values_list("id", flat=True),
+    }
 
-    def _has_earned(node):
-        if node.is_root or node.is_all_of_operator:
-            # has passed all of the child requirements
-            return all(_has_earned(child) for child in node.get_children())
-        elif node.is_min_number_of_operator:
-            # has passed a minimum of the child requirements
-            return len(list(filter(_has_earned, node.get_children()))) >= int(
-                node.operator_value
-            )
-        elif node.is_course:
-            # has passed the reference course
-            return node.course in passed_courses
-        elif node.is_program:
-            # has earned certificate for the required sub-program
-            return ProgramCertificate.objects.filter(
-                user=user, program=node.required_program, is_revoked=False
+    def _has_earned_required_program(required_program):
+        # A required program with a paid mode counts through its own
+        # certificate; otherwise it counts when the learner would have earned one.
+        if required_program.enrollment_modes.filter(requires_payment=True).exists():
+            return ProgramCertificate.all_objects.filter(
+                user=user, program=required_program, is_revoked=False
             ).exists()
-        return False
+        return _has_earned_program_cert(user, required_program)
 
-    return _has_earned(root)
+    return is_requirement_tree_satisfied(
+        program,
+        course_satisfied=passed_course_ids.__contains__,
+        program_satisfied=_has_earned_required_program,
+    )
 
 
 def generate_program_certificate(user, program, force_create=False):  # noqa: FBT002
     """
-    Create a program certificate if the user has a course certificate
-    for each course in the program. Also, It will create the
-    program enrollment if it does not exist for the user.
+    Create a program certificate if the user has a verified enrollment in the
+    program and certificates or passing grades in the program's required courses.
 
     Args:
         user (User): a Django user.
@@ -934,40 +1862,71 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
         ProgramCertificate (or None if one was not found or created) paired
         with a boolean indicating whether the certificate was newly created.
     """
-    from hubspot_sync.task_helpers import sync_hubspot_user
+    from hubspot_sync.task_helpers import sync_hubspot_user  # noqa: PLC0415
 
-    existing_cert_queryset = ProgramCertificate.all_objects.filter(
-        user=user, program=program
-    )
-    if existing_cert_queryset.exists():
-        ProgramEnrollment.objects.get_or_create(
-            program=program, user=user, defaults={"active": True, "change_status": None}
+    if (
+        not force_create
+        and not program.enrollments.filter(
+            user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        ).exists()
+    ):
+        log.warning(
+            "Skipping program enrollment generation for %s in %s: no verified enrollment",
+            user,
+            program,
         )
-        return existing_cert_queryset.first(), False
+        return (
+            None,
+            False,
+        )
+
+    existing_cert = ProgramCertificate.all_objects.filter(
+        user=user, program=program
+    ).first()
+    if existing_cert:
+        return existing_cert, False
 
     if not force_create and not _has_earned_program_cert(user, program):
         return None, False
 
-    program_cert = ProgramCertificate.objects.create(user=user, program=program)
-    if program_cert:
+    if program.certificates_disabled:
+        log.warning(
+            "Skipping program certificate creation for user=%s program=%s: "
+            "certificates are disabled for this program",
+            user.id,
+            program.readable_id,
+        )
+        return None, False
+    program_page = program.program_page
+    if not program_page or not program_page.certificate_page:
+        # program_page.certificate_page is a plain (uncached) property, so
+        # this re-checks live status on every call instead of trusting the
+        # Program.certificate_page cached_property, which would go stale
+        # across a batch that reuses the same Program object for many users
+        # (e.g. manage_program_certificates bulk mode).
+        log.warning(
+            "Skipping program certificate creation for user=%s program=%s: "
+            "no live certificate page",
+            user.id,
+            program.readable_id,
+        )
+        return None, False
+
+    program_cert, created = ProgramCertificate.all_objects.get_or_create(
+        user=user,
+        program=program,
+    )
+    if created:
         log.info(
             "Program certificate for [%s] in program [%s] is created.",
             user.edx_username,
             program.title,
         )
         sync_hubspot_user(user)
-        _, created = ProgramEnrollment.objects.get_or_create(
-            program=program, user=user, defaults={"active": True, "change_status": None}
-        )
+        if not program_cert.verifiable_credential_id:
+            create_verifiable_credential(program_cert)
 
-        if created:
-            log.info(
-                "Program enrollment for [%s] in program [%s] is created.",
-                user.edx_username,
-                program.title,
-            )
-
-    return program_cert, True
+    return program_cert, created
 
 
 def generate_multiple_programs_certificate(user, programs):
@@ -993,6 +1952,126 @@ def generate_multiple_programs_certificate(user, programs):
         result = generate_program_certificate(user, program)
         results.append(result)
     return results
+
+
+def get_eligible_program_certificate_candidates():
+    """
+    Return a queryset of ProgramEnrollment rows that are eligible for a program
+    certificate but do not yet have one.
+
+    Filters applied:
+    - Enrollment is active
+    - Enrollment mode is verified
+    - Program is live
+    - No existing ProgramCertificate (including revoked) for the same user+program pair
+
+    The queryset is ordered by primary key for stable pk-windowed batching and
+    annotated with `has_program_cert` for transparency.
+
+    Returns:
+        QuerySet[ProgramEnrollment]
+    """
+    existing_cert = ProgramCertificate.all_objects.filter(
+        user_id=OuterRef("user_id"),
+        program_id=OuterRef("program_id"),
+    )
+
+    return (
+        ProgramEnrollment.objects.filter(
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            program__live=True,
+        )
+        .annotate(has_program_cert=Exists(existing_cert))
+        .filter(has_program_cert=False)
+        .select_related("user", "program")
+        .prefetch_related(
+            Prefetch(
+                "program__all_requirements",
+                queryset=ProgramRequirement.objects.select_related(
+                    "course", "required_program"
+                ),
+            )
+        )
+        .order_by("id")
+    )
+
+
+def generate_missing_program_certificates(
+    batch_size=500,
+):
+    """
+    Reconciliation job that creates program certificates for every verified,
+    live-program enrollment that is missing one and has earned it.
+
+    Processes candidates in pk-windowed batches so the full result set is never
+    materialised in memory at once.  Each enrollment is handled independently so
+    a single bad record does not abort the entire run.
+
+    Args:
+        batch_size (int): Number of enrollments to process per iteration.
+
+    Returns:
+        dict: Summary counters:
+            - processed (int): total enrollments evaluated
+            - created (int): certificates actually written
+            - ineligible (int): enrollments that did not pass _has_earned_program_cert
+            - failed (int): enrollments skipped due to an unexpected exception
+    """
+    stats = Counter()
+    candidate_qs = get_eligible_program_certificate_candidates()
+    last_id = 0
+    while True:
+        batch = list(candidate_qs.filter(id__gt=last_id)[:batch_size])
+        if not batch:
+            break
+
+        batch_stats = Counter()
+        for enrollment in batch:
+            last_id = enrollment.id
+            stats["processed"] += 1
+
+            try:
+                _, created = generate_program_certificate(
+                    user=enrollment.user,
+                    program=enrollment.program,
+                    force_create=False,
+                )
+                if created:
+                    stats["created"] += 1
+                    batch_stats["created"] += 1
+                else:
+                    stats["ineligible"] += 1
+                    batch_stats["ineligible"] += 1
+
+            except Exception:
+                stats["failed"] += 1
+                batch_stats["failed"] += 1
+                log.exception(
+                    "Error processing program certificate for user=%s program=%s",
+                    enrollment.user_id,
+                    enrollment.program_id,
+                )
+
+        log.info(
+            "generate_missing_program_certificates batch finished: "
+            "last_id=%d batch_size=%d created=%d ineligible=%d failed=%d",
+            last_id,
+            len(batch),
+            batch_stats["created"],
+            batch_stats["ineligible"],
+            batch_stats["failed"],
+        )
+
+    log.info(
+        "generate_missing_program_certificates complete: processed=%d "
+        "created=%d ineligible=%d failed=%d",
+        stats["processed"],
+        stats["created"],
+        stats["ineligible"],
+        stats["failed"],
+    )
+
+    return stats
 
 
 def manage_program_certificate_access(user, program, revoke_state):
@@ -1026,6 +2105,31 @@ def manage_program_certificate_access(user, program, revoke_state):
     return True
 
 
+def partner_schools_for_program(program):
+    """
+    Return the pathway schools a learner may share this program's record with.
+
+    While ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS is off this returns every active
+    school, which is the pre-12321 behavior. Once the flag is on, only schools
+    assigned to this program are returned.
+
+    `.distinct()` is required: a school with more than one recipient row for the
+    program joins once per row and would otherwise be listed twice.
+
+    Args:
+        program (Program): the program whose record is being shared
+
+    Returns:
+        QuerySet of PartnerSchool
+    """
+    schools = PartnerSchool.objects.all()
+
+    if is_enabled(features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS):
+        schools = schools.filter(programs=program).distinct()
+
+    return schools
+
+
 def resolve_courseware_object_from_id(
     courseware_id: str,
 ) -> Program | Course | CourseRun | None:
@@ -1044,3 +2148,599 @@ def resolve_courseware_object_from_id(
         CourseRun.objects.filter(courseware_id=courseware_id).first()
         or Course.objects.filter(readable_id=courseware_id).first()
     )
+
+
+def generate_openedx_course_url(course_key: str) -> str:
+    """
+    Generate a valid edX course URL for the given course key.
+
+    Configuration Settings:
+    - OPENEDX_COURSE_BASE_URL: the base URL to use
+    - OPENEDX_COURSE_BASE_URL_SUFFIX: optional suffix to append to the URL
+    Args:
+    - course_key (str): the course key (course-v1:MITxT+1234x+1T2099) to use
+    Returns:
+    - str, the generated URL
+    """
+
+    parsed_base = urlparse(settings.OPENEDX_COURSE_BASE_URL)
+    suffix = (
+        "/" + settings.OPENEDX_COURSE_BASE_URL_SUFFIX.lstrip().lstrip("/")
+        if settings.OPENEDX_COURSE_BASE_URL_SUFFIX
+        else ""
+    )
+    new_path = f"{parsed_base[2]}{course_key}{suffix}"
+
+    return parsed_base._replace(path=new_path).geturl()
+
+
+def import_courserun_from_edx(  # noqa: C901, PLR0913
+    course_key: str,
+    *,
+    live: bool = False,
+    use_specific_course: str | None = None,
+    departments: list[Department | str] | None = None,
+    create_depts: bool = False,
+    block_countries: list[str] | None = None,
+    price: Decimal | None = None,
+    create_cms_page: bool = False,
+    publish_cms_page: bool = False,
+    include_in_learn_catalog: bool = False,
+    ingest_content_files_for_ai: bool = False,
+    is_source_run: bool = False,
+    language: str = "en",
+    is_primary_language: bool = False,
+    variant_length: str = "",
+    variant_industry: str = "",
+):
+    """
+    Import a course run from edX.
+
+    This checks for the course run in edX, and imports it if it exists. If
+    necessary, it creates:
+    - The underlying Course object
+    - Any necessary Departments (if the flag for this is set)
+    - A Product (if a price is set)
+    - A CMS page (if the flag is set; will publish if the flag is set)
+
+    It will also add the blocked countries for the course if those are set.
+
+    If the course does need to be created, departments must be supplied. The
+    function will throw an AttributeError if there aren't any. An empty list can
+    be supplied if the course exists.
+
+    A specific course can be specified. This is to cover cases where the run you
+    may want to import doesn't technically "live" under the course that is
+    specified in its key. (This happens with B2B/UAI courses - the course will
+    be in the UAI_SOURCE org, but the runs all use an org that matches up with
+    the contract on the MITx Online side. E.g. course-v1:UAI_SOURCE+UAI.0 is the
+    root course for course-v1:UAI_MIT+UAI.0+2025_C999.)
+
+    If the specified course run exists, then this won't do anything. There are
+    separate processes to update an existing run from edX data.
+
+    This will not add the course to any programs - you can do that later.
+
+    Args:
+    - course_key (str): The readable ID of the course run to import.
+    - live (bool): Make the new course run live, and the course if one is created.
+    - use_specific_course (str|None): Readable ID of a specific course to use as the base course.
+    - departments (list[Department | str] | None): Departments to add to the new course. Only required if creating a new course.
+    - create_depts (bool): Create departments.
+    - block_countries (list[str] | None): Country codes to add to the block list for the course.
+    - price (Decimal | None): Price for the course product, if any. If no price is set, a product won't be created.
+    - create_cms_page (bool): Create a CMS page for the course. Only applies if a course is being created.
+    - publish_cms_page (bool): Publish the new CMS page. Only takes effect if creating a CMS page.
+    - include_in_learn_catalog (bool): Set the "include_in_learn_catalog" flag on the new page.
+    - ingest_content_files_for_ai (bool): Set the "ingest_content_files_for_ai" flag on the new page.
+    - is_source_run (bool): Set the "is_source_run" flag on the course run to designate it as a B2B source course.
+    - language (str): The language to set the imported run to. Defaults to "en".
+    - is_primary_language (bool): Whether or not this is the primary run for this language. Defaults False.
+    - variant_length (str): One of the length codes. Defaults to empty string (Full).
+    - variant_industry (str): One of the industry focus codes. Defaults to empty string (Original).
+    Returns:
+    tuple of (CourseRun, CoursePage|None, Product|None) - relevant objects for the imported run
+    """
+
+    if CourseRun.all_objects.filter(courseware_id=course_key).exists():
+        return False
+
+    processed_course_key = CourseKey.from_string(course_key)
+
+    edx_course_detail = get_edx_api_course_detail_client()
+
+    edx_course_run = edx_course_detail.get_detail(
+        course_id=course_key,
+        username=settings.OPENEDX_SERVICE_WORKER_USERNAME,
+    )
+
+    processed_run_key = CourseKey.from_string(edx_course_run.course_id)
+
+    if use_specific_course:
+        root_course = Course.objects.get(readable_id=use_specific_course)
+    else:
+        # edX doesn't have the concept of a "Course", so there's not an opaque
+        # key type for it.
+        root_course_id = (
+            f"course-v1:{processed_course_key.org}+{processed_course_key.course}"
+        )
+        root_course = Course.objects.filter(readable_id=root_course_id).first()
+
+        if not root_course:
+            # Allow creating a course without departments
+            root_course = Course.objects.create(
+                readable_id=root_course_id,
+                title=edx_course_run.name,
+                live=live,
+            )
+
+            if departments:
+                dept = None
+                for department in departments:
+                    if isinstance(department, str) and create_depts:
+                        dept, _ = Department.objects.get_or_create(name=department)
+                        dept.save()
+                    elif isinstance(department, Department):
+                        dept = department
+                    if dept:
+                        root_course.departments.add(dept.id)
+
+    new_run = CourseRun.all_objects.create(
+        course=root_course,
+        run_tag=processed_run_key.run,
+        courseware_id=edx_course_run.course_id,
+        start_date=edx_course_run.start,
+        end_date=edx_course_run.end,
+        enrollment_start=edx_course_run.enrollment_start,
+        enrollment_end=edx_course_run.enrollment_end,
+        title=edx_course_run.name,
+        live=live,
+        is_self_paced=edx_course_run.is_self_paced(),
+        is_source_run=is_source_run,
+        language=language,
+        is_primary_language=is_primary_language,
+        variant_industry=variant_industry,
+        variant_length=variant_length,
+    )
+
+    pull_course_modes(new_run)
+
+    course_page = None
+    if create_cms_page and not use_specific_course:
+        course_page = create_default_courseware_page(
+            courseware=new_run.course,
+            live=publish_cms_page,
+            ingest_content_files_for_ai=ingest_content_files_for_ai,
+            include_in_learn_catalog=include_in_learn_catalog,
+        )
+
+    course_product = None
+    if price:
+        content_type = ContentType.objects.get_for_model(CourseRun)
+        with reversion.create_revision():
+            course_product, _ = Product.objects.update_or_create(
+                content_type=content_type,
+                object_id=new_run.id,
+                defaults={
+                    "price": Decimal(price),
+                    "description": new_run.courseware_id,
+                    "is_active": True,
+                },
+            )
+
+            course_product.save()
+
+    if block_countries:
+        for block_country in block_countries:
+            country_code = countries.by_name(block_country)
+            if not country_code:
+                country_name = countries.countries.get(block_country, None)
+                country_code = block_country if country_name else None
+            else:
+                country_name = block_country
+
+            if country_code:
+                BlockedCountry.objects.get_or_create(
+                    course=new_run.course, country=country_code
+                )
+
+    return (new_run, course_page, course_product)
+
+
+ACHIEVEMENT_TYPE_MAP = {
+    "course_run": "Course",
+    "program": "Program",
+}
+
+
+def get_verifiable_credentials_payload(
+    certificate: CourseRunCertificate | ProgramCertificate,
+    certificate_page: CertificatePage,
+) -> dict:
+    # TODO: We could optimize these queries #noqa: TD002, TD003, FIX002
+    # It's not a massive priority though, as we have a total of 20k certs in prod as of 12/25
+
+    if isinstance(certificate, CourseRunCertificate):
+        cert_type = "course_run"
+        course_run = certificate.course_run
+        course = course_run.course
+        course_page = course.course_page
+
+        course_url_id = course.readable_id
+        url = get_learn_product_url("courses", course_url_id)
+        certificate_name = certificate.course_run.title
+        activity_start_date = CourseRunEnrollment.all_objects.get(
+            user_id=certificate.user_id, run=course_run
+        ).created_on.strftime("%Y-%m-%dT%H:%M:%SZ")
+        achievement_image_url = (
+            get_thumbnail_url(course_page)
+            if course_page and course_page.feature_image
+            else ""
+        )
+
+    elif isinstance(certificate, ProgramCertificate):
+        cert_type = "program"
+        program = certificate.program
+        program_page = program.program_page
+        url = get_learn_product_url("programs", program.readable_id)
+        certificate_name = (
+            certificate_page.product_name or ""
+        ).strip() or certificate.program.title
+        activity_start_date = ProgramEnrollment.all_objects.get(
+            user_id=certificate.user_id, program=program
+        ).created_on.strftime("%Y-%m-%dT%H:%M:%SZ")
+        achievement_image_url = (
+            get_thumbnail_url(program_page)
+            if program_page and program_page.feature_image
+            else ""
+        )
+    else:
+        raise InvalidCertificateError
+
+    narrative = certificate_page.verifiable_credential_criteria
+    cert_page_description = ""
+
+    if is_enabled(features.ENABLE_CREDENTIAL_METADATA_AUTHORING):
+        cert_page_description = certificate_page.verifiable_credential_description
+
+    achievement_type = ACHIEVEMENT_TYPE_MAP[cert_type]
+    user_name = certificate.user.name
+    valid_from = (
+        certificate.issue_date.strftime("%Y-%m-%dT%H:%M:%SZ")
+        if certificate.issue_date
+        else certificate.created_on.strftime("%Y-%m-%dT%H:%M:%SZ")
+    )
+    activity_end_date = valid_from
+    payload = {
+        "@context": [
+            "https://www.w3.org/ns/credentials/v2",
+            "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
+            "https://w3id.org/security/suites/ed25519-2020/v1",
+        ],
+        "id": f"urn:uuid:{certificate.uuid}",
+        "type": ["VerifiableCredential", "OpenBadgeCredential"],
+        "issuer": {
+            "id": f"did:key:{settings.VERIFIABLE_CREDENTIAL_DID}",
+            "type": ["Profile"],
+            "name": "MIT Learn",
+            "image": {
+                "id": "https://learn.mit.edu/images/mit-red.png",
+                "type": "Image",
+                "caption": "MIT Learn logo",
+            },
+        },
+        "validFrom": valid_from,
+        "credentialSubject": {
+            "type": ["AchievementSubject"],
+            "activityStartDate": activity_start_date,
+            "activityEndDate": activity_end_date,
+            "identifier": [
+                {
+                    "type": "IdentityObject",
+                    "identityHash": user_name,
+                    "identityType": "name",
+                    "hashed": False,
+                    "salt": "not-used",
+                }
+            ],
+            "achievement": {
+                # The ID is supposed to be an unambiguous URI corresponding to the course or program.
+                # For now, we will just use the URL if we have it, but we need to figure out the proper way to do this
+                # before we release anything
+                "id": url or f"urn:uuid:{certificate.uuid}",
+                "achievementType": achievement_type,
+                "type": ["Achievement"],
+                "criteria": {
+                    # The `verifiable_credential_criteria` field of the certificate page
+                    "narrative": narrative
+                },
+                "description": cert_page_description
+                or f"{user_name} has successfully completed all modules and earned a {achievement_type} Certificate in {certificate_name}.",
+                "name": certificate_name,
+            },
+        },
+    }
+    if achievement_image_url:
+        payload["credentialSubject"]["achievement"]["image"] = {
+            "id": achievement_image_url,
+            "type": "Image",
+            "caption": "MIT Learn Certificate logo",
+        }
+    return payload
+
+
+def request_verifiable_credential(payload) -> dict:
+    headers = {
+        "content-type": "application/json",
+        "Authorization": f"Bearer {settings.VERIFIABLE_CREDENTIAL_BEARER_TOKEN}",
+    }
+    resp = requests.post(
+        settings.VERIFIABLE_CREDENTIAL_SIGNER_URL,
+        json=payload,
+        headers=headers,
+        timeout=10,
+    )
+    resp.raise_for_status()
+
+    # Save the returned value as BaseCertificate.verifiable_credential
+    return resp.json()
+
+
+def should_provision_verifiable_credential(
+    certificate_page: CertificatePage | None,
+) -> bool:
+    if not certificate_page:
+        return False
+
+    return (
+        certificate_page.should_provision_verifiable_credential
+        and certificate_page.verifiable_credential_criteria
+    )
+
+
+def get_certificate_page(
+    certificate: CourseRunCertificate | ProgramCertificate,
+) -> CertificatePage | None:
+    from cms.models import CertificatePage  # noqa: PLC0415
+
+    certificate_page = None
+    if certificate.certificate_page_revision:
+        certificate_page = CertificatePage.objects.filter(
+            pk=int(certificate.certificate_page_revision.object_id),
+        ).first()
+    return certificate_page
+
+
+def create_verifiable_credential(
+    certificate: ProgramCertificate | CourseRunCertificate, *, raise_on_error=False
+):
+    """
+    Create a verifiable credential for the given course run certificate.
+
+    Args:
+        certificate (CourseRunCertificate): The course run certificate for which to create the verifiable credential.
+        raise_on_error (bool): If True, will re-raise any exceptions encountered during VC creation.
+    """
+
+    try:
+        # We always look at the most recent certificate page revision for content and whether or not to provision
+        # You can imagine that if we used the linked revision, if the certificate page was in a bad state
+        # when the certificate was issued, we could never backfill the VC even if we fixed it later.
+        certificate_page = get_certificate_page(certificate)
+
+        if not should_provision_verifiable_credential(certificate_page):
+            return
+        payload = get_verifiable_credentials_payload(certificate, certificate_page)
+
+        # Call the signing service to create the new credential
+        credential = request_verifiable_credential(payload)
+
+        verifiable_credential = VerifiableCredential.objects.create(
+            uuid=credential["id"], credential_data=credential
+        )
+        certificate.verifiable_credential = verifiable_credential
+        certificate.save()
+    except Exception:
+        # We don't want to block certificate creation if VC creation fails, so we swallow and log all errors to sentry
+        # We can revisit this later once we've ironed out some of the intended behavior around the json payload
+        log.exception(
+            "Error creating verifiable credential for certificate %s",
+            certificate.uuid,
+        )
+        if raise_on_error:
+            raise
+
+
+def summarize_verifiable_credential_certificate_statuses(
+    *, return_objects=False, ids=None
+):
+    from cms.models import CertificatePage  # noqa: PLC0415
+
+    certificate_pages = CertificatePage.objects.all()
+    if ids is not None:
+        certificate_pages = certificate_pages.filter(id__in=ids)
+    certificate_pages_by_status = defaultdict(list)
+    for page in certificate_pages:
+        is_enabled = page.should_provision_verifiable_credential
+        verifiable_credential_criteria = page.verifiable_credential_criteria
+        page_return_value = page if return_objects else f"{page.title} - {page.id}"
+        if should_provision_verifiable_credential(page):
+            certificate_pages_by_status[VERIFIABLE_CREDENTIAL_STATUS_ENABLED].append(
+                page_return_value
+            )
+        elif is_enabled and not verifiable_credential_criteria:
+            certificate_pages_by_status[
+                VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA
+            ].append(page_return_value)
+        elif not is_enabled and verifiable_credential_criteria:
+            certificate_pages_by_status[VERIFIABLE_CREDENTIAL_STATUS_DISABLED].append(
+                page_return_value
+            )
+        elif not is_enabled and not verifiable_credential_criteria:
+            certificate_pages_by_status[
+                VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA
+            ].append(page_return_value)
+
+    return certificate_pages_by_status
+
+
+def rerun_course_run(  # noqa: PLR0913
+    base_run: CourseRun,
+    run_tag: str,
+    *,
+    courseware_id: str | None = None,
+    organization: str | None = None,
+    title: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    enrollment_start: datetime | None = None,
+    enrollment_end: datetime | None = None,
+    is_self_paced: bool | None = None,
+    live: bool | None = None,
+    enrollment_modes: list[EnrollmentMode] | None = None,
+    skip_edx: bool = False,
+    upgrade_deadline: datetime | None = None,
+) -> CourseRun:
+    """
+    Re-run an existing course run.
+
+    Takes the specified base run and re-runs it in edX with the specified run tag.
+    The resulting run must not exist in edX.
+
+    By default, the created run will share all the same parameters as the base
+    run, other than the run tag and the upgrade deadline. The base run's deadline
+    belongs to an earlier session, so the new run only gets one if it's passed in.
+
+    When specifying start and end dates, be aware that course start and end must
+    be set to set enrollment start and end, and the enrollment start and end dates
+    must be before or equal to the course start and end dates respectively.
+
+    The organization option has nothing to do with B2B organizations. This is the
+    first part of the courseware ID after the `course-v1:` part.
+
+    Specifying a custom courseware ID will override the run tag and organization
+    settings passed in.
+
+    Args:
+    - base_run (CourseRun): the course to re-run
+    - run_tag (str): the new run tag to use
+    Keyword Args:
+    - courseware_id (str): new courseware/readable ID to use
+    - organization (str): new organization to use
+    - title (str): new course title
+    - start_date (DateTime): course start date
+    - end_date (DateTime): course end date
+    - enrollment_start (DateTime): enrollment start date
+    - enrollment_end (DateTime): enrollment end date
+    - is_self_paced (bool): course is self-paced
+    - live (bool): course is live (in MITx Online)
+    - enrollment_modes (list[EnrollmentMode]): modes to add to the new run
+    - skip_edx (bool): skip cloning the course run in edX (default False)
+    - upgrade_deadline (DateTime): upgrade deadline; also set on the verified mode
+      when it's created in edX
+    Returns:
+    - CourseRun, the created run
+    """
+
+    if courseware_id:
+        target_run_id = courseware_id
+    else:
+        base_key = CourseKey.from_string(base_run.courseware_id)
+
+        base_key = base_key.replace(run=run_tag)
+        if organization:
+            base_key = base_key.replace(org=organization)
+
+        target_run_id = str(base_key)
+
+    with transaction.atomic():
+        new_run = CourseRun.objects.create(
+            course=base_run.course,
+            title=title if title else base_run.title,
+            courseware_id=target_run_id,
+            run_tag=run_tag,
+            start_date=start_date if start_date else base_run.start_date,
+            end_date=end_date if end_date else base_run.end_date,
+            enrollment_start=enrollment_start
+            if enrollment_start
+            else base_run.enrollment_start,
+            enrollment_end=enrollment_end
+            if enrollment_end
+            else base_run.enrollment_end,
+            is_self_paced=is_self_paced
+            if is_self_paced is not None
+            else base_run.is_self_paced,
+            live=live if live is not None else base_run.live,
+            upgrade_deadline=upgrade_deadline,
+        )
+
+        for mode in (
+            enrollment_modes if enrollment_modes else base_run.enrollment_modes.all()
+        ):
+            new_run.enrollment_modes.add(mode)
+
+        if not skip_edx:
+            process_course_run_clone(new_run, base_run.courseware_id)
+
+    return new_run
+
+
+def get_audit_program_enrollments_for_upgrade():
+    """
+    Return audit program enrollments with what
+    upgrade_program_enrollment_if_eligible reads already loaded: each program's
+    requirement nodes, and those of any program a node requires.
+
+    Returns:
+        QuerySet[ProgramEnrollment]
+    """
+    return (
+        ProgramEnrollment.objects.filter(enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE)
+        .select_related("program", "user")
+        .prefetch("certificate")
+        .prefetch_related(
+            Prefetch(
+                "program__all_requirements",
+                queryset=ProgramRequirement.objects.select_related(
+                    "required_program"
+                ).prefetch_related("required_program__all_requirements"),
+            )
+        )
+    )
+
+
+def upgrade_program_enrollment_if_eligible(program_enrollment):
+    """
+    Upgrade a program enrollment to verified when the learner holds an active
+    verified enrollment in enough of the program's courses to satisfy its
+    requirement tree.
+
+    Returns:
+        (ProgramEnrollment, bool): A tuple containing a
+        ProgramEnrollment paired
+        with a boolean indicating whether the enrollment was upgraded.
+    """
+    if program_enrollment.certificate is not None:
+        return program_enrollment, False
+
+    verified_course_ids = set(
+        CourseRunEnrollment.objects.filter(
+            user=program_enrollment.user,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        ).values_list("run__course_id", flat=True)
+    )
+
+    def _is_satisfied(program):
+        return is_requirement_tree_satisfied(
+            program,
+            course_satisfied=verified_course_ids.__contains__,
+            program_satisfied=_is_satisfied,
+        )
+
+    if not _is_satisfied(program_enrollment.program):
+        return program_enrollment, False
+
+    program_enrollment.enrollment_mode = EDX_ENROLLMENT_VERIFIED_MODE
+    program_enrollment.save_and_log(None)
+    return program_enrollment, True

@@ -1,34 +1,81 @@
 """API functions for B2B operations."""
 
+import email.utils
+import hashlib
+import hmac
 import logging
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Union
-from urllib.parse import quote, urljoin
 from uuid import uuid4
 
+import requests
 import reversion
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
-from django.db.models import Count, Q
+from django.db import IntegrityError, transaction
+from django.db.models import Count, F, Manager, Prefetch, Q
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ValidationError as PydanticValidationError
 from wagtail.models import Page
 
 from b2b.constants import (
     B2B_RUN_TAG_FORMAT,
-    CONTRACT_INTEGRATION_SSO,
+    CONTRACT_MEMBERSHIP_AUTOS,
+    CONTRACT_MEMBERSHIP_MANAGED,
+    MAILGUN_LOGS_API_URL,
+    MAILGUN_LOGS_DESC,
+    MAILGUN_LOGS_PAGE_LIMIT,
+    MAILGUN_LOGS_RETENTION_DAYS,
+    ONBOARDING_STATE_ORG_CREATED,
     ORG_KEY_MAX_LENGTH,
+    RETIREMENT_CONTRACT_NAME,
+    RETIREMENT_ORG_KEY,
+    RETIREMENT_ORG_NAME,
 )
-from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
+from b2b.exceptions import SourceCourseIncompleteError
 from b2b.keycloak_admin_api import KCAM_ORGANIZATIONS, get_keycloak_model
 from b2b.keycloak_admin_dataclasses import OrganizationRepresentation
-from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
+from b2b.mail import ENROLLMENT_CODE_ASSINGMENT_TAG
+from b2b.models import (
+    EMAIL_STATUS_FAILED,
+    EMAIL_STATUS_FAILED_TEMPORARY_SEVERITY,
+    MAILGUN_EMAIL_EVENT_TYPES,
+    ContractPage,
+    ContractProgramItem,
+    DiscountContractAttachmentRedemption,
+    OrganizationIndexPage,
+    OrganizationOnboarding,
+    OrganizationPage,
+    UserB2BContract,
+    UserOrganization,
+)
+from b2b.provisioning import (
+    KeycloakConnection,
+    sync_organization_members_to_keycloak,
+)
+from b2b.tasks import (
+    push_upgraded_enrollments_to_edx,
+    queue_contract_sheet_update_post_save,
+    queue_enrollment_code_check,
+)
 from cms.api import get_home_page
-from courses.constants import UAI_COURSEWARE_ID_PREFIX
-from courses.models import Course, CourseRun
+from courses.constants import ALL_ENROLL_CHANGE_STATUSES
+from courses.models import (
+    Course,
+    CourseRun,
+    CourseRunEnrollment,
+    Department,
+    EnrollmentMode,
+    Program,
+    ProgramEnrollment,
+)
+from courses.utils import is_uai_course_run, is_uai_program, is_xpro_course_run
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     PAYMENT_TYPE_SALES,
@@ -41,14 +88,57 @@ from ecommerce.models import (
     BasketItem,
     Discount,
     DiscountProduct,
+    Order,
+    OrderStatus,
     Product,
 )
+from hubspot_sync.task_helpers import sync_hubspot_cart_add
 from main import constants as main_constants
 from main.utils import date_to_datetime
-from openedx.api import create_user
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.models import CourseRunClone
 from openedx.tasks import clone_courserun
+from users.models import User
 
 log = logging.getLogger(__name__)
+
+
+def get_user_b2b_organizations(user):
+    """
+    Get B2B organizations for a user with their active enrolled contracts prefetched.
+
+    This uses Prefetch to load only contracts that are both active and that
+    the user is enrolled in, avoiding N+1 queries in serializers.
+
+    Args:
+        user: The user to get organizations for.
+    Returns:
+        QuerySet of OrganizationPage with _user_active_contracts prefetched.
+        Each contract has the user's own UserB2BContract row prefetched as
+        _user_memberships.
+    """
+
+    return OrganizationPage.objects.filter(
+        organization_users__user=user
+    ).prefetch_related(
+        Prefetch(
+            "contracts",
+            queryset=ContractPage.objects.prefetch_related(
+                "variant_options",
+                Prefetch(
+                    "contract_programs",
+                    queryset=ContractProgramItem.objects.order_by("sort_order"),
+                    to_attr="_contract_program_ids",
+                ),
+                Prefetch(
+                    "b2b_contract_users",
+                    queryset=UserB2BContract.objects.filter(user=user),
+                    to_attr="_user_memberships",
+                ),
+            ).filter(active=True, users=user),
+            to_attr="_user_active_contracts",
+        )
+    )
 
 
 def ensure_b2b_organization_index() -> OrganizationIndexPage:
@@ -71,37 +161,476 @@ def ensure_b2b_organization_index() -> OrganizationIndexPage:
     return org_index_page
 
 
-def create_contract_run(
-    contract: ContractPage, course: Course
-) -> tuple[CourseRun, Product]:
-    """
-    Create a run for the specified contract.
+class RetirementContractCollisionError(Exception):
+    """Raised when a run can't be moved into the holding contract."""
 
-    This does 3 main things:
+
+def get_or_create_retirement_contract() -> ContractPage:
+    """
+    Get (or create) the holding contract that retired course runs live in.
+
+    Retired course runs can be moved to a retirement contract - previously, this
+    was because the only way to determine if a course run was for B2B was whether
+    it had a linked contract (so just removing the contract FK would make the run
+    potentially appear in the public catalog). We have a specific flag to
+    signify a B2B run now, but we may still want to move the run out of the
+    contract.
+
+    Both pages are created unpublished so they are never served, and the
+    contract is inactive with a zero learner cap. The org has no
+    ``sso_organization_id``, which is safe: ``reconcile_keycloak_orgs`` only
+    creates or updates pages for orgs Keycloak knows about and never prunes
+    ones it doesn't.
+
+    Returns:
+        ContractPage: the holding contract.
+    """
+
+    org = OrganizationPage.objects.filter(org_key=RETIREMENT_ORG_KEY).first()
+
+    if not org:
+        # Prefer an existing index page. ensure_b2b_organization_index() also
+        # re-parents every OrganizationPage when its child count doesn't match,
+        # which is a side effect we don't want to trigger from here.
+        org_index = OrganizationIndexPage.objects.first() or (
+            ensure_b2b_organization_index()
+        )
+        org = OrganizationPage(
+            name=RETIREMENT_ORG_NAME,
+            org_key=RETIREMENT_ORG_KEY,
+            live=False,
+            description=(
+                "System organization. Holds course runs that have been retired. "
+                "Not a real customer - do not add members or contracts."
+            ),
+        )
+        org_index.add_child(instance=org)
+        org.refresh_from_db()
+        log.info("Created retirement holding organization %s", org)
+
+    contract = ContractPage.objects.filter(
+        organization=org, name=RETIREMENT_CONTRACT_NAME
+    ).first()
+
+    if not contract:
+        contract = ContractPage(
+            name=RETIREMENT_CONTRACT_NAME,
+            organization=org,
+            membership_type=CONTRACT_MEMBERSHIP_MANAGED,
+            active=False,
+            max_learners=0,
+            contract_start=None,
+            contract_end=None,
+            live=False,
+            description=(
+                "System contract. Retired course runs are parked here so they "
+                "stay hidden but keep their courseware IDs. Never add programs "
+                "or learners to this contract."
+            ),
+        )
+        org.add_child(instance=contract)
+        contract.refresh_from_db()
+        log.info("Created retirement holding contract %s", contract)
+
+    return contract
+
+
+def check_retirement_contract_collision(run: CourseRun, contract: ContractPage) -> None:
+    """
+    Check that moving the run into the holding contract won't break a rule.
+
+    ``CourseRun`` enforces two uniqueness rules per contract group -
+    ``unique_primary_language_per_group`` and ``unique_language_per_group``
+    (formerly database constraints, now validated in
+    ``CourseRun.validate_b2b_contract_group_uniqueness``). Collisions are
+    unlikely in practice because the B2B run tag embeds the source contract ID
+    and year, but a ``ValidationError`` mid-command is a much worse outcome
+    than a clear refusal.
+
+    Args:
+        run (CourseRun): the run being moved.
+        contract (ContractPage): the holding contract.
+    Raises:
+        RetirementContractCollisionError: if a conflicting run is already parked.
+    """
+
+    siblings = CourseRun.all_objects.filter(
+        course=run.course,
+        run_tag=run.run_tag,
+        is_source_run=run.is_source_run,
+        b2b_contracts=contract,
+    ).exclude(pk=run.pk)
+
+    if (
+        run.language
+        and siblings.filter(
+            language=run.language,
+            variant_length=run.variant_length,
+            variant_industry=run.variant_industry,
+        ).exists()
+    ):
+        msg = (
+            f"A run for {run.course.readable_id} with run tag '{run.run_tag}', "
+            f"language '{run.language}' and variant "
+            f"'{run.variant_length}/{run.variant_industry}' is already parked in "
+            f"{contract}. Rename the run tag or clear the existing one first."
+        )
+        raise RetirementContractCollisionError(msg)
+
+    if run.is_primary_language and siblings.filter(is_primary_language=True).exists():
+        msg = (
+            f"A primary-language run for {run.course.readable_id} with run tag "
+            f"'{run.run_tag}' is already parked in {contract}. Rename the run tag "
+            "or clear the existing one first."
+        )
+        raise RetirementContractCollisionError(msg)
+
+
+def move_run_to_retirement_contract(run: CourseRun) -> ContractPage:
+    """
+    Move a course run into the holding contract.
+
+    Args:
+        run (CourseRun): the run to park.
+    Returns:
+        ContractPage: the holding contract the run was moved to.
+    Raises:
+        RetirementContractCollisionError: if a conflicting run is already parked.
+    """
+
+    contract = get_or_create_retirement_contract()
+
+    # The holding contract is inactive, so the (active-only) related manager
+    # can't be used to look at the run's current contracts.
+    current_contract_ids = set(
+        CourseRun.b2b_contracts.through.objects.filter(courserun_id=run.pk).values_list(
+            "contractpage_id", flat=True
+        )
+    )
+
+    if current_contract_ids == {contract.pk}:
+        return contract
+
+    check_retirement_contract_collision(run, contract)
+
+    other_contract_ids = current_contract_ids - {contract.pk}
+    if other_contract_ids:
+        CourseRun.b2b_contracts.through.objects.filter(courserun_id=run.pk).exclude(
+            contractpage_id=contract.pk
+        ).delete()
+    run.b2b_contracts.add(contract)
+
+    log.info("Moved course run %s to %s", run.courseware_id, contract)
+
+    return contract
+
+
+@transaction.atomic
+def create_contract_run_key(
+    source_course: CourseRun, contract: ContractPage, *, org_prefix: str | None = None
+) -> str:
+    """
+    Create a course key for a contract course run for the specified source course
+    and contract.
+
+    The format for the run tag is in the B2B_RUN_TAG_FORMAT constant; if this
+    changes, you will likely need to change it here too.
+
+    Args:
+    - source_course (CourseRun): the source course to get the original key from
+    - contract (ContractPage): the contract the target run is for
+    Kwargs:
+    - org_prefix (str|None): the prefix to use for the org part of the key; None
+      uses the organization's prefix, and "" means no prefix
+    Returns:
+    - str, the new key
+    """
+
+    if org_prefix is None:
+        org_prefix = contract.organization.org_key_prefix
+
+    source_id = CourseKey.from_string(source_course.readable_id)
+    new_course_key = (
+        f"course-v1:{org_prefix}{contract.organization.org_key}+{source_id.course}"
+    )
+    mostly_run_tag = B2B_RUN_TAG_FORMAT.format(
+        run_idx="", contract_id=contract.id, year=now_in_utc().year
+    )
+    run_idx = 1
+
+    last_run_tag = (
+        CourseRun.objects.filter(
+            courseware_id__startswith=new_course_key,
+            run_tag__endswith=mostly_run_tag,
+            language=source_course.language,
+            variant_industry=source_course.variant_industry,
+            variant_length=source_course.variant_length,
+        )
+        .select_for_update()
+        .order_by("-courseware_id")
+        .first()
+    )
+    if last_run_tag:
+        run_idx, _ = CourseKey.from_string(last_run_tag.courseware_id).run.split("T")
+        run_idx = int(run_idx) + 1
+
+    new_run_tag = B2B_RUN_TAG_FORMAT.format(
+        year=now_in_utc().year, contract_id=contract.id, run_idx=run_idx
+    )
+    # Validate and return
+    return str(CourseKey.from_string(f"{new_course_key}+{new_run_tag}"))
+
+
+def import_and_create_contract_run(  # noqa: PLR0913
+    contract: ContractPage,
+    course_run_id: str,
+    departments: list[Department | str],
+    *,
+    live: bool = True,
+    use_specific_course: str | None = None,
+    create_depts: bool = False,
+    block_countries: list[str] | None = None,
+    create_cms_page: bool = True,
+    publish_cms_page: bool = False,
+    include_in_learn_catalog: bool = False,
+    ingest_content_files_for_ai: bool = True,
+    skip_edx: bool = False,
+    require_designated_source_run: bool = False,
+    org_prefix: str | None = None,
+):
+    """
+    Create a contract run for the given course, importing it from edX if necessary.
+
+    Wraps the create_contract_run function in some logic to check for the specified
+    course, and then import it. If the course is imported from edX, this will set
+    a few flags to reasonable values and call the import_courserun_from_edx
+    function, then call create_contract_run using the imported run as the source
+    course. If the course is already in the system, this just calls
+    create_contract_run with the source run and the use_specific_course flag set
+    to force it to use the specified run.
+
+    The kwargs combine the set from import_courserun_from_edx and
+    create_contract_run. Some of the defaults are different, owning to the use case
+    for this function. Those differences are:
+    - You must pass in a list of departments.
+    - By default, the live flag is set to True.
+    - Learn AI ingestion will be set to True.
+    - require_designated_source_run is set to False. (We assume you want the
+      specified course, regardless of the source flag.)
+
+    In addition, if the course is imported, the corresponding run that is created
+    for it will have the is_source_run flag set to True. This cannot be
+    overridden. By using this function, we are assuming you really want the
+    specified run as the source.
+
+    This won't pass a price to the import call, so the imported run won't have a
+    product. This _will_ set a price on the contract run, because the contract
+    run must have a price, even if that price is zero. The price will be whatever
+    is specified in the contract (or zero).
+
+    Calling this function will result in a contract course run being created. If
+    the course is imported, then you will end up with a course with two runs:
+    the one that was imported and the new contract run.
+
+    Args:
+        contract (ContractPage): The contract to create the run for.
+        course_run_id (str): The readable ID for the source course run.
+        departments (list[Department | str]): Departments to add to the new course.
+    Keyword Args (passed to import_courserun_from_edx and create_contract_run):
+        live (bool): Make the new course run live, and the course if one is created.
+        use_specific_course (str|None): Readable ID of a specific course to use as the base course.
+        create_depts (bool): Create departments.
+        block_countries (list[str] | None): Country codes to add to the block list for the course.
+        create_cms_page (bool): Create a CMS page for the course. Only applies if a course is being created.
+        publish_cms_page (bool): Publish the new CMS page. Only takes effect if creating a CMS page.
+        include_in_learn_catalog (bool): Set the "include_in_learn_catalog" flag on the new page.
+        ingest_content_files_for_ai (bool): Set the "ingest_content_files_for_ai" flag on the new page.
+        skip_edx (bool): Don't try to create a course run in edX.
+        require_designated_source_run (bool): Require a flagged source run.
+    Returns:
+        CourseRun: The created CourseRun object.
+        Product: The created Product object.
+    """
+
+    run_qs = CourseRun.all_objects.filter(courseware_id=course_run_id)
+
+    if run_qs.exists():
+        run = run_qs.get()
+    else:
+        from courses.api import import_courserun_from_edx  # noqa: PLC0415
+
+        rundata = import_courserun_from_edx(
+            course_key=course_run_id,
+            live=live,
+            use_specific_course=use_specific_course,
+            departments=departments,
+            create_depts=create_depts,
+            block_countries=block_countries,
+            price=None,
+            create_cms_page=create_cms_page,
+            publish_cms_page=publish_cms_page,
+            include_in_learn_catalog=include_in_learn_catalog,
+            ingest_content_files_for_ai=ingest_content_files_for_ai,
+            is_source_run=True,
+        )
+
+        if not rundata:
+            msg = f"Import and create contract run for {course_run_id} failed - could not import from edX."
+            raise ValueError(msg)
+
+        run = rundata[0]
+
+    return create_contract_run(
+        contract,
+        run.course,
+        skip_edx=skip_edx,
+        require_designated_source_run=require_designated_source_run,
+        org_prefix=org_prefix,
+    )
+
+
+def _get_source_runs_for_course(  # noqa: PLR0913
+    course: Course,
+    *,
+    require_designated: bool = True,
+    ignore_langs: bool = False,
+    only_lang: str | None = None,
+    filter_variants: Union[list, None] = None,
+    no_variants: bool = False,
+) -> Manager[CourseRun]:
+    """
+    Return the set of source runs for a course.
+
+    Courses may have any number of available variants, so this retrieves the
+    source runs for all variants for the course. Alternatively, pass in a set of
+    SupportedVariant to filter by both what's available for the course and for
+    what is specified.
+
+    Args:
+        course: The course to inspect.
+        require_designated: If True, raise SourceCourseIncompleteError when no
+            source run exists. If False, fall back to the newest non-B2B run.
+        ignore_langs: If True, only pull the source run that has `is_primary_language`
+            set or has the language code set to empty string.
+        only_lang: If set, only add the specified additional language (plus the
+            default)
+        filter_variants: If provided, a list of SupportedVariant objects to filter by.
+        no_variants: If True, only return runs that match the default variant set.
+    Returns:
+        List of distinct source CourseRun objects, one per language (or one
+        for the "no language" legacy case).
+    Raises:
+        SourceCourseIncompleteError: if require_designated is True and no source
+            run is found, or if more than one source run exists for the same
+            language.
+    """
+
+    source_runs = CourseRun.all_objects.filter(course=course).filter(
+        Q(is_source_run=True) | Q(run_tag="SOURCE")
+    )
+
+    if not course.default_variant_options or ignore_langs:
+        if not course.default_variant_options:
+            log.warning(
+                "_get_source_runs_for_course: course %s has no default variant options, falling back to prior behavior",
+                course,
+            )
+        source_runs = source_runs.filter(
+            Q(language__in=["", "en"]) | Q(is_primary_language=True)
+        ).order_by("-is_primary_language")
+    elif no_variants:
+        source_runs = source_runs.filter(
+            language=course.default_variant_options.language,
+            variant_length=course.default_variant_options.variant_length,
+            variant_industry=course.default_variant_options.variant_industry,
+        )
+    else:
+        course_variants = [
+            (sv.language, sv.variant_length, sv.variant_industry)
+            for sv in course.possible_variant_sets.filter(active=True).all()
+        ]
+
+        if filter_variants:
+            fvs = [
+                (fv.language, fv.variant_length, fv.variant_industry)
+                for fv in filter_variants
+            ]
+            course_variants = [cv for cv in course_variants if cv in fvs]
+
+        if only_lang:
+            course_variants = [cv for cv in course_variants if cv[0] == only_lang]
+
+        # Seeded with a match-nothing Q, not Q(), so that no surviving variants
+        # means no source runs instead of every source run.
+        variant_opts = Q(pk__in=[])
+        for language, length, industry in course_variants:
+            variant_opts |= Q(
+                language=language, variant_length=length, variant_industry=industry
+            )
+        source_runs = source_runs.filter(variant_opts)
+
+    if not source_runs.count():
+        if not require_designated:
+            fallback = course.courseruns.filter(b2b_only=False).order_by("-id").first()
+            if not fallback:
+                msg = f"No course runs available for {course}."
+                raise SourceCourseIncompleteError(msg)
+            log.warning(
+                "_get_source_runs_for_course: no source run for %s, falling back to %s",
+                course,
+                fallback,
+            )
+            return CourseRun.all_objects.filter(pk=fallback.pk)
+        msg = f"No source run found for {course}."
+        raise SourceCourseIncompleteError(msg)
+
+    return source_runs.all()
+
+
+def create_contract_run(  # noqa: PLR0913
+    contract: ContractPage,
+    course: Course,
+    *,
+    skip_edx=False,
+    require_designated_source_run=True,
+    org_prefix: str | None = None,
+    no_reruns: bool = False,
+    queue_codes: bool = False,
+    ignore_langs: bool = False,
+    only_lang: str | None = None,
+    filter_variants: Union[list, None] = None,
+) -> list[tuple[CourseRun, Product]]:
+    """
+    Create run(s) for the specified contract.
+
+    If the course has multiple language source runs, a contract run and product
+    is created for **each** language. A list of (CourseRun, Product) tuples is
+    returned, one per source language run.
+
+    This does 3 main things per source run:
     - Grab and identify the source course run, and create a new course key for
       the contract course run.
     - Create the contract course run in MITx Online, and queue a clone of the
-      source course run in edX.
+      source course run in edX. This gets done for _all_ languages that the source
+      course run has.
     - Create a product for the run.
 
-    Source course runs are identified by looking for the most recent course run
-    for the given course. This code expects you to pass in an MITx Online course
-    that has a readable ID like 'course-v1:UAI_SOURCE+number` and that it has a
-    run of some sort. This should just be a single run. If there's multiple runs,
-    this will look for a run tag of "SOURCE". Failing that, it will try to use
-    the _first_ run in the list.
+    Source course runs are runs that have the ``is_source_run`` flag set. If one
+    cannot be found, this will also check for a run with the run tag "SOURCE".
+    If neither of those are found, it will throw an error. However, setting
+    ``require_designated_source_run`` to False will add a third attempt, which
+    will try to use whatever the first course run is for the specified course.
+    This may not be what you want, so this functionality is disabled by default.
 
     The MITx Online course run will belong to the source course. They will get a
     course key that is modified to represent the organization they belong to,
     the current year, and the contract ID. This means that the source course will
     have runs that have readable IDs that do not match the course ID.
 
-    The course key is changed according to a set algorithm. For more information,
+    The course key is generated according to a set algorithm, which is implemented
+    in "create_course_run_key". Generally these now look like regular semester
+    run keys, but with extra data in them. For more information on the key format,
     see this discussion post: https://github.com/mitodl/hq/discussions/7525
-    In general, this expects a course run that is in org `UAI_SOURCE` and then
-    will create a new run that is `UAI_orgkey`, with a run tag that reflects
-    the year we're creating the run in and the contract ID (`2025_C19` for
-    instance).
 
     A product will be created for the new contract course run, and its price will
     either be zero or the amount specified by the contract. (Free courses still
@@ -111,40 +640,30 @@ def create_contract_run(
     Args:
         contract (ContractPage): The contract to create the run for.
         course (Course): The course for which we should create a run.
+    Keyword Args:
+        skip_edx (bool): Don't try to create a course run in edX.
+        require_designated_source_run (bool): Require a flagged source run.
+        org_prefix (str|None): Organization prefix; None uses the organization's.
+        no_reruns (bool): Don't rerun the course - raise an exception instead.
+        queue_codes (bool): Queue enrollment code generation after saving.
+        ignore_langs (bool): Only create a run for the primary language.
+        only_lang (str|None): Only create a run for the primary language and the specified one.
     Returns:
-        CourseRun: The created CourseRun object.
-        Product: The created Product object.
+        list[tuple[CourseRun, Product]]: One (CourseRun, Product) pair per
+        source language run. Legacy single-language courses produce a one-element
+        list.
     """
-
-    clone_course_run = course.courseruns.filter(run_tag="SOURCE").first()
-
-    if not clone_course_run:
-        try:
-            clone_course_run = course.courseruns.order_by("-id").first()
-            log.warning(
-                "create_contract_run: No SOURCE run for %s, using %s",
-                course,
-                clone_course_run,
-            )
-        except CourseRun.DoesNotExist as exc:
-            msg = f"No course runs available for {course}."
-            raise SourceCourseIncompleteError(msg) from exc
-
-    if not clone_course_run:
-        msg = f"No course runs available for {course}."
-        raise SourceCourseIncompleteError(msg)
-
-    new_run_tag = B2B_RUN_TAG_FORMAT.format(
-        year=now_in_utc().year,
-        contract_id=contract.id,
+    source_runs = _get_source_runs_for_course(
+        course,
+        require_designated=require_designated_source_run,
+        ignore_langs=ignore_langs,
+        only_lang=only_lang,
+        filter_variants=filter_variants,
     )
-    source_id = CourseKey.from_string(clone_course_run.courseware_id)
-    new_readable_id = f"{UAI_COURSEWARE_ID_PREFIX}{contract.organization.org_key}+{source_id.course}+{new_run_tag}"
 
-    # Check first for an existing run with the same readable ID.
-    if CourseRun.objects.filter(course=course, courseware_id=new_readable_id).exists():
-        msg = f"Can't create a run for {course} and contract {contract}: courseware ID {new_readable_id} already exists."
-        raise TargetCourseRunExistsError(msg)
+    content_type = ContentType.objects.filter(
+        app_label="courses", model="courserun"
+    ).get()
 
     start_date = (
         date_to_datetime(contract.contract_start, settings.TIME_ZONE)
@@ -157,62 +676,133 @@ def create_contract_run(
         else None
     )
 
-    course_run = CourseRun(
-        course=course,
-        title=course.title,
-        courseware_id=new_readable_id,
-        run_tag=new_run_tag,
-        start_date=start_date,
-        end_date=end_date,
-        enrollment_start=start_date,
-        enrollment_end=end_date,
-        certificate_available_date=start_date,
-        is_self_paced=True,
-        live=True,
-        b2b_contract=contract,
-        courseware_url_path=urljoin(
-            settings.OPENEDX_COURSE_BASE_URL, quote(new_readable_id)
-        ),
-    )
-    course_run.save()
-    clone_courserun.delay(course_run.id, base_id=clone_course_run.courseware_id)
+    results = []
 
-    log.debug(
-        "Created run %s for course %s in contract %s from course run %s",
-        course_run,
-        course,
-        contract,
-        clone_course_run,
-    )
-
-    content_type = ContentType.objects.filter(
-        app_label="courses", model="courserun"
-    ).get()
-
-    with reversion.create_revision():
-        course_run_product = Product(
-            price=contract.enrollment_fixed_price
-            if contract.enrollment_fixed_price
-            else Decimal(0),
-            is_active=True,
-            description=f"{contract.organization.name} #{contract.id} - {course.title} {course.readable_id}",
-            object_id=course_run.id,
-            content_type=content_type,
+    for clone_course_run in source_runs:
+        new_course_key = CourseKey.from_string(
+            create_contract_run_key(
+                source_course=clone_course_run,
+                contract=contract,
+                org_prefix=org_prefix,
+            )
         )
-        course_run_product.save()
+        new_readable_id = str(new_course_key)
 
-        log.debug(
-            "Created product %s for run %s in contract %s",
-            course_run_product,
+        # We group runs by the run tag that gets stored in the run_tag field. edX
+        # has a run tag too, though, but not any of the other extra fields so
+        # we need to throw some additional data into the run tag so we're not
+        # colliding with the other runs in this tag.
+
+        lang_tag = f"_{clone_course_run.language}" if clone_course_run.language else ""
+        industry_tag = (
+            f"_{clone_course_run.variant_industry}"
+            if clone_course_run.variant_industry
+            else ""
+        )
+        length_tag = (
+            f"_{clone_course_run.variant_length}"
+            if clone_course_run.variant_length
+            else ""
+        )
+
+        new_readable_id = f"{new_readable_id}{lang_tag}{industry_tag}{length_tag}"
+
+        new_run_tag = new_course_key.run
+
+        if (
+            CourseRun.objects.filter(
+                course=course,
+                language=clone_course_run.language,
+                variant_industry=clone_course_run.variant_industry,
+                variant_length=clone_course_run.variant_length,
+            )
+            .filter(b2b_contracts=contract)
+            .exists()
+            and no_reruns
+        ):
+            msg = (
+                f"Can't create a run for {course} and contract {contract}: "
+                f"courseware ID {new_readable_id} already exists and we're not rerunning it."
+            )
+            log.warning(msg)
+            continue
+
+        course_run = CourseRun(
+            course=course,
+            title=clone_course_run.title,
+            courseware_id=new_readable_id,
+            run_tag=new_run_tag,
+            start_date=start_date,
+            end_date=end_date,
+            enrollment_start=start_date,
+            enrollment_end=end_date,
+            certificate_available_date=start_date,
+            is_self_paced=True,
+            live=True,
+            b2b_only=True,
+            language=clone_course_run.language,
+            is_primary_language=clone_course_run.is_primary_language,
+            variant_length=clone_course_run.variant_length,
+            variant_industry=clone_course_run.variant_industry,
+        )
+        course_run.save()
+
+        course_run.b2b_contracts.add(contract)
+
+        required_modes = EnrollmentMode.objects.filter(
+            mode_slug__in=[EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE]
+        ).all()
+        course_run.enrollment_modes.add(*required_modes)
+
+        if not skip_edx:
+            CourseRunClone.objects.create(
+                course_run=course_run,
+                source_courseware_id=clone_course_run.courseware_id,
+            )
+            clone_courserun.delay(course_run.id, clone_course_run.courseware_id)
+
+        log.info(
+            "Created run %s (language=%s) for course %s in contract %s from %s",
             course_run,
+            course_run.language,
+            course,
             contract,
+            clone_course_run,
         )
 
-    # Saving the contract here triggers any shoring up of related data that we
-    # need to do, like generating enrollment codes.
-    contract.save()
+        lang_suffix = (
+            f" [{lang_tag}{industry_tag}{length_tag}]" if course_run.language else ""
+        )
+        with reversion.create_revision():
+            course_run_product = Product(
+                price=(
+                    contract.enrollment_fixed_price
+                    if contract.enrollment_fixed_price
+                    else Decimal(0)
+                ),
+                is_active=True,
+                description=(
+                    f"{contract.organization.name} #{contract.id}"
+                    f" - {course.title} {course.readable_id}{lang_suffix}"
+                ),
+                object_id=course_run.id,
+                content_type=content_type,
+            )
+            course_run_product.save()
 
-    return course_run, course_run_product
+            log.debug(
+                "Created product %s for run %s in contract %s",
+                course_run_product,
+                course_run,
+                contract,
+            )
+
+        results.append((course_run, course_run_product))
+
+    if queue_codes:
+        queue_enrollment_code_check.delay(contract.id)
+
+    return results
 
 
 def get_free_and_nonfree_contracts(contracts: Iterable) -> tuple[list, list]:
@@ -229,6 +819,32 @@ def get_free_and_nonfree_contracts(contracts: Iterable) -> tuple[list, list]:
     return free, nonfree
 
 
+def is_product_courserun(product) -> bool:
+    """
+    Check if a product's purchasable object is a CourseRun.
+
+    Args:
+        product: The Product object to check.
+
+    Returns:
+        bool: True if the purchasable object is a CourseRun, False otherwise.
+    """
+    return isinstance(product.purchasable_object, CourseRun)
+
+
+def is_product_program(product) -> bool:
+    """
+    Check if a product's purchasable object is a Program.
+
+    Args:
+        product: The Product object to check.
+
+    Returns:
+        bool: True if the purchasable object is a Program, False otherwise.
+    """
+    return isinstance(product.purchasable_object, Program)
+
+
 def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> bool:
     """
     Check if a discount is supplied for B2B purchase.
@@ -240,7 +856,7 @@ def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> boo
     Returns:
         bool: True if discount is supplied or not needed, False otherwise.
     """
-    from ecommerce.api import establish_basket
+    from ecommerce.api import establish_basket  # noqa: PLC0415
 
     if not active_contracts:
         # No contracts = nothing to validate
@@ -268,16 +884,26 @@ def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> boo
 def get_active_contracts_from_basket_items(basket: Basket):
     """Get active contracts from basket items"""
     course_run_ct = ContentType.objects.get_for_model(CourseRun)
-
-    items = basket.basket_items.select_related("product__content_type").filter(
-        product__content_type=course_run_ct
-    )
-
+    program_ct = ContentType.objects.get_for_model(Program)
     contract_ids = []
-    for item in items:
+    items = basket.basket_items.select_related("product__content_type")
+
+    for item in items.filter(product__content_type=course_run_ct):
         purchasable = item.product.purchasable_object
-        if hasattr(purchasable, "b2b_contract") and purchasable.b2b_contract:
-            contract_ids.append(purchasable.b2b_contract.id)
+        if hasattr(purchasable, "b2b_contracts") and purchasable.b2b_contracts.exists():
+            item_contract_ids = purchasable.b2b_contracts.values_list("id", flat=True)
+            contract_ids.extend(list(item_contract_ids))
+
+    for item in items.filter(product__content_type=program_ct):
+        purchasable = item.product.purchasable_object
+        if (
+            hasattr(purchasable, "contract_memberships")
+            and purchasable.contract_memberships.exists()
+        ):
+            item_contract_ids = purchasable.contract_memberships.values_list(
+                "contract_id", flat=True
+            )
+            contract_ids.extend(list(item_contract_ids))
 
     if contract_ids:
         return list(ContractPage.objects.filter(id__in=contract_ids, active=True))
@@ -303,11 +929,14 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
 
     Returns: bool, True if the basket is valid for B2B purchase, False otherwise.
     """
-    from ecommerce.api import establish_basket
+    from ecommerce.api import establish_basket  # noqa: PLC0415
 
     basket = establish_basket(request)
     if not basket:
         return False
+
+    if not active_contracts:
+        active_contracts = []
 
     free_contracts, nonfree_contracts = get_free_and_nonfree_contracts(active_contracts)
 
@@ -330,13 +959,111 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
         for contract in check_contracts:
             product_ids.update(contract.get_products().values_list("pk", flat=True))
 
-    # Validate that at least one discount applies to these products
+    # Validate that at least one discount applies to these products, and is
+    # a code for one of the basket's contracts. That can be a free contract
+    # the user is already in, which check_contracts leaves out.
     if product_ids:
         return basket.discounts.filter(
-            redeemed_discount__products__product__in=product_ids
+            redeemed_discount__b2b_contract__in=active_contracts,
+            redeemed_discount__products__product__in=product_ids,
         ).exists()
 
     return True  # No products to validate means valid
+
+
+def get_contract_runs_without_products(
+    contract: ContractPage, *, b2b_only=False, public_only=False
+):
+    """
+    Return a list of contract course runs that don't have products.
+
+    This uses ContractPage.get_products so if the run *does* have products, but
+    they're not active products, the run will count.
+
+    Returns:
+    - QuerySet of runs without products.
+    """
+
+    return contract.get_course_runs(b2b_only=b2b_only, public_only=public_only).exclude(
+        id__in=contract.get_products(
+            b2b_only=b2b_only, public_only=public_only
+        ).values_list("object_id", flat=True)
+    )
+
+
+def get_contract_products_with_bad_pricing(contract: ContractPage):
+    """
+    Return a list of products that don't have correct prices set.
+
+    This is products that have a price but the contract price is 0 or not set,
+    or products that have prices that aren't the same as the contract. Only
+    considers products that are for B2B-only runs (public runs may/may not have
+    products that match up with the contract pricing).
+
+    Returns:
+    - QuerySet of products with invalid prices.
+    """
+
+    products_qset = contract.get_products(b2b_only=True)
+
+    if (
+        not contract.enrollment_fixed_price
+        or contract.enrollment_fixed_price == Decimal(0)
+    ):
+        return products_qset.exclude(price=Decimal(0)).all()
+
+    return products_qset.exclude(price=contract.enrollment_fixed_price).all()
+
+
+def ensure_contract_run_products(contract: ContractPage) -> list[Product]:
+    """Ensure the contract's course runs all have products."""
+
+    fixable_crs = get_contract_runs_without_products(contract, b2b_only=True)
+
+    if len(fixable_crs) == 0:
+        return []
+
+    content_type = ContentType.objects.get_for_model(CourseRun)
+
+    with reversion.create_revision():
+        return [
+            Product.all_objects.update_or_create(
+                content_type=content_type,
+                object_id=run.id,
+                defaults={
+                    "price": contract.enrollment_fixed_price
+                    if contract.enrollment_fixed_price
+                    else Decimal(0),
+                    "description": run.courseware_id,
+                    "is_active": True,
+                },
+            )[0]
+            for run in fixable_crs
+        ]
+
+
+def ensure_contract_run_pricing(contract: ContractPage) -> int:
+    """Ensure the contract runs are all priced correctly."""
+
+    products = contract.get_products()
+    expected_price = (
+        contract.enrollment_fixed_price
+        if contract.enrollment_fixed_price
+        else Decimal(0)
+    )
+
+    updated_count = 0
+
+    for product in products:
+        if product.purchasable_object.b2b_only and product.price != expected_price:
+            product.price = expected_price
+
+            # This did do bulk_update, but that doesn't trigger version creation.
+            with reversion.create_revision():
+                product.save()
+                updated_count += 1
+
+    return updated_count
 
 
 def _get_discount_defaults(discount_amount: Decimal) -> dict:
@@ -350,13 +1077,17 @@ def _get_discount_defaults(discount_amount: Decimal) -> dict:
 
 
 def _create_discount_with_product(
-    product: Product, discount_amount: Decimal, redemption_type: str
+    contract: ContractPage,
+    product: Product,
+    discount_amount: Decimal,
+    redemption_type: str,
 ) -> Discount:
-    """Create a discount and associate it with a product."""
+    """Create a discount for the contract and associate it with a product."""
     defaults = _get_discount_defaults(discount_amount)
     discount = Discount(
         discount_code=uuid4(),
         redemption_type=redemption_type,
+        b2b_contract=contract,
         **defaults,
     )
     discount.save()
@@ -379,6 +1110,50 @@ def _update_discount(
         redemption_type=redemption_type,
         **defaults,
     )
+
+
+def _handle_extra_enrollment_codes(contract: ContractPage, product: Product) -> int:
+    """Remove any extra codes, so there's just enough for the given product."""
+
+    remove_count = contract.get_discounts().filter(
+        products__product=product
+    ).count() - (contract.max_learners or 1)
+
+    if remove_count <= 0:
+        log.info(
+            "_handle_extra_enrollment_codes: called for contract %s but no extra codes",
+            contract,
+        )
+        return 0
+
+    # Filter out the discounts that have been used for something - either for
+    # contract attachment or for enrollment.
+    unused_discounts = (
+        contract.get_unused_discounts()
+        .filter(products__product=product)
+        .order_by("-id")
+        .all()
+    )
+
+    for unused_discount in unused_discounts[:remove_count]:
+        log.info(
+            "Removing extra discount %s for contract %s product %s",
+            unused_discount,
+            contract,
+            product,
+        )
+
+        # Remove the product from the discount - only remove the discount if
+        # there's no more product.
+
+        DiscountProduct.objects.filter(
+            discount=unused_discount, product=product
+        ).delete()
+        unused_discount.refresh_from_db()
+        if unused_discount.products.count() == 0:
+            unused_discount.delete()
+
+    return remove_count
 
 
 def _ensure_discount_product_association(discount: Discount, product: Product) -> bool:
@@ -424,11 +1199,11 @@ def _handle_unlimited_seats(
 ) -> tuple[int, int, int]:
     """Handle unlimited seat contracts by creating/updating one discount per product."""
     created = updated = errors = 0
-    discount_amount = contract.enrollment_fixed_price or 0
+    discount_amount = contract.enrollment_fixed_price or Decimal(0)
 
     if len(product_discounts) == 0:
         discount = _create_discount_with_product(
-            product, discount_amount, REDEMPTION_TYPE_UNLIMITED
+            contract, product, discount_amount, REDEMPTION_TYPE_UNLIMITED
         )
         log.info(
             "Contract %s: Created unlimited discount %s for product %s",
@@ -473,18 +1248,31 @@ def _handle_unlimited_seats(
 
 
 def _handle_limited_seats(
-    contract: ContractPage, product: Product, product_discounts: list[Discount]
+    contract: ContractPage, product: Product
 ) -> tuple[int, int, int]:
     """Handle limited seat contracts by creating/updating multiple discounts."""
     created = updated = errors = 0
-    discount_amount = contract.enrollment_fixed_price or 0
+    discount_amount = contract.enrollment_fixed_price or Decimal(0)
+    contract_product_discounts_qset = contract.get_discounts().filter(
+        products__product=product
+    )
+
+    if not contract.max_learners:
+        log.info("Contract %s doesn't have a learner cap, skipping", contract)
+        return (
+            0,
+            0,
+            0,
+        )
 
     log.info(
-        "Updating %s discount codes for product %s", len(product_discounts), product
+        "Updating %s discount codes for product %s",
+        contract_product_discounts_qset.count(),
+        product,
     )
 
     # Update existing discounts
-    for discount in product_discounts:
+    for discount in contract_product_discounts_qset.all():
         _update_discount(discount, discount_amount, REDEMPTION_TYPE_ONE_TIME)
         discount.refresh_from_db()
 
@@ -505,21 +1293,37 @@ def _handle_limited_seats(
         updated += 1
 
     # Create additional discounts if needed
-    create_count = contract.max_learners - len(product_discounts)
-    log.info("Creating %s new discount codes for product %s", create_count, product)
+    current_discount_count = contract_product_discounts_qset.count()
+    create_count = contract.max_learners - current_discount_count
+    log.info(
+        "Contract %s has %s max learners and product %s has %s discounts",
+        contract,
+        contract.max_learners,
+        product,
+        current_discount_count,
+    )
 
     if create_count < 0:
         log.warning(
-            "ensure_enrollment_codes_exist: Seat limited contract %s product %s has too many discount codes: %s - skipping create",
+            "ensure_enrollment_codes_exist: Seat limited contract %s product %s has too many discount codes: %s - removing extras",
             contract,
             product,
-            len(product_discounts),
+            current_discount_count,
+        )
+        errors = _handle_extra_enrollment_codes(contract, product)
+        log.warning(
+            "ensure_enrollment_codes_exist: Removed %s codes for %s product %s",
+            errors,
+            contract,
+            product,
         )
         return (created, updated, errors)
 
+    log.info("Creating %s discounts for product %s", create_count, product)
+
     for _ in range(create_count):
         discount = _create_discount_with_product(
-            product, discount_amount, REDEMPTION_TYPE_ONE_TIME
+            contract, product, discount_amount, REDEMPTION_TYPE_ONE_TIME
         )
         created += 1
         log.info(
@@ -536,7 +1340,7 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
     """
     Ensure that enrollment codes exist for the given contract.
 
-    If the contract is non-SSO or if it specifies a price, we need to create
+    If the contract is code managed or if it specifies a price, we need to create
     enrollment codes so the learners can enroll in the attached resources.
 
     Enrollment codes are discounts. When the contract is seat-limited, we create
@@ -549,11 +1353,11 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
     - If there are discounts, make sure they apply to all the products that
       we've created, and create new ones if necessary.
     - If there are too many discounts, log a warning message.
-    - If the contract is SSO and unlimited, but there are discounts for the
+    - If the contract is SSO managed and unlimited, but there are discounts for the
       products, clear those products out. (Also remove the discounts if there
       was only one product in the discount.)
 
-    Note about SSO contracts: if there's no price, we don't create enrollment
+    Note about SSO managed contracts: if there's no price, we don't create enrollment
     codes regardless of whether there's a learner cap or not. We'll limit the
     attachment when we log the user in.
 
@@ -563,7 +1367,10 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
     """
     log.info("Checking enrollment codes for contract %s", contract)
 
-    if contract.integration_type == "sso" and not contract.enrollment_fixed_price:
+    if (
+        contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS
+        and not contract.enrollment_fixed_price
+    ):
         # SSO contracts w/out price don't need discounts.
         return _handle_sso_free_contract(contract)
 
@@ -573,88 +1380,481 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
     total_created = total_updated = total_errors = 0
 
     for product in products:
-        product_discounts = list(
-            Discount.objects.filter(products__product=product).distinct()
-        )
-
         if not contract.max_learners:
             # Unlimited seats - one discount per product
             created, updated, errors = _handle_unlimited_seats(
-                contract, product, product_discounts
+                contract,
+                product,
+                contract.get_discounts().filter(products__product=product).distinct(),
             )
         else:
             # Limited seats - multiple discounts per product
-            created, updated, errors = _handle_limited_seats(
-                contract, product, product_discounts
-            )
+            created, updated, errors = _handle_limited_seats(contract, product)
 
         total_created += created
         total_updated += updated
         total_errors += errors
 
+    queue_contract_sheet_update_post_save.delay(contract.id)
+
     return (total_created, total_updated, total_errors)
 
 
-def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict, None]:
+def _determine_contract_for_user_product(  # noqa: PLR0911
+    user: User,
+    product: Product,
+    *,
+    program: Program | None = None,
+    contract_slug: str | None = None,
+):
+    """
+    Determine what the contract should be for the given options supplied.
+
+    If the contract slug is specified, then this just needs to validate everything -
+    make sure the product item, user and program (if there) are all part of that
+    contract. If there's no contract slug, this figures out what contract overlaps
+    these pieces (user, item, program); if it's just one, then this continues on
+    as if that one had been specified explicitly; otherwise, return an error.
+    """
+
+    item = product.purchasable_object
+
+    if not item:
+        msg = f"_determine_contract_for_user_product: Product {product} doesn't appear to have a purchasable object."
+        raise ValueError(msg)
+
+    user_contract_ids = list(user.b2b_contracts.values_list("id", flat=True))
+    item_b2b_contracts = (
+        item.b2b_contracts.all()
+        if isinstance(item, CourseRun)
+        else ContractPage.objects.filter(contract_programs__program=item)
+    )
+
+    if program and not program.contract_memberships.exists():
+        log.error(
+            "_determine_contract_for_user_product: User %s tried to use product %s with program %s but program is not attached to any contracts",
+            user,
+            product,
+            program,
+        )
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
+    if (
+        not contract_slug
+        or not ContractPage.objects.filter(slug=contract_slug).exists()
+    ):
+        log.info(
+            "_determine_contract_for_user_product: no contract specified for %s purchasing %s",
+            user,
+            product,
+        )
+
+        if not item_b2b_contracts.filter(id__in=user_contract_ids).exists():
+            log.info(
+                "_determine_contract_for_user_product: no contract match between for %s purchasing %s",
+                user,
+                product,
+            )
+            return {
+                "result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH,
+                "failed_match": "item",
+            }
+
+        if (
+            program
+            and not program.contract_memberships.filter(
+                contract__id__in=user_contract_ids
+            ).exists()
+        ):
+            log.info(
+                "_determine_contract_for_user_product: no contract match between %s purchasing %s for program %s",
+                user,
+                product,
+                program,
+            )
+
+            return {
+                "result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH,
+                "failed_match": "program",
+            }
+
+        overlap_item_contracts = set(
+            item_b2b_contracts.filter(id__in=user_contract_ids).values_list(
+                "id", flat=True
+            )
+        )
+
+        log.info(
+            "Item contracts: %s", ",".join([str(i) for i in overlap_item_contracts])
+        )
+
+        if program:
+            program_overlaps = set(
+                program.contract_memberships.filter(
+                    contract__id__in=user_contract_ids
+                ).values_list("contract__id", flat=True)
+            )
+            log.info(
+                "Program contracts: %s", ",".join([str(i) for i in program_overlaps])
+            )
+            overlap_item_contracts = program_overlaps & overlap_item_contracts
+
+        contract_matches = set(user_contract_ids) & overlap_item_contracts
+
+        if len(contract_matches) != 1:
+            log.error(
+                "User %s tried to use product %s but the contract to use is ambiguous (%s)",
+                user,
+                product,
+                ",".join([str(i) for i in contract_matches]),
+            )
+            return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_AMBIGUOUS_CONTRACT}
+
+        return contract_matches.pop()
+
+    contract_qs = item_b2b_contracts.filter(
+        slug=contract_slug, id__in=user_contract_ids
+    )
+    if program:
+        contract_qs = contract_qs.filter(contract_programs__program=program)
+    contract = contract_qs.first()
+
+    if not contract:
+        log.error(
+            "User %s tried to use product %s (and/or program %s) for contract %s but one or more parts of the transaction weren't in the contract",
+            user,
+            product,
+            program,
+            contract_slug,
+        )
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
+    return contract.id
+
+
+def _validate_b2b_enrollment_prerequisites(  # noqa: PLR0911
+    user,
+    product: Product,
+    *,
+    program: Program | None = None,
+    contract_slug: str | None = None,
+) -> Union[dict, None]:
     """
     Validate prerequisites for B2B enrollment.
 
     Returns:
-        dict with error result if validation fails, None if validation passes.
+        dict with error result if validation fails, applicable contract if validation passes.
     """
     if not user.is_authenticated:
+        log.error("B2B enroll: attempted to use %s with no user account", product)
         return {"result": main_constants.USER_MSG_TYPE_B2B_DISALLOWED}
 
+    contract_resolution_result = _determine_contract_for_user_product(
+        user, product, contract_slug=contract_slug, program=program
+    )
+
     purchasable_object = product.purchasable_object
-    if not purchasable_object or not purchasable_object.b2b_contract:
+    if not purchasable_object:
+        log.error(
+            "B2B enroll: attempted to use %s but product has no purchasable object",
+            product,
+        )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT}
 
-    if not user.b2b_contracts.filter(id=purchasable_object.b2b_contract.id).exists():
+    if isinstance(contract_resolution_result, dict):
+        return contract_resolution_result
+
+    contract = ContractPage.active_objects.filter(pk=contract_resolution_result).first()
+
+    if not contract:
+        log.error(
+            "B2B enroll: %s attempted to use %s but contract %s either doesn't exist or is invalid",
+            user,
+            product,
+            contract,
+        )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
 
-    return None
+    if not isinstance(purchasable_object, (CourseRun, Program)):
+        log.error(
+            "B2B enroll: attempted to use %s but %s is not a program or course run",
+            product,
+            purchasable_object,
+        )
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
+
+    audit_exists = (
+        isinstance(
+            purchasable_object,
+            (
+                CourseRun,
+                Program,
+            ),
+        )
+        and purchasable_object.enrollments.filter(
+            user=user,
+            active=True,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        )
+        .exclude(
+            change_status__in=ALL_ENROLL_CHANGE_STATUSES,
+        )
+        .exists()
+    )
+
+    if (audit_exists and not purchasable_object.is_upgradable) or (
+        not audit_exists and not purchasable_object.enrollable_for_contract(contract)
+    ):
+        log.error(
+            "B2B enroll: attempted to use %s but %s is not enrollable/upgradable for B2B contract %s",
+            product,
+            purchasable_object,
+            contract,
+        )
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
+
+    if (
+        isinstance(
+            purchasable_object,
+            (
+                CourseRun,
+                Program,
+            ),
+        )
+        and purchasable_object.enrollments.filter(
+            user=user,
+            active=True,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+        .exclude(
+            change_status__in=ALL_ENROLL_CHANGE_STATUSES,
+        )
+        .exists()
+    ):
+        log.error(
+            "B2B enroll: attempted to use %s but %s already has verified enrollment in %s",
+            product,
+            user,
+            purchasable_object,
+        )
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED}
+
+    return contract
 
 
-def _prepare_basket_for_b2b_enrollment(request, product: Product) -> Basket:
+def _prepare_basket_for_b2b_enrollment(
+    request, product: Product, contract: ContractPage
+) -> Basket:
     """
     Prepare basket for B2B enrollment by clearing it and adding the product.
 
     Returns:
         The prepared basket.
     """
-    from ecommerce.api import establish_basket
+    from ecommerce.api import establish_basket  # noqa: PLC0415
 
-    basket = establish_basket(request)
-    # Clear the basket. For Unified Ecommerce, we may want to change this.
-    # But MITx Online only allows one item per cart and not clearing it is confusing.
+    # Establish and clear the basket. If the user doesn't have an edX username,
+    # don't wait to create one.
+    basket = establish_basket(request, no_delay=True)
     basket.basket_items.all().delete()
     basket.discounts.all().delete()
 
-    item = BasketItem.objects.create(product=product, basket=basket, quantity=1)
+    item = BasketItem.objects.create(
+        product=product, basket=basket, quantity=1, b2b_contract=contract
+    )
     item.save()
+
+    # Sync with HubSpot for CourseRun
+    sync_hubspot_cart_add(
+        request.user,
+        product,
+        is_uai=(
+            is_product_courserun(product)
+            and is_uai_course_run(product.purchasable_object)
+        )
+        or (is_product_program(product) and is_uai_program(product.purchasable_object)),
+        is_xpro=(
+            is_product_courserun(product)
+            and is_xpro_course_run(product.purchasable_object)
+        ),
+    )
 
     return basket
 
 
-def _apply_available_discount(request, product: Product, basket: Basket) -> None:
-    """Apply available discount to the basket if one exists."""
-    applicable_discounts_qs = product.discounts.annotate(
-        redemptions=Count("discount__order_redemptions")
-    ).filter(discount__is_bulk=True, redemptions=0, discount__products__product=product)
+def _get_or_create_contract_discount(
+    product: Product, contract: ContractPage
+) -> Discount:
+    """
+    Get an available enrollment code for the product, or create one.
+
+    A code is available if it hasn't been used for an order yet, or if it's
+    unlimited (which it will be if the contract has unlimited seats). Codes are
+    ordered by ID so the one picked matches what we send out to people.
+
+    Raises:
+        ValueError: if the product isn't for a course run in the contract.
+    """
+
+    applicable_discounts_qs = (
+        product.discounts.annotate(
+            redemptions=Count(
+                "discount__order_redemptions",
+                filter=Q(
+                    discount__order_redemptions__redeemed_order__state__in=[
+                        OrderStatus.FULFILLED,
+                        OrderStatus.REFUNDED,
+                        OrderStatus.PARTIALLY_REFUNDED,
+                    ]
+                ),
+            ),
+        )
+        .filter(
+            discount__is_bulk=True,
+            discount__products__product=product,
+            discount__b2b_contract=contract,
+        )
+        .filter(
+            Q(redemptions=0) | Q(discount__redemption_type=REDEMPTION_TYPE_UNLIMITED)
+        )
+        .order_by("id")
+    )
 
     if applicable_discounts_qs.exists():
-        # We have unused codes for this product, so we should apply one.
-        discount = applicable_discounts_qs.first().discount
-        basket_discount = BasketDiscount.objects.create(
-            redemption_date=now_in_utc(),
-            redeemed_by=request.user,
-            redeemed_discount=discount,
-            redeemed_basket=basket,
+        # We have unused codes for this product, so we should use one.
+        return applicable_discounts_qs.first().discount
+
+    # We've checked for an appropriate discount, and we couldn't find one, so
+    # now we need to make one for the learner (or for the contract).
+
+    if (
+        not product.purchasable_object
+        or not product.purchasable_object.b2b_contracts.filter(pk=contract.id).exists()
+    ):
+        msg = f"Product {product} has no purchasable object or the purchasable object is not in contract {contract}"
+        raise ValueError(msg)
+
+    discount_amount = contract.enrollment_fixed_price
+    redemption_type = (
+        REDEMPTION_TYPE_ONE_TIME
+        if contract.max_learners and contract.max_learners > 0
+        else REDEMPTION_TYPE_UNLIMITED
+    )
+
+    discount = _create_discount_with_product(
+        contract,
+        product,
+        discount_amount if discount_amount else Decimal(0),
+        redemption_type,
+    )
+    log.error("B2B enroll: had to create a discount for %s", product)
+
+    return discount
+
+
+def _apply_available_discount(
+    request, product: Product, basket: Basket, contract: ContractPage
+) -> None:
+    """Apply available discount to the basket if one exists."""
+
+    discount = _get_or_create_contract_discount(product, contract)
+
+    basket_discount = BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=request.user,
+        redeemed_discount=discount,
+        redeemed_basket=basket,
+    )
+    basket_discount.save()
+
+
+def apply_contract_discounts_to_basket(basket: Basket) -> list[BasketItem]:
+    """
+    Apply enrollment codes for the basket user's contracts to the basket.
+
+    A learner can add a course run to their basket through the regular cart
+    flow when the run is also in a contract they belong to. In that case they
+    should get the contract's pricing, so this finds (or creates) the
+    contract's enrollment code for the product and applies it. If the code
+    wins - i.e. it prices the item at or below whatever the basket already
+    charges for it - the basket item is tied to the contract, so the order line
+    and enrollment are recorded against it.
+
+    An item that's already tied to a contract only gets that contract's code,
+    and only if the learner is in the contract - otherwise the learner has to
+    supply a code themselves, so it's left alone. Only course run products are
+    considered, since contract enrollment codes are only made for course runs.
+    If the learner is in more than one contract with the run, the cheapest
+    contract is used (lowest ID on a tie).
+
+    This should run after any other discounts are applied, so the basket ends
+    up with the contract's code whenever it's tied an item to the contract.
+
+    Args:
+        basket (Basket): the basket to check
+    Returns:
+        list of BasketItem: the items that were tied to a contract
+    """
+    from ecommerce.api import apply_discount_to_basket  # noqa: PLC0415
+
+    user = basket.user
+    if not user or not user.is_authenticated:
+        return []
+
+    course_run_ct = ContentType.objects.get_for_model(CourseRun)
+    items = basket.basket_items.filter(
+        product__content_type=course_run_ct
+    ).select_related("product")
+    updated_items = []
+
+    for item in items:
+        contracts_qs = ContractPage.active_objects.filter(
+            users=user, course_runs__id=item.product.object_id
         )
-        basket_discount.save()
+        if item.b2b_contract_id:
+            contracts_qs = contracts_qs.filter(pk=item.b2b_contract_id)
+
+        contract = contracts_qs.order_by(
+            F("enrollment_fixed_price").asc(nulls_first=True), "id"
+        ).first()
+
+        if not contract:
+            continue
+
+        with transaction.atomic():
+            lock_contract_for_code_assignment(contract)
+            discount = _get_or_create_contract_discount(item.product, contract)
+
+        if not basket.discounts.filter(redeemed_discount=discount).exists():
+            apply_discount_to_basket(basket, discount)
+
+            if not basket.discounts.filter(redeemed_discount=discount).exists():
+                # Something else in the basket is a better deal.
+                continue
+
+            log.info(
+                "Applied contract %s code %s to basket %s for %s",
+                contract,
+                discount,
+                basket,
+                item.product,
+            )
+
+        if not item.b2b_contract_id:
+            item.b2b_contract = contract
+            item.save(update_fields=["b2b_contract", "updated_on"])
+            updated_items.append(item)
+
+    return updated_items
 
 
-def create_b2b_enrollment(request, product: Product):
+def create_b2b_enrollment(
+    request,
+    product: Product,
+    *,
+    program_id: str | None = None,
+    contract_slug: str | None = None,
+):
     """
     Create a B2B enrollment for the given product for the current user.
 
@@ -678,38 +1878,68 @@ def create_b2b_enrollment(request, product: Product):
     Args:
     - request: The HTTP request object containing the user and basket data.
     - product: The Product object representing the B2B product to enroll in.
+    - program_id: Optional readable_id of the program to enroll the user in.
+    - contract_slug: Optional slug of the contract the user's enrollments should belong to.
     Returns: a dict containing
     - "result": the result of the attempt; one of the USER_MSG_TYPE_B2B constants.
     - "order": the order ID if the enrollment was successful and no checkout is needed.
     - "price": the total for the basket, if enrollment did not succeed
     - "checkout_result": the result of the checkout attempt, if applicable.
     """
-    from ecommerce.api import generate_checkout_payload
+    from ecommerce.api import generate_checkout_payload  # noqa: PLC0415
+
+    program = None
+    if program_id:
+        program = Program.objects.get(readable_id=program_id)
 
     # Validate prerequisites for B2B enrollment
-    validation_error = _validate_b2b_enrollment_prerequisites(request.user, product)
-    if validation_error:
-        return validation_error
+    prereq_check = _validate_b2b_enrollment_prerequisites(
+        request.user, product, program=program, contract_slug=contract_slug
+    )
 
-    # Check for an edX user, and create one if there's not one
-    if not request.user.edx_username:
-        create_user(request.user)
-        request.user.refresh_from_db()
+    if (
+        isinstance(prereq_check, dict)
+        and prereq_check.get("result", None)
+        == main_constants.USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED
+    ):
+        # User has a verified enrollment in the run already - try to find the
+        # order number and return that, so the frontend can redirect them to the
+        # course. (There may not be one if we created this enrollment administratively.)
+        order = (
+            Order.objects.filter(
+                purchaser=request.user, lines__product_version__object_id=product.id
+            ).first()
+            if request.user.is_authenticated
+            else ""
+        )
+        return {
+            "result": main_constants.USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
+            "order": order.id if order else "",
+        }
+
+    if not isinstance(prereq_check, ContractPage):
+        return prereq_check
+
+    contract = prereq_check
 
     # Prepare the basket for enrollment
-    basket = _prepare_basket_for_b2b_enrollment(request, product)
+    basket = _prepare_basket_for_b2b_enrollment(request, product, contract)
 
     # Apply any available discount to the basket
-    _apply_available_discount(request, product, basket)
+    _apply_available_discount(request, product, basket, contract)
 
     # Calculate basket total more efficiently
     basket_price = sum(item.discounted_price for item in basket.basket_items.all())
 
     if basket_price == 0:
         # This call should go ahead and fulfill the order.
-        response = generate_checkout_payload(request)
+        response = generate_checkout_payload(request, raise_compliance_data_errors=True)
 
         if "no_checkout" in response:
+            # Course run enrollment succeeded - now handle program enrollment
+            if program_id:
+                _enroll_in_program_for_b2b(request.user, product, program_id, contract)
+
             return {
                 "result": main_constants.USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
                 "order": response["order_id"],
@@ -727,21 +1957,98 @@ def create_b2b_enrollment(request, product: Product):
     }
 
 
-def reconcile_user_orgs(user, organizations):
+def _enroll_in_program_for_b2b(
+    user, product: Product, program_id: str, contract: ContractPage
+):
     """
-    Reconcile the specified users with the provided organization list.
+    Enroll the user in the specified program as part of a B2B course enrollment.
 
-    When we get a list of organizations from an authoritative source, we need to
-    be able to parse that list and make sure the user's org attachments match.
-    This will pull the contracts that the user belongs to that are also
-    SSO-enabled, and will remove the user from the contract if they're not
-    supposed to be in them. It will also add the user to any SSO-enabled contract
-    that the org has.
+    Validates that the program belongs to a contract that the specified course
+    also belongs to, and creates a verified ProgramEnrollment if one doesn't
+    exist.
 
-    This only considers contracts that are SSO-enabled and zero-cost. If the
-    contract is seat limited, we will only add the user if there's room.
-    (If there isn't, we will log an error.) Only SSO-enabled contracts are
-    considered; any that the user is in that aren't SSO-enabled will be left alone.
+    Args:
+    - user: The user to enroll.
+    - product: The Product for the course run being enrolled in.
+    - program_id: The readable_id of the program to enroll in.
+    """
+    from courses.api import create_program_enrollments  # noqa: PLC0415
+    from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE  # noqa: PLC0415
+
+    purchasable_object = product.purchasable_object
+
+    if not isinstance(purchasable_object, CourseRun):
+        msg = f"Product {purchasable_object} is not for a course run."
+        raise TypeError(msg)
+
+    try:
+        program = Program.objects.get(readable_id=program_id)
+    except Program.DoesNotExist:
+        log.warning(
+            "B2B enroll: program %s not found, skipping program enrollment",
+            program_id,
+        )
+        return
+
+    # Validate the program belongs to the same contract as the course run
+    if not ContractProgramItem.objects.filter(
+        contract__in=purchasable_object.b2b_contracts.all(), program=program
+    ).exists():
+        log.warning(
+            "B2B enroll: program %s and course %s do not share a contract, skipping program enrollment",
+            program_id,
+            purchasable_object.courseware_id,
+        )
+        return
+
+    created_enrollments = create_program_enrollments(
+        user, [program], enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    if contract:
+        for program_enrollment in created_enrollments:
+            program_enrollment.b2b_contract = contract
+            program_enrollment.save()
+
+    log.info(
+        "B2B enroll: created program enrollment for user %s in program %s",
+        user,
+        program_id,
+    )
+
+
+def reconcile_user_orgs(user, organizations, *, session_auth_time=None):
+    """
+    Reconcile the specified user with the provided organization list.
+
+    When we get a list of organizations from a source (so, in the user payload
+    from APISIX) for a particular user, we need to ensure that the user's
+    organization membership in MITx Online matches up with what we're given. In
+    addition, once we've done that, we need to ensure they're also in the
+    contracts that are marked as "managed". If the user is in an organization
+    that isn't in the list we've received, we need to remove them; in addition,
+    they should be removed from any "managed" contracts for the org they're in
+    as well.
+
+    There is a special case where the user may be in an organization that isn't
+    represented in the payload we're given. This happens when the user uses an
+    enrollment code. We update the org membership here and in Keycloak, but the
+    payload from APISIX won't include their updated org membership until their
+    APISIX session expires. We have a flag on the many-to-many table that
+    indicates that we should leave those memberships alone - otherwise, we'll
+    inadvertently add them to the org and then immediately remove them. (Once
+    the org _does_ show up in the list, we should clear the flag.)
+
+    We cache the user's org membership in redis to save some hits to the
+    database. This gets hit on every authenticated request, so probably good to
+    try to keep the query count low. The cache is a list of tuples of (org_uuid,
+    not_expected_in_payload).
+
+    The user may have more than one APISIX session open, and each one carries
+    the org list from when it was created, so an older session can have stale
+    data. If session_auth_time is given, we keep the newest one we've seen for
+    the user in redis and skip reconciliation for any session older than that.
+    Otherwise, the older session would undo changes the newer one picked up.
 
     If the user is enrolled in any courses that are in a contract they'll be
     removed from, they will be left there. Not real sure what we should do in
@@ -750,69 +2057,164 @@ def reconcile_user_orgs(user, organizations):
     Args:
     - user (User): the user to work with
     - organizations (dict[str]): UUIDs of the organizations for the user
+    - session_auth_time (int|None): when the user authenticated for the session
+      the organizations came from (epoch seconds), if known
 
     Returns:
     - tuple(int, int); contracts added and contracts removed
     """
 
-    user_org_cache_key = f"org-membership-cache-{user.id}"
+    user_org_cache_key = main_constants.B2B_USER_ORG_MEMBERSHIP_CACHE.format(
+        user.global_id
+    )
+
+    log.debug("reconcile_user_orgs: --> start - user %s", user.global_id)
+
+    if session_auth_time is not None:
+        latest_session_cache_key = main_constants.B2B_USER_LATEST_SESSION_CACHE.format(
+            user.global_id
+        )
+        latest_session_auth_time = caches["redis"].get(latest_session_cache_key)
+
+        if (
+            latest_session_auth_time is not None
+            and session_auth_time < latest_session_auth_time
+        ):
+            log.debug(
+                "reconcile_user_orgs: there's a newer session for user %s - skipping reconciliation (%s vs %s)",
+                user.global_id,
+                session_auth_time,
+                latest_session_auth_time,
+            )
+            return (
+                0,
+                0,
+            )
+
+        # Refresh the timeout on every request so the mark doesn't expire out
+        # from under a session that's still in use.
+        caches["redis"].set(
+            latest_session_cache_key,
+            session_auth_time,
+            timeout=settings.B2B_USER_LATEST_SESSION_CACHE_TIMEOUT,
+        )
+
     cached_org_membership = caches["redis"].get(user_org_cache_key, False)
 
-    if cached_org_membership and sorted(cached_org_membership) == sorted(organizations):
-        log.info("reconcile_user_orgs: skipping reconcilation for %s", user.id)
-        return (
-            0,
-            0,
-        )
-
-    log.info("reconcile_user_orgs: running reconcilation for %s", user.id)
-
-    user_contracts_qs = user.b2b_contracts.filter(
-        integration_type=CONTRACT_INTEGRATION_SSO
-    )
-
-    if len(organizations) == 0:
-        # User has no orgs, so we should clear them from all SSO contracts.
-        contracts_to_remove = user_contracts_qs.all()
-        [user.b2b_contracts.remove(contract) for contract in contracts_to_remove]
-        user.save()
-        return (0, len(contracts_to_remove))
-
-    orgs = OrganizationPage.objects.filter(sso_organization_id__in=organizations).all()
-    no_orgs = OrganizationPage.objects.exclude(
-        sso_organization_id__in=organizations
-    ).all()
-
-    contracts_to_remove = user_contracts_qs.filter(organization__in=no_orgs).all()
-
-    if contracts_to_remove.count() > 0:
-        [
-            user.b2b_contracts.remove(contract_to_remove)
-            for contract_to_remove in contracts_to_remove
+    if cached_org_membership is not False:
+        log.debug("reconcile_user_orgs: orgs passed: %s", ",".join(organizations))
+        log.debug("reconcile_user_orgs: cached membership: %s", cached_org_membership)
+        cached_expected_org_membership = [
+            str(org_id)
+            for org_id, not_expected_in_payload in cached_org_membership
+            if not_expected_in_payload
         ]
 
-    contracts_to_add = (
-        ContractPage.objects.filter(
-            integration_type=CONTRACT_INTEGRATION_SSO, organization__in=orgs
+        if sorted(cached_expected_org_membership) == sorted(organizations):
+            log.debug(
+                "reconcile_user_orgs: everything OK, skipping reconcilation for %s (cache %s - sent %s)",
+                user.id,
+                ",".join(cached_expected_org_membership),
+                ",".join(organizations),
+            )
+            return (
+                0,
+                0,
+            )
+
+    log.debug("reconcile_user_orgs: running reconcilation for %s", user.id)
+
+    # we've checked the cached org membership, so now figure out what orgs
+    # we're in but aren't in the list, and vice versa
+
+    orgs_to_add = OrganizationPage.objects.filter(
+        Q(sso_organization_id__in=organizations) & ~Q(organization_users__user=user)
+    ).filter(sso_organization_id__isnull=False)
+
+    orgs_to_remove = UserOrganization.objects.filter(
+        ~Q(organization__sso_organization_id__in=organizations)
+        & Q(user=user, keep_until_seen=False)
+    ).filter(organization__sso_organization_id__isnull=False)
+
+    for add_org in orgs_to_add:
+        # add org, add contracts, clear flag if we need to
+        UserOrganization.objects.update_or_create(
+            user=user,
+            organization=add_org,
+            defaults={"keep_until_seen": False},
         )
-        .exclude(pk__in=user_contracts_qs.all().values_list("id", flat=True))
-        .all()
-    )
 
-    if contracts_to_add.count() > 0:
-        [
-            user.b2b_contracts.add(contract_to_add)
-            for contract_to_add in contracts_to_add
-        ]
+        add_org.add_user_contracts(user)
+        log.debug("reconcile_user_orgs: added user %s to org %s", user.id, add_org)
 
-    user.save()
+    for remove_org in orgs_to_remove:
+        # remove org, remove contracts
+        remove_org.organization.remove_user_contracts(user)
+        log.debug(
+            "reconcile_user_orgs: removed user %s from org %s", user.id, remove_org
+        )
+        remove_org.delete()
+
     user.refresh_from_db()
-    orgs = [str(org_id) for org_id in user.b2b_organization_sso_ids]
+    orgs = [
+        (str(org.organization.sso_organization_id), not org.keep_until_seen)
+        for org in user.user_organizations.all()
+    ]
 
-    user_org_cache_key = f"org-membership-cache-{user.id}"
+    user.user_organizations.filter(
+        organization__sso_organization_id__in=organizations, keep_until_seen=True
+    ).update(keep_until_seen=False)
+
     caches["redis"].set(user_org_cache_key, sorted(orgs))
 
-    return (len(contracts_to_add), len(contracts_to_remove))
+    log.debug(
+        "reconcile_user_orgs: set cache for key %s (user %s) to %s",
+        user_org_cache_key,
+        user.id,
+        ",".join([cachedata[0] for cachedata in sorted(orgs)]),
+    )
+
+    return (len(orgs_to_add), len(orgs_to_remove))
+
+
+def find_unlinked_page_for_alias(alias: str | None) -> OrganizationPage | None:
+    """
+    Find the OrganizationPage with no Keycloak UUID whose org_key is this alias.
+
+    Provisioning writes the org_key as the Keycloak alias verbatim, so a page
+    that predates provisioning and shares an org_key with a realm alias is the
+    same organization. The match ignores case, as the provisioning collision
+    checks do. A page that is already linked to some other Keycloak organization
+    is not a candidate.
+
+    Args:
+    - alias (str): the Keycloak organization alias
+    Returns:
+    - OrganizationPage or None: the page to link, if there is exactly one. None
+      too when the alias is missing or longer than an org_key can be.
+    Raises:
+    - ValidationError: more than one unlinked page matches, so linking would be a guess
+    """
+
+    # An alias longer than an org_key can never be one, and truncating it would
+    # match an unrelated page whose org_key is the alias's first 30 characters.
+    if alias is None or len(alias) > ORG_KEY_MAX_LENGTH:
+        return None
+
+    candidates = list(
+        OrganizationPage.objects.filter(
+            org_key__iexact=alias, sso_organization_id__isnull=True
+        )
+    )
+
+    if len(candidates) > 1:
+        msg = (
+            f"Keycloak alias '{alias}' matches more than one unlinked "
+            f"organization: {sorted(page.org_key for page in candidates)}."
+        )
+        raise ValidationError(msg)
+
+    return candidates[0] if candidates else None
 
 
 def reconcile_single_keycloak_org(keycloak_org: OrganizationRepresentation):
@@ -821,9 +2223,12 @@ def reconcile_single_keycloak_org(keycloak_org: OrganizationRepresentation):
 
     This is the heavy lifting for reconcile_keycloak_orgs. When provided with a
     Keycloak organization, it creates or updates the corresponding
-    OrganizationPage record for the record.
+    OrganizationPage record for the record. A page that has no Keycloak UUID yet
+    but whose org_key is this organization's alias is linked to it rather than
+    duplicated (see find_unlinked_page_for_alias).
 
-    This won't save the OrganizationPage.
+    This won't save the OrganizationPage, so a page linked here still has no
+    Keycloak UUID in the database until the caller saves it.
 
     Args:
     - keycloak_org (OrganizationRepresentation): The Keycloak organization to reconcile.
@@ -836,12 +2241,18 @@ def reconcile_single_keycloak_org(keycloak_org: OrganizationRepresentation):
     page = OrganizationPage.objects.filter(sso_organization_id=keycloak_org.id).first()
 
     if not page:
+        page = find_unlinked_page_for_alias(keycloak_org.alias)
+        if page:
+            page.sso_organization_id = keycloak_org.id
+            log.info("Linked organization %s to Keycloak org %s", page, keycloak_org.id)
+
+    if not page:
         page = OrganizationPage(
             title=keycloak_org.name,
             name=keycloak_org.name,
             sso_organization_id=keycloak_org.id,
             org_key=keycloak_org.alias[:ORG_KEY_MAX_LENGTH],
-            description=keycloak_org.description,
+            description=keycloak_org.description or "",
         )
         log.info("Created organization %s from Keycloak", page)
         created_flag = True
@@ -849,7 +2260,7 @@ def reconcile_single_keycloak_org(keycloak_org: OrganizationRepresentation):
         # Don't update the org_key, because course keys are tied to it.
         page.name = keycloak_org.name
         page.title = keycloak_org.name
-        page.description = keycloak_org.description
+        page.description = keycloak_org.description or ""
         log.info("Updated organization %s from Keycloak", page)
 
     return (page, created_flag)
@@ -861,34 +2272,533 @@ def reconcile_keycloak_orgs():
 
     Retrieves the organizations for the configured realm out of Keycloak, and
     create or update corresponding records in MITx Online. This does not manage
-    memberships, just base org info.
+    memberships, just base org info, except when it links a page that had no
+    Keycloak UUID (see reconcile_single_keycloak_org). reconcile_user_orgs
+    removes a user from any linked org missing from their token, and a freshly
+    linked org is in nobody's token, so that page's existing members are marked
+    keep_until_seen with the link and then added to the Keycloak organization.
+
+    Since the provisioning API (capability C1) writes both systems together,
+    this is a drift reconciler rather than the primary create path: it adopts
+    the organizations Pulumi still owns, ones made in the console, and ones left
+    behind by a provisioning saga whose compensating delete also failed. That
+    last case is why it has to see the whole realm, not a first page of it.
 
     Returns
     - tuple (created, updated): number of orgs created and updated
     """
 
     org_model = get_keycloak_model(*KCAM_ORGANIZATIONS)
-    orgs = org_model.list()
+    orgs = org_model.list_all()
     parent_org_page = OrganizationIndexPage.objects.first()
     created_count = 0
     updated_count = 0
 
     for org in orgs:
         try:
-            page, created = reconcile_single_keycloak_org(org)
+            # Each org gets its own savepoint. Postgres aborts the whole
+            # transaction on any failed statement, so catching a database error
+            # and carrying on with the loop only works if that error was
+            # contained - otherwise every later query raises
+            # TransactionManagementError and skipping one org still loses the
+            # rest of the pass, just less legibly.
+            with transaction.atomic():
+                page, created = reconcile_single_keycloak_org(org)
 
+                # The UUID is on the instance but not saved yet, so the row
+                # still says whether this pass is the one linking the page.
+                linked = (
+                    not created
+                    and OrganizationPage.objects.filter(
+                        pk=page.pk, sso_organization_id__isnull=True
+                    ).exists()
+                )
+                if linked:
+                    page.organization_users.update(
+                        keep_until_seen=True, added_to_keycloak_at=None
+                    )
+
+                if created:
+                    parent_org_page.add_child(instance=page)
+                    page.save()
+                    parent_org_page.save()
+                else:
+                    page.save()
+
+                # An adopted organization needs an onboarding record too, so
+                # that orgs that arrived this way show up in the same place as
+                # the ones the provisioning API made.
+                OrganizationOnboarding.objects.get_or_create(
+                    organization=page,
+                    defaults={
+                        "state": ONBOARDING_STATE_ORG_CREATED,
+                        "state_changed_at": now_in_utc(),
+                    },
+                )
+
+            # Counted after the savepoint commits, so a rolled-back org is not
+            # reported as reconciled.
             if created:
                 created_count += 1
-                parent_org_page.add_child(instance=page)
-                page.save()
-                parent_org_page.save()
             else:
                 updated_count += 1
-                page.save()
-        except ValidationError:  # noqa: PERF203
+
+            if linked:
+                # After the savepoint, like link_organization_to_keycloak: a
+                # member Keycloak won't take keeps access through the flag.
+                failed_members = sync_organization_members_to_keycloak(
+                    page,
+                    connection=KeycloakConnection(client=org_model.admin_client),
+                )
+                if failed_members:
+                    log.warning(
+                        "Could not add %s member(s) of %s to its Keycloak "
+                        "organization: %s",
+                        len(failed_members),
+                        page.org_key,
+                        [user.id for user in failed_members],
+                    )
+        except (ValidationError, IntegrityError):  # noqa: PERF203
+            # IntegrityError because OrganizationOnboarding.organization is a
+            # OneToOneField: a concurrent provisioning saga or a second
+            # reconcile run can insert the row between this one's check and its
+            # insert. The per-org catch is the point - one org losing that race
+            # must not abandon the rest of the pass.
             log.exception(
-                "Validation error: could not create or update organization for Keycloak org %s",
+                "Could not create or update organization for Keycloak org %s",
                 org.id,
             )
 
     return (created_count, updated_count)
+
+
+def upgrade_user_enrollments_for_contracts(user, contracts):
+    """
+    Upgrade the user's audit enrollments in the given contracts to verified.
+
+    A learner may have audited a run or program that is also in a contract,
+    while it was still publicly available. When they join that contract, those
+    enrollments should become verified. The upgrade happens locally right away.
+    The edX side is queued, because this runs during login (via
+    reconcile_user_orgs), and we don't want a slow or unavailable edX to hold
+    up the page load.
+
+    Upgraded run enrollments are flagged edx_enrolled=False until the task
+    succeeds, so retry_failed_edx_enrollments will pick them up if it doesn't.
+
+    A run is eligible if it's live, has a verified mode, and its upgrade
+    deadline hasn't passed. A program is eligible if it's live and has a
+    verified mode. Enrollments that are inactive or that have a change status
+    (deferred, refunded, etc.) are left alone, as are verified ones.
+
+    Args:
+    - user (User): the user that was attached to the contracts
+    - contracts (Iterable[ContractPage]): the contracts the user was attached to
+    Returns:
+    - tuple(list[CourseRunEnrollment], list[ProgramEnrollment]): the upgraded
+      enrollments
+    """
+
+    now = now_in_utc()
+    upgraded_runs = []
+    upgraded_programs = []
+
+    for contract in contracts:
+        run_enrollments = (
+            CourseRunEnrollment.objects.filter(
+                user=user,
+                enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+                run__b2b_contracts=contract,
+                run__live=True,
+                run__enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+            )
+            .filter(
+                Q(run__upgrade_deadline__isnull=True) | Q(run__upgrade_deadline__gt=now)
+            )
+            .exclude(change_status__in=ALL_ENROLL_CHANGE_STATUSES)
+            .select_related("run")
+            .distinct()
+        )
+
+        for enrollment in run_enrollments:
+            enrollment.enrollment_mode = EDX_ENROLLMENT_VERIFIED_MODE
+            if not enrollment.run.is_fake_course_run:
+                enrollment.edx_enrolled = False
+                enrollment.edx_enrollment_retry_count = 0
+            if enrollment.b2b_contract_id is None:
+                enrollment.b2b_contract = contract
+            enrollment.save_and_log(None)
+            upgraded_runs.append(enrollment)
+
+        program_enrollments = (
+            ProgramEnrollment.objects.filter(
+                user=user,
+                enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+                program__contract_memberships__contract=contract,
+                program__live=True,
+                program__enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+            )
+            .exclude(change_status__in=ALL_ENROLL_CHANGE_STATUSES)
+            .distinct()
+        )
+
+        for enrollment in program_enrollments:
+            enrollment.enrollment_mode = EDX_ENROLLMENT_VERIFIED_MODE
+            if enrollment.b2b_contract_id is None:
+                enrollment.b2b_contract = contract
+            enrollment.save_and_log(None)
+            upgraded_programs.append(enrollment)
+
+    edx_enrollment_ids = [
+        enrollment.id
+        for enrollment in upgraded_runs
+        if not enrollment.run.is_fake_course_run
+    ]
+
+    if edx_enrollment_ids:
+        transaction.on_commit(
+            lambda: push_upgraded_enrollments_to_edx.delay(edx_enrollment_ids)
+        )
+
+    if upgraded_runs or upgraded_programs:
+        log.info(
+            "upgrade_user_enrollments_for_contracts: upgraded %s run and %s program enrollments for %s",
+            len(upgraded_runs),
+            len(upgraded_programs),
+            user.id,
+        )
+
+    return upgraded_runs, upgraded_programs
+
+
+def add_user_org_membership(org, user):
+    """
+    Add a given user to a Keycloak organization.
+
+    If we're adding a user to a contract, and they're not in that contract's
+    organization, we need to do that and update Keycloak as well. Since the user
+    won't have the org in their user data list initially, we'll also need to
+    flag the membership so we don't remove it immediately later in the
+    middleware.
+
+    Args:
+    - org (OrganizationPage): The organization to add the user to.
+    - user (User): The user to add to the organization.
+    Returns:
+    - bool: True if the user was added, False otherwise.
+    """
+
+    if not org.sso_organization_id:
+        return False
+
+    org_model = get_keycloak_model(OrganizationRepresentation, "organizations")
+
+    kc_org = org_model.get(org.sso_organization_id)
+
+    if not kc_org:
+        log.warning("No Keycloak organization found for %s", org.sso_organization_id)
+        return False
+
+    return org_model.associate("members", org.sso_organization_id, user.global_id)
+
+
+def lock_contract_for_code_assignment(contract: ContractPage) -> None:
+    """
+    Serialize code assignment for a contract until the transaction ends.
+
+    Assigning checks which codes are free and then inserts assignment rows.
+    Locking the candidate discounts would not close that gap, because a
+    concurrent assignment inserts a redemption row and never updates the
+    discount, so Postgres has nothing to re-check. Holding the contract row
+    instead makes the second request wait and then read the first one's rows.
+    Only the contract's own table is locked, not the Wagtail page row.
+
+    FOR NO KEY UPDATE serializes callers of this against each other but does
+    not conflict with the key-share lock an insert referencing the contract
+    takes. A transaction may therefore take this after writing rows that
+    reference the contract without deadlocking another caller, and those
+    writes elsewhere don't wait on an assignment holding it.
+    """
+
+    ContractPage.objects.select_for_update(of=("self",), no_key=True).get(
+        pk=contract.pk
+    )
+
+
+def process_add_org_membership(user, organization, *, keep_until_seen=False):
+    """
+    Add a user to an org, and kick off contract processing.
+
+    This allows us to manage UserOrganization records without necessarily
+    being forced to process contract memberships at the same time.
+
+    Args:
+    - user (users.models.User): the user to add
+    - organization (b2b.models.OrganizationPage): the organization to add the user to
+    - keep_until_seen (bool): if True, the user will be kept in the org until the
+        organization is seen in their SSO data.
+    """
+
+    obj, created = UserOrganization.objects.get_or_create(
+        user=user,
+        organization=organization,
+    )
+    if created:
+        obj.keep_until_seen = keep_until_seen
+        obj.save()
+        try:
+            if organization.attach_user(user):
+                obj.added_to_keycloak_at = now_in_utc()
+                obj.save(update_fields=["added_to_keycloak_at"])
+        # requests' ConnectionError and Timeout are not the builtin
+        # ConnectionError, so Keycloak being unreachable needs the second one.
+        except (ConnectionError, requests.exceptions.RequestException):
+            log.exception(
+                "Could not attach %s to Keycloak org for %s", user, organization
+            )
+        organization.add_user_contracts(user)
+
+    return obj
+
+
+def process_remove_org_membership(user, organization):
+    """
+    Remove a user from an org, and kick off contract processing.
+
+    Other side of the process_add_org_membership function - removes the membership
+    and associated managed contracts.
+
+    Args:
+    - user (users.models.User): the user to remove
+    - organization (b2b.models.OrganizationPage): the organization to remove the user from
+    """
+
+    organization.remove_user_contracts(user)
+
+    UserOrganization.objects.filter(
+        user=user,
+        organization=organization,
+    ).get().delete()
+
+
+def verify_mailgun_signature(api_key, token, timestamp, signature):
+    # Cribbed from https://www.mailgun.com/blog/email/your-guide-to-webhooks/.
+    if not settings.MAILGUN_WEBHOOK_VALIDATE_SIGNATURE:
+        return True
+
+    message = f"{timestamp}{token}"
+    expected_signature = hmac.new(
+        key=api_key.encode(), msg=message.encode(), digestmod=hashlib.sha256
+    ).hexdigest()
+    return signature == expected_signature
+
+
+class MailgunWebhookSignature(BaseModel):
+    """The signature block Mailgun attaches to every webhook payload."""
+
+    token: str
+    timestamp: str
+    signature: str
+
+
+class MailgunWebhookMessageHeaders(BaseModel):
+    """The subset of message headers Mailgun includes with an event."""
+
+    model_config = ConfigDict(extra="allow")
+
+    message_id: str = Field(alias="message-id")
+
+
+class MailgunWebhookMessage(BaseModel):
+    """The message block describing the email an event pertains to."""
+
+    model_config = ConfigDict(extra="allow")
+
+    headers: MailgunWebhookMessageHeaders
+
+
+class MailgunWebhookEventData(BaseModel):
+    """The event-data block of a Mailgun webhook payload."""
+
+    model_config = ConfigDict(extra="allow")
+
+    event: str
+    tags: list[str] = Field(default_factory=list)
+    message: MailgunWebhookMessage
+    severity: str | None = None
+    timestamp: float
+
+
+class MailgunWebhookPayload(BaseModel):
+    """A synthetic or real Mailgun webhook payload, as built by build_payload."""
+
+    model_config = ConfigDict(extra="allow")
+
+    signature: MailgunWebhookSignature
+    event_data: MailgunWebhookEventData = Field(alias="event-data")
+
+
+def is_potentially_valid_mailgun_webhook(payload):
+    signing_secret = settings.MAILGUN_WEBHOOK_SIGNING_SECRET
+    # If we are supposed to validate signatures but don't have a secret, fail closed
+    # If we aren't validating signatures (such as in local development w/ synthetic data),
+    # it doesnt matter if we have a secret, treat everything as potentially valid
+    if not signing_secret and settings.MAILGUN_WEBHOOK_VALIDATE_SIGNATURE:
+        return False
+
+    try:
+        webhook = MailgunWebhookPayload.model_validate(payload)
+    except PydanticValidationError:
+        return False
+
+    # Check for the right message tag - if it's not there, do nothing else.
+    # We want to throw out unrelated messages as fast as possible
+    return ENROLLMENT_CODE_ASSINGMENT_TAG in webhook.event_data.tags
+
+
+def is_trackable_event_type(event_data):
+    event_type = event_data["event"]
+    if event_type not in MAILGUN_EMAIL_EVENT_TYPES:
+        return False
+
+    if event_type == EMAIL_STATUS_FAILED:
+        # This field is only present on temporary and permanent failures.
+        # We don't want to show temporary ones to contract managers since there's nothing to do but wait for resolution
+        severity = event_data.get("severity", "")
+        if severity == EMAIL_STATUS_FAILED_TEMPORARY_SEVERITY:
+            return False
+
+    return True
+
+
+def is_later_event(event_data, record):
+    event_timestamp = datetime.fromtimestamp(event_data["timestamp"], tz=UTC)
+    if (  # noqa: SIM103
+        record.email_status_event_timestamp
+        and record.email_status_event_timestamp >= event_timestamp
+    ):
+        return False
+
+    return True
+
+
+# We may want to move some of the cheapest checks to the web tier, but the actual queries need to happen in a task.
+def process_mailgun_webhook_for_enrollment_code_emails(payload):
+    if not is_potentially_valid_mailgun_webhook(payload):
+        return None
+
+    signing_secret = settings.MAILGUN_WEBHOOK_SIGNING_SECRET
+    event_data = payload["event-data"]
+    # Now that we've run the cheapest check, validate the event signature.
+    signature_param = payload["signature"]
+    token = signature_param["token"]
+    timestamp = signature_param["timestamp"]
+    signature = signature_param["signature"]
+
+    if not verify_mailgun_signature(signing_secret, token, timestamp, signature):
+        return None
+
+    if not is_trackable_event_type(event_data):
+        return None
+
+    # At this point we know that the payload is for the email we care about, it's from mailgun, and it's one of the events we care about
+    # Save it to the row corresponding to the event we just got and move on with our lives
+    message_id = event_data["message"]["headers"]["message-id"]
+    message_timestamp = datetime.fromtimestamp(event_data["timestamp"], tz=UTC)
+    assignment = DiscountContractAttachmentRedemption.objects.filter(
+        email_message_id=message_id
+    ).first()
+
+    # This can happen if a user was sent a reminder and then later clicks on the original email.
+    # The DCAR currently only tracks the most recently sent email, so if the user clicks on an older one,
+    # we won't have a record of it. In that case, we just ignore the event.
+    if not assignment:
+        return None
+
+    # We want to store event with the most recent timestamp we get from mailgun.
+    # Event receipt/processing is not guaranteed to be chronologically ordered, so this prevents older events from
+    # clobbering ones which actually occurred later.
+    if is_later_event(event_data, assignment):
+        assignment.email_status = event_data["event"]
+        assignment.email_status_event_timestamp = message_timestamp
+        assignment.save()
+    else:
+        return assignment
+
+    return assignment
+
+
+# Normalize the response from the logs api to have fields expected from webhooks.
+# At the moment, its just timestamp which is misnamed
+def _unpack_event_data_from_api_response(mailgun_log_response):
+    mailgun_log_response["timestamp"] = datetime.fromisoformat(
+        mailgun_log_response["@timestamp"]
+    ).timestamp()
+    return mailgun_log_response
+
+
+# Same set of checks as in process_mailgun_webhook_for_enrollment_code_emails but without signature validation
+def should_persist_event(record, event):
+    if not is_trackable_event_type(event) or not is_later_event(event, record):  # noqa: SIM103
+        return False
+
+    return True
+
+
+def get_events_for_message_ids(message_ids):
+    events_by_message_id = {}
+    for message_id in message_ids:
+        events_by_message_id[message_id] = [
+            _unpack_event_data_from_api_response(event)
+            for event in fetch_logs_for_message(message_id)
+        ]
+    return events_by_message_id
+
+
+def fetch_logs_for_message(message_id):
+    """Page through POST /v1/analytics/logs for a single message_id."""
+    items = []
+    pagination = {"sort": MAILGUN_LOGS_DESC, "limit": MAILGUN_LOGS_PAGE_LIMIT}
+
+    while True:
+        body = {
+            "end": email.utils.format_datetime(now_in_utc()),
+            "duration": MAILGUN_LOGS_RETENTION_DAYS,
+            "filter": {
+                "AND": [
+                    {
+                        "attribute": "message_id",
+                        "comparator": "=",
+                        "values": [{"label": message_id, "value": message_id}],
+                    }
+                ]
+            },
+            "events": MAILGUN_EMAIL_EVENT_TYPES,
+            "include_subaccounts": True,
+            "pagination": pagination,
+        }
+
+        resp = requests.post(
+            MAILGUN_LOGS_API_URL,
+            json=body,
+            headers={"Content-Type": "application/json"},
+            auth=("api", settings.MAILGUN_KEY),
+            timeout=30,
+        )
+        resp.raise_for_status()
+        payload = resp.json()
+
+        page_items = payload.get("items", [])
+        items.extend(page_items)
+
+        next_token = payload.get("pagination", {}).get("next")
+        if not next_token or not page_items:
+            break
+
+        pagination = {
+            "sort": MAILGUN_LOGS_DESC,
+            "limit": MAILGUN_LOGS_PAGE_LIMIT,
+            "token": next_token,
+        }
+
+    return items

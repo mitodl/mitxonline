@@ -1,15 +1,18 @@
 """Serializers for the B2B API (v0)."""
 
+from drf_spectacular.utils import extend_schema_field, inline_serializer
 from rest_framework import serializers
 
 from b2b.models import ContractPage, OrganizationPage
 from main.constants import USER_MSG_TYPE_B2B_CHOICES
+from main.serializers import RichTextSerializer
+from variants.serializers import SupportedVariantSerializer
 
 
-class ContractPageSerializer(serializers.ModelSerializer):
-    """
-    Serializer for the ContractPage model.
-    """
+class BaseContractPageSerializer(serializers.ModelSerializer):
+    """Simplified serializer for the ContractPage model."""
+
+    membership_type = serializers.CharField()
 
     class Meta:
         model = ContractPage
@@ -17,25 +20,56 @@ class ContractPageSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "description",
-            "integration_type",
+            "membership_type",
             "organization",
             "contract_start",
             "contract_end",
-            "active",
             "slug",
-            "organization",
         ]
         read_only_fields = [
             "id",
             "name",
             "description",
-            "integration_type",
+            "membership_type",
             "organization",
             "contract_start",
             "contract_end",
-            "active",
             "slug",
-            "organization",
+        ]
+
+
+class ContractPageSerializer(BaseContractPageSerializer):
+    """
+    Serializer for the ContractPage model.
+    """
+
+    programs = serializers.SerializerMethodField()
+    welcome_message_extra = RichTextSerializer(
+        help_text=ContractPage._meta.get_field("welcome_message_extra").help_text,  # noqa: SLF001, not private https://docs.djangoproject.com/en/5.0/ref/models/meta/
+        read_only=True,
+    )
+    variant_options = SupportedVariantSerializer(many=True, read_only=True)
+
+    @extend_schema_field(serializers.ListField(child=serializers.IntegerField()))
+    def get_programs(self, instance):
+        """Get the ordered list of program IDs for this contract"""
+        return [program.program_id for program in instance.contract_program_ids]
+
+    class Meta:
+        model = ContractPage
+        fields = [
+            *BaseContractPageSerializer.Meta.fields,
+            "welcome_message",
+            "welcome_message_extra",
+            "programs",
+            "variant_options",
+        ]
+        read_only_fields = [
+            *BaseContractPageSerializer.Meta.read_only_fields,
+            "welcome_message",
+            "welcome_message_extra",
+            "programs",
+            "variant_options",
         ]
 
 
@@ -44,7 +78,16 @@ class OrganizationPageSerializer(serializers.ModelSerializer):
     Serializer for the OrganizationPage model.
     """
 
-    contracts = ContractPageSerializer(many=True, read_only=True)
+    contracts = serializers.SerializerMethodField()
+
+    @extend_schema_field(ContractPageSerializer(many=True))
+    def get_contracts(self, instance):
+        """Get only active contracts for the organization"""
+        if hasattr(instance, "_user_active_contracts"):
+            active_contracts = instance._user_active_contracts  # noqa: SLF001
+        else:
+            active_contracts = instance.active_contracts
+        return ContractPageSerializer(active_contracts, many=True).data
 
     class Meta:
         model = OrganizationPage
@@ -54,6 +97,7 @@ class OrganizationPageSerializer(serializers.ModelSerializer):
             "description",
             "logo",
             "slug",
+            "sso_organization_id",
             "contracts",
         ]
         read_only_fields = [
@@ -62,8 +106,57 @@ class OrganizationPageSerializer(serializers.ModelSerializer):
             "description",
             "logo",
             "slug",
+            "sso_organization_id",
             "contracts",
         ]
+
+
+class UserContractPageSerializer(ContractPageSerializer):
+    """
+    A contract the requesting user belongs to, with the user's data sharing
+    consent for it.
+    """
+
+    consented_to_data_sharing = serializers.SerializerMethodField(
+        help_text=(
+            "Whether the user consented to share their learner data with the "
+            "organization: null if never asked, true if consented, false if "
+            "declined or withdrawn."
+        )
+    )
+
+    @extend_schema_field(serializers.BooleanField(allow_null=True))
+    def get_consented_to_data_sharing(self, instance):
+        """Get the user's consent value from the prefetched membership row"""
+        # Prefetched by b2b.api.get_user_b2b_organizations
+        memberships = instance._user_memberships  # noqa: SLF001
+        return memberships[0].consented_to_data_sharing if memberships else None
+
+    class Meta(ContractPageSerializer.Meta):
+        fields = [
+            *ContractPageSerializer.Meta.fields,
+            "consented_to_data_sharing",
+        ]
+        read_only_fields = [
+            *ContractPageSerializer.Meta.read_only_fields,
+            "consented_to_data_sharing",
+        ]
+
+
+class UserOrganizationPageSerializer(OrganizationPageSerializer):
+    """
+    An organization the requesting user belongs to, with the user's active
+    contracts in it.
+    """
+
+    @extend_schema_field(UserContractPageSerializer(many=True))
+    def get_contracts(self, instance):
+        """Get the user's active contracts, with the user's consent"""
+        # Prefetched by b2b.api.get_user_b2b_organizations
+        return UserContractPageSerializer(
+            instance._user_active_contracts,  # noqa: SLF001
+            many=True,
+        ).data
 
 
 class GenerateCheckoutPayloadSerializer(serializers.Serializer):
@@ -94,6 +187,29 @@ class GenerateCheckoutPayloadSerializer(serializers.Serializer):
     )
 
 
+class B2BEnrollRequestSerializer(serializers.Serializer):
+    """
+    Serializer for the B2B enrollment request body.
+
+    Accepts an optional program_id so the user can be enrolled in the
+    appropriate program alongside the course run enrollment.
+    Accepts an optional contract_slug so it can identify which contract
+    the user is working in, so the enrollments can be linked back to the
+    right contract.
+    """
+
+    program_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="The readable_id of the program to enroll the user in.",
+    )
+    contract_slug = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="The slug for the contract the user is in.",
+    )
+
+
 class CreateB2BEnrollmentSerializer(serializers.Serializer):
     """
     Serializer for the result from create_b2b_enrollment.
@@ -109,3 +225,27 @@ class CreateB2BEnrollmentSerializer(serializers.Serializer):
         max_digits=None, decimal_places=2, read_only=True, required=False
     )
     checkout_result = GenerateCheckoutPayloadSerializer(required=False)
+
+
+class DataConsentSerializer(serializers.Serializer):
+    """
+    Records whether a user has consented to data sharing for a contract
+    """
+
+    consented = serializers.BooleanField(allow_null=False, required=True)
+
+
+# This kinda sucks, is there really no standard way to annotate the default behavior for a DRF validity exception?
+class DataConsentValidationErrorSerializer(serializers.Serializer):
+    """Default DRF is_valid(raise_exception=True) error shape for DataConsentSerializer."""
+
+    errors = inline_serializer(
+        name="DataConsentFieldErrors",
+        fields={
+            "consented": serializers.ListField(
+                child=serializers.CharField(),
+                required=False,
+                help_text="Errors for the 'consented' field, e.g. if missing or not a boolean.",
+            )
+        },
+    )

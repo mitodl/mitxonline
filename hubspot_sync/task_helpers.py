@@ -3,9 +3,15 @@
 import logging
 
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
+from mitol.hubspot_api.api import HubspotObjectType
+from mitol.hubspot_api.models import HubspotObject
 
+from courses.models import CourseRun, ProgramEnrollment
+from courses.utils import is_uai_order, is_xpro_order
 from ecommerce.models import Order, Product
 from hubspot_sync import tasks
+from hubspot_sync.api import _resolve_hubspot_token
 from users.models import User
 
 # pylint:disable-bare-except
@@ -20,6 +26,15 @@ def sync_hubspot_user(user: User):
     Args:
         user (User): The user to sync
     """
+    # Skip sync for B2B users to avoid errors
+    if user.b2b_contracts.exists():
+        log.info(
+            "Skipping HubSpot sync for B2B user %s (user_id=%d)",
+            user.edx_username,
+            user.id,
+        )
+        return
+
     if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
         try:
             tasks.sync_contact_with_hubspot.delay(user.id)
@@ -30,38 +45,138 @@ def sync_hubspot_user(user: User):
             )
 
 
+def sync_hubspot_users_batch(user_ids):
+    """
+    Trigger celery tasks to sync many Users to Hubspot via the batch endpoints.
+
+    Unlike sync_hubspot_user, which enqueues one task (and one HubSpot API call)
+    per user, this splits the users into those that already have a HubSpot
+    contact (batch update) and those that don't (batch create) and dispatches
+    each group through batch_upsert_hubspot_objects, which chunks the requests
+    against HubSpot's batch endpoints.
+
+    Args:
+        user_ids (Iterable[int]): ids of the users to sync
+    """
+    if not settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN or not user_ids:
+        return
+
+    # Skip sync for B2B users to avoid errors
+    users = User.objects.filter(id__in=user_ids).exclude(b2b_contracts__isnull=False)
+    eligible_ids = list(users.order_by("id").values_list("id", flat=True))
+    skipped_count = len(set(user_ids)) - len(eligible_ids)
+    if skipped_count:
+        log.info("Skipping HubSpot sync for %d B2B user(s)", skipped_count)
+    if not eligible_ids:
+        return
+
+    content_type = ContentType.objects.get_for_model(User)
+    synced_ids = set(
+        HubspotObject.objects.filter(
+            content_type=content_type, object_id__in=eligible_ids
+        ).values_list("object_id", flat=True)
+    )
+    # The batch create path requires the same eligibility bar as the periodic
+    # full sync (batch_upsert_hubspot_objects with no object_ids); ineligible
+    # users would otherwise crash the create result handling in
+    # batch_create_hubspot_objects_chunked, which looks contacts up by email
+    # with is_active=True.
+    create_eligible_ids = set(
+        users.filter(
+            is_active=True,
+            email__contains="@",
+            global_id__isnull=False,
+            last_login__isnull=False,
+        ).values_list("id", flat=True)
+    )
+    to_create = [
+        uid
+        for uid in eligible_ids
+        if uid not in synced_ids and uid in create_eligible_ids
+    ]
+    to_update = [uid for uid in eligible_ids if uid in synced_ids]
+    dropped_count = len(eligible_ids) - len(to_create) - len(to_update)
+    if dropped_count:
+        log.info(
+            "Skipping HubSpot batch create for %d ineligible user(s)", dropped_count
+        )
+    for create, ids in ((True, to_create), (False, to_update)):
+        if not ids:
+            continue
+        try:
+            tasks.batch_upsert_hubspot_objects.delay(
+                HubspotObjectType.CONTACTS.value,
+                content_type.model,
+                User._meta.app_label,  # noqa: SLF001
+                create=create,
+                object_ids=ids,
+            )
+        except:  # noqa: E722
+            log.exception(
+                "Exception calling batch_upsert_hubspot_objects for %d user(s)",
+                len(ids),
+            )
+
+
+def _order_is_for_program_enrolled_course(order: Order) -> bool:
+    """Return True if any line is a course run belonging to a program the purchaser is already enrolled in."""
+    course_ids = [
+        line.purchased_object.course_id
+        for line in order.lines.all()
+        if line.purchased_object and isinstance(line.purchased_object, CourseRun)
+    ]
+    if not course_ids:
+        return False
+    return ProgramEnrollment.objects.filter(
+        user=order.purchaser,
+        program__all_requirements__course__in=course_ids,
+    ).exists()
+
+
 def sync_hubspot_deal(order: Order):
     """
     Trigger celery task to sync an order to Hubspot if it has lines.
     Use a delay of 10 seconds to make sure state is updated first.
+    For UAI/XPro courses, uses the respective HubSpot account token.
 
     Args:
         order (Order): The order to sync
     """
-    if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN and order.lines.first() is not None:
-        try:
-            tasks.sync_deal_with_hubspot.apply_async(args=(order.id,), countdown=10)
-        except:  # noqa: E722
-            log.exception(
-                "Exception calling sync_deal_with_hubspot for order %d", order.id
-            )
+    # Skip sync for B2B users to avoid errors
+    if order.purchaser.b2b_contracts.exists():
+        log.info(
+            "Skipping HubSpot deal sync for B2B user %s (user_id=%d, order_id=%d)",
+            order.purchaser.edx_username or order.purchaser.email,
+            order.purchaser.id,
+            order.id,
+        )
+        return
 
+    if _order_is_for_program_enrolled_course(order):
+        log.info(
+            "Skipping HubSpot deal sync for order %d: user %s (user_id=%d) is already enrolled in a program containing this course",
+            order.id,
+            order.purchaser.edx_username or order.purchaser.email,
+            order.purchaser.id,
+        )
+        return
 
-def sync_hubspot_line_by_line_id(line_id: int):
-    """
-    Trigger celery task to sync a Line to Hubspot.
-    Use a delay of 10 seconds to make sure state is updated first.
+    if order.lines.first() is not None:
+        is_uai = is_uai_order(order)
+        is_xpro = is_xpro_order(order)
 
-    Args:
-        line_id (int): The ID of the Line to sync with HubSpot
-    """
-    if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN and line_id is not None:
-        try:
-            tasks.sync_line_with_hubspot.apply_async(args=(line_id,), countdown=10)
-        except:  # noqa: E722
-            log.exception(
-                "Exception calling sync_line_with_hubspot for line ID %d", line_id
-            )
+        if _resolve_hubspot_token(is_uai=is_uai, is_xpro=is_xpro):
+            try:
+                tasks.sync_deal_with_hubspot_targeted.apply_async(
+                    args=(order.id,),
+                    kwargs={"is_uai": is_uai, "is_xpro": is_xpro},
+                    countdown=10,
+                )
+            except:  # noqa: E722
+                log.exception(
+                    "Exception calling sync_deal_with_hubspot_targeted for order %d",
+                    order.id,
+                )
 
 
 def sync_hubspot_product(product: Product):
@@ -77,4 +192,35 @@ def sync_hubspot_product(product: Product):
         except:  # noqa: E722
             log.exception(
                 "Exception calling sync_product_with_hubspot for product %d", product.id
+            )
+
+
+def sync_hubspot_cart_add(
+    user: User, product: Product, *, is_uai: bool, is_xpro: bool = False
+):
+    """
+    Trigger celery task to track a cart add event in HubSpot.
+
+    Args:
+        user (User): The user adding the product to cart
+        product (Product): The product being added
+        is_uai (bool): Whether the added course is a UAI course
+        is_xpro (bool): Whether the added course is an XPro course
+    """
+    if (
+        settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN
+        or getattr(settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
+        or getattr(settings, "XPRO_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
+    ):
+        try:
+            tasks.sync_cart_add_event_with_hubspot.apply_async(
+                args=(user.id, product.id),
+                kwargs={"is_uai_course": is_uai, "is_xpro_course": is_xpro},
+                countdown=5,
+            )
+        except:  # noqa: E722
+            log.exception(
+                "Exception calling sync_cart_add_event_with_hubspot for user %s and product %d",
+                user.edx_username,
+                product.id,
             )

@@ -13,7 +13,12 @@ from django.views.generic.base import RedirectView
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
-from rest_framework.decorators import api_view, permission_classes, renderer_classes
+from rest_framework.decorators import (
+    api_view,
+    permission_classes,
+    renderer_classes,
+    versioning_class,
+)
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
@@ -29,6 +34,8 @@ from main.constants import (
     USER_MSG_TYPE_PROFILE_CREATED,
 )
 from main.utils import encode_json_cookie_value, is_success_response
+from main.versioning import NoVersioning
+from users.models import UserProfile
 
 User = get_user_model()
 
@@ -41,6 +48,7 @@ class ProfileDetailsAPIView(APIView):
     serializer_class = None
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = [IsAuthenticated]
+    versioning_class = NoVersioning
 
     def get_serializer_cls(self):  # pragma: no cover
         """Return the serializer cls"""
@@ -51,9 +59,6 @@ class ProfileDetailsAPIView(APIView):
     @extend_schema(exclude=True)
     def post(self, request):
         """Processes a request"""
-        if bool(request.session.get("hijack_history")):
-            return Response(status=status.HTTP_403_FORBIDDEN)
-
         serializer_cls = self.get_serializer_cls()
         serializer = serializer_cls(
             data=request.data,
@@ -138,7 +143,7 @@ class GatewayLoginView(View):
             params = urlencode({"next": redirect_url})
             redirect_url = f"{settings.MITXONLINE_NEW_USER_LOGIN_URL}?{params}"
 
-            profile = user.user_profile
+            profile, _ = UserProfile.objects.get_or_create(user=user)
             profile.completed_onboarding = True
             profile.save()
         return redirect(redirect_url)
@@ -176,6 +181,7 @@ class OpenedxAndApiGatewayLogoutView(RedirectView):
 @api_view(["GET"])
 @renderer_classes([JSONRenderer])
 @permission_classes([])
+@versioning_class(NoVersioning)
 def logout_complete(request):  # noqa: ARG001
     """Simple response for openedx logout being complete"""
     return Response({"message": "Logout complete"}, content_type="application/json")
@@ -196,7 +202,7 @@ class AccountActionStartView(RedirectView):
 
         if action not in self.ACTION_MAPPING:
             log.error("Received unexpected account action: %s", action)
-            redirect_url = self.request.META.get("HTTP_REFERER", settings.SITE_BASE_URL)
+            redirect_url = self.request.headers.get("referer", settings.SITE_BASE_URL)
             return (
                 redirect_url
                 if url_has_allowed_host_and_scheme(

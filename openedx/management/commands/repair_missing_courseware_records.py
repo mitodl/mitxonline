@@ -63,7 +63,7 @@ class Command(BaseCommand):
     def repair_parallel(self):
         self.stdout.write("Sending task to celery to repair users in parallel")
 
-        from openedx import tasks
+        from openedx import tasks  # noqa: PLC0415
 
         task = tasks.repair_faulty_openedx_users_parallel.delay()
         task.get()

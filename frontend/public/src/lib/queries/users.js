@@ -12,6 +12,8 @@ import type {
 export const currentUserSelector = (state: any): ?CurrentUser =>
   state.entities.currentUser
 
+export const CURRENT_USER_URL = "/api/v0/users/current_user/"
+
 // replace the previous state with the next state without merging
 const nextState = nthArg(1)
 
@@ -31,7 +33,7 @@ const DEFAULT_OPTIONS = {
 
 export default {
   currentUserQuery: () => ({
-    url:       "/api/users/me",
+    url:       CURRENT_USER_URL,
     transform: transformCurrentUser,
     update:    updateResult
   }),
@@ -48,7 +50,7 @@ export default {
     ...DEFAULT_OPTIONS,
     transform: transformCurrentUser,
     update:    updateResult,
-    url:       "/api/users/me",
+    url:       "/api/v0/users/me",
     body:      {
       ...profileData
     }
@@ -57,7 +59,7 @@ export default {
     ...DEFAULT_OPTIONS,
     transform: transformCurrentUser,
     update:    updateResult,
-    url:       "/api/users/current_user",
+    url:       "/api/v0/users/current_user",
     body:      {
       ...profileData
     }

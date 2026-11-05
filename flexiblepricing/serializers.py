@@ -69,6 +69,19 @@ class FlexiblePriceSerializer(serializers.ModelSerializer):
             "justification",
             "country_of_residence",
         ]
+        read_only_fields = [
+            "id",
+            "user",
+            "status",
+            "income_usd",
+            "original_income",
+            "original_currency",
+            "country_of_income",
+            "date_exchange_rate",
+            "date_documents_sent",
+            "justification",
+            "country_of_residence",
+        ]
 
 
 class FlexiblePriceIncomeSerializer(serializers.ModelSerializer):
@@ -207,7 +220,7 @@ class FlexiblePriceCoursewareAdminSerializer(serializers.ModelSerializer):
         program_content_type = ContentType.objects.get(
             app_label="courses", model="program"
         ).id
-        if instance["courseware_content_type"] == course_content_type:  # noqa: RET503
+        if instance["courseware_content_type"] == course_content_type:
             return BaseCourseSerializer(
                 Course.objects.filter(id=instance["courseware_object_id"]).first()
             ).data
@@ -215,6 +228,8 @@ class FlexiblePriceCoursewareAdminSerializer(serializers.ModelSerializer):
             return BaseProgramSerializer(
                 Program.objects.filter(id=instance["courseware_object_id"]).first()
             ).data
+
+        return None
 
     @extend_schema_field(str)
     def get_id(self, instance):

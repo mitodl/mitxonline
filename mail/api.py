@@ -32,6 +32,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.template.loader import render_to_string
 
+from mail.constants import EMAIL_SITE_NAME
 from mail.exceptions import EmailSendFailureException, MultiEmailValidationError
 
 log = logging.getLogger()
@@ -95,7 +96,13 @@ def can_email_user(user):
 
 def get_base_context():
     """Returns a dict of context variables that are needed in all emails"""
-    return {"base_url": settings.SITE_BASE_URL, "site_name": settings.SITE_NAME}
+    return {
+        "base_url": settings.SITE_BASE_URL,
+        "site_name": EMAIL_SITE_NAME,
+        "mit_learn_terms_url": settings.MIT_LEARN_TERMS_URL,
+        "mit_learn_privacy_url": settings.MIT_LEARN_PRIVACY_URL,
+        "mit_learn_honor_code_url": settings.MIT_LEARN_HONOR_CODE_URL,
+    }
 
 
 def context_for_user(*, user=None, extra_context=None):
@@ -260,7 +267,7 @@ def build_message(connection, template_name, recipient, context, metadata=None):
         subject=subject,
         body=text_body,
         to=[recipient],
-        from_email=settings.MAILGUN_FROM_EMAIL,
+        from_email=settings.MIT_LEARN_FROM_EMAIL,
         connection=connection,
         headers={"Reply-To": settings.MITX_ONLINE_REPLY_TO_ADDRESS},
     )

@@ -1,12 +1,16 @@
 name: CI
 on: [push]
+
+permissions:
+  contents: read
+
 jobs:
-  python-tests:
-    runs-on: ubuntu-22.04
+  python-checks:
+    runs-on: ubuntu-24.04
 
     services:
       db:
-        image: postgres:15.10
+        image: postgres:15.16
         # Health checks to wait until postgres has started
         options: >-
           --health-cmd pg_isready
@@ -20,74 +24,34 @@ jobs:
         ports:
           - 5432:5432
 
-      redis:
-        image: redis:7.4.3
-        ports:
-          - 6379:6379
-
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
       - name: Apt update
         run: sudo apt-get update -y
 
       - name: Apt install
-        run: cat Aptfile | sudo xargs apt-get install
+        run: xargs sudo apt-get install < Aptfile
 
-      - name: Install poetry
-        uses: snok/install-poetry@v1
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
-          version: 2.1.3
-          virtualenvs-create: true
-          virtualenvs-in-project: true
+          enable-cache: true
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
+      - name: Install Python
+        run: uv python install 3.11
 
       - name: Install dependencies
-        run: poetry install --no-interaction
+        run: uv sync --locked
 
       - name: Create test local state
         run: ./scripts/test/stub-data.sh
 
-      - name: Running Celery
-        run: |
-          celery -A main worker -B -l INFO &
-          sleep 10
-        env:
-          CELERY_TASK_ALWAYS_EAGER: 'True'
-          CELERY_BROKER_URL: redis://localhost:6379/4
-          CELERY_RESULT_BACKEND: redis://localhost:6379/4
-          SECRET_KEY: local_unsafe_key   # pragma: allowlist secret
-          MITX_ONLINE_BASE_URL: http://localhost:8013
-          MAILGUN_SENDER_DOMAIN: other.fake.site
-          MAILGUN_KEY: fake_mailgun_key
-          MITX_ONLINE_ADMIN_EMAIL: example@localhost
-          OPENEDX_API_CLIENT_ID: fake_client_id
-          OPENEDX_API_CLIENT_SECRET: fake_client_secret  # pragma: allowlist secret
-
       - name: Django system checks
-        run: poetry run ./manage.py check --fail-level WARNING
-        env:
-          CELERY_TASK_ALWAYS_EAGER: 'True'
-          CELERY_BROKER_URL: redis://localhost:6379/4
-          CELERY_RESULT_BACKEND: redis://localhost:6379/4
-          SECRET_KEY: local_unsafe_key   # pragma: allowlist secret
-          MITX_ONLINE_BASE_URL: http://localhost:8013
-          MAILGUN_SENDER_DOMAIN: other.fake.site
-          MAILGUN_KEY: fake_mailgun_key
-          MITX_ONLINE_ADMIN_EMAIL: example@localhost
-          OPENEDX_API_CLIENT_ID: fake_client_id
-          OPENEDX_API_CLIENT_SECRET: fake_client_secret  # pragma: allowlist secret
-
-      - name: Tests
-        run: |
-          export MEDIA_ROOT="$(mktemp -d)"
-          cp scripts/test/data/webpack-stats/* webpack-stats/
-          ./scripts/test/python_tests.sh
-        env:
+        run: uv run ./manage.py check --fail-level WARNING
+        env: &django-env-vars
           DEBUG: False
           NODE_ENV: 'production'
           CELERY_TASK_ALWAYS_EAGER: 'True'
@@ -107,27 +71,136 @@ jobs:
           OPENEDX_API_CLIENT_ID: fake_client_id
           OPENEDX_API_CLIENT_SECRET: fake_client_secret  # pragma: allowlist secret
           SECRET_KEY: local_unsafe_key  # pragma: allowlist secret
+          MITOL_PAYMENT_GATEWAY_STRIPE_API_KEY: skc_test_123456  # pragma: allowlist secret
 
-      - name: Upload coverage to CodeCov
-        uses: codecov/codecov-action@v4
+      - name: Get current date
+        id: date
+        run: echo "date=$(date -u +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Keycloak OpenAPI spec
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
-          file: ./coverage.xml
+          path: ${{ runner.temp }}/keycloak-openapi.yaml
+          key: keycloak-openapi-spec-${{ steps.date.outputs.date }}
+
+      - name: Set Keycloak OpenAPI spec path
+        run: echo "KEYCLOAK_OPENAPI_SPEC_FILE=${{ runner.temp }}/keycloak-openapi.yaml" >> "$GITHUB_ENV"
+
+      - name: Migration and OpenAPI spec checks
+        run: ./scripts/test/python_checks.sh
+        env: *django-env-vars
+
+  python-tests:
+    runs-on: ubuntu-24.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [1, 2, 3, 4]
+
+    env:
+      # coverage instrumentation roughly doubles suite runtime and nothing in CI
+      # consumes the coverage output (no upload step, all codecov.yml thresholds
+      # disabled) - skip it here, it's still available locally via a plain `pytest --cov`.
+      PYTEST_ADDOPTS: "--no-cov"
+
+    services:
+      db:
+        image: postgres:15.16
+        # Health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres  # pragma: allowlist secret
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:8.6.2@sha256:832d7785830f3f4b559300e6191fc914b15642c1935252338825cf4332200148
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Apt update
+        run: sudo apt-get update -y
+
+      - name: Apt install
+        run: xargs sudo apt-get install < Aptfile
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Create test local state
+        run: ./scripts/test/stub-data.sh
+
+      - name: Running Celery
+        run: |
+          celery -A main worker -B -l INFO &
+          sleep 10
+        env: &django-shard-env-vars
+          DEBUG: False
+          NODE_ENV: 'production'
+          CELERY_TASK_ALWAYS_EAGER: 'True'
+          CELERY_BROKER_URL: redis://localhost:6379/4
+          CELERY_RESULT_BACKEND: redis://localhost:6379/4
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres  # pragma: allowlist secret
+          MAILGUN_KEY: fake_mailgun_key
+          MAILGUN_SENDER_DOMAIN: other.fake.site
+          MITX_ONLINE_ADMIN_EMAIL: example@localhost
+          MITX_ONLINE_BASE_URL: http://localhost:8013
+          MITX_ONLINE_DB_DISABLE_SSL: 'True'
+          MITX_ONLINE_EMAIL_BACKEND: django.core.mail.backends.locmem.EmailBackend
+          MITX_ONLINE_NOTIFICATION_EMAIL_BACKEND: django.core.mail.backends.locmem.EmailBackend
+          MITX_ONLINE_SECURE_SSL_REDIRECT: 'False'
+          MITX_ONLINE_USE_S3: 'False'
+          OPENEDX_API_BASE_URL: http://localhost:18000
+          OPENEDX_API_CLIENT_ID: fake_client_id
+          OPENEDX_API_CLIENT_SECRET: fake_client_secret  # pragma: allowlist secret
+          SECRET_KEY: local_unsafe_key  # pragma: allowlist secret
+          MITOL_PAYMENT_GATEWAY_STRIPE_API_KEY: skc_test_123456  # pragma: allowlist secret
+
+      - name: Tests
+        run: |
+          MEDIA_ROOT="$(mktemp -d)"
+          export MEDIA_ROOT
+          cp scripts/test/data/webpack-stats/* webpack-stats/
+          ./scripts/test/python_tests.sh -n logical --splits 4 --group ${{ matrix.group }}
+        env: *django-shard-env-vars
 
   javascript-tests:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
       - name: Setup NodeJS
-        uses: actions/setup-node@v2-beta
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: "20.18"
 
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
@@ -144,16 +217,12 @@ jobs:
       - name: Code formatting
         run: yarn workspaces foreach run fmt:check
 
-      - name: Scss lint
-        run: yarn workspaces foreach run scss_lint
-
       - name: Flow
         run: yarn workspaces foreach run flow
 
       - name: Tests
         run: yarn workspaces foreach run test
         env:
-          CODECOV: true
           NODE_ENV: development
 
       - name: Webpack production build
@@ -162,7 +231,51 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Upload test coverage to CodeCov
-        uses: codecov/codecov-action@v4
-        with:
-          file: coverage/lcov.info
+  # ONE required status check standing for this whole workflow.
+  #
+  # GitHub's required status checks take an exact list of context names -- no
+  # wildcards, no "all checks must pass" option -- so requiring these jobs directly
+  # means restating their names in mitodl/ol-infrastructure, where the ruleset lives.
+  # That list then goes stale in two ways, and `python-tests` has already hit the
+  # worse one:
+  #
+  #   A matrix job's checks are named `python-tests (1)`..`(4)`, so the shard count is
+  #   part of the context name. This suite was a single `python-tests` job until
+  #   2026-07-23 (63ded115). Had it been required by name, that commit would have
+  #   blocked itself, and once merged every later PR would have waited forever on a
+  #   check GitHub was never going to report again -- with the cause in this repo and
+  #   the fix in another one.
+  #
+  #   A newly added job is not required until somebody remembers to go and add it, so
+  #   new CI silently cannot block a merge.
+  #
+  # Requiring `ci-gate` instead keeps the list of what must pass in the same file as
+  # the jobs it names, so resizing the matrix or adding a job is one edit in one repo.
+  # `needs` on a matrix job aggregates every shard, so no shard count appears anywhere.
+  ci-gate:
+    needs: [python-checks, python-tests, javascript-tests]
+    # Without this the gate is skipped when a dependency fails, and a skipped required
+    # check leaves the PR pending rather than failing it.
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Evaluate CI result
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          # Read from `needs` rather than naming each job again: adding a job to the
+          # list above is then the only edit, which is the entire point of this job.
+          # `skipped` passes so that a job legitimately gated behind an `if:` does not
+          # wedge the branch; `failure` and `cancelled` do not.
+          failed=$(echo "$NEEDS" | jq -r '
+            to_entries[]
+            | select(.value.result != "success" and .value.result != "skipped")
+            | .key')
+          if [ -n "$failed" ]; then
+            echo "::error::CI did not succeed: $(echo "$failed" | paste -sd, -)"
+            exit 1
+          fi
+          echo "All CI jobs succeeded."

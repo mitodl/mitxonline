@@ -24,6 +24,7 @@ import { addUserNotification } from "../../actions"
 import { ProgramEnrollmentDrawer } from "../../components/ProgramEnrollmentDrawer"
 // $FlowFixMe
 import { Modal, ModalHeader, ModalBody } from "reactstrap"
+import { checkFeatureFlag } from "../../lib/util"
 
 import EnrolledCourseList from "../../components/EnrolledCourseList"
 import EnrolledProgramList from "../../components/EnrolledProgramList"
@@ -77,6 +78,37 @@ export class DashboardPage extends React.Component<
     currentTab:                 DashboardTab.courses,
     showAddlProfileFieldsModal: false,
     destinationUrl:             ""
+  }
+
+  componentDidMount() {
+    const { currentUser } = this.props
+
+    // Identifying happens in a store middleware (see
+    // store/posthogIdentify.js) whenever /current_user/ loads. Here we just
+    // check the feature flag and redirect if enabled.
+    if (currentUser && currentUser.global_id && SETTINGS.posthog_api_host) {
+      setTimeout(() => {
+        try {
+          // Check feature flag and redirect if enabled
+          if (currentUser.global_id) {
+            const flagEnabled = checkFeatureFlag(
+              "redirect-to-learn-dashboard",
+              currentUser.global_id
+            )
+
+            if (flagEnabled) {
+              const baseUrl =
+                SETTINGS.mit_learn_dashboard_url ||
+                "https://learn.mit.edu/dashboard"
+              window.location.href = baseUrl + window.location.search
+              return
+            }
+          }
+        } catch (error) {
+          console.warn("Feature flag check failed:", error)
+        }
+      }, 500) // Wait for PostHog to process the identify call
+    }
   }
 
   toggleDrawer(enrollment: any) {

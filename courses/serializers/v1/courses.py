@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from django.conf import settings
 from drf_spectacular.utils import (
     extend_schema_field,
     extend_schema_serializer,
     inline_serializer,
 )
-from mitol.olposthog.features import is_enabled
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -13,15 +13,14 @@ from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.api import create_run_enrollments
 from courses.serializers.v1.base import (
-    BaseCourseRunEnrollmentSerializer,
+    BaseCourseRunEnrollmentWithFlexiblePriceSerializer,
     BaseCourseRunSerializer,
     BaseCourseSerializer,
-    ProductRelatedField,
+    ProductFlexiblePriceRelatedField,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_approved_flexible_price_exists
 from main import features
-from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 
 class CourseSerializer(BaseCourseSerializer):
@@ -49,8 +48,10 @@ class CourseSerializer(BaseCourseSerializer):
         )
     )
     def get_programs(self, instance):
-        if self.context.get("all_runs", False):
-            from courses.serializers.v1.base import BaseProgramSerializer
+        if self.context.get("include_programs", False):
+            from courses.serializers.v1.base import (  # noqa: PLC0415
+                BaseProgramSerializer,
+            )
 
             programs = (
                 models.Program.objects.select_related("page")
@@ -81,7 +82,7 @@ class CourseSerializer(BaseCourseSerializer):
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
-    products = ProductRelatedField(many=True, read_only=True)
+    products = ProductFlexiblePriceRelatedField(many=True, read_only=True)
     approved_flexible_price_exists = serializers.SerializerMethodField()
 
     class Meta:
@@ -133,7 +134,7 @@ class CourseRunWithCourseSerializer(CourseRunSerializer):
     is_enrollable = serializers.SerializerMethodField()
     is_archived = serializers.SerializerMethodField()
     course_number = serializers.SerializerMethodField()
-    products = ProductRelatedField(
+    products = ProductFlexiblePriceRelatedField(
         many=True,
         read_only=True,
         help_text="List of products associated with this course run",
@@ -157,17 +158,11 @@ class CourseRunWithCourseSerializer(CourseRunSerializer):
         ]
 
 
-class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
+class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSerializer):
     """CourseRunEnrollment model serializer"""
 
     run = CourseRunWithCourseSerializer(read_only=True)
     run_id = serializers.IntegerField(write_only=True)
-    certificate = serializers.SerializerMethodField(read_only=True)
-    enrollment_mode = serializers.ChoiceField(
-        (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE), read_only=True
-    )
-    approved_flexible_price_exists = serializers.SerializerMethodField()
-    grades = serializers.SerializerMethodField(read_only=True)
 
     def create(self, validated_data):
         user = self.context["user"]
@@ -176,14 +171,36 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
             run = models.CourseRun.objects.get(id=run_id)
         except models.CourseRun.DoesNotExist:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})  # noqa: B904
-        successful_enrollments, edx_request_success = create_run_enrollments(
+
+        if run.b2b_only:
+            raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
+
+        # The enrollment window governs getting into a run. An existing active
+        # enrollment is exempt so that mode changes and idempotent retries for
+        # already-enrolled learners keep working after the window closes.
+        if (
+            not run.is_enrollable
+            and not models.CourseRunEnrollment.objects.filter(
+                run=run, user=user, active=True
+            ).exists()
+        ):
+            raise ValidationError(
+                {"run_id": f"Course run is not open for enrollment: {run_id}"}
+            )
+
+        successful_enrollments, _ = create_run_enrollments(
             user,
             [run],
-            keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
+            keep_failed_enrollments=settings.FEATURES.get(
+                features.IGNORE_EDX_FAILURES, False
+            ),
         )
-        return successful_enrollments
 
-    class Meta(BaseCourseRunEnrollmentSerializer.Meta):
-        fields = BaseCourseRunEnrollmentSerializer.Meta.fields + [  # noqa: RUF005
+        return successful_enrollments[0] if successful_enrollments else None
+
+    class Meta(BaseCourseRunEnrollmentWithFlexiblePriceSerializer.Meta):
+        fields = [
+            *BaseCourseRunEnrollmentWithFlexiblePriceSerializer.Meta.fields,
+            "run",
             "run_id",
         ]

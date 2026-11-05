@@ -22,10 +22,11 @@ from courses.serializers.v1.courses import (
     CourseWithCourseRunsSerializer,
 )
 from courses.serializers.v1.programs import ProgramSerializer
-from ecommerce.serializers import BaseProductSerializer
+from ecommerce.serializers.v0 import BaseProductSerializer
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory
 from main.test_utils import assert_drf_json_equal, drf_datetime
+from main.utils import get_learn_product_url
 
 pytestmark = [pytest.mark.django_db]
 
@@ -33,13 +34,15 @@ FAKE = faker.Faker()
 
 
 @pytest.mark.parametrize("is_anonymous", [True, False])
-@pytest.mark.parametrize("all_runs", [True, False])
-def test_serialize_course(mocker, mock_context, is_anonymous, all_runs, settings):
+@pytest.mark.parametrize("include_programs", [True, False])
+def test_serialize_course(
+    mocker, mock_context, is_anonymous, include_programs, settings
+):
     """Test Course serialization"""
     if is_anonymous:
         mock_context["request"].user = AnonymousUser()
-    if all_runs:
-        mock_context["all_runs"] = True
+    if include_programs:
+        mock_context["include_programs"] = True
     user = mock_context["request"].user
     course = CourseFactory.create()
     course_runs = CourseRunFactory.create_batch(10, course=course)
@@ -70,7 +73,9 @@ def test_serialize_course(mocker, mock_context, is_anonymous, all_runs, settings
             "departments": [{"name": department}],
             "page": CoursePageSerializer(course.page).data,
             "programs": (
-                ProgramSerializer(course.programs, many=True).data if all_runs else None
+                ProgramSerializer(course.programs, many=True).data
+                if include_programs
+                else None
             ),
         },
     )
@@ -110,11 +115,11 @@ def test_serialize_course_with_page_fields(
             "id": course.id,
             "type": "course",
             "feature_image_src": fake_image_src,
-            "page_url": None,
+            "page_url": get_learn_product_url("courses", course.readable_id),
             "financial_assistance_form_url": expected_financial_assistance_url,
             "instructors": [],
             "current_price": None,
-            "description": bleach.clean(course_page.description, tags=[], strip=True),
+            "description": bleach.clean(course_page.description, tags={}, strip=True),
             "live": True,
             "effort": course_page.effort,
             "length": course_page.length,
@@ -125,7 +130,7 @@ def test_serialize_course_with_page_fields(
 
 def test_serialize_course_run():
     """Test CourseRun serialization"""
-    course_run = CourseRunFactory.create(course__page=None)
+    course_run = CourseRunFactory.create(course__page=None, enrollment_modes=[])
     course_run.refresh_from_db()
 
     data = CourseRunSerializer(course_run).data
@@ -154,13 +159,22 @@ def test_serialize_course_run():
                 course_run.certificate_available_date
             ),
             "course_number": course_run.course_number,
+            "enrollment_modes": [],
+            "is_primary_language": course_run.is_primary_language,
+            "language": course_run.language,
+            "language_label": course_run.language_label,
+            "variant_industry": "",
+            "variant_industry_label": "Original",
+            "variant_length": "",
+            "variant_length_label": "Full",
+            "course_id": course_run.course.id,
         },
     )
 
 
 def test_serialize_course_run_with_course():
     """Test CoursePageDepartmentsSerializer serialization"""
-    course_run = CourseRunFactory.create(course__page=None)
+    course_run = CourseRunFactory.create(course__page=None, enrollment_modes=[])
     data = CourseRunWithCourseSerializer(course_run).data
 
     assert data == {
@@ -187,6 +201,15 @@ def test_serialize_course_run_with_course():
         "approved_flexible_price_exists": False,
         "live": True,
         "run_tag": course_run.run_tag,
+        "enrollment_modes": [],
+        "is_primary_language": course_run.is_primary_language,
+        "language": course_run.language,
+        "language_label": course_run.language_label,
+        "variant_industry": course_run.variant_industry,
+        "variant_industry_label": course_run.variant_industry_label,
+        "variant_length": course_run.variant_length,
+        "variant_length_label": course_run.variant_length_label,
+        "course_id": course_run.course.id,
     }
 
 

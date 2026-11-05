@@ -3,42 +3,75 @@ Tests for course views
 """
 
 # pylint: disable=unused-argument, redefined-outer-name, too-many-arguments
+import json
 import operator as op
+from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 from urllib.parse import quote
 
 import pytest
 import reversion
+from anys import ANY_STR
+from CyberSource.rest import ApiException
 from django.db.models import Count, Q
-from django.test.client import Client
+from django.test import Client, RequestFactory
 from django.urls import reverse
+from mitol.common.utils import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
 from rest_framework import status
+from rest_framework.test import APIClient
 from reversion.models import Version
 
+from b2b.factories import ContractPageFactory
+from cms.factories import ProgramPageFactory
+from cms.serializers import CoursePageSerializer, ProgramPageSerializer
+from compliance.api import verify_user_with_exports
+from compliance.exceptions import ExportComplianceDataError, ExportComplianceError
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
-    BlockedCountryFactory,
     CourseFactory,
+    CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
+    LearnerProgramRecordShareFactory,
+    PartnerSchoolFactory,
+    PartnerSchoolProgramFactory,
+    ProgramCertificateFactory,
+    ProgramEnrollmentFactory,
+    ProgramFactory,
 )
 from courses.models import (
+    Course,
     CourseRun,
+    CourseRunEnrollment,
+    LearnerProgramRecordShare,
+    PaidProgram,
+    Program,
     ProgramEnrollment,
 )
+from courses.serializers.v1.base import EnrollmentModeSerializer
 from courses.serializers.v1.courses import (
     CourseRunEnrollmentSerializer,
     CourseRunSerializer,
     CourseRunWithCourseSerializer,
     CourseWithCourseRunsSerializer,
 )
-from courses.serializers.v1.programs import ProgramSerializer
+from courses.serializers.v1.programs import (
+    ProgramRequirementTreeSerializer,
+    ProgramSerializer,
+)
+from courses.test_utils import maybe_serialize_course_cert, maybe_serialize_program_cert
 from courses.views.test_utils import (
     num_queries_from_course,
     num_queries_from_programs,
 )
-from courses.views.v1 import UserEnrollmentsApiViewSet
+from courses.views.v1 import (
+    CourseFilterSet,
+    ProgramViewSet,
+    UserEnrollmentsApiViewSet,
+)
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Order, OrderStatus
 from main import features
@@ -49,10 +82,11 @@ from main.constants import (
     USER_MSG_TYPE_ENROLLED,
 )
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
-from main.utils import encode_json_cookie_value
+from main.utils import encode_json_cookie_value, get_learn_product_url
 from openedx.exceptions import NoEdxApiAuthError
+from users.factories import UserFactory
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("raise_nplusone")]
+pytestmark = [pytest.mark.django_db]
 
 
 EXAMPLE_URL = "http://example.com"
@@ -60,6 +94,7 @@ EXAMPLE_URL = "http://example.com"
 
 @pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
+@pytest.mark.zeal_allow("courses.CourseRun", "products")
 def test_get_programs(
     user_drf_client, django_assert_max_num_queries, course_catalog_data
 ):
@@ -79,6 +114,7 @@ def test_get_programs(
 
 @pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
+@pytest.mark.zeal_allow("courses.CourseRun", "products")
 def test_get_program(
     user_drf_client, django_assert_max_num_queries, course_catalog_data
 ):
@@ -146,6 +182,7 @@ def test_delete_program(
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [15], indirect=True)
 def test_get_courses(
@@ -235,7 +272,7 @@ def test_get_course_by_readable_id(  # noqa: PLR0913
             instance=course,
             context={
                 **mock_context,
-                "all_runs": True,
+                "include_programs": True,
             },
         ).data
     )
@@ -301,6 +338,7 @@ def test_delete_course(
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
+@pytest.mark.skip_nplusone_check
 def test_get_course_runs(user_drf_client, course_runs, django_assert_max_num_queries):
     """Test the view that handles requests for all CourseRuns"""
     with django_assert_max_num_queries(38) as context:
@@ -388,7 +426,6 @@ def test_create_course_run(user_drf_client, course_runs, django_assert_max_num_q
         {
             "title": "New CourseRun Title",
             "courseware_id": "new-courserun-id",
-            "courseware_url_path": "http://example.com",
         }
     )
     request_url = reverse("v1:course_runs_api-list")
@@ -419,6 +456,7 @@ def test_delete_course_run(user_drf_client, course_runs, django_assert_max_num_q
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
+@pytest.mark.skip_nplusone_check
 def test_user_enrollments_list(user_drf_client, user):
     """The user enrollments view should return serialized enrollments for the logged-in user"""
     assert UserEnrollmentsApiViewSet.serializer_class == CourseRunEnrollmentSerializer
@@ -508,6 +546,147 @@ def test_user_enrollments_create_invalid(user_drf_client, user):
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {"errors": {"run_id": "Invalid course run id: 1234"}}
+
+
+def test_user_enrollments_create_export_compliance_blocked(
+    mocker, user_drf_client, user
+):
+    """The user enrollments view should fail closed when the export compliance check rejects the user."""
+    run = CourseRunFactory.create()
+    exc = ExportComplianceError(user, "REJECT", "102")
+    mocker.patch(
+        "courses.serializers.v1.courses.create_run_enrollments",
+        side_effect=exc,
+    )
+    resp = user_drf_client.post(
+        reverse("v1:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_700.",
+        "reason_code": "CS_700",
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+def test_user_enrollments_create_export_compliance_missing_data(
+    mocker, user_drf_client, user
+):
+    """Missing profile data carries the fixable-data code and the fields to fix."""
+    run = CourseRunFactory.create()
+    exc = ExportComplianceDataError(user, ["country"])
+    mocker.patch(
+        "courses.serializers.v1.courses.create_run_enrollments",
+        side_effect=exc,
+    )
+    resp = user_drf_client.post(
+        reverse("v1:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
+        "missing_fields": ["country"],
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+def test_user_enrollments_create_cybersource_invalid_request(
+    mocker, user_drf_client, user
+):
+    """
+    Profile data CyberSource rejects as INVALID_REQUEST comes back as a 400
+    naming the field, not a 500 (mitodl/hq#13724).
+    """
+    mocker.patch("courses.api.verify_user_with_exports", verify_user_with_exports)
+    client = mocker.Mock()
+    # Body as returned by CyberSource in production for a last name of "."
+    client.validate_export_compliance.side_effect = ApiException(
+        http_resp=SimpleNamespace(
+            status=400,
+            reason="Bad Request",
+            data=json.dumps(
+                {
+                    "id": "7915649045806763404884",
+                    "status": "INVALID_REQUEST",
+                    "reason": "INVALID_DATA",
+                    "message": "Declined - One or more fields in the request contains invalid data",
+                    "details": [
+                        {
+                            "field": "orderInformation.billTo.lastName",
+                            "reason": "INVALID_DATA",
+                        }
+                    ],
+                }
+            ),
+            getheaders=dict,
+        )
+    )
+    mocker.patch("compliance.api.get_cybersource_client", return_value=client)
+    user.legal_address.first_name = "David"
+    user.legal_address.last_name = "Cohen"
+    user.legal_address.country = "IL"
+    user.legal_address.street_address_1 = "1 Rothschild Blvd"
+    user.legal_address.city = "Tel Aviv"
+    user.legal_address.save()
+    run = CourseRunFactory.create()
+
+    resp = user_drf_client.post(
+        reverse("v1:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
+        "missing_fields": ["last_name"],
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+@pytest.mark.parametrize("b2b_only", [True, False])
+def test_user_enrollments_create_b2b_run(mocker, user_drf_client, user, b2b_only):
+    """
+    A B2B-only course run can't be enrolled in via the public API, but a run
+    that is attached to a contract and not B2B-only is still publicly enrollable.
+    """
+    mock_edx_client = mocker.patch("openedx.api.get_edx_api_service_client")
+    mock_edx_client.return_value.enrollments.create_student_enrollment.return_value.is_active = True
+    contract = ContractPageFactory.create()
+    course = CourseFactory.create()
+    run = CourseRunFactory.create(
+        course=course, b2b_only=b2b_only, b2b_contracts=[contract]
+    )
+
+    resp = user_drf_client.post(
+        reverse("v1:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+
+    if b2b_only:
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.json() == {"errors": {"run_id": f"Invalid course run id: {run.id}"}}
+        assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+    else:
+        assert resp.status_code == status.HTTP_201_CREATED
+        assert CourseRunEnrollment.objects.filter(
+            user=user, run=run, active=True
+        ).exists()
+
+
+def test_user_enrollments_create_closed_run_invalid(user_drf_client, user):
+    """Creating an enrollment for a run outside its enrollment window should be rejected."""
+    course = CourseFactory.create()
+    run = CourseRunFactory.create(course=course, past_enrollment_end=True)
+
+    resp = user_drf_client.post(
+        reverse("v1:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "errors": {"run_id": f"Course run is not open for enrollment: {run.id}"}
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
 
 
 @pytest.mark.parametrize(
@@ -671,24 +850,79 @@ def test_create_enrollments_no_run(mocker, user_client):
     assert resp.url == EXAMPLE_URL
 
 
-def test_create_enrollments_blocked_country(user_client, user):
+def test_create_enrollments_blocked_country(mocker, user_client, user):
     """
-    Create enrollment view should redirect with a user message in a cookie if the attempted enrollment is blocked
+    Create enrollment view should redirect to the dashboard with a blocked message when
+    create_run_enrollments raises CountryBlockedError.
     """
+    from courses.exceptions import CountryBlockedError  # noqa: PLC0415
+
     run = CourseRunFactory.create()
-    BlockedCountryFactory.create(course=run.course, country=user.legal_address.country)
+    mocker.patch("courses.views.v1.create_user")
+    mocker.patch(
+        "courses.views.v1.create_run_enrollments",
+        side_effect=CountryBlockedError(user, run.course),
+    )
     resp = user_client.post(
         reverse("create-enrollment-via-form"),
         data={"run": str(run.id)},
         HTTP_REFERER=EXAMPLE_URL,
     )
     assert resp.status_code == status.HTTP_302_FOUND
-    assert resp.url == EXAMPLE_URL
+    assert resp.url == reverse("user-dashboard")
     assert USER_MSG_COOKIE_NAME in resp.cookies
     assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
         {
             "type": USER_MSG_TYPE_ENROLL_BLOCKED,
         }
+    )
+
+
+def test_create_enrollments_export_compliance_blocked(mocker, user_client, user):
+    """
+    Create enrollment view should redirect with a user message in a cookie
+    if the export compliance check does not accept the enrollment.
+    """
+    run = CourseRunFactory.create()
+    exc = ExportComplianceError(user, "REJECT", "102")
+    mocker.patch(
+        "courses.views.v1.create_run_enrollments",
+        side_effect=exc,
+    )
+    resp = user_client.post(
+        reverse("create-enrollment-via-form"),
+        data={"run": str(run.id)},
+        HTTP_REFERER=EXAMPLE_URL,
+    )
+    assert resp.status_code == status.HTTP_302_FOUND
+    assert resp.url == reverse("user-dashboard")
+    assert USER_MSG_COOKIE_NAME in resp.cookies
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_ENROLL_BLOCKED}
+    )
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+def test_create_enrollments_export_compliance_missing_data(mocker, user_client, user):
+    """
+    Create enrollment view should redirect with the missing profile fields
+    when the export compliance check can't run due to incomplete profile data.
+    """
+    run = CourseRunFactory.create()
+    exc = ExportComplianceDataError(user, ["postal_code", "administrative_area"])
+    mocker.patch(
+        "courses.views.v1.create_run_enrollments",
+        side_effect=exc,
+    )
+    resp = user_client.post(
+        reverse("create-enrollment-via-form"),
+        data={"run": str(run.id)},
+        HTTP_REFERER=EXAMPLE_URL,
+    )
+    assert resp.status_code == status.HTTP_302_FOUND
+    assert resp.url == reverse("user-dashboard")
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_ENROLL_BLOCKED}
     )
 
 
@@ -744,36 +978,174 @@ def test_update_user_enrollment_failure(
     patched_log_exception.assert_called_once()
 
 
-def test_program_enrollments(user_drf_client, user, programs):
+@pytest.mark.skip_nplusone_check
+@pytest.mark.usefixtures("b2b_courses")
+def test_program_enrollments(user_drf_client, user_with_enrollments_and_certificates):
     """
     Tests the program enrollments API, which should show the user's enrollment
     in programs with the course runs that apply.
     """
+    user = user_with_enrollments_and_certificates.user
 
-    enrollments = []
-    for program in programs:
-        enrollment = ProgramEnrollment(user=user, program=program)
-        enrollment.save()
-        enrollments.append(enrollment)
+    program_enrollments = (
+        ProgramEnrollment.objects.filter(user=user)
+        .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
+        .order_by("-id")
+    )
 
-    course = CourseFactory.create()
-    programs[1].add_requirement(course)
-    course_run = CourseRunFactory.create(course=course)
-    course_run_enrollment = CourseRunEnrollmentFactory.create(run=course_run, user=user)
+    run_enrollments_by_program_id = {
+        program_enrollment.program_id: CourseRunEnrollment.objects.filter(
+            user=user, run__course__in_programs__program=program_enrollment.program
+        )
+        .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
+        .order_by("-id")
+        for program_enrollment in program_enrollments
+    }
+
+    courses_by_program_id = {
+        program_enrollment.program_id: Course.objects.filter(
+            in_programs__program=program_enrollment.program
+        ).order_by("in_programs__path")
+        for program_enrollment in program_enrollments
+    }
+
+    # Assert that we ended up with data, covering both cases: a program the user
+    # has course run enrollments in, and one they have none in. Enrolling in a
+    # program does not imply enrolling in its courses, so the response has to be
+    # right either way.
+    assert len(program_enrollments) > 0
+    runs_per_program = list(run_enrollments_by_program_id.values())
+    assert [runs for runs in runs_per_program if len(runs) > 0]
+    assert [runs for runs in runs_per_program if len(runs) == 0]
 
     resp = user_drf_client.get(reverse("v1:user_program_enrollments_api-list"))
 
     assert resp.status_code == status.HTTP_200_OK
 
-    resp_data = resp.json()
+    assert resp.json() == [
+        {
+            "program": {
+                "id": program_enrollment.program.id,
+                "title": program_enrollment.program.title,
+                "live": program_enrollment.program.live,
+                "departments": [],
+                "enrollment_modes": EnrollmentModeSerializer(
+                    program_enrollment.program.enrollment_modes, many=True
+                ).data,
+                "readable_id": program_enrollment.program.readable_id,
+                "req_tree": list(
+                    ProgramRequirementTreeSerializer(
+                        program_enrollment.program.get_requirements_root()
+                    ).data
+                ),
+                "requirements": {
+                    "electives": [
+                        course.id
+                        for course in program_enrollment.program.elective_courses
+                    ],
+                    "required": [
+                        course.id
+                        for course in program_enrollment.program.required_courses
+                    ],
+                },
+                "program_type": program_enrollment.program.program_type,
+                "page": dict(
+                    ProgramPageSerializer(program_enrollment.program.page).data
+                ),
+                "courses": [
+                    {
+                        "id": course.id,
+                        "instructors": [],
+                        "departments": [],
+                        "next_run_id": getattr(course.first_unexpired_run, "id", None),
+                        "current_price": None,
+                        "page": dict(CoursePageSerializer(course.page).data),
+                        "page_url": get_learn_product_url(
+                            "courses", course.readable_id
+                        ),
+                        "programs": None,
+                        "live": course.live,
+                        "effort": course.page.effort,
+                        "length": course.page.length,
+                        "description": course.page.description,
+                        "readable_id": course.readable_id,
+                        "title": course.page.title,
+                        "financial_assistance_form_url": "",
+                        "feature_image_src": ANY_STR,
+                        "courseruns": [
+                            dict(CourseRunSerializer(run).data)
+                            for run in course.courseruns.filter(live=True).order_by(
+                                "id"
+                            )
+                        ],
+                    }
+                    for course in courses_by_program_id[program_enrollment.program.id]
+                ],
+            },
+            "certificate": maybe_serialize_program_cert(
+                program_enrollment.program, user
+            ),
+            "enrollments": [
+                {
+                    "approved_flexible_price_exists": False,
+                    "edx_emails_subscription": True,
+                    "certificate": maybe_serialize_course_cert(
+                        run_enrollment.run, user
+                    ),
+                    "grades": [],
+                    "id": run_enrollment.id,
+                    "enrollment_mode": run_enrollment.enrollment_mode,
+                    "run": dict(CourseRunWithCourseSerializer(run_enrollment.run).data),
+                }
+                for run_enrollment in run_enrollments_by_program_id[
+                    program_enrollment.program_id
+                ]
+            ],
+        }
+        for program_enrollment in program_enrollments
+    ]
 
-    assert len(resp_data) == len(programs)
 
-    for program_detail in resp_data:
-        if program_detail["program"]["id"] == programs[1].id:
-            assert program_detail["enrollments"][0]["id"] == course_run_enrollment.id
-        else:
-            assert len(program_detail["enrollments"]) == 0
+def test_program_enrollments_future_program_cert(user_drf_client, user):
+    """
+    Test that v1 program enrollments returns null for a ProgramCertificate with a
+    future issue_date, treating it as though no certificate exists.
+    """
+    program_page = ProgramPageFactory.create()
+    program = program_page.program
+    ProgramEnrollmentFactory.create(user=user, program=program)
+    ProgramCertificateFactory.create(
+        user=user,
+        program=program,
+        issue_date=now_in_utc() + timedelta(days=1),
+    )
+
+    resp = user_drf_client.get(reverse("v1:user_program_enrollments_api-list"))
+    assert resp.status_code == status.HTTP_200_OK
+
+    enrollment_data = next(e for e in resp.json() if e["program"]["id"] == program.id)
+    assert enrollment_data["certificate"] is None
+
+
+@pytest.mark.skip_nplusone_check
+def test_user_enrollments_future_course_cert(user_drf_client, user):
+    """
+    Test that v1 user enrollments returns null for a CourseRunCertificate with a
+    future issue_date, treating it as though no certificate exists.
+    """
+    run = CourseRunFactory.create()
+    enrollment = CourseRunEnrollmentFactory.create(user=user, run=run)
+    CourseRunCertificateFactory.create(
+        user=user,
+        course_run=run,
+        issue_date=now_in_utc() + timedelta(days=1),
+    )
+
+    resp = user_drf_client.get(reverse("v1:user-enrollments-api-list"))
+    assert resp.status_code == status.HTTP_200_OK
+
+    enrollment_data = next(e for e in resp.json() if e["id"] == enrollment.id)
+    assert enrollment_data["certificate"] is None
 
 
 @pytest.mark.parametrize("fulfilled_order_exists", [True, False])
@@ -808,3 +1180,488 @@ def test_create_enrollments_with_existing_fulfilled_order(
     else:
         assert Order.objects.filter(state=OrderStatus.PENDING).count() == 1
     patched_create_enrollments.assert_called_once()
+
+
+@pytest.mark.django_db
+class TestCourseFilterSet:
+    """Test CourseFilterSet filtering methods"""
+
+    def test_filter_courserun_is_enrollable_true(self):
+        """Test filtering for enrollable courses"""
+        # Create courses with different enrollment status
+        enrollable_course = CourseFactory.create(live=True)
+        # Create an enrollable course run: live=True, has enrollment_start in past, no enrollment_end, has start_date
+        CourseRunFactory.create(
+            course=enrollable_course,
+            live=True,
+            enrollment_start=datetime(2020, 1, 1, tzinfo=timezone.utc),
+            enrollment_end=None,
+            start_date=datetime(2020, 1, 15, tzinfo=timezone.utc),
+        )
+
+        non_enrollable_course = CourseFactory.create(live=True)
+        CourseRunFactory.create(course=non_enrollable_course, live=False)
+
+        queryset = Course.objects.all()
+        filterset = CourseFilterSet()
+
+        # Test filtering for enrollable courses
+        result = filterset.filter_courserun_is_enrollable(queryset, None, value=True)
+        assert enrollable_course in result
+
+    def test_filter_courserun_is_enrollable_false(self):
+        """Test filtering for non-enrollable courses"""
+        # Create courses with different enrollment status
+        enrollable_course = CourseFactory.create(live=True)
+        # Create an enrollable course run: live=True, has enrollment_start in past, no enrollment_end, has start_date
+        CourseRunFactory.create(
+            course=enrollable_course,
+            live=True,
+            enrollment_start=datetime(2020, 1, 1, tzinfo=timezone.utc),
+            enrollment_end=None,
+            start_date=datetime(2020, 1, 15, tzinfo=timezone.utc),
+        )
+
+        non_enrollable_course = CourseFactory.create(live=True)
+        CourseRunFactory.create(course=non_enrollable_course, live=False)
+
+        queryset = Course.objects.all()
+        filterset = CourseFilterSet()
+
+        # Test filtering for non-enrollable courses
+        result = filterset.filter_courserun_is_enrollable(queryset, None, value=False)
+        assert non_enrollable_course in result
+
+
+@pytest.mark.django_db
+class TestProgramViewSetPagination:
+    """Test ProgramViewSet pagination edge cases"""
+
+    def setup_method(self):
+        self.factory = RequestFactory()
+        self.user = UserFactory.create()
+        self.viewset = ProgramViewSet()
+
+    def test_paginate_queryset_no_page_param(self):
+        """Test pagination when no page parameter is provided"""
+        # Create a mock request without page parameter
+        request = self.factory.get("/api/v1/programs/")
+        request.user = self.user
+        request.query_params = {}
+
+        # Set up the viewset
+        self.viewset.request = request
+
+        # Create a mock pagination class instance
+        mock_pagination_class = MagicMock()
+        # Mock the pagination_class attribute to return our mock
+        with patch.object(self.viewset, "pagination_class", mock_pagination_class):
+            queryset = Program.objects.all()
+            result = self.viewset.paginate_queryset(queryset)
+
+            # Should return None when no page param and paginator exists
+            assert result is None
+
+    def test_paginate_queryset_with_page_param(self):
+        """Test pagination when page parameter is provided"""
+        request = self.factory.get("/api/v1/programs/?page=1")
+        request.user = self.user
+        request.query_params = {"page": "1"}
+
+        self.viewset.request = request
+
+        queryset = Program.objects.all()
+
+        # Mock both pagination_class and the parent's paginate_queryset method
+        mock_pagination_class = MagicMock()
+        with (
+            patch.object(self.viewset, "pagination_class", mock_pagination_class),
+            patch(
+                "rest_framework.viewsets.ReadOnlyModelViewSet.paginate_queryset"
+            ) as mock_super,
+        ):
+            mock_super.return_value = "paginated_result"
+            result = self.viewset.paginate_queryset(queryset)
+
+            mock_super.assert_called_once_with(queryset)
+            assert result == "paginated_result"
+
+
+@pytest.mark.django_db
+class TestUserEnrollmentsApiViewSetSync:
+    """Test UserEnrollmentsApiViewSet sync functionality"""
+
+    def setup_method(self):
+        self.factory = RequestFactory()
+        self.user = UserFactory.create()
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+        self.viewset = UserEnrollmentsApiViewSet()
+
+    @patch("courses.views.v1.sync_enrollments_with_edx")
+    @patch("courses.views.v1.is_enabled")
+    def test_list_with_sync_enabled_success(self, mock_is_enabled, mock_sync):
+        """Test list method when sync is enabled and succeeds"""
+        mock_is_enabled.return_value = True
+        mock_sync.return_value = None
+
+        response = self.client.get(reverse("v1:user-enrollments-api-list"))
+
+        assert response.status_code == status.HTTP_200_OK
+        mock_sync.assert_called_once_with(self.user)
+
+    @patch("courses.views.v1.sync_enrollments_with_edx")
+    @patch("courses.views.v1.is_enabled")
+    @patch("courses.views.v1.log.exception")
+    def test_list_with_sync_enabled_exception(
+        self, mock_log, mock_is_enabled, mock_sync
+    ):
+        """Test list method when sync is enabled but fails"""
+        mock_is_enabled.return_value = True
+        mock_sync.side_effect = Exception("Sync failed")
+
+        response = self.client.get(reverse("v1:user-enrollments-api-list"))
+
+        assert response.status_code == status.HTTP_200_OK
+        mock_sync.assert_called_once_with(self.user)
+        mock_log.assert_called_once_with("Failed to sync user enrollments with edX")
+
+    @patch("courses.views.v1.sync_enrollments_with_edx")
+    @patch("courses.views.v1.is_enabled")
+    def test_list_with_sync_disabled(self, mock_is_enabled, mock_sync):
+        """Test list method when sync is disabled"""
+        mock_is_enabled.return_value = False
+
+        response = self.client.get(reverse("v1:user-enrollments-api-list"))
+
+        assert response.status_code == status.HTTP_200_OK
+        mock_sync.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_program_enrollment_destroy_program_not_found(user_drf_client):
+    """Test that destroying a program enrollment for a nonexistent program returns 404."""
+    resp = user_drf_client.delete(
+        reverse("v1:user_program_enrollments_api-detail", kwargs={"pk": 999999})
+    )
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_program_enrollment_destroy_no_enrollment_is_idempotent(user_drf_client):
+    """Test that destroying when the user has no enrollment is idempotent (returns 200 with empty list)."""
+    program = ProgramFactory.create()
+
+    resp = user_drf_client.delete(
+        reverse("v1:user_program_enrollments_api-detail", kwargs={"pk": program.id})
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == []
+
+
+@pytest.mark.django_db
+def test_program_enrollment_destroy(user_drf_client, user):
+    """Test that destroying a program enrollment deactivates it."""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    program = enrollment.program
+
+    resp = user_drf_client.delete(
+        reverse("v1:user_program_enrollments_api-detail", kwargs={"pk": program.id})
+    )
+    assert resp.status_code == status.HTTP_200_OK
+
+    enrollment.refresh_from_db()
+    assert enrollment.active is False
+    assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
+
+
+def test_destroy_program_enrollment_paid_fails(user_drf_client, user):
+    """DELETE a paid program enrollment fails"""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    program = enrollment.program
+
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+    PaidProgram.objects.create(user=user, program=program, order=order)
+
+    resp = user_drf_client.delete(
+        reverse("v1:user_program_enrollments_api-detail", kwargs={"pk": program.id})
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "message": "Cannot unenroll from a purchased program, contact support."
+    }
+
+    enrollment.refresh_from_db()
+    assert enrollment.active is True
+
+
+def test_get_learner_record_requires_program_enrollment(user_drf_client):
+    """The learner record endpoint should return 404 without a program enrollment."""
+    program = ProgramFactory.create()
+
+    resp = user_drf_client.get(reverse("get-learner-record", kwargs={"pk": program.id}))
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_get_learner_record(user_drf_client, user):
+    """The learner record endpoint should return data for an enrolled user."""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    partner_school = PartnerSchoolFactory.create()
+
+    resp = user_drf_client.get(
+        reverse("get-learner-record", kwargs={"pk": enrollment.program.id})
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["program"]["title"] == enrollment.program.title
+    assert resp.json()["partner_schools"] == [
+        {"id": partner_school.id, "name": partner_school.name}
+    ]
+
+
+def test_share_learner_record_requires_program_enrollment(user_drf_client):
+    """The learner record share endpoint should return 404 without a program enrollment."""
+    program = ProgramFactory.create()
+
+    resp = user_drf_client.post(
+        reverse("learner-record-share", kwargs={"pk": program.id}),
+        data={"partnerSchool": None},
+    )
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_share_learner_record(user_drf_client, user, mocker):
+    """The learner record share endpoint should create an active anonymous share."""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    partner_school = PartnerSchoolFactory.create()
+    patched_send_email = mocker.patch(
+        "courses.views.v1.send_partner_school_email.delay"
+    )
+
+    resp = user_drf_client.post(
+        reverse("learner-record-share", kwargs={"pk": enrollment.program.id}),
+        data={"partnerSchool": None},
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["partner_schools"] == [
+        {"id": partner_school.id, "name": partner_school.name}
+    ]
+    assert (
+        LearnerProgramRecordShare.objects.filter(
+            user=user,
+            program=enrollment.program,
+            partner_school=None,
+            is_active=True,
+        ).count()
+        == 1
+    )
+    patched_send_email.assert_not_called()
+
+
+def test_share_learner_record_partner_school(user_drf_client, user, mocker):
+    """The learner record share endpoint should create an active partner school share."""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    partner_school = PartnerSchoolFactory.create()
+    patched_send_email = mocker.patch(
+        "courses.views.v1.send_partner_school_email.delay"
+    )
+
+    resp = user_drf_client.post(
+        reverse("learner-record-share", kwargs={"pk": enrollment.program.id}),
+        data={"partnerSchool": partner_school.id},
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert all("email" not in school for school in resp.json()["partner_schools"])
+    share = LearnerProgramRecordShare.objects.get(
+        user=user,
+        program=enrollment.program,
+        partner_school=partner_school,
+    )
+    assert share.is_active is True
+    patched_send_email.assert_called_once_with(share.share_uuid)
+
+
+def test_revoke_learner_record_share_requires_program_enrollment(user_drf_client):
+    """The learner record revoke endpoint should return 404 without a program enrollment."""
+    program = ProgramFactory.create()
+
+    resp = user_drf_client.post(
+        reverse("revoke-learner-record-share", kwargs={"pk": program.id})
+    )
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_revoke_learner_record_share(user_drf_client, user):
+    """The learner record revoke endpoint should disable only anonymous shares."""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    anonymous_share = LearnerProgramRecordShareFactory.create(
+        user=user,
+        program=enrollment.program,
+        partner_school=None,
+        is_active=True,
+    )
+    partner_school_share = LearnerProgramRecordShareFactory.create(
+        user=user,
+        program=enrollment.program,
+        is_active=True,
+    )
+
+    resp = user_drf_client.post(
+        reverse("revoke-learner-record-share", kwargs={"pk": enrollment.program.id})
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    anonymous_share.refresh_from_db()
+    partner_school_share.refresh_from_db()
+    assert anonymous_share.is_active is False
+    assert partner_school_share.is_active is True
+
+
+def test_get_shared_learner_record(user):
+    """The shared learner record endpoint should expose active shared records."""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    share = LearnerProgramRecordShareFactory.create(
+        user=user,
+        program=enrollment.program,
+        partner_school=None,
+        is_active=True,
+    )
+    client = APIClient()
+
+    resp = client.get(
+        reverse("shared_learner_record_from_uuid", kwargs={"uuid": share.share_uuid})
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["program"]["title"] == enrollment.program.title
+    assert resp.json()["sharing"] == []
+    assert resp.json()["partner_schools"] == []
+
+
+def test_get_shared_learner_record_inactive_share_returns_404(user):
+    """The shared learner record endpoint should return 404 for inactive links."""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    share = LearnerProgramRecordShareFactory.create(
+        user=user,
+        program=enrollment.program,
+        partner_school=None,
+        is_active=False,
+    )
+    client = APIClient()
+
+    resp = client.get(
+        reverse("shared_learner_record_from_uuid", kwargs={"uuid": share.share_uuid})
+    )
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+    assert resp.json() == []
+
+
+def test_share_learner_record_rejects_school_from_another_program(
+    user_drf_client, user, mocker, settings
+):
+    """Sharing with a school that is not assigned to this program is refused."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    other_program = ProgramFactory.create()
+    other_school = PartnerSchoolFactory.create()
+    PartnerSchoolProgramFactory.create(
+        partner_school=other_school, program=other_program
+    )
+    patched_send_email = mocker.patch(
+        "courses.views.v1.send_partner_school_email.delay"
+    )
+
+    resp = user_drf_client.post(
+        reverse("learner-record-share", kwargs={"pk": enrollment.program.id}),
+        data={"partnerSchool": other_school.id},
+    )
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+    assert not LearnerProgramRecordShare.objects.filter(
+        user=user, partner_school=other_school
+    ).exists()
+    patched_send_email.assert_not_called()
+
+
+def test_share_learner_record_allows_any_school_when_flag_off(
+    user_drf_client, user, mocker, settings
+):
+    """With the flag off the endpoint accepts any school, as it does today."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = False
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    unassigned_school = PartnerSchoolFactory.create()
+    patched_send_email = mocker.patch(
+        "courses.views.v1.send_partner_school_email.delay"
+    )
+
+    resp = user_drf_client.post(
+        reverse("learner-record-share", kwargs={"pk": enrollment.program.id}),
+        data={"partnerSchool": unassigned_school.id},
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    patched_send_email.assert_called_once()
+
+
+def test_partner_schools_endpoint_filters_by_program(user_drf_client):
+    """The partner schools list can be scoped to a single program."""
+    scm = ProgramFactory.create()
+    dedp = ProgramFactory.create()
+    scm_school = PartnerSchoolFactory.create(name="SCM School")
+    dedp_school = PartnerSchoolFactory.create(name="DEDP School")
+    PartnerSchoolProgramFactory.create(partner_school=scm_school, program=scm)
+    PartnerSchoolProgramFactory.create(partner_school=dedp_school, program=dedp)
+
+    resp = user_drf_client.get(
+        reverse("v1:partner_schools_api-list"), {"program": scm.id}
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert [school["name"] for school in resp.json()] == ["SCM School"]
+
+
+def test_partner_schools_endpoint_unfiltered_by_default(user_drf_client):
+    """Without a program param the endpoint returns every active school."""
+    program = ProgramFactory.create()
+    school = PartnerSchoolFactory.create(name="Some School")
+    PartnerSchoolProgramFactory.create(partner_school=school, program=program)
+
+    resp = user_drf_client.get(reverse("v1:partner_schools_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert [s["name"] for s in resp.json()] == ["Some School"]
+
+
+@pytest.mark.parametrize("program_id", ["abc", "1.5"])
+def test_partner_schools_endpoint_invalid_program_returns_400(
+    user_drf_client, program_id
+):
+    """A non-integer program value returns a 400, not a 500 or an unfiltered response."""
+    resp = user_drf_client.get(
+        reverse("v1:partner_schools_api-list"), {"program": program_id}
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_partner_schools_endpoint_distinct_with_multiple_program_rows(
+    user_drf_client,
+):
+    """A school with two recipient rows for the same program is returned once."""
+    program = ProgramFactory.create()
+    school = PartnerSchoolFactory.create(name="Duplicate Rows School")
+    PartnerSchoolProgramFactory.create(partner_school=school, program=program)
+    PartnerSchoolProgramFactory.create(partner_school=school, program=program)
+
+    resp = user_drf_client.get(
+        reverse("v1:partner_schools_api-list"), {"program": program.id}
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert [s["name"] for s in resp.json()] == ["Duplicate Rows School"]

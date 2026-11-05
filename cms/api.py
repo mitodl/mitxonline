@@ -3,29 +3,53 @@
 from __future__ import annotations
 
 import logging
+import operator
 import random
+from collections import defaultdict
 from datetime import timedelta
-from typing import Tuple, Union  # noqa: UP035
+from functools import reduce
+from typing import TYPE_CHECKING, Tuple, Union  # noqa: UP035
 from urllib.parse import urlencode, urljoin
 
+import requests
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.postgres.aggregates import ArrayAgg
 from django.core.cache import caches
-from django.core.exceptions import ValidationError
-from django.db.models import Case, IntegerField, When
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.core.files.base import ContentFile
+from django.db.models import Case, IntegerField, Q, When
+from django.db.models.functions import Length, Substr
 from django.utils.text import slugify
 from mitol.common.utils import now_in_utc
+from wagtail.blocks import StreamValue
+from wagtail.images.models import Image
 from wagtail.models import Site
 from wagtail.rich_text import RichText
 
 from cms import models as cms_models
-from cms.constants import CERTIFICATE_INDEX_SLUG, INSTRUCTOR_INDEX_SLUG
+from cms import utils as cms_utils
+from cms.constants import (
+    CERTIFICATE_INDEX_SLUG,
+    INSTRUCTOR_INDEX_SLUG,
+)
 from cms.exceptions import WagtailSpecificPageError
 from cms.models import Page
-from courses.models import Course, Program
+from courses.models import (
+    Course,
+    Program,
+    ProgramRequirementNodeType,
+    RelatedProgram,
+    default_program_queryset,
+)
 from courses.utils import (
     get_enrollable_courseruns_qs,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from courses.models import ProgramQuerySet
 
 log = logging.getLogger(__name__)
 DEFAULT_HOMEPAGE_PROPS = dict(  # noqa: C408
@@ -281,11 +305,120 @@ def get_wagtail_img_src(image_obj) -> str:
     )
 
 
+def create_default_signatory_page(
+    courseware: Union[Course, Program],
+    *,
+    include_placeholder_image: bool = False,
+):
+    # Import here to avoid circular imports
+    from cms.models import SignatoryIndexPage, SignatoryPage  # noqa: PLC0415
+
+    certificate_page = courseware.certificate_page
+    signatory_page = SignatoryPage(
+        name=f"PLACEHOLDER - {courseware.title} Signatory",
+        title_1=f"PLACEHOLDER - {courseware.title} Signatory Title 1",
+        title_2=f"PLACEHOLDER - {courseware.title} Signatory Title 2",
+        title_3=f"PLACEHOLDER - {courseware.title} Signatory Title 3",
+        organization=f"PLACEHOLDER - {courseware.title} Signatory Organization",
+    )
+    if include_placeholder_image:
+        filename = signatory_page.name.replace(" ", "_").lower()
+        image_url = f"https://placecats.com/{SignatoryPage.MINIMUM_IMAGE_WIDTH}/{SignatoryPage.MINIMUM_IMAGE_HEIGHT}"
+        response = requests.get(image_url, timeout=10)
+        response.raise_for_status()
+        image_file = ContentFile(response.content, name=filename)
+        signatory_image = Image(title=filename, file=image_file)
+        signatory_image.save()
+        signatory_page.signature_image = signatory_image
+
+    signatory_index = SignatoryIndexPage.objects.first()
+    signatory_index.add_child(instance=signatory_page)
+    signatory_page.refresh_from_db()
+
+    signatories = StreamValue(
+        certificate_page.signatories.stream_block,
+        [("signatory", signatory_page)],
+        is_lazy=False,
+    )
+    certificate_page.signatories = signatories
+    certificate_page.save()
+    return signatory_page
+
+
+def create_default_certificate_page(
+    courseware: Union[Course, Program],
+):
+    # Import here to avoid circular imports
+    from cms.models import CertificatePage  # noqa: PLC0415
+
+    cert_page = CertificatePage(
+        product_name=f"PLACEHOLDER - {courseware.title} Certificate",
+        CEUs=f"PLACEHOLDER - {courseware.title} CEUs",
+    )
+    courseware_page = (
+        courseware.course_page
+        if isinstance(courseware, Course)
+        else courseware.program_page
+    )
+    courseware_page.add_child(instance=cert_page)
+    return cert_page
+
+
+def get_optional_placeholder_values_for_courseware_type(
+    courseware_type: Union[Course, Program],
+) -> dict:
+    """
+    Returns a dictionary of optional values to include when creating the page,
+    based on the type of courseware (Course or Program).
+    """
+
+    # Just some hardcoded example values for demonstration purposes.
+    # Might make sense to use faker for some of this or allow selection of values from different presets
+    # For now though, this sets up a page which is reasonably complete and can be immediately published
+    values = {
+        "price": [
+            (
+                "price_details",
+                {
+                    "text": "PLACEHOLDER - Three easy payments of 99.99",
+                    "link": "https://example.com/pricing",
+                },
+            )
+        ],
+        "min_weeks": 1,
+        "max_weeks": 1,
+        "effort": "PLACEHOLDER - 1-2 hours per week",
+        "length": "PLACEHOLDER - 1 week",
+        "min_price": 37,
+        "max_price": 149,
+        "prerequisites": "PLACEHOLDER - No prerequisites, other than a willingness to learn",
+        "faq_url": "https://example.com",
+    }
+    if isinstance(courseware_type, Course):
+        values["about"] = (
+            "PLACEHOLDER - In this engineering course, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
+        )
+        values["what_you_learn"] = (
+            "PLACEHOLDER - In this engineering course, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
+        )
+    elif isinstance(courseware_type, Program):
+        values["about"] = (
+            "PLACEHOLDER - In this engineering program, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
+        )
+        values["what_you_learn"] = (
+            "PLACEHOLDER - In this engineering program, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
+        )
+
+    return values
+
+
 def create_default_courseware_page(
     courseware: Union[Course, Program],
-    live: bool = False,  # noqa: FBT001, FBT002
-    *args,  # noqa: ARG001
-    **kwargs,  # noqa: ARG001
+    *,
+    live: bool = False,
+    include_in_learn_catalog: bool = False,
+    ingest_content_files_for_ai: bool = False,
+    optional_kwargs: dict | None = None,
 ):
     """
     Creates a default about page for the given courseware object. Created pages
@@ -306,7 +439,12 @@ def create_default_courseware_page(
     Raises:
     - Exception
     """
-    from cms.models import CourseIndexPage, CoursePage, ProgramIndexPage, ProgramPage
+    from cms.models import (  # noqa: PLC0415
+        CourseIndexPage,
+        CoursePage,
+        ProgramIndexPage,
+        ProgramPage,
+    )
 
     page_framework = {
         "title": courseware.title,
@@ -318,15 +456,29 @@ def create_default_courseware_page(
         "min_weekly_hours": "Empty",
     }
 
+    course_only_kwargs = {
+        "include_in_learn_catalog": include_in_learn_catalog,
+        "ingest_content_files_for_ai": ingest_content_files_for_ai,
+    }
+    program_only_kwargs = {"include_in_learn_catalog": include_in_learn_catalog}
+
+    if optional_kwargs is None:
+        optional_kwargs = {}
+
     try:
         if isinstance(courseware, Course):
             parent_page = CourseIndexPage.objects.filter(live=True).get()
-            page = CoursePage(course=courseware, **page_framework)
         else:
             parent_page = ProgramIndexPage.objects.filter(live=True).get()
-            page = ProgramPage(program=courseware, **page_framework)
-    except:  # noqa: E722
+    except ObjectDoesNotExist:
         raise ValidationError(f"No valid index page found for {courseware}.")  # noqa: B904, EM102
+
+    if isinstance(courseware, Course):
+        merged_kwargs = page_framework | course_only_kwargs | optional_kwargs
+        page = CoursePage(course=courseware, **merged_kwargs)
+    else:
+        merged_kwargs = page_framework | program_only_kwargs | optional_kwargs
+        page = ProgramPage(program=courseware, **merged_kwargs)
 
     parent_page.add_child(instance=page)
 
@@ -349,9 +501,6 @@ def create_featured_items():
     Used only by cron task or management command.
     """
     redis_cache = caches["redis"]
-    cache_key = "CMS_homepage_featured_courses"
-
-    redis_cache.delete(cache_key)
 
     now = now_in_utc()
     end_of_day = now + timedelta(days=1)
@@ -363,7 +512,6 @@ def create_featured_items():
     )
 
     if not valid_course_ids:
-        redis_cache.set(cache_key, [])
         return []
 
     enrollable_courses_qs = Course.objects.select_related("page").filter(
@@ -376,7 +524,6 @@ def create_featured_items():
     )
 
     if not enrollable_courseruns.exists():
-        redis_cache.set(cache_key, [])
         return []
 
     self_paced_runs = []
@@ -409,7 +556,6 @@ def create_featured_items():
     all_course_ids = self_paced_course_ids + future_course_ids + started_course_ids
 
     if not all_course_ids:
-        redis_cache.set(cache_key, [])
         return []
 
     ordering = Case(
@@ -418,7 +564,10 @@ def create_featured_items():
     )
 
     # Store only course IDs to avoid pickling issues and ensure fresh data on retrieval
-    redis_cache.set(cache_key, all_course_ids)
+    # Use timeout=None so the cache never auto-expires; stale data is better than no data.
+    redis_cache.set(
+        cms_utils.get_featured_items_cache_key(), all_course_ids, timeout=None
+    )
 
     return list(
         Course.objects.filter(id__in=all_course_ids)
@@ -426,3 +575,401 @@ def create_featured_items():
         .prefetch_related("courseruns")
         .order_by(ordering)
     )
+
+
+def _form_url(page: Page | None, slug: str | None) -> str:
+    """
+    Build the financial assistance form URL hung off ``page``.
+
+    Args:
+        page (Page or None): the page the form URL hangs off
+        slug (str or None): the form page's slug
+
+    Returns:
+        str: the form URL, or "" if either argument is missing
+    """
+    return f"{page.get_url()}{slug}/" if page and slug else ""
+
+
+def _min_pk(
+    rows: Iterable[cms_models.FlexiblePricingRequestForm],
+) -> cms_models.FlexiblePricingRequestForm | None:
+    """
+    Lowest-pk element, or None.
+
+    ``QuerySet.first()`` orders by pk when the queryset is unordered, so every
+    ``.first()`` this replaces means "min pk".
+
+    Args:
+        rows (iterable of FlexiblePricingRequestForm): rows carrying a ``pk``
+
+    Returns:
+        FlexiblePricingRequestForm or None: the lowest-pk row, or None if there are none
+    """
+    return min(rows, key=lambda row: row.pk, default=None)
+
+
+class _FinancialAssistanceForms:
+    """
+    Everything the financial assistance form lookup needs, fetched once.
+
+    A fixed number of queries however many courses are asked for, each scoped
+    to the batch rather than to the whole site. Resolving a single course is
+    this with a one-element list, so the order of precedence has one
+    implementation instead of a batched and a per-page one to keep in
+    agreement.
+
+    Args:
+        course_ids (list of int): the Course ids this instance can resolve
+        program_queryset (ProgramQuerySet): the programs a URL may be drawn
+            from - see ``_load_programs``
+    """
+
+    def __init__(
+        self, course_ids: list[int], program_queryset: ProgramQuerySet
+    ) -> None:
+        self.pages_by_course_id = {
+            page.course_id: page
+            for page in cms_models.CoursePage.objects.filter(
+                course_id__in=course_ids
+            ).select_related("course")
+        }
+        self.programs_by_course_id = self._load_programs(program_queryset, course_ids)
+
+        own_program_ids = {
+            program.id
+            for programs in self.programs_by_course_id.values()
+            for program in programs
+        }
+        self.related_by_program_id = self._load_related_programs(own_program_ids)
+
+        every_program_id = set(own_program_ids)
+        for related_ids in self.related_by_program_id.values():
+            every_program_id.update(related_ids)
+        self.program_pages_by_program_id = self._load_program_pages(every_program_id)
+
+        # The only pages whose children are ever asked for: course pages via
+        # _fallback_url, program pages via url_for. Program pages here include
+        # related programs' - a superset of what child_form is called with,
+        # deliberately, so the two do not have to stay in step.
+        parent_paths = {page.path for page in self.pages_by_course_id.values()}
+        parent_paths.update(
+            program_page.path
+            for program_page in self.program_pages_by_program_id.values()
+        )
+
+        self._load_forms(course_ids, every_program_id, parent_paths)
+
+    @staticmethod
+    def _load_programs(
+        program_queryset: ProgramQuerySet, course_ids: list[int]
+    ) -> dict[int, list[Program]]:
+        """
+        Programs per course, drawn from the caller's own program scope.
+
+        Deliberately the same shape as ``CourseProgramPrefetcher.filter``: the
+        two answer the same question, and a program the caller filtered out of
+        a course's ``programs`` must not be able to supply that course's
+        financial assistance URL either.
+
+        Only ``program.id`` and the ``course_ids`` annotation are read, so a
+        caller narrowing the queryset with ``.only(...)`` cannot trip a
+        deferred-field reload here.
+
+        Args:
+            program_queryset (ProgramQuerySet): the programs to draw from
+            course_ids (list of int): the Course ids to look up
+
+        Returns:
+            defaultdict: {course_id: [Program]}
+        """
+        programs_by_course_id = defaultdict(list)
+        wanted = set(course_ids)
+        for program in program_queryset.filter(
+            all_requirements__course_id__in=course_ids
+        ).annotate(
+            course_ids=ArrayAgg(
+                "all_requirements__course_id",
+                distinct=True,
+                filter=Q(all_requirements__node_type=ProgramRequirementNodeType.COURSE),
+                # A program can join on a course_id whose node_type is not
+                # COURSE, which aggregates to NULL rather than an empty array.
+                default=[],
+            )
+        ):
+            for course_id in program.course_ids:
+                if course_id in wanted:
+                    programs_by_course_id[course_id].append(program)
+        return programs_by_course_id
+
+    @staticmethod
+    def _load_related_programs(program_ids: set[int]) -> dict[int, list[int]]:
+        """
+        Related programs for every program in play, matching
+        ``Program.related_programs``.
+
+        Args:
+            program_ids (set of int): the Program ids to look up
+
+        Returns:
+            defaultdict: {program_id: [related program_id]}
+        """
+        related_by_program_id = defaultdict(list)
+        if not program_ids:
+            return related_by_program_id
+
+        pairs = RelatedProgram.objects.filter(
+            Q(first_program_id__in=program_ids) | Q(second_program_id__in=program_ids)
+        ).values_list("first_program_id", "second_program_id")
+        for first_id, second_id in pairs:
+            if first_id in program_ids:
+                related_by_program_id[first_id].append(second_id)
+            if second_id in program_ids:
+                related_by_program_id[second_id].append(first_id)
+        return related_by_program_id
+
+    @staticmethod
+    def _load_program_pages(
+        program_ids: set[int],
+    ) -> dict[int, cms_models.ProgramPage]:
+        """
+        Every ProgramPage a URL might hang off, keyed by program.
+
+        ``select_related("program")`` because ``ProductPage.get_url_parts``
+        reads ``product.readable_id``.
+
+        Args:
+            program_ids (set of int): the Program ids to look up
+
+        Returns:
+            dict: {program_id: ProgramPage}, lowest pk wins per program
+        """
+        program_pages_by_program_id = {}
+        if not program_ids:
+            return program_pages_by_program_id
+
+        for program_page in (
+            cms_models.ProgramPage.objects.filter(program_id__in=program_ids)
+            .select_related("program")
+            .order_by("pk")
+        ):
+            program_pages_by_program_id.setdefault(
+                program_page.program_id, program_page
+            )
+        return program_pages_by_program_id
+
+    def _load_forms(
+        self, course_ids: list[int], program_ids: set[int], parent_paths: set[str]
+    ) -> None:
+        """
+        The live forms this batch could consult, bucketed the three ways they
+        are asked for.
+
+        The three buckets are exactly the three lookups ``url_for`` performs,
+        so a form outside them can never be returned. Sets
+        ``forms_by_parent_path``, ``forms_by_course_id`` and
+        ``forms_by_program_id``.
+
+        Args:
+            course_ids (list of int): Course ids a form may be tied to
+            program_ids (set of int): Program ids a form may be tied to
+            parent_paths (set of str): page paths a form may be a child of
+        """
+        self.forms_by_parent_path = defaultdict(list)
+        self.forms_by_course_id = defaultdict(list)
+        self.forms_by_program_id = defaultdict(list)
+
+        # Collected and reduced rather than OR-ed onto a seed Q(): an all-empty
+        # disjunction collapses back to Q(), matching every row.
+        filters = [
+            condition
+            for condition, values in (
+                (Q(selected_course_id__in=course_ids), course_ids),
+                (Q(selected_program_id__in=program_ids), program_ids),
+                (Q(parent_path__in=parent_paths), parent_paths),
+            )
+            if values
+        ]
+
+        if not filters:
+            return
+
+        forms = (
+            cms_models.FlexiblePricingRequestForm.objects.live()
+            # Treebeard gives children a fixed-width path suffix, so a page's
+            # parent path is its own path minus one step - the SQL mirror of
+            # form.path[: -Page.steplen] below, and the batched get_children().
+            .annotate(parent_path=Substr("path", 1, Length("path") - Page.steplen))
+            .filter(reduce(operator.or_, filters))
+            .only(
+                "pk",
+                "path",
+                "slug",
+                "selected_course_id",
+                "selected_program_id",
+            )
+        )
+        for form in forms:
+            self.forms_by_parent_path[form.path[: -Page.steplen]].append(form)
+            if form.selected_course_id:
+                self.forms_by_course_id[form.selected_course_id].append(form)
+            if form.selected_program_id:
+                self.forms_by_program_id[form.selected_program_id].append(form)
+
+    def child_form(self, page: Page) -> cms_models.FlexiblePricingRequestForm | None:
+        """
+        The lowest-pk live form that is a direct child of ``page``.
+
+        Args:
+            page (Page): the parent page
+
+        Returns:
+            FlexiblePricingRequestForm or None: the form row, or None if the page has no child
+                form
+        """
+        return _min_pk(self.forms_by_parent_path.get(page.path, []))
+
+    def _fallback_url(self, page: cms_models.CoursePage, course_id: int) -> str:
+        """
+        The URL used when no program-linked form applies.
+
+        In order of precedence:
+          - the form tied to this course
+          - a form that is a child of the course page
+
+        Args:
+            page (CoursePage): the course's page
+            course_id (int): the Course id
+
+        Returns:
+            str: the form URL, or "" if neither exists
+        """
+        form = _min_pk(self.forms_by_course_id.get(course_id, [])) or self.child_form(
+            page
+        )
+        return _form_url(page, form.slug) if form else ""
+
+    def _program_url(
+        self,
+        page: cms_models.CoursePage,
+        program_page: cms_models.ProgramPage | None,
+        form: cms_models.FlexiblePricingRequestForm,
+        program_ids: list[int],
+    ) -> str:
+        """
+        Turn a program-linked form into a URL.
+
+        In order of precedence:
+          - the program page the form is a child of
+          - the page of the other program the form belongs to
+          - the course page
+
+        Args:
+            page (CoursePage): the course's page
+            program_page (ProgramPage or None): the page the form is a child of
+            form (FlexiblePricingRequestForm): the form row to build a URL for
+            program_ids (list of int): the course's own Program ids
+
+        Returns:
+            str: the form URL, or "" if none of the above apply
+        """
+        if program_page:
+            return _form_url(program_page, form.slug)
+
+        if form.selected_program_id not in program_ids:
+            other_page = self.program_pages_by_program_id.get(form.selected_program_id)
+            if other_page:
+                return _form_url(other_page, form.slug)
+
+        if form.selected_program_id in program_ids:
+            return _form_url(page, form.slug)
+
+        return ""
+
+    def url_for(self, course_id: int) -> str:
+        """
+        The financial assistance form URL for one course.
+
+        In order of precedence:
+          - a form belonging to one of the course's programs, or to a program
+            related to one of them
+          - a form tied to the course, or a child of the course page
+
+        Args:
+            course_id (int): the Course id
+
+        Returns:
+            str: the form URL, or "" if the course has no form
+        """
+        page = self.pages_by_course_id.get(course_id)
+        if page is None:
+            return ""
+
+        programs = self.programs_by_course_id.get(course_id, [])
+        if not programs:
+            return self._fallback_url(page, course_id)
+
+        program_ids = [program.id for program in programs]
+        all_program_ids = list(program_ids)
+        for program in programs:
+            all_program_ids.extend(self.related_by_program_id.get(program.id, []))
+
+        program_page = min(
+            (
+                self.program_pages_by_program_id[program_id]
+                for program_id in program_ids
+                if program_id in self.program_pages_by_program_id
+            ),
+            key=lambda candidate: candidate.pk,
+            default=None,
+        )
+        form = self.child_form(program_page) if program_page else None
+        if not form:
+            program_page = None
+            form = _min_pk(
+                [
+                    candidate
+                    for program_id in all_program_ids
+                    for candidate in self.forms_by_program_id.get(program_id, [])
+                ]
+            )
+
+        if form:
+            url = self._program_url(page, program_page, form, program_ids)
+            if url:
+                return url
+
+        return self._fallback_url(page, course_id)
+
+
+def resolve_financial_assistance_form_urls(
+    course_ids: Iterable[int],
+    program_queryset: ProgramQuerySet | None = None,
+) -> dict[int, str]:
+    """
+    Financial assistance form URL per course id, in a fixed number of queries.
+
+    API callers should not call this directly - the view's queryset resolves it
+    via ``Course.objects.prefetch(...)`` so nothing queries during
+    serialization. Backs both that prefetcher and
+    ``CoursePage.financial_assistance_form_url``.
+
+    Args:
+        course_ids: iterable of Course ids
+        program_queryset: the programs a URL may be drawn from. Pass the same
+            queryset the caller hands the ``programs`` prefetch; ``None`` falls
+            back to ``default_program_queryset()``, which is that prefetch's own
+            default.
+
+    Returns:
+        dict: {course_id: url}, with "" for courses that have no form
+    """
+    course_ids = [course_id for course_id in course_ids if course_id]
+    if not course_ids:
+        return {}
+
+    if program_queryset is None:
+        program_queryset = default_program_queryset()
+
+    forms = _FinancialAssistanceForms(course_ids, program_queryset)
+    return {course_id: forms.url_for(course_id) for course_id in course_ids}
