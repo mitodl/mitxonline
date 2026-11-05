@@ -589,19 +589,35 @@ def test_order_refund_missing_transaction_id_in_data(mocker, fulfilled_order):
     assert refund_success is True
 
 
-@pytest.mark.parametrize("has_program_order", [True, False])
-def test_order_refund_zero_payment(mocker, user, has_program_order):
+@pytest.mark.parametrize(
+    ("redeems_program_discount", "later_program_purchase"),
+    [(True, False), (True, True), (False, False)],
+)
+def test_order_refund_zero_payment(
+    mocker, user, redeems_program_discount, later_program_purchase
+):
     """
     A $0 order isn't refunded, and the message points at the paid program
-    order that granted it if there is one.
+    order whose internal discount granted it, if there is one - not a later
+    purchase of another program with the same course, and not for a $0 order
+    that didn't come from a program.
     """
-    program = ProgramFactory.create()
     run = CourseRunFactory.create()
+    program = ProgramFactory.create()
     program.add_requirement(run.course)
-    if has_program_order:
-        program_line = make_purchase(user, program, Decimal("1524.60"))
-    zero_line = make_purchase(user, run, Decimal("1000.00"), paid=Decimal(0))
-    zero_order = zero_line.order
+    program_order = make_purchase(user, program, Decimal("1524.60")).order
+    zero_order = make_purchase(user, run, Decimal("1000.00"), paid=Decimal(0)).order
+    if redeems_program_discount:
+        DiscountRedemption.objects.create(
+            redemption_date=now_in_utc(),
+            redeemed_by=user,
+            redeemed_discount=create_verified_program_discount(program),
+            redeemed_order=zero_order,
+        )
+    if later_program_purchase:
+        other_program = ProgramFactory.create()
+        other_program.add_requirement(run.course)
+        other_order = make_purchase(user, other_program, Decimal("900.00")).order
     TransactionFactory.create(
         order=zero_order,
         amount=0,
@@ -621,10 +637,12 @@ def test_order_refund_zero_payment(mocker, user, has_program_order):
 
     assert refund_success is False
     assert f"Order {zero_order.reference_number} is a $0 order" in message
-    if has_program_order:
-        assert program_line.order.reference_number in message
+    if redeems_program_discount:
+        assert program_order.reference_number in message
     else:
         assert "program order" not in message
+    if later_program_purchase:
+        assert other_order.reference_number not in message
     start_refund_mock.assert_not_called()
     downgrade_task_mock.assert_not_called()
     zero_order.refresh_from_db()

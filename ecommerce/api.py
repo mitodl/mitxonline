@@ -36,7 +36,7 @@ from courses.api import (
     downgrade_program_enrollment_and_verified_runs,
 )
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
-from courses.models import CourseRunEnrollment
+from courses.models import CourseRunEnrollment, Program
 from courses.utils import is_uai_course_run, is_xpro_course_run
 from ecommerce.constants import (
     ADMIN_FULFILLED_PAYMENT_DATA,
@@ -961,31 +961,36 @@ def find_paid_program_order_for_zero_value_order(order: Order) -> Order | None:
     (see create_verified_program_course_run_order), so a learner asking for a
     refund of a course in the program will usually point at one of those.
 
+    Those orders redeem the program's internal discount (see
+    create_verified_program_discount), which is what ties them to the program.
+    Course membership alone can't: the course may be in several programs the
+    learner bought, or the order may be free for an unrelated reason.
+
     Args:
     - order (Order): the $0 order
     Returns:
-    - FulfilledOrder for a program containing one of the order's course runs,
-      or None if there isn't one
+    - FulfilledOrder, the learner's paid order for that program placed before
+      this one, or None if there isn't exactly one
     """
-    runs = order.purchased_runs
-    if not runs:
-        return None
+    program_ctype = ContentType.objects.get_for_model(Program)
+    program_ids = Product.objects.filter(
+        content_type=program_ctype,
+        discounts__discount__redemption_type=REDEMPTION_TYPE_INTERNAL,
+        discounts__discount__order_redemptions__redeemed_order=order,
+    ).values_list("object_id", flat=True)
 
-    candidates = (
+    candidates = list(
         FulfilledOrder.objects.filter(
             purchaser=order.purchaser,
             state=OrderStatus.FULFILLED,
             total_price_paid__gt=0,
-        )
-        .exclude(pk=order.pk)
-        .order_by("-created_on")
+            created_on__lt=order.created_on,
+            lines__purchased_content_type=program_ctype,
+            lines__purchased_object_id__in=program_ids,
+        ).distinct()[:2]
     )
-    for candidate in candidates:
-        for program in candidate.purchased_programs:
-            if program.courses_qset.filter(courseruns__in=runs).exists():
-                return candidate
 
-    return None
+    return candidates[0] if len(candidates) == 1 else None
 
 
 def _zero_value_order_refund_message(order: Order) -> str:
