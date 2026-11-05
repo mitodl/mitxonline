@@ -7,16 +7,19 @@ jobs:
   openapi-diff:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout HEAD
+      # The default pull_request checkout is the merge ref, so a branch that's
+      # behind the base doesn't report the base's newer changes as its own.
+      - name: Checkout the merge result
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          ref: ${{ github.head_ref }}
           path: head
+          fetch-depth: 2
+          persist-credentials: false
+      # Diff against the merge commit's first parent, the base it was built
+      # from. The base branch's tip can be newer (a queued job, a re-run), and
+      # its changes would then show up reversed.
       - name: Checkout BASE
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ github.base_ref }}
-          path: base
+        run: git -C head worktree add "$GITHUB_WORKSPACE/base" HEAD^1
       - name: Generate oasdiff changelog
         run: | # Write the full comment body to a file rather than a step output.
           # A large changelog interpolated into a JS action's `body:` input becomes a
@@ -47,7 +50,6 @@ jobs:
             done
             echo '```'
             echo ""
-            echo "Unexpected changes? Ensure your branch is up-to-date with \`main\` (consider rebasing)."
             echo "</details>"
           } > comment_body.md
       - name: Find existing comment
