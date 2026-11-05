@@ -163,7 +163,8 @@ class CertificatePageFactory(wagtail_factories.PageFactory):
         Save a revision by default. wagtail_factories saves the page directly
         (live=True) without going through Wagtail's publish flow, unlike a
         real editor publishing a page, which always creates one - certificates
-        rely on certificate_page.get_latest_revision() returning something.
+        need a revision, and certificate_page.get_certificate_revision() falls
+        back to this one since the page has no recorded live revision.
         """
         if create:
             self.save_revision()
