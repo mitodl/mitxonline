@@ -77,6 +77,7 @@ from ecommerce.api import (
     unenroll_learner_from_order,
 )
 from ecommerce.constants import (
+    ADMIN_FULFILLED_PAYMENT_DATA,
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
@@ -651,6 +652,67 @@ def test_order_refund_zero_payment(
     assert not zero_order.transactions.filter(
         transaction_type=TRANSACTION_TYPE_REFUND
     ).exists()
+
+
+@pytest.mark.parametrize(
+    ("program_payment_data", "expected_ending"),
+    [
+        (
+            {"transaction_id": "1234", "req_amount": "1524.60", "req_currency": "USD"},
+            " - refund that order instead.",
+        ),
+        (
+            ADMIN_FULFILLED_PAYMENT_DATA,
+            ", which has no payment gateway transaction to refund - Finance needs to refund it manually.",
+        ),
+        (
+            {
+                "transaction_id": "1234",
+                "req_amount": "1524.60",
+                "req_currency": "USD",
+                "paypal_token": "EC-1234",
+            },
+            ", which has no payment gateway transaction to refund - Finance needs to refund it manually.",
+        ),
+    ],
+)
+def test_order_refund_zero_payment_program_order_payment(
+    user, program_payment_data, expected_ending
+):
+    """
+    The $0 refund message only says to refund the program order when its
+    payment can be refunded through the gateway; an administratively fulfilled
+    or PayPal program order is named, but left to Finance.
+    """
+    run = CourseRunFactory.create()
+    program = ProgramFactory.create()
+    program.add_requirement(run.course)
+    program_order = make_purchase(user, program, Decimal("1524.60")).order
+    TransactionFactory.create(
+        order=program_order,
+        transaction_type=TRANSACTION_TYPE_PAYMENT,
+        transaction_id=str(uuid.uuid4()),
+        data=program_payment_data,
+    )
+    zero_order = make_purchase(user, run, Decimal("1000.00"), paid=Decimal(0)).order
+    DiscountRedemptionFactory.create(
+        redeemed_by=user,
+        redeemed_discount=create_verified_program_discount(program),
+        redeemed_order=zero_order,
+    )
+    TransactionFactory.create(
+        order=zero_order,
+        amount=0,
+        transaction_id=str(uuid.uuid4()),
+        data=ZERO_PAYMENT_DATA,
+    )
+
+    refund_success, message = refund_order(reference_number=zero_order.reference_number)
+
+    assert refund_success is False
+    assert message.endswith(
+        f"granted by program order {program_order.reference_number}{expected_ending}"
+    )
 
 
 @pytest.mark.parametrize(

@@ -997,9 +997,32 @@ def _zero_value_order_refund_message(order: Order) -> str:
     """Explain why a $0 order can't be refunded, and what to refund instead."""
     message = f"Order {order.reference_number} is a $0 order, so there is no payment to refund."
     program_order = find_paid_program_order_for_zero_value_order(order)
-    if program_order:
-        message += f" It was granted by program order {program_order.reference_number} - refund that order instead."
-    return message
+    if not program_order:
+        return message
+
+    message += f" It was granted by program order {program_order.reference_number}"
+    if _has_gateway_refundable_payment(program_order):
+        return f"{message} - refund that order instead."
+    return f"{message}, which has no payment gateway transaction to refund - Finance needs to refund it manually."
+
+
+def _has_gateway_refundable_payment(order: Order) -> bool:
+    """
+    Whether refund_order can refund the order's payment through the gateway.
+
+    Orders fulfilled administratively (ADMIN_FULFILLED_PAYMENT_DATA) and
+    PayPal payments have no CyberSource transaction refund_order can use.
+    """
+    payment = order.transactions.filter(
+        transaction_type=TRANSACTION_TYPE_PAYMENT
+    ).first()
+    data = payment.data if payment else {}
+    return (
+        not data.get("is_administrative")
+        and "paypal_token" not in data
+        and "req_amount" in data
+        and "req_currency" in data
+    )
 
 
 def record_order_refund(
