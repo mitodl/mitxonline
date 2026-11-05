@@ -27,6 +27,7 @@ from mitol.common.utils import (
 from oauth2_provider.models import AccessToken, Application
 from oauthlib.common import generate_token
 from requests.exceptions import HTTPError
+from requests.hooks import default_hooks
 from rest_framework import status
 
 import courses.models
@@ -1193,11 +1194,29 @@ def get_edx_api_enrollments_client():
     if not use_edx_enrollments_v2():
         return get_edx_api_service_client().enrollments
 
-    # Enrollment runs once per learner action and sync once per dashboard load,
-    # and every token request makes the LMS write an AccessToken row, so the
-    # JWT is reused until shortly before it expires.
-    cache_key = f"openedx_jwt:{settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_ID}"
-    access_token = cache.get(cache_key)
+    enrollments_client = EdxApi(
+        {"access_token": _get_enrollments_jwt()},
+        settings.OPENEDX_API_BASE_URL,
+        timeout=settings.EDX_API_CLIENT_TIMEOUT,
+    ).enrollments_v2
+    enrollments_client.requester.hooks["response"].append(
+        _retry_with_fresh_enrollments_jwt(enrollments_client.requester)
+    )
+    return enrollments_client
+
+
+def _enrollments_jwt_cache_key():
+    return f"openedx_jwt:{settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_ID}"
+
+
+def _get_enrollments_jwt():
+    """
+    The enrollments service worker's JWT, reused until shortly before it
+    expires. Enrollment runs once per learner action and sync once per
+    dashboard load, and every token request makes the LMS write an
+    AccessToken row.
+    """
+    access_token = cache.get(_enrollments_jwt_cache_key())
     if access_token is None:
         token = _request_edx_jwt(
             settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_ID,
@@ -1205,15 +1224,40 @@ def get_edx_api_enrollments_client():
         )
         access_token = token["access_token"]
         cache.set(
-            cache_key,
+            _enrollments_jwt_cache_key(),
             access_token,
             token["expires_in"] - OPENEDX_JWT_EXPIRY_MARGIN_SECONDS,
         )
-    return EdxApi(
-        {"access_token": access_token},
-        settings.OPENEDX_API_BASE_URL,
-        timeout=settings.EDX_API_CLIENT_TIMEOUT,
-    ).enrollments_v2
+    return access_token
+
+
+def _retry_with_fresh_enrollments_jwt(session):
+    """
+    A response hook for the enrollments client's session that, on a 401,
+    drops the cached JWT and resends the request once with a new one.
+
+    edX can stop accepting a JWT before it expires (e.g. a signing key
+    rotation). Without this every call would get a 401 until the cached JWT
+    expired, and a 4xx counts against the enrollment's retries. It is a hook
+    rather than a retry around each call because get_enrollments is a
+    generator, so its requests happen while the caller iterates.
+    """
+
+    def hook(response, **kwargs):
+        if response.status_code != status.HTTP_401_UNAUTHORIZED:
+            return response
+        cache.delete(_enrollments_jwt_cache_key())
+        token_type = session.headers["Authorization"].split()[0]
+        session.headers["Authorization"] = f"{token_type} {_get_enrollments_jwt()}"
+        retry = response.request.copy()
+        retry.headers["Authorization"] = session.headers["Authorization"]
+        # The retry goes out without this hook, so a 401 for the new JWT is
+        # raised rather than retried again.
+        retry.hooks = default_hooks()
+        response.close()
+        return session.send(retry, **kwargs)
+
+    return hook
 
 
 def get_edx_api_course_detail_client():
