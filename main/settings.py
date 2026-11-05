@@ -82,7 +82,7 @@ init_sentry(
     # Off: on, the SDK sends the user's email, username and IP, and every
     # cookie but Django's session and CSRF cookies. SENTRY_USER_HASH_KEY
     # restores user counts without the identity.
-    send_default_pii=False,
+    collect_user_info=False,
     user_hash_key=SENTRY_USER_HASH_KEY,
     log_level=SENTRY_LOG_LEVEL,
     heroku_app_name=HEROKU_APP_NAME,
