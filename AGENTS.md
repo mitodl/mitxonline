@@ -5,13 +5,12 @@
 MITx Online is a Django-based web platform for managing MIT online courses and programs. It integrates with Open edX for course delivery, Wagtail CMS for content management, and includes features for ecommerce, B2B provisioning, flexible pricing, and certificate generation.
 
 **Tech Stack:**
-- Backend: Django 5.1, Python 3.11+
+- Backend: Django 5.2, Python 3.11+
 - Frontend: React 16, Webpack, Yarn workspaces
 - CMS: Wagtail 7.2
 - Database: PostgreSQL 15
 - Cache/Queue: Redis, Celery
 - Authentication: OAuth2, Keycloak (optional)
-- Build System: Pants 2.17
 - Container: Docker Compose
 
 ## Build, Test, and Lint Commands
@@ -40,12 +39,16 @@ docker compose run --rm web pytest courses/api_test.py
 
 **Linting and formatting:**
 ```bash
-# Prefer pre-commit where possible; Ruff runs via the configured hooks
-pre-commit run ruff-format --all-files
-pre-commit run ruff --all-files
+# Install the locked tooling and replace any existing pre-commit git hook
+uv sync
+uv run prek install -f
+
+# Prefer prek where possible; Ruff runs via the configured hooks
+uv run prek run ruff-format --all-files
+uv run prek run ruff --all-files
 
 # Run all configured checks
-pre-commit run --all-files
+uv run prek run --all-files
 ```
 
 **Run development server:**
@@ -71,7 +74,6 @@ yarn coverage          # With coverage report
 ```bash
 # From frontend/public directory
 yarn lint              # ESLint
-yarn scss_lint         # Sass linting
 yarn fmt               # Format with prettier-eslint
 yarn fmt:check         # Check formatting
 ```
@@ -89,8 +91,8 @@ yarn dev-server        # Development server with HMR
 ### Documentation
 
 ```bash
-# Build Sphinx docs (requires Pants)
-pants docs ::
+# Build Sphinx docs
+uv run --only-group docs sphinx-build docs/source dist/sphinx
 
 # Output is in dist/sphinx/index.html
 ```
@@ -231,6 +233,8 @@ def list(self, request):
 
 **Queryset optimization:** Use `extend_schema_get_queryset` decorator (from `openapi/utils.py`) when queryset depends on request context not available at schema generation time.
 
+**API versions:** A view's spec (`v0.yaml` … `v3.yaml`) comes from its URL namespace (`v1`, `v2`, …). A view mounted outside a version namespace (b2b, users, Wagtail), and not dropped by `exclude_paths_hook` in `openapi/hooks.py`, fails `generate_openapi_spec` until it declares `versioning_class` from `main/versioning.py`: `V0Versioning`/`V2Versioning` to put it in that spec, or `NoVersioning` to keep it out of every spec.
+
 ### Celery Tasks
 
 **Task organization:**
@@ -265,7 +269,7 @@ docker compose build web celery  # Rebuild images after changes
 ### Code Style
 
 **Python:**
-- Prefer `pre-commit run` for formatting and linting; Ruff runs via the configured `ruff-format` and `ruff` hooks
+- Prefer `uv run prek run` for formatting and linting; Ruff runs via the configured `ruff-format` and `ruff` hooks
 - Type hints encouraged but not required
 - Docstrings for public APIs
 
@@ -339,11 +343,12 @@ docker compose exec web python manage.py collectstatic       # Collect static fi
 
 Generate and view API schema:
 ```bash
-# Generate schema
-docker compose exec web python manage.py spectacular --file schema.yml
+# Regenerate openapi/specs/v0.yaml ... v3.yaml
+docker compose exec web python manage.py generate_openapi_spec
 
 # View in browser
-# Navigate to http://mitxonline.odl.local:8013/api/schema/swagger-ui/
+# Navigate to http://mitxonline.odl.local:8013/api/schema/swagger-ui/ (version dropdown),
+# or /api/v0/schema/swagger-ui/ ... /api/v3/schema/swagger-ui/ for a single version
 ```
 
 Schema checked in tests: `scripts/test/openapi_spec_check.sh` ensures schema is up-to-date.

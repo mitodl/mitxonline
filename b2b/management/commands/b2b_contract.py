@@ -15,11 +15,12 @@ from mitol.common.utils import now_in_utc
 from b2b.constants import (
     CONTRACT_MEMBERSHIP_TYPE_CHOICES,
 )
+from b2b.contracts import create_contract
 from b2b.exceptions import SourceCourseIncompleteError
+from b2b.management.utils import get_contract_by_id_or_slug
 from b2b.models import (
     ContractPage,
     ContractProgramItem,
-    OrganizationIndexPage,
     OrganizationPage,
 )
 from courses.models import (
@@ -131,16 +132,12 @@ class Command(BaseCommand):
             type=str,
             help="The end date of the contract.",
         )
-        create_parser.add_argument(
-            "--create",
-            action="store_true",
-            help="Create an organization if it does not exist.",
-        )
-        create_parser.add_argument(
-            "--org-key",
-            type=str,
-            help="The org key to use for the new organization.",
-        )
+        # No --create: this used to build an OrganizationPage with no
+        # sso_organization_id, and orgs in that state are silently broken -
+        # attach_user() returns False without doing anything, so every
+        # membership write is a no-op (mitodl/hq#10552). Provision the
+        # organization through /api/v0/b2b/provisioning/organizations/ instead,
+        # which writes Keycloak and MITx Online together.
         create_parser.add_argument(
             "--max-learners",
             type=int,
@@ -272,10 +269,8 @@ class Command(BaseCommand):
         description = kwargs.pop("description")
         start_date = kwargs.pop("start")
         end_date = kwargs.pop("end")
-        create_organization = kwargs.pop("create")
         max_learners = kwargs.pop("max_learners")
         price = kwargs.pop("price")
-        new_org_key = kwargs.pop("org_key")
 
         self.stdout.write(
             f"Creating contract '{contract_name}' for organization '{organization_name}'"
@@ -287,36 +282,27 @@ class Command(BaseCommand):
 
         log.info("Got organization %s", org)
 
-        if not org and create_organization:
-            if not new_org_key:
-                msg = f"To create '{organization_name}', you must supply an org key."
-                raise CommandError(msg)
-
-            parent = OrganizationIndexPage.objects.first()
-            org = OrganizationPage(name=organization_name, org_key=new_org_key)
-            parent.add_child(instance=org)
-            org.save()
-            parent.save()
-            org.refresh_from_db()
-            self.stdout.write(f"Created organization '{organization_name}'")
-        elif not org:
-            msg = f"Organization '{organization_name}' does not exist. Use --create to create it."
+        if not org:
+            msg = (
+                f"Organization '{organization_name}' does not exist. Create it "
+                "through POST /api/v0/b2b/provisioning/organizations/, which "
+                "creates the Keycloak organization alongside it."
+            )
             raise CommandError(msg)
 
-        contract = ContractPage(
+        contract = create_contract(
+            org,
             name=contract_name,
-            description=description or "",
             membership_type=membership_type,
-            organization=org,
+            description=description or "",
             contract_start=start_date,
             contract_end=end_date,
             max_learners=max_learners,
             enrollment_fixed_price=price,
         )
-        org.add_child(instance=contract)
-        contract.save()
         self.stdout.write(
-            f"Created contract '{contract_name}' for organization '{organization_name}'"
+            f"Created contract '{contract_name}' (ID {contract.id}) for "
+            f"organization '{organization_name}'"
         )
 
     def handle_modify(self, *args, **kwargs):  # noqa: ARG002, C901
@@ -363,6 +349,151 @@ class Command(BaseCommand):
         contract.save()
         self.stdout.write(f"Modified contract with ID '{contract_id}'")
 
+    def _export_courses(self, program, course_ct):
+        """Serialize the courses directly in a program's requirements, with their source runs."""
+        course_reqs = (
+            ProgramRequirement.objects.filter(
+                program=program,
+                node_type=ProgramRequirementNodeType.COURSE,
+                course__isnull=False,
+            )
+            .select_related("course")
+            .order_by("path")
+            .all()
+        )
+
+        courses_data = []
+        for req in course_reqs:
+            course = req.course
+
+            designated = (
+                CourseRun.all_objects.filter(course=course)
+                .filter(Q(is_source_run=True) | Q(run_tag="SOURCE"))
+                .prefetch_related("enrollment_modes")
+                .order_by("id")
+            )
+
+            if designated.exists():
+                source_runs_data = [_serialize_run(run) for run in designated]
+            else:
+                # Older contracts never set is_source_run or run_tag="SOURCE".
+                # Fall back to the most recent non-B2B run per variant combo,
+                # mirroring create_contract_run's require_designated_source_run=False
+                # behaviour.  Export with is_source_run=True so the import flags
+                # them correctly and create_contract_run can find them.
+                non_b2b = (
+                    CourseRun.all_objects.filter(
+                        course=course, b2b_contracts__isnull=True
+                    )
+                    .exclude(Q(is_source_run=True) | Q(run_tag="SOURCE"))
+                    .prefetch_related("enrollment_modes")
+                    .order_by("-id")
+                )
+
+                # If the course has a default variant language, use it for
+                # runs that have NULL/empty language.  This ensures the
+                # exported run matches _get_source_runs_for_course variant
+                # filtering on the target instance.
+                default_sv = SupportedVariant.objects.filter(
+                    content_type=course_ct,
+                    object_id=course.id,
+                    default_variant=True,
+                ).first()
+                default_lang = default_sv.language if default_sv else None
+
+                seen: set = set()
+                fallback = []
+                for run in non_b2b:
+                    eff_lang = run.language or default_lang or ""
+                    key = (
+                        eff_lang,
+                        run.variant_industry or "",
+                        run.variant_length or "",
+                    )
+                    if key not in seen:
+                        seen.add(key)
+                        fallback.append((run, eff_lang))
+
+                source_runs_data = [
+                    _serialize_run(
+                        run,
+                        force_is_source_run=True,
+                        language_override=eff_lang if eff_lang else None,
+                    )
+                    for run, eff_lang in fallback
+                ]
+
+                if fallback:
+                    self.stderr.write(
+                        self.style.WARNING(
+                            f"  Course {course.readable_id}: no designated source "
+                            f"runs; using {len(fallback)} most-recent non-B2B "
+                            "run(s) as fallback (will be flagged is_source_run=True on import)"
+                        )
+                    )
+                else:
+                    self.stderr.write(
+                        self.style.WARNING(
+                            f"  Course {course.readable_id} has no source runs and "
+                            "no non-B2B runs — contract runs cannot be recreated on import."
+                        )
+                    )
+
+            courses_data.append(
+                {
+                    "readable_id": course.readable_id,
+                    "title": course.title,
+                    "departments": [d.name for d in course.departments.all()],
+                    "variant_options": _serialize_variant_options(
+                        SupportedVariant.objects.filter(
+                            content_type=course_ct, object_id=course.id
+                        )
+                    ),
+                    "source_runs": source_runs_data,
+                }
+            )
+
+        return courses_data
+
+    def _export_program(self, program, course_ct, ancestor_ids):
+        """
+        Serialize a program with its courses and, recursively, the programs nested
+        in its requirements.
+
+        ancestor_ids are the programs above this one, so a requirement cycle is
+        reported and cut instead of recursing forever.
+        """
+        nested_data = []
+        for nested, elective in [
+            *((p, False) for p in program.required_programs),
+            *((p, True) for p in program.elective_programs),
+        ]:
+            if nested.id in ancestor_ids or nested.id == program.id:
+                self.stderr.write(
+                    self.style.WARNING(
+                        f"  Program {program.readable_id} requires its ancestor "
+                        f"{nested.readable_id}; not exporting that requirement."
+                    )
+                )
+                continue
+            nested_data.append(
+                {
+                    **self._export_program(
+                        nested, course_ct, (*ancestor_ids, program.id)
+                    ),
+                    "elective": elective,
+                }
+            )
+
+        return {
+            "readable_id": program.readable_id,
+            "title": program.title,
+            "display_mode": program.display_mode,
+            "departments": [d.name for d in program.departments.all()],
+            "courses": self._export_courses(program, course_ct),
+            "programs": nested_data,
+        }
+
     def handle_export(self, *args, **kwargs):  # noqa: ARG002
         """Serialize a contract and its courseware blueprint to JSON.
 
@@ -375,10 +506,7 @@ class Command(BaseCommand):
         contract_id = kwargs.pop("contract_id")
         output_path = kwargs.pop("output", None)
 
-        if str(contract_id).isdecimal():
-            contract = ContractPage.objects.filter(id=contract_id).first()
-        else:
-            contract = ContractPage.objects.filter(slug=contract_id).first()
+        contract = get_contract_by_id_or_slug(str(contract_id))
 
         if not contract:
             msg = f"Contract '{contract_id}' not found."
@@ -396,115 +524,10 @@ class Command(BaseCommand):
         ):
             program = program_item.program
 
-            course_reqs = (
-                ProgramRequirement.objects.filter(
-                    program=program,
-                    node_type=ProgramRequirementNodeType.COURSE,
-                    course__isnull=False,
-                )
-                .select_related("course")
-                .order_by("path")
-                .all()
-            )
-
-            courses_data = []
-            for req in course_reqs:
-                course = req.course
-
-                designated = (
-                    CourseRun.all_objects.filter(course=course)
-                    .filter(Q(is_source_run=True) | Q(run_tag="SOURCE"))
-                    .prefetch_related("enrollment_modes")
-                    .order_by("id")
-                )
-
-                if designated.exists():
-                    source_runs_data = [_serialize_run(run) for run in designated]
-                else:
-                    # Older contracts never set is_source_run or run_tag="SOURCE".
-                    # Fall back to the most recent non-B2B run per variant combo,
-                    # mirroring create_contract_run's require_designated_source_run=False
-                    # behaviour.  Export with is_source_run=True so the import flags
-                    # them correctly and create_contract_run can find them.
-                    non_b2b = (
-                        CourseRun.all_objects.filter(
-                            course=course, b2b_contract__isnull=True
-                        )
-                        .exclude(Q(is_source_run=True) | Q(run_tag="SOURCE"))
-                        .prefetch_related("enrollment_modes")
-                        .order_by("-id")
-                    )
-
-                    # If the course has a default variant language, use it for
-                    # runs that have NULL/empty language.  This ensures the
-                    # exported run matches _get_source_runs_for_course variant
-                    # filtering on the target instance.
-                    default_sv = SupportedVariant.objects.filter(
-                        content_type=course_ct,
-                        object_id=course.id,
-                        default_variant=True,
-                    ).first()
-                    default_lang = default_sv.language if default_sv else None
-
-                    seen: set = set()
-                    fallback = []
-                    for run in non_b2b:
-                        eff_lang = run.language or default_lang or ""
-                        key = (
-                            eff_lang,
-                            run.variant_industry or "",
-                            run.variant_length or "",
-                        )
-                        if key not in seen:
-                            seen.add(key)
-                            fallback.append((run, eff_lang))
-
-                    source_runs_data = [
-                        _serialize_run(
-                            run,
-                            force_is_source_run=True,
-                            language_override=eff_lang if eff_lang else None,
-                        )
-                        for run, eff_lang in fallback
-                    ]
-
-                    if fallback:
-                        self.stderr.write(
-                            self.style.WARNING(
-                                f"  Course {course.readable_id}: no designated source "
-                                f"runs; using {len(fallback)} most-recent non-B2B "
-                                "run(s) as fallback (will be flagged is_source_run=True on import)"
-                            )
-                        )
-                    else:
-                        self.stderr.write(
-                            self.style.WARNING(
-                                f"  Course {course.readable_id} has no source runs and "
-                                "no non-B2B runs — contract runs cannot be recreated on import."
-                            )
-                        )
-
-                courses_data.append(
-                    {
-                        "readable_id": course.readable_id,
-                        "title": course.title,
-                        "departments": [d.name for d in course.departments.all()],
-                        "variant_options": _serialize_variant_options(
-                            SupportedVariant.objects.filter(
-                                content_type=course_ct, object_id=course.id
-                            )
-                        ),
-                        "source_runs": source_runs_data,
-                    }
-                )
-
             programs_data.append(
                 {
-                    "readable_id": program.readable_id,
-                    "title": program.title,
+                    **self._export_program(program, course_ct, ()),
                     "sort_order": program_item.sort_order,
-                    "departments": [d.name for d in program.departments.all()],
-                    "courses": courses_data,
                 }
             )
 
@@ -615,7 +638,7 @@ class Command(BaseCommand):
 
     def _import_contract(self, org, contract_data, slug):
         """Get or create the ContractPage from exported contract data."""
-        contract = ContractPage.objects.filter(slug=slug).first()
+        contract = ContractPage.objects.child_of(org).filter(slug=slug).first()
         if contract:
             self.stdout.write(f"  Contract exists: {slug}")
             return contract
@@ -764,10 +787,17 @@ class Command(BaseCommand):
         return course
 
     def _import_program(self, prog_data):
-        """Get or create a program with its page, departments, and courses."""
+        """
+        Get or create a program with its page, departments, courses, and,
+        recursively, the programs nested in its requirements.
+        """
         program, was_created = Program.objects.get_or_create(
             readable_id=prog_data["readable_id"],
-            defaults={"title": prog_data["title"], "live": True},
+            defaults={
+                "title": prog_data["title"],
+                "live": True,
+                "display_mode": prog_data.get("display_mode"),
+            },
         )
         if was_created:
             self.stdout.write(
@@ -798,6 +828,24 @@ class Command(BaseCommand):
             if course.id not in existing_course_ids:
                 program.add_requirement(course)
                 existing_course_ids.add(course.id)
+
+        existing_program_ids = set(
+            ProgramRequirement.objects.filter(
+                program=program,
+                node_type=ProgramRequirementNodeType.PROGRAM,
+                required_program__isnull=False,
+            ).values_list("required_program_id", flat=True)
+        )
+
+        for nested_data in prog_data.get("programs", []):
+            nested = self._import_program(nested_data)
+            if nested.id in existing_program_ids:
+                continue
+            if nested_data.get("elective"):
+                program.add_program_elective(nested)
+            else:
+                program.add_program_requirement(nested)
+            existing_program_ids.add(nested.id)
 
         return program
 
@@ -855,7 +903,7 @@ class Command(BaseCommand):
         self.stdout.write("\nStep 5: Contract runs")
         # Reload so cached_property fields see the variant records we just created.
         contract.refresh_from_db()
-        filter_variants = list(contract.variant_options.all())
+        filter_variants = list(contract.active_variant_options())
         total_created = 0
         total_no_source = 0
 

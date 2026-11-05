@@ -1,6 +1,450 @@
 Release Notes
 =============
 
+.. note::
+
+   This file is no longer updated. Releases after 1.171.0 use calendar versions
+   and are cut by the Concourse release workflow. Their release notes are in
+   `CHANGELOG.md <CHANGELOG.md>`_.
+
+Version 1.171.0
+---------------
+
+- Skip the live export compliance check on support deferrals (#4184)
+- Back program-purchase run upgrades with zero-value orders (#4155)
+- Keep learner PII out of Sentry for export checks (#4182)
+- fix: ignore google-api-core's Python 3.11 deprecation warning in tests (#4189)
+- feat: push CourseRun.upgrade_deadline into the edX verified course mode (#3814)
+- fix: update dependency djangorestframework to v3.18.3 [SECURITY] (#4178)
+- Revert "Program Entitlement bug fix" (#4180)
+- Add certifi>=2026.10.19 constraint (eMudhra CA compromise) (#4181)
+- Bump certifi to 2026.10.19 (eMudhra CA compromise) (#4179)
+- Program Entitlement bug fix (#4154)
+- Add quick and dirty status breakdown on verifiable creds (#4169)
+
+Version 1.170.10
+----------------
+
+- Enroll users in archived courses from the admin dashboard (#4174)
+- Requirements editor: description on requirement groups (#4171)
+
+Version 1.170.9
+---------------
+
+- Add form validation for Verifiable Credentials fields in Wagtail, management command to get status breakdown for all certificates. (#4161)
+- Remove stale verifiable-credential note from What you learn field (#4166)
+
+Version 1.170.8
+---------------
+
+- Resolve PENDING order using transaction id (#4163)
+- Transfer all orders and entitlements and Fix bug in transfer user course enrollment (#4164)
+
+Version 1.170.7
+---------------
+
+- Nix sass-lint, update lockfile (#4162)
+- Report course staff roles on enrollments (#4074)
+- Add ability to run rerun_courserun without making a course run in edX (#4156)
+
+Version 1.170.6
+---------------
+
+- Bump anyio package (#4159)
+- fix(13891): B2b Code Redemption Fixes (#4158)
+- Report a contract's variant coverage from setup-status and check_contract_variant (#4115)
+- Re-check the code and the contract's seats under the lock when redeeming an enrollment code (#4102)
+- feat(notifications): proxy Open edX notification preferences (#3897)
+- Apply contract enrollment codes to baskets for B2B members (#4133)
+- Fix flaky test_create_edx_user by giving OpenEdxApiAuthFactory a fixed expiry (#4151)
+
+Version 1.170.5
+---------------
+
+- Add a staff API route that creates a contract's missing variant runs (#4112)
+- Add a contracts section to the staff dashboard (#4121)
+- Add updated pyjwt, remove unused mitol package, bump cybersource (#4101)
+- Update contract add/append logic; add a reconciliation function (#4125)
+- Clear the oasdiff ignore list now that its changes have shipped (#4149)
+
+Version 1.170.4
+---------------
+
+- Makes org reconciliation in user session more reliable (#4145)
+
+Version 1.170.3
+---------------
+
+- Remove line item sync call during unenrollment (#4117)
+- Yarn up for js deps with critical severity issues. (#4131)
+- Requirements editor: reorder groups, tracks and courses; unclip the course picker (#4146)
+
+Version 1.170.2
+---------------
+
+- Add a publication date to product page testimonials (#4137)
+- Fix OpenAPI spec partitioning (#4098)
+- chore(deps): move pytest-lazy-fixtures and datamodel-code-generator to dev (#4144)
+- Retry adding unconfirmed org members to Keycloak on a schedule (#4141)
+- Take the contract assignment lock in b2b_codes and in code redemption (#4096)
+- fix(docker): drop unused libcairo2-dev so the image runs on DHI Python (#4143)
+
+Version 1.170.1
+---------------
+
+- Retry rate-limited course list batches and sync with client credentials (#4076)
+- Make the provisioning API the only writer of an organization's name, description and Keycloak link (#4089)
+- If the product's purchasable object is not B2B, don't change its price (#4132)
+- Program tracks: track nodes, the learner's chosen track, and the admin editor (#4093)
+- Scope B2B enrollment codes to their contract (#4099)
+
+Version 1.170.0
+---------------
+
+- feat(scim): add --fill-only to remediate_keycloak_user_names (#3999)
+- fix: ask for missing profile fields at checkout instead of returning a 500 (#4136)
+- Update Django Zeal, add targeted suppressions for most new N+1 (#4126)
+- Add enrollment eligibility endpoints (#4020)
+
+Version 1.169.12
+----------------
+
+- Return display labels for variant industry and length (#4123)
+- Read credential metadata from the MIT Learn API (#4110)
+- Transfer audit and verified enrollments and sync with edx (#4116)
+- Show notifications on pages that hide header (including cart) (#4081)
+
+Version 1.169.11
+----------------
+
+- Copy only the compiled frontend into the production image (#4108)
+- Fix the two crash paths in picking a contract run's source run (#4073)
+- Upgrade eligible audit enrollments when a user joins a contract (#4114)
+- Terminate the enrollment error code sentence with a period (#4113)
+- Add staff API routes for a contract's variant sets (#4068)
+- Write Keycloak last when changing an existing provisioning resource (#4028)
+- Let staff edit an identity provider instead of deleting and recreating it (staff UI 5/5) (#4005)
+- Link unlinked organizations to their Keycloak org by alias (#3993)
+- Return a specific error code in the API error for compliance check failure (#3938)
+
+Version 1.169.10
+----------------
+
+- Allow purchasing B2B-associated runs as a non-B2B purchase (#4079)
+- Allow upgrades through the B2B one-click enrollment API (#4077)
+- Share one requirement-tree evaluator; validate requirement trees at every depth (#4067)
+- Update pytest-split test durations (#4094)
+- Serialize enrollment code assignment per contract (#4048)
+- Build the docs with uv and remove Pants (#4054)
+- Serializers and Filtering: Decide whether an enrollment is B2B from its own contract (#4084)
+- Add a CoursePage toggle for the Learn course outline section (#4090)
+- feat: add course run id search in courserungrade admin (#3986)
+- Update HubSpot line item sync for existing items (#4080)
+- Group verifiable-credential fields into their own CMS panel (#4071)
+
+Version 1.169.9
+---------------
+
+- Push SCIM user updates to Open edX asynchronously (#3925)
+- Remove duplicates hopefully (#4072)
+- Update astral-sh/setup-uv action to v8.3.2 (#4085)
+- Update actions/checkout action to v6.1.0 (#4034)
+- Remove import_courserun's non-functional --contract flag (#4091)
+- fix(scim): let remediate_keycloak_user_names run against production (#3992)
+- Keep existing members when linking an organization to Keycloak (#4064)
+- Reject ambiguous contract slugs in B2B management commands (#4070)
+- Keep a B2B enrollment's contract when checkout reuses a pending order (#4082)
+- Update Keycloak admin data classes (#4078)
+- chore: remove the interim pre-commit.ci ci: block (#4075)
+- Serialize b2b_only on v2 course runs (#4069)
+
+Version 1.169.8
+---------------
+
+- Add a hookimpl for Stripe refund events (#4051)
+- Run hooks with prek and autofix.ci (#4063)
+- Update actions/setup-node action to v6.5.0 (#4035)
+- Updates to Refunds of Program Entitlements (#4053)
+- Add verifiable_credential_description, feature flag, and FieldPanel (#4027)
+
+Version 1.169.7
+---------------
+
+- Avoid recreating duplicate line items in hubspot (#4041)
+- Add "Manufacturing" to industry focus variant choices (#4060)
+
+Version 1.169.6
+---------------
+
+- Update postcss, @babel/core and webpack-dev-server for security fixes (#4030)
+- Update actions/setup-python digest to ece7cb0 (#4033)
+- Update actions/checkout digest to d23441a (#4032)
+- Update actions/cache digest to caa2961 (#4031)
+- Add a command to backfill Keycloak orgs for unlinked organizations (#4057)
+- Add the B2B provisioning API reference doc (#3922)
+- Change refund status on enrollment refunds (#4026)
+- Fix incorrect course topics caused by a ParentalManyToMany prefetch (#4050)
+- Add a B2B organizations section to the staff dashboard (staff UI 4/4) (#3997)
+
+Version 1.169.4
+---------------
+
+- Enrolling users should skip repair user if it is already synced (#4045)
+- Return the user's data sharing consent on their B2B contracts (#4039)
+
+Version 1.169.3
+---------------
+
+- Add CyberSource compliance check to order generation pre-flight (#4022)
+
+Version 1.169.2
+---------------
+
+- Make migration non-atomic; chunk batches into 100s (#4043)
+
+Version 1.169.1
+---------------
+
+- Fix the program enrollment backfill so that it skips some enrollments rather than crashing out (#4040)
+- Move the staff dashboard onto Refine 4's router and auth provider (staff UI 3/4) (#3996)
+- Remove the leaking method cache from Course.get_filtered_runs (#4037)
+- Upgrade the staff dashboard from Refine 3 to Refine 4 (staff UI 2/4) (#3995)
+- Add the staff provisioning list, SP details and audit trail (staff UI 1/4) (#3994)
+- Add the staff contract provisioning API (C3 3/3) (#3965)
+- Move contract setup out of the management commands into b2b.contracts (C3 2/3) (#3964)
+- Track contract run edX clones and make the clone safe to retry (C3 1/3) (#3963)
+- Add an admin for Stripe webhook secrets (#4024)
+- Track the contract that an enrollment belongs to (#3944)
+- Fix bug in recording consent values on incorrect row (#4025)
+- Initial implementation of simple data consent api. (#3977)
+- Fix CyberSource refund handling (#4016)
+
+Version 1.168.5
+---------------
+
+- Add migration to add data consent boolean, timestamps (#3969)
+- Skip cart for verified program course enrollments (#4008)
+
+Version 1.168.4
+---------------
+
+- Stop hydrating B2B ContractPage rows in /api/v2/courses/ (#4013)
+- Google Sheets: Process program refunds and downgrade enrollments (#4011)
+
+Version 1.168.3
+---------------
+
+- feat(product-pages): expose CMS-managed testimonials on course and program pages (#3987)
+
+Version 1.168.2
+---------------
+
+- Add custom through model for User.b2b_contracts (#3951)
+
+Version 1.168.1
+---------------
+
+- Skip emails when ernolling learners (#4002)
+- chore(deps): security updates for urllib3, wagtail, bleach and djangorestframework (#4000)
+- Disable npm manager in renovate.  (#3991)
+
+Version 1.168.0
+---------------
+
+- Fix the pre-commit errors (#4003)
+- Make /api/v2/courses/ query count flat in course count (#3886)
+- fix: make the CyberSource SDK work against the real urllib3 (#3984)
+- Merge commit from fork
+
+Version 1.167.0
+---------------
+
+- Update dependency django to v5.2.17 [SECURITY] (#3762)
+- feat: FAQs on product pages (mitxonline CMS side) (#3961)
+
+Version 1.166.7
+---------------
+
+- Scope the CSRF cookie domain by Origin and re-issue it when missing (#3978)
+- Make verified-program discounts an "internal" redemption type (#3972)
+
+Version 1.166.5
+---------------
+
+- feat: add --skip-compliance-check flag to enroll_learners (#3980)
+- Expose some new B2B fields in CourseRunAdmin (#3968)
+- fix: reject Course.readable_id values that collide with a CourseRun's courseware_id (#3960)
+
+Version 1.166.4
+---------------
+
+- Disallow the urllib3-future package (#3975)
+
+Version 1.166.3
+---------------
+
+- feat: GET /api/v0/products/{id}/user_pricing/ per-user price quote (#3959)
+- Return 409 when a new organization's name reuses a page slug (#3955)
+- Restrict B2B page access to admins (#3957)
+- fix(sentry): cap request bodies at 1KB and scrub Postgres DETAIL rows (#3936)
+
+Version 1.166.2
+---------------
+
+- Add XPro HubSpot routing for ecommerce events (#3947)
+- Search compliance logs in the admin (#3962)
+
+Version 1.166.1
+---------------
+
+- Fix enrollable_for_contract so it just checks that the run is in the contract (#3954)
+- Only sync changed users to HubSpot during cert generation, and in batches (#3946)
+- Add admin filters for compliance logs (#3952)
+
+Version 1.166.0
+---------------
+
+- feat (hq11846): Complete your Purchase, paid-amount-off discount behavior (#3926)
+- Retire b2b_contract create --create, demote the org sync to a reconciler (C1 5/5) (#3932)
+- Expose the provisioning API under /api/v0/b2b/provisioning/ (C1 4/5) (#3931)
+- Provision Keycloak organizations and IdPs at runtime (C1 3/5) (#3930)
+- Add the B2B onboarding and identity provider records (C1 2/5) (#3929)
+- Give the Keycloak admin client the calls provisioning needs (C1 1/5) (#3928)
+- Harden test for locals (#3950)
+- chore: pin mitol-drf-lint in the drf-serializer-orm-check hook (#3943)
+- Reuse prefetched course runs in the v2 course API again (#3948)
+
+Version 1.165.4
+---------------
+
+- Skip duplicate learner records when transfering (#3942)
+- Update B2B provisioning; allow public course attachment (#3903)
+- Respect product-scoped discounts in pricing (#3937)
+- Cut per-order queries on GET /api/v0/orders/history/ from 17 to 10 (#3934)
+
+Version 1.165.3
+---------------
+
+- Optimize course API pagination query (#3939)
+- ENABLE_MULTIPLE_CART_ITEMS=False should disable multi-product baskets even through APIs   (#3909)
+
+Version 1.165.2
+---------------
+
+- fix: Handle payment gateway refund errors in admin (#3803)
+- Remove 'screen' from Dockerfile dependencies (#3927)
+- fix: remap issued-certificate signatory references (#3921)
+- feat (hq11846): Complete your Purchase, Discount Creation (#3916)
+- Fix Content-Type on Keycloak organization member association requests (#3923)
+
+Version 1.165.1 (Released September 02, 2026)
+---------------
+
+- Revert "Look up orders by reference_number on the CyberSource callback (#3899)" (#3918)
+- fix: Repair the reused test DB after transaction=True tests (which do not use pytest's normal transaction) (#3917)
+- Fix AGENTS.md Django version (5.1 -> 5.2) (#3910)
+- Email context updates (#3911)
+- fix: basket api discount-related bugfixes (#3898)
+- fix: OpenAPI / Serializer improvements for BulkDiscountSerializer, CreateBasketWithProductsSerializer (#3902)
+- fix: unbreak python-checks — ecommerce migration leaf conflict + stale Keycloak dataclasses (#3908)
+- Skip downgrade for unenrolled learners on refund (#3901)
+- fix: downgrade stale course run 404 errors from error to warning (#3904)
+- Look up orders by reference_number on the CyberSource callback (#3899)
+
+Version 1.164.1 (Released August 31, 2026)
+---------------
+
+- add command to trasfer grades to another account (#3627)
+- Expose refund state on the order receipt payload (#3873)
+
+Version 1.164.0 (Released August 31, 2026)
+---------------
+
+- Add per-page hubspot_form_id to product pages, drop show_stay_updated (#3893)
+- Make Line.discounted_unit_price non-null (#3896)
+- Site name for emails should be MIT Learn (#3900)
+- Change export compliance flag to posthog (#3895)
+- Add backfill action to DiscountContractAttachmentRedemption admin page (#3891)
+- Make the user admin's contract picker searchable (#3856)
+- fix: hard purge Fastly surrogate keys instead of soft purge (#3792)
+
+Version 1.163.5 (Released August 31, 2026)
+---------------
+
+- updating emails to use MIT Learn branding (#3892)
+- feat(certificates): gate certificate creation on CMS certificate page and disabled flag (#3888)
+- Punch up admin page for DiscountContractAttachmentRedemption records (#3889)
+- Honor the enrollment mode in the Open edX enrollment webhook (#3840)
+
+Version 1.163.4 (Released August 27, 2026)
+---------------
+
+- Record the post-discount unit price on order lines (#3884)
+- Uneroll learners management command (#3883)
+- Enforce export compliance verification on course/program enrollment (#3786)
+- Add a default (fake) Stripe key for testing use (#3885)
+- ci: add a ci-gate job so one required check can cover the whole suite (#3876)
+- Handle deleted products from versioned lines (#3878)
+- Sync HubSpot first and last names (#3880)
+
+Version 1.163.3 (Released August 26, 2026)
+---------------
+
+- CI step to check for stale keycloak api spec (#3867)
+- Require login to view a financial assistance form (#3865)
+- Mailgun event disaster recovery management command (#3870)
+- feat(scim): add migrate_and_sync_users orchestrator command (#3837)
+- fix(courses): re-fetch created users by email after bulk_create in migrate_edx_data (#3843)
+- Remove ATTR_MAP entries that silently corrupt data on SCIM PATCH replace (#3874)
+
+Version 1.163.2 (Released August 24, 2026)
+---------------
+
+- Sync HubSpot on LegalAddress save (#3862)
+
+Version 1.163.1 (Released August 24, 2026)
+---------------
+
+- Handle SQL rules on the Product table (again) (#3871)
+- Fix some issues in the tests for remeidate_keycloak_user_names (#3872)
+- Replace the requirements tree editor with plain-language groups (#3857)
+- chore(deps): mitol-django-observability 2026.3.11 -> 2026.8.19 (#3863)
+- chore: drop the Heroku deployment artifacts (#3866)
+- Handle SQL rules on the Product table (#3868)
+- fix(scim): send name.givenName/familyName in outbound SCIM payload (#3836)
+- Add manual order completion; refactor Stripe event handling (#3855)
+- Enforce one product per purchasable object (#3847)
+- chore(otel): delete a dead flag and fix a setting name that was never read (#3859)
+
+Version 1.162.8 (Released August 19, 2026)
+---------------
+
+- Regen datamodel with pydantic classes (#3854)
+- Fix certificate generation for nested programs to check the required program (#3858)
+- Add enroll_learners management command for bulk csv enrollment (#3853)
+
+Version 1.162.7 (Released August 18, 2026)
+---------------
+
+- fix: reject enrollments in course runs whose enrollment window has closed (#3846)
+- Fix: Handle expired OpenEdX refresh tokens gracefully (#3835)
+- Regen dataclass for Keycloak (#3852)
+- fix issues with orders api (#3823)
+
+Version 1.162.6 (Released August 17, 2026)
+---------------
+
+- Recurse into the program if the program doesn't have a verified mode when generating certificates (#3848)
+- Add postal_code and state to missing fields in the user api (#3850)
+- Skip HubSpot deal sync for program-enrolled courses (#3844)
+- Backfill verified enrollments when verified program (#3838)
+
+Version 1.162.5 (Released August 13, 2026)
+---------------
+
+- Backfill missing LegalAddress/UserProfile for migrated users; guard should_skip_onboarding (#3845)
+- refactor: pass the Learn Fastly service ID at the call sites (#3804)
+
 Version 1.162.4 (Released August 12, 2026)
 ---------------
 

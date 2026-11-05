@@ -2,5 +2,19 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "local>mitodl/.github:renovate-config"
+  ],
+  "pre-commit": {
+    "enabled": true
+  },
+  "npm": {
+    "enabled": false
+  },
+  "packageRules": [
+    {
+      "description": "Keep updating the mitol-drf-lint additional_dependencies pin on the local hook as well as hook revs.",
+      "matchManagers": ["pre-commit"],
+      "matchPackageNames": ["mitol-drf-lint"],
+      "enabled": true
+    }
   ]
 }

@@ -3,6 +3,7 @@
 import logging
 
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.types import OpenApiTypes
@@ -14,12 +15,17 @@ from drf_spectacular.utils import (
 from mitol.common.utils.datetime import now_in_utc
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_api_key.permissions import HasAPIKey
 
-from b2b.api import create_b2b_enrollment, process_add_org_membership
+from b2b.api import (
+    create_b2b_enrollment,
+    lock_contract_for_code_assignment,
+    process_add_org_membership,
+)
+from b2b.constants import CONTRACT_MEMBERSHIP_CODE
 from b2b.models import (
     ContractPage,
     ContractProgramItem,
@@ -30,6 +36,8 @@ from b2b.serializers.v0 import (
     B2BEnrollRequestSerializer,
     ContractPageSerializer,
     CreateB2BEnrollmentSerializer,
+    DataConsentSerializer,
+    DataConsentValidationErrorSerializer,
     OrganizationPageSerializer,
 )
 from courses.models import CourseRun
@@ -38,7 +46,7 @@ from ecommerce.constants import REDEMPTION_TYPE_UNLIMITED
 from ecommerce.models import Discount, Product
 from main.authentication import CsrfExemptSessionAuthentication
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
-from main.permissions import IsAdminOrReadOnly
+from main.versioning import V0Versioning
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +55,8 @@ class OrganizationPageViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Viewset for the OrganizationPage model.
     """
+
+    versioning_class = V0Versioning
 
     queryset = OrganizationPage.objects.prefetch_related(
         Prefetch(
@@ -62,7 +72,7 @@ class OrganizationPageViewSet(viewsets.ReadOnlyModelViewSet):
         )
     )
     serializer_class = OrganizationPageSerializer
-    permission_classes = [IsAdminOrReadOnly | HasAPIKey]
+    permission_classes = [IsAdminUser | HasAPIKey]
     lookup_field = "slug"
     lookup_url_kwarg = "organization_slug"
 
@@ -72,8 +82,9 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
     Viewset for the ContractPage model.
     """
 
+    versioning_class = V0Versioning
     serializer_class = ContractPageSerializer
-    permission_classes = [IsAdminOrReadOnly | HasAPIKey]
+    permission_classes = [IsAdminUser | HasAPIKey]
     lookup_field = "slug"
     lookup_url_kwarg = "contract_slug"
 
@@ -145,6 +156,7 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
 class Enroll(APIView):
     """View for enrolling in a B2B course."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
@@ -159,9 +171,11 @@ class Enroll(APIView):
         """Create an enrollment for the given course run."""
 
         course_run_content_type = ContentType.objects.get_for_model(CourseRun)
-        courserun = CourseRun.objects.filter(
-            courseware_id=readable_id, b2b_contract__isnull=False
-        ).get()
+        courserun = (
+            CourseRun.objects.annotate(b2b_contract_count=Count("b2b_contracts"))
+            .filter(courseware_id=readable_id, b2b_contract_count__gt=0)
+            .get()
+        )
         product = Product.objects.filter(
             content_type=course_run_content_type, object_id=courserun.id
         ).get()
@@ -170,13 +184,16 @@ class Enroll(APIView):
         request_serializer = B2BEnrollRequestSerializer(data=request.data)
         request_serializer.is_valid(raise_exception=True)
         program_id = request_serializer.validated_data.get("program_id")
+        contract_slug = request_serializer.validated_data.get("contract_slug")
 
-        response = create_b2b_enrollment(request, product, program_id=program_id)
+        response = create_b2b_enrollment(
+            request, product, program_id=program_id, contract_slug=contract_slug
+        )
 
         return Response(
             CreateB2BEnrollmentSerializer(response).data,
             status=status.HTTP_201_CREATED
-            if response["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+            if response and response["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
             else status.HTTP_400_BAD_REQUEST,
         )
 
@@ -184,6 +201,7 @@ class Enroll(APIView):
 class AttachContractApi(APIView):
     """View for attaching a user to a B2B contract."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAuthenticated]
     authentication_classes = [
         CsrfExemptSessionAuthentication,
@@ -193,7 +211,7 @@ class AttachContractApi(APIView):
         request=None,
         responses=ContractPageSerializer(many=True),
     )
-    def post(self, request, enrollment_code: str, format=None):  # noqa: A002, ARG002
+    def post(self, request, enrollment_code: str, format=None):  # noqa: A002, ARG002, PLR0911
         """
         Use the provided enrollment code to attach the user to a B2B contract.
 
@@ -212,7 +230,8 @@ class AttachContractApi(APIView):
         Returns:
         - 201: Code successfully redeemed and user attached to new contract(s)
         - 200: Code valid but user already attached to all associated contracts
-        - 404: Invalid or expired enrollment code
+        - 404: Invalid or expired enrollment code, including a single-use code
+          that someone else redeemed while this request was in flight
         - 409: Code valid but no available seats in associated contract(s)
         - list of ContractPageSerializer - the active contract associated with the code
         """
@@ -238,10 +257,9 @@ class AttachContractApi(APIView):
             )
 
             for discount in fallback_discounts:
-                for contract in (
-                    discount.b2b_contracts()
-                    .filter(active=True)
-                    .exclude(Q(contract_start__gte=now) | Q(contract_end__lt=now))
+                for contract in ContractPage.active_objects.filter(
+                    pk=discount.b2b_contract_id,
+                    membership_type=CONTRACT_MEMBERSHIP_CODE,
                 ):
                     if contract.is_full():
                         log.error(  # noqa: TRY400
@@ -259,17 +277,20 @@ class AttachContractApi(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        # Only code contracts take members this way. Managed and auto contracts
+        # get theirs from organization membership, and their codes are for
+        # enrolling members, not for joining.
         b2b_contract_ids = list(
-            code.b2b_contracts()
-            .filter(active=True)
-            .exclude(Q(contract_start__gte=now) | Q(contract_end__lt=now))
-            .values_list("id", flat=True)
+            ContractPage.active_objects.filter(
+                pk=code.b2b_contract_id, membership_type=CONTRACT_MEMBERSHIP_CODE
+            ).values_list("id", flat=True)
         )
         if not b2b_contract_ids:
-            # Log an error here. We found a code, but it isn't associated with
-            # any active contracts, which is generally confusing for operators.
-            log.error(
-                "B2B attach: code %s is valid but not associated with any contracts",
+            # A valid code with no active code contract behind it: a managed or
+            # auto contract's code, which is refused on purpose, or a code whose
+            # contract has ended or been deactivated.
+            log.info(
+                "B2B attach: code %s is valid but not associated with any active code contract",
                 code,
             )
             return Response(
@@ -279,7 +300,7 @@ class AttachContractApi(APIView):
 
         contracts = self._get_eligible_contracts(request.user, b2b_contract_ids)
 
-        contracts_attached, contract_full = self._attach_user_to_contracts(
+        contracts_attached, contract_full, code_taken = self._attach_user_to_contracts(
             request.user, contracts, code
         )
 
@@ -297,6 +318,13 @@ class AttachContractApi(APIView):
 
         if contracts_attached:
             return Response(serialized_contracts, status=status.HTTP_201_CREATED)
+
+        if code_taken:
+            # Someone else redeemed the code after it was validated above.
+            return Response(
+                {"detail": "Invalid or expired enrollment code."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         if contract_full:
             return Response(
@@ -343,32 +371,119 @@ class AttachContractApi(APIView):
         )
 
     def _attach_user_to_contracts(self, user, contracts, code):
-        """Attach the user to eligible contracts and track redemption state."""
+        """
+        Attach the user to eligible contracts and record the redemption.
+
+        The code and the contract's seats were checked before this is called,
+        with no lock, so two requests can both get this far for one single-use
+        code or for a contract's last seat. Each contract is therefore handled
+        under its assignment lock, and both are checked again there before
+        anything is written.
+
+        Returns a tuple of three booleans: whether the user was attached to a
+        contract, whether a contract was skipped for being full, and whether
+        one was skipped because someone else had redeemed the code.
+        """
         contracts_attached = False
         contract_full = False
+        code_taken = False
+        single_use = code.redemption_type != REDEMPTION_TYPE_UNLIMITED
 
         for contract in contracts:
-            if contract.is_full():
-                log.error(
-                    "B2B attach to contract: can't add %s to %s: no open seats",
-                    user,
-                    contract,
-                )
-                contract_full = True
-                continue
+            with transaction.atomic():
+                lock_contract_for_code_assignment(contract)
+                # The seat limit may have been changed while this waited for
+                # the lock; the contract passed in was loaded before it.
+                contract.refresh_from_db(fields=["max_learners"])
 
+                if (
+                    user.b2b_contracts.filter(pk=contract.pk).exists()
+                    and code.contract_redemptions.filter(
+                        contract=contract, user=user
+                    ).exists()
+                ):
+                    # A repeat of this request got here first. Someone in the
+                    # contract with no row for this code, or with a row but no
+                    # longer in the contract, is redeeming it for real.
+                    continue
+
+                # The user's own rows don't count: one code can cover several
+                # contracts, and this loop redeems it once for each.
+                if (
+                    single_use
+                    and code.contract_redemptions.filter(user__isnull=False)
+                    .exclude(user=user)
+                    .exists()
+                ):
+                    log.warning(
+                        "B2B attach to contract: code %s was redeemed by someone "
+                        "else before %s could use it for %s",
+                        code,
+                        user,
+                        contract,
+                    )
+                    code_taken = True
+                    continue
+
+                if contract.is_full():
+                    log.error(
+                        "B2B attach to contract: can't add %s to %s: no open seats",
+                        user,
+                        contract,
+                    )
+                    contract_full = True
+                    continue
+
+                user.b2b_contracts.add(contract)
+                DiscountContractAttachmentRedemption.objects.update_or_create(
+                    discount=code,
+                    contract=contract,
+                    user=None,
+                    defaults={"user": user, "redeemed_on": now_in_utc()},
+                )
+
+            # After the commit, so the lock is not held across the Keycloak
+            # call this makes.
             process_add_org_membership(
                 user, contract.organization, keep_until_seen=True
-            )
-            user.b2b_contracts.add(contract)
-            DiscountContractAttachmentRedemption.objects.update_or_create(
-                discount=code,
-                contract=contract,
-                user=None,
-                defaults={"user": user, "redeemed_on": now_in_utc()},
             )
             contracts_attached = True
 
         user.save()
 
-        return contracts_attached, contract_full
+        return contracts_attached, contract_full, code_taken
+
+
+class DataConsentAPI(APIView):
+    """View for recording data consent for a user on a contract."""
+
+    versioning_class = V0Versioning
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=DataConsentSerializer,
+        responses={
+            204: None,
+            400: DataConsentValidationErrorSerializer,
+            403: None,
+        },
+    )
+    def post(self, request, contract_id: int):
+
+        user = request.user
+        # user_b2b_contracts gives back UserB2BContract rows, scoped to the user from the request
+        b2b_contract_membership = user.user_b2b_contracts.filter(
+            contract_page_id=contract_id
+        ).first()
+        if not b2b_contract_membership:
+            # Users shouldn't be able to provide data consent for contracts they're not in
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        request_serializer = DataConsentSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        consent_value = request_serializer.validated_data["consented"]
+        b2b_contract_membership.consented_to_data_sharing = consent_value
+        b2b_contract_membership.consent_modified_at = now_in_utc()
+        b2b_contract_membership.save()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)

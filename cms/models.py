@@ -6,7 +6,7 @@ import re
 import uuid
 from datetime import datetime
 from json import dumps
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlencode
 
 import pycountry
 from django.conf import settings
@@ -16,10 +16,12 @@ from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.forms import CheckboxInput, ChoiceField, IntegerField, Textarea
-from django.http import Http404
+from django.http import Http404, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.functional import cached_property
+from django.utils.safestring import mark_safe
 from django.utils.text import slugify
 from mitol.common.utils.datetime import now_in_utc
 from mitol.olposthog.features import is_enabled
@@ -44,11 +46,12 @@ from wagtail.embeds.embeds import get_embed
 from wagtail.embeds.exceptions import EmbedException
 from wagtail.fields import RichTextField, StreamField
 from wagtail.images.models import Image
-from wagtail.models import Page
+from wagtail.models import Orderable, Page
 from wagtail.search import index
 from wagtail.snippets.models import register_snippet
 from wagtailmetadata.models import MetadataPageMixin
 
+from cms import credential_metadata
 from cms import utils as cms_utils
 from cms.blocks import (
     CourseRunCertificateOverrides,
@@ -324,6 +327,68 @@ class CourseProgramChildPage(Page):
         raise Http404
 
 
+class GenerateWithAIFieldPanel(FieldPanel):
+    """A FieldPanel with a "Generate with AI" button that fills it from MIT Learn.
+
+    The button only renders while MIT Learn is configured and the credential
+    metadata authoring flag is on. The field itself renders regardless, unless
+    hide_without_flag is set: that lets a field ship (and accumulate a
+    migration) ahead of the functionality that consumes it, without exposing a
+    field that does nothing to CMS authors.
+    """
+
+    def __init__(
+        self, field_name, metadata_field, *, hide_without_flag=False, **kwargs
+    ):
+        super().__init__(field_name, **kwargs)
+        self.metadata_field = metadata_field
+        self.hide_without_flag = hide_without_flag
+
+    def clone_kwargs(self):
+        """Carry our kwargs across clones.
+
+        Wagtail clones panels when binding them to a model/instance, so without
+        this they are lost and the panel reverts to a plain FieldPanel.
+        """
+        kwargs = super().clone_kwargs()
+        kwargs["metadata_field"] = self.metadata_field
+        kwargs["hide_without_flag"] = self.hide_without_flag
+        return kwargs
+
+    class BoundPanel(FieldPanel.BoundPanel):
+        """Bound panel that adds the button and consults the feature flag."""
+
+        template_name = "cms/panels/generate_with_ai_field_panel.html"
+
+        class Media:
+            js = ["js/credential_metadata_admin.js"]
+
+        @cached_property
+        def flag_enabled(self):
+            """Whether credential metadata authoring is switched on"""
+            return is_enabled(features.ENABLE_CREDENTIAL_METADATA_AUTHORING)
+
+        def is_shown(self):
+            """Hide the panel entirely if it is flag-gated and the flag is off."""
+            if self.panel.hide_without_flag and not self.flag_enabled:
+                return False
+            return super().is_shown()
+
+        def get_context_data(self, parent_context=None):
+            """Add the URL the button reads MIT Learn's draft from."""
+            context = super().get_context_data(parent_context)
+            parent_page = getattr(self.form, "parent_page", None)
+            context["metadata_field"] = self.panel.metadata_field
+            context["metadata_url"] = (
+                reverse("cms_credential_metadata", args=[parent_page.id])
+                if parent_page
+                and self.flag_enabled
+                and credential_metadata.is_configured()
+                else None
+            )
+            return context
+
+
 class CertificatePage(CourseProgramChildPage):
     """
     CMS page representing a Certificate.
@@ -379,6 +444,12 @@ class CertificatePage(CourseProgramChildPage):
         help_text="For verifiable credentials issued for this certificate, this is the criteria narrative field. It should be something descriptive, like a list of completed courses, and may be plaintext or markdown. If it is not supplied, no verifiable credential will be provisioned for those certificates.",
     )
 
+    verifiable_credential_description = models.TextField(  # noqa: DJ001
+        null=True,
+        blank=True,
+        help_text="1-2 sentences describing the course or program. This language serves as a template applied to the credential for every learner who completes the course and earns a certificate, so it should not include a specific learner's name.",
+    )
+
     should_provision_verifiable_credential = models.BooleanField(
         default=False,
         help_text="Whether a verifiable credential should be provisioned for this certificate.",
@@ -389,8 +460,37 @@ class CertificatePage(CourseProgramChildPage):
         FieldPanel("CEUs"),
         FieldPanel("overrides"),
         FieldPanel("signatories"),
-        FieldPanel("verifiable_credential_criteria", widget=Textarea),
-        FieldPanel("should_provision_verifiable_credential"),
+        MultiFieldPanel(
+            [
+                FieldPanel("should_provision_verifiable_credential"),
+                GenerateWithAIFieldPanel(
+                    "verifiable_credential_description",
+                    metadata_field="description",
+                    hide_without_flag=True,
+                    widget=Textarea,
+                ),
+                # Set on the panel, not the field: panel help text carries
+                # markup and isn't migration-tracked, so this copy can be
+                # revised without one.
+                GenerateWithAIFieldPanel(
+                    "verifiable_credential_criteria",
+                    metadata_field="criteria",
+                    widget=Textarea,
+                    help_text=mark_safe(
+                        "Describe what the learner did in order to earn the "
+                        "credential. This should be a bulleted list, in plain "
+                        "text or markdown, with each item beginning with an "
+                        "action verb -- for example: <strong>Described</strong> "
+                        "how machine learning models are trained, or "
+                        "<strong>Distinguished</strong> between symbolic and "
+                        "modern machine learning. If it is not supplied, no "
+                        "verifiable credential will be provisioned for those "
+                        "certificates."
+                    ),
+                ),
+            ],
+            heading="Verifiable Credential",
+        ),
     ]
     api_fields = [
         APIField("product_name"),
@@ -725,6 +825,80 @@ class InstructorPageLink(models.Model):  # noqa: DJ008
     ]
 
 
+class ProductPageFAQ(Orderable):
+    """A single frequently asked question shown on a course/program product page."""
+
+    # ParentalKey needs a concrete target, but ProductPage is abstract, so this
+    # points at Page (same as linked_instructors). Only CoursePage/ProgramPage
+    # surface it, via their InlinePanel + faqs APIField.
+    page = ParentalKey(Page, on_delete=models.CASCADE, related_name="faqs_list")
+    question = models.TextField(help_text="The frequently asked question.")
+    answer = RichTextField(
+        help_text="The answer. Supports links and basic formatting.",
+    )
+
+    panels = [
+        FieldPanel("question"),
+        FieldPanel("answer"),
+    ]
+
+    def __str__(self):
+        return self.question
+
+
+class ProductPageTestimonial(Orderable):
+    """A single testimonial shown on a course/program product page."""
+
+    # ParentalKey needs a concrete target, but ProductPage is abstract, so this
+    # points at Page (same as faqs_list/linked_instructors). Only
+    # CoursePage/ProgramPage surface it, via their InlinePanel + testimonials
+    # APIField.
+    page = ParentalKey(Page, on_delete=models.CASCADE, related_name="testimonials_list")
+    quote = models.TextField(
+        help_text="The testimonial quote. Aim for 600 characters or fewer.",
+    )
+    name = models.CharField(
+        max_length=255,
+        help_text="Name of the person quoted. Aim for 40 characters or fewer.",
+    )
+    title = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text=(
+            "Optional role/affiliation, e.g. 'Product Manager, Acme'. "
+            "Aim for 80 characters or fewer."
+        ),
+    )
+    image = models.ForeignKey(
+        Image,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="Optional photo of the person quoted.",
+    )
+    # Defaults to today so revisions saved before this field existed rehydrate
+    # without tripping the NOT NULL column.
+    date_published = models.DateField(
+        default=timezone.localdate,
+        help_text=(
+            "When this testimonial was published. Shown to search engines as the "
+            "review date, not displayed on the page."
+        ),
+    )
+
+    panels = [
+        FieldPanel("quote"),
+        FieldPanel("name"),
+        FieldPanel("title"),
+        FieldPanel("image"),
+        FieldPanel("date_published"),
+    ]
+
+    def __str__(self):
+        return self.name
+
+
 class HomePage(VideoPlayerConfigMixin):
     """
     Site home page
@@ -799,11 +973,6 @@ class HomePage(VideoPlayerConfigMixin):
         "InstructorIndexPage",
         "ProgramPage",
     ]
-
-    def _get_child_page_of_type(self, cls):
-        """Gets the first child page of the given type if it exists"""
-        child = self.get_children().type(cls).live().first()
-        return child.specific if child else None
 
     @property
     def get_cached_featured_products(self):
@@ -1160,7 +1329,11 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
     faq_url = models.URLField(  # noqa: DJ001
         null=True,
         blank=True,
-        help_text="URL a relevant FAQ page or entry for the course/program.",
+        help_text=(
+            "External link to a separate FAQ page (opens in a new tab on the "
+            "legacy site). For on-page FAQs shown on MIT Learn, use the FAQs "
+            "section below instead."
+        ),
     )
 
     video_url = models.URLField(  # noqa: DJ001
@@ -1168,11 +1341,19 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         blank=True,
         help_text="URL to the video to be displayed for this course/program. It can be an HLS or Youtube video URL.",
     )
-    # this field should be required, since VC creation depends on it
     what_you_learn = RichTextField(
         null=True,
         blank=True,
-        help_text="*Required for Verifiable Credential generation. What you will learn from this course.",
+        help_text="What you will learn from this course.",
+    )
+    hubspot_form_id = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        help_text=(
+            "HubSpot form ID for this page's 'Stay Updated' sign-up form. "
+            "Set to show the form on this page; leave blank to hide it."
+        ),
     )
 
     # How You'll Learn choice fields - these toggle on or off components on the
@@ -1245,6 +1426,7 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         FieldPanel("max_price"),
         FieldPanel("prerequisites"),
         FieldPanel("faq_url"),
+        FieldPanel("hubspot_form_id"),
         FieldPanel("about"),
         FieldPanel("what_you_learn"),
         MultiFieldPanel(
@@ -1289,6 +1471,8 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
             "linked_instructors",
             label="Faculty Members",
         ),
+        InlinePanel("faqs_list", label="FAQs"),
+        InlinePanel("testimonials_list", label="Testimonials"),
     ]
     api_fields = [
         APIField("description", serializer=RichTextSerializer()),
@@ -1303,12 +1487,15 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         APIField("max_price"),
         APIField("prerequisites", serializer=RichTextSerializer()),
         APIField("faq_url"),
+        APIField("hubspot_form_id"),
         APIField("about", serializer=RichTextSerializer()),
         APIField("what_you_learn", serializer=RichTextSerializer()),
         APIField("feature_image", serializer=ImageSerializer()),
         APIField("video_url"),
         APIField("faculty_section_title"),
         APIField("faculty"),
+        APIField("faqs"),
+        APIField("testimonials"),
         APIField("certificate_page", serializer=ProductChildPageSerializer()),
         APIField("how_youll_learn"),
     ]
@@ -1338,9 +1525,8 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         return super().save(clean=clean, user=user, log_action=log_action, **kwargs)
 
     def _get_child_page_of_type(self, cls):
-        """Gets the first child page of the given type if it exists"""
-        child = self.get_children().type(cls).live().first()
-        return child.specific if child else None
+        """Gets the first live child page of the given type, or None."""
+        return cls.objects.child_of(self).live().first()
 
     @property
     def certificate_page(self):
@@ -1369,6 +1555,29 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
             member.linked_instructor_page for member in self.linked_instructors.all()
         ]
         return InstructorPageSerializer(instructor_pages, many=True).data
+
+    @property
+    def faqs(self):
+        """
+        Returns the FAQs for this product page, ordered, for the wagtail API.
+        """
+        from cms.serializers import ProductPageFAQSerializer  # noqa: PLC0415
+
+        # Orderable's default ordering already sorts by sort_order.
+        return ProductPageFAQSerializer(self.faqs_list.all(), many=True).data
+
+    @property
+    def testimonials(self):
+        """
+        Returns the testimonials for this product page, ordered, for the
+        wagtail API.
+        """
+        from cms.serializers import ProductPageTestimonialSerializer  # noqa: PLC0415
+
+        # Orderable's default ordering already sorts by sort_order.
+        return ProductPageTestimonialSerializer(
+            self.testimonials_list.all(), many=True
+        ).data
 
     @property
     def product(self):
@@ -1445,10 +1654,13 @@ class CoursePage(ProductPage):
         null=True,
         help_text="If true, allow the AI chatbots to ingest the course's content files.",
     )
-    show_stay_updated = models.BooleanField(
-        default=False,
-        null=True,
-        help_text="If true, show the 'Stay Updated' sign-up form on this course page.",
+    show_course_outline = models.BooleanField(
+        default=True,
+        help_text=(
+            "If true, Learn should show the course outline (modules) on the "
+            "product page. Turn this off for courses whose module titles aren't "
+            "written for a pre-purchase audience."
+        ),
     )
 
     template = "product_page.html"
@@ -1466,7 +1678,7 @@ class CoursePage(ProductPage):
         *ProductPage.content_panels,
         FieldPanel("include_in_learn_catalog"),
         FieldPanel("ingest_content_files_for_ai"),
-        FieldPanel("show_stay_updated"),
+        FieldPanel("show_course_outline"),
     ]
     api_fields = [
         *ProductPage.api_fields,
@@ -1474,13 +1686,33 @@ class CoursePage(ProductPage):
         APIField("topic_list"),
         APIField("include_in_learn_catalog"),
         APIField("ingest_content_files_for_ai"),
-        APIField("show_stay_updated"),
+        APIField("show_course_outline"),
     ]
 
     @cached_property
     def product(self):
         """Gets the product associated with this page"""
         return self.course
+
+    @cached_property
+    def financial_assistance_form_url(self) -> str:
+        """
+        URL of the financial assistance form for this course.
+
+        This is the lazy path, for callers that reach a CoursePage without going
+        through a Course queryset (ecommerce, v1 programs). API paths should
+        instead let the view's queryset resolve it -
+        ``Course.objects.prefetch("financial_assistance_form_url")`` writes this
+        name into the instance ``__dict__``, which shadows this property so
+        nothing queries during serialization.
+        """
+        from cms.api import resolve_financial_assistance_form_urls  # noqa: PLC0415
+
+        if self.course_id is None:
+            return ""
+        return resolve_financial_assistance_form_urls([self.course_id]).get(
+            self.course_id, ""
+        )
 
     def _get_current_finaid(self, request):
         """
@@ -1502,7 +1734,7 @@ class CoursePage(ProductPage):
                 ecommerce_product, request.user
             )
 
-            if discount and discount.check_validity(request.user):
+            if discount and discount.is_redeemable_by(request.user):
                 log.debug(
                     f"price is {ecommerce_product.price}, discount is {discount.discount_product(ecommerce_product)}"  # noqa: G004
                 )
@@ -1567,7 +1799,9 @@ class CoursePage(ProductPage):
         if self.course_id is None:
             return None
 
-        course = Course.objects.prefetch("programs").get(id=self.course_id)
+        course = Course.objects.prefetch(
+            "programs", "financial_assistance_form_url"
+        ).get(id=self.course_id)
 
         return CourseSerializer(course).data
 
@@ -1592,11 +1826,6 @@ class ProgramPage(ProductPage):
         default=False,
         null=True,
         help_text="If true, Learn should include this in its catalog.",
-    )
-    show_stay_updated = models.BooleanField(
-        default=False,
-        null=True,
-        help_text="If true, show the 'Stay Updated' sign-up form on this program page.",
     )
     list_price = models.DecimalField(
         max_digits=10,
@@ -1623,7 +1852,6 @@ class ProgramPage(ProductPage):
         + ProductPage.content_panels
         + [
             FieldPanel("include_in_learn_catalog"),
-            FieldPanel("show_stay_updated"),
         ]
     )
     api_fields = [
@@ -1631,7 +1859,6 @@ class ProgramPage(ProductPage):
         APIField("program_details"),
         APIField("list_price"),
         APIField("include_in_learn_catalog"),
-        APIField("show_stay_updated"),
     ]
 
     @property
@@ -1987,6 +2214,18 @@ class FlexiblePricingRequestForm(AbstractForm):
         return context
 
     def serve(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            # A flexible price request always belongs to a user, so there is
+            # nothing to render anonymously. Bounce through the gateway login
+            # route, which APISIX authenticates, and come back here. Skip the
+            # profile onboarding interstitial: this form collects what it needs
+            # on its own, and most visitors arrive from Learn with no reason to
+            # detour through MITxOnline's account setup.
+            login_params = urlencode(
+                {"next": request.get_full_path(), "skip_onboarding": 1}
+            )
+            return HttpResponseRedirect(f"{reverse(settings.LOGIN_URL)}?{login_params}")
+
         previous_submission = self.get_previous_submission(request)
         if request.method == "POST" and (
             previous_submission is not None and not previous_submission.is_reset()

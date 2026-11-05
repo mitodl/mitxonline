@@ -15,8 +15,9 @@ from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 from django.db import connection
-from django.db.models import Q
+from django.db.models import Exists, Q
 from django.test import RequestFactory
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from faker import Faker
 from mitol.common.serializers import THIS_IS_NOT_AN_API
@@ -27,9 +28,16 @@ from rest_framework.test import APIClient
 
 from b2b.api import create_contract_run
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
-from b2b.models import ContractProgramItem
-from cms.factories import CoursePageFactory, ProgramPageFactory
+from b2b.models import ContractProgramItem, UserOrganization
+from cms.factories import (
+    CoursePageFactory,
+    FlexiblePricingFormFactory,
+    ProgramPageFactory,
+)
+from cms.models import CoursePage
 from cms.serializers import ProgramPageSerializer
+from compliance.api import verify_user_with_exports
+from compliance.exceptions import ExportComplianceDataError, ExportComplianceError
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
     CourseFactory,
@@ -49,6 +57,8 @@ from courses.models import (
     Program,
     ProgramEnrollment,
 )
+from courses.serializers.utils import get_topics_from_page
+from courses.serializers.v1.base import EnrollmentModeSerializer
 from courses.serializers.v2.certificates import (
     CourseRunCertificateSerializer,
     ProgramCertificateSerializer,
@@ -56,6 +66,7 @@ from courses.serializers.v2.certificates import (
 from courses.serializers.v2.courses import (
     CourseRunWithCourseSerializer,
     CourseWithCourseRunsSerializer,
+    _get_canonical_runs_per_tag,
 )
 from courses.serializers.v2.departments import (
     DepartmentWithCoursesAndProgramsSerializer,
@@ -75,7 +86,7 @@ from courses.views.test_utils import (
     num_queries_from_department,
     num_queries_from_programs,
 )
-from courses.views.v2 import Pagination, ProgramFilterSet
+from courses.views.v2 import CourseViewSet, Pagination, ProgramFilterSet
 from ecommerce.factories import OrderFactory, ProductFactory
 from ecommerce.models import OrderStatus, Product
 from main import features
@@ -86,6 +97,12 @@ from users.factories import UserFactory
 pytestmark = [pytest.mark.django_db]
 logger = logging.getLogger(__name__)
 faker = Faker()
+
+# Ceiling for GET /api/v2/courses/. This is a per-request budget, not a
+# per-course one: it must stay constant as the number of courses on the page
+# grows. Tighten it as the remaining N+1s are removed; never scale it by row
+# count.
+COURSES_LIST_QUERY_BUDGET = 18
 
 
 @pytest.mark.skip_nplusone_check
@@ -257,7 +274,14 @@ def test_delete_program(
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
-@pytest.mark.skip_nplusone_check
+def test_course_queryset_avoids_courserun_aggregate_annotations():
+    """Course pagination should not aggregate over every related course run."""
+    annotations = CourseViewSet().get_queryset().query.annotations
+
+    assert isinstance(annotations["has_verified_courserun"], Exists)
+    assert {"count_b2b_courseruns", "count_courseruns"}.isdisjoint(annotations)
+
+
 @pytest.mark.usefixtures("course_catalog_data")
 @pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [2], indirect=True)
@@ -454,8 +478,43 @@ def test_filter_with_org_id_anonymous():
     assert response.data["results"] == []
 
 
+def test_courses_list_certificate_available_gated_via_annotation():
+    """
+    certificate_available in the list endpoint must reflect the annotated
+    has_live_certificate_page queryset field, not just the model flag, since
+    the list serializer never falls back to the (N+1-prone) certificate_page
+    property.
+    """
+    client = APIClient()
+    course = CourseRunFactory.create().course
+
+    response = client.get(reverse("v2:courses_api-list"))
+    result = next(r for r in response.data["results"] if r["id"] == course.id)
+    assert result["certificate_available"] is True
+
+    course.page.certificate_page.delete()
+    response = client.get(reverse("v2:courses_api-list"))
+    result = next(r for r in response.data["results"] if r["id"] == course.id)
+    assert result["certificate_available"] is False
+
+
+def test_programs_list_certificate_available_gated_via_annotation():
+    """certificate_available in the program list endpoint must reflect certificates_disabled and the live certificate page."""
+    client = APIClient()
+    program = ProgramFactory.create()
+
+    response = client.get(reverse("v2:programs_api-list"))
+    result = next(r for r in response.data["results"] if r["id"] == program.id)
+    assert result["certificate_available"] is True
+
+    program.certificates_disabled = True
+    program.save()
+    response = client.get(reverse("v2:programs_api-list"))
+    result = next(r for r in response.data["results"] if r["id"] == program.id)
+    assert result["certificate_available"] is False
+
+
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_returns_contracted_course(
     mocker, contract_ready_course, mock_course_run_clone
 ):
@@ -484,7 +543,6 @@ def test_filter_with_org_id_returns_contracted_course(
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_user_not_associated_with_org_returns_no_courses(
     contract_ready_course, mock_course_run_clone
 ):
@@ -509,7 +567,6 @@ def test_filter_with_org_id_user_not_associated_with_org_returns_no_courses(
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_multiple_courses_same_org(
     contract_ready_course, mock_course_run_clone
 ):
@@ -556,7 +613,6 @@ def test_filter_with_org_id_multiple_courses_same_org(
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_inactive_contract_excluded(
     contract_ready_course, mock_course_run_clone
 ):
@@ -584,7 +640,6 @@ def test_filter_with_org_id_inactive_contract_excluded(
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_multiple_orgs(contract_ready_course, mock_course_run_clone):
     """Test that filtering by org_id returns courses only for that specific org"""
     org1 = OrganizationPageFactory(name="Test Org 1")
@@ -625,7 +680,6 @@ def test_filter_with_org_id_multiple_orgs(contract_ready_course, mock_course_run
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_user_in_org_but_no_contract(
     contract_ready_course, mock_course_run_clone
 ):
@@ -663,7 +717,6 @@ def test_filter_with_org_id_nonexistent_org_id(user_drf_client):
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_returns_detail_view(
     contract_ready_course, mock_course_run_clone
 ):
@@ -690,7 +743,6 @@ def test_filter_with_org_id_returns_detail_view(
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_detail_view_unauthorized_user(
     contract_ready_course, mock_course_run_clone
 ):
@@ -715,7 +767,6 @@ def test_filter_with_org_id_detail_view_unauthorized_user(
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_respects_course_live_status(
     contract_ready_course, mock_course_run_clone
 ):
@@ -746,7 +797,6 @@ def test_filter_with_org_id_respects_course_live_status(
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_pagination(contract_ready_course, mock_course_run_clone):
     """Test that org_id filter works correctly with pagination"""
     org = OrganizationPageFactory(name="Test Org")
@@ -781,7 +831,6 @@ def test_filter_with_org_id_pagination(contract_ready_course, mock_course_run_cl
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_combined_with_other_filters(
     contract_ready_course, mock_course_run_clone
 ):
@@ -820,14 +869,13 @@ def test_filter_with_org_id_combined_with_other_filters(
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 def test_filter_without_org_id_authenticated_user(user_drf_client):
     course_with_contract = CourseFactory(title="Contract Course")
     contract = ContractPageFactory(active=True)
-    CourseRunFactory(course=course_with_contract, b2b_contract=contract)
+    CourseRunFactory(course=course_with_contract, b2b_contracts=[contract])
 
     course_no_contract = CourseFactory(title="No Contract Course")
-    CourseRunFactory(course=course_no_contract, b2b_contract=None)
+    CourseRunFactory(course=course_no_contract)
 
     url = reverse("v2:courses_api-list")
     response = user_drf_client.get(url)
@@ -865,6 +913,37 @@ def test_filter_by_org_id_with_contracted_user(
     assert program_with_contract.title in [
         program["title"] for program in response.data["results"]
     ]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("param", ["org_id", "contract_id"])
+def test_filter_by_org_or_contract_includes_nested_programs(param):
+    """
+    Filtering by org or contract also returns the programs nested in the
+    contract's programs, including b2b-only ones, but no other b2b-only program.
+    """
+    org = OrganizationPageFactory()
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    UserOrganization.objects.create(user=user, organization=org)
+    user.b2b_contracts.add(contract)
+
+    program = ProgramFactory.create(b2b_only=True)
+    module = ProgramFactory.create(b2b_only=True)
+    program.add_program_requirement(module)
+    ContractProgramItem(contract=contract, program=program).save(skip_run_creation=True)
+    unrelated = ProgramFactory.create(b2b_only=True)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+    response = client.get(
+        reverse("v2:programs_api-list"),
+        {param: org.id if param == "org_id" else contract.id},
+    )
+
+    ids = {result["id"] for result in response.data["results"]}
+    assert {program.id, module.id} <= ids
+    assert unrelated.id not in ids
 
 
 @pytest.mark.django_db
@@ -1044,11 +1123,13 @@ def test_next_run_id_with_org_filter(  # noqa: PLR0915
 
     # create a run for the other org, same course, and starting before b2b_run
     second_eligible_b2b_run = CourseRunFactory.create(
-        b2b_contract=third_contract_first_org,
+        b2b_contracts=[third_contract_first_org],
+        b2b_only=True,
         start_date=one_month_prior - timedelta(days=5),
         enrollment_start=one_month_prior - timedelta(days=5),
         course=b2b_run.course,
     )
+    second_eligible_b2b_run.b2b_contracts.add(third_contract_first_org)
 
     # we're not in this contract so we should get the b2b_run id next
     resp = auth_api_client.get(f"{url}?org_id={contract.organization.id}")
@@ -1069,11 +1150,6 @@ def test_next_run_id_with_org_filter(  # noqa: PLR0915
     assert resp_course["next_run_id"] == second_eligible_b2b_run.id
 
     # same test as above, but filter on contract ID
-
-    url = reverse(
-        "v2:courses_api-detail",
-        kwargs={"pk": b2b_course.id},
-    )
 
     resp = auth_api_client.get(f"{url}?contract_id={contract.id}")
 
@@ -1116,10 +1192,12 @@ def test_user_enrollments_b2b_organization_filter(user_drf_client, user):
     regular_run = CourseRunFactory.create(course=regular_course)
 
     b2b_course = CourseFactory.create()
-    b2b_run = CourseRunFactory.create(course=b2b_course, b2b_contract=contract)
+    b2b_run = CourseRunFactory.create(course=b2b_course, b2b_contracts=[contract])
 
     CourseRunEnrollmentFactory.create(user=user, run=regular_run)
-    b2b_enrollment = CourseRunEnrollmentFactory.create(user=user, run=b2b_run)
+    b2b_enrollment = CourseRunEnrollmentFactory.create(
+        user=user, run=b2b_run, b2b_contract=contract
+    )
 
     resp = user_drf_client.get(reverse("v2:user-enrollments-api-list"))
     assert resp.status_code == status.HTTP_200_OK
@@ -1142,18 +1220,117 @@ def test_user_enrollments_b2b_organization_filter(user_drf_client, user):
     assert len(resp.json()) == 0
 
 
-def test_user_enrollments_create_b2b_run_invalid_v2(user_drf_client, user):
-    """v2 enrollments API should reject creating enrollments for B2B course runs."""
+@pytest.mark.parametrize("b2b_only", [True, False])
+def test_user_enrollments_create_b2b_run_v2(mocker, user_drf_client, user, b2b_only):
+    """
+    v2 enrollments API should reject B2B-only course runs, but a run that is
+    attached to a contract and not B2B-only is still publicly enrollable.
+    """
+    mock_edx_client = mocker.patch("openedx.api.get_edx_api_service_client")
+    mock_edx_client.return_value.enrollments.create_student_enrollment.return_value.is_active = True
     contract = ContractPageFactory.create()
     course = CourseFactory.create()
-    run = CourseRunFactory.create(course=course, b2b_contract=contract)
+    run = CourseRunFactory.create(
+        course=course, b2b_only=b2b_only, b2b_contracts=[contract]
+    )
+
+    resp = user_drf_client.post(
+        reverse("v2:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+
+    if b2b_only:
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.json() == {"errors": {"run_id": f"Invalid course run id: {run.id}"}}
+        assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+    else:
+        assert resp.status_code == status.HTTP_201_CREATED
+        assert CourseRunEnrollment.objects.filter(
+            user=user, run=run, active=True
+        ).exists()
+
+
+def test_user_enrollments_create_closed_run_invalid_v2(user_drf_client, user):
+    """v2 enrollments API should reject runs that are outside their enrollment window."""
+    course = CourseFactory.create()
+    run = CourseRunFactory.create(course=course, past_enrollment_end=True)
 
     resp = user_drf_client.post(
         reverse("v2:user-enrollments-api-list"), data={"run_id": run.id}
     )
 
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
-    assert resp.json() == {"errors": {"run_id": f"Invalid course run id: {run.id}"}}
+    assert resp.json() == {
+        "errors": {"run_id": f"Course run is not open for enrollment: {run.id}"}
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+def test_user_enrollments_create_closed_run_existing_enrollment_v2(
+    mocker, user_drf_client, user
+):
+    """
+    A learner who already holds an active seat isn't blocked by a closed window.
+
+    The window governs getting into a run; mode changes and idempotent retries
+    for an existing enrollment must keep working after it closes.
+    """
+    course = CourseFactory.create()
+    run = CourseRunFactory.create(course=course, past_enrollment_end=True)
+    enrollment = CourseRunEnrollmentFactory.create(user=user, run=run, active=True)
+    patched_enroll = mocker.patch(
+        "courses.serializers.v2.courses.create_run_enrollments",
+        return_value=([enrollment], True),
+    )
+
+    resp = user_drf_client.post(
+        reverse("v2:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+
+    assert resp.status_code == status.HTTP_201_CREATED
+    patched_enroll.assert_called_once()
+
+
+def test_user_enrollments_create_export_compliance_blocked_v2(
+    mocker, user_drf_client, user
+):
+    """v2 enrollments API should fail closed when the export compliance check rejects the user."""
+    run = CourseRunFactory.create()
+    exc = ExportComplianceError(user, "REJECT", "102")
+    mocker.patch(
+        "courses.serializers.v2.courses.create_run_enrollments",
+        side_effect=exc,
+    )
+    resp = user_drf_client.post(
+        reverse("v2:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_700.",
+        "reason_code": "CS_700",
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+def test_user_enrollments_create_export_compliance_missing_data_v2(
+    mocker, user_drf_client, user
+):
+    """Missing profile data carries the fixable-data code and the fields to fix."""
+    run = CourseRunFactory.create()
+    exc = ExportComplianceDataError(user, ["country"])
+    mocker.patch(
+        "courses.serializers.v2.courses.create_run_enrollments",
+        side_effect=exc,
+    )
+    resp = user_drf_client.post(
+        reverse("v2:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
+        "missing_fields": ["country"],
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
 
 
 def test_program_filter_for_b2b_org(user, mock_course_run_clone):
@@ -1540,7 +1717,6 @@ def test_filter_programs_by_org_and_contract_no_duplicates(
 
 
 @pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
 @pytest.mark.usefixtures("mock_course_run_clone")
 def test_filter_courses_with_contract_id_authenticated_user(make_contract_ready_course):
     """Test that filtering courses by contract_id returns contracted courses for authorized users"""
@@ -1573,7 +1749,7 @@ def test_filter_courses_with_contract_id_authenticated_user(make_contract_ready_
 
     other_contract = ContractPageFactory(organization=org, active=True)
     unrelated_course_runs = [
-        CourseRunFactory(course=course, b2b_contract=other_contract)
+        CourseRunFactory(course=course, b2b_contracts=[other_contract])
         for course in courses
     ]
 
@@ -1699,7 +1875,7 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                 "collections": [],
                 "availability": "anytime",
                 "certificate_type": "Certificate of Completion",
-                "certificate_available": False,
+                "certificate_available": True,
                 "required_prerequisites": _get_page_prop(
                     program_enrollment, "prerequisites", ""
                 )
@@ -1711,7 +1887,9 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                 "end_date": None,
                 "enrollment_end": None,
                 "enrollment_start": None,
-                "enrollment_modes": [],
+                "enrollment_modes": EnrollmentModeSerializer(
+                    program_enrollment.program.enrollment_modes, many=True
+                ).data,
                 "duration": _get_page_prop(program_enrollment, "length"),
                 "time_commitment": _get_page_prop(program_enrollment, "effort"),
                 "min_price": _get_page_prop(program_enrollment, "min_price"),
@@ -1776,10 +1954,10 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                     ),
                     **(
                         {
-                            "b2b_contract_id": run_enrollment.run.b2b_contract.id,
-                            "b2b_organization_id": run_enrollment.run.b2b_contract.organization_id,
+                            "b2b_contract_id": run_enrollment.b2b_contract.id,
+                            "b2b_organization_id": run_enrollment.b2b_contract.organization_id,
                         }
-                        if run_enrollment.run.b2b_contract
+                        if run_enrollment.b2b_contract
                         else {
                             "b2b_contract_id": None,
                             "b2b_organization_id": None,
@@ -1925,6 +2103,48 @@ def test_add_verified_program_course_enrollment(
 
 
 @pytest.mark.skip_nplusone_check
+def test_add_verified_program_course_enrollment_incomplete_profile(
+    mocker, mocked_export_compliance, user, user_drf_client
+):
+    """An incomplete profile should be a 400, not a 500, on the verified program path."""
+    mocked_export_compliance.side_effect = verify_user_with_exports
+    mocker.patch("compliance.api.get_cybersource_client")
+    program = ProgramEnrollmentFactory.create(
+        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    ).program
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        for courseware in (program, course_run):
+            Product.objects.create(
+                price=10,
+                is_active=True,
+                object_id=courseware.id,
+                content_type=ContentType.objects.get_for_model(courseware),
+            )
+    # A country that doesn't require state/postal code, so only this is missing
+    user.legal_address.country = "GB"
+    user.legal_address.street_address_1 = ""
+    user.legal_address.save()
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={"courserun_id": course_run.courseware_id},
+        ),
+        data=[program.readable_id],
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
+        "missing_fields": ["street_address_1"],
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
+
+
+@pytest.mark.skip_nplusone_check
 @responses.activate
 def test_add_verified_program_course_enrollment_audit_only_run_falls_back_to_audit(
     user, user_drf_client
@@ -1980,6 +2200,212 @@ def test_add_verified_program_course_enrollment_audit_only_run_falls_back_to_aud
     assert resp.json()["run"]["id"] == course_run.id
     assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_AUDIT_MODE
     assert user.orders.count() == initial_order_count
+
+
+def _verified_program_enrollment_with_product(user):
+    """Set up a verified program enrollment whose program has a product."""
+
+    prog_enrollment = ProgramEnrollmentFactory.create(
+        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    program = prog_enrollment.program
+
+    program_content_type = ContentType.objects.get_for_model(program)
+    with reversion.create_revision():
+        Product.objects.create(
+            price=10,
+            is_active=True,
+            object_id=program.id,
+            content_type=program_content_type,
+        )
+
+    return program
+
+
+@pytest.mark.skip_nplusone_check
+@responses.activate
+def test_add_verified_program_course_enrollment_rejects_closed_non_upgradable_run(
+    user_drf_client, user
+):
+    """
+    A run whose enrollment window has closed must be rejected on the audit
+    fallback path, even for a learner enrolled in the program.
+
+    This is the shape reported in #12813: the run is closed and not upgradable
+    (no product), so it used to fall through to the audit branch and enroll the
+    learner with no enrollment-window check at all.
+    """
+
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/enrollment/v1/enrollments",
+        json={"results": [{"mode": EDX_ENROLLMENT_VERIFIED_MODE, "is_active": True}]},
+        status=status.HTTP_200_OK,
+    )
+
+    program = _verified_program_enrollment_with_product(user)
+
+    # No product for the run, so it is not upgradable -> audit fallback branch.
+    course_run = CourseRunFactory.create(past_enrollment_end=True)
+    program.add_requirement(course_run.course)
+
+    assert not course_run.is_upgradable
+    assert not course_run.is_enrollable
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={"courserun_id": course_run.courseware_id},
+        ),
+        data=[program.readable_id],
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
+
+
+@pytest.mark.skip_nplusone_check
+@responses.activate
+def test_add_verified_program_course_enrollment_rejects_closed_upgradable_run(
+    user_drf_client, user
+):
+    """
+    A closed run must also be rejected on the verified path, and no order should
+    be generated for it.
+
+    is_upgradable guards upgrade_deadline while is_enrollable guards
+    enrollment_end, so a run can be closed for enrollment and still upgradable.
+    That combination reaches the verified branch, which creates an order.
+    """
+
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/enrollment/v1/enrollments",
+        json={"results": [{"mode": EDX_ENROLLMENT_VERIFIED_MODE, "is_active": True}]},
+        status=status.HTTP_200_OK,
+    )
+
+    program = _verified_program_enrollment_with_product(user)
+
+    course_run = CourseRunFactory.create(past_enrollment_end=True)
+    program.add_requirement(course_run.course)
+
+    course_run_content_type = ContentType.objects.get_for_model(course_run)
+    with reversion.create_revision():
+        Product.objects.create(
+            price=10,
+            is_active=True,
+            object_id=course_run.id,
+            content_type=course_run_content_type,
+        )
+
+    # Closed for enrollment, but still upgradable, so this exercises the
+    # verified branch rather than the audit fallback.
+    assert course_run.is_upgradable
+    assert not course_run.is_enrollable
+
+    initial_order_count = user.orders.count()
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={"courserun_id": course_run.courseware_id},
+        ),
+        data=[program.readable_id],
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
+    assert user.orders.count() == initial_order_count
+
+
+@pytest.mark.skip_nplusone_check
+@responses.activate
+def test_add_verified_program_course_enrollment_closed_run_existing_enrollment(
+    user_drf_client, user
+):
+    """
+    A learner already holding a seat in a closed run still gets the idempotent
+    no-op rather than being rejected by the new window check.
+    """
+
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/enrollment/v1/enrollments",
+        json={"results": [{"mode": EDX_ENROLLMENT_AUDIT_MODE, "is_active": True}]},
+        status=status.HTTP_200_OK,
+    )
+
+    prog_enrollment = ProgramEnrollmentFactory.create(
+        user=user, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+    program = prog_enrollment.program
+
+    course_run = CourseRunFactory.create(past_enrollment_end=True)
+    program.add_requirement(course_run.course)
+    CourseRunEnrollmentFactory.create(
+        user=user,
+        run=course_run,
+        active=True,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+    )
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={"courserun_id": course_run.courseware_id},
+        ),
+        data=[program.readable_id],
+    )
+
+    assert resp.status_code == status.HTTP_204_NO_CONTENT
+
+
+@pytest.mark.skip_nplusone_check
+@responses.activate
+def test_add_verified_program_course_enrollment_export_compliance_blocked(
+    mocker, user, user_drf_client
+):
+    """
+    A single-program audit enrollment should fail closed (400) when the export
+    compliance check rejects the user, instead of creating an enrollment.
+    """
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/enrollment/v1/enrollments",
+        json={
+            "results": [
+                {"mode": EDX_ENROLLMENT_AUDIT_MODE, "is_active": True},
+            ],
+        },
+        status=status.HTTP_200_OK,
+    )
+
+    prog_enrollment = ProgramEnrollmentFactory.create(
+        user=user, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+    program = prog_enrollment.program
+
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+
+    exc = ExportComplianceError(user, "REJECT", "102")
+    mocker.patch("courses.views.v2.create_run_enrollments", side_effect=exc)
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={"courserun_id": course_run.courseware_id},
+        ),
+        data=[program.readable_id],
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_700.",
+        "reason_code": "CS_700",
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
 
 
 @pytest.mark.skip_nplusone_check
@@ -2160,6 +2586,54 @@ def test_add_nested_verified_program_course_enrollment(
         )
 
 
+@responses.activate
+def test_add_nested_verified_program_course_enrollment_export_compliance_blocked(
+    mocker, user, user_drf_client
+):
+    """
+    Reconciling program enrollments across a multi-program request should fail
+    closed (400) when the export compliance check rejects the user.
+    """
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/enrollment/v1/enrollments",
+        json={"results": [{"mode": EDX_ENROLLMENT_AUDIT_MODE, "is_active": True}]},
+        status=status.HTTP_200_OK,
+    )
+
+    base_program = ProgramFactory.create(display_mode=None)
+    crogram = ProgramFactory.create(display_mode="course")
+    course_run = CourseRunFactory.create()
+
+    crogram.add_requirement(course_run.course)
+    base_program.add_requirement(crogram)
+
+    # Neither program has a verified enrollment, so reconciliation will try to
+    # create audit program enrollments via create_program_enrollments - which
+    # is where the export compliance check happens.
+    ProgramEnrollmentFactory.create(
+        program=base_program, user=user, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+
+    exc = ExportComplianceError(user, "REJECT", "102")
+    mocker.patch("courses.api.create_program_enrollments", side_effect=exc)
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={"courserun_id": course_run.courseware_id},
+        ),
+        data=[base_program.readable_id, crogram.readable_id],
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_700.",
+        "reason_code": "CS_700",
+    }
+    assert not ProgramEnrollment.objects.filter(user=user, program=crogram).exists()
+
+
 @pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize(
     "sync_on_load,flag_enabled,sync_raises",  # noqa: PT006
@@ -2243,7 +2717,9 @@ def test_get_courses_b2b_runs(with_b2b, single, user_drf_client):
 
     contract = ContractPageFactory.create() if with_b2b else None
 
-    test_course_run = CourseRunFactory.create(b2b_contract=contract)
+    test_course_run = CourseRunFactory.create(
+        b2b_only=with_b2b, b2b_contracts=[contract] if contract else []
+    )
 
     url = reverse("v2:courses_api-list")
     response_raw = user_drf_client.get(
@@ -2270,7 +2746,6 @@ def test_get_courses_b2b_runs(with_b2b, single, user_drf_client):
         )
 
 
-@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize(
     "with_b2b",
     [
@@ -2326,8 +2801,8 @@ def test_get_courses_with_specified_contract_programs(user, user_drf_client):
     other_contract = ContractPageFactory.create()
 
     programs = ProgramFactory.create_batch(2)
-    course_run = CourseRunFactory.create(b2b_contract=contract)
-    CourseRunFactory.create(b2b_contract=other_contract, course=course_run.course)
+    course_run = CourseRunFactory.create(b2b_contracts=[contract])
+    CourseRunFactory.create(b2b_contracts=[other_contract], course=course_run.course)
 
     for program in programs:
         program.add_requirement(course_run.course)
@@ -2473,14 +2948,17 @@ def test_course_run_and_product_prefetch_optimized(
         data = resp.json()["results"]
         assert len(data) == 1
         assert len(data[0]["courseruns"]) == num_courseruns
-    # Check that products are queried only once/twice
-    # not sure why there is a second query
+    # Products are fetched exactly once, by the courseruns prefetch. This used
+    # to be twice: Course.active_products re-queried them because
+    # first_unexpired_run came from its own query and so carried no
+    # prefetched_products. It now reads the prefetch cache, so the second
+    # query is gone.
     queries_after = connection.queries[num_queries_before:]
 
     product_queries = [
         q for q in queries_after if 'FROM "ecommerce_product"' in q.get("sql", "")
     ]
-    assert len(product_queries) == 2, (
+    assert len(product_queries) == 1, (
         f"Expected 1 product query, got {len(product_queries)}: {[q['sql'] for q in product_queries]}"
     )
 
@@ -2585,3 +3063,420 @@ def test_correct_courserun_languages(user_drf_client, primary):
     assert (
         regular_run.id if primary == "transreg" else translated_regular_run.id
     ) not in seen_run_ids
+
+
+@pytest.mark.django_db
+@pytest.mark.skip_nplusone_check
+def test_filter_returns_contracted_public_course(
+    mocker, contract_ready_course, mock_course_run_clone
+):
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    user.b2b_organizations.add(org)
+    user.b2b_contracts.add(contract)
+    user.refresh_from_db()
+
+    (course, _) = contract_ready_course
+    contract_runs = create_contract_run(contract, course)
+    (course_run, _) = contract_runs[0]
+
+    course_run.b2b_only = False
+    course_run.save()
+
+    contract_2 = ContractPageFactory(organization=org, active=True)
+    contract_runs = create_contract_run(contract_2, course)
+    (course_run_2, _) = contract_runs[0]
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    url = reverse("v2:courses_api-list")
+    response = client.get(url, {"org_id": org.id})
+
+    returned_course = [
+        result for result in response.data["results"] if result["id"] == course.id
+    ]
+    assert len(returned_course) == 1
+
+    returned_course = returned_course.pop()
+    run_ids = [returned_run["id"] for returned_run in returned_course["courseruns"]]
+    assert course_run.id in run_ids
+    assert course_run_2.id in run_ids
+
+    # run above again - we should still get the run even without the filtering
+    url = reverse("v2:courses_api-list")
+    response = client.get(url)
+
+    returned_course = [
+        result for result in response.data["results"] if result["id"] == course.id
+    ]
+    assert len(returned_course) == 1
+
+    returned_course = returned_course.pop()
+    run_ids = [returned_run["id"] for returned_run in returned_course["courseruns"]]
+    assert course_run.id in run_ids
+    assert course_run_2.id not in run_ids
+
+
+@pytest.mark.usefixtures("course_catalog_data")
+@pytest.mark.parametrize("course_catalog_program_count", [3], indirect=True)
+@pytest.mark.parametrize("course_catalog_course_count", [1, 5, 12], indirect=True)
+def test_get_courses_query_count_is_flat_in_course_count(
+    user_drf_client,
+    django_assert_max_num_queries,
+    course_catalog_course_count,
+):
+    """
+    The list endpoint's query count must not grow with the number of courses.
+
+    A constant bound that holds at 1, 5 and 12 courses is the assertion that
+    actually pins the N+1s down - a budget computed from the row count (see
+    courses.views.test_utils.num_queries_from_course) can never fail for one.
+    """
+    with django_assert_max_num_queries(COURSES_LIST_QUERY_BUDGET) as context:
+        resp = user_drf_client.get(reverse("v2:courses_api-list"), {"page_size": 12})
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert len(resp.json()["results"]) == course_catalog_course_count
+    logger.info(
+        "test_get_courses_query_count_is_flat_in_course_count: %s courses, %s queries",
+        course_catalog_course_count,
+        len(context.captured_queries),
+    )
+
+
+@pytest.mark.usefixtures("course_catalog_data")
+@pytest.mark.parametrize("course_catalog_program_count", [3], indirect=True)
+@pytest.mark.parametrize("course_catalog_course_count", [10], indirect=True)
+@pytest.mark.parametrize(
+    "params",
+    [
+        {},
+        {"page_size": 5},
+        {"page_size": 5, "page": 2},
+        {"courserun_is_enrollable": True},
+        {"courserun_is_enrollable": False},
+        {"include_approved_financial_aid": True},
+    ],
+)
+def test_get_courses_ordering_is_unchanged_by_prefetching(user_drf_client, params):
+    """
+    Every array in the response must keep its exact order.
+
+    The previous attempt at this optimization (#3169) was reverted by #3213
+    because it silently reordered and deduplicated the ``topics`` array. This
+    asserts order explicitly - note the absence of ``ignore_order`` - by
+    comparing the prefetched response against the same courses serialized
+    without any of the prefetches the viewset adds.
+    """
+    resp = user_drf_client.get(reverse("v2:courses_api-list"), params)
+    assert resp.status_code == status.HTTP_200_OK
+    results = resp.json()["results"]
+
+    for course_data in results:
+        # Re-serialize from a bare queryset: no select_related, no
+        # prefetch_related, no annotations - so every fallback path runs.
+        bare = Course.objects.get(pk=course_data["id"])
+        assert course_data["topics"] == get_topics_from_page(bare.course_page)
+        assert course_data["availability"] == (
+            "dated" if bare.has_dated_courseruns else "anytime"
+        )
+        expected_run = bare.first_unexpired_run
+        assert course_data["next_run_id"] == (expected_run.id if expected_run else None)
+        if course_data["page"] is not None:
+            # The batched finaid cascade must agree with the per-page
+            # cached_property it replaced, branch for branch. The two agree
+            # here because every program course_catalog_data builds is live and
+            # non-b2b; they are scoped differently in general - see
+            # test_courses_list_omits_finaid_form_of_a_non_live_program.
+            expected_url = CoursePage.objects.get(
+                pk=bare.course_page.pk
+            ).financial_assistance_form_url
+            assert course_data["page"]["financial_assistance_form_url"] == expected_url
+
+
+@pytest.mark.django_db
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize("page_size", [2, 5, 20])
+def test_courses_list_topics_belong_to_their_own_course(
+    page_size, django_assert_max_num_queries
+):
+    """
+    Each course must carry its own topics, at every page size.
+
+    ``CoursePage.topics`` is a ParentalManyToManyField. Prefetching it with an
+    explicit ``queryset=`` sends modelcluster's deferring manager down a path
+    that identifies the page by a join-table column it names literally, and
+    once that join is aliased the rows land on the wrong pages - every course
+    on the page gets one course's topics, or none, depending on how many rows
+    come back. Production served an identical seven-topic list for 89 of 100
+    courses at ``page_size=100`` and an empty list for the same courses at
+    ``page_size=5``.
+
+    ``test_get_courses_ordering_is_unchanged_by_prefetching`` already compares
+    ``topics`` against a bare queryset, but every course the shared fixture
+    builds has no topics, so both sides were ``[]`` and it passed throughout.
+    This builds courses whose topics actually differ.
+    """
+    parent = CoursesTopic.objects.create(name="Bench Parent")
+    courses = []
+    for index in range(6):
+        page = CoursePageFactory.create()
+        page.topics.set(
+            [
+                CoursesTopic.objects.create(name=f"Topic {index}-{slot}", parent=parent)
+                for slot in range(index % 3)
+            ]
+        )
+        page.save()
+        courses.append(page.course)
+
+    # The shapes get_topics_from_page branches on: a topic with no parent to
+    # walk up to, and one whose own parent has a parent, so the walk uses both
+    # levels the prefetch names. limit_choices_to keeps parentless topics out
+    # of the page chooser, but nothing stops the rows existing.
+    orphan = CoursesTopic.objects.create(name="Orphan", parent=None)
+    grandchild = CoursesTopic.objects.create(
+        name="Grandchild",
+        parent=CoursesTopic.objects.create(name="Middle", parent=parent),
+    )
+    for topic in (orphan, grandchild):
+        page = CoursePageFactory.create()
+        page.topics.set([topic])
+        page.save()
+        courses.append(page.course)
+
+    # A course with no topics at all must stay empty rather than picking up a
+    # neighbour's - that is the half of the bug that an emptiness check misses.
+    bare_page = CoursePageFactory.create()
+    courses.append(bare_page.course)
+
+    client = APIClient()
+    # skip_nplusone_check: zeal fires on courses.CoursesTopic.parent from
+    # inside prefetch_one_level while Django is executing the multi-level
+    # prefetch itself - not from the serializer. Verified by removing the
+    # marker: it raises at every page size. The queryset cannot carry a
+    # select_related through the ParentalManyToMany without reintroducing the
+    # bug, so the per-request query budget asserted below is the real guard.
+    #
+    # Walk every page, not just the first. Each page is its own prefetch
+    # batch, which is the unit the bug operates on, and titles are unseeded
+    # FuzzyText - sampling only page 1 would check whichever two courses
+    # happened to sort first and would fail outright whenever both of them
+    # were topic-less.
+    rows = {}
+    page = 1
+    while True:
+        with django_assert_max_num_queries(COURSES_LIST_QUERY_BUDGET):
+            response = client.get(
+                reverse("v2:courses_api-list"),
+                {"page_size": page_size, "live": True, "page": page},
+            )
+        assert response.status_code == status.HTTP_200_OK
+        body = response.json()
+        rows.update({row["id"]: row["topics"] for row in body["results"]})
+        if not body.get("next"):
+            break
+        page += 1
+
+    for course in courses:
+        # Same oracle as test_get_courses_ordering_is_unchanged_by_prefetching:
+        # re-serialize outside the viewset's prefetches. The parent chain is
+        # prefetched here only to keep the oracle's own reads batched; it is
+        # not the path under test.
+        expected_page = CoursePage.objects.prefetch_related(
+            "topics__parent__parent"
+        ).get(course_id=course.id)
+        assert rows[course.id] == get_topics_from_page(expected_page)
+
+    # Every row agreeing with every other row is the smearing failure, and the
+    # per-course assertion above cannot tell that apart from a correct response
+    # in which the courses happen to match. Pin the variety across all pages.
+    returned = [tuple(t["name"] for t in topics) for topics in rows.values()]
+    assert len(set(returned)) > 1
+
+
+@pytest.mark.django_db
+def test_courses_list_omits_finaid_form_of_a_non_live_program():
+    """
+    A non-live program's financial assistance form must not reach the catalog.
+
+    The list scopes its ``programs`` prefetch to live, non-b2b programs, and the
+    financial assistance URL is chosen by walking a course's programs - so both
+    have to be asked the same question. When they drifted apart, a course whose
+    only program was an unpublished draft served that draft's form.
+    """
+    program = ProgramFactory.create(live=False)
+    course_page = CoursePageFactory.create()
+    program.add_requirement(course_page.product)
+    FlexiblePricingFormFactory.create(parent=program.page)
+
+    client = APIClient()
+    response = client.get(reverse("v2:courses_api-list"))
+
+    result = next(
+        row for row in response.json()["results"] if row["id"] == course_page.course_id
+    )
+    assert result["programs"] == []
+    assert result["page"]["financial_assistance_form_url"] == ""
+
+
+@pytest.mark.usefixtures("course_catalog_data")
+@pytest.mark.parametrize("course_catalog_program_count", [2], indirect=True)
+@pytest.mark.parametrize("course_catalog_course_count", [8], indirect=True)
+def test_courses_list_count_query_is_pk_only(user_drf_client):
+    """
+    The paginator's COUNT must not carry the body's columns or aggregates.
+
+    A count query that wraps a DISTINCT subquery selecting every column - and
+    the aggregates that exist only to build the response - is the shape that
+    caused the 2026-03-24 MIT Learn outage. It should select the pk and nothing
+    else.
+    """
+    with CaptureQueriesContext(connection) as ctx:
+        resp = user_drf_client.get(reverse("v2:courses_api-list"))
+    assert resp.status_code == status.HTTP_200_OK
+
+    count_queries = [q["sql"] for q in ctx.captured_queries if "COUNT(*)" in q["sql"]]
+    assert len(count_queries) == 1, count_queries
+    count_sql = count_queries[0]
+
+    # values("pk") masks the annotations out, so no aggregate and no GROUP BY.
+    assert "GROUP BY" not in count_sql, count_sql
+    # order_by() was cleared, so the compiler cannot append the ordering
+    # column to the DISTINCT select list.
+    assert "title" not in count_sql, count_sql
+
+
+@pytest.fixture
+def b2b_contracted_course(contract_ready_course, mock_course_run_clone):
+    """
+    A course with a run under an active contract, and a user who can see it.
+    """
+    org = OrganizationPageFactory(name="Contract Org")
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    user.b2b_organizations.add(org)
+    user.b2b_contracts.add(contract)
+    user.refresh_from_db()
+
+    (course, _) = contract_ready_course
+    create_contract_run(contract, course)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+    return client, course, org, contract
+
+
+@pytest.mark.parametrize("filter_by", ["org_id", "contract_id", "both"])
+def test_courses_list_does_not_select_contract_page_columns(
+    b2b_contracted_course, filter_by
+):
+    """
+    The b2b contract prefetches must not hydrate whole Wagtail pages.
+
+    ``ContractPage`` is a Wagtail Page, so an unnarrowed ``b2b_contracts``
+    prefetch selects the full
+    multi-table row - ~50 columns including two RichTextFields - once per
+    (run, contract) pair. Only the pk and ``organization_id`` are ever read,
+    and deserializing the rest was ~900ms of a 1.4s production request.
+    """
+    client, _, org, contract = b2b_contracted_course
+    params = {"org_id": org.id, "contract_id": contract.id}
+    if filter_by != "both":
+        params = {filter_by: params[filter_by]}
+
+    with CaptureQueriesContext(connection) as ctx:
+        resp = client.get(reverse("v2:courses_api-list"), params)
+    assert resp.status_code == status.HTTP_200_OK
+
+    for query in ctx.captured_queries:
+        sql = query["sql"]
+        if "b2b_contractpage" not in sql:
+            continue
+        # organization_id and the active/date predicate still need the table
+        # joined; nothing may select a payload column off it.
+        for column in ("description", "welcome_message", "name", "google_sheet_target"):
+            assert f'"b2b_contractpage"."{column}"' not in sql, sql
+
+
+def test_courses_list_b2b_runs_match_unprefetched_queryset(b2b_contracted_course):
+    """
+    Prefetched and lazy paths must agree.
+
+    The viewset narrows the ``b2b_contracts`` prefetch; a bare ``Course.objects.get()`` has neither, so
+    comparing the two exercises every fallback in ``get_filtered_runs``.
+    """
+    client, course, org, contract = b2b_contracted_course
+
+    for params, org_id, contract_id in (
+        ({"org_id": org.id}, org.id, None),
+        ({"contract_id": contract.id}, None, contract.id),
+        ({"org_id": org.id, "contract_id": contract.id}, org.id, contract.id),
+    ):
+        resp = client.get(reverse("v2:courses_api-list"), params)
+        assert resp.status_code == status.HTTP_200_OK
+        result = next(r for r in resp.json()["results"] if r["id"] == course.id)
+
+        bare = Course.objects.get(pk=course.id)
+        expected = _get_canonical_runs_per_tag(
+            bare.get_filtered_runs(
+                courserun_is_enrollable=None, org_id=org_id, contract_id=contract_id
+            )
+        )
+        assert [run["id"] for run in result["courseruns"]] == [
+            run.id for run in expected
+        ], params
+        assert result["courseruns"], params
+
+
+def test_courses_list_excludes_runs_of_a_deactivated_contract(b2b_contracted_course):
+    """
+    Deactivating a contract must drop its runs from the payload.
+
+    The ``b2b_contracts`` prefetch is what applies ActiveContractManager, so
+    narrowing it with the wrong manager would silently keep serving runs from
+    inactive or out-of-window contracts.
+    """
+    client, course, _org, contract = b2b_contracted_course
+
+    resp = client.get(reverse("v2:courses_api-list"), {"contract_id": contract.id})
+    result = next(r for r in resp.json()["results"] if r["id"] == course.id)
+    assert result["courseruns"]
+
+    contract.active = False
+    contract.save()
+
+    resp = client.get(reverse("v2:courses_api-list"), {"contract_id": contract.id})
+    assert resp.json()["results"] == []
+
+
+def test_course_queryset_courseruns_prefetch_avoids_contract_pages():
+    """
+    Inspect the queryset directly, without a request.
+
+    A bare ``"b2b_contracts"`` lookup reintroduces the full Wagtail page
+    fetch, and that doesn't show up as an extra query - only as a slower
+    one - so the query-count budget cannot catch a regression here.
+    """
+    view = CourseViewSet()
+    view.validated_params = CourseViewSet.validated_params
+    prefetch = next(
+        lookup
+        for lookup in view.get_queryset()._prefetch_related_lookups  # noqa: SLF001
+        if getattr(lookup, "prefetch_to", None) == "courseruns"
+    )
+    runs_qs = prefetch.queryset
+
+    assert not runs_qs.query.select_related, runs_qs.query.select_related
+
+    contracts = next(
+        lookup
+        for lookup in runs_qs._prefetch_related_lookups  # noqa: SLF001
+        if getattr(lookup, "prefetch_to", None) == "b2b_contracts"
+    )
+    assert contracts.queryset.query.deferred_loading[1] is False, (
+        "the contracts prefetch must use only(), not defer()"
+    )
+    assert "organization_id" in contracts.queryset.query.deferred_loading[0]

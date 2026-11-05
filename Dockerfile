@@ -15,17 +15,18 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       htop \
       iputils-ping \
       less \
-      libcairo2-dev \
       lsof \
       nano \
       ngrep \
       procps \
-      screen \
       wget
 
 FROM base AS deps
 
 # Trusted certs (org PKI + local-dev mkcert root injected at deploy time).
+# COPY --chmod also applies to directories it creates; make them first so
+# /usr/local/share stays traversable (perl, pg_config need it).
+RUN mkdir -p /usr/local/share/ca-certificates
 COPY --chmod=644 certs/ /usr/local/share/ca-certificates/
 RUN update-ca-certificates
 
@@ -33,6 +34,8 @@ RUN update-ca-certificates
 # mitol_*.gz are local wheels that uv resolves from the lock file.
 COPY --chown=mitodl:mitodl pyproject.toml uv.lock /src/
 COPY --chown=mitodl:mitodl mitol_*.gz /src/
+# Local path dependency resolved by the lock file (metadata-only urllib3-future stub).
+COPY --chown=mitodl:mitodl shims/ /src/shims/
 
 USER mitodl
 WORKDIR /src
@@ -68,7 +71,13 @@ CMD ["sh", "-c", "exec granian --interface wsgi --host 0.0.0.0 --port ${PORT:-80
 
 FROM django-server AS production
 
-COPY --from=node /src /src
+# Only the compiled frontend: these are the node stage's outputs that
+# STATICFILES_DIRS and WEBPACK_LOADER in main/settings.py read. The rest of
+# its /src is the source `code` already has, plus node_modules and yarn's
+# cache, which nothing reads at runtime.
+COPY --from=node /src/frontend/public/build /src/frontend/public/build
+COPY --from=node /src/frontend/staff-dashboard/build /src/frontend/staff-dashboard/build
+COPY --from=node /src/webpack-stats /src/webpack-stats
 
 # ─── Local-dev target (ol-infrastructure local-dev k8s/Tilt stack) ───────────
 # Runtime user owns /src (live-synced source), plus dev deps (pytest, ipdb, …)

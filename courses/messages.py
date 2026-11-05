@@ -1,9 +1,9 @@
 """Course email messages"""
 
 from django.conf import settings
-from mitol.mail.messages import TemplatedMessage
 
 from courses.utils import is_uai_course_run
+from mail.messages import SiteTemplatedMessage
 
 
 class UAIEmailMixin:
@@ -25,28 +25,28 @@ class UAIEmailMixin:
         return super().create(**kwargs)
 
 
-class CourseRunEnrollmentMessage(UAIEmailMixin, TemplatedMessage):
+class CourseRunEnrollmentMessage(UAIEmailMixin, SiteTemplatedMessage):
     """Email message for course enrollment"""
 
     name = "Course Run Enrollment"
     template_name = "mail/course_run_enrollment"
 
 
-class CourseRunUnenrollmentMessage(UAIEmailMixin, TemplatedMessage):
+class CourseRunUnenrollmentMessage(UAIEmailMixin, SiteTemplatedMessage):
     """Email message for course unenrollment"""
 
     name = "Course Run Unenrollment"
     template_name = "mail/course_run_unenrollment"
 
 
-class EnrollmentFailureMessage(TemplatedMessage):
+class EnrollmentFailureMessage(SiteTemplatedMessage):
     """Email message for enrollment failures"""
 
     name = "Enrollment Failure"
     template_name = "mail/enrollment_failure"
 
 
-class PartnerSchoolSharingMessage(TemplatedMessage):
+class PartnerSchoolSharingMessage(SiteTemplatedMessage):
     """Email message for sharing learner records to partner schools"""
 
     name = "Shared Learner Record"

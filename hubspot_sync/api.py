@@ -45,9 +45,9 @@ from ecommerce import models
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
 )
-from ecommerce.discounts import resolve_product_version
 from ecommerce.models import Line, Order, Product
 from hubspot_sync.rate_limiter import wait_for_hubspot_rate_limit
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
@@ -278,7 +278,7 @@ CUSTOM_ECOMMERCE_PROPERTIES = {
             {
                 "name": "discount_type",
                 "label": "Discount Type",
-                "description": "Type of discount (percent-off or dollars-off or fixed-price)",
+                "description": "Type of discount (percent-off, dollars-off, fixed-price, or paid-amount-off)",
                 "groupName": "coupon",
                 "type": "enumeration",
                 "fieldType": "select",
@@ -299,6 +299,12 @@ CUSTOM_ECOMMERCE_PROPERTIES = {
                         "value": DISCOUNT_TYPE_FIXED_PRICE,
                         "label": DISCOUNT_TYPE_FIXED_PRICE,
                         "displayOrder": 2,
+                        "hidden": False,
+                    },
+                    {
+                        "value": DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+                        "label": DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+                        "displayOrder": 3,
                         "hidden": False,
                     },
                 ],
@@ -1185,6 +1191,8 @@ def make_contact_sync_message_from_user(
     contact_properties_map = {
         "email": "email",
         "name": "name",
+        "first_name": "firstname",
+        "last_name": "lastname",
         "country": "country",
         "state": "state",
         "year_of_birth": "yearofbirth",
@@ -1808,7 +1816,7 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject | None:
     return result
 
 
-def sync_deal_with_hubspot_targeted(  # noqa: C901
+def sync_deal_with_hubspot_targeted(
     order: Order, token: str
 ) -> SimplePublicObject | None:
     """
@@ -1930,26 +1938,8 @@ def sync_deal_with_hubspot_targeted(  # noqa: C901
                 contact_id,
             )
 
-    # Ensure each line item exists by checking unique_app_id to avoid duplicates
     for line in order.lines.all():
-        line_item_id = _ensure_target_line_item_for_line(line, hubspot_client)
-        if line_item_id:
-            # Ensure the line item is associated with the deal
-            try:
-                wait_for_hubspot_rate_limit()
-                hubspot_client.crm.associations.v4.basic_api.create_default(
-                    from_object_type=HubspotObjectType.LINES.value,
-                    from_object_id=line_item_id,
-                    to_object_type=HubspotObjectType.DEALS.value,
-                    to_object_id=result.id,
-                )
-            except Exception:  # noqa: BLE001
-                # Association might already exist, which is fine
-                log.debug(
-                    "Association may already exist for line %s and deal %s",
-                    line_item_id,
-                    result.id,
-                )
+        _upsert_target_deal_line_item(line, result.id, hubspot_client)
 
     # Update the local HubspotObject mapping to maintain ID tracking
     content_type = ContentType.objects.get_for_model(Order)
@@ -2024,9 +2014,9 @@ def sync_contact_with_hubspot(user: User):
     return result
 
 
-def _resolve_hubspot_token(*, is_uai: bool) -> str | None:
-    """Resolve HubSpot API token, routing UAI orders to the UAI account when configured."""
-    if is_uai:
+def _resolve_hubspot_token(*, is_uai: bool, is_xpro: bool = False) -> str | None:
+    """Resolve HubSpot API token, routing UAI/XPro orders to the UAI/xPro account."""
+    if is_uai or is_xpro:
         return getattr(
             settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None
         ) or getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
@@ -2034,7 +2024,7 @@ def _resolve_hubspot_token(*, is_uai: bool) -> str | None:
 
 
 def _is_uai_token(token: str) -> bool:
-    """Return True if the token belongs to the UAI HubSpot account."""
+    """Return True if the token belongs to the UAI/XPro HubSpot account."""
     uai_token = getattr(settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
     return bool(uai_token) and token == uai_token
 
@@ -2328,17 +2318,6 @@ def _build_target_line_item_message(
     return line_item_input
 
 
-def _get_product_from_line(line: Line) -> Product | None:
-    """Resolve the line's product similarly to serializer logic used for HubSpot payloads."""
-    if not line.product_version:
-        return None
-    version = line.product_version
-    product = Product.all_objects.filter(id=version.object_id).first()
-    if product:
-        return resolve_product_version(product, product_version=version)
-    return version.object
-
-
 def _find_target_product_id_by_unique_app_id(
     hubspot_client: HubspotApi, unique_app_id: str
 ) -> str | None:
@@ -2490,49 +2469,80 @@ def _find_target_line_item_id_by_unique_app_id(
         return None
 
 
-def _ensure_target_line_item_for_line(
-    line: Line, hubspot_client: HubspotApi
+def _find_target_deal_line_item_id_by_product(
+    hubspot_client: HubspotApi, deal_id: str, hs_product_id: str
 ) -> str | None:
-    """Return a target-account line item id, creating one when missing."""
-    line_item_input = _build_target_line_item_message(line, hubspot_client)
-    unique_app_id = str(line_item_input.properties.get("unique_app_id") or "")
+    """
+    Find the line item on a target-account deal that points at the given product.
 
-    if unique_app_id:
-        existing_line_item_id = _find_target_line_item_id_by_unique_app_id(
-            hubspot_client, unique_app_id
+    Cart-add creates a fresh local Order/Line each time, so the line item's
+    unique_app_id can't be used to find an earlier line item on the same deal.
+    Matching by the deal's associated line items and their product avoids
+    depending on any local record id.
+    """
+    wait_for_hubspot_rate_limit()
+    associations = hubspot_client.crm.associations.v4.basic_api.get_page(
+        object_type=HubspotObjectType.DEALS.value,
+        object_id=deal_id,
+        to_object_type=HubspotObjectType.LINES.value,
+    )
+    for association in associations.results:
+        wait_for_hubspot_rate_limit()
+        line_item = hubspot_client.crm.objects.basic_api.get_by_id(
+            object_type=HubspotObjectType.LINES.value,
+            object_id=association.to_object_id,
+            properties=["hs_product_id"],
         )
-        if existing_line_item_id:
-            # Update the local HubspotObject mapping for existing line item
-            content_type = ContentType.objects.get_for_model(Line)
-            HubspotObject.objects.update_or_create(
-                object_id=line.id,
-                content_type=content_type,
-                defaults={"hubspot_id": existing_line_item_id},
-            )
-            return existing_line_item_id
+        if str(line_item.properties.get("hs_product_id")) == str(hs_product_id):
+            return line_item.id
+    return None
+
+
+def _upsert_target_deal_line_item(
+    line: Line, deal_id: str, hubspot_client: HubspotApi
+) -> None:
+    """
+    Create or update the line item for a Line on a deal.
+    """
+    line_item_input = _build_target_line_item_message(line, hubspot_client)
+
+    # Not sure if we ever ever expect a line item w/o a product id...
+    hs_product_id = line_item_input.properties.get("hs_product_id")
+    existing_line_item_id = (
+        _find_target_deal_line_item_id_by_product(
+            hubspot_client, deal_id, hs_product_id
+        )
+        if hs_product_id
+        else None
+    )
 
     wait_for_hubspot_rate_limit()
-    created_line_item = hubspot_client.crm.objects.basic_api.create(
-        object_type=HubspotObjectType.LINES.value,
-        simple_public_object_input_for_create=line_item_input,
-    )
+    if existing_line_item_id:
+        hubspot_client.crm.objects.basic_api.update(
+            object_type=HubspotObjectType.LINES.value,
+            object_id=existing_line_item_id,
+            simple_public_object_input=line_item_input,
+        )
+    else:
+        line_item = hubspot_client.crm.objects.basic_api.create(
+            object_type=HubspotObjectType.LINES.value,
+            simple_public_object_input_for_create=line_item_input,
+        )
 
-    # Update the local HubspotObject mapping for newly created line item
-    content_type = ContentType.objects.get_for_model(Line)
-    HubspotObject.objects.update_or_create(
-        object_id=line.id,
-        content_type=content_type,
-        defaults={"hubspot_id": created_line_item.id},
-    )
-
-    return created_line_item.id
+        wait_for_hubspot_rate_limit()
+        hubspot_client.crm.associations.v4.basic_api.create_default(
+            from_object_type=HubspotObjectType.LINES.value,
+            from_object_id=line_item.id,
+            to_object_type=HubspotObjectType.DEALS.value,
+            to_object_id=deal_id,
+        )
 
 
 def _ensure_target_hubspot_product_for_line(
     line: Line, hubspot_client: HubspotApi
 ) -> str | None:
     """Return a target-account product id for a line item's hs_product_id."""
-    product = _get_product_from_line(line)
+    product = line.product
     if not product:
         return None
 
@@ -2691,27 +2701,13 @@ def _sync_cart_add_deal_with_hubspot(
     )
 
     for line in order.lines.all():
-        line_item_input = _build_target_line_item_message(line, hubspot_client)
-
-        wait_for_hubspot_rate_limit()
-        line_item = hubspot_client.crm.objects.basic_api.create(
-            object_type=HubspotObjectType.LINES.value,
-            simple_public_object_input_for_create=line_item_input,
-        )
-
-        wait_for_hubspot_rate_limit()
-        hubspot_client.crm.associations.v4.basic_api.create_default(
-            from_object_type=HubspotObjectType.LINES.value,
-            from_object_id=line_item.id,
-            to_object_type=HubspotObjectType.DEALS.value,
-            to_object_id=deal.id,
-        )
+        _upsert_target_deal_line_item(line, deal.id, hubspot_client)
 
     return deal
 
 
 def track_cart_add_with_hubspot(
-    user: User, product: Product, *, is_uai_course: bool
+    user: User, product: Product, *, is_uai_course: bool, is_xpro_course: bool = False
 ) -> bool:
     """
     Create and sync a dedicated deal that represents a cart-add occurrence.
@@ -2723,11 +2719,12 @@ def track_cart_add_with_hubspot(
         user (User): The user adding to cart
         product (Product): Product being added
         is_uai_course (bool): Whether this is a UAI/Learn course add
+        is_xpro_course (bool): Whether this is an XPro course add
 
     Returns:
         bool: True if synced successfully, False otherwise.
     """
-    token = _resolve_hubspot_token(is_uai=is_uai_course)
+    token = _resolve_hubspot_token(is_uai=is_uai_course, is_xpro=is_xpro_course)
     if not token:
         return False
 
@@ -2765,24 +2762,31 @@ def track_cart_add_with_hubspot(
                 purchased_content_type_id=product.content_type_id,
                 product_version=product_version,
                 quantity=1,
+                discounted_unit_price=Line.compute_discounted_unit_price_for(
+                    order, product_version
+                ),
             )
             order.total_price_paid = line.discounted_price
-            order.save(update_fields=["total_price_paid"])
+            # auto_now fields are skipped when update_fields excludes them, so
+            # updated_on has to be listed to move.
+            order.save(update_fields=["total_price_paid", "updated_on"])
 
         deal = _sync_cart_add_deal_with_hubspot(order, contact_id, hubspot_client)
         log.info(
-            "Synced cart-add deal with HubSpot for user_id=%s product_id=%s deal_id=%s is_uai=%s",
+            "Synced cart-add deal with HubSpot for user_id=%s product_id=%s deal_id=%s is_uai=%s is_xpro=%s",
             user.id,
             product.id,
             deal.id,
             is_uai_course,
+            is_xpro_course,
         )
     except Exception:  # pylint: disable=broad-except
         log.exception(
-            "Failed to sync HubSpot cart-add deal for user %s product %s (is_uai=%s)",
+            "Failed to sync HubSpot cart-add deal for user %s product %s (is_uai=%s is_xpro=%s)",
             user.id,
             product.id,
             is_uai_course,
+            is_xpro_course,
         )
         return False
 

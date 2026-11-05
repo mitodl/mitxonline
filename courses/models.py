@@ -5,7 +5,9 @@ Course models
 
 import logging
 import uuid
+from dataclasses import dataclass
 from decimal import ROUND_HALF_EVEN, Decimal
+from typing import TYPE_CHECKING
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
@@ -24,9 +26,9 @@ from django.utils.functional import cached_property
 from django.utils.html import format_html
 from django.utils.text import slugify
 from django_countries.fields import CountryField
-from lru_method_cache import lru_method_cache
 from mitol.common.models import TimestampedModel, TimestampedModelQuerySet
 from mitol.common.utils.datetime import now_in_utc
+from mitol.common.utils.queryset import is_prefetched
 from mitol.openedx.utils import get_course_number
 from modelcluster.fields import ParentalKey
 from prefetch import Prefetcher, PrefetchManagerMixin, PrefetchQuerySet
@@ -47,10 +49,18 @@ from main.models import AuditableModel, AuditModel, ValidateOnSaveMixin
 from main.utils import serialize_model_object
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
+    EDX_ENROLLMENT_AUDIT_MODE,
     EDX_ENROLLMENT_VERIFIED_MODE,
     EDX_ENROLLMENTS_PAID_MODES,
 )
 from variants.models import SupportedVariant, VariantOptionsModel
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    # Import-time only: b2b.models imports Program from this module at module
+    # scope, so a runtime import here would be circular.
+    from b2b.models import Contract
 
 User = get_user_model()
 
@@ -187,6 +197,13 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     b2b_only = models.BooleanField(
         default=False, help_text="Indicates if the program is B2B only"
     )
+    certificates_disabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "If set, no certificates will be generated for this program, "
+            "even if a live certificate page exists."
+        ),
+    )
     products = GenericRelation("ecommerce.Product", related_query_name="programs")
 
     @cached_property
@@ -242,6 +259,37 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     def text_id(self):
         """Gets the readable_id"""
         return self.readable_id
+
+    @property
+    def has_free_audit(self):
+        """Whether this can still be taken for free once a paid enrollment ends."""
+        return self.enrollment_modes.filter(
+            mode_slug=EDX_ENROLLMENT_AUDIT_MODE
+        ).exists()
+
+    @property
+    def is_upgradable(self):
+        """
+        Checks if the program can be upgraded.
+        Requires program to be live, a product to exist, and a verified
+        enrollment mode to be available.
+        """
+        if hasattr(self, "prefetched_products"):
+            has_product = bool(self.prefetched_products)
+        else:
+            has_product = self.products.exists()
+
+        if hasattr(self, "prefetched_enrollment_modes"):
+            has_verified_mode = any(
+                mode.mode_slug == EDX_ENROLLMENT_VERIFIED_MODE
+                for mode in self.prefetched_enrollment_modes
+            )
+        else:
+            has_verified_mode = self.enrollment_modes.filter(
+                mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+            ).exists()
+
+        return self.live is True and has_product and has_verified_mode
 
     @property
     def related_programs_qs(self):
@@ -448,6 +496,51 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             .prefetch_related("courseruns", "departments")
         )
 
+    @property
+    def courses_qset_recursive(self):
+        """
+        Returns a QuerySet of the related courses for this program and for every
+        program nested in its requirements tree, at any depth, required or
+        elective.
+        """
+
+        return (
+            Course.objects.filter(
+                in_programs__program_id__in=Program.expand_nested_program_ids([self.id])
+            )
+            .distinct()
+            .prefetch_related("courseruns", "departments")
+        )
+
+    @staticmethod
+    def expand_nested_program_ids(program_ids):
+        """
+        Returns the given program ids plus the ids of every program nested in
+        their requirements trees, at any depth, required or elective.
+
+        Args:
+        - program_ids (iterable of int): the programs to start from
+        Returns:
+        - set of int: the program ids
+        """
+
+        program_ids = set(program_ids)
+        frontier = set(program_ids)
+        while frontier:
+            frontier = (
+                set(
+                    ProgramRequirement.objects.filter(
+                        program_id__in=frontier,
+                        node_type=ProgramRequirementNodeType.PROGRAM,
+                        required_program__isnull=False,
+                    ).values_list("required_program_id", flat=True)
+                )
+                - program_ids
+            )
+            program_ids |= frontier
+
+        return program_ids
+
     def _get_operator_course_requirements(self, main_ops):
         """
         Helper method to fetch all course requirements under operator nodes.
@@ -497,45 +590,40 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         elective_courses = []
         required_title = "Required Courses"
         elective_title = "Elective Courses"
-        minimum_elective_requirement = None
 
-        # First, check all operators for titles and minimum elective requirements
+        # First, take the section titles from the operators
         for op in path_to_operator.values():
             # Store titles from actual operator nodes
             if not op.elective_flag and required_title == "Required Courses":
                 required_title = op.title or required_title
             elif op.elective_flag and elective_title == "Elective Courses":
                 elective_title = op.title or elective_title
-                if (
-                    op.is_min_number_of_operator
-                    and minimum_elective_requirement is None
-                ):
-                    minimum_elective_requirement = (
-                        int(op.operator_value) if op.operator_value else None
-                    )
 
+        # A course can sit in more than one group (two tracks, or overlapping
+        # elective groups); list it once, where it first appears, and as
+        # required if any of its groups is required. Otherwise the learner
+        # record and the API show it twice.
+        required_course_ids = {
+            req.course_id
+            for req in course_reqs
+            if req.course
+            and (op := self._find_parent_operator(req, path_to_operator))
+            and not op.elective_flag
+        }
+        seen_course_ids = set()
         for req in course_reqs:
-            if not req.course:
+            if (
+                not req.course
+                or req.course_id in seen_course_ids
+                or self._find_parent_operator(req, path_to_operator) is None
+            ):
                 continue
-
-            # Find which operator this requirement belongs to
-            parent_op = self._find_parent_operator(req, path_to_operator)
-            if parent_op is None:
-                continue
-
-            requirement_type = (
-                "Required Courses"
-                if not parent_op.elective_flag
-                else "Elective Courses"
-            )
-
-            # Build course tuples and separate lists
-            course_tuple = (req.course, requirement_type)
-            courses.append(course_tuple)
-
-            if not parent_op.elective_flag:
+            seen_course_ids.add(req.course_id)
+            if req.course_id in required_course_ids:
+                courses.append((req.course, "Required Courses"))
                 required_courses.append(req.course)
             else:
+                courses.append((req.course, "Elective Courses"))
                 elective_courses.append(req.course)
 
         return {
@@ -544,7 +632,6 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             "elective_courses": elective_courses,
             "required_title": required_title,
             "elective_title": elective_title,
-            "minimum_elective_requirement": minimum_elective_requirement,
         }
 
     def _find_parent_operator(self, req, path_to_operator):
@@ -572,7 +659,6 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             "elective_courses": [],
             "required_title": "Required Courses",
             "elective_title": "Elective Courses",
-            "minimum_elective_requirement": None,
         }
 
     def get_courses_with_requirements_data(self, requirements=None) -> dict:
@@ -607,7 +693,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
 
         Returns:
         - dict: Contains 'courses', 'required_courses', 'elective_courses',
-                'required_title', 'elective_title', and 'minimum_elective_requirement'
+                'required_title', and 'elective_title'
         """
         prefetched_requirements = getattr(self, "_prefetched_objects_cache", {}).get(
             "all_requirements"
@@ -735,17 +821,6 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         """
         return self._courses_with_requirements_data["elective_title"]
 
-    @cached_property
-    def minimum_elective_courses_requirement(self):
-        """
-        Returns the (int) value defined for the minimum number of elective courses required to be completed by the Program
-
-        Returns:
-            int: Minimum number of elective courses required to be completed by the Program.
-                Returns None, if no value is defined or elective node is absent.
-        """
-        return self._courses_with_requirements_data["minimum_elective_requirement"]
-
     @property
     def is_program(self):
         """Flag to indicate if this is a program"""
@@ -769,6 +844,28 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
                 collection_items__program__id=self.id
             ).distinct()
         )
+
+    @cached_property
+    def is_enrollable(self):
+        """
+        Determines if the program is enrollable
+        """
+        now = now_in_utc()
+        return (
+            (self.enrollment_end is None or self.enrollment_end > now)
+            and self.enrollment_start is not None
+            and self.enrollment_start <= now
+            and self.live is True
+            and self.start_date is not None
+        )
+
+    def enrollable_for_contract(self, contract) -> bool:
+        """Determine if the run is enrollable for the specified contract."""
+
+        if not self.contract_memberships.filter(contract_id=contract.id).exists():
+            return False
+
+        return self.is_enrollable
 
 
 class RelatedProgram(TimestampedModel, ValidateOnSaveMixin):
@@ -890,15 +987,27 @@ class CourseQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):  # pylint: dis
         return self.filter(in_programs__program=program)
 
 
+def default_program_queryset() -> ProgramQuerySet:
+    """
+    The program scope used when a caller does not name one.
+
+    Non-b2b is the safest default: a b2b-only program is not part of the public
+    catalog, so it must not supply a course's programs list nor - which is the
+    same question asked twice - its financial assistance form URL.
+
+    Returns:
+        ProgramQuerySet: every program outside the b2b-only catalog
+    """
+    return Program.objects.filter(b2b_only=False)
+
+
 class CourseProgramPrefetcher(Prefetcher):
     """Prefetcher for Course programs."""
 
-    queryset: CourseQuerySet
+    queryset: ProgramQuerySet
 
     def __init__(self, *args, **kwargs):
-        self.queryset = kwargs.pop(  # safest default is non-b2b
-            "queryset", Program.objects.filter(b2b_only=False)
-        )
+        self.queryset = kwargs.pop("queryset", default_program_queryset())
         super().__init__(*args, **kwargs)
 
     @staticmethod
@@ -917,6 +1026,9 @@ class CourseProgramPrefetcher(Prefetcher):
                 "all_requirements__course_id",
                 distinct=True,
                 filter=Q(all_requirements__node_type=ProgramRequirementNodeType.COURSE),
+                # A program can join on a course_id whose node_type is not
+                # COURSE, which aggregates to NULL rather than an empty array.
+                default=[],
             )
         )
 
@@ -929,6 +1041,94 @@ class CourseProgramPrefetcher(Prefetcher):
         course.programs = programs or []
 
 
+@dataclass(frozen=True)
+class FinancialAssistanceFormUrl:
+    """One course's resolved financial assistance form URL."""
+
+    course_id: int
+    url: str
+
+
+class _PrefetchRows(list):
+    """
+    Rows returned from a ``Prefetcher.filter()``.
+
+    django-prefetch calls ``.using()`` on the return value when the queryset was
+    bound to a database (prefetch.py:262). These rows are computed rather than
+    fetched, so there is nothing to rebind.
+    """
+
+    def using(self, _db):
+        """Nothing to rebind; these rows were computed, not fetched."""
+        return self
+
+
+class CourseFinancialAssistanceFormUrlPrefetcher(Prefetcher):
+    """
+    Resolve each course's financial assistance form URL in the view's queryset.
+
+    The URL is chosen by a priority cascade over Wagtail child pages, program
+    pages and related programs, which costs 4-8 queries per course if done
+    during serialization. Resolving it here means the serializer only ever reads
+    an attribute.
+
+    Scoped to ``program_queryset``, which must be the same programs the caller
+    hands the ``programs`` prefetch: the URL is chosen by walking a course's
+    programs, so a program the caller filtered out must not be able to supply it
+    either.
+
+    Holds no *result* state on ``self``. ``PrefetchQuerySet._clone()`` shares the
+    ``_prefetch`` dict by reference, so a class-level ``queryset =
+    ...prefetch(...)`` reuses one Prefetcher instance across every request in the
+    process; results are carried in ``filter()``'s return value instead.
+    Configuration set once in ``__init__`` and only ever read is safe under that
+    same sharing - ``CourseProgramPrefetcher`` has always worked this way.
+    """
+
+    program_queryset: ProgramQuerySet
+
+    def __init__(self, *args, **kwargs):
+        self.program_queryset = kwargs.pop(
+            "program_queryset", default_program_queryset()
+        )
+        super().__init__(*args, **kwargs)
+
+    @staticmethod
+    def mapper(course):
+        """Map each course to Course.id"""
+        return course.id
+
+    def filter(self, course_ids):
+        """Resolve every id at once, one row per id."""
+        # Local import: cms.api imports courses.models at module scope.
+        from cms.api import resolve_financial_assistance_form_urls  # noqa: PLC0415
+
+        course_ids = list(course_ids)
+        urls = resolve_financial_assistance_form_urls(
+            course_ids, program_queryset=self.program_queryset
+        )
+        # A row for every id, including courses with no form, so each one
+        # reaches the two-arg decorator() call - the one-arg pass runs before
+        # filter() and so cannot see these results.
+        return _PrefetchRows(
+            FinancialAssistanceFormUrl(course_id, urls.get(course_id, ""))
+            for course_id in course_ids
+        )
+
+    @staticmethod
+    def reverse_mapper(row):
+        return [row.course_id]
+
+    @staticmethod
+    def decorator(course, rows=None):
+        url = rows[0].url if rows else ""
+        # On the course so required_prefetches can see it, and on the page
+        # because that is the instance CoursePageSerializer receives.
+        course.financial_assistance_form_url = url
+        if course.course_page is not None:
+            course.course_page.financial_assistance_form_url = url
+
+
 class CourseManager(models.Manager.from_queryset(CourseQuerySet), PrefetchManagerMixin):
     """Manager for Course"""
 
@@ -936,7 +1136,10 @@ class CourseManager(models.Manager.from_queryset(CourseQuerySet), PrefetchManage
     def get_queryset_class(cls):
         return CourseQuerySet
 
-    prefetch_definitions = {"programs": CourseProgramPrefetcher}
+    prefetch_definitions = {
+        "programs": CourseProgramPrefetcher,
+        "financial_assistance_form_url": CourseFinancialAssistanceFormUrlPrefetcher,
+    }
 
 
 class Course(TimestampedModel, ValidateOnSaveMixin):
@@ -952,6 +1155,13 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     )
     live = models.BooleanField(default=False, db_index=True)
     departments = models.ManyToManyField(Department, blank=True, related_name="courses")
+    certificates_disabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "If set, no certificates will be generated for this course, "
+            "even if a live certificate page exists."
+        ),
+    )
     flexible_prices = GenericRelation(
         "flexiblepricing.FlexiblePrice",
         object_id_field="courseware_object_id",
@@ -1006,6 +1216,51 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             return [p for p in relevant_run.prefetched_products if p.is_active]
         return list(relevant_run.products.filter(is_active=True).all())
 
+    @staticmethod
+    def _select_first_unexpired_run(runs):
+        """
+        Pick the first unexpired/enrollable run from an in-memory iterable.
+
+        This works over already-loaded runs so it can use the ``courseruns``
+        prefetch cache instead of issuing a query per course. It mirrors the SQL
+        it replaces: enrollable runs in a usable language, preferring runs that
+        have not ended, ordered by start date with primary-language runs winning
+        ties.
+
+        ``CourseRun.is_enrollable`` is exactly equivalent to
+        ``CourseRunQuerySet.get_enrollable_filter()`` - same four conditions
+        against the same ``now_in_utc()`` - which is what makes this a faithful
+        translation rather than an approximation.
+
+        Args:
+            runs: iterable of CourseRun objects to choose from
+
+        Returns:
+            CourseRun or None: An unexpired/enrollable course run
+        """
+        candidates = [
+            run
+            for run in runs
+            if run.is_enrollable
+            and (run.is_primary_language or run.language in ["", "en"])
+        ]
+        if not candidates:
+            return None
+
+        # is_enrollable guarantees start_date is not None, so this never
+        # compares None. The trailing id makes ties deterministic, where the
+        # SQL .first() left them up to the database.
+        def sort_key(run):
+            return (run.start_date, not run.is_primary_language, run.id)
+
+        now = now_in_utc()
+        unended = [
+            run for run in candidates if run.end_date is None or run.end_date > now
+        ]
+
+        # Prefer runs that have not ended; fall back to any enrollable run.
+        return min(unended or candidates, key=sort_key)
+
     @cached_property
     def first_unexpired_run(self):
         """
@@ -1015,28 +1270,22 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         Returns:
             CourseRun or None: An unexpired/enrollable course run
         """
-        # Use the CourseRunQuerySet.enrollable() method to eliminate code duplication
-        # First try to find non-past enrollable runs (end_date is None or in the future)
-        best_run = (
-            self.courseruns.filter(b2b_contract__isnull=True)
-            .enrollable()
-            .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
-            .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
-            .order_by("start_date", "-is_primary_language")
-            .first()
+        return self._select_first_unexpired_run(
+            run for run in self.courseruns.all() if not run.b2b_only
         )
 
-        # If no non-past runs found, look for any enrollable runs (including archived)
-        if best_run is None:
-            best_run = (
-                self.courseruns.filter(b2b_contract__isnull=True)
-                .enrollable()
-                .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
-                .order_by("start_date", "-is_primary_language")
-                .first()
-            )
+    @cached_property
+    def has_dated_courseruns(self) -> bool:
+        """
+        Whether this course has at least one enrollable, non-self-paced run.
 
-        return best_run
+        Mirrors ``courses.utils.get_dated_courseruns``, which filters on
+        ``get_enrollable_filter() & Q(is_self_paced=False)``. Reads the
+        ``courseruns`` prefetch cache rather than issuing a COUNT per course.
+        """
+        return any(
+            run.is_enrollable and not run.is_self_paced for run in self.courseruns.all()
+        )
 
     @cached_property
     def include_in_learn_catalog(self) -> bool:
@@ -1074,7 +1323,9 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             default_variant=True,
         ).first()
 
-    def get_first_unexpired_b2b_run(self, user_contracts):
+    def get_first_unexpired_b2b_run(
+        self, user_contracts: "Iterable[int | Contract] | None"
+    ) -> "CourseRun | None":
         """
         Gets the first unexpired/enrollable CourseRun associated with both this
         Course and the user's specified contracts.
@@ -1082,33 +1333,26 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         First means in start date order ascending.
 
         Args:
-        - user_contracts (list of int): the current user's contracts
+        - user_contracts (iterable of int or Contract): the current user's
+          contracts, as ids or as model instances
 
         Returns:
             CourseRun or None: An unexpired/enrollable course run
         """
-        # Use the CourseRunQuerySet.enrollable() method to eliminate code duplication
-        # First try to find non-past enrollable runs (end_date is None or in the future)
-        best_run = (
-            self.courseruns.filter(b2b_contract__in=user_contracts)
-            .enrollable()
-            .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
-            .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
-            .order_by("start_date", "-is_primary_language")
-            .first()
+        # Ids or instances, matching what the ``b2b_contracts__in`` filter this
+        # replaces would have accepted. Callers pass ids today
+        # (CourseViewSet.get_serializer_context builds them with values_list).
+        contract_ids = {
+            getattr(contract, "id", contract) for contract in (user_contracts or [])
+        }
+        # ``b2b_contracts`` is an M2M, so this reads its prefetch cache when the
+        # caller prefetched it and falls back to a query per run when it did not
+        # - same shape as the ``b2b_contracts__in`` filter it replaces.
+        return self._select_first_unexpired_run(
+            run
+            for run in self._courseruns_with_contracts()
+            if any(contract.id in contract_ids for contract in run.b2b_contracts.all())
         )
-
-        # If no non-past runs found, look for any enrollable runs (including archived)
-        if best_run is None:
-            best_run = (
-                self.courseruns.filter(b2b_contract__in=user_contracts)
-                .enrollable()
-                .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
-                .order_by("start_date", "-is_primary_language")
-                .first()
-            )
-
-        return best_run
 
     @cached_property
     def programs(self) -> list[Program]:
@@ -1165,7 +1409,21 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         """Flag to indicate if this is a run"""
         return False
 
-    @lru_method_cache(max_size=12, typed=True)
+    def _courseruns_with_contracts(self):
+        """
+        Return this course's runs with ``b2b_contracts`` available.
+
+        Calling ``prefetch_related`` on the related manager unconditionally
+        would clone the prefetched queryset, and a clone starts with an empty
+        result cache - so a caller that already prefetched ``courseruns``
+        (``CourseViewSet`` does, with ``b2b_contracts`` inside it) would still
+        pay one query per course. Read the cache when it is populated and only
+        build a new queryset when it is not.
+        """
+        if is_prefetched(self, "courseruns"):
+            return self.courseruns.all()
+        return self.courseruns.prefetch_related("b2b_contracts").all()
+
     def get_filtered_runs(
         self,
         *,
@@ -1174,12 +1432,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         contract_id: int | None = None,
     ) -> list["CourseRun"]:
         """Return sorted course runs respecting org/contract/enrollability context."""
-        courseruns = (
-            self.prefetched_courseruns
-            if hasattr(self, "prefetched_courseruns")
-            else list(self.courseruns.all())
-        )
-        courseruns = sorted(courseruns, key=lambda r: r.id)
+        courseruns = sorted(self._courseruns_with_contracts(), key=lambda r: r.id)
 
         if courserun_is_enrollable is not None:
             courseruns = filter(
@@ -1191,20 +1444,20 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
 
         if org_id is not None:
             courseruns = filter(
-                lambda run: (
-                    getattr(run.b2b_contract, "organization_id", None) == org_id
+                lambda run: any(
+                    c.organization_id == org_id for c in run.b2b_contracts.all()
                 ),
                 courseruns,
             )
 
         if contract_id is not None:
             courseruns = filter(
-                lambda run: getattr(run.b2b_contract, "id", None) == contract_id,
+                lambda run: any(c.id == contract_id for c in run.b2b_contracts.all()),
                 courseruns,
             )
 
         if org_id is None and contract_id is None:
-            courseruns = filter(lambda run: run.b2b_contract_id is None, courseruns)
+            courseruns = filter(lambda run: not run.b2b_only, courseruns)
 
         return list(courseruns)
 
@@ -1217,7 +1470,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
                 language=run.language,
                 variant_length=run.variant_length,
                 variant_industry=run.variant_industry,
-                b2b_only=bool(run.b2b_contract),
+                b2b_only=run.has_b2b_contracts,
             ).exists()
         )
 
@@ -1225,18 +1478,47 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         title = f"{self.readable_id} | {self.title}"
         return title if len(title) <= 100 else title[:97] + "..."  # noqa: PLR2004
 
+    def clean(self):
+        """
+        Guard against a Course's readable_id being set to a CourseRun's full
+        courseware_id (e.g. "course-v1:MITxT+JPAL101SPAx+1T2023") instead of
+        the course-level ID (e.g. "course-v1:MITxT+JPAL101SPAx"). Links built
+        from a readable_id in that shape 404 once redirected to the Learn
+        front end, since a run ID isn't a valid course readable_id there.
+
+        Only checked when readable_id is being newly set or changed, so
+        existing rows that already have a colliding value (from before this
+        validation existed) aren't blocked from being saved for unrelated
+        reasons.
+        """
+        if not self.readable_id:
+            return
+
+        unchanged = (
+            self.pk
+            and Course.objects.filter(pk=self.pk, readable_id=self.readable_id).exists()
+        )
+        if (
+            not unchanged
+            and CourseRun.objects.filter(courseware_id=self.readable_id).exists()
+        ):
+            raise ValidationError(
+                "readable_id matches an existing CourseRun's courseware_id. "  # noqa: EM101
+                "It should be the course-level ID without a run tag."
+            )
+
 
 class CourseRunQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):  # pylint: disable=missing-docstring
     def exclude_b2b(self):
         """Exclude B2B course runs."""
 
-        return self.filter(b2b_contract__isnull=True)
+        return self.filter(b2b_only=False)
 
     def live(self, *, include_b2b=False):
         """Applies a filter for Course runs with live=True"""
 
         queryset = self.filter(live=True)
-        return queryset if include_b2b else queryset.filter(b2b_contract__isnull=True)
+        return queryset if include_b2b else queryset.filter(b2b_only=False)
 
     def available(self, *, include_b2b=False):
         """Applies a filter for Course runs with end_date in future"""
@@ -1245,7 +1527,7 @@ class CourseRunQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):  # pylint: 
 
         if include_b2b:
             return self.filter(q_filter)
-        return self.filter(b2b_contract__isnull=True).filter(q_filter)
+        return self.filter(b2b_only=False).filter(q_filter)
 
     def enrollable(self, enrollment_end_date=None):
         """
@@ -1413,12 +1695,14 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
         EnrollmentMode, blank=True, related_name="+"
     )
 
-    b2b_contract = models.ForeignKey(
+    b2b_contracts = models.ManyToManyField(
         "b2b.ContractPage",
-        null=True,
         blank=True,
-        on_delete=models.DO_NOTHING,
         related_name="course_runs",
+        help_text="B2B contracts this course run is attached to.",
+    )
+    b2b_only = models.BooleanField(
+        default=False, help_text="Indicates if the course run is B2B only"
     )
     is_source_run = models.BooleanField(
         default=False,
@@ -1444,29 +1728,17 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
         return format_html(f'{self.courseware_id} <a href="{dj_change_url}">Admin</a>')
 
     class Meta:
+        # The ``unique_primary_language_per_group`` and
+        # ``unique_language_per_group`` rules used to live here as database
+        # UniqueConstraints that included the now-removed ``b2b_contract``
+        # FK. A run can now belong to multiple contracts through the
+        # ``b2b_contracts`` ManyToManyField, and M2M fields cannot participate
+        # in a UniqueConstraint, so the rules are enforced in application code
+        # instead - see ``CourseRun.validate_b2b_contract_group_uniqueness``,
+        # which runs from ``clean()``/``save()`` and from the ``m2m_changed``
+        # handler in ``courses/signals.py`` (which covers direct mutations such
+        # as ``run.b2b_contracts.add(contract)``).
         unique_together = ("course", "courseware_id", "run_tag")
-        constraints = [
-            UniqueConstraint(
-                fields=["course", "run_tag", "is_source_run", "b2b_contract"],
-                condition=Q(is_primary_language=True),
-                nulls_distinct=False,
-                name="unique_primary_language_per_group",
-            ),
-            UniqueConstraint(
-                fields=[
-                    "course",
-                    "run_tag",
-                    "language",
-                    "is_source_run",
-                    "b2b_contract",
-                    "variant_length",
-                    "variant_industry",
-                ],
-                condition=~Q(language=""),
-                nulls_distinct=False,
-                name="unique_language_per_group",
-            ),
-        ]
 
     @property
     def is_past(self):
@@ -1545,26 +1817,6 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
             and self.start_date is not None
         )
 
-    @cached_property
-    def is_enrollable_for_b2b(self):
-        """Determine if the run is enrollable for B2B purchases."""
-
-        if not self.b2b_contract:
-            return False
-
-        if not self.b2b_contract.max_learners:
-            return self.is_enrollable
-
-        contract_enrollments = self.enrollments.filter(
-            active=True, change_status=None
-        ).count()
-
-        return (
-            self.b2b_contract.max_learners > 0
-            and self.b2b_contract.max_learners > contract_enrollments
-            and self.is_enrollable
-        )
-
     @property
     def is_fake_course_run(self):
         """
@@ -1601,6 +1853,13 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
     def text_id(self):
         """Gets the courseware_id"""
         return self.courseware_id
+
+    @property
+    def has_free_audit(self):
+        """Whether this can still be taken for free once a paid enrollment ends."""
+        return self.enrollment_modes.filter(
+            mode_slug=EDX_ENROLLMENT_AUDIT_MODE
+        ).exists()
 
     @property
     def course_number(self):
@@ -1645,8 +1904,22 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
         Validate that the expiration date is:
         1. Later than end_date if end_date is set
         2. Later than start_date if start_date is set
+
+        Also enforces the B2B contract group uniqueness rules that used to be
+        database constraints.
         """
         self.clean_language()
+
+        if self.pk:
+            self.validate_b2b_contract_group_uniqueness(self.contract_group_ids)
+        elif not self.b2b_only:
+            # An unsaved row has no primary key, so `b2b_contracts` can't be
+            # queried yet - B2B runs get their contracts attached immediately
+            # after this first save. Only rows that are unambiguously public
+            # are checked here (against the public group); everything else is
+            # validated by the `m2m_changed` handler in courses/signals once
+            # its contracts are attached.
+            self.validate_b2b_contract_group_uniqueness([])
 
         if not self.expiration_date:
             return
@@ -1674,6 +1947,113 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
             using=using,
             update_fields=update_fields,
         )
+
+    @property
+    def has_b2b_contracts(self) -> bool:
+        """
+        Return True if the run is attached to any B2B contract.
+
+        This checks the M2M's through table directly, since the
+        ``b2b_contracts`` related manager is filtered to active contracts and a
+        run in an inactive (or expired) contract is still a contract run.
+        """
+        if not self.pk:
+            return False
+
+        return CourseRun.b2b_contracts.through.objects.filter(
+            courserun_id=self.pk
+        ).exists()
+
+    @property
+    def contract_group_ids(self):
+        """
+        Return the ids of every contract group this run belongs to.
+        """
+        if not self.pk:
+            return set()
+
+        # Read the through table directly - the related manager only returns
+        # active contracts, but inactive ones are still contract groups.
+        return set(
+            CourseRun.b2b_contracts.through.objects.filter(
+                courserun_id=self.pk
+            ).values_list("contractpage_id", flat=True)
+        )
+
+    def validate_b2b_contract_group_uniqueness(self, contract_ids):
+        """
+        Enforce, in application code, the uniqueness rules that used to be the
+        ``unique_primary_language_per_group`` and ``unique_language_per_group``
+        database constraints.
+
+        Those constraints grouped runs by contract using the now-removed
+        ``b2b_contract`` FK. Now that a run can be attached to several
+        contracts via ``b2b_contracts``, the rules are applied once per
+        contract group: within a given contract (or within the "no contract"
+        group) no two runs may share the same
+        ``(course, run_tag, is_source_run)`` combination as the primary
+        language run, nor the same
+        ``(course, run_tag, is_source_run, language, variant_length, variant_industry)``
+        combination.
+
+        Args:
+            contract_ids (Collection): the ``ContractPage`` ids this run is (or
+                is about to be) associated with. An empty collection checks the
+                "no contract" group.
+
+        Raises:
+            ValidationError: if another run already occupies the same slot in
+                any of the contract groups being checked.
+        """
+        # `None` stands for the "no contract" group, which is a valid group in
+        # its own right and must be checked when the run has no contracts.
+        groups_to_check = list(contract_ids) or [None]
+
+        for contract_id in groups_to_check:
+            siblings = CourseRun.all_objects.filter(
+                course=self.course,
+                run_tag=self.run_tag,
+                is_source_run=self.is_source_run,
+            ).exclude(pk=self.pk)
+
+            siblings = (
+                siblings.filter(b2b_contracts__id=contract_id)
+                if contract_id is not None
+                else siblings.filter(b2b_contracts__isnull=True)
+            )
+            if (
+                self.is_primary_language
+                and siblings.filter(is_primary_language=True).exists()
+            ):
+                msg = (
+                    f"A primary-language run for {self.course.readable_id} with "
+                    f"run tag '{self.run_tag}' already exists in this contract group."
+                )
+                raise ValidationError(msg)
+
+            if (
+                self.language
+                and siblings.filter(
+                    language=self.language,
+                    variant_length=self.variant_length,
+                    variant_industry=self.variant_industry,
+                ).exists()
+            ):
+                msg = (
+                    f"A run for {self.course.readable_id} with run tag "
+                    f"'{self.run_tag}', language '{self.language}' and variant "
+                    f"'{self.variant_length}/{self.variant_industry}' already "
+                    "exists in this contract group."
+                )
+                raise ValidationError(msg)
+
+    def enrollable_for_contract(self, contract) -> bool:
+        """Determine if the run is enrollable for the specified contract."""
+
+        if not self.b2b_contracts.filter(pk=contract.id).exists():
+            return False
+
+        return self.is_enrollable
 
 
 def limit_to_certificate_pages():
@@ -2135,6 +2515,13 @@ class CourseRunEnrollment(EnrollmentModel):
             "longer retried automatically."
         ),
     )
+    b2b_contract = models.ForeignKey(
+        "b2b.ContractPage",
+        on_delete=models.DO_NOTHING,
+        related_name="course_run_enrollments",
+        null=True,
+        blank=True,
+    )
 
     objects = ActiveCourseRunEnrollmentManager()
     all_objects = CourseRunEnrollmentManager()
@@ -2222,6 +2609,44 @@ class CourseRunEnrollmentAudit(AuditModel):
         return "enrollment"
 
 
+class CourseRunAccessRole(TimestampedModel):
+    """
+    A course access role a user holds in Open edX for a given course run.
+
+    Open edX is the system of record. Rows here are mirrored from its
+    COURSE_ACCESS_ROLE_ADDED event by the enrollment webhook, so that MITx
+    Online can answer "is this user on the course team?" locally instead of
+    calling Open edX once per enrollment when the dashboard loads. The
+    plugin's `sync_course_access_roles` management command posts to the same
+    webhook to backfill roles granted before we started recording them; it
+    skips org-wide roles, which have no single run to attach to.
+
+    Two limits worth knowing. A row only lands here if the role passes both
+    the plugin's ENROLLMENT_COURSE_ACCESS_ROLES setting and our own
+    OPENEDX_COURSE_STAFF_ROLES, so this is not a complete picture of a run's
+    course team. And nothing removes a row, because Open edX's
+    COURSE_ACCESS_ROLE_REMOVED event is not forwarded, so a revoked role stays
+    recorded until it is deleted by hand.
+    """
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="course_run_access_roles"
+    )
+    run = models.ForeignKey(
+        "courses.CourseRun", on_delete=models.CASCADE, related_name="access_roles"
+    )
+    role = models.CharField(
+        max_length=64,
+        help_text="The Open edX course access role name, e.g. 'staff' or 'instructor'.",
+    )
+
+    class Meta:
+        unique_together = ("user", "run", "role")
+
+    def __str__(self):
+        return f"{self.role} for {self.user} in {self.run.courseware_id}"
+
+
 class ProgramEnrollmentCertificatePrefetcher(Prefetcher):
     """Prefetcher for ProgramEnrollment certificates"""
 
@@ -2273,12 +2698,38 @@ class ProgramEnrollment(EnrollmentModel):
     program = models.ForeignKey(
         "courses.Program", on_delete=models.CASCADE, related_name="enrollments"
     )
+    b2b_contract = models.ForeignKey(
+        "b2b.ContractPage",
+        on_delete=models.DO_NOTHING,
+        related_name="program_enrollments",
+        null=True,
+        blank=True,
+    )
+    # The chosen track only selects which view of the program the learner sees;
+    # certificates and the nightly upgrade never read it, so deleting the track
+    # node just clears the choice.
+    track = models.ForeignKey(
+        "courses.ProgramRequirement",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="The track the learner chose, a track node of this program",
+    )
 
     objects = ActiveProgramEnrollmentManager()
     all_objects = ProgramEnrollmentManager()
 
     class Meta:
         unique_together = ("user", "program")
+
+    def clean(self):
+        """Require track, when set, to be a track node of this program"""
+        super().clean()
+        if self.track is not None and not (
+            self.track.is_track and self.track.program_id == self.program_id
+        ):
+            raise ValidationError({"track": "Must be a track of this program."})
 
     @property
     def is_ended(self):
@@ -2487,17 +2938,21 @@ class ProgramRequirementNodeType(models.TextChoices):
     OPERATOR = "operator", "Operator"
     COURSE = "course", "Course"
     PROGRAM = "program", "Program"
+    TRACK = "track", "Track"
 
 
 class ProgramRequirement(MP_Node):
     """
     A representation of program requirements.
 
-    There are 3 types of nodes that exist in a requirement tree:
+    The types of nodes that exist in a requirement tree:
 
     Root nodes - these represent a program
-    Operator nodes - these represent a logical operation over a set of courses
+    Operator nodes - these represent a logical operation over a set of requirements
     Course nodes - these represent a reference to a course
+    Program nodes - these represent a reference to another program
+    Track nodes - a named, described alternative; the program requires any one
+        whole track, and a track is satisfied when all of its operator nodes are
 
     Usage:
 
@@ -2515,15 +2970,16 @@ class ProgramRequirement(MP_Node):
     )
     elective_courses.add_child(course=course3)
     elective_courses.add_child(course=course4)
+    elective_courses.add_child(course=course5)
 
-    # 3rd elective option is at least one of these courses
-    mut_exclusive_courses = elective_courses.add_child(
-        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
-        operator_value=1
-    )
-    mut_exclusive_courses.add_child(course=course5)
-    mut_exclusive_courses.add_child(course=course6)
+    A MIN_NUMBER_OF operator counts each satisfied child once. The admin form and
+    the requirement-tree serializer accept only the shapes
+    courses.requirement_tree.validate_requirement_tree allows. The evaluator
+    itself handles any nesting.
 
+    Tracks sit at depth 3, under one MIN_NUMBER_OF operator at depth 2 whose
+    children are all tracks (the tracks container), and hold operator nodes of
+    their own.
     """
 
     # extended alphabet from the default to the recommended one for postgres
@@ -2570,6 +3026,7 @@ class ProgramRequirement(MP_Node):
     )
 
     title = models.TextField(null=True, blank=True, default="")  # noqa: DJ001
+    description = models.TextField(blank=True, default="")
     elective_flag = models.BooleanField(null=True, blank=True, default=False)
 
     @property
@@ -2622,6 +3079,11 @@ class ProgramRequirement(MP_Node):
         """True if the node is the root"""
         return self.node_type == ProgramRequirementNodeType.PROGRAM_ROOT
 
+    @property
+    def is_track(self):
+        """True if the node is a track"""
+        return self.node_type == ProgramRequirementNodeType.TRACK
+
     def add_child(self, **kwargs):
         """Children must always have the same program"""
         kwargs["program"] = self.program
@@ -2641,6 +3103,8 @@ class ProgramRequirement(MP_Node):
             attrs["course"] = self.course
         elif self.is_program:
             attrs["required_program"] = self.required_program
+        elif self.is_track:
+            attrs["title"] = self.title
 
         return " ".join(f"{key}={value}" for key, value in attrs.items())
 
@@ -2684,6 +3148,16 @@ class ProgramRequirement(MP_Node):
                         course__isnull=True,
                         required_program__isnull=False,
                         depth__gt=1,
+                    )
+                    # track nodes: depth 3, inside the depth-2 tracks container;
+                    # validate_requirement_tree checks the parent and children
+                    | Q(
+                        node_type=ProgramRequirementNodeType.TRACK.value,
+                        operator__isnull=True,
+                        operator_value__isnull=True,
+                        course__isnull=True,
+                        required_program__isnull=True,
+                        depth=3,
                     )
                 ),
             ),

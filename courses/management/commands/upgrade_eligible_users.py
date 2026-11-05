@@ -15,6 +15,7 @@ from django.conf import settings
 from django.core.management import BaseCommand
 
 from courses.api import create_run_enrollments
+from courses.exceptions import CountryBlockedError
 from courses.models import CourseRun, CourseRunEnrollment
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
@@ -71,30 +72,10 @@ class Command(BaseCommand):
                         )
                     )
                     continue
-                if enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE:
-                    self.stdout.write(
-                        self.style.ERROR(
-                            f"User {user} has already verified enrollment."
-                        )
-                    )
-                elif enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE:
-                    (
-                        _,
-                        edx_request_success,
-                    ) = create_run_enrollments(
-                        user, [course_run], mode=EDX_ENROLLMENT_VERIFIED_MODE
-                    )
-                    if edx_request_success is False:
-                        self.stdout.write(
-                            self.style.ERROR(f"Enrollment for user {user} has failed.")
-                        )
-                        continue
-                    upgrade_count += 1
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f"User {user} was upgraded for {course_run.courseware_id}, edx request {edx_request_success}"
-                        )
-                    )
+                upgraded = self._upgrade_enrollment(user, course_run, enrollment)
+                if upgraded is None:
+                    continue
+                upgrade_count += upgraded
         if users_no_enrollment:
             file_name = "users_eligible_for_coupon.csv"
             path = f"{settings.BASE_DIR}/{file_name}"
@@ -109,3 +90,38 @@ class Command(BaseCommand):
             )
 
         self.stdout.write(self.style.SUCCESS(f"Upgraded {upgrade_count} learners."))
+
+    def _upgrade_enrollment(self, user, course_run, enrollment):
+        """Attempt to upgrade one audit enrollment to verified.
+
+        Returns 1 on success, 0 if already verified, None to signal skip.
+        """
+        if enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE:
+            self.stdout.write(
+                self.style.ERROR(f"User {user} has already verified enrollment.")
+            )
+            return 0
+        if enrollment.enrollment_mode != EDX_ENROLLMENT_AUDIT_MODE:
+            return None
+        try:
+            _, edx_request_success = create_run_enrollments(
+                user, [course_run], mode=EDX_ENROLLMENT_VERIFIED_MODE
+            )
+        except CountryBlockedError:
+            self.stdout.write(
+                self.style.ERROR(
+                    f"Enrollment for user {user} is blocked due to country restrictions."
+                )
+            )
+            return None
+        if edx_request_success is False:
+            self.stdout.write(
+                self.style.ERROR(f"Enrollment for user {user} has failed.")
+            )
+            return None
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"User {user} was upgraded for {course_run.courseware_id}, edx request {edx_request_success}"
+            )
+        )
+        return 1

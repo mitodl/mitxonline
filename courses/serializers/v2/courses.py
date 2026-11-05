@@ -14,7 +14,7 @@ from rest_framework.exceptions import ValidationError
 from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.api import create_run_enrollments
-from courses.serializers.utils import get_topics_from_page
+from courses.serializers.utils import get_topics_from_page, has_live_certificate_page
 from courses.serializers.v1.base import (
     BaseCourseRunEnrollmentWithFlexiblePriceSerializer,
     BaseCourseRunSerializer,
@@ -24,7 +24,6 @@ from courses.serializers.v1.base import (
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import (
     get_approved_flexible_price_exists,
-    get_dated_courseruns,
 )
 from ecommerce.serializers.v0 import BaseProductSerializer
 from main import features
@@ -68,6 +67,10 @@ class CourseSerializer(BaseCourseSerializer):
     required_prefetches: list[str] = [
         *BaseCourseSerializer.required_prefetches,
         "programs",
+        # Resolved by CourseFinancialAssistanceFormUrlPrefetcher in the view's
+        # queryset; without it CoursePageSerializer would fall back to the lazy
+        # per-page cascade.
+        "financial_assistance_form_url",
     ]
 
     departments = DepartmentSerializer(many=True, read_only=True)
@@ -149,33 +152,33 @@ class CourseSerializer(BaseCourseSerializer):
         return []
 
     @extend_schema_field(str)
-    def get_certificate_type(self, instance):
+    def get_certificate_type(self, instance):  # noqa: ARG002
         """Return the certificate type."""
-
-        if instance.programs:
-            program = instance.programs[0]
-            if "MicroMasters" in program.program_type:
-                return "MicroMasters Credential"
-
+        # A course certificate is a certificate of completion even when the
+        # course belongs to a MicroMasters program; only the program itself
+        # awards the MicroMasters credential.
         return "Certificate of Completion"
 
     @extend_schema_field(bool)
     def get_certificate_available(self, instance) -> bool:
         """Return if there is a certificate available for the course."""
 
+        # has_verified_courserun is annotated by CourseViewSet, but this
+        # serializer is also nested in CourseRunWithCourseSerializer (v2
+        # enrollments, certificates) and instantiated bare in cms.models, where
+        # no annotation is present. Defaulting to False keeps those callers
+        # returning what they returned when this read an absent attribute.
         return (
             instance.first_unexpired_run is not None
-            and hasattr(instance, "verified_courserun_count")
-            and instance.verified_courserun_count > 0
+            and bool(getattr(instance, "has_verified_courserun", False))
+            and not instance.certificates_disabled
+            and has_live_certificate_page(instance)
         )
 
     @extend_schema_field(str)
     def get_availability(self, instance):
         """Get course availability"""
-        dated_courseruns = get_dated_courseruns(instance.courseruns)
-        if dated_courseruns.count() == 0:
-            return "anytime"
-        return "dated"
+        return "dated" if instance.has_dated_courseruns else "anytime"
 
     def get_min_weeks(self, instance) -> int | None:
         """
@@ -240,6 +243,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
 
     products = serializers.SerializerMethodField(method_name="get_products")
     approved_flexible_price_exists = serializers.SerializerMethodField()
+    b2b_contract = serializers.SerializerMethodField()
 
     class Meta:
         model = models.CourseRun
@@ -247,6 +251,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
             "products",
             "approved_flexible_price_exists",
             "b2b_contract",
+            "b2b_only",
         ]
 
     def to_representation(self, instance):
@@ -263,6 +268,35 @@ class CourseRunSerializer(BaseCourseRunSerializer):
     def get_approved_flexible_price_exists(self, instance):
         return get_approved_flexible_price_exists(instance, self.context)
 
+    @extend_schema_field(serializers.IntegerField(allow_null=True))
+    def get_b2b_contract(self, instance):
+        """
+        Return the ID of the B2B contract this run is being displayed for.
+
+        A run can belong to several contracts. If the request was scoped to a
+        contract or an organization, the matching contract is returned;
+        otherwise, returns None.
+        """
+        contracts = sorted(instance.b2b_contracts.all(), key=lambda c: c.id)
+        if not contracts:
+            return None
+
+        contract_id = self.context.get("contract_id")
+        org_id = self.context.get("org_id")
+
+        # These come from query params, so compare as strings.
+        for contract in contracts:
+            if contract_id is not None and str(contract.id) == str(contract_id):
+                return contract.id
+            if (
+                contract_id is None
+                and org_id is not None
+                and str(contract.organization_id) == str(org_id)
+            ):
+                return contract.id
+
+        return None
+
     @extend_schema_field(BaseProductSerializer(many=True))
     def get_products(self, obj):
         # Use prefetched products if available to avoid N+1 queries
@@ -278,6 +312,18 @@ class CourseRunSerializer(BaseCourseRunSerializer):
 @extend_schema_serializer(component_name="CourseWithCourseRunsSerializerV2")
 class CourseWithCourseRunsSerializer(CourseSerializer):
     """Course model serializer - also serializes child course runs"""
+
+    # Declared here rather than on CourseSerializer: that class is also nested
+    # in CourseRunWithCourseSerializer (v2 enrollments, certificates) and
+    # instantiated bare in cms.models, none of which prefetch these. This
+    # subclass has exactly one caller, CourseViewSet.
+    required_prefetches: list[str] = [
+        *CourseSerializer.required_prefetches,
+        "page",
+        "departments",
+        "courseruns",
+        "possible_variant_sets",
+    ]
 
     courseruns = serializers.SerializerMethodField()
 
@@ -334,12 +380,26 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSeri
         user = self.context["user"]
         run_id = validated_data["run_id"]
         try:
-            run = models.CourseRun.objects.select_related("b2b_contract").get(id=run_id)
+            run = models.CourseRun.objects.get(id=run_id)
         except models.CourseRun.DoesNotExist:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})  # noqa: B904
 
-        if run.b2b_contract is not None:
+        if run.b2b_only:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
+
+        # The enrollment window governs getting into a run. An existing active
+        # enrollment is exempt so that mode changes and idempotent retries for
+        # already-enrolled learners keep working after the window closes.
+        if (
+            not run.is_enrollable
+            and not models.CourseRunEnrollment.objects.filter(
+                run=run, user=user, active=True
+            ).exists()
+        ):
+            raise ValidationError(
+                {"run_id": f"Course run is not open for enrollment: {run_id}"}
+            )
+
         successful_enrollments, _ = create_run_enrollments(
             user,
             [run],
@@ -347,21 +407,20 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSeri
                 features.IGNORE_EDX_FAILURES, False
             ),
         )
+
         return successful_enrollments[0] if successful_enrollments else None
 
     @extend_schema_field(serializers.IntegerField(allow_null=True))
     def get_b2b_organization_id(self, enrollment):
         """Get the B2B organization ID if this enrollment is associated with a B2B contract."""
-        if enrollment.run.b2b_contract:
-            return enrollment.run.b2b_contract.organization.id
+        if enrollment.b2b_contract:
+            return enrollment.b2b_contract.organization_id
         return None
 
     @extend_schema_field(serializers.IntegerField(allow_null=True))
     def get_b2b_contract_id(self, enrollment):
         """Get the B2B contract ID if this enrollment is associated with a B2B contract."""
-        if enrollment.run.b2b_contract:
-            return enrollment.run.b2b_contract.id
-        return None
+        return enrollment.b2b_contract_id
 
     class Meta(BaseCourseRunEnrollmentWithFlexiblePriceSerializer.Meta):
         fields = [

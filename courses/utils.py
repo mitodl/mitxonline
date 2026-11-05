@@ -2,16 +2,18 @@
 
 import logging
 import re
+from http import HTTPStatus
 from urllib.parse import urljoin
 
 from django.conf import settings
-from django.db.models import Prefetch, Q
+from django.db.models import Exists, OuterRef, Q
 from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError
 
 from courses.constants import (
     COURSEWARE_URL_PATTERN_TEMPLATE,
     UAI_COURSEWARE_ID_PREFIX,
+    XPRO_COURSEWARE_ID_PREFIX,
 )
 from courses.models import (
     CourseRun,
@@ -23,6 +25,45 @@ from courses.models import (
 log = logging.getLogger(__name__)
 
 
+def verified_courserun_exists(manager=None):
+    """
+    Build an Exists() annotation for whether a course has a verified run.
+
+    Args:
+        manager: CourseRun manager to search. Defaults to ``CourseRun.objects``,
+            which excludes source runs. The ETL views pass ``all_objects``
+            because they report on source runs too.
+    """
+    from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE  # noqa: PLC0415
+
+    return Exists(
+        (manager or CourseRun.objects).filter(
+            course_id=OuterRef("pk"),
+            enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+    )
+
+
+def live_certificate_page_exists():
+    """
+    Build an Exists() subquery annotation for whether a live CertificatePage
+    is a direct child of the course/program page (`page`) on the outer
+    queryset.
+
+    Returns:
+        Exists: subquery expression suitable for QuerySet.annotate()
+    """
+    from cms.models import CertificatePage  # noqa: PLC0415
+
+    return Exists(
+        CertificatePage.objects.filter(
+            live=True,
+            path__startswith=OuterRef("page__path"),
+            depth=OuterRef("page__depth") + 1,
+        )
+    )
+
+
 def exception_logging_generator(generator):
     """Returns a new generator that logs exceptions from the given generator and continues with iteration"""
     while True:
@@ -31,7 +72,19 @@ def exception_logging_generator(generator):
         except StopIteration:  # noqa: PERF203
             return
         except HTTPError as exc:
-            log.exception("EdX API error for fetching user grades %s:", exc)  # noqa: TRY401
+            if (
+                exc.response is not None
+                and exc.response.status_code == HTTPStatus.NOT_FOUND
+            ):
+                # Course run no longer exists in edX (e.g. an old run that was
+                # removed). This is expected for stale runs and shouldn't page
+                # Sentry every hour - see mitodl/hq#12729.
+                log.warning(
+                    "EdX API 404 fetching user grades, course run may no longer exist in edX: %s",
+                    exc,
+                )
+            else:
+                log.exception("EdX API error for fetching user grades %s:", exc)  # noqa: TRY401
         except Exception as exp:  # pylint: disable=broad-except
             log.exception("Error fetching user grades from edX %s:", exp)  # noqa: TRY401
 
@@ -120,12 +173,15 @@ def get_unenrollable_courses(queryset):
         queryset: Queryset of Course objects
     """
     courseruns_qs = CourseRun.objects.unenrollable()
-    return (
-        queryset.prefetch_related(Prefetch("courseruns", queryset=courseruns_qs))
-        .prefetch_related("courseruns__course")
-        .filter(courseruns__id__in=courseruns_qs.values_list("id", flat=True))
-        .distinct()
-    )
+    # Deliberately does not prefetch "courseruns" here. Callers (notably
+    # CourseViewSet) build a richer Prefetch for that relation, and re-declaring
+    # it would silently replace theirs, dropping the prefetched b2b_contracts
+    # and the prefetched_enrollment_modes / prefetched_products caches.
+    # Course.get_filtered_runs applies the is_enrollable predicate in Python, so
+    # narrowing the prefetch was redundant anyway.
+    return queryset.filter(
+        courseruns__id__in=courseruns_qs.values_list("id", flat=True)
+    ).distinct()
 
 
 def get_archived_courseruns(queryset):
@@ -155,6 +211,50 @@ def get_dated_courseruns(queryset):
     return queryset.filter(
         CourseRunQuerySet.get_enrollable_filter() & Q(is_self_paced=False)
     )
+
+
+def is_xpro_course_run(course_run):
+    """
+    Check if a course run is an XPro course run.
+
+    Args:
+        course_run: CourseRun instance
+
+    Returns:
+        bool: True if the course run is XPro, False otherwise
+    """
+    if not course_run or not course_run.courseware_id:
+        return False
+
+    courseware_id = course_run.courseware_id
+    return courseware_id.startswith(
+        (XPRO_COURSEWARE_ID_PREFIX, f"course-v1:{XPRO_COURSEWARE_ID_PREFIX}")
+    )
+
+
+def is_xpro_order(order):
+    """
+    Check if an order contains any XPro course runs.
+
+    Args:
+        order: Order instance
+
+    Returns:
+        bool: True if the order contains XPro course runs, False otherwise
+    """
+    for line in order.lines.all():
+        purchasable_object = getattr(line, "purchased_object", None)
+        if not purchasable_object and hasattr(line.product, "purchasable_object"):
+            purchasable_object = line.product.purchasable_object
+
+        if not purchasable_object:
+            continue
+
+        if isinstance(purchasable_object, CourseRun) and is_xpro_course_run(
+            purchasable_object
+        ):
+            return True
+    return False
 
 
 def is_uai_course_run(course_run):
@@ -235,12 +335,7 @@ def is_contract_order(order):
     Returns:
         bool: True if the order contains contract products, False otherwise
     """
-    for line in order.lines.all():
-        if hasattr(line.product, "purchasable_object"):
-            course_run = line.product.purchasable_object
-            if isinstance(course_run, CourseRun) and course_run.b2b_contract_id:
-                return True
-    return False
+    return any(line.b2b_contract_id for line in order.lines.all())
 
 
 def get_approved_flexible_price_exists(instance, context):

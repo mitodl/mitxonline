@@ -2,44 +2,14 @@ import abc
 from dataclasses import dataclass
 from decimal import Decimal
 
-from reversion.models import Version
-
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PAID_AMOUNT_OFF,
     DISCOUNT_TYPE_PERCENT_OFF,
+    REDEMPTION_TYPE_INTERNAL,
 )
 from ecommerce.models import Discount, Product
-
-
-def resolve_product_version(product: Product, product_version=None):
-    """
-    Resolves the specified version of the product. Specify None to indicate the
-    current version. (This should probably move to the model.)
-
-    Returns: Product; either the product you passed in or the version of the product
-    you requested.
-    """
-    if product_version is None:
-        return product
-
-    versions = Version.objects.get_for_object(product)
-
-    if versions.count() == 0:
-        return product
-
-    for test_version in versions.all():
-        if test_version == product_version:
-            return Product(
-                id=test_version.field_dict["id"],
-                content_type_id=test_version.field_dict["content_type_id"],
-                object_id=test_version.field_dict["object_id"],
-                price=test_version.field_dict["price"],
-                description=test_version.field_dict["description"],
-                is_active=test_version.field_dict["is_active"],
-            )
-
-    raise TypeError("Invalid product version specified")  # noqa: EM101
 
 
 @dataclass
@@ -58,59 +28,97 @@ class DiscountType(abc.ABC):
         cls._CLASSES[discount_type] = cls
 
     @classmethod
-    def for_discount(cls, discount: Discount):
+    def for_discount(
+        cls, discount: Discount, *, resolved_amount: Decimal | None = None
+    ):
         DiscountTypeCls = cls._CLASSES[discount.discount_type]
 
-        return DiscountTypeCls(discount)
+        if resolved_amount is None:
+            return DiscountTypeCls(discount)
+        # Only PaidAmountOffDiscount declares the field. Any other type raises
+        # TypeError here, which is right: a resolved amount for a percent-off
+        # discount means the caller keyed its mapping to the wrong discount.
+        return DiscountTypeCls(discount, resolved_amount=resolved_amount)
 
     @staticmethod
-    def get_discounted_price(discounts, product, *, product_version=None):
+    def get_discounted_price(
+        discounts, product, *, resolved_amounts: dict[int, Decimal] | None = None
+    ):
         """Return the price of the product with discounts"""
-        if product_version is not None:
-            product = resolve_product_version(product, product_version)
-
         # apply discount to product using the best discount
         # in practice, orders will only have one discount
         # but JUST IN CASE this ever changes
         # we want to have this be deterministic
         price = product.price
+        resolved_amounts = resolved_amounts or {}
         for discount in discounts:
-            discount_cls = DiscountType.for_discount(discount)
+            discount_cls = DiscountType.for_discount(
+                discount, resolved_amount=resolved_amounts.get(discount.id)
+            )
             price = min(discount_cls.get_product_price(product), price)
 
         return price
 
     def get_product_price(self, product: Product):
-        # original spec had this tracking versions differently than the way it is now
-        # need to build in some logic to check on reversion for a given version but it should be the latest one
+        # An internal discount's product links say what it is for, not what it
+        # prices; the code that attached it decided eligibility (see
+        # REDEMPTION_TYPE_INTERNAL).
+        if (
+            self.discount.redemption_type != REDEMPTION_TYPE_INTERNAL
+            and not self.discount.applies_to_products([product])
+        ):
+            return product.price
         return self.get_product_version_price(product)
 
     @abc.abstractmethod
-    def get_product_version_price(self, product: Product, version):
+    def get_product_version_price(self, product: Product):
         pass
 
 
 class PercentDiscount(DiscountType, discount_type=DISCOUNT_TYPE_PERCENT_OFF):
-    def get_product_version_price(self, product: Product, version=None):
-        version = resolve_product_version(product, version)
-
+    def get_product_version_price(self, product: Product):
         return round(
-            Decimal(version.price)
-            - (version.price * Decimal(self.discount.amount / 100)),
+            Decimal(product.price)
+            - (product.price * Decimal(self.discount.amount / 100)),
             2,
         )
 
 
 class DollarsOffDiscount(DiscountType, discount_type=DISCOUNT_TYPE_DOLLARS_OFF):
-    def get_product_version_price(self, product: Product, version=None):
-        version = resolve_product_version(product, version)
+    @property
+    def amount_off(self) -> Decimal:
+        return Decimal(self.discount.amount)
 
-        if version.price < self.discount.amount:
-            return Decimal(0)
-
-        return version.price - self.discount.amount
+    def get_product_version_price(self, product: Product):
+        return max(Decimal(0), Decimal(product.price) - self.amount_off)
 
 
 class FixedPriceDiscount(DiscountType, discount_type=DISCOUNT_TYPE_FIXED_PRICE):
-    def get_product_version_price(self, product: Product, version=None):  # noqa: ARG002
+    def get_product_version_price(self, product: Product):  # noqa: ARG002
         return Decimal(self.discount.amount)
+
+
+@dataclass
+class PaidAmountOffDiscount(
+    DollarsOffDiscount, discount_type=DISCOUNT_TYPE_PAID_AMOUNT_OFF
+):
+    """
+    Dollars-off by the amount the learner paid for a qualifying prior purchase.
+
+    The amount is resolved outside this module and injected via
+    resolved_amounts; without one nothing comes off, so an unresolved discount
+    can never undercharge. The discount's own stored amount is always 0.
+    """
+
+    # Computed by the caller and injected, because this layer must stay
+    # user-blind and query-free: Line.compute_discounted_unit_price prices an
+    # unsaved Product rebuilt from a reversion Version, so a query from here
+    # would read the current row, not the historical one.
+    resolved_amount: Decimal | None = None
+
+    @property
+    def amount_off(self) -> Decimal:
+        if self.resolved_amount is None:
+            return Decimal(0)
+
+        return self.resolved_amount

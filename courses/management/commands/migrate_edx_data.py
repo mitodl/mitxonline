@@ -255,6 +255,7 @@ class Command(BaseCommand):
         Create users in bulk, skipping those with existing emails.
         """
         new_users = []
+        new_emails = []
         for row in rows:
             email = row.get("user_email")
             if not email or email in existing_emails:
@@ -269,9 +270,25 @@ class Command(BaseCommand):
             )
             user.set_unusable_password()
             new_users.append(user)
-        return User.objects.bulk_create(
+            new_emails.append(email)
+
+        User.objects.bulk_create(
             new_users, batch_size=batch_size, ignore_conflicts=True
         )
+
+        if not new_emails:
+            return []
+
+        # bulk_create never populates .pk on the returned objects when
+        # ignore_conflicts=True is used - on any database backend, per
+        # Django's own documented behavior, since it can't reliably map a
+        # generated id back to a specific input object once some rows may
+        # have been silently skipped on conflict. Re-fetch by email (unique
+        # per users_user_email_unique) to get real ids for
+        # _bulk_create_legal_addresses/_bulk_create_user_profiles to key off
+        # of - without this, those two methods filter on ids that are all
+        # None, match zero rows, and silently never create anything.
+        return list(User.objects.filter(email__in=new_emails))
 
     @staticmethod
     def _bulk_create_legal_addresses(created_users, row_lookup_by_id, batch_size):
@@ -384,11 +401,15 @@ class Command(BaseCommand):
             }
             emails = list(row_lookup.keys())
 
-            existing_emails = set(
-                User.objects.filter(
+            # usernames too: migrated users get username=email, so an email
+            # matching an existing username would conflict on create
+            existing_emails = {
+                value
+                for pair in User.objects.filter(
                     Q(username__in=emails) | Q(email__in=emails)
-                ).values_list("email", flat=True)
-            )
+                ).values_list("username", "email")
+                for value in pair
+            }
 
             if dry_run:
                 new_emails = [email for email in emails if email not in existing_emails]
@@ -875,8 +896,11 @@ class Command(BaseCommand):
                         if line.product_version_id != product_version.id:
                             line.product_version = product_version
                             line.save(update_fields=["product_version"])
+                            # product_version just moved, so the recorded price
+                            # is stale.
+                            line.record_discounted_unit_price()
                             order.total_price_paid = line.discounted_price
-                            order.save(update_fields=["total_price_paid"])
+                            order.save(update_fields=["total_price_paid", "updated_on"])
                         fulfill_completed_order(
                             order,
                             payment_data=ZERO_PAYMENT_DATA,

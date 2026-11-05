@@ -17,3 +17,18 @@ class CertificatePageForm(WagtailAdminPageForm):
             self.fields["overrides"].block.child_blocks["course_run"].child_blocks[
                 "readable_id"
             ].parent_readable_id = parent_page.specific.course.readable_id
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        provisioning_enabled = cleaned_data.get(
+            "should_provision_verifiable_credential"
+        )
+        criteria = cleaned_data.get("verifiable_credential_criteria")
+        if provisioning_enabled and not criteria:
+            self.add_error(
+                "verifiable_credential_criteria",
+                "You must specify criteria if provisioning is enabled",
+            )
+
+        return cleaned_data

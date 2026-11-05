@@ -5,6 +5,7 @@ import uuid
 from dataclasses import dataclass
 from decimal import Decimal
 
+from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
@@ -23,7 +24,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
-from b2b.api import _create_discount_with_product, is_potentially_valid_mailgun_webhook
+from b2b.api import (
+    _create_discount_with_product,
+    is_potentially_valid_mailgun_webhook,
+    lock_contract_for_code_assignment,
+)
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
 from b2b.models import (
     EMAIL_STATUS_FAILED,
@@ -60,6 +65,7 @@ from b2b.utils import is_redeemed_attachment_record
 from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME
 from ecommerce.models import Discount
+from main.versioning import V0Versioning
 
 log = logging.getLogger(__name__)
 
@@ -85,21 +91,23 @@ def clear_assignment_email_deliverability_fields(assignment):
     return assignment
 
 
-def assign_codes_and_send_emails(
+def create_code_assignments(
     assignments: list[CodeAssignment], assigning_user
-) -> bool:
-    # If we're passed an empty list, short circuit and return true
-    # This can happen in bulk_assign if all users in the payload have already
-    # been assigned or redeemed a code for the contract
-    if not assignments:
-        return True
+) -> list[DiscountContractAttachmentRedemption] | None:
+    """
+    Write assignment rows for the given codes.
+
+    Callers hold lock_contract_for_code_assignment for the check that the
+    codes are free through this write, and call queue_code_assignment_emails
+    once that transaction has committed, so the email task never runs ahead
+    of the rows it reads.
+
+    Returns the created rows, or None if they could not be written.
+    """
 
     assignment_records = []
     for assignment in assignments:
         # For bulk_create, we have to set the auto timestamps manually.
-        # We're unlikely to have integrity errors here at the moment - while the APIs do some precondition checking
-        # There aren't any meaningful database constraints that would bite us.
-        # We may need to reevaluate that as the feature set around these records grows.
         now = now_in_utc()
         assignment_record = DiscountContractAttachmentRedemption(
             discount=assignment.discount,
@@ -116,17 +124,29 @@ def assign_codes_and_send_emails(
         assignment.discount.prefetched_redemptions = [assignment_record]
         assignment_records.append(assignment_record)
 
+    if not assignment_records:
+        return assignment_records
+
     try:
-        DiscountContractAttachmentRedemption.objects.bulk_create(assignment_records)
+        # A savepoint, so a failed insert does not abort the caller's transaction.
+        with transaction.atomic():
+            DiscountContractAttachmentRedemption.objects.bulk_create(assignment_records)
     except Exception:
         log.exception("Error creating code assignments")
-        return False
+        return None
 
-    queue_send_enrollment_code_assignment_email.delay(
-        [record.id for record in assignment_records]
-    )
+    return assignment_records
 
-    return True
+
+def queue_code_assignment_emails(
+    assignment_records: list[DiscountContractAttachmentRedemption],
+) -> None:
+    """Queue the invite email for each newly created assignment row."""
+
+    if assignment_records:
+        queue_send_enrollment_code_assignment_email.delay(
+            [record.id for record in assignment_records]
+        )
 
 
 def _create_discount_codes_for_contract(
@@ -145,16 +165,122 @@ def _create_discount_codes_for_contract(
 
     for _ in range(count_to_provision):
         discount = _create_discount_with_product(
-            product, Decimal(0), REDEMPTION_TYPE_ONE_TIME
+            contract, product, Decimal(0), REDEMPTION_TYPE_ONE_TIME
         )
         new_discounts.append(discount)
 
     return new_discounts
 
 
+def bulk_assign_enrollment_codes(
+    contract: ContractPage, email_assignees: list[dict], assigning_user
+) -> tuple[list[CodeAssignment], list[dict]] | None:
+    """
+    Assign a contract's free enrollment codes to people and email them.
+
+    Shared by the manager dashboard and the staff contract API. Emails that
+    already hold or have redeemed a code for the contract are skipped. A code
+    contract with no seat cap gets new codes when it runs out.
+
+    Returns (assignments, errors), or None if the assignments could not be
+    written.
+    """
+
+    with transaction.atomic():
+        lock_contract_for_code_assignment(contract)
+        assignments, errors = _match_free_codes(contract, email_assignees)
+        assignment_records = create_code_assignments(assignments, assigning_user)
+
+    if assignment_records is None:
+        return None
+
+    queue_code_assignment_emails(assignment_records)
+
+    return assignments, errors
+
+
+def _match_free_codes(
+    contract: ContractPage, email_assignees: list[dict]
+) -> tuple[list[CodeAssignment], list[dict]]:
+    """Pair each assignee with a free code. Run under the contract lock."""
+
+    # Emails that have already been assigned a code or have redeemed one for
+    # this contract should not receive another assignment.
+    taken_emails = set()
+    for (
+        assigned_email,
+        user_email,
+    ) in DiscountContractAttachmentRedemption.objects.filter(
+        contract=contract
+    ).values_list("assigned_email", "user__email"):
+        if assigned_email:
+            taken_emails.add(assigned_email.lower())
+        if user_email:
+            taken_emails.add(user_email.lower())
+
+    errors = [
+        {
+            "email": record["email"],
+            "name": record.get("name", ""),
+            "detail": "Email has already been assigned or has redeemed a code.",
+        }
+        for record in email_assignees
+        if record["email"].lower() in taken_emails
+    ]
+    email_assignees = [
+        record
+        for record in email_assignees
+        if record["email"].lower() not in taken_emails
+    ]
+
+    available_discounts = list(
+        contract.get_discounts()
+        .filter(contract_redemptions__isnull=True)
+        .order_by("id")[: len(email_assignees)]
+    )
+
+    assignments = []
+    # If we're in a contract type that uses codes, doesnt have a seat limit and we're out of available discounts
+    # Provision enough on the fly to handle the payload
+    if (
+        contract.membership_type not in CONTRACT_MEMBERSHIP_AUTOS
+        and not contract.max_learners
+        and len(available_discounts) < len(email_assignees)
+    ):
+        # If we are in a contract without a seat limit, provision new discounts for users up to the number required
+        count_to_provision = len(email_assignees) - len(available_discounts)
+        new_discounts = _create_discount_codes_for_contract(
+            contract, count_to_provision
+        )
+        available_discounts.extend(new_discounts)
+
+    for i, record in enumerate(email_assignees):
+        email = record["email"]
+        name = record.get("name", "")
+
+        if i < len(available_discounts):
+            discount = available_discounts[i]
+            assignments.append(
+                CodeAssignment(
+                    code=discount.discount_code,
+                    contract=contract,
+                    discount=discount,
+                    email=email,
+                    name=name,
+                )
+            )
+        else:
+            errors.append(
+                {"email": email, "name": name, "detail": "No available code."}
+            )
+
+    return assignments, errors
+
+
 class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
     """List organizations available for the current user."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAuthenticated]
     serializer_class = OrganizationPageSerializer
     pagination_class = ManagerContractOrgPagination
@@ -175,11 +301,12 @@ class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
                 Prefetch(
                     "contracts",
                     queryset=ContractPage.objects.prefetch_related(
+                        "variant_options",
                         Prefetch(
                             "contract_programs",
                             queryset=ContractProgramItem.objects.order_by("sort_order"),
                             to_attr="contract_program_ids",
-                        )
+                        ),
                     ).filter(active=True),
                     to_attr="_active_contracts",
                 ),
@@ -263,6 +390,7 @@ class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
 class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     """List an organization's contracts."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAuthenticated, IsOrganizationManager]
     # While we define this at the class level, we pretty much have to do the pagination manually in view defintions for anything that matters
     # The queryset we return is for ContractPages - course_run_enrollments and codes lookups are performed almost entirely in view
@@ -347,12 +475,12 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         # Get the course run and verify it belongs to this contract
         course_run = get_object_or_404(
-            CourseRun, courseware_id=course_run_id, b2b_contract=contract
+            CourseRun, courseware_id=course_run_id, b2b_contracts=contract
         )
 
         # Get enrollments for this course run
         enrollments = (
-            CourseRunEnrollment.objects.filter(run=course_run)
+            CourseRunEnrollment.objects.filter(run=course_run, b2b_contract=contract)
             .select_related("user")
             .order_by("-created_on")
         )
@@ -526,22 +654,26 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 status=http_status.HTTP_404_NOT_FOUND,
             )
 
-        if discount.contract_redemptions.exists():
-            return Response(
-                {"detail": "Code has already been assigned or redeemed."},
-                status=http_status.HTTP_409_CONFLICT,
-            )
-
         assignment = CodeAssignment(
             code=code, contract=contract, discount=discount, email=email, name=name
         )
 
-        success = assign_codes_and_send_emails([assignment], request.user)
-        if not success:
+        with transaction.atomic():
+            lock_contract_for_code_assignment(contract)
+            if discount.contract_redemptions.exists():
+                return Response(
+                    {"detail": "Code has already been assigned or redeemed."},
+                    status=http_status.HTTP_409_CONFLICT,
+                )
+            assignment_records = create_code_assignments([assignment], request.user)
+
+        if assignment_records is None:
             return Response(
                 {"detail": "Error assigning codes."},
                 status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+        queue_code_assignment_emails(assignment_records)
 
         return Response(
             ManagerEnrollmentCodeSerializer(discount).data,
@@ -716,85 +848,16 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 status=http_status.HTTP_400_BAD_REQUEST,
             )
 
-        email_assignees = serializer.validated_data
-
-        # Emails that have already been assigned a code or have redeemed one for
-        # this contract should not receive another assignment.
-        taken_emails = set()
-        for (
-            assigned_email,
-            user_email,
-        ) in DiscountContractAttachmentRedemption.objects.filter(
-            contract=contract
-        ).values_list("assigned_email", "user__email"):
-            if assigned_email:
-                taken_emails.add(assigned_email.lower())
-            if user_email:
-                taken_emails.add(user_email.lower())
-
-        errors = [
-            {
-                "email": record["email"],
-                "name": record.get("name", ""),
-                "detail": "Email has already been assigned or has redeemed a code.",
-            }
-            for record in email_assignees
-            if record["email"].lower() in taken_emails
-        ]
-        email_assignees = [
-            record
-            for record in email_assignees
-            if record["email"].lower() not in taken_emails
-        ]
-
-        available_discounts = list(
-            contract.get_discounts()
-            .filter(contract_redemptions__isnull=True)
-            .order_by("id")[: len(email_assignees)]
+        result = bulk_assign_enrollment_codes(
+            contract, serializer.validated_data, request.user
         )
-
-        assignments = []
-        # If we're in a contract type that uses codes, doesnt have a seat limit and we're out of available discounts
-        # Provision enough on the fly to handle the payload
-        if (
-            contract.membership_type not in CONTRACT_MEMBERSHIP_AUTOS
-            and not contract.max_learners
-            and len(available_discounts) < len(email_assignees)
-        ):
-            # If we are in a contract without a seat limit, provision new discounts for users up to the number required
-            count_to_provision = len(email_assignees) - len(available_discounts)
-            new_discounts = _create_discount_codes_for_contract(
-                contract, count_to_provision
-            )
-            available_discounts.extend(new_discounts)
-
-        for i, record in enumerate(email_assignees):
-            email = record["email"]
-            name = record.get("name", "")
-
-            if i < len(available_discounts):
-                discount = available_discounts[i]
-                assignments.append(
-                    CodeAssignment(
-                        code=discount.discount_code,
-                        contract=contract,
-                        discount=discount,
-                        email=email,
-                        name=name,
-                    )
-                )
-            else:
-                errors.append(
-                    {"email": email, "name": name, "detail": "No available code."}
-                )
-
-        success = assign_codes_and_send_emails(assignments, request.user)
-        if not success:
+        if result is None:
             return Response(
                 {"detail": "Error assigning codes."},
                 status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+        assignments, errors = result
         return Response(
             {
                 "assigned": ManagerEnrollmentCodeSerializer(

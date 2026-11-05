@@ -168,12 +168,25 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSeri
         user = self.context["user"]
         run_id = validated_data["run_id"]
         try:
-            run = models.CourseRun.objects.select_related("b2b_contract").get(id=run_id)
+            run = models.CourseRun.objects.get(id=run_id)
         except models.CourseRun.DoesNotExist:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})  # noqa: B904
 
-        if run.b2b_contract is not None:
+        if run.b2b_only:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
+
+        # The enrollment window governs getting into a run. An existing active
+        # enrollment is exempt so that mode changes and idempotent retries for
+        # already-enrolled learners keep working after the window closes.
+        if (
+            not run.is_enrollable
+            and not models.CourseRunEnrollment.objects.filter(
+                run=run, user=user, active=True
+            ).exists()
+        ):
+            raise ValidationError(
+                {"run_id": f"Course run is not open for enrollment: {run_id}"}
+            )
 
         successful_enrollments, _ = create_run_enrollments(
             user,

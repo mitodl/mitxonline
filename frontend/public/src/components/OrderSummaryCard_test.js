@@ -27,6 +27,28 @@ describe("OrderSummaryCard", () => {
     sandbox.restore()
   })
 
+  it("shows a paid-amount-off coupon as the gap between the basket prices", () => {
+    const wrapper = shallow(
+      <OrderSummaryCard
+        {...baseProps}
+        totalPrice={899}
+        discountedPrice={799}
+        discounts={[
+          {
+            id:            1,
+            amount:        0,
+            discount_code: "bought-child",
+            discount_type: "paid-amount-off",
+            payment_type:  "sales"
+          }
+        ]}
+        isAuthenticated={true}
+      />
+    )
+
+    assert.include(wrapper.text(), "-$100.00")
+  })
+
   it("does not render the coupon form when logged out", () => {
     const wrapper = shallow(
       <OrderSummaryCard {...baseProps} isAuthenticated={false} />
@@ -88,5 +110,20 @@ describe("OrderSummaryCard", () => {
       // $FlowFixMe - originalDescriptor is always defined for window.location
       Object.defineProperty(window, "location", originalDescriptor)
     }
+  })
+
+  it("hands the checkout url to onCheckout instead of redirecting when given", async () => {
+    const onCheckout = sandbox.stub()
+    const wrapper = shallow(
+      <OrderSummaryCard
+        {...baseProps}
+        isAuthenticated={true}
+        onCheckout={onCheckout}
+      />
+    )
+    await wrapper.instance().handlePlaceOrder()
+
+    sinon.assert.calledOnce(onCheckout)
+    sinon.assert.calledWithExactly(onCheckout, "/checkout/to_payment")
   })
 })

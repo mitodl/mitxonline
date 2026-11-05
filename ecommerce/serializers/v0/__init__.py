@@ -3,30 +3,37 @@ MITxOnline ecommerce serializers
 """
 
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 
 from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
 from cms.serializers import CoursePageSerializer, ProgramPageSerializer
+from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
 from courses.models import Course, CourseRun, Program, ProgramRun
 from ecommerce import models
 from ecommerce.constants import (
     CYBERSOURCE_CARD_TYPES,
-    DISCOUNT_TYPE_DOLLARS_OFF,
-    DISCOUNT_TYPE_PERCENT_OFF,
+    DISCOUNT_SOURCE_TYPES,
     DISCOUNT_TYPES,
     PAYMENT_TYPES,
     TRANSACTION_TYPE_REFUND,
 )
+from ecommerce.discount_sources import credited_courseware
 from ecommerce.models import (
     Basket,
     BasketItem,
     Order,
+    OrderRefundStatus,
     OrderStatus,
     Product,
+    RefundReasonChoices,
     RefundRequest,
+    RefundRequestStatus,
+)
+from ecommerce.serializers import (
+    DiscountShapeMixin,
+    discount_is_price_neutral,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from main.constants import (
@@ -37,8 +44,8 @@ from main.constants import (
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
-from main.settings import TIME_ZONE
 from users.serializers import (
     ExtendedLegalAddressSerializer,
     PublicUserSerializer,
@@ -48,7 +55,7 @@ from users.serializers import (
 User = get_user_model()
 
 
-class V0DiscountSerializer(serializers.ModelSerializer):
+class V0DiscountSerializer(DiscountShapeMixin, serializers.ModelSerializer):
     """Serializes a discount."""
 
     class Meta:
@@ -83,17 +90,13 @@ class TransactionLineSerializer(serializers.Serializer):
     total_paid = serializers.CharField()
     discount = serializers.CharField()
     price = serializers.CharField()
+    has_free_audit = serializers.BooleanField()
 
     def to_representation(self, instance):
         """Returns the representation of the object."""
 
-        coupon_redemption = instance.order.discounts.first()
-        discount = 0.0
-
-        if coupon_redemption:
-            discount = instance.product.price - instance.discounted_price
-
-        total_paid = (instance.product.price - Decimal(discount)) * instance.quantity
+        total_paid = instance.discounted_price
+        discount = instance.product.price * instance.quantity - total_paid
 
         content_object = instance.product.purchasable_object
         (content_title, readable_id) = (None, None)
@@ -121,8 +124,14 @@ class TransactionLineSerializer(serializers.Serializer):
             content_type=content_type,
             readable_id=readable_id,
             price=str(instance.product.price),
-            start_date=content_object.start_date,
-            end_date=content_object.end_date,
+            # `purchasable_object` is a generic FK and dangles if the courseware
+            # object was deleted; the receipt still has to serialize.
+            start_date=content_object.start_date if content_object else None,
+            end_date=content_object.end_date if content_object else None,
+            # Refunding drops the learner to the audit track, unless there is
+            # no audit track, in which case they lose access altogether. The
+            # refund modal warns about whichever applies.
+            has_free_audit=(content_object.has_free_audit if content_object else False),
         )
 
         return line  # noqa: RET504
@@ -425,7 +434,7 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
     @extend_schema_field(BasketDiscountSerializer(many=True))
     def get_discounts(self, instance) -> list[BasketDiscountSerializer]:
         """
-        Exclude zero value discounts and return applicable discounts on the basket.
+        Serialize the basket's discounts, skipping the price-neutral ones.
 
         Args:
             instance: Basket instance
@@ -433,20 +442,11 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
         Returns:
             List of serialized basket discount records
         """
-        discounts = []
-        for discount_record in instance.discounts.all():
-            discount = discount_record.redeemed_discount
-            if discount.amount == 0 and discount.discount_type in [
-                DISCOUNT_TYPE_PERCENT_OFF,
-                DISCOUNT_TYPE_DOLLARS_OFF,
-            ]:
-                continue
-
-            discounts.append(
-                BasketDiscountSerializer(discount_record, context=self.context).data
-            )
-
-        return discounts
+        return [
+            BasketDiscountSerializer(discount_record, context=self.context).data
+            for discount_record in instance.discounts.all()
+            if not discount_is_price_neutral(discount_record.redeemed_discount)
+        ]
 
     class Meta:
         model = models.Basket
@@ -464,20 +464,12 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
 class LineSerializer(serializers.ModelSerializer):
     """Serializes order lines."""
 
-    product = serializers.SerializerMethodField()
+    product = ProductSerializer(read_only=True)
     quantity = serializers.IntegerField()
     item_description = serializers.CharField()
     unit_price = serializers.DecimalField(max_digits=9, decimal_places=2)
     total_price = serializers.DecimalField(max_digits=9, decimal_places=2)
     id = serializers.IntegerField()
-
-    @extend_schema_field(ProductSerializer)
-    def get_product(self, instance):
-        product = models.Product.all_objects.get(
-            pk=instance.product_version.field_dict["id"]
-        )
-
-        return ProductSerializer(instance=product).data
 
     class Meta:
         fields = [
@@ -499,10 +491,31 @@ class OrderSerializer(serializers.ModelSerializer):
     transactions = serializers.SerializerMethodField()
     street_address = serializers.SerializerMethodField()
     refund_eligible = serializers.SerializerMethodField()
+    refund_deadline = serializers.SerializerMethodField()
+    refund_status = serializers.SerializerMethodField()
+    refund_requested_on = serializers.SerializerMethodField()
+    refund_reviewed_on = serializers.SerializerMethodField()
 
     @extend_schema_field(serializers.BooleanField())
     def get_refund_eligible(self, instance):
         return instance.is_refund_eligible
+
+    @extend_schema_field(serializers.DateTimeField())
+    def get_refund_deadline(self, instance):
+        return instance.refund_deadline
+
+    @extend_schema_field(serializers.ChoiceField(choices=OrderRefundStatus.choices))
+    def get_refund_status(self, instance):
+        return instance.refund_status
+
+    @extend_schema_field(serializers.DateTimeField(allow_null=True))
+    def get_refund_requested_on(self, instance):
+        request = instance.latest_refund_request
+        return request.created_on if request else None
+
+    @extend_schema_field(serializers.DateTimeField(allow_null=True))
+    def get_refund_reviewed_on(self, instance):
+        return instance.refund_reviewed_on
 
     @extend_schema_field(TransactionLineSerializer(many=True))
     def get_lines(self, instance):
@@ -636,7 +649,7 @@ class OrderSerializer(serializers.ModelSerializer):
             return street_address
         return None
 
-    @extend_schema_field(ExtendedLegalAddressSerializer(many=True))
+    @extend_schema_field(ExtendedLegalAddressSerializer)
     def get_purchaser(self, instance):
         """Get the purchaser infrmation"""
         return ExtendedLegalAddressSerializer(instance.purchaser.legal_address).data
@@ -655,6 +668,10 @@ class OrderSerializer(serializers.ModelSerializer):
             "transactions",
             "street_address",
             "refund_eligible",
+            "refund_deadline",
+            "refund_status",
+            "refund_requested_on",
+            "refund_reviewed_on",
         ]
         model = models.Order
 
@@ -674,12 +691,11 @@ class OrderHistorySerializer(serializers.ModelSerializer):
         titles = []
 
         for line in instance.lines.all():
-            product = models.Product.all_objects.get(
-                pk=line.product_version.field_dict["id"]
-            )
-            if product.content_type.model == "courserun" and product.purchasable_object:
+            product = line.product
+            content_type = line.product_content_type
+            if content_type.model == "courserun" and product.purchasable_object:
                 titles.append(product.purchasable_object.course.title)
-            elif product.content_type.model == "programrun":
+            elif content_type.model == "programrun":
                 titles.append(product.description)
             else:
                 titles.append(f"No Title - {product.id}")
@@ -727,6 +743,143 @@ class ProductFlexiblePriceSerializer(BaseProductSerializer):
         model = models.Product
 
 
+class DiscountSourceSerializer(serializers.Serializer):
+    """The prior purchase a discount credits."""
+
+    type = serializers.ChoiceField(choices=DISCOUNT_SOURCE_TYPES)
+    readable_id = serializers.CharField()
+    title = serializers.CharField()
+
+
+class UserPricingDiscountSerializer(serializers.Serializer):
+    """The discount checkout would apply to a product for this user."""
+
+    id = serializers.IntegerField()
+    discount_code = serializers.CharField()
+    discount_type = serializers.ChoiceField(choices=DISCOUNT_TYPES)
+    # required=False matches V0Discount's derivation from the nullable model
+    # column; openapi-generator types a required nullable enum as non-null.
+    payment_type = serializers.ChoiceField(
+        choices=PAYMENT_TYPES,
+        allow_null=True,
+        required=False,
+        help_text=(
+            "What kind of discount won: `financial-assistance` is the learner's "
+            "approved aid tier; the other values say how a discount was funded. "
+            "Null on discounts created without one."
+        ),
+    )
+    amount_off = serializers.DecimalField(
+        max_digits=7,
+        decimal_places=2,
+        help_text=(
+            "Dollars taken off `price` for this user. For paid-amount-off "
+            "discounts this is the prior purchase's paid price, capped at "
+            "`price`, never the stored amount."
+        ),
+    )
+    source = DiscountSourceSerializer(
+        allow_null=True,
+        help_text=(
+            "Set only for paid-amount-off discounts (`discount_type` is the "
+            "discriminator): the prior purchase being credited."
+        ),
+    )
+
+    def get_attribute(self, instance):
+        """
+        Shape the winning discount out of the request's quote. The quote is the
+        only place the resolved amount and the credited purchase exist; neither
+        is stored on the Discount row.
+        """
+        quote = self.context["quote"]
+        if quote.discount is None:
+            return None
+        return {
+            "id": quote.discount.id,
+            "discount_code": quote.discount.discount_code,
+            "discount_type": quote.discount.discount_type,
+            "payment_type": quote.discount.payment_type,
+            "amount_off": instance.price - quote.price,
+            "source": self._source(quote.source_line),
+        }
+
+    @staticmethod
+    def _source(source_line):
+        if source_line is None:
+            return None
+        courseware = credited_courseware(source_line)
+        return {
+            "type": CONTENT_TYPE_MODEL_PROGRAM
+            if isinstance(courseware, Program)
+            else CONTENT_TYPE_MODEL_COURSE,
+            "readable_id": courseware.readable_id,
+            "title": courseware.title,
+        }
+
+
+class _QuotedPriceField(serializers.DecimalField):
+    """
+    The quoted price, which belongs to the request rather than to the product,
+    so it is read from serializer context. Declaring it as a real DecimalField
+    rather than a method field is what keeps it a decimal string on the wire,
+    like every other price the API publishes.
+    """
+
+    def get_attribute(self, instance):  # noqa: ARG002
+        return self.context["quote"].price
+
+
+# Subclassing the deprecated endpoint's serializer is what makes this payload a
+# strict superset of that one rather than a copy of it: every field a caller
+# reads from user_flexible_price is inherited here, so moving off it
+# (https://github.com/mitodl/hq/issues/12799) cannot lose one. The docstring is
+# the public schema description, so the rationale lives here instead.
+class UserPricingProductSerializer(ProductFlexiblePriceSerializer):
+    """A product priced for one user."""
+
+    # The quote already determined the learner's aid while gathering its
+    # candidates, so this reads it from context instead of repeating the
+    # lookup the inherited method makes.
+    @extend_schema_field(
+        V0DiscountSerializer(
+            allow_null=True,
+            help_text=(
+                "The learner's approved financial-assistance tier discount, or "
+                "null: whether they are approved and at which tier, even when "
+                "that tier is 0% or another discount wins. Read `user_price` "
+                "for the price, not this field's `amount`."
+            ),
+        )
+    )
+    def get_product_flexible_price(self, instance):  # noqa: ARG002
+        finaid = self.context["quote"].flexible_price_discount
+        if finaid is None:
+            return None
+        return V0DiscountSerializer(finaid, context=self.context).data
+
+    user_price = _QuotedPriceField(
+        max_digits=7,
+        decimal_places=2,
+        help_text="What this user pays at checkout today.",
+    )
+    discount = UserPricingDiscountSerializer(
+        allow_null=True,
+        help_text=(
+            "The discount checkout applies to this product for this user, or "
+            "null at list price."
+        ),
+    )
+
+    class Meta:
+        fields = [
+            *ProductFlexiblePriceSerializer.Meta.fields,
+            "user_price",
+            "discount",
+        ]
+        model = models.Product
+
+
 class DiscountRedemptionSerializer(serializers.ModelSerializer):
     """Serializes a discount redemption."""
 
@@ -763,24 +916,6 @@ class DiscountProductSerializer(serializers.ModelSerializer):
             "discount",
             "product",
         ]
-
-
-class BulkDiscountSerializer(serializers.Serializer):
-    """For validating bulk discount requests."""
-
-    discount_type = serializers.ChoiceField(choices=DISCOUNT_TYPES)
-    payment_type = serializers.ChoiceField(choices=PAYMENT_TYPES)
-    amount = serializers.DecimalField(max_digits=9, decimal_places=2)
-    one_time = serializers.BooleanField(default=False)
-    one_time_per_user = serializers.BooleanField(default=False)
-    activates = serializers.DateTimeField(
-        required=False, default_timezone=ZoneInfo(TIME_ZONE)
-    )
-    expires = serializers.DateTimeField(
-        required=False, default_timezone=ZoneInfo(TIME_ZONE)
-    )
-    count = serializers.IntegerField(required=False)
-    prefix = serializers.CharField(max_length=63, required=False)
 
 
 class UserDiscountSerializer(serializers.ModelSerializer):
@@ -994,13 +1129,13 @@ class CheckoutPayloadSerializer(serializers.Serializer):
         read_only=True,
         required=False,
         default="",
-        help_text="The URL to POST the form to.",
+        help_text="The URL to POST the form to, or to redirect the user to.",
     )
     method = serializers.CharField(
         read_only=True,
         required=False,
         default="POST",
-        help_text="The method to use for the checkout form (always POST).",
+        help_text="The method to use for the data - POST for form data, GET for redirect.",
     )
     payload = serializers.JSONField(
         read_only=True, required=False, default={}, help_text="The data for the form."
@@ -1024,11 +1159,27 @@ class CheckoutPayloadSerializer(serializers.Serializer):
             USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
             USER_MSG_TYPE_B2B_INVALID_BASKET,
             USER_MSG_TYPE_BASKET_EMPTY,
+            USER_MSG_TYPE_PROFILE_INCOMPLETE,
         ),
+    )
+    missing_fields = serializers.ListField(
+        child=serializers.CharField(),
+        read_only=True,
+        required=False,
+        default=list,
+        help_text="With a profile-incomplete error, the profile fields to fix.",
     )
 
     class Meta:
-        fields = ["no_checkout", "url", "method", "payload", "order_id", "error"]
+        fields = [
+            "no_checkout",
+            "url",
+            "method",
+            "payload",
+            "order_id",
+            "error",
+            "missing_fields",
+        ]
 
 
 class OrderStatusSerializer(serializers.ModelSerializer):
@@ -1060,8 +1211,6 @@ class RefundRequestSerializer(serializers.ModelSerializer):
         fields = ["order", "refund_reason", "refund_reason_text", "consent_given"]
 
     def validate_order(self, order):
-        from courses.utils import is_contract_order  # noqa: PLC0415
-
         user = self.context["request"].user
         if order.purchaser != user:
             msg = "You can only request a refund for your own orders."
@@ -1069,10 +1218,15 @@ class RefundRequestSerializer(serializers.ModelSerializer):
         if order.state != OrderStatus.FULFILLED:
             msg = "Refund requests can only be submitted for fulfilled orders."
             raise serializers.ValidationError(msg)
-        if is_contract_order(order):
+        # Same property `refund_status` reports on, so what the receipt advertises
+        # and what this endpoint accepts cannot drift apart.
+        if order.is_b2b_order:
             msg = (
                 "B2B contract orders are not eligible for self-service refund requests."
             )
+            raise serializers.ValidationError(msg)
+        if order.refund_requests.filter(status=RefundRequestStatus.PENDING).exists():
+            msg = "A refund request for this order is already awaiting review."
             raise serializers.ValidationError(msg)
         return order
 
@@ -1081,6 +1235,25 @@ class RefundRequestSerializer(serializers.ModelSerializer):
             msg = "You must acknowledge the consequences of requesting a refund."
             raise serializers.ValidationError(msg)
         return value
+
+    def validate(self, attrs):
+        """
+        Require free text when no preset reason identifies the request.
+
+        Requests made after the refund window offer no preset reasons at all, and
+        "Other" says nothing on its own, so both cases need the learner's own
+        words for customer service to act on.
+        """
+        reason = attrs.get("refund_reason", "")
+        if (
+            reason in ("", RefundReasonChoices.OTHER)
+            and not attrs.get("refund_reason_text", "").strip()
+        ):
+            msg = {
+                "refund_reason_text": "Please tell us why you are requesting a refund."
+            }
+            raise serializers.ValidationError(msg)
+        return attrs
 
     def create(self, validated_data):
         validated_data["user"] = self.context["request"].user

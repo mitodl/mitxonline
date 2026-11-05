@@ -2,10 +2,13 @@
 Tests for B2B views.
 """
 
+import json
 from datetime import timedelta
+from types import SimpleNamespace
 
 import pytest
 import reversion
+from CyberSource.rest import ApiException
 from django.urls import reverse
 from freezegun import freeze_time
 from mitol.common.utils.datetime import now_in_utc
@@ -13,18 +16,32 @@ from rest_framework.test import APIClient
 
 from b2b.api import create_contract_run, ensure_enrollment_codes_exist
 from b2b.constants import (
+    CONTRACT_MEMBERSHIP_AUTO,
     CONTRACT_MEMBERSHIP_CODE,
     CONTRACT_MEMBERSHIP_MANAGED,
 )
 from b2b.factories import ContractPageFactory
-from b2b.models import DiscountContractAttachmentRedemption, UserOrganization
+from b2b.models import (
+    DiscountContractAttachmentRedemption,
+    UserB2BContract,
+    UserOrganization,
+)
+from compliance.api import verify_user_with_exports
 from courses.factories import CourseRunFactory
 from courses.models import CourseRunEnrollment
-from ecommerce.factories import ProductFactory, UnlimitedUseDiscountFactory
+from ecommerce.constants import DISCOUNT_TYPE_FIXED_PRICE
+from ecommerce.factories import (
+    OneTimeDiscountFactory,
+    ProductFactory,
+    UnlimitedUseDiscountFactory,
+)
+from ecommerce.models import DiscountProduct
 from main.constants import (
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
     USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED,
+    USER_MSG_TYPE_B2B_ERROR_AMBIGUOUS_CONTRACT,
     USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT,
+    USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH,
     USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE,
     USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
 )
@@ -47,6 +64,32 @@ def test_b2b_contract_attachment_bad_code(user):
     assert user.b2b_contracts.count() == 0
 
 
+def test_b2b_contract_attachment_code_taken_during_request(mocker, user):
+    """A code someone else redeems after it was validated is a 404, not a 201."""
+
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_CODE, max_learners=1
+    )
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
+    ProductFactory.create(purchasable_object=courserun)
+    ensure_enrollment_codes_exist(contract)
+    code = contract.get_discounts().first()
+    mocker.patch(
+        "b2b.views.v0.AttachContractApi._attach_user_to_contracts",
+        return_value=(False, False, True),
+    )
+
+    client = APIClient()
+    client.force_login(user)
+    resp = client.post(
+        reverse("b2b:attach-user", kwargs={"enrollment_code": code.discount_code})
+    )
+
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Invalid or expired enrollment code."
+
+
 def test_b2b_contract_attachment_code_with_no_contracts(user):
     """Ensure a code not tied to any B2B contracts returns 404."""
     client = APIClient()
@@ -60,6 +103,44 @@ def test_b2b_contract_attachment_code_with_no_contracts(user):
     assert resp.status_code == 404
     assert resp.json()["detail"] == "No contracts found for this code."
     assert user.b2b_contracts.count() == 0
+
+
+@pytest.mark.parametrize(
+    "membership_type", [CONTRACT_MEMBERSHIP_MANAGED, CONTRACT_MEMBERSHIP_AUTO]
+)
+@pytest.mark.parametrize("code_spent", [False, True])
+def test_b2b_contract_attachment_refuses_non_code_contracts(
+    mocker, membership_type, code_spent
+):
+    """
+    Managed and auto contracts get their members from organization membership,
+    so their codes don't attach anyone. A spent code from a full one gets the
+    invalid-code 404 rather than the full-contract 409.
+    """
+    mocked_attach_user = mocker.patch(
+        "b2b.models.OrganizationPage.attach_user", return_value=True
+    )
+    user = UserFactory.create()
+    contract = ContractPageFactory.create(
+        membership_type=membership_type, max_learners=1
+    )
+    code = OneTimeDiscountFactory.create(b2b_contract=contract)
+    if code_spent:
+        member = UserFactory.create()
+        member.b2b_contracts.add(contract)
+        DiscountContractAttachmentRedemption.objects.create(
+            discount=code, user=member, contract=contract
+        )
+
+    client = APIClient()
+    client.force_login(user)
+    resp = client.post(
+        reverse("b2b:attach-user", kwargs={"enrollment_code": code.discount_code})
+    )
+
+    assert resp.status_code == 404
+    assert not user.b2b_contracts.filter(pk=contract.pk).exists()
+    mocked_attach_user.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -98,7 +179,8 @@ def test_b2b_contract_attachment(mocker, max_learners, code_used, contract_activ
         max_learners=max_learners,
     )
 
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     ensure_enrollment_codes_exist(contract)
@@ -169,7 +251,8 @@ def test_b2b_contract_attachment_response_excludes_unrelated_contracts(mocker):
     contract = ContractPageFactory.create(
         membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     ensure_enrollment_codes_exist(contract)
@@ -203,7 +286,8 @@ def test_b2b_contract_attachment_returns_matching_contract_when_already_attached
     contract = ContractPageFactory.create(
         membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     ensure_enrollment_codes_exist(contract)
@@ -239,7 +323,8 @@ def test_b2b_contract_attachment_invalid_code_dates(user, bad_start_or_end):
         max_learners=1,
     )
 
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     ensure_enrollment_codes_exist(contract)
@@ -294,7 +379,8 @@ def test_b2b_contract_attachment_invalid_contract_dates(user, bad_start_or_end):
         max_learners=1,
     )
 
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     ensure_enrollment_codes_exist(contract)
@@ -346,7 +432,8 @@ def test_b2b_contract_attachment_full_contract(mocker):
         max_learners=1,
     )
 
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     ensure_enrollment_codes_exist(contract)
@@ -394,7 +481,8 @@ def test_b2b_contract_attachment_full_contract_with_used_code(mocker):
         max_learners=1,
     )
 
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     ensure_enrollment_codes_exist(contract)
@@ -435,6 +523,44 @@ def test_b2b_contract_attachment_full_contract_with_used_code(mocker):
 
 
 @pytest.mark.skip_nplusone_check
+def test_b2b_enroll_incomplete_profile(mocker, settings, mocked_export_compliance):
+    """A free B2B enrollment with an incomplete profile names the fields to fix."""
+    mocked_export_compliance.side_effect = verify_user_with_exports
+    mocker.patch("compliance.api.get_cybersource_client")
+    mocker.patch("hubspot_sync.tasks.sync_cart_add_event_with_hubspot.apply_async")
+    mocker.patch("openedx.tasks.clone_courserun.delay")
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "a token"  # noqa: S105
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED, enrollment_fixed_price=0
+    )
+    source_courserun = CourseRunFactory.create(
+        is_source_run=True, language="en", is_primary_language=True
+    )
+    [(courserun, _)] = create_contract_run(
+        contract, source_courserun.course, queue_codes=True
+    )
+    user = UserFactory.create()
+    user.b2b_contracts.add(contract)
+    # A country that doesn't require state/postal code, so only this is missing
+    user.legal_address.country = "GB"
+    user.legal_address.street_address_1 = ""
+    user.legal_address.save()
+    client = APIClient()
+    client.force_login(user)
+
+    resp = client.post(
+        reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
+    )
+
+    assert resp.status_code == 400
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
+        "missing_fields": ["street_address_1"],
+    }
+
+
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize("user_has_edx_user", [True, False])
 @pytest.mark.parametrize("has_price", [True, False])
 @pytest.mark.parametrize("run_is_enrollable", [True, False])
@@ -446,7 +572,7 @@ def test_b2b_contract_attachment_full_contract_with_used_code(mocker):
         "flag",
     ],
 )
-def test_b2b_enroll(  # noqa: PLR0915, PLR0913
+def test_b2b_enroll(  # noqa: PLR0915, PLR0913, C901
     mocker, settings, user_has_edx_user, has_price, run_is_enrollable, contract_active
 ):
     """Make sure that hitting the enroll endpoint actually results in enrollments"""
@@ -503,6 +629,11 @@ def test_b2b_enroll(  # noqa: PLR0915, PLR0913
     url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
     resp = client.post(url)
 
+    if contract_active in ["date", "flag"]:
+        assert resp.status_code == 400
+        assert resp.json()["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH
+        return
+
     if not run_is_enrollable:
         assert resp.status_code == 400
         assert resp.json()["result"] == USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE
@@ -532,6 +663,73 @@ def test_b2b_enroll(  # noqa: PLR0915, PLR0913
     assert CourseRunEnrollment.objects.filter(user=user, run=courserun).exists()
 
 
+@pytest.mark.skip_nplusone_check
+def test_b2b_enroll_cybersource_invalid_request(mocker, settings):
+    """
+    Profile data CyberSource rejects as INVALID_REQUEST comes back as a 400
+    naming the field, not a 500 (mitodl/hq#13724, Sentry MITXONLINE-73F).
+    """
+    mocker.patch("hubspot_sync.tasks.sync_cart_add_event_with_hubspot.apply_async")
+    mocker.patch("openedx.tasks.create_user_from_id")
+    mocker.patch("openedx.tasks.clone_courserun.delay")
+    mocker.patch("openedx.api._create_edx_user_request")
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "a token"  # noqa: S105
+    mocker.patch("courses.api.verify_user_with_exports", verify_user_with_exports)
+    cybersource = mocker.Mock()
+    # Body as returned by CyberSource in production for a postal code of "_"
+    cybersource.validate_export_compliance.side_effect = ApiException(
+        http_resp=SimpleNamespace(
+            status=400,
+            reason="Bad Request",
+            data=json.dumps(
+                {
+                    "status": "INVALID_REQUEST",
+                    "reason": "MISSING_FIELD",
+                    "message": "Declined - The request is missing one or more fields",
+                    "details": [
+                        {
+                            "field": "orderInformation.billTo.postalCode",
+                            "reason": "MISSING_FIELD",
+                        }
+                    ],
+                }
+            ),
+            getheaders=dict,
+        )
+    )
+    mocker.patch("compliance.api.get_cybersource_client", return_value=cybersource)
+
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED, enrollment_fixed_price=0
+    )
+    source_courserun = CourseRunFactory.create(
+        is_source_run=True, language="en", is_primary_language=True
+    )
+    [(courserun, _)] = create_contract_run(
+        contract, source_courserun.course, queue_codes=True
+    )
+    user = UserFactory.create()
+    user.b2b_contracts.add(contract)
+    # A country that doesn't require state/postal code, so the local checks pass
+    # and the request reaches the mocked CyberSource response
+    user.legal_address.country = "GB"
+    user.legal_address.save()
+
+    client = APIClient()
+    client.force_login(user)
+    resp = client.post(
+        reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
+    )
+
+    assert resp.status_code == 400
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
+        "missing_fields": ["postal_code"],
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=courserun).exists()
+
+
 def test_b2b_contract_attachment_requires_authentication():
     """An unauthenticated request should be rejected before checking the code."""
     client = APIClient()
@@ -546,7 +744,8 @@ def test_b2b_contract_attachment_sets_redeemed_on(mocker):
 
     user = UserFactory.create()
     contract = ContractPageFactory.create(membership_type=CONTRACT_MEMBERSHIP_CODE)
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
     ensure_enrollment_codes_exist(contract)
     contract_code = contract.get_discounts().first()
@@ -571,7 +770,8 @@ def test_b2b_contract_attachment_creates_org_membership_with_keep_until_seen(moc
 
     user = UserFactory.create()
     contract = ContractPageFactory.create(membership_type=CONTRACT_MEMBERSHIP_CODE)
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
     ensure_enrollment_codes_exist(contract)
     contract_code = contract.get_discounts().first()
@@ -611,7 +811,8 @@ def test_preassigned_code_can_be_redeemed(mocker):
         is_manager=True,
     )
 
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     with reversion.create_revision():
         ProductFactory.create(purchasable_object=courserun)
 
@@ -696,7 +897,8 @@ def test_enroll_product_not_found(mocker):
         membership_type=CONTRACT_MEMBERSHIP_MANAGED,
         enrollment_fixed_price=0,
     )
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     # Intentionally do not create a Product for courserun
 
     user = UserFactory.create()
@@ -715,7 +917,8 @@ def test_enroll_success(mocker):
         membership_type=CONTRACT_MEMBERSHIP_MANAGED,
         enrollment_fixed_price=0,
     )
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     mocker.patch(
@@ -750,7 +953,8 @@ def test_enroll_failure_returns_400(mocker, error_result):
         membership_type=CONTRACT_MEMBERSHIP_MANAGED,
         enrollment_fixed_price=0,
     )
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     mocker.patch(
@@ -776,7 +980,8 @@ def test_enroll_passes_program_id_to_api(mocker):
         membership_type=CONTRACT_MEMBERSHIP_MANAGED,
         enrollment_fixed_price=0,
     )
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     mocked_enroll = mocker.patch(
@@ -805,7 +1010,8 @@ def test_enroll_omits_program_id_when_not_provided(mocker):
         membership_type=CONTRACT_MEMBERSHIP_MANAGED,
         enrollment_fixed_price=0,
     )
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
     ProductFactory.create(purchasable_object=courserun)
 
     mocked_enroll = mocker.patch(
@@ -826,10 +1032,85 @@ def test_enroll_omits_program_id_when_not_provided(mocker):
     assert kwargs["program_id"] is None
 
 
+@pytest.mark.parametrize("send_slug", [True, False])
+def test_enroll_passes_contract_slug_to_api(mocker, send_slug):
+    """The contract_slug from the request body should be forwarded to create_b2b_enrollment."""
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED,
+        enrollment_fixed_price=0,
+    )
+    courserun = CourseRunFactory.create(b2b_only=True)
+    courserun.b2b_contracts.add(contract)
+    ProductFactory.create(purchasable_object=courserun)
+
+    mocked_enroll = mocker.patch(
+        "b2b.views.v0.create_b2b_enrollment",
+        return_value={"result": USER_MSG_TYPE_B2B_ENROLL_SUCCESS},
+    )
+
+    user = UserFactory.create()
+    user.b2b_contracts.add(contract)
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
+    resp = client.post(
+        url,
+        data={"contract_slug": contract.slug} if send_slug else {},
+        format="json",
+    )
+
+    assert resp.status_code == 201
+    _, kwargs = mocked_enroll.call_args
+    assert kwargs["contract_slug"] == (contract.slug if send_slug else None)
+
+
+@pytest.mark.skip_nplusone_check
+def test_enroll_multi_contract_run_with_slug(mocker):
+    """
+    Enrolling through the API in a run that's in two contracts should use the
+    contract named in the request.
+    """
+    mocker.patch("openedx.api.enroll_in_edx_course_runs")
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch("hubspot_sync.tasks.sync_cart_add_event_with_hubspot.apply_async")
+
+    contracts = ContractPageFactory.create_batch(
+        2, membership_type=CONTRACT_MEMBERSHIP_MANAGED, enrollment_fixed_price=0
+    )
+    courserun = CourseRunFactory.create(b2b_only=True, b2b_contracts=contracts)
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=courserun, price=0)
+    discount = UnlimitedUseDiscountFactory.create(
+        is_bulk=True, discount_type=DISCOUNT_TYPE_FIXED_PRICE, amount=0
+    )
+    DiscountProduct.objects.create(discount=discount, product=product)
+
+    user = UserFactory.create()
+    user.b2b_contracts.add(*contracts)
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
+
+    resp = client.post(url, format="json")
+    assert resp.status_code == 400
+    assert resp.json()["result"] == USER_MSG_TYPE_B2B_ERROR_AMBIGUOUS_CONTRACT
+
+    resp = client.post(url, data={"contract_slug": contracts[1].slug}, format="json")
+    assert resp.status_code == 201
+    assert resp.json()["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+    assert (
+        CourseRunEnrollment.objects.get(user=user, run=courserun).b2b_contract
+        == contracts[1]
+    )
+
+
 def test_enroll_courserun_without_b2b_contract_not_found(mocker):
-    """A course run that exists but has no b2b_contract should not be matched."""
+    """A course run that exists but has no B2B contracts should not be matched."""
     mocker.patch("b2b.views.v0.create_b2b_enrollment")
-    courserun = CourseRunFactory.create(b2b_contract=None)
+    courserun = CourseRunFactory.create()
     ProductFactory.create(purchasable_object=courserun)
 
     user = UserFactory.create()
@@ -839,3 +1120,107 @@ def test_enroll_courserun_without_b2b_contract_not_found(mocker):
     url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
     with pytest.raises(Exception):  # noqa: B017, PT011
         client.post(url)
+
+
+def test_data_consent_forbidden_when_not_a_contract_member(user):
+    """A user who isn't attached to the contract should get a 403."""
+    contract = ContractPageFactory.create()
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:data-consent", kwargs={"contract_id": contract.id})
+    resp = client.post(url, data={"consented": True}, format="json")
+
+    assert resp.status_code == 403
+    assert not UserB2BContract.objects.filter(
+        user=user, contract_page=contract
+    ).exists()
+
+
+def test_data_consent_invalid_body(user):
+    """A request missing the required 'consented' field should return 400."""
+    contract = ContractPageFactory.create()
+    user.b2b_contracts.add(contract)
+
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:data-consent", kwargs={"contract_id": contract.id})
+    resp = client.post(url, data={}, format="json")
+
+    assert resp.status_code == 400
+    assert "consented" in resp.json()["errors"]
+
+    membership = UserB2BContract.objects.get(user=user, contract_page=contract)
+    assert membership.consented_to_data_sharing is None
+    assert membership.consent_modified_at is None
+
+
+def test_data_consent_success(user):
+    """A contract member can set consent, and later change their mind."""
+    contract = ContractPageFactory.create()
+    user.b2b_contracts.add(contract)
+
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:data-consent", kwargs={"contract_id": contract.id})
+
+    resp = client.post(url, data={"consented": True}, format="json")
+    assert resp.status_code == 204
+    membership = UserB2BContract.objects.get(user=user, contract_page=contract)
+    assert membership.consented_to_data_sharing is True
+    first_modified_at = membership.consent_modified_at
+    assert first_modified_at is not None
+
+    resp = client.post(url, data={"consented": False}, format="json")
+    assert resp.status_code == 204
+    membership.refresh_from_db()
+    assert membership.consented_to_data_sharing is False
+    assert membership.consent_modified_at is not None
+    assert membership.consent_modified_at >= first_modified_at
+
+
+def test_data_consent_non_member_cannot_modify_other_members_consent(user):
+    """A non-member should get a 403 even when the contract has other members."""
+    contract = ContractPageFactory.create()
+    other_user = UserFactory.create()
+    other_user.b2b_contracts.add(contract)
+
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:data-consent", kwargs={"contract_id": contract.id})
+    resp = client.post(url, data={"consented": True}, format="json")
+
+    assert resp.status_code == 403
+    other_membership = UserB2BContract.objects.get(
+        user=other_user, contract_page=contract
+    )
+    assert other_membership.consented_to_data_sharing is None
+    assert other_membership.consent_modified_at is None
+
+
+def test_data_consent_only_modifies_callers_membership(user):
+    """With multiple members, only the caller's consent should change."""
+    contract = ContractPageFactory.create()
+    # Created first so it would be returned by an unscoped .first()
+    other_user = UserFactory.create()
+    other_user.b2b_contracts.add(contract)
+    user.b2b_contracts.add(contract)
+
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:data-consent", kwargs={"contract_id": contract.id})
+    resp = client.post(url, data={"consented": True}, format="json")
+
+    assert resp.status_code == 204
+    membership = UserB2BContract.objects.get(user=user, contract_page=contract)
+    assert membership.consented_to_data_sharing is True
+    assert membership.consent_modified_at is not None
+    other_membership = UserB2BContract.objects.get(
+        user=other_user, contract_page=contract
+    )
+    assert other_membership.consented_to_data_sharing is None
+    assert other_membership.consent_modified_at is None

@@ -1,15 +1,25 @@
+from decimal import Decimal
+from types import SimpleNamespace
+
 import faker
-from factory import SubFactory, fuzzy
+import reversion
+from factory import LazyAttribute, SubFactory, fuzzy
 from factory.django import DjangoModelFactory
+from reversion.models import Version
 
 from courses.factories import CourseRunFactory, ProgramFactory
+from courses.models import CourseRun
 from ecommerce import models
 from ecommerce.constants import (
-    ALL_DISCOUNT_TYPES,
-    ALL_REDEMPTION_TYPES,
+    DISCOUNT_TYPE_PAID_AMOUNT_OFF,
+    DISCOUNT_TYPE_PERCENT_OFF,
+    REDEMPTION_TYPE_INTERNAL,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
+    REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
     REDEMPTION_TYPE_UNLIMITED,
+    STANDARD_DISCOUNT_TYPES,
+    STANDARD_REDEMPTION_TYPES,
     ZERO_PAYMENT_DATA,
 )
 from main.utils import now_datetime_with_tz
@@ -40,57 +50,46 @@ class ProgramProductFactory(DjangoModelFactory):
 
 class DiscountFactory(DjangoModelFactory):
     amount = fuzzy.FuzzyInteger(1, 49)
-    discount_type = fuzzy.FuzzyChoice(ALL_DISCOUNT_TYPES)
+    discount_type = fuzzy.FuzzyChoice(STANDARD_DISCOUNT_TYPES)
     discount_code = fuzzy.FuzzyText(length=20)
-    redemption_type = fuzzy.FuzzyChoice(ALL_REDEMPTION_TYPES)
+    redemption_type = fuzzy.FuzzyChoice(STANDARD_REDEMPTION_TYPES)
     payment_type = None
 
     class Meta:
         model = models.Discount
 
 
-# Four factories here to test the redemption ruleset
+# One factory per redemption type, so tests can name the ruleset they exercise.
 
 
-class OneTimeDiscountFactory(DjangoModelFactory):
-    amount = fuzzy.FuzzyInteger(1, 49)
-    discount_type = fuzzy.FuzzyChoice(ALL_DISCOUNT_TYPES)
-    discount_code = fuzzy.FuzzyText(length=20)
+class OneTimeDiscountFactory(DiscountFactory):
     redemption_type = REDEMPTION_TYPE_ONE_TIME
 
-    class Meta:
-        model = models.Discount
 
-
-class OneTimePerUserDiscountFactory(DjangoModelFactory):
-    amount = fuzzy.FuzzyInteger(1, 49)
-    discount_type = fuzzy.FuzzyChoice(ALL_DISCOUNT_TYPES)
-    discount_code = fuzzy.FuzzyText(length=20)
+class OneTimePerUserDiscountFactory(DiscountFactory):
     redemption_type = REDEMPTION_TYPE_ONE_TIME_PER_USER
 
-    class Meta:
-        model = models.Discount
 
-
-class UnlimitedUseDiscountFactory(DjangoModelFactory):
-    amount = fuzzy.FuzzyInteger(1, 49)
-    discount_type = fuzzy.FuzzyChoice(ALL_DISCOUNT_TYPES)
-    discount_code = fuzzy.FuzzyText(length=20)
+class UnlimitedUseDiscountFactory(DiscountFactory):
     redemption_type = REDEMPTION_TYPE_UNLIMITED
 
-    class Meta:
-        model = models.Discount
 
-
-class SetLimitDiscountFactory(DjangoModelFactory):
-    amount = fuzzy.FuzzyInteger(1, 49)
-    discount_type = fuzzy.FuzzyChoice(ALL_DISCOUNT_TYPES)
-    discount_code = fuzzy.FuzzyText(length=20)
+class SetLimitDiscountFactory(DiscountFactory):
     redemption_type = REDEMPTION_TYPE_UNLIMITED
     max_redemptions = fuzzy.FuzzyInteger(1, 4)
 
-    class Meta:
-        model = models.Discount
+
+class PaidAmountOffDiscountFactory(DiscountFactory):
+    amount = 0
+    discount_type = DISCOUNT_TYPE_PAID_AMOUNT_OFF
+    redemption_type = REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE
+    automatic = True
+
+
+class InternalDiscountFactory(DiscountFactory):
+    amount = 100
+    discount_type = DISCOUNT_TYPE_PERCENT_OFF
+    redemption_type = REDEMPTION_TYPE_INTERNAL
 
 
 class BasketFactory(DjangoModelFactory):
@@ -135,6 +134,13 @@ class LineFactory(DjangoModelFactory):
     quantity = 1
     order = SubFactory(OrderFactory)
     purchased_object = SubFactory(CourseRunFactory)
+    # discounted_unit_price is non-null, so price the line the way the app does:
+    # under whatever discounts the order carries when the line is built.
+    discounted_unit_price = LazyAttribute(
+        lambda line: models.Line.compute_discounted_unit_price_for(
+            line.order, line.product_version
+        )
+    )
 
     class Meta:
         model = models.Line
@@ -148,3 +154,60 @@ class DiscountRedemptionFactory(DjangoModelFactory):
 
     class Meta:
         model = models.DiscountRedemption
+
+
+def make_purchase(
+    user,
+    purchasable,
+    price,
+    *,
+    paid=None,
+    state=models.OrderStatus.FULFILLED,
+):
+    """
+    An order for ``purchasable`` with one line listed at ``price`` and charged
+    ``paid`` (defaults to ``price``). Returns the Line.
+
+    The Product is created inside a revision because Line.product_version is
+    non-null and reversion only records a Version for objects saved under one.
+    """
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=purchasable, price=price)
+    charged = price if paid is None else paid
+    order = OrderFactory.create(purchaser=user, state=state, total_price_paid=charged)
+    return models.Line.objects.create(
+        order=order,
+        purchased_object_id=product.object_id,
+        purchased_content_type_id=product.content_type_id,
+        product_version=Version.objects.get_for_object(product).first(),
+        quantity=1,
+        discounted_unit_price=charged,
+    )
+
+
+def make_paid_amount_off_offer(user, purchased):
+    """
+    One learner holding exactly one qualifying source for a paid-amount-off
+    discount: a $999 program product whose requirement tree contains
+    ``purchased`` -- a course run or a sub-program -- and a $100 fulfilled
+    purchase of it. Resolving the discount returns a 100.00 credit, so the
+    program prices at 899.00.
+    """
+    program = ProgramFactory.create()
+    program.add_requirement(
+        purchased.course if isinstance(purchased, CourseRun) else purchased
+    )
+    source_line = make_purchase(user, purchased, Decimal("100.00"))
+    with reversion.create_revision():
+        program_product = ProgramProductFactory.create(
+            purchasable_object=program, price=Decimal("999.00")
+        )
+    discount = PaidAmountOffDiscountFactory.create()
+    models.DiscountProduct.objects.create(discount=discount, product=program_product)
+    return SimpleNamespace(
+        user=user,
+        program_product=program_product,
+        program_product_version=Version.objects.get_for_object(program_product).first(),
+        source_line=source_line,
+        discount=discount,
+    )

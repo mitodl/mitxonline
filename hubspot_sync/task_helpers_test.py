@@ -1,16 +1,25 @@
 """Tests for hubspot_sync.task_helpers"""
 
 import pytest
+import reversion
+from django.contrib.contenttypes.models import ContentType
+from mitol.hubspot_api.api import HubspotObjectType
+from mitol.hubspot_api.factories import HubspotObjectFactory
+from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
-from ecommerce.factories import ProductFactory
+from courses.factories import CourseRunFactory, ProgramEnrollmentFactory, ProgramFactory
+from courses.models import ProgramRequirementNodeType
+from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from hubspot_sync.task_helpers import (
     sync_hubspot_cart_add,
     sync_hubspot_deal,
     sync_hubspot_product,
     sync_hubspot_user,
+    sync_hubspot_users_batch,
 )
 from users.factories import UserFactory
+from users.models import User
 
 pytestmark = pytest.mark.django_db
 
@@ -38,7 +47,9 @@ def test_sync_hubspot_deal_uai_order_with_uai_token(
 
     sync_hubspot_deal(hubspot_order)
     mock_sync.assert_called_once_with(
-        args=(hubspot_order.id,), kwargs={"is_uai": True}, countdown=10
+        args=(hubspot_order.id,),
+        kwargs={"is_uai": True, "is_xpro": False},
+        countdown=10,
     )
 
     if raise_exc:
@@ -66,7 +77,9 @@ def test_sync_hubspot_deal_non_uai_order(
 
     sync_hubspot_deal(hubspot_order)
     mock_sync.assert_called_once_with(
-        args=(hubspot_order.id,), kwargs={"is_uai": False}, countdown=10
+        args=(hubspot_order.id,),
+        kwargs={"is_uai": False, "is_xpro": False},
+        countdown=10,
     )
 
     if raise_exc:
@@ -154,6 +167,156 @@ def test_sync_hubspot_user_syncs_regular_users(mocker, settings):
     mock_info_log.assert_not_called()
 
 
+def test_sync_hubspot_users_batch(mocker, settings):
+    """sync_hubspot_users_batch should split users into batch create/update tasks"""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "faketoken"  # noqa: S105
+    mock_batch = mocker.patch(
+        "hubspot_sync.task_helpers.tasks.batch_upsert_hubspot_objects.delay"
+    )
+    synced_users = UserFactory.create_batch(2)
+    unsynced_users = UserFactory.create_batch(2)
+    content_type = ContentType.objects.get_for_model(User)
+    for user in synced_users:
+        HubspotObjectFactory.create(
+            content_type=content_type, object_id=user.id, content_object=user
+        )
+
+    sync_hubspot_users_batch(
+        [user.id for user in synced_users + unsynced_users],
+    )
+
+    assert mock_batch.call_count == 2
+    mock_batch.assert_any_call(
+        HubspotObjectType.CONTACTS.value,
+        "user",
+        "users",
+        create=True,
+        object_ids=[user.id for user in unsynced_users],
+    )
+    mock_batch.assert_any_call(
+        HubspotObjectType.CONTACTS.value,
+        "user",
+        "users",
+        create=False,
+        object_ids=[user.id for user in synced_users],
+    )
+
+
+def test_sync_hubspot_users_batch_skips_b2b_users(mocker, settings):
+    """sync_hubspot_users_batch should exclude B2B users from the batch"""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "faketoken"  # noqa: S105
+    mock_batch = mocker.patch(
+        "hubspot_sync.task_helpers.tasks.batch_upsert_hubspot_objects.delay"
+    )
+    user = UserFactory.create()
+    b2b_user = UserFactory.create()
+    b2b_user.b2b_contracts.add(ContractPageFactory.create())
+
+    sync_hubspot_users_batch([user.id, b2b_user.id])
+
+    mock_batch.assert_called_once_with(
+        HubspotObjectType.CONTACTS.value,
+        "user",
+        "users",
+        create=True,
+        object_ids=[user.id],
+    )
+
+
+def test_sync_hubspot_users_batch_excludes_ineligible_from_create(mocker, settings):
+    """Unsynced users failing the create eligibility bar should not be batch-created"""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "faketoken"  # noqa: S105
+    mock_batch = mocker.patch(
+        "hubspot_sync.task_helpers.tasks.batch_upsert_hubspot_objects.delay"
+    )
+    eligible_user = UserFactory.create()
+    inactive_user = UserFactory.create(is_active=False)
+    never_logged_in_user = UserFactory.create(last_login=None)
+    # An already-synced inactive user still goes through the update path,
+    # which tolerates inactive users
+    synced_inactive_user = UserFactory.create(is_active=False)
+    HubspotObjectFactory.create(
+        content_type=ContentType.objects.get_for_model(User),
+        object_id=synced_inactive_user.id,
+        content_object=synced_inactive_user,
+    )
+
+    sync_hubspot_users_batch(
+        [
+            eligible_user.id,
+            inactive_user.id,
+            never_logged_in_user.id,
+            synced_inactive_user.id,
+        ]
+    )
+
+    assert mock_batch.call_count == 2
+    mock_batch.assert_any_call(
+        HubspotObjectType.CONTACTS.value,
+        "user",
+        "users",
+        create=True,
+        object_ids=[eligible_user.id],
+    )
+    mock_batch.assert_any_call(
+        HubspotObjectType.CONTACTS.value,
+        "user",
+        "users",
+        create=False,
+        object_ids=[synced_inactive_user.id],
+    )
+
+
+def test_sync_hubspot_users_batch_all_b2b(mocker, settings):
+    """sync_hubspot_users_batch should dispatch nothing when all users are B2B"""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "faketoken"  # noqa: S105
+    mock_batch = mocker.patch(
+        "hubspot_sync.task_helpers.tasks.batch_upsert_hubspot_objects.delay"
+    )
+    b2b_user = UserFactory.create()
+    b2b_user.b2b_contracts.add(ContractPageFactory.create())
+
+    sync_hubspot_users_batch([b2b_user.id])
+
+    mock_batch.assert_not_called()
+
+
+@pytest.mark.parametrize("user_ids", [None, [], set()])
+def test_sync_hubspot_users_batch_no_users(mocker, settings, user_ids):
+    """sync_hubspot_users_batch should be a no-op with no user ids"""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "faketoken"  # noqa: S105
+    mock_batch = mocker.patch(
+        "hubspot_sync.task_helpers.tasks.batch_upsert_hubspot_objects.delay"
+    )
+    sync_hubspot_users_batch(user_ids)
+    mock_batch.assert_not_called()
+
+
+def test_sync_hubspot_users_batch_no_token(mocker, settings):
+    """sync_hubspot_users_batch should be a no-op without a HubSpot token"""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = None
+    mock_batch = mocker.patch(
+        "hubspot_sync.task_helpers.tasks.batch_upsert_hubspot_objects.delay"
+    )
+    sync_hubspot_users_batch([UserFactory.create().id])
+    mock_batch.assert_not_called()
+
+
+def test_sync_hubspot_users_batch_logs_exception(mocker, mock_exception_log):
+    """sync_hubspot_users_batch should log exceptions from task dispatch"""
+    mocker.patch(
+        "hubspot_sync.task_helpers.tasks.batch_upsert_hubspot_objects.delay",
+        side_effect=ConnectionError,
+    )
+    user = UserFactory.create()
+
+    sync_hubspot_users_batch([user.id])
+
+    mock_exception_log.assert_called_once_with(
+        "Exception calling batch_upsert_hubspot_objects for %d user(s)", 1
+    )
+
+
 @pytest.mark.parametrize("raise_exc", [True, False])
 def test_sync_hubspot_product(mocker, mock_exception_log, raise_exc):
     """sync_hubspot_product should call tasks.sync_product_with_hubspot.delay and log any exception"""
@@ -172,6 +335,100 @@ def test_sync_hubspot_product(mocker, mock_exception_log, raise_exc):
         mock_exception_log.assert_not_called()
 
 
+def test_sync_hubspot_deal_skips_for_course_in_enrolled_program(mocker, settings):
+    """sync_hubspot_deal should skip if the order is for a course run in a program the user is enrolled in."""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "faketoken"  # noqa: S105
+
+    mock_sync = mocker.patch(
+        "hubspot_sync.task_helpers.tasks.sync_deal_with_hubspot_targeted.apply_async"
+    )
+    mocker.patch("hubspot_sync.task_helpers.is_uai_order", return_value=False)
+
+    course_run = CourseRunFactory.create()
+    program = ProgramFactory.create()
+    program.requirements_root.add_child(
+        node_type=ProgramRequirementNodeType.COURSE,
+        course=course_run.course,
+    )
+
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=course_run)
+
+    order = OrderFactory.create()
+    LineFactory.create(
+        order=order,
+        product_version=Version.objects.get_for_object(product).first(),
+        purchased_object=course_run,
+    )
+    ProgramEnrollmentFactory.create(user=order.purchaser, program=program)
+
+    sync_hubspot_deal(order)
+
+    mock_sync.assert_not_called()
+
+
+def test_sync_hubspot_deal_proceeds_for_course_not_in_program(
+    mocker, mock_exception_log, settings
+):
+    """sync_hubspot_deal should proceed if the order is for a course not in any program."""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "faketoken"  # noqa: S105
+
+    mock_sync = mocker.patch(
+        "hubspot_sync.task_helpers.tasks.sync_deal_with_hubspot_targeted.apply_async"
+    )
+    mocker.patch("hubspot_sync.task_helpers.is_uai_order", return_value=False)
+
+    course_run = CourseRunFactory.create()
+
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=course_run)
+
+    order = OrderFactory.create()
+    LineFactory.create(
+        order=order,
+        product_version=Version.objects.get_for_object(product).first(),
+        purchased_object=course_run,
+    )
+
+    sync_hubspot_deal(order)
+
+    mock_sync.assert_called_once()
+
+
+def test_sync_hubspot_deal_proceeds_when_not_enrolled_in_program(
+    mocker, mock_exception_log, settings
+):
+    """sync_hubspot_deal should proceed if the user is not enrolled in the program containing this course."""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "faketoken"  # noqa: S105
+
+    mock_sync = mocker.patch(
+        "hubspot_sync.task_helpers.tasks.sync_deal_with_hubspot_targeted.apply_async"
+    )
+    mocker.patch("hubspot_sync.task_helpers.is_uai_order", return_value=False)
+
+    course_run = CourseRunFactory.create()
+    program = ProgramFactory.create()
+    program.requirements_root.add_child(
+        node_type=ProgramRequirementNodeType.COURSE,
+        course=course_run.course,
+    )
+
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=course_run)
+
+    order = OrderFactory.create()
+    LineFactory.create(
+        order=order,
+        product_version=Version.objects.get_for_object(product).first(),
+        purchased_object=course_run,
+    )
+    # Intentionally do not enroll the user in the program
+
+    sync_hubspot_deal(order)
+
+    mock_sync.assert_called_once()
+
+
 @pytest.mark.parametrize("raise_exc", [True, False])
 def test_sync_hubspot_cart_add(mocker, mock_exception_log, user, raise_exc):
     """sync_hubspot_cart_add should call sync_cart_add_event_with_hubspot.apply_async and log any exception"""
@@ -183,7 +440,7 @@ def test_sync_hubspot_cart_add(mocker, mock_exception_log, user, raise_exc):
     sync_hubspot_cart_add(user, product, is_uai=True)
     mock_sync.assert_called_once_with(
         args=(user.id, product.id),
-        kwargs={"is_uai_course": True},
+        kwargs={"is_uai_course": True, "is_xpro_course": False},
         countdown=5,
     )
     if raise_exc:

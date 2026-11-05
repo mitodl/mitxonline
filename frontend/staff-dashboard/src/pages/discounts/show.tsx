@@ -1,5 +1,6 @@
-import { useShow } from "@pankod/refine-core";
-import { Show, Typography, Tag, Row, Col, Space } from "@pankod/refine-antd";
+import { useShow } from "@refinedev/core";
+import { Show } from "@refinedev/antd";
+import { Typography, Tag, Row, Col, Space } from "antd";
 import dayjs from "dayjs";
 
 import { RedemptionList, UserAssignments, Products } from "components/discounts";
@@ -7,8 +8,8 @@ import { FinAidTiers } from "components/discounts/fin_aid_tiers";
 const { Title, Text } = Typography;
 
 export const DiscountShow = () => {
-    const { queryResult } = useShow();
-    const { data, isLoading } = queryResult;
+    const { query } = useShow();
+    const { data, isLoading } = query;
     const record = data?.data;
 
     return (

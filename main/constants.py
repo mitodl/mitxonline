@@ -11,6 +11,7 @@ USER_MSG_TYPE_DISCOUNT_INVALID = "discount-invalid"
 USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY = "required-enrollment-code-empty"
 USER_MSG_TYPE_PROFILE_CREATED = "profile-created"
 USER_MSG_TYPE_BASKET_EMPTY = "basket-empty"
+USER_MSG_TYPE_PROFILE_INCOMPLETE = "profile-incomplete"
 
 USER_MSG_TYPE_PAYMENT_DECLINED = "payment-declined"
 USER_MSG_TYPE_PAYMENT_ERROR = "payment-error"
@@ -22,7 +23,9 @@ USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN = "payment-error-unknown"
 
 USER_MSG_TYPE_B2B_DISALLOWED = "b2b-disallowed"
 USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED = "b2b-error-already-enrolled"
+USER_MSG_TYPE_B2B_ERROR_AMBIGUOUS_CONTRACT = "b2b-error-ambiguous-contract"
 USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT = "b2b-error-no-contract"
+USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH = "b2b-error-no-matching-contract"
 USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT = "b2b-error-no-product"
 USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE = "b2b-error-missing-enrollment-code"
 USER_MSG_TYPE_B2B_ERROR_INVALID_ENROLLMENT_CODE = "b2b-error-invalid-enrollment-code"
@@ -34,7 +37,9 @@ USER_MSG_TYPE_B2B_INVALID_BASKET = "b2b-invalid-basket"
 USER_MSG_TYPE_B2B = [
     USER_MSG_TYPE_B2B_DISALLOWED,
     USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED,
+    USER_MSG_TYPE_B2B_ERROR_AMBIGUOUS_CONTRACT,
     USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT,
+    USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT_MATCH,
     USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT,
     USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
     USER_MSG_TYPE_B2B_ERROR_INVALID_ENROLLMENT_CODE,
@@ -66,3 +71,7 @@ ENV_TO_LEARN_HOSTNAME_MAP = {
     "rc": "rc.learn.mit.edu",
     "ci": "ci.learn.mit.edu",
 }
+
+# Redis cache key templates for B2B org reconciliation
+B2B_USER_ORG_MEMBERSHIP_CACHE = "org-membership-cache-{}"
+B2B_USER_LATEST_SESSION_CACHE = "user-latest-session-auth-time-{}"

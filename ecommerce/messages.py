@@ -1,18 +1,18 @@
 """Ecommerce email messages"""
 
-from mitol.mail.messages import TemplatedMessage
+from mail.messages import SiteTemplatedMessage
 
 
-class OrderReceiptMessage(TemplatedMessage):
+class OrderReceiptMessage(SiteTemplatedMessage):
     template_name = "mail/product_order_receipt"
     name = "Order Receipt"
 
 
-class OrderRefundMessage(TemplatedMessage):
+class OrderRefundMessage(SiteTemplatedMessage):
     template_name = "mail/order_refund_message"
     name = "Refund of MITx Online Order"
 
 
-class RefundRequestNotificationMessage(TemplatedMessage):
+class RefundRequestNotificationMessage(SiteTemplatedMessage):
     template_name = "mail/refund_request_notification"
     name = "Refund Request Submitted"

@@ -6,6 +6,8 @@ import pytest
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from mitol.common.utils.datetime import now_in_utc
 from wagtail.models import Page
 from wagtail_factories import PageFactory
@@ -13,6 +15,7 @@ from wagtail_factories import PageFactory
 from cms import utils as cms_utils
 from cms.api import (
     RESOURCE_PAGE_TITLES,
+    _FinancialAssistanceForms,
     create_default_courseware_page,
     create_featured_items,
     ensure_home_page_and_site,
@@ -21,9 +24,15 @@ from cms.api import (
     ensure_resource_pages,
     get_home_page,
     get_wagtail_img_src,
+    resolve_financial_assistance_form_urls,
 )
 from cms.exceptions import WagtailSpecificPageError
-from cms.factories import CoursePageFactory, HomePageFactory, ProgramPageFactory
+from cms.factories import (
+    CoursePageFactory,
+    FlexiblePricingFormFactory,
+    HomePageFactory,
+    ProgramPageFactory,
+)
 from cms.models import (
     CourseIndexPage,
     CoursePage,
@@ -34,7 +43,14 @@ from cms.models import (
     ResourcePage,
 )
 from courses.factories import CourseFactory, CourseRunFactory, ProgramFactory
+from courses.models import Program, default_program_queryset
 from main.utils import get_learn_product_url
+
+# resolve_financial_assistance_form_urls does a fixed number of queries:
+# course pages, programs, related programs, program pages, live forms. This is
+# an upper bound; the property that matters is that it does not scale with the
+# number of courses asked for.
+FINANCIAL_ASSISTANCE_QUERY_COUNT = 6
 
 
 @pytest.mark.django_db
@@ -615,3 +631,219 @@ def test_create_featured_items_cache_no_expiry():
         if ttl == -2
         else f"Unexpected ttl value `{ttl}` for `{cms_utils.get_featured_items_cache_key()}`"
     )
+
+
+def _url_for(course, program_queryset=None):
+    """The resolved financial assistance form URL for one course."""
+    return resolve_financial_assistance_form_urls(
+        [course.id], program_queryset=program_queryset
+    )[course.id]
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_child_form():
+    """
+    A form that is a child page of the course page.
+
+    Exercises the treebeard path arithmetic standing in for Wagtail's
+    ``get_children()``.
+    """
+    page = CoursePageFactory()
+    page.product.program = None
+    form = FlexiblePricingFormFactory(parent=page)
+
+    assert _url_for(page.product).endswith(f"{form.slug}/")
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_course_specific_form():
+    """A form linked to the course via ``selected_course``."""
+    page = CoursePageFactory()
+    form = FlexiblePricingFormFactory(
+        parent=CoursePageFactory(), selected_course=page.product
+    )
+
+    assert _url_for(page.product).endswith(f"{form.slug}/")
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_own_program_form():
+    """A form linked to one of the course's own programs."""
+    program = ProgramFactory()
+    page = CoursePageFactory()
+    program.add_requirement(page.product)
+    form = FlexiblePricingFormFactory(
+        parent=CoursePageFactory(), selected_program=program
+    )
+
+    assert _url_for(page.product).endswith(f"{form.slug}/")
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_related_program_form():
+    """A form linked to a program *related* to the course's program."""
+    program = ProgramFactory()
+    related = ProgramFactory()
+    program.add_related_program(related)
+    page = CoursePageFactory()
+    program.add_requirement(page.product)
+    form = FlexiblePricingFormFactory(
+        parent=CoursePageFactory(), selected_program=related
+    )
+
+    assert _url_for(page.product).endswith(f"{form.slug}/")
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_absent_when_no_form():
+    """No form anywhere yields an empty string."""
+    page = CoursePageFactory()
+    page.product.program = None
+
+    assert _url_for(page.product) == ""
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_skips_programs_outside_the_scope():
+    """
+    A program the caller filtered out cannot supply the URL.
+
+    The regression this guards: the v2 course list scopes its ``programs``
+    prefetch to live, non-b2b programs, and the URL is chosen by walking a
+    course's programs - so the two have to be asked the same question. Before
+    this was threaded through, a course in a ``live=False`` program served that
+    program's form.
+    """
+    program = ProgramFactory(live=False)
+    page = CoursePageFactory()
+    program.add_requirement(page.product)
+    FlexiblePricingFormFactory(parent=CoursePageFactory(), selected_program=program)
+
+    live_only = Program.objects.filter(live=True)
+
+    assert _url_for(page.product, program_queryset=live_only) == ""
+    # Same data, no scope: the form is reachable, so the assertion above is
+    # about the scope rather than about the form being missing.
+    assert _url_for(page.product, program_queryset=Program.objects.all()) != ""
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_default_scope_excludes_b2b_programs():
+    """
+    With no scope named, b2b-only programs are out.
+
+    ``default_program_queryset()`` is what both this resolver and the
+    ``programs`` prefetch fall back to, so a b2b-only program must not supply a
+    URL to a caller that never asked about b2b.
+    """
+    program = ProgramFactory(b2b_only=True)
+    page = CoursePageFactory()
+    program.add_requirement(page.product)
+    FlexiblePricingFormFactory(parent=CoursePageFactory(), selected_program=program)
+
+    assert _url_for(page.product) == ""
+    assert _url_for(page.product, program_queryset=Program.objects.all()) != ""
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_scope_is_not_reentered_by_related_programs():
+    """
+    A scoped-out program does not sneak back in as somebody's related program.
+
+    Related programs are deliberately unscoped - they are reached *through* a
+    course's own programs, which are scoped - so this pins down that the
+    scoping happens at the only place it can: the course's own programs.
+    """
+    scoped_out = ProgramFactory(live=False)
+    related = ProgramFactory()
+    scoped_out.add_related_program(related)
+    page = CoursePageFactory()
+    scoped_out.add_requirement(page.product)
+    FlexiblePricingFormFactory(parent=CoursePageFactory(), selected_program=related)
+
+    assert (
+        _url_for(page.product, program_queryset=Program.objects.filter(live=True)) == ""
+    )
+
+
+@pytest.mark.django_db
+def test_financial_assistance_forms_load_is_scoped_to_the_request():
+    """
+    The forms query must not grow with the number of live forms on the site.
+
+    The query count tests below cannot catch this: fetching the whole form table
+    is still exactly one query, so a regression back to that would leave every
+    other test in this file passing. What matters here is how many rows come
+    back, which is why this asserts on the loaded buckets rather than on timing
+    or query count.
+
+    A form is reachable from a course only via one of the three lookups
+    ``url_for`` performs - tied to the course, tied to one of its programs, or a
+    child of one of the pages in play. Forms hung off unrelated course pages
+    satisfy none of them.
+    """
+    page = CoursePageFactory()
+    FlexiblePricingFormFactory(parent=page)
+    course_ids = [page.product.id]
+
+    def loaded_form_pks():
+        forms = _FinancialAssistanceForms(course_ids, default_program_queryset())
+        return {
+            form.pk
+            for bucket in (
+                forms.forms_by_parent_path,
+                forms.forms_by_course_id,
+                forms.forms_by_program_id,
+            )
+            for rows in bucket.values()
+            for form in rows
+        }
+
+    before = loaded_form_pks()
+    assert before, "the course's own form should load"
+
+    for _ in range(5):
+        FlexiblePricingFormFactory(parent=CoursePageFactory())
+
+    assert loaded_form_pks() == before
+
+
+@pytest.mark.django_db
+def test_financial_assistance_url_query_count_is_flat(django_assert_max_num_queries):
+    """
+    The resolver's query count must not grow with the number of courses.
+
+    That is the whole reason it exists: the cascade costs 4-8 queries per course
+    when resolved one at a time. Asserting that two cardinalities cost the same
+    tests that property directly, and unlike a fixed number it cannot be thrown
+    off by which test happens to warm Wagtail's cached site-root paths.
+    """
+
+    def make_courses(count):
+        courses = []
+        for _ in range(count):
+            page = CoursePageFactory()
+            FlexiblePricingFormFactory(parent=page)
+            # A program with a related program, so the whole cascade runs - a
+            # course with no programs short-circuits two of the queries.
+            program = ProgramFactory()
+            program.add_related_program(ProgramFactory())
+            program.add_requirement(page.product)
+            courses.append(page.product)
+        return [course.id for course in courses]
+
+    one = make_courses(1)
+    many = make_courses(10)
+
+    # The first get_url() in the process fetches the site root paths and caches
+    # them; warm that here so it lands in neither measurement.
+    resolve_financial_assistance_form_urls(one)
+
+    with CaptureQueriesContext(connection) as one_ctx:
+        assert resolve_financial_assistance_form_urls(one)
+    with django_assert_max_num_queries(FINANCIAL_ASSISTANCE_QUERY_COUNT) as many_ctx:
+        urls = resolve_financial_assistance_form_urls(many)
+
+    assert len(urls) == len(many)
+    assert all(url for url in urls.values())
+    assert len(many_ctx.captured_queries) == len(one_ctx.captured_queries)

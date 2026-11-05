@@ -145,3 +145,152 @@ export interface IDiscountFilters {
     payment_type: string;
     is_redeemed: string;
 }
+
+export type OnboardingState =
+    | "requested"
+    | "org_created"
+    | "idp_configured"
+    | "idp_validated"
+    | "contract_ready"
+    | "live"
+    | "blocked";
+
+export type IdpLifecycleState = "draft" | "testing" | "active" | "disabled";
+
+export type IdpProtocol = "saml" | "oidc";
+
+export interface IOrganizationOnboarding {
+    state: OnboardingState;
+    state_changed_at: string;
+    notes: string;
+}
+
+export interface IServiceProviderDetails {
+    // entity_id and metadata_url are null for OIDC.
+    entity_id: string | null;
+    redirect_uri: string;
+    metadata_url: string | null;
+}
+
+export interface IOrganizationIdentityProvider {
+    id: number;
+    alias: string;
+    protocol: IdpProtocol;
+    display_name: string;
+    lifecycle_state: IdpLifecycleState;
+    internal_id: string;
+    metadata_source: string;
+    metadata_artifact: Record<string, string> | null;
+    metadata_fetched_at: string | null;
+    created_on: string;
+    updated_on: string;
+    service_provider: IServiceProviderDetails;
+}
+
+export interface IProvisionedOrganization {
+    id: number;
+    name: string;
+    org_key: string;
+    org_key_prefix: string;
+    description: string;
+    slug: string;
+    sso_organization_id: string | null;
+    domains: string[] | null;
+    redirect_url: string | null;
+    onboarding: IOrganizationOnboarding | null;
+    identity_providers: IOrganizationIdentityProvider[];
+}
+
+export interface IProvisioningEvent {
+    id: number;
+    action: string;
+    identity_provider_alias: string;
+    actor: { id: number; username: string; email: string } | null;
+    data_before: Record<string, unknown> | null;
+    data_after: Record<string, unknown> | null;
+    created_on: string;
+}
+
+export type ContractMembershipType = "managed" | "code" | "auto";
+
+export interface IContractProgram {
+    readable_id: string;
+    title: string;
+    sort_order: number;
+}
+
+export interface IProvisionedContract {
+    id: number;
+    name: string;
+    slug: string;
+    organization: number;
+    membership_type: ContractMembershipType;
+    // Rich text, stored as HTML.
+    description: string;
+    welcome_message: string;
+    contract_start: string | null;
+    contract_end: string | null;
+    active: boolean;
+    max_learners: number | null;
+    enrollment_fixed_price: string | null;
+    programs: IContractProgram[];
+}
+
+export type ContractSetupStatus = "in_progress" | "complete" | "failed";
+
+export type CourseRunCloneStatus = "pending" | "cloning" | "cloned" | "failed";
+
+export interface IContractRunSetup {
+    courseware_id: string;
+    // null for a run created without an edX clone.
+    clone_status: CourseRunCloneStatus | null;
+    clone_attempts: number;
+    clone_error: string;
+}
+
+export interface IContractSetupStatus {
+    status: ContractSetupStatus;
+    runs: IContractRunSetup[];
+    enrollment_codes: { expected: number; existing: number };
+}
+
+export interface ICoursewareAddition {
+    runs_added: number;
+    courses_without_source_run: number;
+    skipped_reason: string;
+}
+
+export interface IRemovedContractRun {
+    courseware_id: string;
+    unlinked: boolean;
+}
+
+export interface IContractEnrollmentCode {
+    id: number;
+    code: string;
+    redemption_status: "unassigned" | "assigned" | "redeemed";
+    assigned_to: string | null;
+    assigned_on: string | null;
+    assigned_name: string | null;
+    redeemed_on: string | null;
+    redeemed_by: string | null;
+    last_sent: string | null;
+    email_status: string | null;
+    email_status_event_timestamp: string | null;
+}
+
+export interface IBulkAssignResult {
+    assigned: IContractEnrollmentCode[];
+    errors: { email: string; name: string; detail: string }[];
+}
+
+export interface IExpiredEnrollmentCode {
+    code: string;
+    deleted: boolean;
+}
+
+// DRF's PageNumberPagination envelope.
+export interface IPage<T> {
+    count: number;
+    results: T[];
+}

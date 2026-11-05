@@ -5,6 +5,7 @@ from ecommerce.factories import ProductFactory
 from ecommerce.serializers.serializers_test import create_order_receipt
 from ecommerce.tasks import (
     perform_cull_anonymous_baskets,
+    perform_cull_stale_pending_orders,
     perform_downgrade_from_order,
     perform_unenrollment_from_order,
 )
@@ -21,6 +22,15 @@ def test_perform_cull_anonymous_baskets_calls_api(mocker):
     mock_cull = mocker.patch("ecommerce.api.cull_anonymous_baskets")
 
     perform_cull_anonymous_baskets()
+
+    mock_cull.assert_called_once()
+
+
+def test_perform_cull_stale_pending_orders_calls_api(mocker):
+    """The task should just delegate to the api function"""
+    mock_cull = mocker.patch("ecommerce.api.cull_stale_pending_orders")
+
+    perform_cull_stale_pending_orders()
 
     mock_cull.assert_called_once()
 
@@ -90,6 +100,8 @@ def test_delayed_downgrade_user(mocker, user):
     Test that unenroll task properly calls the unenrollment functionality against an order
     """
 
-    downgrade_learner_mock = mocker.patch("ecommerce.api.downgrade_learner_from_order")
+    downgrade_learner_mock = mocker.patch(
+        "ecommerce.api.downgrade_enrollments_from_order"
+    )
     perform_downgrade_from_order.delay(order_id=1)
     downgrade_learner_mock.assert_called()

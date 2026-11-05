@@ -4,10 +4,12 @@ MITxOnline ecommerce views
 
 import logging
 from distutils.util import strtobool  # noqa: F401
+from urllib.parse import urlencode
 
 import django_filters
 from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Count, Q
@@ -38,11 +40,26 @@ from rest_framework.viewsets import (
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.api import is_product_courserun, is_product_program
-from courses.models import Course, CourseRun, Program, ProgramRun
-from courses.utils import is_uai_course_run, is_uai_program
+from courses.models import (
+    Course,
+    CourseRun,
+    CourseRunEnrollment,
+    PaidProgram,
+    Program,
+    ProgramEnrollment,
+    ProgramRun,
+)
+from courses.utils import is_uai_course_run, is_uai_program, is_xpro_course_run
 from ecommerce import api
 from ecommerce.constants import PAYMENT_TYPE_FINANCIAL_ASSISTANCE
 from ecommerce.discounts import DiscountType
+from ecommerce.exceptions import (
+    VerifiedProgramCourseNotInProgramError,
+    VerifiedProgramInvalidBasketError,
+    VerifiedProgramInvalidOrderError,
+    VerifiedProgramNoEnrollmentError,
+    VerifiedProgramNoProductError,
+)
 from ecommerce.models import (
     Basket,
     BasketDiscount,
@@ -70,6 +87,7 @@ from ecommerce.serializers import (
     UserDiscountMetaSerializer,
     UserDiscountSerializer,
 )
+from ecommerce.views.utils import AttachDiscountProductMixin
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.models import FlexiblePriceTier
 from flexiblepricing.serializers import FlexiblePriceTierSerializer
@@ -81,15 +99,18 @@ from main.constants import (
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_ENROLL_FAILED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
     USER_MSG_TYPE_PAYMENT_CANCELLED,
     USER_MSG_TYPE_PAYMENT_DECLINED,
     USER_MSG_TYPE_PAYMENT_ERROR,
     USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
+    USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 from main.utils import redirect_with_user_message
 from main.views import RefinePagination
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
 
 log = logging.getLogger(__name__)
@@ -400,7 +421,9 @@ class DiscountViewSet(ModelViewSet):
         otherSerializer = BulkDiscountSerializer(data=request.data)
 
         if otherSerializer.is_valid():
-            generated_codes = api.generate_discount_code(**request.data)
+            generated_codes = api.generate_discount_code(
+                **otherSerializer.validated_data
+            )
 
             discounts = DiscountSerializer(generated_codes, many=True)
 
@@ -427,7 +450,9 @@ class DiscountViewSet(ModelViewSet):
         ),
     ]
 )
-class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
+class NestedDiscountProductViewSet(
+    AttachDiscountProductMixin, NestedViewSetMixin, ModelViewSet
+):
     """API view set for Discounts"""
 
     serializer_class = DiscountProductSerializer
@@ -435,20 +460,6 @@ class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated, IsAdminUser)
     pagination_class = RefinePagination
-
-    def partial_update(self, request, **kwargs):
-        discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
-
-        (_, created) = DiscountProduct.objects.get_or_create(
-            discount=discount, product_id=request.data["product_id"]
-        )
-
-        return Response(
-            DiscountProductSerializer(
-                DiscountProduct.objects.filter(discount=discount).all(), many=True
-            ).data,
-            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
-        )
 
     def destroy(self, request, **kwargs):  # noqa: ARG002
         discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
@@ -637,7 +648,7 @@ class CheckoutApiViewSet(ViewSet):
             if not api.check_discount_for_products(discount, basket):
                 raise ObjectDoesNotExist()  # noqa: RSE102, TRY301
 
-            if not discount.check_validity(request.user):
+            if not discount.is_redeemable_by(request.user):
                 log.error(
                     f"Discount code {request.data['discount']} has already been redeemed"  # noqa: G004
                 )
@@ -736,6 +747,10 @@ class CheckoutApiViewSet(ViewSet):
                             is_product_program(product)
                             and is_uai_program(product.purchasable_object)
                         ),
+                        is_xpro=(
+                            is_product_courserun(product)
+                            and is_xpro_course_run(product.purchasable_object)
+                        ),
                     )
             else:
                 # Legacy behavior: add single item
@@ -752,6 +767,10 @@ class CheckoutApiViewSet(ViewSet):
                     or (
                         is_product_program(product)
                         and is_uai_program(product.purchasable_object)
+                    ),
+                    is_xpro=(
+                        is_product_courserun(product)
+                        and is_xpro_course_run(product.purchasable_object)
                     ),
                 )
 
@@ -1005,24 +1024,30 @@ class CheckoutProductView(RedirectView):
     def get_redirect_url(self, *args, **kwargs):
         """Populate the basket before redirecting"""
         with transaction.atomic():
-            basket = api.establish_basket_for_request(self.request, for_update=True)
-            basket.basket_items.all().delete()
-            BasketDiscount.objects.filter(redeemed_basket=basket).delete()
-
             # Incoming product ids from internal checkout
             all_product_ids = self.request.GET.getlist("product_id")
 
             # If the request is from an external source we would have course_id as query param
             # Note that course_id passed in param corresponds to course run's courseware_id on mitxonline
             course_run_ids = self.request.GET.getlist("course_run_id")
-            course_ids = self.request.GET.getlist("course_id")
+            courseware_ids = self.request.GET.getlist("course_id")
             program_ids = self.request.GET.getlist("program_id")
+
+            dashboard_redirect_url = self._enroll_via_verified_program(
+                all_product_ids, course_run_ids, courseware_ids, program_ids
+            )
+            if dashboard_redirect_url is not None:
+                return dashboard_redirect_url
+
+            basket = api.establish_basket_for_request(self.request, for_update=True)
+            basket.basket_items.all().delete()
+            BasketDiscount.objects.filter(redeemed_basket=basket).delete()
 
             all_product_ids.extend(
                 list(
                     CourseRun.objects.filter(
                         Q(courseware_id__in=course_run_ids)
-                        | Q(courseware_id__in=course_ids)
+                        | Q(courseware_id__in=courseware_ids)
                     ).values_list("products__id", flat=True)
                 )
             )
@@ -1037,6 +1062,97 @@ class CheckoutProductView(RedirectView):
                 BasketItem.objects.create(basket=basket, product=product)
 
         return super().get_redirect_url(*args, **kwargs)
+
+    def _enroll_via_verified_program(  # noqa: PLR0911
+        self, product_ids, course_run_ids, courseware_ids, program_ids
+    ):
+        """
+        If this is a request for a single course run, and the learner already
+        holds a verified enrollment in a program that run's course belongs
+        to, create the verified run enrollment directly (they've already
+        paid for it via the program) and return the dashboard URL to redirect
+        to instead of the cart.
+
+        The run can be requested by courseware id (external checkout) or by
+        the id of its product (in-app "Add to Cart" buttons).
+
+        Returns None if the request doesn't qualify for the shortcut, so the
+        caller falls back to the normal basket flow.
+        """
+        if program_ids or not self.request.user.is_authenticated:
+            return None
+
+        products = Product.objects.filter(id__in=product_ids)
+        if products.exclude(
+            content_type=ContentType.objects.get_for_model(CourseRun)
+        ).exists():
+            # A program (or anything else that isn't a run) is in the request.
+            return None
+
+        runs = list(
+            CourseRun.objects.filter(
+                Q(courseware_id__in=course_run_ids)
+                | Q(courseware_id__in=courseware_ids)
+                | Q(id__in=products.values_list("object_id", flat=True))
+            )
+        )
+        if len(runs) != 1:
+            return None
+        run = runs[0]
+
+        # Only a program the learner actually paid for counts - a verified
+        # enrollment can also be set without a purchase (e.g. by staff), and
+        # that shouldn't make the program's courses free.
+        # order_by keeps this deterministic if the learner somehow holds more
+        # than one matching verified program enrollment (e.g. the course is
+        # in multiple programs) -- prefer the most recently created one.
+        program_enrollment = (
+            ProgramEnrollment.objects.filter(
+                user=self.request.user,
+                enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+                active=True,
+                program__all_requirements__course=run.course,
+                program__id__in=PaidProgram.objects.filter(
+                    user=self.request.user
+                ).values_list("program__id", flat=True),
+            )
+            .distinct()
+            .order_by("-id")
+            .first()
+        )
+        if program_enrollment is None:
+            return None
+
+        if CourseRunEnrollment.objects.filter(
+            user=self.request.user,
+            run=run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        ).exists():
+            # Already fully enrolled at the verified level for this run --
+            # nothing to purchase, so skip straight to the dashboard instead
+            # of falling through to the cart.
+            return reverse("user-dashboard")
+
+        try:
+            api.create_verified_program_course_run_enrollment(
+                self.request, run, program_enrollment.program
+            )
+        except (
+            VerifiedProgramNoEnrollmentError,
+            VerifiedProgramCourseNotInProgramError,
+            VerifiedProgramNoProductError,
+            VerifiedProgramInvalidBasketError,
+            VerifiedProgramInvalidOrderError,
+        ):
+            log.exception(
+                "Failed to create verified program course enrollment for user id %s, run %s",
+                self.request.user.id,
+                run.courseware_id,
+            )
+            return None
+
+        return reverse("user-dashboard")
 
 
 class AnonymousCheckoutView(LoginRequiredMixin, RedirectView):
@@ -1099,6 +1215,23 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             return redirect_with_user_message(
                 reverse("user-dashboard"),
                 {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
+            )
+        if "profile_incomplete" in checkout_payload:
+            # The cart opens its profile dialog on these fields. It can't edit
+            # the email address, so a rejection of only that goes to support.
+            missing_fields = [
+                field
+                for field in checkout_payload["missing_fields"]
+                if field != "email"
+            ]
+            if not missing_fields:
+                return redirect_with_user_message(
+                    reverse("cart"), {"type": USER_MSG_TYPE_ENROLL_FAILED}
+                )
+            params = urlencode({"profile_incomplete": ",".join(missing_fields)})
+            return redirect_with_user_message(
+                f"{reverse('cart')}?{params}",
+                {"type": USER_MSG_TYPE_PROFILE_INCOMPLETE},
             )
         if "no_checkout" in checkout_payload:
             order = checkout_payload["order"]

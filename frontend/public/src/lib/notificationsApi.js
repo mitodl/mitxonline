@@ -12,6 +12,7 @@ import {
   USER_MSG_TYPE_ENROLLED,
   USER_MSG_TYPE_PAYMENT_DECLINED,
   USER_MSG_TYPE_PAYMENT_CANCELLED,
+  USER_MSG_TYPE_PAYMENT_ERROR,
   USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
   USER_MSG_TYPE_PAYMENT_ACCEPTED,
   USER_MSG_TYPE_PAYMENT_ACCEPTED_NO_VALUE,
@@ -19,6 +20,7 @@ import {
   USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
   USER_MSG_TYPE_DISCOUNT_INVALID,
   USER_MSG_TYPE_PROFILE_CREATED,
+  USER_MSG_TYPE_PROFILE_INCOMPLETE,
   USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY
 } from "../constants"
 
@@ -60,6 +62,11 @@ export function parseStoredUserMessage(
     msgText =
         "We're sorry, your country is currently blocked from enrolling in this course."
     break
+  case USER_MSG_TYPE_PROFILE_INCOMPLETE:
+    alertType = ALERT_TYPE_DANGER
+    msgText =
+        'We need a few more details about you before you can place your order. Please click "Place your order" again to provide them.'
+    break
   case USER_MSG_TYPE_COURSE_NON_UPGRADABLE:
     alertType = ALERT_TYPE_DANGER
     msgText =
@@ -80,6 +87,10 @@ export function parseStoredUserMessage(
   case USER_MSG_TYPE_PAYMENT_DECLINED:
     alertType = ALERT_TYPE_DANGER
     msgText = "Payment was declined, please try again."
+    break
+  case USER_MSG_TYPE_PAYMENT_ERROR:
+    alertType = ALERT_TYPE_DANGER
+    msgText = "There was an error processing your payment, please try again."
     break
   case USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN:
     alertType = ALERT_TYPE_DANGER

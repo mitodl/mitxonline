@@ -116,7 +116,7 @@ describe("Top-level App", () => {
     )
   })
 
-  it("does not render header on cart page", async () => {
+  it("renders notifications but not the header on cart page", async () => {
     helper.handleRequestStub.returns(anonymousUser)
     renderPage = helper.configureMountRenderer(
       App,
@@ -129,8 +129,11 @@ describe("Top-level App", () => {
         }
       }
     )
-    const { inner } = await renderPage()
+    const { inner } = await renderPage({
+      entities: { currentUser: anonymousUser }
+    })
     assert.isFalse(inner.find("Header").exists())
+    assert.lengthOf(inner.find("DelayedNotificationContainer"), 1)
   })
 
   it("does not render header on checkout page", async () => {

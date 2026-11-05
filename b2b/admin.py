@@ -1,19 +1,24 @@
 """B2B model admin. Only for convenience; you should use the Wagtail interface instead."""
 
+from datetime import UTC, datetime
+
 from django.contrib import admin
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.db.models import Count
+from django.urls import reverse
 from django.utils.html import format_html
 
+from b2b.api import get_events_for_message_ids, should_persist_event
 from b2b.models import (
     ContractPage,
     ContractProgramItem,
     DiscountContractAttachmentRedemption,
     OrganizationPage,
+    OrganizationProvisioningAudit,
     UserOrganization,
 )
 from courses.models import CourseRun
-from main.admin import DisplayOnlyAdminMixin, ReadOnlyModelAdmin
+from main.admin import DisplayOnlyAdminMixin, ReadOnlyModelAdmin, get_model_admin_url
 
 
 class UserOrganizationAdminInline(DisplayOnlyAdminMixin, admin.TabularInline):
@@ -100,11 +105,10 @@ class ContractPageProgramInline(DisplayOnlyAdminMixin, admin.TabularInline):
 class ContractPageCourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
     """Inline to display course runs for contract pages."""
 
-    model = CourseRun
-    fk_name = "b2b_contract"
+    model = CourseRun.b2b_contracts.through
     extra = 0
     fields = [
-        "title_linked",
+        "courseware_id",
         "title",
         "run_tag",
         "language",
@@ -112,7 +116,7 @@ class ContractPageCourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
         "variant_industry",
     ]
     readonly_fields = [
-        "title_linked",
+        "courseware_id",
         "title",
         "run_tag",
         "language",
@@ -123,6 +127,36 @@ class ContractPageCourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
     verbose_name = "Contract Course Run"
     verbose_name_plural = "Contract Course Runs"
 
+    @admin.display(description="Courseware ID")
+    def courseware_id(self, obj):
+        admin_link = reverse("admin:courses_courserun_change", args=(obj.courserun.id,))
+        course_admin_link = reverse(
+            "admin:courses_course_change", args=(obj.courserun.course.id,)
+        )
+        return format_html(
+            f'{obj.courserun.courseware_id}<br />Admins: <a href="{admin_link}">Run</a> -  <a href="{course_admin_link}">Course</a>'
+        )
+
+    @admin.display(description="Course Title")
+    def title(self, obj):
+        return obj.courserun.title
+
+    @admin.display(description="Run Tag")
+    def run_tag(self, obj):
+        return obj.courserun.run_tag
+
+    @admin.display(description="Language")
+    def language(self, obj):
+        return obj.courserun.language
+
+    @admin.display(description="Variant Length")
+    def variant_length(self, obj):
+        return obj.courserun.variant_length
+
+    @admin.display(description="Variant Industry")
+    def variant_industry(self, obj):
+        return obj.courserun.variant_industry
+
 
 @admin.register(DiscountContractAttachmentRedemption)
 class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
@@ -131,9 +165,12 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
     list_display = [
         "discount_code",
         "status",
-        "user",
+        "user_link",
         "assignee",
-        "contract",
+        "contract_link",
+        "email_status",
+        "email_message_id",
+        "email_status_event_timestamp",
         "created_on",
         "redeemed_on",
         "last_reminder_sent_on",
@@ -153,6 +190,7 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
         ),
         "assigned_email",
         "assigned_name",
+        "email_status",
     ]
     date_hierarchy = "created_on"
     fields = [
@@ -162,6 +200,9 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
         "assigned_by",
         "contract",
         "discount",
+        "email_status",
+        "email_message_id",
+        "email_status_event_timestamp",
         "created_on",
         "redeemed_on",
         "last_reminder_sent_on",
@@ -170,6 +211,7 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
         "user",
         "contract",
         "discount",
+        "email_status_event_timestamp",
         "assigned_by",
         "created_on",
         "redeemed_on",
@@ -182,7 +224,11 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
         "discount__discount_code",
         "assigned_email",
         "assigned_name",
+        "email_status",
+        "email_message_id",
     ]
+
+    actions = ["backfill_email_events"]
 
     @admin.display(description="Discount Code")
     def discount_code(self, instance):
@@ -212,6 +258,46 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
         namestr = f"<br />{instance.assigned_name}" if instance.assigned_name else ""
         return format_html(f"{instance.assigned_email}{namestr}")
 
+    @admin.display(description="User")
+    def user_link(self, instance):
+        return get_model_admin_url(instance.user)
+
+    @admin.display(description="Contract")
+    def contract_link(self, instance):
+        return get_model_admin_url(instance.contract)
+
+    @admin.action(
+        description="Backfill most recent email event within last 30d for records with email message IDs"
+    )
+    def backfill_email_events(self, request, queryset):
+        """Admin action to backfill email deliverability status from Mailgun logs."""
+        dcars = list(queryset.exclude(email_message_id=""))
+
+        message_id_to_record = {dcar.email_message_id: dcar for dcar in dcars}
+        events_by_message_id = get_events_for_message_ids(
+            list(message_id_to_record.keys())
+        )
+
+        updated = 0
+        for message_id, record in message_id_to_record.items():
+            events = events_by_message_id.get(message_id)
+            if not events:
+                continue
+            for event in events:
+                if should_persist_event(record, event):
+                    record.email_status = event["event"]
+                    record.email_status_event_timestamp = datetime.fromtimestamp(
+                        event["timestamp"], tz=UTC
+                    )
+                    record.save()
+                    updated += 1
+                    break
+
+        self.message_user(
+            request,
+            f"Updated email status for {updated} of {len(dcars)} record(s).",
+        )
+
 
 @admin.register(ContractPage)
 class ContractPageAdmin(ReadOnlyModelAdmin):
@@ -229,6 +315,7 @@ class ContractPageAdmin(ReadOnlyModelAdmin):
     ]
     list_filter = ["membership_type", "organization", "contract_start", "contract_end"]
     date_hierarchy = "contract_start"
+    search_fields = ["title", "slug", "organization__name"]
     fields = [
         "id",
         "active",
@@ -247,6 +334,16 @@ class ContractPageAdmin(ReadOnlyModelAdmin):
         ContractPageProgramInline,
         ContractPagePossibleVariantInline,
     ]
+
+    def get_queryset(self, request):  # noqa: ARG002
+        """
+        Use the unfiltered manager.
+
+        Inactive contracts have to be searchable in the autocomplete widget
+        used by UserContractPageInline.
+        """
+
+        return ContractPage.objects.get_queryset()
 
 
 @admin.register(OrganizationPage)
@@ -294,4 +391,60 @@ class UserOrganizationAdmin(admin.ModelAdmin):
     list_display = ["user", "organization", "is_manager", "keep_until_seen"]
     list_filter = ["is_manager", "keep_until_seen", "organization"]
     search_fields = ["user__email", "user__username", "organization__name"]
-    fields = ["user", "organization", "is_manager", "keep_until_seen"]
+    fields = [
+        "user",
+        "organization",
+        "is_manager",
+        "keep_until_seen",
+        "added_to_keycloak_at",
+    ]
+    readonly_fields = ["added_to_keycloak_at"]
+
+
+@admin.register(OrganizationProvisioningAudit)
+class OrganizationProvisioningAuditAdmin(admin.ModelAdmin):
+    """Read-only view of the provisioning audit trail."""
+
+    list_display = [
+        "created_on",
+        "org_key",
+        "organization",
+        "action",
+        "identity_provider_alias",
+        "acting_user",
+    ]
+    list_filter = ["action"]
+    list_select_related = ["organization", "acting_user"]
+    search_fields = [
+        "org_key",
+        "organization__name",
+        "identity_provider_alias",
+        "acting_user__email",
+    ]
+    readonly_fields = [
+        "created_on",
+        "org_key",
+        "organization",
+        "action",
+        "identity_provider_alias",
+        "acting_user",
+        "data_before",
+        "data_after",
+        "call_stack",
+    ]
+    fields = readonly_fields
+
+    def has_add_permission(self, request):  # noqa: ARG002
+        """Audit records are written by the provisioning functions only."""
+
+        return False
+
+    def has_change_permission(self, request, obj=None):  # noqa: ARG002
+        """Audit records are append-only."""
+
+        return False
+
+    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
+        """Audit records are append-only."""
+
+        return False

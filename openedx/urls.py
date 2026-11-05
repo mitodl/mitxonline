@@ -16,6 +16,11 @@ urlpatterns = (
         name="openedx-private-oauth-complete-no-apisix",
     ),
     path(
+        "api/notification-preferences/",
+        views.NotificationPreferencesView.as_view(),
+        name="notification-preferences",
+    ),
+    path(
         "api/openedx_webhook/enrollment/",
         views.edx_enrollment_webhook,
         name="openedx-enrollment-webhook",

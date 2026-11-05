@@ -1,199 +1,62 @@
+from django import forms
+from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import Q
 from django.forms import ModelForm, ValidationError
 from django.forms.fields import JSONField
 from webpack_loader import utils as webpack_loader_utils
 
 from courses.models import (
     Course,
+    CourseRun,
     Program,
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
+from courses.requirement_tree import programs_requiring, validate_requirement_tree
 from courses.serializers.v1.programs import ProgramRequirementTreeSerializer
 from courses.widgets import ProgramRequirementsInput
 
+#: Courseware ID suffix of the runs offered by the admin "enroll in runs" page
+ADMIN_ENROLL_RUN_SUFFIX = "0T2026"
 
-def program_requirements_schema():
-    # here, you can create a schema dynamically
-    # such as read data from database and populate choices
+
+def program_requirements_catalog():
+    """
+    Build the course/program catalog the requirements builder searches over.
+
+    The requirements-admin.js widget renders its own "requirement groups" UI
+    client-side; this just hands it the raw data it needs to populate course
+    and program pickers, the node types it writes, and the operator choices
+    for a group's "all of" / "choose N of" toggle.
+    """
 
     courses = Course.objects.live().order_by("title")
     programs = Program.objects.live().order_by("title")
 
     return {
-        "title": "Requirements",
-        "type": "array",
-        "items": {
-            "$ref": "#/$defs/node",
-            "title": "Section",
-            "headerTemplate": "{{ self.data.title }}",
-            "options": {
-                "disable_collapse": False,
-                "collapsed": True,
-            },
-            "properties": {
-                "data": {
-                    "type": "object",
-                    "properties": {
-                        "node_type": {
-                            "type": "string",
-                            "default": ProgramRequirementNodeType.OPERATOR.value,
-                            "options": {
-                                "hidden": True,
-                            },
-                        }
-                    },
-                },
-                "children": {
-                    "type": "array",
-                    "title": "Requirements",
-                    "items": {
-                        "title": "Requirement",
-                        "$ref": "#/$defs/node",
-                        "properties": {
-                            "children": {
-                                "type": "array",
-                                "title": "Courses",
-                                "format": "table",
-                                "options": {
-                                    "dependencies": {
-                                        "data.node_type": ProgramRequirementNodeType.OPERATOR.value,
-                                    }
-                                },
-                                "items": {
-                                    "$ref": "#/$defs/node",
-                                    "title": "Course",
-                                    "properties": {
-                                        "data": {
-                                            "title": "Courses",
-                                            "properties": {
-                                                "node_type": {
-                                                    "type": "string",
-                                                    "default": ProgramRequirementNodeType.COURSE.value,
-                                                    "options": {
-                                                        "hidden": True,
-                                                    },
-                                                }
-                                            },
-                                        },
-                                    },
-                                },
-                            }
-                        },
-                    },
-                },
-            },
+        "nodeTypes": {
+            "course": ProgramRequirementNodeType.COURSE.value,
+            "operator": ProgramRequirementNodeType.OPERATOR.value,
+            "program": ProgramRequirementNodeType.PROGRAM.value,
+            "track": ProgramRequirementNodeType.TRACK.value,
         },
-        "$defs": {
-            "node": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": ["number", "null"],
-                        "default": None,
-                        "options": {
-                            "hidden": True,
-                        },
-                    },
-                    "data": {
-                        "type": "object",
-                        "title": "Details",
-                        "propertyOrder": 1,
-                        "properties": {
-                            "node_type": {
-                                "type": "string",
-                                "title": "Type",
-                                "enum": [
-                                    ProgramRequirementNodeType.COURSE.value,
-                                    ProgramRequirementNodeType.OPERATOR.value,
-                                    ProgramRequirementNodeType.PROGRAM.value,
-                                ],
-                                "options": {
-                                    "enum_titles": [
-                                        ProgramRequirementNodeType.COURSE.label,
-                                        ProgramRequirementNodeType.OPERATOR.label,
-                                        ProgramRequirementNodeType.PROGRAM.label,
-                                    ],
-                                },
-                            },
-                            "title": {
-                                "type": "string",
-                                "title": "Title",
-                                "options": {
-                                    "dependencies": {
-                                        "node_type": ProgramRequirementNodeType.OPERATOR.value,
-                                    }
-                                },
-                            },
-                            "operator": {
-                                "type": "string",
-                                "title": "Operation",
-                                "enum": ProgramRequirement.Operator.values,
-                                "options": {
-                                    "dependencies": {
-                                        "node_type": ProgramRequirementNodeType.OPERATOR.value,
-                                    },
-                                    "enum_titles": ProgramRequirement.Operator.labels,
-                                },
-                            },
-                            "operator_value": {
-                                "type": "string",
-                                "format": "number",
-                                "title": "Value",
-                                "default": 1,
-                                "minimum": 0,
-                                "options": {
-                                    "dependencies": {
-                                        "node_type": ProgramRequirementNodeType.OPERATOR.value,
-                                        "operator": ProgramRequirement.Operator.MIN_NUMBER_OF.value,
-                                    },
-                                },
-                            },
-                            "elective_flag": {
-                                "type": "boolean",
-                                "title": "Contains Electives",
-                                "default": False,
-                                "options": {
-                                    "dependencies": {
-                                        "node_type": ProgramRequirementNodeType.OPERATOR.value,
-                                    },
-                                },
-                            },
-                            # course fields
-                            "course": {
-                                "type": "number",
-                                "title": "Course",
-                                "enum": [course.id for course in courses],
-                                "options": {
-                                    "dependencies": {
-                                        "node_type": ProgramRequirementNodeType.COURSE.value
-                                    },
-                                    "enum_titles": [
-                                        f"{course.readable_id} | {course.title}"
-                                        for course in courses
-                                    ],
-                                },
-                            },
-                            # program fields
-                            "required_program": {
-                                "type": "number",
-                                "title": "Required Program",
-                                "enum": [program.id for program in programs],
-                                "options": {
-                                    "dependencies": {
-                                        "node_type": ProgramRequirementNodeType.PROGRAM.value
-                                    },
-                                    "enum_titles": [
-                                        f"{program.readable_id} | {program.title}"
-                                        for program in programs
-                                    ],
-                                },
-                            },
-                        },
-                    },
-                },
-            },
+        "operators": [
+            {"value": value, "label": label}
+            for value, label in ProgramRequirement.Operator.choices
+        ],
+        "operatorValues": {
+            "allOf": ProgramRequirement.Operator.ALL_OF.value,
+            "minNumberOf": ProgramRequirement.Operator.MIN_NUMBER_OF.value,
         },
+        "courses": [
+            {"id": course.id, "code": course.readable_id, "title": course.title}
+            for course in courses
+        ],
+        "programs": [
+            {"id": program.id, "code": program.readable_id, "title": program.title}
+            for program in programs
+        ],
     }
 
 
@@ -201,7 +64,7 @@ class ProgramAdminForm(ModelForm):
     """Custom form for handling requirements data"""
 
     requirements = JSONField(
-        widget=ProgramRequirementsInput(schema=program_requirements_schema)
+        widget=ProgramRequirementsInput(catalog=program_requirements_catalog)
     )
 
     def __init__(self, *args, **kwargs):
@@ -252,155 +115,22 @@ class ProgramAdminForm(ModelForm):
 
         return [_serialize(node) for node in data]
 
-    def clean(self):  # noqa: C901
-        """
-        Verifies that a Program's elective and requirement operators.
-        Ensures that every operator has a Title defined.
-        Ensures that elective operators have a Value defined which
-        is less than or equal to the number of courses which can be
-        applied to the program certificate.
-
-        Raises:
-            ValidationError: operator_value does not exist.
-            ValidationError: operator_value does exist but is empty.
-            ValidationError: operator_value is not equal to or less than the number of courses
-                which can apply towards the program certificate.
-        """
-
-        def _validate_elective_value_presence(operator):
-            """
-            Verifies that a Program's elective operator contains
-            a defined Value field that is not negative.
-
-            Args:
-                operator (dict):
-                {
-                    'children': [],
-                    'id': None,
-                    'data': {
-                        'node_type': 'operator',
-                        'title': 'Only 1 of',
-                        'operator': 'min_number_of',
-                        'operator_value': '1',
-                        'elective_flag': False
-                    }
-                }
-            ValidationError: operator_value does not exist.
-            ValidationError: operator_value does exist but is empty.
-            ValidationError: operator_value is negative.
-            """
-            if (
-                operator["data"]["operator"]
-                == ProgramRequirement.Operator.MIN_NUMBER_OF.value
-            ):
-                # Ensure a Value exists and is defined for elective operators.
-                if "operator_value" not in operator["data"]:
-                    raise ValidationError(
-                        '"Minimum # of" operator must have Value equal to 1 or more.'  # noqa: EM101
-                    )
-                if operator["data"]["operator_value"] == "":
-                    raise ValidationError(
-                        '"Minimum # of" operator must have Value equal to 1 or more.'  # noqa: EM101
-                    )
-                # Ensure the value is not negative
-                try:
-                    value = int(operator["data"]["operator_value"])
-                    if value < 0:
-                        raise ValidationError(
-                            '"Minimum # of" operator must have Value equal to 0 or more.'  # noqa: EM101
-                        )
-                except (ValueError, TypeError):
-                    raise ValidationError(
-                        '"Minimum # of" operator must have a valid numeric Value equal to 0 or more.'  # noqa: EM101
-                    ) from None
-
-        def _validate_operator_title(operator):
-            """Ensure Title is defined for every operator.
-
-            Args:
-                operator (dict):
-                    {
-                        'children': [],
-                        'id': None,
-                        'data': {
-                            'node_type': 'operator',
-                            'title': 'Only 1 of',
-                            'operator': 'min_number_of',
-                            'operator_value': '1',
-                            'elective_flag': False
-                        }
-                    }
-
-            Raises:
-                ValidationError: Operator Title value is empty.
-            """
-            if operator["data"]["title"] == "":
-                raise ValidationError("Operator must have a Title.")  # noqa: EM101
-
-        def _validate_elective_value_and_child_courses(
-            elective_operator_value: int, number_of_applicable_courses_in_operator: int
-        ):
-            """Validate that the elective operations Value is equal to or less
-                    than the total number of course certificates which count
-                    towards satisfying the elective.
-
-            Args:
-                elective_operator_value (int): The Value field of the elective operator.
-                number_of_applicable_courses_in_operator (int): The calculated total number of course
-                    certificates which count towards satisfying the elective.
-
-            Raises:
-                ValidationError: The elective operator's Value is larger than the total number of course
-                    certificates which count towards satisfying the elective.
-            """
-            if elective_operator_value > number_of_applicable_courses_in_operator:
-                raise ValidationError(
-                    '"Minimum # of" operator must have Value equal to or less than the number of elective courses which can apply towards the program certificate.'  # noqa: EM101
-                )
-
-        if "requirements" in self.cleaned_data:
-            for operator in self.cleaned_data["requirements"]:
-                # Ensure Title is defined for every operator.
-                _validate_operator_title(operator)
-
-                if (
-                    operator["data"]["operator"]
-                    == ProgramRequirement.Operator.MIN_NUMBER_OF.value
-                ):
-                    _validate_elective_value_presence(operator)
-
-                    # Ensure the total number of courses that are allowed to apply towards the program
-                    # certificate is equal to or less than the Value field for the elective.
-                    total_child_courses = 0
-                    for child in operator["children"]:
-                        if child["data"]["node_type"] == "operator":
-                            _validate_operator_title(child)
-                            if (
-                                child["data"]["operator"]
-                                == ProgramRequirement.Operator.MIN_NUMBER_OF.value
-                            ):
-                                _validate_elective_value_presence(child)
-                                # Make sure the nested elective stipulation's value is equal to or less than the number
-                                # of child courses associated with it.  We can assume that all children of the nested
-                                # elective stipulation are courses and not operators.
-                                _validate_elective_value_and_child_courses(
-                                    int(child["data"]["operator_value"]),
-                                    len(child["children"]),
-                                )
-                                # The value of the nested elective stipulation defines the number of courses
-                                # within that nested stipulation which are allowed to apply towards a program's
-                                # elective requirement.
-                                total_child_courses += int(
-                                    child["data"]["operator_value"]
-                                )
-                        else:
-                            # Assume the child must be a course.
-                            total_child_courses += 1
-
-                    # Validate the main elective operator using child courses and nested stipulation values.
-                    _validate_elective_value_and_child_courses(
-                        int(operator["data"]["operator_value"]), total_child_courses
-                    )
+    def clean(self):
+        """Reject a requirements tree that breaks validate_requirement_tree's rules."""
+        cleaned_data = super().clean()
+        if "requirements" in cleaned_data:
+            program_id = self.instance.pk
+            errors = validate_requirement_tree(
+                cleaned_data["requirements"],
+                display_mode=cleaned_data.get("display_mode"),
+                program_id=program_id,
+                programs_requiring_this=(
+                    programs_requiring(program_id) if program_id else {}
+                ),
+            )
+            if errors:
+                raise ValidationError(errors)
+        return cleaned_data
 
     def save(self, commit=True):  # noqa: FBT002
         """Save requirements"""
@@ -449,6 +179,7 @@ class ProgramAdminForm(ModelForm):
             "b2b_only",
             "display_mode",
             "enrollment_modes",
+            "certificates_disabled",
         ]
 
     class Media:
@@ -462,3 +193,47 @@ class ProgramAdminForm(ModelForm):
             chunk["url"]
             for chunk in webpack_loader_utils.get_files("requirementsAdmin", "js")
         ]
+
+
+class AdminEnrollUserInRunsForm(forms.Form):
+    """
+    Admin form for enrolling one user in any of the course runs whose
+    courseware_id ends with ADMIN_ENROLL_RUN_SUFFIX.
+    """
+
+    user = forms.CharField(
+        help_text="Email, username, or ID of the user to enroll",
+        widget=forms.TextInput(attrs={"size": 60}),
+    )
+    runs = forms.ModelMultipleChoiceField(
+        queryset=CourseRun.objects.none(),
+        widget=forms.CheckboxSelectMultiple,
+        help_text=f"Course runs ending in {ADMIN_ENROLL_RUN_SUFFIX}",
+    )
+
+    def __init__(self, *args, **kwargs):
+        """Populate the run choices at form creation so new runs show up."""
+        super().__init__(*args, **kwargs)
+        self.fields["runs"].queryset = (
+            CourseRun.objects.filter(courseware_id__endswith=ADMIN_ENROLL_RUN_SUFFIX)
+            .select_related("course")
+            .order_by("courseware_id")
+        )
+        self.fields["runs"].label_from_instance = lambda run: (
+            f"{run.courseware_id} — {run.title}"
+        )
+
+    def clean_user(self):
+        """Resolve the entered email, username, or ID to a single User."""
+        value = self.cleaned_data["user"].strip()
+        query = Q(email__iexact=value) | Q(username=value)
+        if value.isdigit():
+            query |= Q(pk=int(value))
+        users = list(get_user_model().objects.filter(query)[:2])
+        if not users:
+            msg = f"No user found matching '{value}'"
+            raise ValidationError(msg)
+        if len(users) > 1:
+            msg = f"More than one user matches '{value}'; use the user ID instead"
+            raise ValidationError(msg)
+        return users[0]

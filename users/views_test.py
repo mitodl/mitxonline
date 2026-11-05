@@ -4,12 +4,15 @@ from datetime import timedelta
 
 import pytest
 from django.conf import settings
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from factory import fuzzy
 from mitol.common.utils import now_in_utc
 from rest_framework import status
 
 from b2b.factories import ContractPageFactory
+from b2b.models import UserB2BContract
 from compliance.api import get_missing_export_compliance_fields
 from main.test_utils import drf_datetime
 from users.api import User
@@ -104,6 +107,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
                                 SupportedVariantSerializer(sv).data
                                 for sv in contract.variant_options.all()
                             ],
+                            "consented_to_data_sharing": None,
                         }
                     ],
                 }
@@ -241,6 +245,66 @@ def test_get_user_by_me_excludes_unenrolled_contracts(client, user):
     # Should not include the unenrolled contract
     contract_ids = [contract["id"] for contract in org_data["contracts"]]
     assert unenrolled_contract.id not in contract_ids
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("consented", [None, True, False])
+def test_get_user_by_me_contract_consent(client, user, consented):
+    """
+    /api/v0/users/me returns the user's own consent for each contract, and not
+    another member's.
+    """
+    client.force_login(user)
+    contract = ContractPageFactory.create(active=True)
+    user.b2b_organizations.add(contract.organization)
+    user.b2b_contracts.add(contract)
+    UserB2BContract.objects.filter(user=user, contract_page=contract).update(
+        consented_to_data_sharing=consented
+    )
+
+    other_member = UserFactory.create()
+    other_member.b2b_organizations.add(contract.organization)
+    other_member.b2b_contracts.add(contract)
+    UserB2BContract.objects.filter(user=other_member, contract_page=contract).update(
+        consented_to_data_sharing=consented is not True
+    )
+
+    resp = client.get(reverse("users_api-me"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    [org_data] = resp.json()["b2b_organizations"]
+    [contract_data] = org_data["contracts"]
+    assert contract_data["id"] == contract.id
+    assert contract_data["consented_to_data_sharing"] is consented
+
+
+@pytest.mark.django_db
+def test_get_user_by_me_contract_consent_query_count(client, user):
+    """Consent for all of the user's contracts is read in a single query"""
+    client.force_login(user)
+    org_contract = ContractPageFactory.create(active=True)
+    user.b2b_organizations.add(org_contract.organization)
+    user.b2b_contracts.add(org_contract)
+    for _ in range(3):
+        user.b2b_contracts.add(
+            ContractPageFactory.create(
+                active=True,
+                organization=org_contract.organization,
+                parent=org_contract.organization,
+            )
+        )
+
+    with CaptureQueriesContext(connection) as ctx:
+        resp = client.get(reverse("users_api-me"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert len(resp.json()["b2b_organizations"][0]["contracts"]) == 4
+    membership_queries = [
+        query
+        for query in ctx.captured_queries
+        if 'FROM "b2b_userb2bcontract"' in query["sql"]
+    ]
+    assert len(membership_queries) == 1
 
 
 @pytest.mark.parametrize(

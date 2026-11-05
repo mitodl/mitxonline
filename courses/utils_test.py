@@ -7,8 +7,11 @@ from datetime import timedelta
 from types import SimpleNamespace
 
 import pytest
+import reversion
 from mitol.common.utils import now_in_utc
+from requests.exceptions import HTTPError
 
+from b2b.factories import ContractPageFactory
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
@@ -20,6 +23,7 @@ from courses.factories import (
 )
 from courses.models import Course, CourseRun
 from courses.utils import (
+    exception_logging_generator,
     get_dated_courseruns,
     get_enrollable_courseruns_qs,
     get_enrollable_courses,
@@ -29,6 +33,7 @@ from courses.utils import (
     is_uai_course_run,
     is_uai_order,
 )
+from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 
 
 def test_get_program_certificate_by_enrollment(user, program_with_requirements):  # noqa: F811
@@ -280,35 +285,26 @@ def test_get_dated_courseruns():
     assert instructor_paced_course_run in dated_courseruns
 
 
-def test_is_contract_order_true_for_course_run_with_contract():
-    """Test that is_contract_order returns True when a line has a contract course run."""
-    contract_course_run = CourseRun(b2b_contract_id=1)
-    line = SimpleNamespace(
-        product=SimpleNamespace(purchasable_object=contract_course_run)
+@pytest.mark.django_db
+@pytest.mark.parametrize("bought_through_contract", [True, False])
+def test_is_contract_order_follows_the_line_contract(bought_through_contract):
+    """
+    Buying a run that is also in a contract is a contract order only when the
+    line was bought through the contract, so public buyers still get a receipt.
+    """
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(b2b_contracts=[contract])
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run)
+    order = OrderFactory.create()
+    LineFactory.create(
+        order=order,
+        purchased_object=run,
+        product_version=reversion.models.Version.objects.get_for_object(product).last(),
+        b2b_contract=contract if bought_through_contract else None,
     )
-    order = SimpleNamespace(lines=SimpleNamespace(all=lambda: [line]))
 
-    assert is_contract_order(order) is True
-
-
-def test_is_contract_order_false_for_course_run_without_contract():
-    """Test that is_contract_order returns False when course runs have no contract."""
-    non_contract_course_run = CourseRun(b2b_contract=None)
-    line = SimpleNamespace(
-        product=SimpleNamespace(purchasable_object=non_contract_course_run)
-    )
-    order = SimpleNamespace(lines=SimpleNamespace(all=lambda: [line]))
-
-    assert is_contract_order(order) is False
-
-
-def test_is_contract_order_false_for_non_course_run_product():
-    """Test that is_contract_order ignores non-CourseRun purchasable objects."""
-    non_course_run = SimpleNamespace(b2b_contract=object())
-    line = SimpleNamespace(product=SimpleNamespace(purchasable_object=non_course_run))
-    order = SimpleNamespace(lines=SimpleNamespace(all=lambda: [line]))
-
-    assert is_contract_order(order) is False
+    assert is_contract_order(order) is bought_through_contract
 
 
 @pytest.mark.django_db
@@ -365,3 +361,33 @@ def test_is_uai_order_uses_purchased_object_when_available():
     order = SimpleNamespace(lines=SimpleNamespace(all=lambda: [line]))
 
     assert is_uai_order(order) is True
+
+
+def _make_http_error(status_code):
+    error = HTTPError(f"{status_code} error")
+    error.response = SimpleNamespace(status_code=status_code)
+    return error
+
+
+@pytest.mark.parametrize(
+    ("status_code", "expected_level"),
+    [
+        (404, "WARNING"),  # stale/deleted course run - shouldn't page Sentry
+        (500, "ERROR"),  # real edX API failure - should still page Sentry
+    ],
+)
+def test_exception_logging_generator_http_error_log_level(
+    caplog, status_code, expected_level
+):
+    """HTTPErrors should log at WARNING for 404s and ERROR otherwise, without stopping iteration."""
+
+    def gen():
+        yield 1
+        raise _make_http_error(status_code)
+
+    with caplog.at_level("WARNING"):
+        results = list(exception_logging_generator(gen()))
+
+    assert results == [1]
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelname == expected_level

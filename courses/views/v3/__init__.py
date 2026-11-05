@@ -8,7 +8,7 @@ import re
 import django_filters
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models import Prefetch, Q
+from django.db.models import Exists, OuterRef, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
@@ -20,15 +20,22 @@ from drf_spectacular.utils import (
     inline_serializer,
 )
 from rest_framework import mixins, serializers, status, viewsets
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from b2b.models import ContractPage
-from courses.api import create_program_enrollments, deactivate_run_enrollment
+from courses.api import (
+    check_enrollment_eligibility,
+    create_program_enrollments,
+    deactivate_run_enrollment,
+)
 from courses.constants import COURSE_KEY_PATTERN, ENROLL_CHANGE_STATUS_UNENROLLED
+from courses.exceptions import EnrollmentError
 from courses.models import (
     Course,
+    CourseRun,
+    CourseRunAccessRole,
     CourseRunEnrollment,
     Program,
     ProgramEnrollment,
@@ -37,15 +44,19 @@ from courses.serializers.v3.courses import (
     CourseOutlineResponseSerializer,
     CourseRunEnrollmentSerializer,
     CourseVariantRunsResponseSerializer,
+    EnrollmentEligibilitySerializer,
 )
 from courses.serializers.v3.programs import (
     ProgramEnrollmentCreateSerializer,
     ProgramEnrollmentSerializer,
+    ProgramEnrollmentTrackSerializer,
 )
+from courses.throttles import EnrollmentEligibilityThrottle
 from courses.utils import get_enrollable_courseruns_qs
 from ecommerce.models import Product
 from main import features
 from openedx.api import get_edx_course_outline
+from openedx.constants import OPENEDX_COURSE_STAFF_ROLES
 from openedx.exceptions import EdxApiCourseOutlineError
 
 log = logging.getLogger(__name__)
@@ -60,7 +71,7 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
     )
     exclude_b2b = django_filters.BooleanFilter(
         method="filter_exclude_b2b",
-        label="Exclude B2B enrollments (enrollments linked to course runs with B2B contracts)",
+        label="Exclude B2B enrollments (enrollments made through a B2B contract)",
     )
 
     class Meta:
@@ -70,13 +81,13 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
     def filter_exclude_b2b(self, queryset, name, value):  # noqa: ARG002
         """Filter out B2B enrollments if exclude_b2b is True."""
         if value:
-            return queryset.filter(run__b2b_contract__isnull=True)
+            return queryset.filter(b2b_contract__isnull=True)
         return queryset
 
     def filter_org_id(self, queryset, name, value):  # noqa: ARG002
         """Filter enrollments by B2B organization ID."""
         if value:
-            return queryset.filter(run__b2b_contract__organization_id=value)
+            return queryset.filter(b2b_contract__organization_id=value)
         return queryset
 
 
@@ -84,7 +95,7 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
     list=extend_schema(
         operation_id="user_enrollments_list_v3",
         description="List user enrollments with B2B organization and contract information - API v3. "
-        "Use ?exclude_b2b=true to filter out enrollments linked to course runs with B2B contracts. "
+        "Use ?exclude_b2b=true to filter out enrollments made through a B2B contract. "
         "Use ?org_id=<id> to filter enrollments by specific B2B organization.",
     ),
     create=extend_schema(
@@ -93,6 +104,18 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
     ),
 )
 class UserEnrollmentsApiViewSet(
+    # CreateModelMixin is inherited but POST cannot currently succeed: the v3
+    # serializer's create() reads validated_data["run_id"] while never
+    # declaring run_id as a field, so DRF drops it and the lookup raises
+    # KeyError. v1 and v2 both declare it; the dashboard creates through v1.
+    #
+    # Whoever fixes that must also annotate the created instance before it is
+    # serialized. get_queryset() annotates has_course_staff_role, and the
+    # serializer reads that attribute directly rather than defaulting it, so a
+    # response built from an unannotated instance raises AttributeError. The
+    # mixin is left in place rather than removed because dropping it would
+    # delete POST /api/v3/enrollments/ from the spec, which the oasdiff gate
+    # reads as a breaking change.
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.ListModelMixin,
@@ -110,9 +133,10 @@ class UserEnrollmentsApiViewSet(
         CourseRunEnrollment.objects.select_related(
             # these possibly get joined anyway via filer, so select over prefetch
             "run",
-            "run__b2b_contract",
+            "b2b_contract",
         )
         .prefetch_related(
+            "run__b2b_contracts",
             "run__course",
             "run__course__page",
             Prefetch(
@@ -131,7 +155,21 @@ class UserEnrollmentsApiViewSet(
 
     def get_queryset(self):
         """Get the queryset for user enrollments."""
-        return super().get_queryset().filter(user=self.request.user)
+        return (
+            super()
+            .get_queryset()
+            .filter(user=self.request.user)
+            # One subquery for the whole page instead of a lookup per card.
+            .annotate(
+                has_course_staff_role=Exists(
+                    CourseRunAccessRole.objects.filter(
+                        user_id=OuterRef("user_id"),
+                        run_id=OuterRef("run_id"),
+                        role__in=OPENEDX_COURSE_STAFF_ROLES,
+                    )
+                )
+            )
+        )
 
     def get_serializer_context(self):
         """Get the serializer context."""
@@ -173,6 +211,21 @@ class UserEnrollmentsApiViewSet(
         ],
         responses={204: None},
     ),
+    partial_update=extend_schema(
+        operation_id="v3_program_enrollments_partial_update",
+        description="Set or clear the learner's chosen track for this program.",
+        parameters=[
+            OpenApiParameter(
+                name="program_id",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                description="Program ID",
+                required=True,
+            )
+        ],
+        request=ProgramEnrollmentTrackSerializer,
+        responses={200: ProgramEnrollmentSerializer},
+    ),
 )
 class UserProgramEnrollmentsViewSet(
     mixins.CreateModelMixin,
@@ -193,6 +246,7 @@ class UserProgramEnrollmentsViewSet(
         ProgramEnrollment.objects.prefetch_related(
             "program",
         )
+        .select_related("track")
         .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
         .prefetch("certificate")
         .order_by("-id")
@@ -207,6 +261,8 @@ class UserProgramEnrollmentsViewSet(
         """Return appropriate serializer class based on action."""
         if self.action == "create":
             return ProgramEnrollmentCreateSerializer
+        if self.action == "partial_update":
+            return ProgramEnrollmentTrackSerializer
         return ProgramEnrollmentSerializer
 
     def create(self, request, *args, **kwargs):  # noqa: ARG002
@@ -236,10 +292,35 @@ class UserProgramEnrollmentsViewSet(
 
         # Create the enrollment using default enrollment mode (audit)
         enrollments = create_program_enrollments(request.user, [program])
+
         if not enrollments:
-            raise ValueError("Failed to create program enrollment.")  # noqa: EM101
+            log.error(
+                "create_program_enrollments returned no enrollments for user=%s program=%s",
+                request.user.id,
+                program.id,
+            )
+            raise EnrollmentError
         response_serializer = ProgramEnrollmentSerializer(enrollments[0])
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+    def partial_update(self, request, *args, **kwargs):  # noqa: ARG002
+        """
+        Set or clear the learner's chosen track for this program.
+
+        Body: {"track": <track node id> | null}; a body without "track" changes
+        nothing. Returns the updated enrollment. 404 when the user has no
+        active enrollment in the program. There is no PUT.
+        """
+        enrollment = self.get_object()
+        serializer = self.get_serializer(enrollment, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        if "track" in serializer.validated_data:
+            enrollment.track = serializer.validated_data["track"]
+            # Only the track: a full-row save would write back the mode and
+            # active flag this request read, over a concurrent upgrade or
+            # unenrollment.
+            enrollment.save_and_log(request.user, update_fields=["track", "updated_on"])
+        return Response(ProgramEnrollmentSerializer(enrollment).data)
 
     def destroy(self, request, *args, **kwargs):  # noqa: ARG002
         """
@@ -471,9 +552,63 @@ def get_course_variant_runs(request):
         Prefetch(
             "courseruns",
             queryset=get_enrollable_courseruns_qs()
-            .filter(b2b_contract_id=contract)
+            .filter(b2b_contracts=contract)
             .filter(variant_filter),
         )
     )
 
     return Response(CourseVariantRunsResponseSerializer(output, many=True).data)
+
+
+ENROLLMENT_ELIGIBILITY_DESCRIPTION = (
+    "Report whether the authenticated user may enroll, without enrolling them. "
+    "Only covers export compliance - it says nothing about whether the run or "
+    "program is open for enrollment, live, or already enrolled in.\n\n"
+    "A POST because a cache miss triggers a live CyberSource export compliance "
+    "check and records its result. Rate limited per user, so ask at the point "
+    "of intent rather than pre-flighting a whole catalogue page."
+)
+
+ENROLLMENT_ELIGIBILITY_RESPONSES = {
+    200: EnrollmentEligibilitySerializer,
+    404: inline_serializer(
+        name="EnrollmentEligibilityNotFoundSerializer",
+        fields={"detail": serializers.CharField()},
+    ),
+    429: inline_serializer(
+        name="EnrollmentEligibilityThrottledSerializer",
+        fields={"detail": serializers.CharField()},
+    ),
+}
+
+
+@extend_schema(
+    operation_id="course_runs_enrollment_eligible",
+    description=ENROLLMENT_ELIGIBILITY_DESCRIPTION,
+    request=None,
+    responses=ENROLLMENT_ELIGIBILITY_RESPONSES,
+)
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+@throttle_classes([EnrollmentEligibilityThrottle])
+def course_run_enrollment_eligible(request, run_id):
+    """Report whether the user may enroll in this course run."""
+    run = get_object_or_404(CourseRun, pk=run_id)
+    eligibility = check_enrollment_eligibility(request.user, run)
+    return Response(EnrollmentEligibilitySerializer(eligibility).data)
+
+
+@extend_schema(
+    operation_id="programs_enrollment_eligible",
+    description=ENROLLMENT_ELIGIBILITY_DESCRIPTION,
+    request=None,
+    responses=ENROLLMENT_ELIGIBILITY_RESPONSES,
+)
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+@throttle_classes([EnrollmentEligibilityThrottle])
+def program_enrollment_eligible(request, program_id):
+    """Report whether the user may enroll in this program."""
+    program = get_object_or_404(Program, pk=program_id)
+    eligibility = check_enrollment_eligibility(request.user, program)
+    return Response(EnrollmentEligibilitySerializer(eligibility).data)

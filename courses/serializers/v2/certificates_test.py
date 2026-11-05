@@ -97,7 +97,7 @@ def test_serialize_certificate(is_program, mock_context):
         expected_data["program"] = ProgramSerializer(certificate.program).data
     else:
         expected_data["course_run"] = CourseRunWithCourseSerializer(
-            certificate.course_run
+            certificate.course_run, context=mock_context
         ).data
 
     assert_drf_json_equal(expected_data, serialized_data, ignore_order=True)

@@ -12,8 +12,19 @@ a Session (like, say, from stripe_checkout_session) in there. You'll want to mak
 
 import json
 
-from stripe import Event, convert_to_stripe_object
+from stripe import Event, PaymentIntent, Refund, convert_to_stripe_object
 from stripe.checkout import Session
+
+
+def stripe_payment_intent() -> PaymentIntent:
+    """Return a fake PaymentIntent."""
+
+    # From the example at https://docs.stripe.com/api/payment_intents/object
+    return convert_to_stripe_object(
+        json.loads(
+            """{"id": "pi_3MtwBwLkdIwHu7ix28a3tqPa","object": "payment_intent","amount": 2000,"amount_capturable": 0,"amount_details": {"tip": {}},"amount_received": 0,"application": null,"application_fee_amount": null,"automatic_payment_methods": {"enabled": true},"canceled_at": null,"cancellation_reason": null,"capture_method": "automatic","client_secret": "pi_3MtwBwLkdIwHu7ix28a3tqPa_secret_YrKJUKribcBjcG8HVhfZluoGH","confirmation_method": "automatic","created": 1680800504,"currency": "usd","customer": null,"description": null,"last_payment_error": null,"latest_charge": null,"livemode": false,"metadata": {},"next_action": null,"on_behalf_of": null,"payment_method": null,"payment_method_options": {"card": {"installments": null,"mandate_options": null,"network": null,"request_three_d_secure": "automatic"},"link": {"persistent_token": null}},"payment_method_types": ["card","link"],"processing": null,"receipt_email": null,"review": null,"setup_future_usage": null,"shipping": null,"source": null,"statement_descriptor": null,"statement_descriptor_suffix": null,"status": "requires_payment_method","transfer_data": null,"transfer_group": null}"""  # pragma: allowlist secret
+        )
+    )
 
 
 def stripe_checkout_session() -> Session:
@@ -97,6 +108,17 @@ def stripe_checkout_session() -> Session:
   "return_url": null,
   "ui_mode": "hosted_page"
 }""")
+    )
+
+
+def stripe_refund() -> Refund:
+    """Return a fake Refund."""
+
+    # From the example at https://docs.stripe.com/api/refunds/object
+    return convert_to_stripe_object(
+        json.loads(
+            """{"id": "re_1Nispe2eZvKYlo2Cd31jOCgZ","object": "refund","amount": 1000,"balance_transaction": "txn_1Nispe2eZvKYlo2CYezqFhEx","charge": "ch_1NirD82eZvKYlo2CIvbtLWuY","created": 1692942318,"currency": "usd","destination_details": {"card": {"reference": "123456789012","reference_status": "available","reference_type": "acquirer_reference_number","type": "refund"},"type": "card"},"metadata": {},"payment_intent": "pi_1GszsK2eZvKYlo2CfhZyoZLp","reason": null,"receipt_number": null,"source_transfer_reversal": null,"status": "succeeded","transfer_reversal": null}"""  # pragma: allowlist secret
+        )
     )
 
 

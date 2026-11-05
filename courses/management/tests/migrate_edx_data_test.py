@@ -1,5 +1,5 @@
-"""Tests for migrate_edx_data management command's repair_migrated_profiles
-type and --dry-run behavior
+"""Tests for migrate_edx_data management command's user migration
+(bulk_create fix and --dry-run) and repair_migrated_profiles type
 """
 
 import pytest
@@ -76,6 +76,81 @@ def _break_user(user):
     """
     LegalAddress.objects.filter(user=user).delete()
     UserProfile.objects.filter(user=user).delete()
+
+
+def test_bulk_create_users_returns_real_ids():
+    """_bulk_create_users must return objects with real, populated ids -
+    bulk_create(ignore_conflicts=True) never sets .pk on its own, on any
+    backend, so this only works if the returned rows are re-fetched
+    """
+    rows = [{"user_email": "new@example.com", "user_full_name": "New User"}]
+
+    created = Command._bulk_create_users(  # noqa: SLF001
+        rows, existing_emails=set(), batch_size=100
+    )
+
+    assert len(created) == 1
+    assert created[0].id is not None
+    assert User.objects.get(email="new@example.com").id == created[0].id
+
+
+def test_migrate_users_creates_legal_address_and_profile():
+    """End to end through _migrate_users: new users must actually get
+    LegalAddress and UserProfile rows, not just a User row
+    """
+    conn = FakeConnection(
+        columns=USER_COLUMNS,
+        rows=[_user_row("alice@example.com", "Alice A", country="US")],
+    )
+
+    Command()._migrate_users(conn, {})  # noqa: SLF001
+
+    user = User.objects.get(email="alice@example.com")
+    assert user.legal_address.country == "US"
+    assert UserProfile.objects.filter(user=user).exists()
+
+
+def test_migrate_users_multiple_new_users_in_one_batch():
+    """Multiple new users in a single batch must each get their own
+    LegalAddress - previously, every user.id was None, so id_row_lookup
+    collapsed every entry onto the same None key and only one user's row
+    data survived
+    """
+    conn = FakeConnection(
+        columns=USER_COLUMNS,
+        rows=[
+            _user_row("alice@example.com", "Alice A", country="US"),
+            _user_row("bob@example.com", "Bob B", country="CA"),
+        ],
+    )
+
+    Command()._migrate_users(conn, {})  # noqa: SLF001
+
+    alice = User.objects.get(email="alice@example.com")
+    bob = User.objects.get(email="bob@example.com")
+    assert alice.legal_address.country == "US"
+    assert bob.legal_address.country == "CA"
+    assert UserProfile.objects.filter(user=alice).exists()
+    assert UserProfile.objects.filter(user=bob).exists()
+
+
+def test_migrate_users_skips_existing_emails():
+    """A user who already exists in mitxonline must not get a duplicate
+    User row, and their existing LegalAddress/UserProfile must be left
+    alone
+    """
+    existing_user = UserFactory.create(email="existing@example.com")
+    LegalAddress.objects.filter(user=existing_user).delete()
+
+    conn = FakeConnection(
+        columns=USER_COLUMNS,
+        rows=[_user_row(existing_user.email, "Existing User", country="US")],
+    )
+
+    Command()._migrate_users(conn, {})  # noqa: SLF001
+
+    assert User.objects.filter(email=existing_user.email).count() == 1
+    assert not LegalAddress.objects.filter(user=existing_user).exists()
 
 
 def test_repair_creates_missing_legal_address_and_profile():
@@ -222,24 +297,16 @@ def test_migrate_users_dry_run_respects_batching(capsys):
     assert "[DRY RUN] Would create 5 users" in output
 
 
-def test_migrate_users_real_run_creates_user_records():
-    """Without --dry-run, matching rows actually create User rows.
-
-    Deliberately not asserting on legal_address here: _bulk_create_users
-    calls User.objects.bulk_create(..., ignore_conflicts=True), and Django
-    never populates .pk on returned objects when ignore_conflicts=True is
-    used, on any backend - confirmed empirically against this test DB. That
-    means _bulk_create_legal_addresses/_bulk_create_user_profiles, which
-    filter on those (always-None) ids, never actually create anything today.
-    That's a separate, pre-existing bug unrelated to --dry-run - flagged
-    separately, not fixed here.
+def test_migrate_users_dry_run_excludes_existing_usernames(capsys):
+    """An incoming email that matches an existing user's username (but not
+    their email) would conflict on create, so dry-run must not count it
     """
+    UserFactory.create(username="taken@example.com", email="other@example.com")
     conn = FakeConnection(
         columns=["user_email", "user_full_name"],
-        rows=[("new@example.com", "New User")],
+        rows=[("taken@example.com", "Taken"), ("new@example.com", "New")],
     )
 
-    Command()._migrate_users(conn, {})  # noqa: SLF001
+    Command()._migrate_users(conn, {"dry_run": True})  # noqa: SLF001
 
-    user = User.objects.get(email="new@example.com")
-    assert user.name == "New User"
+    assert "[DRY RUN] Would create 1 users" in capsys.readouterr().out

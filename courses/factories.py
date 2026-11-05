@@ -87,6 +87,29 @@ class ProgramFactory(DjangoModelFactory):
             return
         self.departments.set(extracted)
 
+    @factory.post_generation
+    def enrollment_modes(self, create, extracted, **kwargs):  # noqa: ARG002
+        """
+        Post-generation method to add enrollment modes to the course run.
+        By default, adds the audit and verified modes if no modes are provided.
+
+        Args:
+            create: Whether the instance is being created (as opposed to just built).
+            extracted: The enrollment modes to add, if any were provided when the factory was called.
+            **kwargs: Additional keyword arguments (not used here).
+        """
+        if not create:
+            return
+        if extracted is not None and len(extracted) > 0:
+            self.enrollment_modes.set(extracted)
+        else:
+            self.enrollment_modes.add(
+                EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)
+            )
+            self.enrollment_modes.add(
+                EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
+            )
+
     class Meta:
         model = Program
 
@@ -105,7 +128,9 @@ class CourseFactory(DjangoModelFactory):
     """Factory for Courses"""
 
     title = fuzzy.FuzzyText(prefix="Course ")
-    readable_id = factory.Sequence("course-v1:PyT+Course{0}".format)
+    readable_id = factory.LazyFunction(
+        lambda: f"course-v1:PyT+{''.join(FAKE.words(nb=3, unique=True))}"
+    )
     live = True
     departments = factory.SubFactory(DepartmentFactory)
 
@@ -172,7 +197,7 @@ class CourseRunFactory(DjangoModelFactory):
     )
 
     live = True
-    b2b_contract = None
+    b2b_only = False
     is_source_run = False
     language = ""
     is_primary_language = False
@@ -200,10 +225,26 @@ class CourseRunFactory(DjangoModelFactory):
                 EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
             )
 
+    @factory.post_generation
+    def b2b_contracts(self, create, extracted, **kwargs):  # noqa: ARG002
+        """Handle assignment of B2B contracts."""
+
+        if not create:
+            return
+
+        if extracted is not None:
+            self.b2b_contracts.set(extracted)
+
     class Meta:
         model = CourseRun
 
     class Params:
+        # Dates that move into the future use an explicit "+1d" floor rather than
+        # Faker's future_datetime, which starts one second from now. A run whose
+        # start_date or end_date falls inside a test's own runtime changes state
+        # mid-test - is_archived flips, first_unexpired_run moves on - which makes
+        # any expected-vs-actual comparison flaky. past_datetime needs no such
+        # floor: it moves further into the past as the test runs.
         past_start = factory.Trait(
             start_date=factory.Faker("past_datetime", tzinfo=ZoneInfo("UTC"))
         )
@@ -212,10 +253,20 @@ class CourseRunFactory(DjangoModelFactory):
         )
         in_progress = factory.Trait(
             start_date=factory.Faker("past_datetime", tzinfo=ZoneInfo("UTC")),
-            end_date=factory.Faker("future_datetime", tzinfo=ZoneInfo("UTC")),
+            end_date=factory.Faker(
+                "date_time_between",
+                start_date="+1d",
+                end_date="+1y",
+                tzinfo=ZoneInfo("UTC"),
+            ),
         )
         in_future = factory.Trait(
-            start_date=factory.Faker("future_datetime", tzinfo=ZoneInfo("UTC")),
+            start_date=factory.Faker(
+                "date_time_between",
+                start_date="+1d",
+                end_date="+30d",
+                tzinfo=ZoneInfo("UTC"),
+            ),
             end_date=None,
         )
         completed = factory.Trait(
@@ -498,3 +549,59 @@ class ProgramCollectionFactory(wagtail_factories.PageFactory):
         for program in extracted:
             self.programs.add(program)
         self.save()
+
+
+def create_program_with_tracks():
+    """Create a program with a core group and two tracks, each a group of two courses"""
+    program = ProgramFactory.create()
+    core_courses = CourseFactory.create_batch(2)
+    root_node = program.requirements_root
+
+    core_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Core Courses",
+    )
+    for course in core_courses:
+        core_node.add_child(node_type=ProgramRequirementNodeType.COURSE, course=course)
+
+    tracks_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=1,
+        title="Tracks",
+        elective_flag=True,
+    )
+    track_nodes = []
+    track_courses = []
+    for title in ("General Track", "Methods Track"):
+        track_node = tracks_node.add_child(
+            node_type=ProgramRequirementNodeType.TRACK, title=title
+        )
+        group_node = track_node.add_child(
+            node_type=ProgramRequirementNodeType.OPERATOR,
+            operator=ProgramRequirement.Operator.ALL_OF,
+            title="Required",
+        )
+        courses = CourseFactory.create_batch(2)
+        for course in courses:
+            group_node.add_child(
+                node_type=ProgramRequirementNodeType.COURSE, course=course
+            )
+        track_nodes.append(track_node)
+        track_courses.append(courses)
+
+    return SimpleNamespace(
+        program=program,
+        root_node=root_node,
+        core_courses=core_courses,
+        tracks_node=tracks_node,
+        track_nodes=track_nodes,
+        track_courses=track_courses,
+    )
+
+
+@pytest.fixture
+def program_with_tracks():
+    """A program with a core group and two tracks, each one group of two courses"""
+    return create_program_with_tracks()

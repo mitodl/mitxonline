@@ -88,7 +88,7 @@ Note that a learner using a standard, one-time use code via either of these meth
 
 Enrollment codes are redeemed **automatically** sometimes. If the learner is in the contract, they don't have to continue to apply enrollment codes to enroll in courses. (We've already verified a code, so we're aware they're allowed to take courses.) Instead, learners clicking on the "Start Course" button in their dashboard in Learn trigger a process that creates an order and fulfills it for the course in MITx Online. This results in the learner being enrolled in the course, and the system consumes an enrollment code for this purpose.
 
-If a contract that requires enrollment codes is changed, enrollment codes may be refreshed accordingly:
-- If new courses are added, new codes will be created for those courses.
-- If the seat limit changes, codes will be adjusted accordingly. (If the limit increases, new codes may be added; if the limit decreases other than to zero, codes may be removed.)
-- Codes that have been used won't be modified.
+Enrollment codes are not refreshed when a contract changes. Saving the contract, adding courseware, or changing its price or seat limit leaves the codes as they were. Codes are brought in line with the contract only when something asks for it: `b2b_courseware add --make-codes` or `b2b_codes validate`. When the check runs:
+- Courses added since the last check get codes.
+- A changed seat limit adds codes, or removes unused ones if the limit dropped to a non-zero value.
+- Codes that have been used are not modified.

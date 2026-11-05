@@ -5,11 +5,12 @@ MITx Online API-ready views, migrated from Unified Ecommerce.
 import logging
 
 import django_filters
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import Http404
 from django.shortcuts import redirect
 from django.views import View
@@ -33,7 +34,12 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
-from b2b.api import is_product_courserun, is_product_program
+from b2b.api import (
+    apply_contract_discounts_to_basket,
+    is_product_courserun,
+    is_product_program,
+)
+from b2b.serializers.v0.manager import DetailErrorSerializer
 from courses.models import (
     Course,
     CourseRun,
@@ -42,7 +48,7 @@ from courses.models import (
     Program,
     ProgramRun,
 )
-from courses.utils import is_uai_course_run, is_uai_program
+from courses.utils import is_uai_course_run, is_uai_program, is_xpro_course_run
 from ecommerce.api import (
     apply_discount_to_basket,
     establish_basket,
@@ -50,7 +56,9 @@ from ecommerce.api import (
     generate_checkout_payload,
     generate_discount_code,
     get_auto_apply_discounts_for_basket,
+    quote_user_price,
 )
+from ecommerce.discount_sources import funds_fulfilled_redemption_exists
 from ecommerce.exceptions import ProductBlockedError
 from ecommerce.models import (
     Basket,
@@ -59,15 +67,17 @@ from ecommerce.models import (
     Discount,
     DiscountProduct,
     DiscountRedemption,
+    Line,
     Order,
     OrderStatus,
     Product,
     UserDiscount,
+    b2b_order_exists,
 )
+from ecommerce.serializers import BulkDiscountSerializer
 from ecommerce.serializers.v0 import (
     BasketItemSerializer,
     BasketWithProductSerializer,
-    BulkDiscountSerializer,
     CheckoutPayloadSerializer,
     DiscountProductSerializer,
     DiscountRedemptionSerializer,
@@ -79,10 +89,12 @@ from ecommerce.serializers.v0 import (
     RefundRequestSerializer,
     UserDiscountMetaSerializer,
     UserDiscountSerializer,
+    UserPricingProductSerializer,
     V0DiscountSerializer,
     requests,
 )
 from ecommerce.tasks import send_refund_request_notification_email
+from ecommerce.views.utils import AttachDiscountProductMixin
 from flexiblepricing.models import FlexiblePriceTier
 from flexiblepricing.serializers import FlexiblePriceTierSerializer
 from hubspot_sync.task_helpers import sync_hubspot_cart_add
@@ -123,7 +135,9 @@ class BasketItemViewSet(ModelViewSet):
         if getattr(self, "swagger_fake_view", False):
             return BasketItem.objects.none()
 
-        return BasketItem.objects.filter(basket__user=self.request.user)
+        # BasketItem has no Meta.ordering, so without this the row order is
+        # whatever Postgres hands back - it varies between requests.
+        return BasketItem.objects.filter(basket__user=self.request.user).order_by("id")
 
 
 @extend_schema_view(
@@ -243,6 +257,11 @@ def _create_basket_from_product(
     with transaction.atomic():
         basket = establish_basket_for_request(request, for_update=True)
 
+        if not getattr(settings, "ENABLE_MULTIPLE_CART_ITEMS", False):
+            basket.basket_items.all().delete()
+            # Don't clear discounts here — the read→delete→reapply logic below
+            # already preserves and re-checks them correctly.
+
         # FUTURE: This is where the basket_add hook was called.
 
         (_, created) = BasketItem.objects.update_or_create(
@@ -260,6 +279,10 @@ def _create_basket_from_product(
                 or (
                     is_product_program(product)
                     and is_uai_program(product.purchasable_object)
+                ),
+                is_xpro=(
+                    is_product_courserun(product)
+                    and is_xpro_course_run(product.purchasable_object)
                 ),
             )
 
@@ -293,6 +316,10 @@ def _create_basket_from_product(
                     apply_discount_to_basket(basket, supplied_discount)
                 except Discount.DoesNotExist:
                     pass
+
+            # Contract pricing goes last - if it wins, the item gets tied to the
+            # contract, and that only holds if nothing replaces its code after.
+            apply_contract_discounts_to_basket(basket)
 
     basket.refresh_from_db()
 
@@ -371,27 +398,35 @@ def create_basket_from_product_with_discount(
 def create_basket_with_products(request):
     """
     Create new basket items for the currently logged in user. Reuse the existing
-    basket object if it exists. Optionally apply the specified discount.
+    basket object if it exists. Optionally apply the supplied discount code.
+
+    Eligible auto-apply and financial assistance discounts are applied whether
+    or not a discount code is supplied.
 
     If the checkout flag is set in the POST data, then this will create the
     basket, then immediately flip the user to the checkout interstitial (which
     then redirects to the payment gateway).
 
-    If any of the products aren't found, this will return a 404 error. If
-    the discount code is invalid, the discount won't be applied and an error
-    will be logged, but the basket will still be updated.
+    If any of the products aren't found, this will return a 404 error. A
+    discount code that isn't found, isn't redeemable, or doesn't beat a
+    discount already on the basket is dropped silently, and the basket is
+    still updated.
 
     POST Args:
+        product_ids (list[dict]): products to add to the basket, each
+            ``{"product_id": int, "quantity": int}`` (required)
         checkout (bool): redirect to checkout interstitial (defaults to False)
-        product_ids (list[(str, int)]): list of product SKUs to add to the basket with quantity
-        discount_code (str): discount code to apply to the basket
+        discount_code (str): discount code to apply to the basket (optional)
 
     Returns:
         Response: HTTP response
     """
-    checkout = request.data.get("checkout", False)
-    discount_code = request.data.get("discount_code", None)
-    product_ids = request.data.get("product_ids", [])
+    serializer = requests.CreateBasketWithProductsSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    checkout = serializer.validated_data["checkout"]
+    discount_code = serializer.validated_data["discount_code"]
+    product_ids = serializer.validated_data["product_ids"]
 
     basket = establish_basket(request)
     products = []
@@ -399,15 +434,25 @@ def create_basket_with_products(request):
     try:
         products = [
             (
-                Product.objects.get(id=product_id["product_id"]),
-                product_id["quantity"],
+                Product.objects.get(id=item["product_id"]),
+                item["quantity"],
             )
-            for product_id in product_ids
+            for item in product_ids
         ]
     except Product.DoesNotExist:
         return Response(
             {"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND
         )
+
+    allow_multiple_items = getattr(settings, "ENABLE_MULTIPLE_CART_ITEMS", False)
+    if not allow_multiple_items:
+        if len(products) > 1:
+            return Response(
+                {"error": "Multiple cart items are not enabled."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        basket.basket_items.all().delete()
+        BasketDiscount.objects.filter(redeemed_basket=basket).delete()
 
     try:
         for product, quantity in products:
@@ -427,6 +472,10 @@ def create_basket_with_products(request):
                     is_product_program(product)
                     and is_uai_program(product.purchasable_object)
                 ),
+                is_xpro=(
+                    is_product_courserun(product)
+                    and is_xpro_course_run(product.purchasable_object)
+                ),
             )
     except ProductBlockedError:
         return Response(
@@ -444,6 +493,8 @@ def create_basket_with_products(request):
             apply_discount_to_basket(basket, discount)
         except Discount.DoesNotExist:
             pass
+
+    apply_contract_discounts_to_basket(basket)
 
     basket.refresh_from_db()
 
@@ -468,9 +519,6 @@ def clear_basket(request):
     """
     Clear the basket for the current user.
 
-    Args:
-        system_slug (str): system slug
-
     Returns:
         Response: HTTP response
     """
@@ -482,9 +530,7 @@ def clear_basket(request):
 
 
 @extend_schema(
-    description=(
-        "Returns the payload necessary to redirect the user to CyberSource for payment."
-    ),
+    description=("Returns the payload necessary to start the payment process."),
     methods=["GET"],
     responses=CheckoutPayloadSerializer,
 )
@@ -495,10 +541,7 @@ def checkout_basket(request):
     Generate the data for checkout and return it.
 
     This gathers and converts the data in the current user's Basket, makes it
-    into an Order, and returns the form data needed to start the checkout process
-    in CyberSource. The frontend app then needs to pull the data into a form and
-    POST it to the appropriate URL to send the user over to CyberSource so we can
-    collect payment.
+    into an Order, and returns the data to start the checkout process.
     """
 
     try:
@@ -509,7 +552,7 @@ def checkout_basket(request):
 
         return Response(CheckoutPayloadSerializer(payload).data, status=req_status)
     except ObjectDoesNotExist:
-        return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
+        return Response("No basket", status=status.HTTP_400_BAD_REQUEST)
 
 
 class ProductsPagination(LimitOffsetPagination):
@@ -623,7 +666,11 @@ class ProductViewSet(ReadOnlyModelViewSet):
 
     @extend_schema(
         operation_id="products_user_flexible_price_retrieve",
-        description="Retrieve a product with user-specific flexible price information",
+        description=(
+            "Retrieve a product with user-specific flexible price information. "
+            "Use `user_pricing` instead."
+        ),
+        deprecated=True,
         responses={
             200: ProductFlexiblePriceSerializer,
         },
@@ -639,6 +686,42 @@ class ProductViewSet(ReadOnlyModelViewSet):
         product = self.get_object()
         serializer = ProductFlexiblePriceSerializer(
             product, context={"request": request}
+        )
+        return Response(serializer.data)
+
+    @extend_schema(
+        operation_id="products_user_pricing_retrieve",
+        description=(
+            "The price this user pays for this product, computed the way "
+            "checkout computes it (financial assistance, user-tied and "
+            "automatic discounts, including paid-amount-off credit for a "
+            "qualifying prior purchase). The response also carries "
+            "product_flexible_price exactly as the deprecated "
+            "user_flexible_price endpoint returns it, so a caller moves over "
+            "field for field. Anonymous requests are a 403; an unknown or "
+            "no-longer-purchasable product is a 404."
+        ),
+        responses={
+            200: UserPricingProductSerializer,
+            403: DetailErrorSerializer,
+            404: DetailErrorSerializer,
+        },
+    )
+    @action(
+        detail=True,
+        methods=["get"],
+        permission_classes=[IsAuthenticated],
+        url_path="user_pricing",
+    )
+    def user_pricing(self, request, **kwargs):  # noqa: ARG002
+        """Quote the per-user price of a product."""
+        product = self.get_object()
+        serializer = UserPricingProductSerializer(
+            product,
+            context={
+                "request": request,
+                "quote": quote_user_price(product, request.user),
+            },
         )
         return Response(serializer.data)
 
@@ -686,7 +769,20 @@ class DiscountViewSet(ModelViewSet):
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
     filterset_class = DiscountFilterSet
 
-    @action(url_name="create_batch", detail=False, methods=["post"])
+    # filters=False and pagination_class=None because the schema otherwise
+    # inherits the viewset's filter and pagination query params, which this
+    # POST action never reads.
+    @extend_schema(
+        request=BulkDiscountSerializer,
+        responses={201: V0DiscountSerializer(many=True)},
+        filters=False,
+    )
+    @action(
+        url_name="create_batch",
+        detail=False,
+        methods=["post"],
+        pagination_class=None,
+    )
     def create_batch(self, request):
         """
         Create a batch of codes. This is used in the staff-dashboard.
@@ -696,7 +792,7 @@ class DiscountViewSet(ModelViewSet):
         otherSerializer = BulkDiscountSerializer(data=request.data)
 
         if otherSerializer.is_valid():
-            generated_codes = generate_discount_code(**request.data)
+            generated_codes = generate_discount_code(**otherSerializer.validated_data)
 
             discounts = V0DiscountSerializer(generated_codes, many=True)
 
@@ -723,7 +819,9 @@ class DiscountViewSet(ModelViewSet):
         ),
     ]
 )
-class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
+class NestedDiscountProductViewSet(
+    AttachDiscountProductMixin, NestedViewSetMixin, ModelViewSet
+):
     """API view set for Discounts"""
 
     serializer_class = DiscountProductSerializer
@@ -731,22 +829,6 @@ class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
     authentication_classes = (SessionAuthentication,)
     permission_classes = (IsAdminUser,)
     pagination_class = LimitOffsetPagination
-
-    def partial_update(self, request, **kwargs):
-        """Partial update for a discount product."""
-
-        discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
-
-        (_, created) = DiscountProduct.objects.get_or_create(
-            discount=discount, product_id=request.data["product_id"]
-        )
-
-        return Response(
-            DiscountProductSerializer(
-                DiscountProduct.objects.filter(discount=discount).all(), many=True
-            ).data,
-            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
-        )
 
     def destroy(self, request, **kwargs):  # noqa: ARG002
         """Delete a linked product from a discount."""
@@ -923,6 +1005,18 @@ class UserDiscountViewSet(ModelViewSet):
     pagination_class = LimitOffsetPagination
 
 
+class OrderHistoryPagination(LimitOffsetPagination):
+    """
+    Sets a default limit for the order history API.
+
+    Without a default, DRF skips pagination when the caller omits `limit` and
+    returns a bare list instead of the `{count, next, previous, results}` envelope
+    the generated spec declares.
+    """
+
+    default_limit = 20
+
+
 @extend_schema_view(
     list=extend_schema(
         description=("Retrives the current user's order history."),
@@ -939,7 +1033,7 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
     """Viewset to retrieve a user's order history."""
 
     serializer_class = OrderHistorySerializer
-    pagination_class = LimitOffsetPagination
+    pagination_class = OrderHistoryPagination
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
@@ -947,6 +1041,32 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
         return (
             Order.objects.filter(purchaser=self.request.user)
             .filter(state__in=[OrderStatus.FULFILLED, OrderStatus.REFUNDED])
+            .select_related("purchaser")
+            .prefetch_related(
+                # select_related builds a separate purchaser instance per row,
+                # so User.openedx_user (behind the serializer's `username`)
+                # needs its own prefetch to stay off the per-row path.
+                "purchaser__openedx_users",
+                # `refund_requests` feeds Order.latest_refund_request.
+                "refund_requests",
+                # `product_version` is read by Line.product and
+                # Line.item_description; `purchased_object` feeds
+                # Order.purchased_runs, behind both is_b2b_order and
+                # refund_deadline. `purchased_object` is nested rather than a
+                # sibling "lines__purchased_object" lookup, which is
+                # order-dependent: declared ahead of this Prefetch it raises
+                # "'lines' lookup was already seen with a different queryset".
+                Prefetch(
+                    "lines",
+                    queryset=Line.objects.select_related(
+                        "product_version"
+                    ).prefetch_related("purchased_object"),
+                ),
+            )
+            # Read by Order.refund_status for every fulfilled row.
+            .annotate(funds_fulfilled_redemption=funds_fulfilled_redemption_exists())
+            # Read by Order.refund_status and the serializer for every row.
+            .annotate(is_b2b_order=b2b_order_exists())
             .order_by("-created_on")
             .all()
         )

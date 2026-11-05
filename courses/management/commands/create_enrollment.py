@@ -5,6 +5,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from courses.api import create_run_enrollments
+from courses.exceptions import CountryBlockedError
 from courses.models import CourseRun
 from openedx.api import create_user
 from users.api import fetch_user
@@ -54,11 +55,18 @@ class Command(BaseCommand):
             user.refresh_from_db()
 
         with transaction.atomic():
-            successful_enrollments, edx_request_success = create_run_enrollments(
-                user,
-                [run],
-                keep_failed_enrollments=options["keep_failed_enrollments"],
-            )
+            try:
+                successful_enrollments, edx_request_success = create_run_enrollments(
+                    user,
+                    [run],
+                    keep_failed_enrollments=options["keep_failed_enrollments"],
+                )
+            except CountryBlockedError:
+                raise CommandError(  # noqa: B904
+                    "Enrollment is blocked for this course with courseware_id={} for user {}".format(  # noqa: EM103
+                        options["run"], options["user"]
+                    )
+                )
             if not successful_enrollments:
                 raise CommandError("Failed to create the enrollment record")  # noqa: EM101
 

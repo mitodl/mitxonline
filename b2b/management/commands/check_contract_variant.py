@@ -5,8 +5,8 @@ Check B2B contract variants for validity.
 from django.core.management import BaseCommand
 from django.core.management.base import CommandParser
 
-from b2b.models import ContractPage
-from variants.models import SupportedVariant
+from b2b.contracts import ensure_default_variant, get_contract_variant_coverage
+from b2b.management.utils import get_contract_by_id_or_slug
 
 
 class Command(BaseCommand):
@@ -28,16 +28,44 @@ class Command(BaseCommand):
             help="Add a default variant if there's not one.",
         )
 
+    def _write_variant_set(self, entry):
+        """Print one variant set and the contract's courses under it."""
+
+        variant = entry["variant"]
+        inactive = "" if variant.active else " (inactive)"
+
+        self.stdout.write(
+            f"Language = {variant.language} Industry = {variant.variant_industry} Length = {variant.variant_length}{inactive}"
+        )
+
+        if not entry["courses"] and not entry["unsupported_courses"]:
+            self.stdout.write(f"\t{self.style.WARNING('NO COURSES')}")
+
+        for listed in entry["courses"]:
+            if listed["contract_run"]:
+                run_status = listed["contract_run"].courseware_id
+            elif listed["has_source_run"]:
+                run_status = self.style.WARNING("NO RUN")
+            else:
+                run_status = self.style.WARNING("NO RUN, NO SOURCE RUN")
+
+            self.stdout.write(f"\t{listed['course'].readable_id}: {run_status}")
+
+        for listed in entry["unsupported_courses"]:
+            run = listed["contract_run"]
+            run_status = self.style.WARNING("NOT IN THE COURSE VARIANTS")
+            if run:
+                run_status = f"{run.courseware_id} {run_status}"
+
+            self.stdout.write(f"\t{listed['course'].readable_id}: {run_status}")
+
     def handle(self, *_args, **kwargs):
         """Perform the check."""
 
         contract = kwargs.pop("contract", False)
         contract_obj = False
 
-        if contract.isdecimal():
-            contract_obj = ContractPage.objects.filter(id=contract).first()
-        else:
-            contract_obj = ContractPage.objects.filter(slug=contract).first()
+        contract_obj = get_contract_by_id_or_slug(contract)
 
         if not contract_obj:
             self.stderr.write(
@@ -60,35 +88,15 @@ class Command(BaseCommand):
                 self.stdout.write(
                     "'fix-default' flag set, creating a default variant set for the contract."
                 )
-                default_variant = SupportedVariant.objects.create(
-                    variant_object=contract_obj,
-                    language="en",
-                    b2b_only=False,
-                    default_variant=True,
-                )
+                ensure_default_variant(contract_obj)
             else:
                 return
 
         other_options = contract_obj.variant_options.filter(default_variant=False)
 
         self.stdout.write(
-            f"{len(other_options)} supported variants + default for contract {contract_obj.slug}"
+            f"{other_options.count()} supported variants + default for contract {contract_obj.slug}"
         )
 
-        runs_qs = contract_obj.get_all_variant_runs()
-
-        for variant in [default_variant, *other_options.all()]:
-            variant_runs = runs_qs.filter(variant.to_q_filter()).all()
-
-            runs = []
-
-            for variant_run in variant_runs:
-                source_flag = "(Source)" if variant_run.is_source_run else ""
-                runs.append(f"{variant_run.courseware_id}{source_flag}")
-
-            runs = " ".join(runs) if len(runs) > 0 else self.style.WARNING("NO RUNS")
-
-            self.stdout.write(
-                f"Language = {variant.language} Industry = {variant.variant_industry} Length = {variant.variant_length}"
-            )
-            self.stdout.write(f"\t{runs}")
+        for entry in get_contract_variant_coverage(contract_obj):
+            self._write_variant_set(entry)

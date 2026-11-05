@@ -57,6 +57,29 @@ class FacultySerializer(serializers.Serializer):
     feature_image_src = serializers.CharField(allow_null=True)
 
 
+class FAQItemSerializer(serializers.Serializer):
+    """
+    Serializer for FAQ items shown on course/program pages.
+    """
+
+    id = serializers.IntegerField()
+    question = serializers.CharField()
+    answer = serializers.CharField()
+
+
+class TestimonialItemSerializer(serializers.Serializer):
+    """
+    Serializer for testimonial items shown on course/program pages.
+    """
+
+    id = serializers.IntegerField()
+    quote = serializers.CharField()
+    name = serializers.CharField()
+    title = serializers.CharField(allow_blank=True)
+    date_published = serializers.DateField()
+    image_src = serializers.CharField(allow_null=True)
+
+
 class PriceItemSerializer(serializers.Serializer):
     """
     Serializer for price items used in course pages.
@@ -187,18 +210,21 @@ class CoursePageItemSerializer(serializers.ModelSerializer):
             "max_price",
             "prerequisites",
             "faq_url",
+            "hubspot_form_id",
             "about",
             "what_you_learn",
             "feature_image",
             "video_url",
             "faculty_section_title",
             "faculty",
+            "faqs",
+            "testimonials",
             "certificate_page",
             "course_details",
             "topic_list",
             "include_in_learn_catalog",
             "ingest_content_files_for_ai",
-            "show_stay_updated",
+            "show_course_outline",
             "how_youll_learn",
         ]
 
@@ -210,6 +236,8 @@ class CoursePageItemSerializer(serializers.ModelSerializer):
     meta = PageMetaSerializer()
     feature_image = FeatureImageSerializer()
     faculty = FacultySerializer(many=True)
+    faqs = FAQItemSerializer(many=True)
+    testimonials = TestimonialItemSerializer(many=True)
     certificate_page = CertificatePageSerializer(allow_null=True)
     course_details = CourseSerializer()
     topic_list = TopicSerializer(many=True)
@@ -250,15 +278,17 @@ class ProgramPageItemSerializer(serializers.ModelSerializer):
             "max_price",
             "prerequisites",
             "faq_url",
+            "hubspot_form_id",
             "about",
             "what_you_learn",
             "feature_image",
             "video_url",
             "faculty_section_title",
             "faculty",
+            "faqs",
+            "testimonials",
             "certificate_page",
             "program_details",
-            "show_stay_updated",
             "how_youll_learn",
         ]
 
@@ -277,6 +307,8 @@ class ProgramPageItemSerializer(serializers.ModelSerializer):
     price = PriceItemSerializer(many=True)
     feature_image = FeatureImageSerializer()
     faculty = FacultySerializer(many=True)
+    faqs = FAQItemSerializer(many=True)
+    testimonials = TestimonialItemSerializer(many=True)
     certificate_page = CertificatePageSerializer()
     program_details = ProgramSerializer()
     how_youll_learn = HowYoullLearnSerializer(many=True)

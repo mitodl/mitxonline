@@ -4,6 +4,11 @@ import json
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as ContribUserAdmin
+from django.core.exceptions import PermissionDenied
+from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
@@ -12,6 +17,7 @@ from mitol.common.admin import TimestampedModelAdmin
 
 from b2b.models import UserOrganization
 from openedx.models import OpenEdxUser
+from users.admin_debug import get_user_debug_context
 from users.models import BlockList, LegalAddress, User, UserProfile
 
 
@@ -109,6 +115,25 @@ class UserContractPageInline(admin.TabularInline):
 
     model = User.b2b_contracts.through
     extra = 0
+    autocomplete_fields = ("contract_page",)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """
+        Show inactive contracts in the contract dropdown.
+
+        See CourseRunAdmin.formfield_for_foreignkey for the full explanation:
+        the choices have to include inactive contracts, or a user already
+        linked to one would render with an empty selection here.
+        """
+
+        if db_field.name == "contract_page":
+            from b2b.models import ContractPage  # noqa: PLC0415
+
+            kwargs["queryset"] = ContractPage.objects.order_by(
+                "organization__name", "name"
+            )
+
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 class UserOrganizationInline(admin.TabularInline):
@@ -116,6 +141,7 @@ class UserOrganizationInline(admin.TabularInline):
 
     model = UserOrganization
     extra = 0
+    readonly_fields = ["added_to_keycloak_at"]
 
 
 @admin.register(User)
@@ -181,7 +207,46 @@ class UserAdmin(DjangoObjectActions, ContribUserAdmin, TimestampedModelAdmin):
     def clear_sync_errors(self, request, obj):  # noqa: ARG002
         obj.openedx_users.update(has_sync_error=False, sync_error_data=None)
 
-    change_actions = ["clear_sync_errors"]
+    @action(label="Debug View", description="Read-only summary of this user's data")
+    def debug_view_link(self, request, obj):  # noqa: ARG002
+        return HttpResponseRedirect(reverse("admin:users_user_debug", args=[obj.pk]))
+
+    change_actions = ["debug_view_link", "clear_sync_errors"]
+
+    def get_change_actions(self, request, object_id, form_url):
+        actions = super().get_change_actions(request, object_id, form_url)
+        if not request.user.is_superuser:
+            actions = [name for name in actions if name != "debug_view_link"]
+        return actions
+
+    def get_urls(self):
+        custom = [
+            path(
+                "<int:user_id>/debug/",
+                self.admin_site.admin_view(self.debug_view),
+                name="users_user_debug",
+            )
+        ]
+        return custom + super().get_urls()
+
+    def debug_view(self, request, user_id):
+        """Read-only view of the user's data from across the app"""
+
+        # This pulls together data from many models, so it's superuser-only
+        # rather than relying on the per-model view permissions.
+        if not request.user.is_superuser:
+            raise PermissionDenied
+
+        debug_user = get_object_or_404(User, pk=user_id)
+
+        context = {
+            **self.admin_site.each_context(request),
+            **get_user_debug_context(debug_user),
+            "title": f"User Debug: {debug_user.email}",
+            "opts": self.model._meta,  # noqa: SLF001
+            "user_change_url": reverse("admin:users_user_change", args=[debug_user.pk]),
+        }
+        return TemplateResponse(request, "admin/users/user/debug.html", context)
 
 
 @admin.register(BlockList)

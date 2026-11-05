@@ -12,9 +12,9 @@ from cms.serializers import ProgramPageSerializer
 from courses.factories import (  # noqa: F401
     CourseFactory,
     CourseRunFactory,
-    EnrollmentModeFactory,
     ProgramCollectionFactory,
     ProgramFactory,
+    create_program_with_tracks,
     program_with_empty_requirements,
     program_with_requirements,
 )
@@ -24,7 +24,9 @@ from courses.models import (
     Program,
     ProgramCollectionItem,
     ProgramRequirement,
+    ProgramRequirementNodeType,
 )
+from courses.serializers.v1.base import EnrollmentModeSerializer
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.serializers.v2.programs import (
     ProgramDetailSerializer,
@@ -164,8 +166,10 @@ def test_serialize_program(
             "min_weekly_hours": program_with_empty_requirements.page.min_weekly_hours,
             "min_price": program_with_empty_requirements.page.min_price,
             "max_price": program_with_empty_requirements.page.max_price,
-            "certificate_available": False,
-            "enrollment_modes": [],
+            "certificate_available": True,
+            "enrollment_modes": EnrollmentModeSerializer(
+                program_with_empty_requirements.enrollment_modes, many=True
+            ).data,
             "display_mode": None,
         },
     )
@@ -340,17 +344,40 @@ def test_serialize_program_certificate_available(
     expected,
 ):
     """Test that certificate_available reflects whether any enrollment mode requires payment."""
-    mode = EnrollmentModeFactory.create(
-        mode_slug="verified" if has_paid_mode else "audit",
-        requires_payment=has_paid_mode,
-    )
-    program_with_empty_requirements.enrollment_modes.add(mode)
+    if not has_paid_mode:
+        program_with_empty_requirements.enrollment_modes.filter(
+            requires_payment=True
+        ).delete()
 
     data = ProgramSerializer(
         instance=program_with_empty_requirements, context=mock_context
     ).data
 
     assert data["certificate_available"] is expected
+
+
+def test_serialize_program_certificate_available_certificates_disabled(
+    mock_context,
+    program_with_empty_requirements,  # noqa: F811
+):
+    """certificate_available should be False when certificates are disabled for the program."""
+    program_with_empty_requirements.certificates_disabled = True
+    program_with_empty_requirements.save()
+
+    data = ProgramSerializer(
+        instance=program_with_empty_requirements, context=mock_context
+    ).data
+
+    assert data["certificate_available"] is False
+
+
+def test_serialize_program_certificate_available_no_certificate_page(mock_context):
+    """certificate_available should be False when the program has no live certificate page."""
+    program = ProgramFactory.create(page=None)
+
+    data = ProgramSerializer(instance=program, context=mock_context).data
+
+    assert data["certificate_available"] is False
 
 
 def test_serialize_program_with_no_page(mock_context):
@@ -431,6 +458,7 @@ def test_program_requirement_tree_serializer_save():
                 "required_program": None,
                 "title": "Required Courses",
                 "elective_flag": False,
+                "description": "",
             },
             "id": ANY,
             "children": [
@@ -444,6 +472,7 @@ def test_program_requirement_tree_serializer_save():
                         "required_program": None,
                         "title": None,
                         "elective_flag": False,
+                        "description": "",
                     },
                     "id": ANY,
                 }
@@ -459,6 +488,7 @@ def test_program_requirement_tree_serializer_save():
                 "required_program": None,
                 "title": "Elective Courses",
                 "elective_flag": False,
+                "description": "",
             },
             "id": ANY,
             "children": [
@@ -472,6 +502,7 @@ def test_program_requirement_tree_serializer_save():
                         "required_program": None,
                         "title": None,
                         "elective_flag": False,
+                        "description": "",
                     },
                     "id": ANY,
                 },
@@ -485,9 +516,51 @@ def test_program_requirement_tree_serializer_save():
                         "required_program": None,
                         "title": None,
                         "elective_flag": False,
+                        "description": "",
                     },
                     "id": ANY,
                 },
             ],
         },
     ]
+
+
+def _program_in_both_tracks(tracked):
+    """Require a new program in each of tracked's track groups; return the program"""
+    child = ProgramFactory.create()
+    for track in tracked.track_nodes:
+        track.get_children().get().add_child(
+            node_type=ProgramRequirementNodeType.PROGRAM, required_program=child
+        )
+    return child
+
+
+def test_serialize_program_programs_lists_a_parent_once(mock_context):
+    """A parent whose two tracks both require the child appears once in programs"""
+    mock_context["include_programs"] = True
+    tracked = create_program_with_tracks()
+    child = _program_in_both_tracks(tracked)
+
+    data = ProgramSerializer(instance=child, context=mock_context).data
+
+    assert [program["id"] for program in data["programs"]] == [tracked.program.id]
+
+
+def test_serialize_program_requirements_lists_a_program_in_two_groups_once(
+    mock_context,
+):
+    """A program in two tracks and a later required group is listed once, as required"""
+    tracked = create_program_with_tracks()
+    child = _program_in_both_tracks(tracked)
+    tracked.root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="More Core",
+    ).add_child(node_type=ProgramRequirementNodeType.PROGRAM, required_program=child)
+
+    data = ProgramSerializer(instance=tracked.program, context=mock_context).data
+
+    assert data["requirements"]["programs"] == {
+        "required": [{"id": child.id, "readable_id": child.readable_id}],
+        "electives": [],
+    }

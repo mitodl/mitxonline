@@ -8,7 +8,7 @@ from argparse import RawTextHelpFormatter
 from django.core.management import BaseCommand
 from django.core.management.base import CommandParser
 
-from b2b.models import ContractPage
+from b2b.management.utils import get_contract_by_id_or_slug
 from courses.api import resolve_courseware_object_from_id
 from courses.models import Course
 from variants.models import SupportedVariant
@@ -94,10 +94,7 @@ by the course, which may include variant options that the contract does not incl
             return
 
         if contract:
-            if contract.isdecimal():
-                contract_obj = ContractPage.objects.filter(id=contract).first()
-            else:
-                contract_obj = ContractPage.objects.filter(slug=contract).first()
+            contract_obj = get_contract_by_id_or_slug(contract)
 
             if not contract_obj:
                 self.stderr.write(
@@ -141,9 +138,12 @@ by the course, which may include variant options that the contract does not incl
             f"{len(other_options)} supported variants + default for course {course_obj.readable_id}"
         )
 
-        runs_qs = course_obj.courseruns.filter(
-            b2b_contract=(contract_obj if contract_obj else None)
-        )
+        runs_qs = course_obj.courseruns
+
+        if contract_obj:
+            runs_qs = runs_qs.filter(b2b_contracts=contract_obj)
+        else:
+            runs_qs = runs_qs.filter(b2b_only=False)
 
         if b2b_flag:
             runs_qs = runs_qs.filter(is_source_run=True)

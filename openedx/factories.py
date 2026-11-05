@@ -1,7 +1,6 @@
 """Courseware factories"""
 
 from datetime import timedelta
-from zoneinfo import ZoneInfo
 
 import faker
 from edx_api.course_detail.models import CourseMode
@@ -35,8 +34,11 @@ class OpenEdxApiAuthFactory(DjangoModelFactory):
     user = SubFactory("users.factories.UserFactory", no_openedx_api_auth=True)
     refresh_token = Faker("pystr", max_chars=30)
     access_token = Faker("pystr", max_chars=30)
-    access_token_expires_on = Faker(
-        "future_datetime", end_date="+10h", tzinfo=ZoneInfo("UTC")
+    # get_valid_edx_api_auth refreshes a token that expires within the caller's
+    # ttl (always under OPENEDX_AUTH_MAX_TTL_IN_SECONDS), and tests relying on
+    # this default don't mock that refresh, so it has to clear the largest ttl.
+    access_token_expires_on = LazyAttribute(
+        lambda _: now_in_utc() + timedelta(hours=10)
     )
 
     class Meta:

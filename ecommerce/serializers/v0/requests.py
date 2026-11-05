@@ -1,8 +1,7 @@
 """
 Request serializers for MITx Online ecommerce.
 
-Request serializers are used for OpenAPI schema generation - so separating them
-out so they don't get used for responses.
+These validate incoming request bodies and describe them in the OpenAPI schema.
 """
 
 from rest_framework import serializers
@@ -16,9 +15,12 @@ class CreateBasketWithProductIDSerializer(serializers.Serializer):
 
 
 class CreateBasketWithProductsSerializer(serializers.Serializer):
-    """Serializer for creating a basket with products. (For OpenAPI spec.)"""
+    """Serializer for creating a basket with products."""
 
-    system_slug = serializers.CharField()
     product_ids = CreateBasketWithProductIDSerializer(many=True)
-    checkout = serializers.BooleanField()
-    discount_code = serializers.CharField()
+    checkout = serializers.BooleanField(required=False, default=False)
+    # `null` and `""` both mean "no discount": the view treats any falsy code as
+    # absent. CharField rejects both without allow_null/allow_blank.
+    discount_code = serializers.CharField(
+        required=False, default=None, allow_null=True, allow_blank=True
+    )

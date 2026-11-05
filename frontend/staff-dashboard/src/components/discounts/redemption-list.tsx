@@ -1,9 +1,5 @@
-import {
-    Table,
-    useTable,
-    List,
-    DateField,
-} from "@pankod/refine-antd";
+import { useTable, List, DateField } from "@refinedev/antd";
+import { Table } from "antd";
 import moment from "moment";
 
 export const RedemptionList = (props: any) => {

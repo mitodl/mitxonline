@@ -4,6 +4,10 @@ from collections.abc import Sequence
 
 from django.contrib import admin
 from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
+from django.contrib.admin.templatetags.admin_urls import admin_urlname
+from django.db.models import Model
+from django.shortcuts import resolve_url
+from django.utils.html import format_html
 
 
 class AuditableModelAdmin(admin.ModelAdmin):
@@ -100,3 +104,11 @@ class ReadOnlyModelAdmin(admin.ModelAdmin, DisplayOnlyAdminMixin):
             for field in self.model._meta.fields  # noqa: SLF001
         ]
         super().__init__(*args, **kwargs)
+
+
+def get_model_admin_url(model: Model):
+    if model:
+        url = resolve_url(admin_urlname(model._meta, "change"), model.pk)  # noqa: SLF001
+        return format_html('<a href="{}">{}</a>', url, str(model))
+    else:
+        return "-"

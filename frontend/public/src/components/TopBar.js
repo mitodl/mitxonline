@@ -1,12 +1,12 @@
 // @flow
-import React, { useEffect, useState } from "react"
+import React from "react"
 
 import { routes } from "../lib/urls"
 import UserMenu from "./UserMenu"
 import AnonymousMenu from "./AnonymousMenu"
 import InstituteLogo from "./InstituteLogo"
 import type { Location } from "react-router"
-import NotificationContainer from "./NotificationContainer"
+import DelayedNotificationContainer from "./DelayedNotificationContainer"
 
 import type { CurrentUser } from "../flow/authTypes"
 import MixedLink from "./MixedLink"
@@ -19,17 +19,6 @@ type Props = {
 }
 
 const TopBar = ({ currentUser, cartItemsCount }: Props) => {
-  // Delay any alert displayed on page-load by 500ms in order to
-  // ensure the alert is read by screen readers.
-  const [showComponent, setShowComponent] = useState(false)
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setShowComponent(true)
-    }, 500)
-
-    return () => clearTimeout(timeout)
-  }, [])
-
   const newCartDesign = checkFeatureFlag(
     "new-cart-design",
     currentUser && currentUser.is_authenticated && currentUser.global_id ?
@@ -38,9 +27,7 @@ const TopBar = ({ currentUser, cartItemsCount }: Props) => {
   )
   return (
     <header className="site-header d-flex d-flex flex-column">
-      {showComponent ? (
-        <NotificationContainer id="notifications-container" />
-      ) : null}
+      <DelayedNotificationContainer />
       <nav
         className={`order-1 sub-nav navbar navbar-expand-md top-navbar ${
           currentUser.is_authenticated ? "nowrap login" : ""

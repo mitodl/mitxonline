@@ -1,6 +1,6 @@
 [project]
 name = "mitxonline"
-version = "1.155.0"
+version = "2026.11.4.1"
 description = "MITx Online"
 authors = [{ name = "MIT ODL" }]
 requires-python = "~=3.11.0"
@@ -31,22 +31,20 @@ dependencies = [
     "django-user-agents>=0.4.0,<0.5",
     "django-viewflow>=2.2.7,<3",
     "django-webpack-loader>=3.0.0,<4",
-    "djangorestframework==3.16.1",
-    "djoser>=2.1.0,<3",
+    "djangorestframework==3.18.3",
     "drf-extensions>=0.8.0,<0.9",
     "drf-spectacular>=0.29.0,<0.30",
     "edx-api-client>=1.14.0,<2",
     "hubspot-api-client>=12.0.0,<13",
     "ipython>=9.13,<10",
     "mitol-django-apigateway==2026.4.29",
-    "mitol-django-authentication==2026.4.29",
     "mitol-django-common==2026.6.16.4",
     "mitol-django-hubspot-api==2026.4.29",
     "mitol-django-mail==2026.4.29",
     "mitol-django-openedx==2026.4.29",
     "mitol-django-payment-gateway==2026.8.5",
     "mitol-django-scim==2026.4.29",
-    "mitol-django-observability>=2026.1.0",
+    "mitol-django-observability>=2026.8.19",
     "opentelemetry-instrumentation-celery>=0.52b0",
     "opentelemetry-instrumentation-django>=0.52b0",
     "opentelemetry-instrumentation-psycopg>=0.52b0",
@@ -61,15 +59,17 @@ dependencies = [
     "rich>=14.0.0,<15",
     "sentry-sdk>=2.29.1,<3",
     "ulid-py>=1.1.0,<2",
+    "urllib3>=2.0.0,<3",
+    # Metadata-only stub; see shims/urllib3-future/pyproject.toml for why.
+    "urllib3-future",
     "user-util>=0.1.5,<0.2",
-    "wagtail==7.3.3",
+    "wagtail==7.3.4",
     "wagtail-metadata>=5.0.0,<6",
     "djangorestframework-api-key>=3.1.0,<4",
     "setuptools<80.11",
     "mitol-django-google-sheets>=2025.6.13,<2026",
     "mitol-django-google-sheets-deferrals>=2025.3.17,<2026",
     "mitol-django-google-sheets-refunds>=2025.6.13,<2026",
-    "pytest-lazy-fixtures>=1.1.4,<2",
     "tabulate>=0.9.0,<0.10",
     "python-redis-lock>=4.0.0,<5",
     "django-object-actions>=5.0.0,<6",
@@ -80,44 +80,54 @@ dependencies = [
     "mitol-django-olposthog>=2026.3.6,<2027",
     "django-removals>=1.1.6,<2",
     "django-prefetch>=1.2.3,<2",
-    "lru-method-cache>=0.2.0",
     "django-qp[drf]>=0.2.0",
     "pydantic>=2.13.4",
     "pynacl>=1.6.2",
+    "pyjwt==2.15.0",
 ]
 
 [dependency-groups]
+prek = ["prek==0.5.5"]
 dev = [
+    { include-group = "prek" },
     "anys>=0.3.1,<0.4",
     "bpython>=0.26,<0.27",
     "ddt>=1.6.0,<2",
     "django-debug-toolbar>=6.0.0,<7",
-    "django-zeal>=2.0.4,<3",
+    "django-zeal>=2.2.4,<3",
     "factory-boy>=3.2.0,<4",
-    "faker>=40.15.0,<=40.15.0",
+    "faker>=40.43.0,<=40.43.0",
     "flaky>=3.7.0,<4",
     "freezegun>=1.2,<2",
     "ipdb>=0.13.13,<0.14",
     "pdbpp>=0.11.6,<0.12",
-    "pre-commit>=4.0.0,<5",
     "pytest-cov>=7.0.0,<8",
     "pytest-django>=4.5.2,<5",
     "pytest-env>=1.0.0,<2",
+    "pytest-lazy-fixtures>=1.1.4,<2",
     "pytest-mock>=3.11.1,<4",
     "responses>=0.26.0,<0.27",
     "ruff>=0.15,<0.16",
     "semantic-version>=2.10.0,<3",
     "wagtail-factories>=4.2,<4.3",
     "pytest-xdist[psutil]>=3.6.1,<4",
-    "mitol-drf-lint>=2025.3.27",
+    "mitol-drf-lint>=2026.8.28",
     "pytest-urllib3>=0.2.0",
     "granian[reload]>=2.5.4,<3",
     "pytest-split>=0.9,<1",
+    "datamodel-code-generator[http]>=0.72.4",
+]
+docs = [
+    "insipid-sphinx-theme>=0.4.4,<0.5",
+    "myst-parser>=5.0.0,<6",
+    "sphinx>=9.0.4,<10",
+    "sphinxcontrib-mermaid>=2.1.1,<3",
 ]
 
 [tool.uv]
+constraint-dependencies = ["certifi>=2026.10.19"]  # eMudhra CA compromise: never resolve a certifi that trusts the compromised CAs
 package = false
-default-groups = "all"
+default-groups = ["dev"]
 exclude-newer = "7d"
 required-version = ">=0.9.17"
 
@@ -169,6 +179,7 @@ mitol-django-scim = "0d"
 mitol-drf-lint = "0d"
 
 [tool.uv.sources]
+urllib3-future = { path = "shims/urllib3-future" }
 
 [tool.uv.build-backend]
 module-root = ""
@@ -332,10 +343,14 @@ filterwarnings = [
     # factoryboy
     "ignore:.*\\._after_postgeneration will stop saving the instance after postgeneration hooks in the next major release",
     "ignore:authlib\\.jose module is deprecated, please use joserfc instead:authlib.deprecate.AuthlibDeprecationWarning",
-    "ignore:N+1 detected on",
-    "ignore:Failed to load HostKeys"
+    "ignore:Failed to load HostKeys",
+    # google-api-core warns from 2026-10-24 that it drops Python 3.11 on 2027-10-24
+    "ignore:You are using a Python version .* which Google will stop supporting:FutureWarning",
 ]
 env = [
+  "AWS_ACCESS_KEY_ID=",
+  "AWS_SECRET_ACCESS_KEY=",
+  "AWS_STORAGE_BUCKET_NAME=",
   "CELERY_TASK_ALWAYS_EAGER=True",
   "DEBUG=False",
   "DJANGO_SETTINGS_MODULE=main.settings",
@@ -370,14 +385,17 @@ env = [
   "RECAPTCHA_SECRET_KEY=",
   "POSTHOG_ENABLED=True",
   "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN=",
+  "MITOL_PAYMENT_GATEWAY_STRIPE_API_KEY=not-a-real-key",
 ]
 markers = [
   "dont_mock_enrollments",
-  "skip_nplusone_check"
+  "skip_nplusone_check",
+  "zeal_allow(model, field): ignore one known N+1 (see fixtures/common.py check_nplusone)"
 ]
 pythonpath = ["."]
 
 [tool.bumpversion]
+current_version = "2026.11.4.1"
 commit = false
 tag = false
 parse = "(?P<release>(?:[1-9][0-9]{3})\\.(?:1[0-2]|[1-9])\\.(?:3[0-1]|[12][0-9]|[1-9]))\\.(?P<build>\\d+)"
