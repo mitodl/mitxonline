@@ -1439,6 +1439,11 @@ def existing_edx_enrollment(
     return None
 
 
+# What a failed JWT request for the enrollments client raises: the request
+# failing, or a response without a token in it.
+ENROLLMENTS_JWT_REQUEST_ERRORS = (requests.RequestException, KeyError, ValueError)
+
+
 def _get_enrollments_client_to_enroll(user, course_run):
     """
     get_edx_api_enrollments_client, with a failed JWT request raised as an
@@ -1451,7 +1456,7 @@ def _get_enrollments_client_to_enroll(user, course_run):
     """
     try:
         return get_edx_api_enrollments_client()
-    except (requests.RequestException, KeyError, ValueError) as exc:
+    except ENROLLMENTS_JWT_REQUEST_ERRORS as exc:
         raise UnknownEdxApiEnrollException(user, course_run, exc) from exc
 
 
@@ -1727,9 +1732,17 @@ def _get_edx_enrollments_to_sync(user):
     if not user.openedx_user_exists:
         return None
     try:
-        return get_edx_api_enrollments_client().get_student_enrollments(
-            username=user.edx_username
+        enrollments_client = get_edx_api_enrollments_client()
+    except ENROLLMENTS_JWT_REQUEST_ERRORS:
+        # As with rate limiting below, a bad secret or an edX outage shouldn't
+        # fail the dashboard load that triggered the sync.
+        log.exception(
+            "Skipped edX enrollment sync for %s: could not get a JWT",
+            user.edx_username,
         )
+        return None
+    try:
+        return enrollments_client.get_student_enrollments(username=user.edx_username)
     except HTTPError as exc:
         # Every learner's sync now shares the service user's throttle, so
         # a busy minute shouldn't fail the dashboard load that triggered it.

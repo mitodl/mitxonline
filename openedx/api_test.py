@@ -2156,6 +2156,29 @@ def test_sync_enrollments_with_edx_v2_rate_limited(
             sync_enrollments_with_edx(user)
 
 
+@pytest.mark.parametrize(
+    "token_error",
+    [
+        requests.exceptions.ConnectionError(),
+        HTTPError(response=MockResponse("", status_code=status.HTTP_401_UNAUTHORIZED)),
+        KeyError("access_token"),
+    ],
+)
+def test_sync_enrollments_with_edx_v2_token_failure(
+    mocker, enrollments_v2_settings, user, token_error
+):
+    """
+    With the v2 enrollment API, a failed JWT request is logged and the sync is
+    skipped, as when it is rate limited
+    """
+    CourseRunEnrollmentFactory.create(user=user, active=True)
+    mocker.patch("openedx.api.get_edx_api_enrollments_client", side_effect=token_error)
+    patched_log = mocker.patch("openedx.api.log")
+
+    assert sync_enrollments_with_edx(user) == SyncResult()
+    patched_log.exception.assert_called_once()
+
+
 def test_sync_enrollments_with_edx_v2_not_synced(mocker, enrollments_v2_settings, user):
     """With the v2 enrollment API, a user edX doesn't know yet is skipped without calling edX"""
     user.openedx_users.update(has_been_synced=False)
