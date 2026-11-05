@@ -893,6 +893,14 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
         log.error(message)
         return False, message
 
+    # Nothing was charged for a $0 order, so there's no processor transaction
+    # to refund. Most of these are the course run orders made for a program
+    # purchase, where the payment (and the refund) is on the program's order.
+    if order.total_price_paid == 0:
+        message = _zero_value_order_refund_message(order)
+        log.error(message)
+        return False, message
+
     transaction_dict = order_recent_transaction.data
 
     # Ensure the payment gateway can find the transaction ID — it may be stored
@@ -943,6 +951,50 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
     )
 
     return True, message
+
+
+def find_paid_program_order_for_zero_value_order(order: Order) -> Order | None:
+    """
+    Find the paid program order that a $0 course run order was made for.
+
+    Buying a program creates a $0 order for each of the program's course runs
+    (see create_verified_program_course_run_order), so a learner asking for a
+    refund of a course in the program will usually point at one of those.
+
+    Args:
+    - order (Order): the $0 order
+    Returns:
+    - FulfilledOrder for a program containing one of the order's course runs,
+      or None if there isn't one
+    """
+    runs = order.purchased_runs
+    if not runs:
+        return None
+
+    candidates = (
+        FulfilledOrder.objects.filter(
+            purchaser=order.purchaser,
+            state=OrderStatus.FULFILLED,
+            total_price_paid__gt=0,
+        )
+        .exclude(pk=order.pk)
+        .order_by("-created_on")
+    )
+    for candidate in candidates:
+        for program in candidate.purchased_programs:
+            if program.courses_qset.filter(courseruns__in=runs).exists():
+                return candidate
+
+    return None
+
+
+def _zero_value_order_refund_message(order: Order) -> str:
+    """Explain why a $0 order can't be refunded, and what to refund instead."""
+    message = f"Order {order.reference_number} is a $0 order, so there is no payment to refund."
+    program_order = find_paid_program_order_for_zero_value_order(order)
+    if program_order:
+        message += f" It was granted by program order {program_order.reference_number} - refund that order instead."
+    return message
 
 
 def record_order_refund(

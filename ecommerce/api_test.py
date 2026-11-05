@@ -589,6 +589,51 @@ def test_order_refund_missing_transaction_id_in_data(mocker, fulfilled_order):
     assert refund_success is True
 
 
+@pytest.mark.parametrize("has_program_order", [True, False])
+def test_order_refund_zero_payment(mocker, user, has_program_order):
+    """
+    A $0 order isn't refunded, and the message points at the paid program
+    order that granted it if there is one.
+    """
+    program = ProgramFactory.create()
+    run = CourseRunFactory.create()
+    program.add_requirement(run.course)
+    if has_program_order:
+        program_line = make_purchase(user, program, Decimal("1524.60"))
+    zero_line = make_purchase(user, run, Decimal("1000.00"), paid=Decimal(0))
+    zero_order = zero_line.order
+    TransactionFactory.create(
+        order=zero_order,
+        amount=0,
+        transaction_id=str(uuid.uuid4()),
+        data=ZERO_PAYMENT_DATA,
+    )
+    start_refund_mock = mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.start_refund"
+    )
+    downgrade_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_downgrade_from_order.delay"
+    )
+
+    refund_success, message = refund_order(
+        reference_number=zero_order.reference_number, unenroll=True
+    )
+
+    assert refund_success is False
+    assert f"Order {zero_order.reference_number} is a $0 order" in message
+    if has_program_order:
+        assert program_line.order.reference_number in message
+    else:
+        assert "program order" not in message
+    start_refund_mock.assert_not_called()
+    downgrade_task_mock.assert_not_called()
+    zero_order.refresh_from_db()
+    assert zero_order.state == OrderStatus.FULFILLED
+    assert not zero_order.transactions.filter(
+        transaction_type=TRANSACTION_TYPE_REFUND
+    ).exists()
+
+
 def test_paypal_refunds(fulfilled_paypal_transaction):
     """PayPal transactions should fail before they get to the payment gateway."""
 
