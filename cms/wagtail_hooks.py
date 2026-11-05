@@ -89,17 +89,16 @@ def block_deleting_pages_with_certificate_revisions(request, page):
     ]
     revisions = Revision.page_revisions.filter(object_id__in=page_ids)
     certificate_counts = [
-        (
-            model.all_objects.filter(certificate_page_revision__in=revisions).count(),
-            label,
-        )
+        (count, label)
         for model, label in (
             (CourseRunCertificate, "course run certificate(s)"),
             (ProgramCertificate, "program certificate(s)"),
         )
-    ]
-    certificate_counts = [
-        (count, label) for count, label in certificate_counts if count
+        if (
+            count := model.all_objects.filter(
+                certificate_page_revision__in=revisions
+            ).count()
+        )
     ]
     if not certificate_counts:
         return None
