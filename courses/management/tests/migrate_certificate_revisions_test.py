@@ -119,11 +119,13 @@ def test_migrate_certificate_revisions_confirmation(mocker, kind, confirm_answer
     """
     The command prompts for confirmation and, only when the user accepts,
     moves every certificate - including ones already on an older revision -
-    to the latest revision.
+    to the published revision, ignoring a later unpublished draft.
     """
     certificate_page, cert, handle_kwargs = CERT_SETUPS[kind]()
     old_revision = cert.certificate_page_revision
     new_revision = certificate_page.save_revision()
+    new_revision.publish()
+    certificate_page.save_revision()  # an unpublished draft
 
     mock_input = mocker.patch("builtins.input", return_value=confirm_answer)
 

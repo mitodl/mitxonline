@@ -11,9 +11,10 @@ def _live_certificate_page_state(page_model, fk_field, obj_id):
     Look up the live CertificatePage child of the CoursePage/ProgramPage that
     has `fk_field=obj_id`.
 
-    Returns (has_live_page, latest_revision_id): (False, None) if there's no
+    Returns (has_live_page, revision_id): (False, None) if there's no
     live certificate page (a draft-only page counts as none), otherwise
-    (True, <id of its latest revision, or None if it has none>).
+    (True, <id of its published revision - or, if it has none recorded,
+    its latest revision - or None if it has no revisions>).
 
     page_model/CertificatePage are imported for real (not looked up via
     `apps.get_model`) because this needs actual Wagtail Page behavior -
@@ -35,6 +36,11 @@ def _live_certificate_page_state(page_model, fk_field, obj_id):
     )
     if certificate_page is None:
         return False, None
+    # The published revision, not the latest one, which may be an unpublished
+    # draft. Inlined rather than calling CertificatePage.get_certificate_revision
+    # so later changes to that method can't change what this migration did.
+    if certificate_page.live_revision_id:
+        return True, certificate_page.live_revision_id
     latest_revision = certificate_page.specific.get_latest_revision()
     return True, latest_revision.id if latest_revision else None
 
@@ -49,7 +55,7 @@ def _resolve_certificates_without_revision(
 
     - no live certificate page: delete them. No CertificatePage is ever
       auto-created, so they could never resolve on their own.
-    - live page with a revision: backfill its latest revision - the same
+    - live page with a revision: backfill its published revision - the same
       lookup CourseRunCertificate.save()/ProgramCertificate.save() do.
     - live page with no revision: leave them alone. The AlterField
       operations below then fail with a NOT NULL violation, aborting this

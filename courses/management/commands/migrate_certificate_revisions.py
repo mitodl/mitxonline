@@ -1,7 +1,8 @@
 """
 Management command to migrate every CourseRunCertificate/ProgramCertificate for
-a course, course run, or program to the latest certificate page revision,
-after asking for confirmation.
+a course, course run, or program to the certificate page's published
+revision (see CertificatePage.get_certificate_revision), after asking for
+confirmation.
 
 This is a targeted refresh tool for one course/run/program at a time (e.g.
 after publishing a new certificate page revision that already-issued
@@ -42,7 +43,7 @@ class Command(BaseCommand):
     """
 
     help = (
-        "Migrate every certificate of a course/course run/program to the latest "
+        "Migrate every certificate of a course/course run/program to the published "
         "certificate page revision, after asking for confirmation."
     )
 
@@ -122,15 +123,15 @@ class Command(BaseCommand):
             message = f"No certificate page found for {courseware_label}."
             raise CommandError(message)
 
-        latest_revision = certificate_page.get_latest_revision()
-        if not latest_revision:
+        revision = certificate_page.get_certificate_revision()
+        if not revision:
             message = f"Certificate page '{certificate_page.title}' (id={certificate_page.pk}) for {courseware_label} has no revisions."
             raise CommandError(message)
 
         answer = input(
             self.style.WARNING(
                 f"This will update all {certificates.count()} certificates for "
-                f"{courseware_label} to revision {latest_revision.pk}. "
+                f"{courseware_label} to revision {revision.pk}. "
                 "Continue? (y/n): "
             )
         ).lower()
@@ -138,11 +139,11 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("Aborted. No changes made."))
             return
 
-        updated_count = certificates.update(certificate_page_revision=latest_revision)
+        updated_count = certificates.update(certificate_page_revision=revision)
 
         self.stdout.write(
             self.style.SUCCESS(
                 f"Updated {updated_count} certificate(s) for {courseware_label} to "
-                f"revision {latest_revision.pk}."
+                f"revision {revision.pk}."
             )
         )

@@ -1,5 +1,6 @@
 """Tests for course models"""
 
+import importlib
 import logging
 import random
 from datetime import timedelta
@@ -21,7 +22,7 @@ from cms.factories import (
     ProgramPageFactory,
     ResourcePageFactory,
 )
-from cms.models import CertificatePage
+from cms.models import CertificatePage, CoursePage
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.factories import (
     CourseFactory,
@@ -701,6 +702,56 @@ def test_purge_revisions_keeps_revisions_referenced_by_certificates(mocker, is_p
     certificate.refresh_from_db()
     assert certificate.certificate_page_revision == pinned_revision
     assert not Revision.objects.filter(pk=unreferenced_revision.pk).exists()
+
+
+@pytest.mark.parametrize("is_program", [True, False])
+def test_certificate_uses_published_revision_not_draft(mocker, is_program):
+    """
+    A new certificate is pinned to the certificate page's published revision,
+    not a later unpublished draft.
+    """
+    mocker.patch("hubspot_sync.api.upsert_custom_properties")
+    if is_program:
+        program = ProgramFactory.create()
+        certificate_page = program.certificate_page
+    else:
+        course_run = CourseRunFactory.create()
+        certificate_page = course_run.course.certificate_page
+    published_revision = certificate_page.save_revision()
+    published_revision.publish()
+    certificate_page.CEUs = "draft only"
+    draft_revision = certificate_page.save_revision()
+    assert certificate_page.get_latest_revision() == draft_revision
+
+    if is_program:
+        certificate = ProgramCertificate.objects.create(
+            user=UserFactory.create(), program=program
+        )
+    else:
+        certificate = CourseRunCertificate.objects.create(
+            user=UserFactory.create(), course_run=course_run
+        )
+
+    assert certificate.certificate_page_revision == published_revision
+
+
+def test_0112_backfill_uses_published_revision_not_draft():
+    """
+    Migration 0112 backfills certificates with the certificate page's published
+    revision, not a later unpublished draft.
+    """
+    migration = importlib.import_module(
+        "courses.migrations.0112_certificate_page_revision_not_nullable"
+    )
+    course = CourseFactory.create()
+    certificate_page = course.certificate_page
+    published_revision = certificate_page.save_revision()
+    published_revision.publish()
+    certificate_page.save_revision()  # an unpublished draft
+
+    assert migration._live_certificate_page_state(  # noqa: SLF001
+        CoursePage, "course_id", course.id
+    ) == (True, published_revision.id)
 
 
 def test_program_certificate_start_end_dates_and_page_revision(user, mocker):

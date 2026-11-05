@@ -368,8 +368,8 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
 
     def get_certificate_page_revision(self):
         """
-        Return the latest revision of this program's live certificate page, or
-        ``None``.
+        Return the published revision of this program's live certificate page
+        (see CertificatePage.get_certificate_revision), or ``None``.
 
         Unlike the certificate_page cached_property, this re-reads the page
         on every call, so a batch that reuses the same Program object for
@@ -377,7 +377,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         """
         page = self.program_page
         certificate_page = page.certificate_page if page else None
-        return certificate_page.get_latest_revision() if certificate_page else None
+        return certificate_page.get_certificate_revision() if certificate_page else None
 
     def get_requirements_root(self, *, for_update=False):
         """The root of the requirements tree"""
@@ -1207,8 +1207,8 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
 
     def get_certificate_page_revision(self):
         """
-        Return the latest revision of this course's live certificate page, or
-        ``None``.
+        Return the published revision of this course's live certificate page
+        (see CertificatePage.get_certificate_revision), or ``None``.
 
         Unlike the certificate_page cached_property, this re-reads the page
         on every call, so a batch that reuses the same Course object for
@@ -1216,7 +1216,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         """
         page = self.course_page
         certificate_page = page.certificate_page if page else None
-        return certificate_page.get_latest_revision() if certificate_page else None
+        return certificate_page.get_certificate_revision() if certificate_page else None
 
     @cached_property
     def course_number(self):
@@ -2228,7 +2228,7 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
         if not self.course_run_id:
             return
 
-        # Left blank (e.g. in the admin): use the latest revision, or fail if
+        # Left blank (e.g. in the admin): use the published revision, or fail if
         # there isn't one rather than hitting the NOT NULL constraint on save.
         if not self.certificate_page_revision_id:
             revision = self.course_run.course.get_certificate_page_revision()
@@ -2345,7 +2345,7 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
         if not self.program_id:
             return
 
-        # Left blank (e.g. in the admin): use the latest revision, or fail if
+        # Left blank (e.g. in the admin): use the published revision, or fail if
         # there isn't one rather than hitting the NOT NULL constraint on save.
         if not self.certificate_page_revision_id:
             revision = self.program.get_certificate_page_revision()
