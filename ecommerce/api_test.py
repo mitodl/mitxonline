@@ -62,6 +62,7 @@ from ecommerce.api import (
     establish_basket,
     establish_basket_for_request,
     find_order_for_stripe_payment_intent,
+    find_paid_program_order_for_zero_value_order,
     fulfill_completed_order,
     fulfill_order_from_cybersource_transaction,
     generate_checkout_payload,
@@ -77,6 +78,7 @@ from ecommerce.api import (
     unenroll_learner_from_order,
 )
 from ecommerce.constants import (
+    ADMIN_FULFILLED_PAYMENT_DATA,
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
@@ -592,6 +594,198 @@ def test_order_refund_missing_transaction_id_in_data(mocker, fulfilled_order):
     )
     refund_success, _ = refund_order(order_id=transaction.order.id)
     assert refund_success is True
+
+
+@pytest.mark.parametrize(
+    ("redeems_program_discount", "later_program_purchase"),
+    [(True, False), (True, True), (False, False)],
+)
+def test_order_refund_zero_payment(
+    mocker, user, redeems_program_discount, later_program_purchase
+):
+    """
+    A $0 order isn't refunded, and the message points at the paid program
+    order whose internal discount granted it, if there is one - not a later
+    purchase of another program with the same course, and not for a $0 order
+    that didn't come from a program.
+    """
+    run = CourseRunFactory.create()
+    program = ProgramFactory.create()
+    program.add_requirement(run.course)
+    program_order = make_purchase(user, program, Decimal("1524.60")).order
+    zero_order = make_purchase(user, run, Decimal("1000.00"), paid=Decimal(0)).order
+    if redeems_program_discount:
+        DiscountRedemption.objects.create(
+            redemption_date=now_in_utc(),
+            redeemed_by=user,
+            redeemed_discount=create_verified_program_discount(program),
+            redeemed_order=zero_order,
+        )
+    if later_program_purchase:
+        other_program = ProgramFactory.create()
+        other_program.add_requirement(run.course)
+        other_order = make_purchase(user, other_program, Decimal("900.00")).order
+    TransactionFactory.create(
+        order=zero_order,
+        amount=0,
+        transaction_id=str(uuid.uuid4()),
+        data=ZERO_PAYMENT_DATA,
+    )
+    start_refund_mock = mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.start_refund"
+    )
+    downgrade_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_downgrade_from_order.delay"
+    )
+
+    refund_success, message = refund_order(
+        reference_number=zero_order.reference_number, unenroll=True
+    )
+
+    assert refund_success is False
+    assert f"Order {zero_order.reference_number} is a $0 order" in message
+    if redeems_program_discount:
+        assert program_order.reference_number in message
+    else:
+        assert "program order" not in message
+    if later_program_purchase:
+        assert other_order.reference_number not in message
+    start_refund_mock.assert_not_called()
+    downgrade_task_mock.assert_not_called()
+    zero_order.refresh_from_db()
+    assert zero_order.state == OrderStatus.FULFILLED
+    assert not zero_order.transactions.filter(
+        transaction_type=TRANSACTION_TYPE_REFUND
+    ).exists()
+
+
+@pytest.mark.parametrize(
+    ("program_payment_data", "expected_ending"),
+    [
+        (
+            {"transaction_id": "1234", "req_amount": "1524.60", "req_currency": "USD"},
+            " - refund that order instead.",
+        ),
+        (
+            ADMIN_FULFILLED_PAYMENT_DATA,
+            ", which has no payment gateway transaction to refund - Finance needs to refund it manually.",
+        ),
+        (
+            {
+                "transaction_id": "1234",
+                "req_amount": "1524.60",
+                "req_currency": "USD",
+                "paypal_token": "EC-1234",
+            },
+            ", which has no payment gateway transaction to refund - Finance needs to refund it manually.",
+        ),
+    ],
+)
+def test_order_refund_zero_payment_program_order_payment(
+    user, program_payment_data, expected_ending
+):
+    """
+    The $0 refund message only says to refund the program order when its
+    payment can be refunded through the gateway; an administratively fulfilled
+    or PayPal program order is named, but left to Finance.
+    """
+    run = CourseRunFactory.create()
+    program = ProgramFactory.create()
+    program.add_requirement(run.course)
+    program_order = make_purchase(user, program, Decimal("1524.60")).order
+    TransactionFactory.create(
+        order=program_order,
+        transaction_type=TRANSACTION_TYPE_PAYMENT,
+        transaction_id=str(uuid.uuid4()),
+        data=program_payment_data,
+    )
+    zero_order = make_purchase(user, run, Decimal("1000.00"), paid=Decimal(0)).order
+    DiscountRedemptionFactory.create(
+        redeemed_by=user,
+        redeemed_discount=create_verified_program_discount(program),
+        redeemed_order=zero_order,
+    )
+    TransactionFactory.create(
+        order=zero_order,
+        amount=0,
+        transaction_id=str(uuid.uuid4()),
+        data=ZERO_PAYMENT_DATA,
+    )
+
+    refund_success, message = refund_order(reference_number=zero_order.reference_number)
+
+    assert refund_success is False
+    assert message.endswith(
+        f"granted by program order {program_order.reference_number}{expected_ending}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("purchases", "expected_index"),
+    [
+        (["paid", "zero", "paid"], 0),
+        (["zero", "paid"], None),
+        (["paid", "paid", "zero"], None),
+        (["free_with_paid_course", "zero"], None),
+    ],
+)
+def test_find_paid_program_order_for_zero_value_order(user, purchases, expected_index):
+    """
+    Only a single order placed before the $0 order, with a paid line for the
+    program, is the granting order. Later, ambiguous, and fully discounted
+    program purchases aren't.
+    """
+    run = CourseRunFactory.create()
+    program = ProgramFactory.create()
+    program.add_requirement(run.course)
+    with reversion.create_revision():
+        run_product = ProductFactory.create(purchasable_object=run, price=1000)
+        program_product = ProductFactory.create(purchasable_object=program, price=1524)
+        other_product = ProductFactory.create(
+            purchasable_object=CourseRunFactory.create(), price=500
+        )
+
+    def place_order(*lines):
+        order = OrderFactory.create(
+            purchaser=user,
+            state=OrderStatus.FULFILLED,
+            total_price_paid=sum(paid for _, paid in lines),
+        )
+        for product, paid in lines:
+            Line.objects.create(
+                order=order,
+                purchased_object_id=product.object_id,
+                purchased_content_type_id=product.content_type_id,
+                product_version=Version.objects.get_for_object(product).first(),
+                quantity=1,
+                discounted_unit_price=paid,
+            )
+        return order
+
+    program_orders = []
+    zero_order = None
+    for purchase in purchases:
+        if purchase == "zero":
+            zero_order = place_order((run_product, Decimal(0)))
+        elif purchase == "paid":
+            program_orders.append(place_order((program_product, Decimal(1524))))
+        else:
+            # A free program bought alongside a paid course: the order total
+            # is positive, but nothing was paid for the program.
+            program_orders.append(
+                place_order(
+                    (program_product, Decimal(0)), (other_product, Decimal(500))
+                )
+            )
+
+    DiscountRedemptionFactory.create(
+        redeemed_by=user,
+        redeemed_discount=create_verified_program_discount(program),
+        redeemed_order=zero_order,
+    )
+
+    expected = None if expected_index is None else program_orders[expected_index]
+    assert find_paid_program_order_for_zero_value_order(zero_order) == expected
 
 
 def test_paypal_refunds(fulfilled_paypal_transaction):

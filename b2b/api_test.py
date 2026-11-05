@@ -39,6 +39,7 @@ from b2b.api import (
     get_contract_runs_without_products,
     get_user_b2b_organizations,
     import_and_create_contract_run,
+    move_run_to_retirement_contract,
     process_add_org_membership,
     process_remove_org_membership,
     reconcile_keycloak_orgs,
@@ -169,7 +170,7 @@ def test_create_single_course_run(mocker, contract_ready_course, has_start, has_
     assert run.run_tag == B2B_RUN_TAG_FORMAT.format(
         run_idx=1, year=now_time.year, contract_id=contract.id
     )
-    assert run.b2b_contract == contract
+    assert run.contract_group_ids == {contract.id}
 
     if has_start:
         assertable_start = date_to_datetime(contract.contract_start, settings.TIME_ZONE)
@@ -783,7 +784,7 @@ def test_create_contract_run_falls_back_to_newest_non_b2b_run(mocker):
         contract, course, require_designated_source_run=False
     )
 
-    assert created_run.b2b_contract == contract
+    assert created_run.b2b_contracts.filter(pk=contract.id).exists()
     assert older_run.id < newest_run.id
     mocked_clone_run.assert_called_once_with(created_run.id, newest_run.courseware_id)
 
@@ -893,7 +894,7 @@ def test_create_contract_run_variants(mocker):
         course.courseruns.filter(courseware_id__startswith=target_course_id).count()
         == 5
     )
-    run_check_qs = course.courseruns.filter(b2b_contract=contract)
+    run_check_qs = course.courseruns.filter(b2b_contracts=contract)
 
     found_count = 0
     for language, variant_industry, variant_length in [
@@ -928,9 +929,9 @@ def test_create_contract_run_variants(mocker):
     create_contract_run(contract, course, no_reruns=False)
     mocked_clone_run.assert_called()
 
-    assert course.courseruns.filter(b2b_contract=contract).count() == 10
+    assert course.courseruns.filter(b2b_contracts=contract).count() == 10
     run_check_qs = course.courseruns.filter(
-        b2b_contract=contract, courseware_id__startswith=target_course_id
+        b2b_contracts=contract, courseware_id__startswith=target_course_id
     )
 
     found_count = 0
@@ -2226,7 +2227,7 @@ def test_create_contract_run_single_language_legacy(mocker):
     results = create_contract_run(contract, course, require_designated_source_run=True)
     assert len(results) == 1
     run, product = results[0]
-    assert run.b2b_contract == contract
+    assert run.contract_group_ids == {contract.id}
     assert product.object_id == run.id
 
 
@@ -3896,3 +3897,28 @@ def test_apply_user_discounts_applies_contract_code(public_contract_run):
     item = basket.basket_items.get()
     assert item.b2b_contract == contract
     assert item.discounted_price == Decimal(10)
+
+
+@pytest.mark.parametrize("old_contract_state", ["expired", "inactive"])
+def test_move_run_to_retirement_contract_removes_old_contract(old_contract_state):
+    """Retirement removes old associations even when related managers hide them."""
+    old_contract = ContractPageFactory.create(
+        active=old_contract_state != "inactive",
+        contract_end=(
+            now_in_utc() - timedelta(days=1)
+            if old_contract_state == "expired"
+            else None
+        ),
+    )
+    run = CourseRunFactory.create()
+    run.b2b_contracts.add(old_contract)
+    memberships = run.b2b_contracts.through.objects.filter(courserun_id=run.pk)
+
+    assert memberships.filter(contractpage_id=old_contract.pk).exists()
+    assert not run.b2b_contracts.filter(pk=old_contract.pk).exists()
+
+    retirement_contract = move_run_to_retirement_contract(run)
+
+    assert set(memberships.values_list("contractpage_id", flat=True)) == {
+        retirement_contract.pk
+    }

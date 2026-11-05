@@ -170,39 +170,16 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = CourseFilterSet
 
     def get_queryset(self):
-        courserun_is_enrollable = self.request.query_params.get(
-            "courserun_is_enrollable", None
+        # Filtering by courserun_is_enrollable is CourseFilterSet's job; the
+        # queryset is the same either way.
+        return Course.objects.select_related("page").prefetch_related(
+            "departments",
+            "courseruns__products",
+            Prefetch(
+                "courseruns__enrollment_modes",
+                to_attr="prefetched_enrollment_modes",
+            ),
         )
-
-        if courserun_is_enrollable:
-            queryset = (
-                Course.objects.filter()
-                .select_related("page")
-                .prefetch_related(
-                    "departments",
-                    Prefetch(
-                        "courseruns__enrollment_modes",
-                        to_attr="prefetched_enrollment_modes",
-                    ),
-                )
-                .all()
-            )
-        else:
-            queryset = (
-                Course.objects.filter()
-                .select_related("page")
-                .prefetch_related(
-                    "courseruns",
-                    "departments",
-                    Prefetch(
-                        "courseruns__enrollment_modes",
-                        to_attr="prefetched_enrollment_modes",
-                    ),
-                )
-                .all()
-            )
-
-        return queryset
 
     def get_serializer_context(self):
         added_context = {}
@@ -514,9 +491,22 @@ class UserEnrollmentsApiViewSet(
                     NoEdxApiAuthError,
                     HTTPError,
                     RequestsConnectionError,
-                ) as exc:
-                    log.exception(str(exc))  # noqa: TRY401
-                    return Response(data=str(exc), status=status.HTTP_400_BAD_REQUEST)
+                ):
+                    # Log full details for debugging
+                    log.exception(
+                        "Failed to update email subscription for user %s, enrollment %s, receive_emails=%s",
+                        request.user.id,
+                        enrollment.id,
+                        receive_emails,
+                    )
+
+                    # Return user-friendly error
+                    return Response(
+                        data={
+                            "error": "Unable to update email preferences at this time. Please try again later or contact support."
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
         else:
             # only designed to update edx_emails_subscription field
             # TODO: In the future please add the implementation  # noqa: FIX002, TD002, TD003

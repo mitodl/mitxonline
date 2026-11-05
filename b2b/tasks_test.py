@@ -79,6 +79,31 @@ def test_create_program_contract_runs_success(mocker):
     mock_cache_delete.assert_called_once_with(expected_lock_key)
 
 
+def test_create_program_contract_runs_nested_programs(mocker):
+    """Courses of nested programs get contract runs, including when the program has no courses of its own."""
+    contract = ContractPageFactory.create()
+    program = ProgramFactory.create()
+    nested_program = ProgramFactory.create()
+    program.add_program_requirement(nested_program)
+    nested_course = CourseFactory.create()
+    add_courses_to_program(nested_program, [nested_course])
+    CourseRunFactory.create(course=nested_course, is_source_run=True)
+
+    mocker.patch("django.core.cache.cache.add", return_value=True)
+    mocker.patch("django.core.cache.cache.delete")
+    mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
+
+    result = create_program_contract_runs.apply(
+        args=[contract.id, program.id],
+        kwargs={},
+    )
+
+    assert result.successful()
+    mock_create_contract_run.assert_called_once_with(
+        contract, nested_course, org_prefix=None
+    )
+
+
 def test_create_program_contract_runs_lock_not_acquired(mocker):
     """Test task skips execution when lock cannot be acquired."""
 
@@ -123,7 +148,7 @@ def test_create_program_contract_runs_skips_existing_runs(mocker):
     existing_courseware_id = create_contract_run_key(source_run, contract)
 
     CourseRunFactory.create(
-        course=course, courseware_id=existing_courseware_id, b2b_contract=contract
+        course=course, courseware_id=existing_courseware_id, b2b_contracts=[contract]
     )
 
     mocker.patch("django.core.cache.cache.add", return_value=True)
