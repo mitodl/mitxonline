@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [2026.11.5.1] - 2026-11-05
+
+### Changes
+
+- **fix: point $0 program course order refunds at the paid program order** (#4234) by 88967643+Anas12091101@users.noreply.github.com
+- **chore(deps): upgrade Pillow to 13.0.0** (#4236) by 1447295+shaidar@users.noreply.github.com
+- **Refactor exception handling** (#2988) by 1447295+shaidar@users.noreply.github.com
+- **Remove unused YouTube data-src iframe script from base template** (#4231) by 1447295+shaidar@users.noreply.github.com
+- **Checkout product with program product ID uses cart flow** (#4207) by annagav@users.noreply.github.com
+- **Fix the test_create_edx_user flake and log edX lookup failures** (#4029) by tmacey@mit.edu
+- **ci: limit the CI workflow's GITHUB_TOKEN to read-only** (#4232) by 1447295+shaidar@users.noreply.github.com
+- **Do not return a parent program's certificate type for courses (e.g., courses do not have Micromaster Credentials)** (#4213) by christopher.chudzicki@gmail.com
+
 ## [2026.11.4.1] - 2026-11-04
 
 ### Changes
