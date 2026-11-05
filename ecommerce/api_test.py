@@ -61,6 +61,7 @@ from ecommerce.api import (
     establish_basket,
     establish_basket_for_request,
     find_order_for_stripe_payment_intent,
+    find_paid_program_order_for_zero_value_order,
     fulfill_completed_order,
     fulfill_order_from_cybersource_transaction,
     generate_checkout_payload,
@@ -650,6 +651,74 @@ def test_order_refund_zero_payment(
     assert not zero_order.transactions.filter(
         transaction_type=TRANSACTION_TYPE_REFUND
     ).exists()
+
+
+@pytest.mark.parametrize(
+    ("purchases", "expected_index"),
+    [
+        (["paid", "zero", "paid"], 0),
+        (["zero", "paid"], None),
+        (["paid", "paid", "zero"], None),
+        (["free_with_paid_course", "zero"], None),
+    ],
+)
+def test_find_paid_program_order_for_zero_value_order(user, purchases, expected_index):
+    """
+    Only a single order placed before the $0 order, with a paid line for the
+    program, is the granting order. Later, ambiguous, and fully discounted
+    program purchases aren't.
+    """
+    run = CourseRunFactory.create()
+    program = ProgramFactory.create()
+    program.add_requirement(run.course)
+    with reversion.create_revision():
+        run_product = ProductFactory.create(purchasable_object=run, price=1000)
+        program_product = ProductFactory.create(purchasable_object=program, price=1524)
+        other_product = ProductFactory.create(
+            purchasable_object=CourseRunFactory.create(), price=500
+        )
+
+    def place_order(*lines):
+        order = OrderFactory.create(
+            purchaser=user,
+            state=OrderStatus.FULFILLED,
+            total_price_paid=sum(paid for _, paid in lines),
+        )
+        for product, paid in lines:
+            Line.objects.create(
+                order=order,
+                purchased_object_id=product.object_id,
+                purchased_content_type_id=product.content_type_id,
+                product_version=Version.objects.get_for_object(product).first(),
+                quantity=1,
+                discounted_unit_price=paid,
+            )
+        return order
+
+    program_orders = []
+    zero_order = None
+    for purchase in purchases:
+        if purchase == "zero":
+            zero_order = place_order((run_product, Decimal(0)))
+        elif purchase == "paid":
+            program_orders.append(place_order((program_product, Decimal(1524))))
+        else:
+            # A free program bought alongside a paid course: the order total
+            # is positive, but nothing was paid for the program.
+            program_orders.append(
+                place_order(
+                    (program_product, Decimal(0)), (other_product, Decimal(500))
+                )
+            )
+
+    DiscountRedemptionFactory.create(
+        redeemed_by=user,
+        redeemed_discount=create_verified_program_discount(program),
+        redeemed_order=zero_order,
+    )
+
+    expected = None if expected_index is None else program_orders[expected_index]
+    assert find_paid_program_order_for_zero_value_order(zero_order) == expected
 
 
 def test_paypal_refunds(fulfilled_paypal_transaction):

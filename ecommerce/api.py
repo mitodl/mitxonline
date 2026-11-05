@@ -969,8 +969,8 @@ def find_paid_program_order_for_zero_value_order(order: Order) -> Order | None:
     Args:
     - order (Order): the $0 order
     Returns:
-    - FulfilledOrder, the learner's paid order for that program placed before
-      this one, or None if there isn't exactly one
+    - FulfilledOrder, the learner's order placed before this one that paid for
+      that program, or None if there isn't exactly one
     """
     program_ctype = ContentType.objects.get_for_model(Program)
     program_ids = Product.objects.filter(
@@ -983,10 +983,10 @@ def find_paid_program_order_for_zero_value_order(order: Order) -> Order | None:
         FulfilledOrder.objects.filter(
             purchaser=order.purchaser,
             state=OrderStatus.FULFILLED,
-            total_price_paid__gt=0,
             created_on__lt=order.created_on,
             lines__purchased_content_type=program_ctype,
             lines__purchased_object_id__in=program_ids,
+            lines__discounted_unit_price__gt=0,
         ).distinct()[:2]
     )
 
