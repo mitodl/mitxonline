@@ -209,14 +209,22 @@ object clears its mappers. To change one mapping, read the current maps from
 the IdP's `GET` and send them back with the change. Mappers of other types
 added in the Keycloak console are left alone.
 
+Mappers are updated in place. An unchanged mapping leaves its mapper alone, a
+changed one keeps the rest of its config (sync mode, SAML name format, the
+mapper's name), a removed one is deleted, and a new one is created with
+`syncMode` `INHERIT` and, for SAML, the URI name format. Where two mappers
+import the same user attribute, the `GET` shows the later one and only that
+one is edited. A mapper with no user attribute or no source isn't shown and
+isn't touched.
+
 `alias` and `protocol` can't be changed. Sending either is a 400, and so is a
 field that belongs to the other protocol or a body with no fields. The
 lifecycle state doesn't change here, only through `transition/`.
 
-The update writes the IdP to Keycloak, then replaces the mappers, then saves
+The update writes the IdP to Keycloak, then updates the mappers, then saves
 the MITx Online record, with no compensation. If a step fails, Keycloak is
-ahead of MITx Online, and on SAML it may have fewer mappers than it started
-with. Send the same `PATCH` again to finish it.
+ahead of MITx Online and may have only some of the mapper changes. Send the
+same `PATCH` again to finish it.
 
 ### Lifecycle
 

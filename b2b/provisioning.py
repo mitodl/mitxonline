@@ -794,11 +794,19 @@ def parse_identity_provider_metadata(
     )
 
 
+def _attribute_mapper_source_key(protocol, *, friendly):
+    """Return the mapper config key that holds the source attribute or claim."""
+
+    if protocol == IDP_PROTOCOL_OIDC:
+        return "claim"
+    return "attribute.friendly.name" if friendly else "attribute.name"
+
+
 def _attribute_mapper_payload(protocol, alias, user_attribute, source, *, friendly):
     """Build one attribute-importer mapper representation."""
 
+    source_key = _attribute_mapper_source_key(protocol, friendly=friendly)
     if protocol == IDP_PROTOCOL_SAML:
-        source_key = "attribute.friendly.name" if friendly else "attribute.name"
         config = {
             source_key: source,
             "user.attribute": user_attribute,
@@ -807,7 +815,7 @@ def _attribute_mapper_payload(protocol, alias, user_attribute, source, *, friend
         }
     else:
         config = {
-            "claim": source,
+            source_key: source,
             "user.attribute": user_attribute,
             "syncMode": "INHERIT",
         }
@@ -846,7 +854,7 @@ def _attribute_importer_mappers(connection, alias):
     """
     Return the IdP's attribute-importer mappers.
 
-    Only the attribute importers are ever replaced. A mapper of another type - a
+    Only the attribute importers are ever edited. A mapper of another type - a
     username template, a hardcoded role - was added out of band and has nothing
     to do with the maps being supplied, so an attribute edit does not destroy
     it.
@@ -863,16 +871,59 @@ def _attribute_importer_mappers(connection, alias):
     ]
 
 
+def _read_attribute_mapper(protocol, mapper):
+    """
+    Return (user_attribute, friendly, source) for an attribute-importer mapper.
+
+    `friendly` says which map the mapping belongs in: attribute_map (a SAML
+    FriendlyName, or any OIDC claim) or attribute_name_map (a SAML Name). A
+    SAML mapper carrying both a FriendlyName and a Name is read by its
+    FriendlyName. Nothing here or in ol-infrastructure creates one.
+
+    A mapper with no user attribute or no source imports nothing, so it is
+    None. One edited into that state in the Keycloak console must not stop
+    the rest from being read.
+    """
+
+    config = mapper.config or {}
+    if protocol == IDP_PROTOCOL_OIDC:
+        friendly, source = True, config.get("claim")
+    elif config.get("attribute.friendly.name"):
+        friendly, source = True, config["attribute.friendly.name"]
+    else:
+        friendly, source = False, config.get("attribute.name")
+    user_attribute = config.get("user.attribute")
+    if not (user_attribute and source):
+        return None
+    return user_attribute, friendly, source
+
+
+def _reported_attribute_mappers(protocol, existing):
+    """
+    Map (user_attribute, friendly) to the mapper a read reports for it, and
+    its source.
+
+    The maps hold one source per user attribute, so when two mappers import
+    the same one, the later is reported.
+    """
+
+    reported = {}
+    for mapper in existing:
+        mapping = _read_attribute_mapper(protocol, mapper)
+        if mapping is not None:
+            user_attribute, friendly, source = mapping
+            reported[(user_attribute, friendly)] = (mapper, source)
+    return reported
+
+
 def get_identity_provider_attribute_maps(identity_provider, *, connection=None):
     """
     Return the IdP's attribute mappers as the two maps an update takes.
 
-    The maps replace the whole mapper set on an update, so a caller editing one
+    The maps are the whole mapper set on an update, so a caller editing one
     mapping has to start from what Keycloak holds now. Keycloak is the only
-    place the mappers are stored.
-
-    A SAML mapper carrying both a FriendlyName and a Name is reported by its
-    FriendlyName. Nothing here or in ol-infrastructure creates one.
+    place the mappers are stored. See _read_attribute_mapper for how a mapper
+    is read.
 
     Args:
     - identity_provider (OrganizationIdentityProvider): the IdP to read
@@ -882,56 +933,87 @@ def get_identity_provider_attribute_maps(identity_provider, *, connection=None):
     """
 
     connection = connection or KeycloakConnection()
-    attribute_map = {}
-    attribute_name_map = {}
+    maps = {True: {}, False: {}}
 
-    for mapper in _attribute_importer_mappers(connection, identity_provider.alias):
-        config = mapper.config or {}
-        user_attribute = config.get("user.attribute")
-        if identity_provider.protocol == IDP_PROTOCOL_OIDC:
-            source, target = config.get("claim"), attribute_map
-        elif config.get("attribute.friendly.name"):
-            source, target = config["attribute.friendly.name"], attribute_map
-        else:
-            source, target = config.get("attribute.name"), attribute_name_map
-        # A mapper with no user attribute or no source imports nothing, so
-        # there is nothing to report. One edited into that state in the
-        # Keycloak console must not stop the rest from being read.
-        if user_attribute and source:
-            target[user_attribute] = source
+    for (user_attribute, friendly), (_, source) in _reported_attribute_mappers(
+        identity_provider.protocol,
+        _attribute_importer_mappers(connection, identity_provider.alias),
+    ).items():
+        maps[friendly][user_attribute] = source
 
-    return attribute_map, attribute_name_map
+    return maps[True], maps[False]
 
 
-def _replace_attribute_mappers(  # noqa: PLR0913
+def _update_attribute_mappers(  # noqa: PLR0913
     connection, alias, protocol, existing, attribute_map, attribute_name_map
 ):
     """
-    Replace the IdP's attribute-importer mappers with the supplied set.
+    Bring the IdP's attribute-importer mappers in line with the supplied maps.
 
     The two maps together are the whole mapper set, the way `domains` is the
-    whole domain list on an organization update: what is on the IdP now goes,
-    and what is supplied takes its place. A merge would have to guess which
-    mapper an operator meant to change - Keycloak keys them by a generated id,
-    and the only name we give them is `{alias}-{attribute}-mapper`.
+    whole domain list on an organization update, and each entry is matched to
+    the mapper get_identity_provider_attribute_maps reported for it:
+    - an unchanged mapping leaves its mapper alone
+    - a changed source is written to the existing mapper, keeping the rest of
+      its config (sync mode, SAML name format) and its name, which may have
+      been set outside this API, e.g. by ol-infrastructure
+    - a mapping no longer in the maps deletes its mapper
+    - a new mapping gets a mapper with _attribute_mapper_payload's defaults
+
+    A mapper the read did not report is left alone, because the maps cannot
+    say anything about it: the earlier of two mappers importing the same user
+    attribute, and a mapper with no user attribute or no source. Deleting
+    them would lose a mapping nobody chose to remove.
+
+    Deletes and updates run before creates, so moving a SAML attribute
+    between the two maps frees the `{alias}-{attribute}-mapper` name before
+    the new mapper takes it.
 
     Args:
     - connection (KeycloakConnection): the Keycloak connection to use
     - alias (str): the IdP alias
     - protocol (str): "saml" or "oidc"
-    - existing (list): the mappers to remove, from _attribute_importer_mappers
+    - existing (list): the IdP's mappers, from _attribute_importer_mappers
     - attribute_map (dict): user attribute -> SAML friendly name / OIDC claim
     - attribute_name_map (dict): user attribute -> SAML attribute name
     """
 
-    for mapper in existing:
-        connection.client.delete(
-            f"identity-provider/instances/{alias}/mappers/{mapper.id}"
-        )
+    endpoint = f"identity-provider/instances/{alias}/mappers"
+    wanted = {
+        **{
+            (user_attribute, True): source
+            for user_attribute, source in (attribute_map or {}).items()
+        },
+        **{
+            (user_attribute, False): source
+            for user_attribute, source in (attribute_name_map or {}).items()
+        },
+    }
+    reported = _reported_attribute_mappers(protocol, existing)
 
-    _create_attribute_mappers(
-        connection, alias, protocol, attribute_map, attribute_name_map
-    )
+    for (user_attribute, friendly), (mapper, source) in reported.items():
+        if (user_attribute, friendly) not in wanted:
+            connection.client.delete(f"{endpoint}/{mapper.id}")
+            continue
+        wanted_source = wanted[(user_attribute, friendly)]
+        if wanted_source != source:
+            source_key = _attribute_mapper_source_key(protocol, friendly=friendly)
+            updated = mapper.model_copy(
+                update={"config": {**mapper.config, source_key: wanted_source}}
+            )
+            connection.client.save(
+                f"{endpoint}/{mapper.id}",
+                updated.model_dump(by_alias=True, exclude_none=True),
+            )
+
+    for (user_attribute, friendly), source in wanted.items():
+        if (user_attribute, friendly) not in reported:
+            connection.client.create_returning_id(
+                endpoint,
+                _attribute_mapper_payload(
+                    protocol, alias, user_attribute, source, friendly=friendly
+                ),
+            )
 
 
 def create_identity_provider(  # noqa: PLR0913
@@ -1231,12 +1313,11 @@ def update_identity_provider(  # noqa: PLR0913
     value when it sees the sentinel (IdentityProviderResource.updateIdpFromRep,
     Keycloak main). The alias cannot change here and Keycloak rejects it too.
 
-    The IdP write and the mapper replacement are two Keycloak writes, made after
+    The IdP write and the mapper writes are separate Keycloak writes, made after
     our save, so a failure between them rolls our row back and leaves Keycloak
-    with the new IdP config - on a SAML IdP, possibly with fewer mappers than it
-    started with. Every step is idempotent for the same request body, so the
-    recovery is to send the same PATCH again; unlike a create, there is nothing
-    half-made to delete.
+    with the new IdP config and only some of the mapper changes. Every step is
+    idempotent for the same request body, so the recovery is to send the same
+    PATCH again; unlike a create, there is nothing half-made to delete.
 
     Args:
     - identity_provider (OrganizationIdentityProvider): the IdP to update
@@ -1265,7 +1346,7 @@ def update_identity_provider(  # noqa: PLR0913
             connection=connection,
         )
 
-    replace_mappers = attribute_map is not None or attribute_name_map is not None
+    update_mappers = attribute_map is not None or attribute_name_map is not None
 
     with transaction.atomic():
         identity_provider = _locked(identity_provider)
@@ -1295,12 +1376,13 @@ def update_identity_provider(  # noqa: PLR0913
             rotated_secret=client_secret is not None,
         )
 
-        if replace_mappers:
+        if update_mappers:
             existing_mappers = _attribute_importer_mappers(
                 connection, identity_provider.alias
             )
-            # Gone from Keycloak once the replacement runs, so the audit record
-            # is the only place the set an operator replaced can still be read.
+            # Changed or deleted in Keycloak once the update runs, so the audit
+            # record is the only place the set an operator edited can still be
+            # read.
             data_before["attribute_mappers"] = [
                 {"name": mapper.name, "config": mapper.config}
                 for mapper in existing_mappers
@@ -1333,8 +1415,8 @@ def update_identity_provider(  # noqa: PLR0913
             )
 
         connection.identity_providers.update(identity_provider.alias, payload)
-        if replace_mappers:
-            _replace_attribute_mappers(
+        if update_mappers:
+            _update_attribute_mappers(
                 connection,
                 identity_provider.alias,
                 identity_provider.protocol,

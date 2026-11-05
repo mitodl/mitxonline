@@ -794,14 +794,12 @@ def test_update_identity_provider_audits_a_rotation_without_the_secret(
     assert rotated not in str(audit.data_before) + str(audit.data_after)
 
 
-def test_update_identity_provider_audits_the_mappers_it_replaced(
-    connection, staff_user
-):
+def test_update_identity_provider_audits_the_mappers_it_edited(connection, staff_user):
     """
-    The mappers an edit removed are only readable from the audit record.
+    The mappers an edit changed or removed are only readable from the audit record.
 
-    They are gone from Keycloak by the time the call returns, so recording
-    what the operator replaced is the only way to answer what was there.
+    They are changed or gone in Keycloak by the time the call returns, so
+    recording what the operator edited is the only way to answer what was there.
     """
 
     identity_provider = _identity_provider(OrganizationPageFactory.create())
@@ -998,36 +996,143 @@ def test_update_identity_provider_drops_keys_the_new_metadata_omits(connection, 
     assert payload["config"]["clientId"] == "mitxonline"
 
 
-def test_update_identity_provider_replaces_every_attribute_mapper(connection):
-    """The supplied maps are the whole mapper set, so the old ones go first."""
+def _saml_mapper(mapper_id, user_attribute, **config):
+    return IdentityProviderMapperRepresentation(
+        id=mapper_id,
+        name=f"exampleu-{user_attribute}-mapper",
+        identity_provider_alias="exampleu",
+        identity_provider_mapper="saml-user-attribute-idp-mapper",
+        config={"user.attribute": user_attribute, "syncMode": "INHERIT", **config},
+    )
 
+
+def _update_saml_mappers(connection, existing, attribute_map, attribute_name_map):
     identity_provider = _identity_provider(OrganizationPageFactory.create())
     connection.identity_providers.get.return_value = IdentityProviderRepresentation(
         alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
     )
-    connection.client.list.return_value = [
-        IdentityProviderMapperRepresentation(
-            id="mapper-1", identity_provider_mapper="saml-user-attribute-idp-mapper"
-        ),
-        IdentityProviderMapperRepresentation(
-            id="mapper-2", identity_provider_mapper="saml-user-attribute-idp-mapper"
-        ),
-    ]
+    connection.client.list.return_value = existing
 
     update_identity_provider(
         identity_provider,
-        attribute_map={"email": "E-Mail Address"},
+        attribute_map=attribute_map,
+        attribute_name_map=attribute_name_map,
         connection=connection,
     )
 
-    assert [call.args[0] for call in connection.client.delete.call_args_list] == [
-        "identity-provider/instances/exampleu/mappers/mapper-1",
-        "identity-provider/instances/exampleu/mappers/mapper-2",
-    ]
 
-    endpoint, payload = connection.client.create_returning_id.call_args.args
-    assert endpoint == "identity-provider/instances/exampleu/mappers"
-    assert payload["config"]["attribute.friendly.name"] == "E-Mail Address"
+def test_update_identity_provider_changes_a_mapper_in_place(connection):
+    """
+    A changed mapping updates its mapper and keeps the rest of its config.
+
+    Settings made outside the form (sync mode, attribute name format, the
+    mapper's name) would be lost if the mapper were recreated from defaults.
+    """
+
+    _update_saml_mappers(
+        connection,
+        [
+            _saml_mapper(
+                "mapper-1",
+                "email",
+                **{
+                    "attribute.name": "urn:oid:0.9.2342.19200300.100.1.3",
+                    "attribute.name.format": "ATTRIBUTE_FORMAT_BASIC",
+                    "syncMode": "FORCE",
+                },
+            )
+        ],
+        {},
+        {"email": "mail"},
+    )
+
+    connection.client.save.assert_called_once_with(
+        "identity-provider/instances/exampleu/mappers/mapper-1",
+        {
+            "id": "mapper-1",
+            "name": "exampleu-email-mapper",
+            "identityProviderAlias": "exampleu",
+            "identityProviderMapper": "saml-user-attribute-idp-mapper",
+            "config": {
+                "user.attribute": "email",
+                "attribute.name": "mail",
+                "attribute.name.format": "ATTRIBUTE_FORMAT_BASIC",
+                "syncMode": "FORCE",
+            },
+        },
+    )
+    connection.client.delete.assert_not_called()
+    connection.client.create_returning_id.assert_not_called()
+
+
+def test_update_identity_provider_reconciles_the_mapper_set(connection):
+    """
+    An unchanged mapping is left alone, a removed one is deleted, and a new
+    one is created with the defaults.
+    """
+
+    _update_saml_mappers(
+        connection,
+        [
+            _saml_mapper("unchanged", "email", **{"attribute.friendly.name": "mail"}),
+            _saml_mapper("removed", "lastName", **{"attribute.friendly.name": "sn"}),
+        ],
+        {"email": "mail", "firstName": "givenName"},
+        {},
+    )
+
+    connection.client.save.assert_not_called()
+    connection.client.delete.assert_called_once_with(
+        "identity-provider/instances/exampleu/mappers/removed"
+    )
+    connection.client.create_returning_id.assert_called_once_with(
+        "identity-provider/instances/exampleu/mappers",
+        {
+            "name": "exampleu-firstName-mapper",
+            "identityProviderAlias": "exampleu",
+            "identityProviderMapper": "saml-user-attribute-idp-mapper",
+            "config": {
+                "attribute.friendly.name": "givenName",
+                "user.attribute": "firstName",
+                "syncMode": "INHERIT",
+                "attribute.name.format": "ATTRIBUTE_FORMAT_URI",
+            },
+        },
+    )
+
+
+def test_update_identity_provider_leaves_mappers_it_did_not_report(connection):
+    """
+    Only the mapper a read reported for an attribute is edited.
+
+    The maps hold one source per user attribute, so of two mappers for the
+    same attribute the read reports the later one, and a mapper with no user
+    attribute or no source is not reported at all. Neither is in the maps the
+    caller sent back, so neither can be told apart from an intended removal;
+    they are left as they are.
+    """
+
+    _update_saml_mappers(
+        connection,
+        [
+            _saml_mapper("fallback", "email", **{"attribute.friendly.name": "mail"}),
+            _saml_mapper("reported", "email", **{"attribute.friendly.name": "email"}),
+            IdentityProviderMapperRepresentation(
+                id="incomplete",
+                identity_provider_mapper="saml-user-attribute-idp-mapper",
+                config={"user.attribute": "firstName"},
+            ),
+        ],
+        {"email": "emailAddress"},
+        {},
+    )
+
+    connection.client.save.assert_called_once()
+    assert connection.client.save.call_args.args[0] == (
+        "identity-provider/instances/exampleu/mappers/reported"
+    )
+    connection.client.delete.assert_not_called()
+    connection.client.create_returning_id.assert_not_called()
 
 
 def test_update_identity_provider_keeps_mappers_of_other_types(connection):
@@ -1046,6 +1151,10 @@ def test_update_identity_provider_keeps_mappers_of_other_types(connection):
         IdentityProviderMapperRepresentation(
             id="attribute-mapper",
             identity_provider_mapper="saml-user-attribute-idp-mapper",
+            config={
+                "attribute.friendly.name": "givenName",
+                "user.attribute": "firstName",
+            },
         ),
         IdentityProviderMapperRepresentation(
             id="role-mapper", identity_provider_mapper="oidc-hardcoded-role-idp-mapper"
@@ -1094,7 +1203,9 @@ def test_update_identity_provider_can_clear_the_mappers(connection):
     )
     connection.client.list.return_value = [
         IdentityProviderMapperRepresentation(
-            id="mapper-1", identity_provider_mapper="oidc-user-attribute-idp-mapper"
+            id="mapper-1",
+            identity_provider_mapper="oidc-user-attribute-idp-mapper",
+            config={"claim": "upn", "user.attribute": "email"},
         )
     ]
 
@@ -1962,23 +2073,19 @@ def _identity_provider_update(connection, mocker):
     )
 
 
-def _mapper_replacement(connection, mocker):
+def _mapper_update(connection, mocker):
     identity_provider = _identity_provider(OrganizationPageFactory.create())
     connection.identity_providers.get.return_value = IdentityProviderRepresentation(
         alias="exampleu", enabled=True, config=dict(PARSED_METADATA)
     )
     connection.client.list.return_value = [
-        IdentityProviderMapperRepresentation(
-            id="mapper-1",
-            name="exampleu-email-mapper",
-            identity_provider_mapper="saml-user-attribute-idp-mapper",
-            config={"attribute.friendly.name": "E-Mail", "user.attribute": "email"},
-        )
+        _saml_mapper("changed", "email", **{"attribute.friendly.name": "E-Mail"}),
+        _saml_mapper("removed", "lastName", **{"attribute.friendly.name": "sn"}),
     ]
     updated_on = identity_provider.updated_on
 
     def unchanged():
-        # Replacing mappers changes no column of ours, so the save itself is
+        # Updating mappers changes no column of ours, so the save itself is
         # the only local write there is to see.
         identity_provider.refresh_from_db()
         return identity_provider.updated_on == updated_on
@@ -1986,11 +2093,12 @@ def _mapper_replacement(connection, mocker):
     return (
         lambda: update_identity_provider(
             identity_provider,
-            attribute_map={"email": "E-Mail Address"},
+            attribute_map={"email": "E-Mail Address", "firstName": "givenName"},
             connection=connection,
         ),
         [
             connection.identity_providers.update,
+            connection.client.save,
             connection.client.delete,
             connection.client.create_returning_id,
         ],
@@ -2055,7 +2163,7 @@ CHANGES_TO_EXISTING_RESOURCES = pytest.mark.parametrize(
     [
         _organization_update,
         _identity_provider_update,
-        _mapper_replacement,
+        _mapper_update,
         _metadata_refresh,
         _transition,
         _deletion,
