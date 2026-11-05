@@ -15,10 +15,9 @@ import responses
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
-from edx_api.client import EdxApi
 from edx_api.course_detail.models import CourseMode
 from edx_api.course_runs.exceptions import CourseRunAPIError
-from edx_api.enrollments import CourseEnrollments
+from edx_api.enrollments import CourseEnrollmentsV2
 from freezegun import freeze_time
 from mitol.common.utils.datetime import now_in_utc
 from mitol.common.utils.user import _reformat_for_username, usernameify
@@ -1189,12 +1188,9 @@ def test_get_edx_api_enrollments_client_v2(mocker, enrollments_v2_settings):
     mock_resp = mocker.Mock()
     mock_resp.json.return_value = {"access_token": "a_jwt", "expires_in": 3600}
     mock_post = mocker.patch("openedx.api.requests.post", return_value=mock_resp)
-    # edx-api-client 1.14.0 predates EdxApi.enrollments_v2
-    mock_edx_api = mocker.patch("openedx.api.EdxApi")
     mock_cache_set = mocker.spy(cache, "set")
 
-    first_client = get_edx_api_enrollments_client()
-    second_client = get_edx_api_enrollments_client()
+    clients = [get_edx_api_enrollments_client() for _ in range(2)]
 
     mock_post.assert_called_once()
     assert mock_post.call_args.kwargs["data"] == {
@@ -1207,37 +1203,43 @@ def test_get_edx_api_enrollments_client_v2(mocker, enrollments_v2_settings):
         "a_jwt",
         3600 - OPENEDX_JWT_EXPIRY_MARGIN_SECONDS,
     )
-    assert mock_edx_api.call_count == 2
-    for edx_api_call in mock_edx_api.call_args_list:
-        assert edx_api_call.args == ({"access_token": "a_jwt"}, "http://example.com")
-    assert first_client == second_client == mock_edx_api.return_value.enrollments_v2
+    for enrollments_client in clients:
+        assert isinstance(enrollments_client, CourseEnrollmentsV2)
+        assert enrollments_client.base_url == "http://example.com"
+        assert enrollments_client.requester.headers["Authorization"] == "jwt a_jwt"
 
 
-def _edx_api_with_jwt_enrollments(credentials, base_url, timeout):
-    """
-    EdxApi, with v1's enrollments client on v2's JWT requester standing in for
-    enrollments_v2, which edx-api-client 1.14.0 predates
-    """
-    edx_api = EdxApi(credentials, base_url, timeout=timeout)
-    edx_api.enrollments_v2 = CourseEnrollments(
-        edx_api.get_requester(token_type="jwt"),  # noqa: S106
-        base_url,
-    )
-    return edx_api
-
-
+@pytest.mark.parametrize(
+    ("method", "url", "body", "make_call"),
+    [
+        (
+            responses.POST,
+            CourseEnrollmentsV2.enrollment_url,
+            {},
+            lambda client: client.deactivate_enrollment(
+                "course-v1:a+b+c", username="u"
+            ),
+        ),
+        # A generator, so its request happens while the caller iterates
+        (
+            responses.GET,
+            CourseEnrollmentsV2.enrollment_list_url,
+            {"results": [], "next": None},
+            lambda client: list(client.get_enrollments(usernames=["u"])),
+        ),
+    ],
+)
 @pytest.mark.parametrize(
     "second_attempt_status", [status.HTTP_200_OK, status.HTTP_401_UNAUTHORIZED]
 )
 @responses.activate
-def test_get_edx_api_enrollments_client_v2_rejected_jwt(
-    mocker, enrollments_v2_settings, second_attempt_status
+def test_get_edx_api_enrollments_client_v2_rejected_jwt(  # noqa: PLR0913
+    enrollments_v2_settings, second_attempt_status, method, url, body, make_call
 ):
     """
     When edX rejects the cached JWT, the enrollments client drops it and retries
     the request once with a new one, which later requests reuse
     """
-    mocker.patch("openedx.api.EdxApi", side_effect=_edx_api_with_jwt_enrollments)
     token_url = f"http://example.com{OPENEDX_OAUTH2_ACCESS_TOKEN_PATH}"
     for access_token in ("rejected_jwt", "fresh_jwt"):
         responses.add(
@@ -1245,32 +1247,35 @@ def test_get_edx_api_enrollments_client_v2_rejected_jwt(
             token_url,
             json={"access_token": access_token, "expires_in": 3600},
         )
-    enrollment_url = f"http://example.com{CourseEnrollments.enrollment_url}"
+    url = f"http://example.com{url}"
     for status_code in (
         status.HTTP_401_UNAUTHORIZED,
         second_attempt_status,
         status.HTTP_200_OK,
     ):
-        responses.add(responses.POST, enrollment_url, json={}, status=status_code)
+        responses.add(method, url, json=body, status=status_code)
 
     enrollments_client = get_edx_api_enrollments_client()
     if second_attempt_status == status.HTTP_401_UNAUTHORIZED:
         with pytest.raises(HTTPError):
-            enrollments_client.deactivate_enrollment("course-v1:a+b+c", username="u")
+            make_call(enrollments_client)
     else:
-        enrollments_client.deactivate_enrollment("course-v1:a+b+c", username="u")
-        enrollments_client.deactivate_enrollment("course-v1:a+b+c", username="u")
+        make_call(enrollments_client)
+        make_call(enrollments_client)
 
     assert [
-        (api_call.request.url, api_call.request.headers.get("Authorization"))
+        (
+            api_call.request.url.split("?")[0],
+            api_call.request.headers.get("Authorization"),
+        )
         for api_call in responses.calls
     ] == [
         (token_url, None),
-        (enrollment_url, "jwt rejected_jwt"),
+        (url, "jwt rejected_jwt"),
         (token_url, None),
-        (enrollment_url, "jwt fresh_jwt"),
+        (url, "jwt fresh_jwt"),
         *(
-            [(enrollment_url, "jwt fresh_jwt")]
+            [(url, "jwt fresh_jwt")]
             if second_attempt_status == status.HTTP_200_OK
             else []
         ),
