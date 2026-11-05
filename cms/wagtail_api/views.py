@@ -109,6 +109,8 @@ class WagtailPagesAPIViewSet(PagesAPIViewSet):
         """
         queryset = super().get_base_queryset()
         if self._is_keyed_course_request:
+            # Deliberately not limited to live pages: Learn needs the pages of
+            # unpublished test-mode courses. Live pages are already in `queryset`.
             return Page.objects.filter(
                 Q(pk__in=queryset.values("pk"))
                 | Q(coursepage__ingest_content_files_for_ai=True)
