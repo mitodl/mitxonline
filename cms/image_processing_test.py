@@ -12,6 +12,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.template import Context, Template
 from PIL import Image as PILImage
 from wagtail.images import get_image_model
+from wagtail.images.fields import WagtailImageField
 from wagtail.images.tests.utils import get_test_image_file
 
 from b2b.models import OrganizationPage
@@ -43,6 +44,7 @@ def media_root(settings, tmp_path):
     ("fmt", "extension"),
     [
         ("JPEG", "jpg"),
+        ("JPEG", "jpeg"),
         ("PNG", "png"),
         ("GIF", "gif"),
         ("WEBP", "webp"),
@@ -51,10 +53,11 @@ def media_root(settings, tmp_path):
 )
 def test_wagtail_image_renditions(fmt, extension):
     """Uploaded images in each allowed format should produce resized renditions"""
-    image = get_image_model().objects.create(
-        title=fmt,
-        file=SimpleUploadedFile(f"test.{extension}", _image_bytes(fmt)),
-    )
+    upload = SimpleUploadedFile(f"test.{extension}", _image_bytes(fmt))
+    # The validation an admin upload goes through: format detection and size checks.
+    WagtailImageField().clean(upload)
+    upload.seek(0)
+    image = get_image_model().objects.create(title=fmt, file=upload)
     assert (image.width, image.height) == (800, 400)
 
     rendition = image.get_rendition("max-150x50")
