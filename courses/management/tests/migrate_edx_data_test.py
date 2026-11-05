@@ -310,3 +310,23 @@ def test_migrate_users_dry_run_excludes_existing_usernames(capsys):
     Command()._migrate_users(conn, {"dry_run": True})  # noqa: SLF001
 
     assert "[DRY RUN] Would create 1 users" in capsys.readouterr().out
+
+
+def test_migrate_users_dry_run_matches_emails_case_insensitively(capsys):
+    """Email uniqueness ignores case, so dry-run must not count an email that
+    differs from an existing user's only by case, or count two case variants
+    of one new email twice - including across batches
+    """
+    UserFactory.create(email="Existing@example.com")
+    conn = FakeConnection(
+        columns=["user_email", "user_full_name"],
+        rows=[
+            ("existing@example.com", "Existing"),
+            ("New@example.com", "New"),
+            ("new@example.com", "New Again"),
+        ],
+    )
+
+    Command()._migrate_users(conn, {"dry_run": True, "batch_size": 2})  # noqa: SLF001
+
+    assert "[DRY RUN] Would create 1 users" in capsys.readouterr().out

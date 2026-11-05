@@ -3,6 +3,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.db.models import Q
+from django.db.models.functions import Lower
 from reversion.models import Version
 from trino.auth import BasicAuthentication
 from trino.dbapi import connect
@@ -389,6 +390,8 @@ class Command(BaseCommand):
         GENDER_MAP = {label: code for code, label in GENDER_CHOICES}
 
         user_creation_count = 0
+        # dry-run only: lowercased emails already counted, across batches
+        dry_run_counted = set()
         while True:
             results = cur.fetchmany(batch_size)
             if not results:
@@ -412,8 +415,22 @@ class Command(BaseCommand):
             }
 
             if dry_run:
-                new_emails = [email for email in emails if email not in existing_emails]
-                user_creation_count += len(new_emails)
+                # email uniqueness is case-insensitive (user_email_unique), so
+                # count the way a real run's inserts would succeed or conflict
+                existing_lower = set(
+                    User.objects.annotate(email_lower=Lower("email"))
+                    .filter(email_lower__in=[email.lower() for email in emails])
+                    .values_list("email_lower", flat=True)
+                )
+                for email in emails:
+                    key = email.lower()
+                    if (
+                        email not in existing_emails
+                        and key not in existing_lower
+                        and key not in dry_run_counted
+                    ):
+                        dry_run_counted.add(key)
+                        user_creation_count += 1
                 continue
 
             created_users = self._bulk_create_users(rows, existing_emails, batch_size)
