@@ -2233,7 +2233,7 @@ def test_establish_basket_calls_create_user(mocker, no_delay):
 
     OpenEdxUserFactory.create(user=user)
     if not no_delay:
-        del user.openedx_user
+        user.clear_openedx_user_cache()
 
     basket.delete()
 
@@ -2871,8 +2871,6 @@ def test_apply_user_discounts_validates_against_the_whole_basket(
     paid_amount_off_source,
 ):
     """A user discount linked to the second basket item is applied, not refused against the first."""
-    request = RequestFactory().get("/")
-    request.user = paid_amount_off_source.user
     basket = Basket.objects.create(user=paid_amount_off_source.user)
     BasketItem.objects.create(
         basket=basket, product=ProductFactory.create(), quantity=1
@@ -2884,7 +2882,7 @@ def test_apply_user_discounts_validates_against_the_whole_basket(
         user=paid_amount_off_source.user, discount=paid_amount_off_source.discount
     )
 
-    apply_user_discounts(request)
+    apply_user_discounts(basket)
 
     assert basket.discounts.get().redeemed_discount == paid_amount_off_source.discount
 
@@ -2898,8 +2896,6 @@ def test_revalidation_passes_a_resolvable_program_child_purchase_discount(
     check_basket_discounts_for_validity wipes every basket discount and blocks
     checkout.
     """
-    request = RequestFactory().get("/")
-    request.user = paid_amount_off_source.user
     basket = Basket.objects.create(user=paid_amount_off_source.user)
     BasketItem.objects.create(
         basket=basket, product=paid_amount_off_source.program_product, quantity=1
@@ -2908,10 +2904,10 @@ def test_revalidation_passes_a_resolvable_program_child_purchase_discount(
         user=paid_amount_off_source.user, discount=paid_amount_off_source.discount
     )
 
-    apply_user_discounts(request)
+    apply_user_discounts(basket)
 
     assert basket.discounts.get().redeemed_discount == paid_amount_off_source.discount
-    assert check_basket_discounts_for_validity(request) is True
+    assert check_basket_discounts_for_validity(basket) is True
 
 
 STRIPE_TEST_PAYMENT_INTENT_ID = "pi_1GszsK2eZvKYlo2CfhZyoZLp"

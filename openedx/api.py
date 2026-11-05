@@ -461,6 +461,10 @@ def create_edx_user(user, edx_username=None):
 
     if reconcile_edx_username(user, desired_username=edx_username):
         user.refresh_from_db()
+        # refresh_from_db() leaves functools.cached_property values in
+        # __dict__, so the caller's openedx_user would keep the pre-reconcile
+        # row.
+        user.clear_openedx_user_cache()
 
     open_edx_user = user.openedx_users.first()
 
@@ -480,6 +484,11 @@ def create_edx_user(user, edx_username=None):
         if not ignore_edx_failures:
             raise
         return False
+    finally:
+        # _create_edx_user_request saves every username it attempts, including
+        # collision replacements, through its own OpenEdxUser instance, so the
+        # row can change even when registration fails.
+        user.clear_openedx_user_cache()
 
 
 def reconcile_edx_username(user, *, desired_username=None):
@@ -1369,6 +1378,13 @@ def enroll_in_edx_course_runs(
             msg = f"User {user.edx_username} does not exist in OpenEdX and could not be created"
             raise OpenEdxUserMissingError(msg)
 
+    # create_edx_user, which the repair above runs, clears this instance's
+    # cached username itself. What it can't clear is a None cached before a
+    # create_user_from_id worker wrote the row in another process:
+    # establish_basket reads user.edx_username and queues that task only when
+    # it is empty, so None is the only cached value that can be stale here.
+    if user.edx_username is None:
+        user.clear_openedx_user_cache()
     username = user.edx_username
     results = []
     for course_run in course_runs:

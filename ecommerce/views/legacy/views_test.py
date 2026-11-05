@@ -522,7 +522,6 @@ def test_redeem_time_limited_discount(  # noqa: PLR0913
         assert "not found" in resp_json
 
 
-@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 def test_start_checkout_with_invalid_discounts(user, user_client, products, discounts):
     """
     Applies a discount, invalidates all the discounts, then hits the start
@@ -976,7 +975,6 @@ def test_checkout_product_with_no_active_product_uses_cart(user, user_client):
 
 
 @pytest.mark.dont_mock_enrollments
-@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 @pytest.mark.parametrize("by_product_id", [True, False])
 def test_checkout_product_with_verified_program_enrollment(
     user, user_client, by_product_id
@@ -1052,7 +1050,6 @@ def test_checkout_product_with_unpaid_verified_program_enrollment_uses_cart(
 
 
 @pytest.mark.dont_mock_enrollments
-@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 def test_checkout_product_verified_program_shortcut_with_unusable_profile(
     mocked_export_compliance, user, user_client
 ):
@@ -2176,7 +2173,6 @@ def test_bulk_discount_create(admin_drf_client, use_redemption_type_flags):
     assert discounts[0].is_bulk
 
 
-@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 def test_checkout_interstitial_google_analytics_object(
     mocker, settings, user, user_client, products
 ):
@@ -2207,7 +2203,6 @@ def test_checkout_interstitial_google_analytics_object(
         assert isinstance(item["quantity"], int)
 
 
-@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 def test_checkout_interstitial_no_ga_flag_without_global_id(
     mocker, settings, user_client, products
 ):
