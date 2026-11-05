@@ -10,7 +10,6 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.scrubber import DEFAULT_DENYLIST, EventScrubber
-from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 
 # these errors occur when a shutdown is happening (usually caused by a SIGTERM)
 SHUTDOWN_ERRORS = (WorkerLostError, SystemExit)
@@ -60,28 +59,6 @@ SECRET_PAIR_RE = re.compile(
 )
 
 
-class SerializedEventScrubber(EventScrubber):
-    """The SDK's EventScrubber, for an event that has already been serialized.
-
-    Passing data_collection to sentry_sdk.init() makes the SDK drop the
-    event_scrubber option (sentry_sdk.client._get_options), so ours runs from
-    before_send instead. The stock scrubber substitutes an AnnotatedValue,
-    which only the SDK's serializer turns into JSON, and before_send runs after
-    serialization; this one substitutes the same "[Filtered]" string directly.
-    """
-
-    def scrub_dict(self, d):
-        """Blank denylisted keys, recursing into nested dicts and lists."""
-        if not isinstance(d, dict):
-            return
-        for key, value in d.items():
-            if isinstance(key, str) and key.lower() in self.denylist:
-                d[key] = SENSITIVE_DATA_SUBSTITUTE
-            elif self.recursive:
-                self.scrub_dict(value)
-                self.scrub_list(value)
-
-
 def build_event_scrubber(*, collect_user_info):
     """Return the SDK's scrubber, extended with our secret keys and made recursive.
 
@@ -90,7 +67,7 @@ def build_event_scrubber(*, collect_user_info):
     SDK's PII denylist (IP address keys) is scrubbed too, as it was when this
     followed send_default_pii.
     """
-    return SerializedEventScrubber(
+    return EventScrubber(
         denylist=[*DEFAULT_DENYLIST, *SECRET_KEYS],
         recursive=True,
         send_default_pii=collect_user_info,
@@ -130,23 +107,6 @@ def build_data_collection(*, collect_user_info):
         "stack_frame_variables": True,
         "frame_context_lines": 5,
     }
-
-
-def _client_collects_user_info():
-    """Return whether the active Sentry client's data_collection sends user info.
-
-    False when no client is configured, so the stricter scrub is the fallback.
-    """
-    data_collection = sentry_sdk.get_client().options.get("data_collection") or {}
-    return bool(data_collection.get("user_info"))
-
-
-def scrub_sensitive_keys(event):
-    """Blank denylisted keys in the event, as the SDK's event_scrubber did."""
-    build_event_scrubber(collect_user_info=_client_collects_user_info()).scrub_event(
-        event
-    )
-    return event
 
 
 def scrub_secret_values(text):
@@ -267,12 +227,7 @@ def before_send(event, hint):
         if isinstance(exc_value, SHUTDOWN_ERRORS):
             # so we don't want to report expected shutdown errors to sentry
             return None
-    return scrub_pg_details(scrub_export_compliance_event(scrub_sensitive_keys(event)))
-
-
-def before_send_transaction(event, hint):  # noqa: ARG001
-    """Scrub denylisted keys from transactions, which before_send never sees."""
-    return scrub_sensitive_keys(event)
+    return scrub_pg_details(scrub_export_compliance_event(event))
 
 
 def init_sentry(  # noqa: PLR0913
@@ -316,7 +271,6 @@ def init_sentry(  # noqa: PLR0913
         environment=environment,
         release=version,
         before_send=before_send,
-        before_send_transaction=before_send_transaction,
         data_collection=build_data_collection(collect_user_info=collect_user_info),
         # Request bodies are NOT gated on user info: data_collection's
         # http_bodies keeps them on, and request_body_within_bounds makes this
@@ -333,6 +287,15 @@ def init_sentry(  # noqa: PLR0913
             RedisIntegration(),
             LoggingIntegration(level=log_level),
         ],
+    )
+    # Passing data_collection makes sentry_sdk.client._get_options drop the
+    # event_scrubber option, with a warning, so it is set on the client after
+    # init instead. _prepare_event reads it per event and runs it before
+    # serialization. That ordering matters: the serializer repr()s anything
+    # nested past MAX_DATABAG_DEPTH, and no key-based scrub in before_send can
+    # see into that string.
+    sentry_sdk.get_client().options["event_scrubber"] = build_event_scrubber(
+        collect_user_info=collect_user_info
     )
 
     with sentry_sdk.configure_scope() as scope:
