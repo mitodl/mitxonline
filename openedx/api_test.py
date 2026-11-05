@@ -1347,6 +1347,27 @@ def test_unenroll_edx_course_run_v2(mocker, enrollments_v2_settings):
 
 
 @pytest.mark.parametrize(
+    "token_error",
+    [
+        requests.exceptions.ReadTimeout(),
+        HTTPError(response=MockResponse("", status_code=status.HTTP_401_UNAUTHORIZED)),
+        KeyError("access_token"),
+    ],
+)
+def test_unenroll_edx_course_run_v2_token_failure(
+    mocker, enrollments_v2_settings, token_error
+):
+    """A failed JWT request is raised as UnknownEdxApiEnrollException, as when enrolling"""
+    run_enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
+    mocker.patch("openedx.api.get_edx_api_enrollments_client", side_effect=token_error)
+
+    with pytest.raises(UnknownEdxApiEnrollException) as exc_info:
+        unenroll_edx_course_run(run_enrollment)
+
+    assert exc_info.value.base_exc is token_error
+
+
+@pytest.mark.parametrize(
     ("failure", "expected_level"),
     [
         ("http_400", logging.ERROR),
