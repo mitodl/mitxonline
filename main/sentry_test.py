@@ -6,18 +6,27 @@ from dataclasses import dataclass
 
 import pytest
 import sentry_sdk
+from django.test import override_settings
+from django.urls import path
+from sentry_sdk.data_collection import _map_from_send_default_pii, _resolve_explicit
+from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.transport import Transport
 
 from main.sentry import (
     EXPORT_COMPLIANCE_USER_TAG,
     before_send,
+    before_send_transaction,
+    build_data_collection,
     build_event_scrubber,
+    init_sentry,
     scrub_export_compliance_event,
     scrub_pg_detail,
     scrub_pg_details,
     scrub_secret_values,
 )
+from main.urls import urlpatterns as main_urlpatterns
+from users.factories import UserFactory
 
 # A real MITXONLINE-6PK exception value, with the learner identifiers replaced.
 PG_INTEGRITY_ERROR = (
@@ -41,7 +50,9 @@ class FakeTransport(Transport):
 
     def capture_envelope(self, envelope):
         self.events.extend(
-            item.payload.json for item in envelope.items if item.type == "event"
+            item.payload.json
+            for item in envelope.items
+            if item.type in ("event", "transaction")
         )
 
 
@@ -204,6 +215,7 @@ def test_real_sdk_scrubs_params_and_local_variables(sentry_transport):
 
 
 OIDC_SECRET = "oidc-client-secret-value"  # noqa: S105
+LEARNER_USER = {"id": "42", "email": "learner@example.invalid", "username": "ada"}
 
 
 @dataclass
@@ -273,27 +285,34 @@ def test_scrubber_blanks_nested_secret_keys():
             ]
         },
     }
-    build_event_scrubber(send_default_pii=False).scrub_event(event)
+    build_event_scrubber(collect_user_info=False).scrub_event(event)
     assert OIDC_SECRET not in repr(event)
     frame_vars = event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]
     assert frame_vars["data"]["alias"] == "partner"
 
 
-@pytest.fixture
-def scrubbing_sentry_transport():
-    """Initialize the real SDK with our scrubber as well as before_send."""
+def _init_scrubbing_sdk(*, collect_user_info, **kwargs):
+    """Initialize the real SDK with our data_collection and hooks, as init_sentry does."""
     transport = FakeTransport()
     sentry_sdk.init(
         dsn="https://k@o0.ingest.sentry.io/0",
         transport=transport,
         before_send=before_send,
-        event_scrubber=build_event_scrubber(send_default_pii=False),
+        before_send_transaction=before_send_transaction,
+        data_collection=build_data_collection(collect_user_info=collect_user_info),
         default_integrations=False,
         integrations=[
             LoggingIntegration(level=logging.INFO, event_level=logging.ERROR)
         ],
+        **kwargs,
     )
-    yield transport
+    return transport
+
+
+@pytest.fixture(params=[True, False], ids=["user_info", "no_user_info"])
+def scrubbing_sentry_transport(request):
+    """Initialize the real SDK with our scrubbing, with user info on and off."""
+    yield _init_scrubbing_sdk(collect_user_info=request.param)
     sentry_sdk.get_global_scope().set_client(None)
 
 
@@ -318,6 +337,158 @@ def test_real_sdk_keeps_the_oidc_secret_out(scrubbing_sentry_transport):
     event_json = json.dumps(scrubbing_sentry_transport.events[0])
     assert OIDC_SECRET not in event_json
     assert "Keycloak said no" in event_json
+
+
+@pytest.mark.parametrize("collect_user_info", [True, False])
+def test_data_collection_matches_send_default_pii(collect_user_info):
+    """Resolved by the SDK, it collects exactly what send_default_pii did."""
+    resolved = _resolve_explicit(
+        build_data_collection(collect_user_info=collect_user_info)
+    )
+    expected = _map_from_send_default_pii(
+        send_default_pii=collect_user_info,
+        include_local_variables=True,
+        include_source_context=True,
+    )
+    assert resolved.pop("provided_by_user") is True
+    assert expected.pop("provided_by_user") is False
+    if not collect_user_info:
+        # send_default_pii=False sent no cookies; the SDK's mapping would
+        # send them through its denylist instead.
+        assert resolved.pop("cookies") == {"mode": "off"}
+        expected.pop("cookies")
+    assert resolved == expected
+
+
+@pytest.mark.parametrize("collect_user_info", [True, False])
+def test_init_sentry_configures_data_collection(collect_user_info):
+    """init_sentry no longer sets the deprecated option, and keeps its hooks.
+
+    pytest turns warnings into errors, so a send_default_pii or ignored
+    event_scrubber deprecation warning fails this test.
+    """
+    try:
+        init_sentry(
+            dsn="https://k@o0.ingest.sentry.io/0",
+            environment="test",
+            version="0.0.0",
+            collect_user_info=collect_user_info,
+            log_level="ERROR",
+            heroku_app_name=None,
+            traces_sample_rate=0,
+            profiles_sample_rate=0,
+        )
+        options = sentry_sdk.get_client().options
+    finally:
+        sentry_sdk.get_global_scope().set_client(None)
+
+    assert options["send_default_pii"] is None
+    assert options["event_scrubber"] is None
+    assert options["data_collection"]["provided_by_user"] is True
+    assert options["data_collection"]["user_info"] is collect_user_info
+    assert options["max_request_body_size"] == "small"
+    assert options["before_send"] is before_send
+    assert options["before_send_transaction"] is before_send_transaction
+
+
+def test_real_sdk_scrubs_ip_keys_only_without_user_info(scrubbing_sentry_transport):
+    """The PII denylist follows user_info, as it followed send_default_pii."""
+    collect_user_info = sentry_sdk.get_client().options["data_collection"]["user_info"]
+
+    def handle(remote_addr):
+        raise RuntimeError(remote_addr)
+
+    try:
+        handle("192.0.2.10")
+    except RuntimeError as e:
+        sentry_sdk.capture_exception(e)
+    sentry_sdk.flush()
+
+    (event,) = scrubbing_sentry_transport.events
+    frame = event["exception"]["values"][0]["stacktrace"]["frames"][-1]
+    assert frame["function"] == "handle"
+    if collect_user_info:
+        assert frame["vars"]["remote_addr"] == "'192.0.2.10'"
+    else:
+        assert frame["vars"]["remote_addr"] == "[Filtered]"
+
+
+def test_real_sdk_scrubs_secret_keys_in_transactions(scrubbing_sentry_transport):
+    """The event_scrubber covered span data; before_send_transaction must too."""
+    sentry_sdk.get_client().options["traces_sample_rate"] = 1.0
+    with sentry_sdk.start_transaction(name="provision"):  # noqa: SIM117
+        with sentry_sdk.start_span(op="keycloak") as span:
+            span.set_data("client_secret", OIDC_SECRET)
+            span.set_data("alias", "partner")
+    sentry_sdk.flush()
+
+    (event,) = scrubbing_sentry_transport.events
+    assert event["type"] == "transaction"
+    event_json = json.dumps(event)
+    assert OIDC_SECRET not in event_json
+    assert event["spans"][0]["data"]["alias"] == "partner"
+    assert event["spans"][0]["data"]["client_secret"] == "[Filtered]"  # noqa: S105
+
+
+def test_real_sdk_keeps_the_explicit_user(scrubbing_sentry_transport):
+    """A user set on the scope reaches before_send whatever user_info says."""
+    sentry_sdk.set_user(dict(LEARNER_USER))
+    sentry_sdk.capture_message("boom")
+    sentry_sdk.flush()
+
+    (event,) = scrubbing_sentry_transport.events
+    assert event["user"] == LEARNER_USER
+
+
+def failing_view(request):
+    """Raise inside a request, so DjangoIntegration attaches the request and user."""
+    msg = "boom"
+    raise RuntimeError(msg)
+
+
+urlpatterns = [path("sentry-boom/", failing_view), *main_urlpatterns]
+
+
+@pytest.mark.django_db
+@override_settings(ROOT_URLCONF=__name__)
+@pytest.mark.parametrize("collect_user_info", [True, False])
+def test_django_request_event(client, collect_user_info):
+    """The request user and cookies are sent only with user info, as with send_default_pii."""
+    user = UserFactory.create()
+    transport = FakeTransport()
+    sentry_sdk.init(
+        dsn="https://k@o0.ingest.sentry.io/0",
+        transport=transport,
+        before_send=before_send,
+        data_collection=build_data_collection(collect_user_info=collect_user_info),
+        max_request_body_size="small",
+        integrations=[DjangoIntegration()],
+    )
+    try:
+        client.force_login(user)
+        client.cookies["tracking"] = "abc"
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            client.post(
+                "/sentry-boom/", data={"name": "Ada", "client_secret": OIDC_SECRET}
+            )
+        sentry_sdk.flush()
+    finally:
+        sentry_sdk.get_global_scope().set_client(None)
+
+    (event,) = [
+        event
+        for event in transport.events
+        if event["exception"]["values"][-1]["value"] == "boom"
+    ]
+    request = event["request"]
+    assert request["data"] == {"name": "Ada", "client_secret": "[Filtered]"}
+    if collect_user_info:
+        assert event["user"]["email"] == user.email
+        assert request["cookies"]["tracking"] == "abc"
+        assert request["cookies"]["mitxonline_sessionid"] == "[Filtered]"
+    else:
+        assert "user" not in event
+        assert "cookies" not in request
 
 
 LEARNER_ADDRESS = "77 Massachusetts Ave"
@@ -392,9 +563,6 @@ def test_thread_stacktraces_are_covered():
     event = {"threads": _exception_event("compliance.api", "main.views")["exception"]}
     scrub_export_compliance_event(event)
     assert LEARNER_ADDRESS not in json.dumps(event)
-
-
-LEARNER_USER = {"id": "42", "email": "learner@example.invalid", "username": "ada"}
 
 
 def test_export_compliance_user_becomes_the_tagged_global_id():
