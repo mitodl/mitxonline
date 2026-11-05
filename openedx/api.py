@@ -424,7 +424,12 @@ def _edx_user_exists(user):
         if client is None:
             return False
         client.user_info.get_user_info()
-    except:  # noqa: E722
+    except Exception:  # noqa: BLE001
+        log.warning(
+            "_edx_user_exists: could not verify edX user for: %s",
+            user.id,
+            exc_info=True,
+        )
         return False
     return True
 
@@ -1357,9 +1362,12 @@ def enroll_in_edx_course_runs(
             msg = f"Failed to verify/create user {user.edx_username} in OpenEdX"
             raise OpenEdxUserMissingError(msg) from exc
 
-    if not user.openedx_user_exists:
-        msg = f"User {user.edx_username} does not exist in OpenEdX and could not be created"
-        raise OpenEdxUserMissingError(msg)
+        # Only re-check after a repair attempt; re-reading the property on the
+        # happy path repeats the same query (flagged as an N+1).
+        openedx_user = user.openedx_users.first()
+        if openedx_user is None or not openedx_user.has_been_synced:
+            msg = f"User {user.edx_username} does not exist in OpenEdX and could not be created"
+            raise OpenEdxUserMissingError(msg)
 
     username = user.edx_username
     results = []

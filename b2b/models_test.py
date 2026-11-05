@@ -79,6 +79,39 @@ def test_add_program_courses_to_contract(mocker):
     assert contract.get_course_runs().count() == 4
 
 
+@pytest.mark.parametrize("with_direct_course", [True, False])
+def test_add_program_courses_includes_nested_program_courses(
+    mocker, with_direct_course
+):
+    """Courses of nested programs get contract runs, including when the program has no courses of its own."""
+
+    mocker.patch("openedx.tasks.clone_courserun.delay")
+
+    program = ProgramFactory.create()
+    nested_program = ProgramFactory.create()
+    program.add_program_requirement(nested_program)
+    nested_courseruns = CourseRunFactory.create_batch(
+        2, is_source_run=True, language="en", is_primary_language=True
+    )
+    for courserun in nested_courseruns:
+        nested_program.add_requirement(courserun.course)
+    if with_direct_course:
+        direct_courserun = CourseRunFactory.create(
+            is_source_run=True, language="en", is_primary_language=True
+        )
+        program.add_requirement(direct_courserun.course)
+
+    contract = ContractPageFactory.create()
+
+    created, no_source = contract.add_program_courses(program)
+
+    expected = 3 if with_direct_course else 2
+    assert created == expected
+    assert no_source == 0
+    assert list(contract.programs) == [program]
+    assert contract.get_course_runs().count() == expected
+
+
 def test_organization_page_slug_preserved_on_name_change():
     """Test that the slug is not regenerated when only the name changes."""
     org = OrganizationPageFactory.create(name="MIT")

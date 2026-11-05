@@ -445,7 +445,7 @@ class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, Template
 
                 # Call the refund CyberSource API with provided reason and amount
                 try:
-                    refund_api_success, _ = refund_order(
+                    refund_api_success, refund_message = refund_order(
                         order_id=order.id,
                         refund_amount=refund_amount,
                         refund_reason=refund_reason,
@@ -468,15 +468,21 @@ class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, Template
 
                 if not refund_api_success:
                     messages.error(
-                        request, f"Order {order.reference_number} refund failed."
+                        request,
+                        f"Order {order.reference_number} refund failed. {refund_message}".strip(),
+                    )
+                    return HttpResponseRedirect(
+                        reverse(
+                            "admin:ecommerce_fulfilledorder_change", args=(order.id,)
+                        )
                     )
 
-                elif refund_api_success and should_unenroll:
+                if should_unenroll:
                     messages.success(
                         request,
                         f"Order {order.reference_number} refunded and unenrollment is in progress.",
                     )
-                elif refund_api_success:
+                else:
                     messages.success(
                         request, f"Order {order.reference_number} refunded."
                     )

@@ -114,13 +114,15 @@ def create_program_contract_runs(
         created_count = 0
         skipped_count = 0
 
+        courses = program.courses_qset_recursive
+
         # Get courses with source runs
-        courses_with_source = program.courses_qset.filter(
+        courses_with_source = courses.filter(
             Q(courseruns__is_source_run=True) | Q(courseruns__run_tag="SOURCE")
         )
 
         # Count courses without source runs
-        courses_without_source = program.courses_qset.exclude(
+        courses_without_source = courses.exclude(
             Q(courseruns__is_source_run=True) | Q(courseruns__run_tag="SOURCE")
         ).count()
 
@@ -135,7 +137,7 @@ def create_program_contract_runs(
                 continue
 
             # Check if run already exists
-            if CourseRun.objects.filter(course=course, b2b_contract=contract).exists():
+            if CourseRun.objects.filter(course=course, b2b_contracts=contract).exists():
                 skipped_count += 1
                 log.debug(
                     "Contract run already exists for course %s in contract %s",

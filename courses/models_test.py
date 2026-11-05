@@ -7,12 +7,13 @@ from datetime import timedelta
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
-from django.db.models import F, Prefetch
+from django.db.models import Prefetch
 from django.test.utils import CaptureQueriesContext
 from mitol.common.utils.datetime import now_in_utc
 from wagtail.models import Page
 
 from b2b.factories import ContractPageFactory
+from b2b.models import ContractPage
 from cms.factories import (
     CertificatePageFactory,
     CoursePageFactory,
@@ -1170,6 +1171,35 @@ def test_program_elective_programs_property():
     assert required_program not in elective_programs
 
 
+def test_program_courses_qset_recursive():
+    """courses_qset_recursive includes the courses of nested programs at any depth"""
+    parent_program = ProgramFactory.create()
+    required_program = ProgramFactory.create()
+    elective_program = ProgramFactory.create()
+    grandchild_program = ProgramFactory.create()
+    direct_course, required_course, elective_course, grandchild_course, _ = (
+        CourseFactory.create_batch(5)
+    )
+
+    parent_program.add_requirement(direct_course)
+    parent_program.add_program_requirement(required_program)
+    parent_program.add_program_elective(elective_program)
+    required_program.add_requirement(required_course)
+    required_program.add_program_requirement(grandchild_program)
+    elective_program.add_requirement(elective_course)
+    grandchild_program.add_requirement(grandchild_course)
+    # A program nested twice is walked once
+    elective_program.add_program_requirement(grandchild_program)
+
+    assert set(parent_program.courses_qset_recursive) == {
+        direct_course,
+        required_course,
+        elective_course,
+        grandchild_course,
+    }
+    assert set(parent_program.courses_qset) == {direct_course}
+
+
 def test_program_requirement_node_types():
     """Test that the new PROGRAM node type works correctly"""
     parent_program = ProgramFactory.create()
@@ -1526,38 +1556,6 @@ def test_get_filtered_runs_reuses_prefetched_courseruns(django_assert_num_querie
     assert runs == [course_run]
 
 
-def test_b2b_contract_organization_id_prefers_annotation(django_assert_num_queries):
-    """
-    The annotation must shadow the cached_property, with no query.
-
-    ``CourseViewSet`` annotates ``b2b_contract_organization_id`` instead of
-    select_related'ing the contract, which would drag a whole Wagtail page per
-    run. cached_property is a non-data descriptor, so the value Django's
-    ModelIterable setattr's into ``__dict__`` wins over the method body - if
-    that ever stops holding, this falls back to one query per run.
-    """
-    contract = ContractPageFactory.create()
-    CourseRunFactory.create(b2b_contract=contract)
-
-    run = CourseRun.objects.annotate(
-        b2b_contract_organization_id=F("b2b_contract__organization_id")
-    ).get(b2b_contract=contract)
-
-    with django_assert_num_queries(0):
-        assert run.b2b_contract_organization_id == contract.organization_id
-
-
-def test_b2b_contract_organization_id_without_annotation():
-    """Unannotated callers still resolve, via the relation."""
-    contract = ContractPageFactory.create()
-    run = CourseRunFactory.create(b2b_contract=contract)
-
-    assert CourseRun.objects.get(pk=run.pk).b2b_contract_organization_id == (
-        contract.organization_id
-    )
-    assert CourseRunFactory.create().b2b_contract_organization_id is None
-
-
 @pytest.mark.parametrize("filter_name", ["org_id", "contract_id"])
 def test_get_filtered_runs_excludes_inactive_b2b_contracts(filter_name):
     """
@@ -1663,13 +1661,22 @@ def _generate_lang_run_data():
         "enrollment_start": start_date,
         "live": True,
         "is_source_run": False,
-        "b2b_contract": None,
     }
 
     return (
         course,
         run_dict,
     )
+
+
+def _create_run(run_data):
+    """Create a run from the data, attaching any contracts in b2b_contracts."""
+
+    run_data = {**run_data}
+    contracts = run_data.pop("b2b_contracts", [])
+    run = CourseRun.all_objects.create(**run_data)
+    run.b2b_contracts.add(*contracts)
+    return run
 
 
 def _run_primary_lang_run_test(  # noqa: PLR0913
@@ -1692,7 +1699,7 @@ def _run_primary_lang_run_test(  # noqa: PLR0913
     }
     log.info("run_data is: %s", run_data)
 
-    regular_course = CourseRun.all_objects.create(**run_data)
+    regular_course = _create_run(run_data)
 
     assert regular_course.id
 
@@ -1705,7 +1712,7 @@ def _run_primary_lang_run_test(  # noqa: PLR0913
         }
         log.info("run_data is: %s", run_data)
 
-        CourseRun.all_objects.create(**run_data)
+        _create_run(run_data)
 
     if set_primary and set_language_field:
         # Also test what happens if we try to make another primary language
@@ -1719,7 +1726,7 @@ def _run_primary_lang_run_test(  # noqa: PLR0913
         log.info("run_data is: %s", run_data)
 
         with pytest.raises(ValidationError) as exc, transaction.atomic():
-            CourseRun.all_objects.create(**run_data)
+            _create_run(run_data)
 
         assert "primary-language run" in str(exc)
 
@@ -1759,7 +1766,8 @@ def test_run_language_constraints_regular_languages(set_language_field, set_prim
     def _run_b2b_test():
         contract = ContractPageFactory.create()
         run_dict = starting_run_dict
-        run_dict["b2b_contract"] = contract
+        run_dict["b2b_contracts"] = [contract]
+        run_dict["b2b_only"] = True
         run_dict["is_source_run"] = False
 
         _run_primary_lang_run_test(
@@ -1773,7 +1781,7 @@ def test_run_language_constraints_regular_languages(set_language_field, set_prim
         )
 
         assert (
-            CourseRun.all_objects.filter(course=course, b2b_contract=contract).count()
+            CourseRun.all_objects.filter(course=course, b2b_contracts=contract).count()
             == 3
         )
 
@@ -2268,3 +2276,19 @@ def test_program_requirement_track_delete_clears_enrollment_track(
 
     enrollment.refresh_from_db()
     assert enrollment.track is None
+
+
+@pytest.mark.parametrize("active", [True, False])
+def test_course_run_has_b2b_contracts(active):
+    """has_b2b_contracts should count inactive contracts too."""
+    assert CourseRunFactory.build().has_b2b_contracts is False
+    assert CourseRunFactory.create().has_b2b_contracts is False
+
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
+    # Saving an inactive ContractPage through the factory trips Wagtail's
+    # reload via the (active-only) default manager, so flip it directly.
+    ContractPage.objects.filter(pk=contract.pk).update(active=active)
+
+    assert run.has_b2b_contracts is True
+    assert run.contract_group_ids == {contract.id}

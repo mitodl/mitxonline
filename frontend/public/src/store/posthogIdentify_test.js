@@ -39,7 +39,6 @@ describe("posthogIdentifyMiddleware", () => {
 
   afterEach(() => {
     sandbox.restore()
-    delete global.SETTINGS
   })
 
   const currentUserSuccess = (user = currentUser) => ({
