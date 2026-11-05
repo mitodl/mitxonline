@@ -429,20 +429,21 @@ def create_basket_with_products(request):
     product_ids = serializer.validated_data["product_ids"]
 
     basket = establish_basket(request)
-    products = []
 
-    try:
-        products = [
-            (
-                Product.objects.get(id=item["product_id"]),
-                item["quantity"],
-            )
-            for item in product_ids
-        ]
-    except Product.DoesNotExist:
+    requested_ids = {item["product_id"] for item in product_ids}
+    # sync_hubspot_cart_add's arguments below read each product's
+    # purchasable_object, a GenericForeignKey that no queryset loads without an
+    # explicit prefetch_related.
+    products_by_id = Product.objects.prefetch_related("purchasable_object").in_bulk(
+        requested_ids
+    )
+    if len(products_by_id) != len(requested_ids):
         return Response(
             {"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND
         )
+    products = [
+        (products_by_id[item["product_id"]], item["quantity"]) for item in product_ids
+    ]
 
     allow_multiple_items = getattr(settings, "ENABLE_MULTIPLE_CART_ITEMS", False)
     if not allow_multiple_items:
