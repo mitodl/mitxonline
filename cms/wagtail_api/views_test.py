@@ -9,6 +9,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from freezegun import freeze_time
 from rest_framework.test import APIClient
+from rest_framework_api_key.models import APIKey
 
 from cms.factories import CoursePageFactory, ProgramPageFactory
 from cms.models import ProductPageFAQ, ProductPageTestimonial
@@ -582,3 +583,52 @@ def test_course_page_listing_testimonials_prefetched(user_drf_client, fields):
 
     # Prefetch means more testimonials/images add no extra queries.
     assert after == before
+
+
+# --- API key access to test-mode course pages ---
+
+
+@pytest.fixture
+def keyed_client():
+    """API client sending a valid API key, with no user authentication."""
+    _, key = APIKey.objects.create_key(name="learn-etl")
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Api-Key {key}")
+    return client
+
+
+def _course_ids(client):
+    resp = client.get(reverse("wagtailapi:pages:listing"), {"type": "cms.coursepage"})
+    assert resp.status_code == 200
+    return {item["id"] for item in resp.json()["items"]}
+
+
+@pytest.mark.parametrize("live", [True, False])
+@pytest.mark.parametrize("in_catalog", [True, False])
+@pytest.mark.parametrize("ingest", [True, False])
+@pytest.mark.parametrize("keyed", [True, False])
+def test_course_pages_test_mode_visibility(  # noqa: PLR0913
+    anon_client, keyed_client, keyed, ingest, in_catalog, live
+):
+    """Only a keyed request sees unpublished/uncatalogued pages, and only with ingest on."""
+    page = CoursePageFactory.create(
+        include_in_learn_catalog=in_catalog,
+        ingest_content_files_for_ai=ingest,
+        live=live,
+    )
+    client = keyed_client if keyed else anon_client
+    expected = (live and in_catalog) or (keyed and ingest)
+    assert (page.id in _course_ids(client)) is expected
+
+
+def test_keyed_request_returns_latest_saved_draft(keyed_client):
+    """An unpublished page's row holds its latest draft, so it is returned as saved."""
+    page = CoursePageFactory.create(
+        live=False, ingest_content_files_for_ai=True, description="latest draft"
+    )
+    resp = keyed_client.get(
+        reverse("wagtailapi:pages:listing"),
+        {"type": "cms.coursepage", "fields": "description"},
+    )
+    item = next(i for i in resp.json()["items"] if i["id"] == page.id)
+    assert item["description"] == "latest draft"
