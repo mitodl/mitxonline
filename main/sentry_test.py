@@ -16,6 +16,7 @@ from django.urls import path
 from sentry_sdk.data_collection import _map_from_send_default_pii, _resolve_explicit
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.scope import Scope, ScopeType, use_isolation_scope, use_scope
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.transport import Transport
 
@@ -518,7 +519,16 @@ def test_django_request_event(client, collect_user_info):
     try:
         client.force_login(user)
         client.cookies["tracking"] = "abc"
-        with pytest.raises(Exception):  # noqa: B017, PT011
+        # The test client skips Sentry's WSGI middleware, so every earlier
+        # request on this worker (under the client settings.py installs) left a
+        # request event processor on the shared current scope. One whose request
+        # is still alive fills in its own user first, and _set_user_info never
+        # overwrites it. Scope.clear() keeps event processors, so use new scopes.
+        with (
+            use_isolation_scope(Scope(ty=ScopeType.ISOLATION)),
+            use_scope(Scope(ty=ScopeType.CURRENT)),
+            pytest.raises(Exception),  # noqa: B017, PT011
+        ):
             client.post(
                 "/sentry-boom/", data={"name": "Ada", "client_secret": OIDC_SECRET}
             )
