@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [2026.11.4.1] - 2026-11-04
+
+### Changes
+
+- **Remove legacy b2b_contract FK** (#4066) by jkachel@mit.edu
+- **Create contract runs for courses in nested programs** (#4215) by gumaerc@mit.edu
+- **Update dockerignore to fix some local build issues** (#4222) by jkachel@mit.edu
+- **Refund sheet: validate user email and order** (#4220) by annagav@users.noreply.github.com
+- **Stop redux-query retries leaking into later JS tests [DRAFT]** (#4223) by christopher.chudzicki@gmail.com
+- **Fix the page-walk N+1s allowlisted in #4126** (#4172) by christopher.chudzicki@gmail.com
+
 ## [2026.11.3.1] - 2026-11-03
 
 ### Changes
