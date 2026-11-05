@@ -16,6 +16,7 @@ from django.urls import path
 from sentry_sdk.data_collection import _map_from_send_default_pii, _resolve_explicit
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.transport import Transport
 
 from main.sentry import (
@@ -300,19 +301,21 @@ def test_scrubber_blanks_nested_secret_keys():
 
 
 def _init_scrubbing_sdk(*, collect_user_info, **kwargs):
-    """Initialize the real SDK with our data_collection and hooks, as init_sentry does."""
+    """Initialize the real SDK with our data_collection and scrubbing, as init_sentry does."""
     transport = FakeTransport()
     sentry_sdk.init(
         dsn="https://k@o0.ingest.sentry.io/0",
         transport=transport,
         before_send=before_send,
-        before_send_transaction=before_send_transaction,
         data_collection=build_data_collection(collect_user_info=collect_user_info),
         default_integrations=False,
         integrations=[
             LoggingIntegration(level=logging.INFO, event_level=logging.ERROR)
         ],
         **kwargs,
+    )
+    sentry_sdk.get_client().options["event_scrubber"] = build_event_scrubber(
+        collect_user_info=collect_user_info
     )
     return transport
 
@@ -392,7 +395,8 @@ def test_init_sentry_configures_data_collection(collect_user_info):
         sentry_sdk.get_global_scope().set_client(None)
 
     assert options["send_default_pii"] is None
-    assert options["event_scrubber"] is None
+    assert isinstance(options["event_scrubber"], EventScrubber)
+    assert ("ip_address" in options["event_scrubber"].denylist) is not collect_user_info
     assert options["data_collection"]["provided_by_user"] is True
     assert options["data_collection"]["user_info"] is collect_user_info
     assert options["max_request_body_size"] == "small"
@@ -422,8 +426,43 @@ def test_real_sdk_scrubs_ip_keys_only_without_user_info(scrubbing_sentry_transpo
         assert frame["vars"]["remote_addr"] == "[Filtered]"
 
 
+DEEP_SECRET = "deep-nested-password"  # noqa: S105  # pragma: allowlist secret
+
+
+@pytest.mark.parametrize("collect_user_info", [True, False])
+def test_init_sentry_scrubs_keys_nested_past_the_serializer_depth(collect_user_info):
+    """The scrubber runs before serialization, which repr()s anything below depth 5.
+
+    A key-based scrub after serialization cannot see into that repr string.
+    """
+    transport = FakeTransport()
+    try:
+        init_sentry(
+            dsn="https://k@o0.ingest.sentry.io/0",
+            environment="test",
+            version="0.0.0",
+            collect_user_info=collect_user_info,
+            user_hash_key="",
+            log_level="ERROR",
+            heroku_app_name=None,
+            traces_sample_rate=0,
+            profiles_sample_rate=0,
+        )
+        sentry_sdk.get_client().transport = transport
+        nested = {"a": {"b": {"c": {"d": {"e": {"password": DEEP_SECRET}}}}}}
+        sentry_sdk.set_extra("cfg", nested)
+        sentry_sdk.capture_message("boom")
+        sentry_sdk.flush()
+    finally:
+        sentry_sdk.get_global_scope().set_client(None)
+
+    (event,) = transport.events
+    assert "cfg" in event["extra"]
+    assert DEEP_SECRET not in json.dumps(event)
+
+
 def test_real_sdk_scrubs_secret_keys_in_transactions(scrubbing_sentry_transport):
-    """The event_scrubber covered span data; before_send_transaction must too."""
+    """The event_scrubber covers span data, which before_send never sees."""
     sentry_sdk.get_client().options["traces_sample_rate"] = 1.0
     with sentry_sdk.start_transaction(name="provision"):  # noqa: SIM117
         with sentry_sdk.start_span(op="keycloak") as span:
@@ -472,6 +511,9 @@ def test_django_request_event(client, collect_user_info):
         data_collection=build_data_collection(collect_user_info=collect_user_info),
         max_request_body_size="small",
         integrations=[DjangoIntegration()],
+    )
+    sentry_sdk.get_client().options["event_scrubber"] = build_event_scrubber(
+        collect_user_info=collect_user_info
     )
     try:
         client.force_login(user)
@@ -792,6 +834,10 @@ def test_real_django_request_sends_only_the_hash(settings):
         data_collection=build_data_collection(collect_user_info=False),
         default_integrations=False,
         integrations=[DjangoIntegration()],
+    )
+    # As init_sentry does: data_collection makes init drop event_scrubber.
+    sentry_sdk.get_client().options["event_scrubber"] = build_event_scrubber(
+        collect_user_info=False
     )
     try:
         headers = {
