@@ -955,16 +955,18 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
 
 def find_paid_program_order_for_zero_value_order(order: Order) -> Order | None:
     """
-    Find the paid program order that a $0 course run order was made for.
+    Find the order where the learner actually paid for the program.
 
-    Buying a program creates a $0 order for each of the program's course runs
-    (see create_verified_program_course_run_order), so a learner asking for a
-    refund of a course in the program will usually point at one of those.
+    Buying a program costs money once, on the program's order. When the
+    learner then enrolls in each course, the system also makes a $0 order for
+    that course, just to record that they have a seat (see
+    create_verified_program_course_run_order). To refund, you need the
+    program's order, not the $0 course order. This finds it.
 
-    Those orders redeem the program's internal discount (see
-    create_verified_program_discount), which is what ties them to the program.
-    Course membership alone can't: the course may be in several programs the
-    learner bought, or the order may be free for an unrelated reason.
+    The $0 order uses the program's 100% discount (see
+    create_verified_program_discount), and that discount is how we know which
+    program it came from. Matching on the course alone isn't enough: the
+    course may be in more than one program the learner bought.
 
     Args:
     - order (Order): the $0 order
