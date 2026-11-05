@@ -3,9 +3,8 @@ import { Edit } from "@refinedev/antd";
 import { useApiUrl, useCustom, useCustomMutation, useGo, useParsed } from "@refinedev/core";
 import { Descriptions, Form, Input, Radio, Typography } from "antd";
 
-import { apiErrorDescription } from "components/b2b/api_error";
 import { AttributeMapping, IAttributeRow, fromMaps, toMap } from "components/b2b/attribute_mapping";
-import { B2B_ORGANIZATIONS, PROVISIONING_RESOURCE } from "components/b2b/constants";
+import { B2B_ORGANIZATIONS, PROVISIONING_RESOURCE, apiErrorNotification } from "components/b2b/constants";
 import { useRefreshOrganization } from "components/b2b/use_refresh_organization";
 import { IOrganizationIdentityProviderDetail } from "interfaces";
 
@@ -104,11 +103,7 @@ export const IdentityProviderEdit: React.FC = () => {
                 method: "patch",
                 values: changes,
                 successNotification: { type: "success", message: `${alias} updated` },
-                errorNotification: (error) => ({
-                    type: "error",
-                    message: `Could not update ${alias}`,
-                    description: apiErrorDescription(error),
-                }),
+                errorNotification: apiErrorNotification(`Could not update ${alias}`),
             },
             {
                 onSuccess: () => {
