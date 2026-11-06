@@ -335,6 +335,8 @@ filterwarnings = [
     # ol-django
     "ignore:Deprecated call to `pkg_resources.declare_namespace",
     "ignore:sentry_sdk.configure_scope",
+    # sentry-sdk 2.73; moving main/sentry.py to data_collection needs a PII review first
+    "ignore:The send_default_pii option is deprecated:DeprecationWarning",
     "ignore:CheckConstraint.check:django.utils.deprecation.RemovedInDjango60Warning",
     # cybersource
     "ignore:invalid escape sequence '\\\\R'",
