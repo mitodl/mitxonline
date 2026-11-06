@@ -116,7 +116,7 @@ def resolve_certificates_without_revision(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("courses", "0111_course_run_access_role"),
+        ("courses", "0112_remove_courserun_b2b_contract"),
         # The RunPython functions query through the real CoursePage/
         # ProgramPage/CertificatePage (and Wagtail Page) classes, not
         # historical models, so they SELECT every column those classes have
@@ -124,7 +124,7 @@ class Migration(migrations.Migration):
         # columns are guaranteed to exist. If this migration's RunPython
         # steps are ever changed, bump these to the then-latest migrations.
         ("wagtailcore", "0097_baselogentry_uuid_action_timestamp_indexes"),
-        ("cms", "0072_add_testimonial_date_published"),
+        ("cms", "0073_update_what_you_learn_help_text"),
     ]
 
     operations = [

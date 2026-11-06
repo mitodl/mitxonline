@@ -8,7 +8,7 @@ This is a targeted refresh tool for one course/run/program at a time (e.g.
 after publishing a new certificate page revision that already-issued
 certificates should pick up). Every certificate always has a revision
 (certificate_page_revision is non-nullable since
-courses/migrations/0112_certificate_page_revision_not_nullable.py, which
+courses/migrations/0113_certificate_page_revision_not_nullable.py, which
 backfilled the ones that didn't), so this re-points existing certificates
 rather than filling in missing ones.
 

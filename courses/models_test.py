@@ -735,13 +735,13 @@ def test_certificate_uses_published_revision_not_draft(mocker, is_program):
     assert certificate.certificate_page_revision == published_revision
 
 
-def test_0112_backfill_uses_published_revision_not_draft():
+def test_0113_backfill_uses_published_revision_not_draft():
     """
-    Migration 0112 backfills certificates with the certificate page's published
+    Migration 0113 backfills certificates with the certificate page's published
     revision, not a later unpublished draft.
     """
     migration = importlib.import_module(
-        "courses.migrations.0112_certificate_page_revision_not_nullable"
+        "courses.migrations.0113_certificate_page_revision_not_nullable"
     )
     course = CourseFactory.create()
     certificate_page = course.certificate_page
