@@ -1,52 +1,16 @@
 """API functions for locating the user."""
 
 from django.conf import settings
-from django.db.models import Q
 from ipware import get_client_ip
 from mitol.geoip.api import ip_to_country_code
 
 from location.constants import (
     GEOLOCATION_TYPE_GEOIP,
     GEOLOCATION_TYPE_PROFILE,
-    LOCATION_FLAG_TYPE_BLOCKED,
     LOCATION_FLAG_TYPES,
 )
 from location.dataclasses import UserCalculatedLocation
-
-
-def get_flagged_countries(flag_type, product=None):
-    """
-    Return the list of flagged countries.
-
-    A country can be flagged for a particular item; passing that in as a Product
-    will return globally-flagged countries and any that are flagged for that
-    Product. (This only applies to blocks for now.)
-
-    Args:
-    - flag_type (string): one of LOCATION_FLAG_TYPES
-    - product (Product): a product to also consider
-    Returns:
-    - list of string: country codes that are blocked
-    """
-
-    if flag_type not in LOCATION_FLAG_TYPES:
-        errmsg = "Invalid flag type %s"
-        raise ValueError(errmsg, flag_type)
-
-    qset = None
-
-    if flag_type == LOCATION_FLAG_TYPE_BLOCKED:
-        qset = BlockedCountry.objects
-
-        if product:
-            qset = qset.filter(Q(product__isnull=True) | Q(product=product))
-        else:
-            qset = qset.filter(product__isnull=True)
-
-    elif flag_type == FLAGGED_COUNTRY_TAX:
-        qset = TaxRate.objects
-
-    return qset.values_list("country_code", flat=True).all() if qset else []
+from location.models import LocationFlag
 
 
 def determine_user_location(request) -> list[UserCalculatedLocation]:
@@ -82,12 +46,12 @@ def determine_user_location(request) -> list[UserCalculatedLocation]:
             UserCalculatedLocation(
                 country_code=settings.MITOL_FORCE_COUNTRY,
                 lookup_type=GEOLOCATION_TYPE_PROFILE,
-                ip="0.0.0.0",
+                ip="",
             ),
             UserCalculatedLocation(
                 country_code=settings.MITOL_FORCE_COUNTRY,
                 lookup_type=GEOLOCATION_TYPE_GEOIP,
-                ip="0.0.0.0",
+                ip="0.0.0.0",  # noqa: S104
             ),
         ]
 
@@ -102,7 +66,7 @@ def determine_user_location(request) -> list[UserCalculatedLocation]:
             UserCalculatedLocation(
                 country_code=profile_code,
                 lookup_type=GEOLOCATION_TYPE_PROFILE,
-                ip="0.0.0.0",
+                ip="",
             )
         )
 
@@ -123,7 +87,7 @@ def determine_user_location(request) -> list[UserCalculatedLocation]:
     return calculated_locations
 
 
-def determine_user_flags(request, flag_type):
+def determine_user_flags(request, *, flag_type=None):
     """
     Determine where the user is, based on various details.
 
@@ -140,24 +104,31 @@ def determine_user_flags(request, flag_type):
     - The flag is set if the user's profile matches _and_ the GeoIP location matches.
     - The flag is set if the user's GeoIP matches _or_ the profile matches.
 
-
-
-    If MITOL_UE_FORCE_PROFILE_COUNTRY is set, then this will _always_ return the
-    country code listed in the profile.
+    If there are flags that should be set, the LocationFlag objects that matched
+    will be returned.
 
     Args:
     - request (Request): the current request
-    - flagged_countries (None or list): a list of flagged countries
+    - flag_type (None or list): a list of flagged countries
 
     Returns:
-    - UserCalculatedLocation:
-        ISO country code (ISO 3166 alpha2) and one of the GEOLOCATION_TYPE constants
+    - list[LocationFlag]: The matching flags
     """
+
+    if flag_type and flag_type not in LOCATION_FLAG_TYPES:
+        msg = f"Invalid flag type {flag_type}"
+        raise ValueError(msg)
 
     user_locations = determine_user_location(request)
 
     if len(user_locations) == 0:
-        return
+        return []
 
-    # Now pull the flags for the type and then determine if they should be set.
-    # Tomorrow probably though.
+    country_codes = [ul.country_code for ul in user_locations]
+
+    potential_flags = LocationFlag.objects.filter(country_code__in=country_codes)
+
+    if flag_type:
+        potential_flags = potential_flags.filter(flag_type=flag_type)
+
+    return [flag for flag in potential_flags if flag.evaluate(user_locations)]
