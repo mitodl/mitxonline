@@ -57,6 +57,11 @@ class SoftDeleteTimestampedModel(TimestampedModel):
             )
         )
 
+    class Meta:
+        """Flag this model as abstract."""
+
+        abstract = True
+
 
 @reversion.register(exclude=("created_on", "updated_on"))
 class LocationFlag(SoftDeleteTimestampedModel, ValidateOnSaveMixin):
