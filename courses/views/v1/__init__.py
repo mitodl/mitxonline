@@ -285,7 +285,11 @@ def _validate_enrollment_post_request(
         log.error(
             "Attempting to enroll in a non-existent run (id: %s)", str(run_id_str)
         )
-        return HttpResponseRedirect(request.headers["Referer"]), None, None
+        resp = redirect_with_user_message(
+            reverse("user-dashboard"),
+            {"type": USER_MSG_TYPE_ENROLL_FAILED},
+        )
+        return resp, None, None
     if (
         PaidCourseRun.fulfilled_paid_course_run_exists(user, run)
         or CourseRunEnrollment.objects.filter(
@@ -394,7 +398,7 @@ class CreateEnrollmentView(APIView):
                 else:
                     sync_hubspot_deal(order.first())
         else:
-            resp = respond(request.headers["Referer"])
+            resp = respond(reverse("user-dashboard"))
             cookie_value = {
                 "type": USER_MSG_TYPE_ENROLL_FAILED,
             }
