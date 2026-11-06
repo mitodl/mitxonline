@@ -2274,7 +2274,7 @@ prek = [
 
 [package.metadata]
 requires-dist = [
-    { name = "authlib", specifier = ">=1.6.3,<2" },
+    { name = "authlib", specifier = ">=1.9.0,<2" },
     { name = "beautifulsoup4", specifier = ">=4.8.2,<5" },
     { name = "bleach", specifier = ">=6.0.0,<7" },
     { name = "boto3", specifier = ">=1.16.63,<2" },
