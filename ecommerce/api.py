@@ -99,6 +99,8 @@ from ecommerce.models import (
     OrderStatus,
     PendingOrder,
     Product,
+    RefundRequest,
+    RefundRequestStatus,
     StripeEventLog,
     Transaction,
     UserDiscount,
@@ -953,6 +955,51 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
     )
 
     return True, message
+
+
+def auto_refund_request(refund_request_id: int) -> tuple[bool, str]:
+    """
+    Refund the order behind a pending refund request when it qualifies for
+    automatic approval (`Order.is_auto_refund_eligible`), and mark the request
+    approved. The learner is unenrolled, as on the Google Sheets path.
+
+    The order row is locked for the whole check-and-refund, so concurrent or
+    repeated requests serialize: the second sees a request that is no longer
+    pending, or an order that is no longer fulfilled, and does nothing.
+
+    Returns:
+        (auto_refunded, error): error is set only when a refund was attempted
+        and failed; the request is then left pending for support.
+    """
+    try:
+        with transaction.atomic():
+            refund_request = RefundRequest.objects.get(pk=refund_request_id)
+            order = Order.objects.select_for_update().get(pk=refund_request.order_id)
+            # Re-read under the lock: another task may have decided it already.
+            refund_request.refresh_from_db()
+            if (
+                refund_request.status != RefundRequestStatus.PENDING
+                or not order.is_auto_refund_eligible
+            ):
+                return False, ""
+
+            refunded, message = refund_order(
+                order_id=order.id,
+                refund_reason=f"Auto-approved refund request {refund_request.id}",
+                unenroll=True,
+            )
+            if not refunded:
+                raise Exception(message)  # noqa: TRY002, TRY301
+
+            refund_request.status = RefundRequestStatus.APPROVED
+            refund_request.save(update_fields=["status", "updated_on"])
+    except Exception as exc:
+        log.exception(
+            "Automatic refund failed for refund request %s; leaving it pending",
+            refund_request_id,
+        )
+        return False, str(exc)
+    return True, ""
 
 
 def find_paid_program_order_for_zero_value_order(order: Order) -> Order | None:
