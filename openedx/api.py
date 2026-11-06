@@ -9,6 +9,7 @@ from urllib.parse import parse_qs, quote, urljoin, urlparse
 import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.shortcuts import reverse
@@ -26,6 +27,7 @@ from mitol.common.utils import (
 from oauth2_provider.models import AccessToken, Application
 from oauthlib.common import generate_token
 from requests.exceptions import HTTPError
+from requests.hooks import default_hooks
 from rest_framework import status
 
 import courses.models
@@ -38,6 +40,7 @@ from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
     EDX_ENROLLMENT_VERIFIED_MODE,
     OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES,
+    OPENEDX_JWT_EXPIRY_MARGIN_SECONDS,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
     OPENEDX_USERNAME_MAX_LEN,
     PLATFORM_EDX,
@@ -1061,6 +1064,30 @@ def get_edx_course_outline(course_id: str) -> dict:
         raise EdxApiCourseOutlineError(message) from exc
 
 
+def _request_edx_jwt(client_id: str, client_secret: str) -> dict:
+    """
+    Request a client-credentials JWT from Open edX
+
+    Args:
+    - client_id (str): the client ID to authenticate as
+    - client_secret (str): the client secret to use for authentication
+    Returns:
+    - dict, the token response, with "access_token" and "expires_in"
+    """
+    resp = requests.post(
+        edx_url(OPENEDX_OAUTH2_ACCESS_TOKEN_PATH),
+        data={
+            "grant_type": "client_credentials",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "token_type": "jwt",
+        },
+        timeout=settings.EDX_API_CLIENT_TIMEOUT,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
 def get_edx_api_jwt_client(
     client_id: str = settings.OPENEDX_API_CLIENT_ID,
     client_secret: str = settings.OPENEDX_API_CLIENT_SECRET,
@@ -1091,19 +1118,7 @@ def get_edx_api_jwt_client(
     - EdxApi, with the JWT token in it for the user specified.
     """
 
-    data = {
-        "grant_type": "client_credentials",
-        "client_id": client_id,
-        "client_secret": client_secret,
-        "token_type": "jwt",
-    }
-    resp = requests.post(
-        edx_url(OPENEDX_OAUTH2_ACCESS_TOKEN_PATH),
-        data=data,
-        timeout=settings.EDX_API_CLIENT_TIMEOUT,
-    )
-    resp.raise_for_status()
-    access_token = resp.json()["access_token"]
+    access_token = _request_edx_jwt(client_id, client_secret)["access_token"]
 
     edx_client = EdxApi(
         {
@@ -1160,6 +1175,98 @@ def get_edx_course_management_service_client():
         settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET,
         use_studio=True,
     )
+
+
+def use_edx_enrollments_v2():
+    """
+    Whether enrollments go through the Open edX v2 enrollment API.
+
+    The v1 API is deprecated (openedx/openedx-platform#39128) and v2 refuses the
+    static service worker token, because it only accepts JWT or session auth, so
+    v2 needs a client-credentials application of its own.
+    """
+    return bool(
+        settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_ID
+        and settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_SECRET
+    )
+
+
+def get_edx_api_enrollments_client():
+    """
+    Gets an edx api client for managing enrollments on behalf of the service worker
+
+    Returns:
+        CourseEnrollmentsV2 with a client-credentials JWT when
+        use_edx_enrollments_v2() is true, otherwise CourseEnrollments with the
+        static service worker token
+    """
+    if not use_edx_enrollments_v2():
+        return get_edx_api_service_client().enrollments
+
+    enrollments_client = EdxApi(
+        {"access_token": _get_enrollments_jwt()},
+        settings.OPENEDX_API_BASE_URL,
+        timeout=settings.EDX_API_CLIENT_TIMEOUT,
+    ).enrollments_v2
+    enrollments_client.requester.hooks["response"].append(
+        _retry_with_fresh_enrollments_jwt(enrollments_client.requester)
+    )
+    return enrollments_client
+
+
+def _enrollments_jwt_cache_key():
+    return f"openedx_jwt:{settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_ID}"
+
+
+def _get_enrollments_jwt():
+    """
+    The enrollments service worker's JWT, reused until shortly before it
+    expires. Enrollment runs once per learner action and sync once per
+    dashboard load, and every token request makes the LMS write an
+    AccessToken row.
+    """
+    access_token = cache.get(_enrollments_jwt_cache_key())
+    if access_token is None:
+        token = _request_edx_jwt(
+            settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_ID,
+            settings.OPENEDX_ENROLLMENTS_SERVICE_WORKER_CLIENT_SECRET,
+        )
+        access_token = token["access_token"]
+        cache.set(
+            _enrollments_jwt_cache_key(),
+            access_token,
+            token["expires_in"] - OPENEDX_JWT_EXPIRY_MARGIN_SECONDS,
+        )
+    return access_token
+
+
+def _retry_with_fresh_enrollments_jwt(session):
+    """
+    A response hook for the enrollments client's session that, on a 401,
+    drops the cached JWT and resends the request once with a new one.
+
+    edX can stop accepting a JWT before it expires (e.g. a signing key
+    rotation). Without this every call would get a 401 until the cached JWT
+    expired, and a 4xx counts against the enrollment's retries. It is a hook
+    rather than a retry around each call because get_enrollments is a
+    generator, so its requests happen while the caller iterates.
+    """
+
+    def hook(response, **kwargs):
+        if response.status_code != status.HTTP_401_UNAUTHORIZED:
+            return response
+        cache.delete(_enrollments_jwt_cache_key())
+        token_type = session.headers["Authorization"].split()[0]
+        session.headers["Authorization"] = f"{token_type} {_get_enrollments_jwt()}"
+        retry = response.request.copy()
+        retry.headers["Authorization"] = session.headers["Authorization"]
+        # The retry goes out without this hook, so a 401 for the new JWT is
+        # raised rather than retried again.
+        retry.hooks = default_hooks()
+        response.close()
+        return session.send(retry, **kwargs)
+
+    return hook
 
 
 def get_edx_api_course_detail_client():
@@ -1307,7 +1414,14 @@ def get_edx_grades_with_users(course_run, user=None):
                 yield edx_grade, user
 
 
-def existing_edx_enrollment(user, course_id, mode, is_active=True):  # noqa: FBT002
+def existing_edx_enrollment(
+    user,
+    course_id,
+    mode,
+    is_active=True,  # noqa: FBT002
+    *,
+    enrollments_client=None,
+):
     """
     Returns enrollment object if user is already enrolled in edx course run.
 
@@ -1316,19 +1430,43 @@ def existing_edx_enrollment(user, course_id, mode, is_active=True):  # noqa: FBT
         courseware_id : The course runs to enroll in
         mode (str): The course mode to enroll the user with
         is_active (boolean): Whether the expected course run enrollment is active.
+        enrollments_client (CourseEnrollments): The client to use, so a caller
+            checking several runs fetches one JWT instead of one per run.
+            Defaults to get_edx_api_enrollments_client().
 
     Returns:
         (edx_api.enrollments.models.Enrollment or None):
             The results of enrollments via the edx API client
     """
-    edx_client = get_edx_api_service_client()
-    edx_enrollments = edx_client.enrollments.get_enrollments(
+    enrollments_client = enrollments_client or get_edx_api_enrollments_client()
+    edx_enrollments = enrollments_client.get_enrollments(
         course_id=course_id, usernames=[user.edx_username]
     )
     for enrollment in edx_enrollments:
         if enrollment.mode == mode and enrollment.is_active == is_active:
             return enrollment
     return None
+
+
+# What a failed JWT request for the enrollments client raises: the request
+# failing, or a response without a token in it.
+ENROLLMENTS_JWT_REQUEST_ERRORS = (requests.RequestException, KeyError, ValueError)
+
+
+def _get_enrollments_client_to_enroll(user, course_run):
+    """
+    get_edx_api_enrollments_client, with a failed JWT request raised as an
+    enrollment failure so enrollment callers handle it like any other.
+
+    It is UnknownEdxApiEnrollException rather than EdxApiEnrollErrorException
+    because _is_permanent_enrollment_failure counts a 4xx of the latter against
+    the enrollment's retries, and a bad client secret would then use up the
+    retries of every pending enrollment.
+    """
+    try:
+        return get_edx_api_enrollments_client()
+    except ENROLLMENTS_JWT_REQUEST_ERRORS as exc:
+        raise UnknownEdxApiEnrollException(user, course_run, exc) from exc
 
 
 def enroll_in_edx_course_runs(
@@ -1357,8 +1495,6 @@ def enroll_in_edx_course_runs(
         EdxApiEnrollErrorException: Raised if the underlying edX API HTTP request fails
         UnknownEdxApiEnrollException: Raised if an unknown error was encountered during the edX API request
     """
-    edx_client = get_edx_api_service_client()
-
     # repair_faulty_edx_user's own check re-verifies existence against edX
     # over HTTP even when we already know locally that the user is synced
     # (see create_edx_user's `has_been_synced and _edx_user_exists(user)`),
@@ -1387,27 +1523,34 @@ def enroll_in_edx_course_runs(
         user.clear_openedx_user_cache()
     username = user.edx_username
     results = []
+    enrollments_client = None
     for course_run in course_runs:
+        enrollments_client = enrollments_client or _get_enrollments_client_to_enroll(
+            user, course_run
+        )
         try:
             enrollment = existing_edx_enrollment(
-                user, course_run.courseware_id, mode=mode
+                user,
+                course_run.courseware_id,
+                mode=mode,
+                enrollments_client=enrollments_client,
             )
             if enrollment is None:
-                enrollment = edx_client.enrollments.create_student_enrollment(
+                enrollment = enrollments_client.create_student_enrollment(
                     course_run.courseware_id,
                     mode=mode,
                     username=username,
                     force_enrollment=force_enrollment,
                 )
                 if not enrollment.is_active:
-                    enrollment = edx_client.enrollments.create_student_enrollment(
+                    enrollment = enrollments_client.create_student_enrollment(
                         course_run.courseware_id,
                         mode=mode,
                         username=username,
                         force_enrollment=force_enrollment,
                     )
             results.append(enrollment)
-        except HTTPError as exc:  # noqa: PERF203
+        except HTTPError as exc:
             # logging is left to callers, who are best positioned to decide
             # the right level - retry_failed_edx_enrollments demotes
             # permanent per-enrollment failures to WARNING to avoid paging
@@ -1544,9 +1687,11 @@ def unenroll_edx_course_run(run_enrollment):
         EdxApiEnrollErrorException: Raised if the underlying edX API HTTP request fails
         UnknownEdxApiEnrollException: Raised if an unknown error was encountered during the edX API request
     """
-    edx_client = get_edx_api_service_client()
+    enrollments_client = _get_enrollments_client_to_enroll(
+        run_enrollment.user, run_enrollment.run
+    )
     try:
-        deactivated_enrollment = edx_client.enrollments.deactivate_enrollment(
+        deactivated_enrollment = enrollments_client.deactivate_enrollment(
             run_enrollment.run.courseware_id, username=run_enrollment.user.edx_username
         )
     except HTTPError as exc:
@@ -1582,14 +1727,59 @@ def update_edx_user_name(user):
         )
 
 
+def _get_edx_enrollments_to_sync(user):
+    """
+    Get the user's enrollments from edX for sync_enrollments_with_edx
+
+    Args:
+        user (users.models.User): The user whose enrollments to get
+
+    Returns:
+        edx_api.enrollments.models.Enrollments or None: None when there is
+            nothing to sync against
+    """
+    if not use_edx_enrollments_v2():
+        client = get_edx_api_client(user)
+        if client is None:
+            return None
+        return client.enrollments.get_student_enrollments()
+
+    # get_edx_api_client returns None for a user edX doesn't know yet.
+    if not user.openedx_user_exists:
+        return None
+    try:
+        enrollments_client = get_edx_api_enrollments_client()
+    except ENROLLMENTS_JWT_REQUEST_ERRORS:
+        # As with rate limiting below, a bad secret or an edX outage shouldn't
+        # fail the dashboard load that triggered the sync.
+        log.exception(
+            "Skipped edX enrollment sync for %s: could not get a JWT",
+            user.edx_username,
+        )
+        return None
+    try:
+        return enrollments_client.get_student_enrollments(username=user.edx_username)
+    except HTTPError as exc:
+        # Every learner's sync now shares the service user's throttle, so
+        # a busy minute shouldn't fail the dashboard load that triggered it.
+        if (
+            exc.response is None
+            or exc.response.status_code != status.HTTP_429_TOO_MANY_REQUESTS
+        ):
+            raise
+        log.warning(
+            "Skipped edX enrollment sync for %s: rate limited", user.edx_username
+        )
+        return None
+
+
 def sync_enrollments_with_edx(
     user: User,
 ) -> SyncResult[courses.models.CourseRunEnrollment]:
     """Syncs enrollment records so that local enrollments match the enrollment data in edX"""
-    client = get_edx_api_client(user)
-    if client is None:
+    edx_enrollments = _get_edx_enrollments_to_sync(user)
+    if edx_enrollments is None:
         return SyncResult()
-    edx_enrollments = client.enrollments.get_student_enrollments()
     local_enrollments = (
         user.courserunenrollment_set(manager="all_objects")
         .filter(user=user)
