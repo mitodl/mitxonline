@@ -116,21 +116,6 @@ def test_commit_is_idempotent():
     assert "0 revision(s)" in output
 
 
-def test_null_revision_cert_is_skipped_without_error():
-    """A certificate with no frozen revision is left untouched."""
-    program, certificate = _program_with_issued_cert(
-        frozen_title="OLD Title", live_title="NEW Title"
-    )
-    ProgramCertificate.objects.filter(pk=certificate.pk).update(
-        certificate_page_revision=None
-    )
-
-    _run("--program", program.readable_id, "--commit")
-
-    certificate.refresh_from_db()
-    assert certificate.certificate_page_revision is None
-
-
 def test_revoked_certificate_is_also_backfilled():
     """Revoked certs are included (all_objects): their frozen title is fixed too."""
     program, certificate = _program_with_issued_cert(

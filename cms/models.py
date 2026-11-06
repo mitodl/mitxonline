@@ -397,6 +397,16 @@ class CertificatePage(CourseProgramChildPage):
     template = "certificate_page.html"
     parent_page_types = ["CoursePage", "ProgramPage"]
 
+    def get_certificate_revision(self):
+        """
+        Return the revision new certificates should be pinned to: the published
+        one, so a later "Save draft" doesn't leak unpublished content onto
+        certificates. Falls back to the latest revision for a live page with no
+        recorded live revision (e.g. one saved live without going through
+        Wagtail's publish flow).
+        """
+        return self.live_revision or self.get_latest_revision()
+
     product_name = models.CharField(
         max_length=250,
         null=False,
