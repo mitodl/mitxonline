@@ -361,5 +361,3 @@ For frontend changes with hot module replacement:
 cd frontend/public
 yarn dev-server
 ```
-
-The Django dev server uses `webpack-dev-middleware` to proxy webpack assets.
