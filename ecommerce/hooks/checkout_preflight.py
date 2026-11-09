@@ -9,23 +9,47 @@ ecommerce.api is imported inside the hooks: it imports ecommerce.models, which
 imports the plugin manager, which imports this module.
 """
 
+import logging
+
 import pluggy
 
+from compliance.exceptions import ExportComplianceDataError
 from main.constants import (
     USER_MSG_TYPE_BASKET_EMPTY,
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 
 hookimpl = pluggy.HookimplMarker("mitxonline")
+log = logging.getLogger(__name__)
 
 
-def _check_basket_purchasable(request, basket) -> dict | None:
+def _check_basket_purchasable(request, basket, options) -> dict | None:
     """Check that the user is allowed to buy what's in the basket."""
 
-    if basket.has_user_blocked_products(request.user):
+    raise_compliance_data_errors = options.get("raise_compliance_data_errors", False)
+
+    try:
+        has_blocked_products = basket.has_user_blocked_products(basket.user)
+    except ExportComplianceDataError as exc:
+        if raise_compliance_data_errors:
+            raise
+        # The learner can fix this themselves, unlike a compliance denial.
+        log.info(
+            "Checkout blocked on incomplete profile for user=%s: missing %s",
+            basket.user.id,
+            exc.missing_fields,
+        )
+        return {
+            "profile_incomplete": True,
+            "error": USER_MSG_TYPE_PROFILE_INCOMPLETE,
+            "missing_fields": exc.profile_fields,
+        }
+
+    if has_blocked_products:
         return {
             "country_blocked": True,
             "error": USER_MSG_TYPE_ENROLL_BLOCKED,
@@ -46,7 +70,7 @@ def _check_basket_purchasable(request, basket) -> dict | None:
     return None
 
 
-def _check_basket_discounts(request, basket) -> dict | None:
+def _check_basket_discounts(request, basket) -> dict | None:  # noqa: ARG001
     """
     Check that the basket's discounts are still valid.
 
@@ -59,24 +83,24 @@ def _check_basket_discounts(request, basket) -> dict | None:
         check_basket_discounts_for_validity,
     )
 
-    if check_basket_discounts_for_validity(request):
+    if check_basket_discounts_for_validity(basket):
         return None
 
     # We only allow one discount per basket so clear all of them here.
     basket.discounts.all().delete()
-    apply_user_discounts(request)
+    apply_user_discounts(basket)
     return {
         "invalid_discounts": True,
         "error": USER_MSG_TYPE_DISCOUNT_INVALID,
     }
 
 
-def _check_basket_finalized(request, basket) -> dict | None:
+def _check_basket_finalized(request, basket) -> dict | None:  # noqa: ARG001
     """Check the basket against its contracts, and that it isn't empty."""
 
-    from ecommerce.api import _validate_basket_steps_for_b2b  # noqa: PLC0415
+    from ecommerce.api import validate_basket_steps_for_b2b  # noqa: PLC0415
 
-    b2b_validation_result = _validate_basket_steps_for_b2b(basket, request)
+    b2b_validation_result = validate_basket_steps_for_b2b(basket)
 
     if b2b_validation_result:
         return b2b_validation_result
@@ -94,10 +118,10 @@ class CheckoutPreflight:
     """The core checkout pre-flight checks."""
 
     @hookimpl(specname="checkout_validate_basket")
-    def check_basket_purchasable(self, request, basket) -> dict | None:
+    def check_basket_purchasable(self, request, basket, options) -> dict | None:
         """Call the internal function (so we can test it)"""
 
-        return _check_basket_purchasable(request, basket)
+        return _check_basket_purchasable(request, basket, options)
 
     @hookimpl(specname="checkout_apply_discounts")
     def apply_contract_discounts(self, request, basket) -> None:  # noqa: ARG002

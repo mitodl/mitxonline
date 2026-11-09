@@ -29,7 +29,6 @@ from b2b.api import (
     get_active_contracts_from_basket_items,
     is_discount_supplied_for_b2b_purchase,
 )
-from compliance.exceptions import ExportComplianceDataError
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -110,7 +109,6 @@ from main import features
 from main.constants import (
     USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
     USER_MSG_TYPE_B2B_INVALID_BASKET,
-    USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 from main.plugin_manager import get_plugin_manager
 from main.utils import parse_supplied_date
@@ -145,7 +143,7 @@ def get_checkout_cancel_url(gateway_type):
     )
 
 
-def _validate_basket_steps_for_b2b(basket):
+def validate_basket_steps_for_b2b(basket):
     """
     Validate the basket for B2B.
 
@@ -186,7 +184,9 @@ def _validate_basket_steps_for_b2b(basket):
     return {}
 
 
-def _run_checkout_preflight(request, basket, *, skip_discount_check=False):
+def _run_checkout_preflight(
+    request, basket, *, skip_discount_check=False, raise_compliance_data_errors=False
+):
     """
     Run the checkout pre-flight hooks, in order.
 
@@ -199,7 +199,13 @@ def _run_checkout_preflight(request, basket, *, skip_discount_check=False):
 
     pm = get_plugin_manager()
 
-    if result := pm.hook.checkout_validate_basket(request=request, basket=basket):
+    if result := pm.hook.checkout_validate_basket(
+        request=request,
+        basket=basket,
+        options={
+            "raise_compliance_data_errors": raise_compliance_data_errors,
+        },
+    ):
         return result
 
     if not skip_discount_check:
@@ -213,7 +219,7 @@ def _run_checkout_preflight(request, basket, *, skip_discount_check=False):
     return pm.hook.checkout_finalize_basket(request=request, basket=basket)
 
 
-def generate_checkout_payload(  # noqa: PLR0911, PLR0913, C901
+def generate_checkout_payload(  # noqa: PLR0913
     request,
     *,
     basket=None,
@@ -246,7 +252,8 @@ def generate_checkout_payload(  # noqa: PLR0911, PLR0913, C901
       returning a profile_incomplete payload (default False)
     """
 
-    basket = establish_basket(request)
+    if basket is None:
+        basket = establish_basket(request)
 
     if not gateway_type:
         global_id = basket.user.global_id
@@ -259,24 +266,12 @@ def generate_checkout_payload(  # noqa: PLR0911, PLR0913, C901
         else:
             gateway_type = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 
-    try:
-        preflight_error = _run_checkout_preflight(
-            request, basket, skip_discount_check=skip_discount_check
-        )
-    except ExportComplianceDataError as exc:
-        if raise_compliance_data_errors:
-            raise
-        # The learner can fix this themselves, unlike a compliance denial.
-        log.info(
-            "Checkout blocked on incomplete profile for user=%s: missing %s",
-            request.user.id,
-            exc.missing_fields,
-        )
-        return {
-            "profile_incomplete": True,
-            "error": USER_MSG_TYPE_PROFILE_INCOMPLETE,
-            "missing_fields": exc.profile_fields,
-        }
+    preflight_error = _run_checkout_preflight(
+        request,
+        basket,
+        skip_discount_check=skip_discount_check,
+        raise_compliance_data_errors=raise_compliance_data_errors,
+    )
 
     if preflight_error:
         return preflight_error

@@ -78,7 +78,7 @@ def test_check_basket_purchasable(mocker, basket_request, failing, expected):
     ):
         mocker.patch.object(basket, check, return_value=check == failing)
 
-    assert _check_basket_purchasable(request, basket) == expected
+    assert _check_basket_purchasable(request, basket, options={}) == expected
 
 
 @pytest.mark.parametrize("discounts_valid", [True, False])
@@ -110,7 +110,7 @@ def test_check_basket_discounts(mocker, basket_request, discounts_valid):
             "error": USER_MSG_TYPE_DISCOUNT_INVALID,
         }
         assert basket.discounts.count() == 0
-        mocked_apply.assert_called_once_with(request)
+        mocked_apply.assert_called_once_with(basket)
 
 
 @pytest.mark.parametrize("b2b_error", [{}, {"invalid_discounts": True, "error": "x"}])
@@ -119,7 +119,7 @@ def test_check_basket_finalized(mocker, basket_request, b2b_error, basket_empty)
     """B2B validation errors win; otherwise an empty basket is an error."""
 
     request, basket = basket_request
-    mocker.patch("ecommerce.api._validate_basket_steps_for_b2b", return_value=b2b_error)
+    mocker.patch("ecommerce.api.validate_basket_steps_for_b2b", return_value=b2b_error)
     if basket_empty:
         basket.basket_items.all().delete()
 

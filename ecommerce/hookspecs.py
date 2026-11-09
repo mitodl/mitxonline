@@ -81,7 +81,7 @@ def stripe_event(event):
 
 
 @hookspec(firstresult=True)
-def checkout_validate_basket(request, basket):
+def checkout_validate_basket(request, basket, options):
     """
     Check that the user can check out with what's in the basket.
 
@@ -96,6 +96,7 @@ def checkout_validate_basket(request, basket):
     Args:
     request (HttpRequest): the current request
     basket (Basket): the current basket
+    options (dict): options to pass to the individual hooks
 
     Returns:
     - dict|None: an error payload (with an "error" key) to stop checkout, or
