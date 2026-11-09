@@ -30,6 +30,7 @@ from courses.factories import (
     program_with_tracks,  # noqa: F401
 )
 from courses.models import (
+    CourseRunAccessRole,
     CourseRunEnrollment,
     PaidProgram,
     ProgramEnrollment,
@@ -41,6 +42,7 @@ from ecommerce.factories import OrderFactory
 from ecommerce.models import OrderStatus
 from main.test_utils import drf_datetime
 from openedx.exceptions import EdxApiCourseOutlineError
+from users.factories import UserFactory
 
 pytestmark = [
     pytest.mark.django_db,
@@ -156,6 +158,7 @@ def test_user_enrollments_detail(
         else None,
         "enrollment_mode": enrollment.enrollment_mode,
         "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+        "has_course_staff_role": False,
     }
 
 
@@ -234,6 +237,7 @@ def test_user_enrollments_list(
             else None,
             "enrollment_mode": enrollment.enrollment_mode,
             "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+            "has_course_staff_role": False,
         }
         for enrollment in user_with_enrollments_and_certificates.run_enrollments
         for upgrade_product in [
@@ -352,6 +356,7 @@ def test_user_enrollments_list_filter_exclude_b2b(
             "b2b_organization_id": None,
             "enrollment_mode": enrollment.enrollment_mode,
             "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+            "has_course_staff_role": False,
         }
         for enrollment in user_with_enrollments_and_certificates.run_enrollments
         for upgrade_product in [
@@ -433,6 +438,7 @@ def test_user_enrollments_list_filter_exclude_b2b(
             else None,
             "enrollment_mode": enrollment.enrollment_mode,
             "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+            "has_course_staff_role": False,
         }
         for enrollment in user_with_enrollments_and_certificates.run_enrollments
         for upgrade_product in [
@@ -452,6 +458,77 @@ def test_user_enrollments_list_query_count_guard(
     with django_assert_max_num_queries(20):
         resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
     assert resp.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.parametrize(
+    ("role", "expected"),
+    [
+        ("staff", True),
+        ("instructor", True),
+        ("data_researcher", False),
+    ],
+)
+def test_user_enrollments_list_has_course_staff_role(
+    user_drf_client, user, role, expected
+):
+    """
+    The list endpoint reports whether the user is course staff on each run, so
+    the dashboard can offer the courseware link before the run starts. Only the
+    roles Open edX itself lets in early count.
+    """
+    enrollment = CourseRunEnrollmentFactory.create(user=user)
+    CourseRunAccessRole.objects.create(user=user, run=enrollment.run, role=role)
+
+    resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    [result] = [row for row in resp.json() if row["id"] == enrollment.id]
+    assert result["has_course_staff_role"] is expected
+
+
+def test_user_enrollments_detail_has_course_staff_role(user_drf_client, user):
+    """
+    Retrieve reports the role too.
+
+    It shares `get_queryset` with list today, so this is a guard against a
+    future `get_object`/`retrieve` override that skips the annotation.
+    """
+    enrollment = CourseRunEnrollmentFactory.create(user=user)
+    CourseRunAccessRole.objects.create(user=user, run=enrollment.run, role="staff")
+
+    resp = user_drf_client.get(
+        reverse("v3:user_enrollments_api-detail", kwargs={"pk": enrollment.id})
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["has_course_staff_role"] is True
+
+
+def test_user_enrollments_list_course_staff_role_is_per_run(user_drf_client, user):
+    """A role on one run does not mark the user's other enrollments"""
+    staffed, other = CourseRunEnrollmentFactory.create_batch(2, user=user)
+    CourseRunAccessRole.objects.create(user=user, run=staffed.run, role="staff")
+
+    resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    flags = {row["id"]: row["has_course_staff_role"] for row in resp.json()}
+    assert flags[staffed.id] is True
+    assert flags[other.id] is False
+
+
+def test_user_enrollments_list_course_staff_role_is_per_user(user_drf_client, user):
+    """Another user's role on the same run does not mark this user's enrollment"""
+    enrollment = CourseRunEnrollmentFactory.create(user=user)
+    CourseRunAccessRole.objects.create(
+        user=UserFactory.create(), run=enrollment.run, role="staff"
+    )
+
+    resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    [result] = [row for row in resp.json() if row["id"] == enrollment.id]
+    assert result["has_course_staff_role"] is False
 
 
 def test_program_enrollments(
@@ -640,7 +717,8 @@ def test_create_program_enrollment_export_compliance_blocked(
 
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
-        "detail": "Unable to complete enrollment. Error code: CS_700."
+        "detail": "Unable to complete enrollment. Error code: CS_700.",
+        "reason_code": "CS_700",
     }
     assert not ProgramEnrollment.objects.filter(user=user, program=program).exists()
 
@@ -648,9 +726,9 @@ def test_create_program_enrollment_export_compliance_blocked(
 def test_create_program_enrollment_export_compliance_missing_data(
     mocker, user_drf_client, user
 ):
-    """Missing profile data is not a CyberSource rejection, so it carries no error code."""
+    """Missing profile data carries the fixable-data code and the fields to fix."""
     program = ProgramFactory.create(live=True)
-    exc = ExportComplianceDataError(user, ["bill_to_country"])
+    exc = ExportComplianceDataError(user, ["country"])
     mocker.patch("courses.views.v3.create_program_enrollments", side_effect=exc)
 
     resp = user_drf_client.post(
@@ -660,7 +738,11 @@ def test_create_program_enrollment_export_compliance_missing_data(
     )
 
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
-    assert resp.json() == {"detail": "Unable to complete enrollment."}
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
+        "missing_fields": ["country"],
+    }
     assert not ProgramEnrollment.objects.filter(user=user, program=program).exists()
 
 
@@ -883,7 +965,11 @@ class TestEnrollmentEligibility:
         resp = user_drf_client.post(endpoints[kind](courseware_object))
 
         assert resp.status_code == status.HTTP_200_OK
-        assert resp.json() == {"enrollable": True, "reason_code": None}
+        assert resp.json() == {
+            "enrollable": True,
+            "reason_code": None,
+            "missing_fields": [],
+        }
 
     @pytest.mark.parametrize("kind", ["run", "program"])
     def test_blocked_by_compliance(self, mocker, user_drf_client, endpoints, kind):
@@ -902,23 +988,33 @@ class TestEnrollmentEligibility:
         resp = user_drf_client.post(endpoints[kind](courseware_object))
 
         assert resp.status_code == status.HTTP_200_OK
-        assert resp.json() == {"enrollable": False, "reason_code": "CS_700"}
+        assert resp.json() == {
+            "enrollable": False,
+            "reason_code": "CS_700",
+            "missing_fields": [],
+        }
 
     @pytest.mark.parametrize("kind", ["run", "program"])
     def test_blocked_by_missing_profile_data(
         self, mocker, user, user_drf_client, endpoints, kind
     ):
-        """An incomplete profile reports CS_701, not CS_700."""
+        """An incomplete profile reports CS_701, not CS_700, and the fields to fix."""
         courseware_object = self._courseware_object(kind)
         mocker.patch(
             "courses.api.verify_user_with_exports",
-            side_effect=ExportComplianceDataError(user, ["postal_code", "state"]),
+            side_effect=ExportComplianceDataError(
+                user, ["postal_code", "administrative_area"]
+            ),
         )
 
         resp = user_drf_client.post(endpoints[kind](courseware_object))
 
         assert resp.status_code == status.HTTP_200_OK
-        assert resp.json() == {"enrollable": False, "reason_code": "CS_701"}
+        assert resp.json() == {
+            "enrollable": False,
+            "reason_code": "CS_701",
+            "missing_fields": ["postal_code", "state"],
+        }
 
     @pytest.mark.parametrize("kind", ["run", "program"])
     def test_does_not_enroll(self, user, user_drf_client, endpoints, kind):

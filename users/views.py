@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from hubspot_sync.task_helpers import sync_hubspot_user
 from main import features
 from main.permissions import UserIsOwnerPermission
+from main.versioning import V0Versioning
 from main.views import RefinePagination
 from openedx import tasks
 from users.models import ChangeEmailRequest, User
@@ -35,6 +36,7 @@ log = logging.getLogger(__name__)
 class UserRetrieveViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """User retrieve viewsets"""
 
+    versioning_class = V0Versioning
     queryset = User.objects.all()
     serializer_class = PublicUserSerializer
     permission_classes = [IsAuthenticatedOrTokenHasScope, UserIsOwnerPermission]
@@ -46,6 +48,7 @@ class CurrentUserRetrieveUpdateViewSet(
 ):
     """User retrieve and update viewsets for the current user"""
 
+    versioning_class = V0Versioning
     # NOTE: this is a separate viewset from UserRetrieveViewSet because of the differences in permission requirements
     serializer_class = UserSerializer
     permission_classes = []
@@ -94,6 +97,8 @@ class UserInfoViewSet(CurrentUserRetrieveUpdateViewSet):
     User info viewset for the open edx OAuth, extends CurrentUserRetrieveUpdateViewSet
     """
 
+    versioning_class = V0Versioning
+
     def retrieve(self, request, *args, **kwargs):
         """
         Retrieve the current user's info only if they have an edx_username, otherwise return 409
@@ -113,6 +118,7 @@ class ChangeEmailRequestViewSet(
 ):
     """Viewset for creating and updating email change requests"""
 
+    versioning_class = V0Versioning
     lookup_field = "code"
 
     def get_permissions(self):
@@ -143,6 +149,7 @@ class ChangeEmailRequestViewSet(
 class CountriesStatesViewSet(viewsets.GenericViewSet, GenericAPIView):
     """Retrieve viewset of countries, with states/provinces for US and Canada"""
 
+    versioning_class = V0Versioning
     permission_classes = []
     serializer_class = CountrySerializer
 
@@ -162,6 +169,7 @@ class UsersViewSet(viewsets.ReadOnlyModelViewSet):
     dashboard.
     """
 
+    versioning_class = V0Versioning
     serializer_class = StaffDashboardUserSerializer
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAdminUser]

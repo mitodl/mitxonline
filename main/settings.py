@@ -39,7 +39,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "1.170.0"
+VERSION = "2026.11.4.1"
 
 log = logging.getLogger()
 
@@ -282,7 +282,6 @@ INSTALLED_APPS = (
     # "mitol.digitalcredentials.apps.DigitalCredentialsApp",
     "mitol.hubspot_api",
     "mitol.mail.apps.MailApp",
-    "mitol.authentication.apps.TransitionalAuthenticationApp",
     "mitol.payment_gateway.apps.PaymentGatewayApp",
     "mitol.olposthog.apps.OlPosthog",
     "mitol.scim.apps.ScimApp",
@@ -340,6 +339,18 @@ ANONYMOUS_BASKET_CULL_AGE = get_int(
     name="ANONYMOUS_BASKET_CULL_AGE",
     default=global_settings.SESSION_COOKIE_AGE,
     description="Seconds of inactivity after which an anonymous (unclaimed) basket is deleted",
+)
+
+PENDING_ORDER_CULL_AGE_DAYS = get_int(
+    name="PENDING_ORDER_CULL_AGE_DAYS",
+    default=60,
+    description="Age in days after which an unresolved PendingOrder is deleted",
+)
+
+B2B_USER_LATEST_SESSION_CACHE_TIMEOUT = get_int(
+    name="B2B_USER_LATEST_SESSION_CACHE_TIMEOUT",
+    default=60 * 60 * 24 * 30,
+    description="Seconds to keep the auth time of a user's most recent APISIX session, used to skip org reconciliation for older sessions",
 )
 
 MITXONLINE_NEW_USER_LOGIN_URL = get_string(
@@ -508,13 +519,6 @@ KEYCLOAK_ADMIN_CLIENT_NO_VERIFY_SSL = get_bool(
 
 # Serve static files with dj-static
 STATIC_URL = "/static/"
-CLOUDFRONT_DIST = get_string(
-    name="CLOUDFRONT_DIST",
-    default=None,
-    description="The Cloundfront distribution to use for static assets",
-)
-if CLOUDFRONT_DIST:
-    STATIC_URL = urljoin(f"https://{CLOUDFRONT_DIST}.cloudfront.net", STATIC_URL)
 
 STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.FileSystemFinder",
@@ -813,6 +817,14 @@ AWS_SECRET_ACCESS_KEY = get_string(
 AWS_STORAGE_BUCKET_NAME = get_string(
     name="AWS_STORAGE_BUCKET_NAME", default=None, description="S3 Bucket name."
 )
+AWS_S3_CUSTOM_DOMAIN = get_string(
+    name="AWS_S3_CUSTOM_DOMAIN",
+    default=None,
+    description=(
+        "Host (and optional path) that media URLs are built on instead of the bucket's "
+        "S3 hostname, e.g. mitxonline.mit.edu/media to serve them through the CDN."
+    ),
+)
 AWS_QUERYSTRING_AUTH = get_bool(
     name="AWS_QUERYSTRING_AUTH",
     default=False,
@@ -838,8 +850,6 @@ if MITX_ONLINE_USE_S3 and (
         "AWS_STORAGE_BUCKET_NAME"
     )
 if MITX_ONLINE_USE_S3:
-    if CLOUDFRONT_DIST:
-        AWS_S3_CUSTOM_DOMAIN = f"{CLOUDFRONT_DIST}.cloudfront.net"
     # Override default storage backend to use S3 (Django 5.0+)
     STORAGES = global_settings.STORAGES.copy()
     STORAGES["default"]["BACKEND"] = "storages.backends.s3boto3.S3Boto3Storage"
@@ -1065,6 +1075,13 @@ CELERY_BEAT_SCHEDULE = {
             offset=timedelta(seconds=KEYCLOAK_ORG_SYNC_OFFSET),
         ),
     },
+    "push-unconfirmed-org-members-to-keycloak": {
+        "task": "b2b.tasks.push_unconfirmed_org_members_to_keycloak",
+        "schedule": OffsettingSchedule(
+            run_every=timedelta(seconds=KEYCLOAK_ORG_SYNC_FREQUENCY),
+            offset=timedelta(seconds=KEYCLOAK_ORG_SYNC_OFFSET),
+        ),
+    },
     "clear-expired-tokens": {
         "task": "main.tasks.run_clear_tokens",
         "schedule": crontab(minute=0, hour=9, day_of_week=1),  # every week
@@ -1099,6 +1116,10 @@ CELERY_BEAT_SCHEDULE = {
     "cull-anonymous-baskets": {
         "task": "ecommerce.tasks.perform_cull_anonymous_baskets",
         "schedule": crontab(minute=0, hour=4),
+    },
+    "cull-stale-pending-orders": {
+        "task": "ecommerce.tasks.perform_cull_stale_pending_orders",
+        "schedule": crontab(minute=30, hour=4),
     },
 }
 
@@ -1180,9 +1201,9 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "EXCEPTION_HANDLER": "main.exceptions.exception_handler",
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
-    "DEFAULT_VERSIONING": "rest_framework.versioning.NamespaceVersioning",
+    "DEFAULT_VERSIONING_CLASS": "main.versioning.FallbackNamespaceVersioning",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "ALLOWED_VERSIONS": ["v0", "v1", "v2"],
+    "ALLOWED_VERSIONS": ["v0", "v1", "v2", "v3"],
     "DEFAULT_THROTTLE_RATES": {
         "enrollment_eligibility": ENROLLMENT_ELIGIBILITY_THROTTLE_RATE,
     },
@@ -1194,14 +1215,9 @@ REST_FRAMEWORK = {
     ),
 }
 
-# Relative URL to be used by Djoser for the link in the password reset email
-# (see: http://djoser.readthedocs.io/en/stable/settings.html#password-reset-confirm-url)
-PASSWORD_RESET_CONFIRM_URL = "password_reset/confirm/{uid}/{token}/"  # noqa: S105
-
 # ol-django configuration
 
 import_settings_modules(
-    "mitol.authentication.settings.djoser_settings",
     "mitol.payment_gateway.settings",
     "mitol.olposthog.settings.olposthog",
 )
@@ -1230,10 +1246,6 @@ MITOL_MAIL_ENABLE_EMAIL_DEBUGGER = get_bool(  # NOTE: this will override the leg
     description="Enable the mitol-mail email debugger",
     dev_only=True,
 )
-
-# mitol-django-authentication
-MITOL_AUTHENTICATION_FROM_EMAIL = MIT_LEARN_FROM_EMAIL
-MITOL_AUTHENTICATION_REPLY_TO_EMAIL = MITX_ONLINE_REPLY_TO_ADDRESS
 
 OPENEDX_OAUTH_PROVIDER = get_string(
     name="OPENEDX_OAUTH_PROVIDER",
@@ -1347,6 +1359,17 @@ EDX_API_CLIENT_TIMEOUT = get_int(
     name="EDX_API_CLIENT_TIMEOUT",
     default=60,
     description="Timeout (in seconds) for requests made via the edX API client",
+)
+
+OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES = get_int(
+    name="OPENEDX_COURSE_LIST_THROTTLE_MAX_RETRIES",
+    default=3,
+    description="How many times to retry a rate-limited (429) edX course list API request",
+)
+OPENEDX_COURSE_LIST_THROTTLE_WAIT_SECONDS = get_int(
+    name="OPENEDX_COURSE_LIST_THROTTLE_WAIT_SECONDS",
+    default=60,
+    description="Seconds to wait before retrying a rate-limited edX course list API request when edX doesn't say how long to wait, and the longest wait allowed when it does",
 )
 
 OPENEDX_COURSE_CLONE_MAX_RETRIES = get_int(

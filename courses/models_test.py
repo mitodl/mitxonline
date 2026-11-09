@@ -1,5 +1,6 @@
 """Tests for course models"""
 
+import importlib
 import logging
 import random
 from datetime import timedelta
@@ -7,19 +8,21 @@ from datetime import timedelta
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
-from django.db.models import F, Prefetch
+from django.db.models import Prefetch, ProtectedError
 from django.test.utils import CaptureQueriesContext
 from mitol.common.utils.datetime import now_in_utc
-from wagtail.models import Page
+from wagtail.management.commands.purge_revisions import purge_revisions
+from wagtail.models import Page, Revision
 
 from b2b.factories import ContractPageFactory
+from b2b.models import ContractPage
 from cms.factories import (
     CertificatePageFactory,
     CoursePageFactory,
     ProgramPageFactory,
     ResourcePageFactory,
 )
-from cms.models import CertificatePage
+from cms.models import CertificatePage, CoursePage
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.factories import (
     CourseFactory,
@@ -39,10 +42,12 @@ from courses.factories import (
 from courses.models import (
     Course,
     CourseRun,
+    CourseRunCertificate,
     CourseRunEnrollment,
     PaidCourseRun,
     PartnerSchool,
     Program,
+    ProgramCertificate,
     ProgramRequirement,
     ProgramRequirementNodeType,
     limit_to_certificate_pages,
@@ -590,22 +595,8 @@ def test_course_run_certificate_start_end_dates_and_page_revision(mocker):
     )
 
 
-def test_course_run_certificate_clean_allows_missing_page_revision(mocker):
-    """Revoking a certificate can clear certificate_page_revision before save."""
-    mocker.patch(
-        "hubspot_sync.api.upsert_custom_properties",
-    )
-    certificate = CourseRunCertificateFactory.create(
-        course_run__course__page__certificate_page__product_name="product_name"
-    )
-    certificate.certificate_page_revision = None
-
-    # Should not raise when revision is intentionally unset.
-    certificate.clean()
-
-
 def test_course_run_certificate_save_without_course_page(mocker):
-    """Saving should not fail if the course has no CMS page."""
+    """Saving should fail if the course has no CMS page to derive a revision from."""
     mocker.patch(
         "hubspot_sync.api.upsert_custom_properties",
     )
@@ -613,24 +604,154 @@ def test_course_run_certificate_save_without_course_page(mocker):
     course = CourseFactory.create(page=None)
     course_run = CourseRunFactory.create(course=course)
 
-    certificate = CourseRunCertificateFactory.create(user=user, course_run=course_run)
+    with pytest.raises(IntegrityError):
+        CourseRunCertificateFactory.create(user=user, course_run=course_run)
 
-    assert certificate.certificate_page_revision is None
+
+@pytest.mark.parametrize(
+    "certificate_model", [CourseRunCertificate, ProgramCertificate]
+)
+@pytest.mark.parametrize("has_certificate_page", [True, False])
+def test_certificate_full_clean_without_revision(
+    certificate_model, has_certificate_page
+):
+    """
+    A certificate left without a revision (e.g. the admin add form left blank)
+    gets the certificate page's latest revision in full_clean(), or fails
+    validation with a field error if there is no revision to use.
+    """
+    page_kwargs = {} if has_certificate_page else {"page": None}
+    certificate = certificate_model(user=UserFactory.create())
+    if certificate_model is CourseRunCertificate:
+        certificate.course_run = CourseRunFactory.create(
+            **{f"course__{key}": value for key, value in page_kwargs.items()}
+        )
+        certified_object = certificate.course_run.course
+    else:
+        certificate.program = ProgramFactory.create(**page_kwargs)
+        certified_object = certificate.program
+
+    if has_certificate_page:
+        certificate.full_clean()
+        assert (
+            certificate.certificate_page_revision
+            == certified_object.certificate_page.get_latest_revision()
+        )
+    else:
+        with pytest.raises(ValidationError) as exc_info:
+            certificate.full_clean()
+        assert "certificate_page_revision" in exc_info.value.message_dict
 
 
-def test_course_run_certificate_save_without_certificate_child_page(mocker):
-    """Saving should not fail if the course page has no live certificate child page."""
+@pytest.mark.parametrize(
+    "certificate_model", [CourseRunCertificate, ProgramCertificate]
+)
+def test_certificate_full_clean_without_parent(certificate_model):
+    """A certificate with no course run/program fails on that field, not with RelatedObjectDoesNotExist."""
+    certificate = certificate_model(user=UserFactory.create())
+
+    with pytest.raises(ValidationError) as exc_info:
+        certificate.full_clean()
+
+    parent_field = (
+        "course_run" if certificate_model is CourseRunCertificate else "program"
+    )
+    assert parent_field in exc_info.value.message_dict
+
+
+def test_certificate_page_with_issued_certificates_cannot_be_deleted(mocker):
+    """
+    Deleting a certificate page is blocked while certificates reference one of
+    its revisions: Wagtail deletes a page's Revision rows along with the page,
+    and certificate_page_revision is on_delete=PROTECT.
+    """
     mocker.patch(
         "hubspot_sync.api.upsert_custom_properties",
     )
     certificate = CourseRunCertificateFactory.create()
     course_page = certificate.course_run.course.page
-    CertificatePage.objects.descendant_of(course_page).delete()
 
-    certificate.certificate_page_revision = None
-    certificate.save()
+    with pytest.raises(ProtectedError):
+        CertificatePage.objects.descendant_of(course_page).delete()
 
-    assert certificate.certificate_page_revision is None
+    assert CourseRunCertificate.all_objects.filter(pk=certificate.pk).exists()
+
+
+@pytest.mark.parametrize("is_program", [True, False])
+def test_purge_revisions_keeps_revisions_referenced_by_certificates(mocker, is_program):
+    """
+    Wagtail's purge_revisions deletes every non-latest revision, skipping any
+    that raise ProtectedError. A certificate pinned to an older revision must
+    survive, along with that revision.
+    """
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    if is_program:
+        certificate = ProgramCertificateFactory.create()
+        certificate_page = certificate.program.page.certificate_page
+    else:
+        certificate = CourseRunCertificateFactory.create()
+        certificate_page = certificate.course_run.course.page.certificate_page
+    pinned_revision = certificate.certificate_page_revision
+    unreferenced_revision = certificate_page.save_revision()
+    certificate_page.save_revision()
+
+    purge_revisions()
+
+    certificate.refresh_from_db()
+    assert certificate.certificate_page_revision == pinned_revision
+    assert not Revision.objects.filter(pk=unreferenced_revision.pk).exists()
+
+
+@pytest.mark.parametrize("is_program", [True, False])
+def test_certificate_uses_published_revision_not_draft(mocker, is_program):
+    """
+    A new certificate is pinned to the certificate page's published revision,
+    not a later unpublished draft.
+    """
+    mocker.patch("hubspot_sync.api.upsert_custom_properties")
+    if is_program:
+        program = ProgramFactory.create()
+        certificate_page = program.certificate_page
+    else:
+        course_run = CourseRunFactory.create()
+        certificate_page = course_run.course.certificate_page
+    published_revision = certificate_page.save_revision()
+    published_revision.publish()
+    certificate_page.CEUs = "draft only"
+    draft_revision = certificate_page.save_revision()
+    assert certificate_page.get_latest_revision() == draft_revision
+
+    if is_program:
+        certificate = ProgramCertificate.objects.create(
+            user=UserFactory.create(), program=program
+        )
+    else:
+        certificate = CourseRunCertificate.objects.create(
+            user=UserFactory.create(), course_run=course_run
+        )
+
+    assert certificate.certificate_page_revision == published_revision
+
+
+def test_0113_backfill_uses_published_revision_not_draft():
+    """
+    Migration 0113 backfills certificates with the certificate page's published
+    revision, not a later unpublished draft.
+    """
+    migration = importlib.import_module(
+        "courses.migrations.0113_certificate_page_revision_not_nullable"
+    )
+    course = CourseFactory.create()
+    certificate_page = course.certificate_page
+    published_revision = certificate_page.save_revision()
+    published_revision.publish()
+    certificate_page.save_revision()  # an unpublished draft
+
+    assert migration._live_certificate_page_state(  # noqa: SLF001
+        CoursePage, "course_id", course.id
+    ) == (True, published_revision.id)
 
 
 def test_program_certificate_start_end_dates_and_page_revision(user, mocker):
@@ -1170,6 +1291,35 @@ def test_program_elective_programs_property():
     assert required_program not in elective_programs
 
 
+def test_program_courses_qset_recursive():
+    """courses_qset_recursive includes the courses of nested programs at any depth"""
+    parent_program = ProgramFactory.create()
+    required_program = ProgramFactory.create()
+    elective_program = ProgramFactory.create()
+    grandchild_program = ProgramFactory.create()
+    direct_course, required_course, elective_course, grandchild_course, _ = (
+        CourseFactory.create_batch(5)
+    )
+
+    parent_program.add_requirement(direct_course)
+    parent_program.add_program_requirement(required_program)
+    parent_program.add_program_elective(elective_program)
+    required_program.add_requirement(required_course)
+    required_program.add_program_requirement(grandchild_program)
+    elective_program.add_requirement(elective_course)
+    grandchild_program.add_requirement(grandchild_course)
+    # A program nested twice is walked once
+    elective_program.add_program_requirement(grandchild_program)
+
+    assert set(parent_program.courses_qset_recursive) == {
+        direct_course,
+        required_course,
+        elective_course,
+        grandchild_course,
+    }
+    assert set(parent_program.courses_qset) == {direct_course}
+
+
 def test_program_requirement_node_types():
     """Test that the new PROGRAM node type works correctly"""
     parent_program = ProgramFactory.create()
@@ -1526,38 +1676,6 @@ def test_get_filtered_runs_reuses_prefetched_courseruns(django_assert_num_querie
     assert runs == [course_run]
 
 
-def test_b2b_contract_organization_id_prefers_annotation(django_assert_num_queries):
-    """
-    The annotation must shadow the cached_property, with no query.
-
-    ``CourseViewSet`` annotates ``b2b_contract_organization_id`` instead of
-    select_related'ing the contract, which would drag a whole Wagtail page per
-    run. cached_property is a non-data descriptor, so the value Django's
-    ModelIterable setattr's into ``__dict__`` wins over the method body - if
-    that ever stops holding, this falls back to one query per run.
-    """
-    contract = ContractPageFactory.create()
-    CourseRunFactory.create(b2b_contract=contract)
-
-    run = CourseRun.objects.annotate(
-        b2b_contract_organization_id=F("b2b_contract__organization_id")
-    ).get(b2b_contract=contract)
-
-    with django_assert_num_queries(0):
-        assert run.b2b_contract_organization_id == contract.organization_id
-
-
-def test_b2b_contract_organization_id_without_annotation():
-    """Unannotated callers still resolve, via the relation."""
-    contract = ContractPageFactory.create()
-    run = CourseRunFactory.create(b2b_contract=contract)
-
-    assert CourseRun.objects.get(pk=run.pk).b2b_contract_organization_id == (
-        contract.organization_id
-    )
-    assert CourseRunFactory.create().b2b_contract_organization_id is None
-
-
 @pytest.mark.parametrize("filter_name", ["org_id", "contract_id"])
 def test_get_filtered_runs_excludes_inactive_b2b_contracts(filter_name):
     """
@@ -1663,13 +1781,22 @@ def _generate_lang_run_data():
         "enrollment_start": start_date,
         "live": True,
         "is_source_run": False,
-        "b2b_contract": None,
     }
 
     return (
         course,
         run_dict,
     )
+
+
+def _create_run(run_data):
+    """Create a run from the data, attaching any contracts in b2b_contracts."""
+
+    run_data = {**run_data}
+    contracts = run_data.pop("b2b_contracts", [])
+    run = CourseRun.all_objects.create(**run_data)
+    run.b2b_contracts.add(*contracts)
+    return run
 
 
 def _run_primary_lang_run_test(  # noqa: PLR0913
@@ -1692,7 +1819,7 @@ def _run_primary_lang_run_test(  # noqa: PLR0913
     }
     log.info("run_data is: %s", run_data)
 
-    regular_course = CourseRun.all_objects.create(**run_data)
+    regular_course = _create_run(run_data)
 
     assert regular_course.id
 
@@ -1705,7 +1832,7 @@ def _run_primary_lang_run_test(  # noqa: PLR0913
         }
         log.info("run_data is: %s", run_data)
 
-        CourseRun.all_objects.create(**run_data)
+        _create_run(run_data)
 
     if set_primary and set_language_field:
         # Also test what happens if we try to make another primary language
@@ -1719,7 +1846,7 @@ def _run_primary_lang_run_test(  # noqa: PLR0913
         log.info("run_data is: %s", run_data)
 
         with pytest.raises(ValidationError) as exc, transaction.atomic():
-            CourseRun.all_objects.create(**run_data)
+            _create_run(run_data)
 
         assert "primary-language run" in str(exc)
 
@@ -1759,7 +1886,8 @@ def test_run_language_constraints_regular_languages(set_language_field, set_prim
     def _run_b2b_test():
         contract = ContractPageFactory.create()
         run_dict = starting_run_dict
-        run_dict["b2b_contract"] = contract
+        run_dict["b2b_contracts"] = [contract]
+        run_dict["b2b_only"] = True
         run_dict["is_source_run"] = False
 
         _run_primary_lang_run_test(
@@ -1773,7 +1901,7 @@ def test_run_language_constraints_regular_languages(set_language_field, set_prim
         )
 
         assert (
-            CourseRun.all_objects.filter(course=course, b2b_contract=contract).count()
+            CourseRun.all_objects.filter(course=course, b2b_contracts=contract).count()
             == 3
         )
 
@@ -2268,3 +2396,19 @@ def test_program_requirement_track_delete_clears_enrollment_track(
 
     enrollment.refresh_from_db()
     assert enrollment.track is None
+
+
+@pytest.mark.parametrize("active", [True, False])
+def test_course_run_has_b2b_contracts(active):
+    """has_b2b_contracts should count inactive contracts too."""
+    assert CourseRunFactory.build().has_b2b_contracts is False
+    assert CourseRunFactory.create().has_b2b_contracts is False
+
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=[contract])
+    # Saving an inactive ContractPage through the factory trips Wagtail's
+    # reload via the (active-only) default manager, so flip it directly.
+    ContractPage.objects.filter(pk=contract.pk).update(active=active)
+
+    assert run.has_b2b_contracts is True
+    assert run.contract_group_ids == {contract.id}

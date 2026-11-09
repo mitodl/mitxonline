@@ -1,11 +1,15 @@
 """Tests for Wagtail API views."""
 
+from datetime import date
+
 import pytest
 import wagtail_factories
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from freezegun import freeze_time
 from rest_framework.test import APIClient
+from rest_framework_api_key.models import APIKey
 
 from cms.factories import CoursePageFactory, ProgramPageFactory
 from cms.models import ProductPageFAQ, ProductPageTestimonial
@@ -292,7 +296,6 @@ def test_course_page_detail_exposes_hubspot_form_id(user_drf_client):
     assert "show_stay_updated" not in body
 
 
-@pytest.mark.zeal_allow("cms.CertificatePage", "get()")
 def test_program_page_detail_exposes_hubspot_form_id(user_drf_client):
     """ProgramPage detail returns hubspot_form_id and no longer returns show_stay_updated."""
     page = ProgramPageFactory.create(hubspot_form_id="program-form-456")
@@ -335,7 +338,6 @@ def test_course_page_detail_exposes_faqs_in_order(user_drf_client):
     assert all(isinstance(faq["id"], int) for faq in faqs)
 
 
-@pytest.mark.zeal_allow("cms.CertificatePage", "get()")
 def test_program_page_detail_exposes_faqs(user_drf_client):
     """ProgramPage detail returns authored FAQs (question + answer)."""
     page = ProgramPageFactory.create()
@@ -417,7 +419,6 @@ def test_course_page_detail_exposes_testimonials_in_order(user_drf_client):
     assert all(isinstance(t["id"], int) for t in testimonials)
 
 
-@pytest.mark.zeal_allow("cms.CertificatePage", "get()")
 def test_program_page_detail_exposes_testimonials(user_drf_client):
     """ProgramPage detail returns authored testimonials."""
     page = ProgramPageFactory.create()
@@ -443,6 +444,65 @@ def test_course_page_detail_testimonials_empty_when_none_authored(user_drf_clien
     )
     assert resp.status_code == 200
     assert resp.json()["testimonials"] == []
+
+
+def test_testimonial_exposes_date_published(user_drf_client):
+    """A testimonial serializes date_published as an ISO date."""
+    page = CoursePageFactory.create()
+    ProductPageTestimonial.objects.create(
+        page=page,
+        quote="Dated quote.",
+        name="Erin",
+        date_published=date(2025, 3, 14),
+    )
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    assert resp.json()["testimonials"][0]["date_published"] == "2025-03-14"
+
+
+@freeze_time("2025-06-01")
+def test_testimonial_date_published_defaults_to_today(user_drf_client):
+    """An unset date_published falls back to today."""
+    page = CoursePageFactory.create()
+    ProductPageTestimonial.objects.create(page=page, quote="Undated.", name="Frank")
+    resp = user_drf_client.get(
+        reverse("wagtailapi:pages:detail", kwargs={"pk": page.id})
+    )
+    assert resp.status_code == 200
+    assert resp.json()["testimonials"][0]["date_published"] == "2025-06-01"
+
+
+@freeze_time("2025-06-01")
+def test_testimonial_date_published_restamped_by_pre_field_revision():
+    """
+    A revision saved before this field existed restamps the date on publish.
+
+    modelcluster builds child objects only from the keys present in the stored
+    revision JSON, so an absent date_published falls back to the model default
+    rather than raising on the NOT NULL column. Any stored date, including the
+    migration backfill, is overwritten with today.
+    """
+    page = CoursePageFactory.create()
+    testimonial = ProductPageTestimonial.objects.create(
+        page=page,
+        quote="Authored long ago.",
+        name="Grace",
+        date_published=date(2020, 1, 2),
+    )
+
+    revision = page.save_revision()
+    content = revision.content
+    for child in content["testimonials_list"]:
+        child.pop("date_published", None)
+    revision.content = content
+    revision.save()
+
+    revision.as_object().save()
+
+    testimonial.refresh_from_db()
+    assert testimonial.date_published == date(2025, 6, 1)
 
 
 def test_testimonial_image_src_null_without_image(user_drf_client):
@@ -523,3 +583,52 @@ def test_course_page_listing_testimonials_prefetched(user_drf_client, fields):
 
     # Prefetch means more testimonials/images add no extra queries.
     assert after == before
+
+
+# --- API key access to test-mode course pages ---
+
+
+@pytest.fixture
+def keyed_client():
+    """API client sending a valid API key, with no user authentication."""
+    _, key = APIKey.objects.create_key(name="learn-etl")
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Api-Key {key}")
+    return client
+
+
+def _course_ids(client):
+    resp = client.get(reverse("wagtailapi:pages:listing"), {"type": "cms.coursepage"})
+    assert resp.status_code == 200
+    return {item["id"] for item in resp.json()["items"]}
+
+
+@pytest.mark.parametrize("live", [True, False])
+@pytest.mark.parametrize("in_catalog", [True, False])
+@pytest.mark.parametrize("ingest", [True, False])
+@pytest.mark.parametrize("keyed", [True, False])
+def test_course_pages_test_mode_visibility(  # noqa: PLR0913
+    anon_client, keyed_client, keyed, ingest, in_catalog, live
+):
+    """Only a keyed request sees unpublished/uncatalogued pages, and only with ingest on."""
+    page = CoursePageFactory.create(
+        include_in_learn_catalog=in_catalog,
+        ingest_content_files_for_ai=ingest,
+        live=live,
+    )
+    client = keyed_client if keyed else anon_client
+    expected = (live and in_catalog) or (keyed and ingest)
+    assert (page.id in _course_ids(client)) is expected
+
+
+def test_keyed_request_returns_latest_saved_draft(keyed_client):
+    """An unpublished page's row holds its latest draft, so it is returned as saved."""
+    page = CoursePageFactory.create(
+        live=False, ingest_content_files_for_ai=True, description="latest draft"
+    )
+    resp = keyed_client.get(
+        reverse("wagtailapi:pages:listing"),
+        {"type": "cms.coursepage", "fields": "description"},
+    )
+    item = next(i for i in resp.json()["items"] if i["id"] == page.id)
+    assert item["description"] == "latest draft"

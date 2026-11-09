@@ -1,6 +1,7 @@
 from drf_spectacular.utils import extend_schema_serializer
 from rest_framework import serializers
 
+from courses.constants import PROGRAM_ENROLLMENT_MODES
 from courses.models import (
     Program,
     ProgramEnrollment,
@@ -46,6 +47,7 @@ class ProgramEnrollmentSerializer(serializers.ModelSerializer):
     program = SimpleProgramSerializer(read_only=True)
     certificate = ProgramCertificateSerializer(allow_null=True, read_only=True)
     track = ProgramTrackSerializer(allow_null=True, read_only=True)
+    enrollment_mode = serializers.ChoiceField(PROGRAM_ENROLLMENT_MODES, read_only=True)
 
     class Meta:
         model = ProgramEnrollment

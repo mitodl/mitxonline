@@ -19,6 +19,7 @@ from django.forms import CheckboxInput, ChoiceField, IntegerField, Textarea
 from django.http import Http404, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.functional import cached_property
 from django.utils.safestring import mark_safe
 from django.utils.text import slugify
@@ -50,6 +51,7 @@ from wagtail.search import index
 from wagtail.snippets.models import register_snippet
 from wagtailmetadata.models import MetadataPageMixin
 
+from cms import credential_metadata
 from cms import utils as cms_utils
 from cms.blocks import (
     CourseRunCertificateOverrides,
@@ -325,33 +327,66 @@ class CourseProgramChildPage(Page):
         raise Http404
 
 
-class FeatureFlaggedFieldPanel(FieldPanel):
-    """A FieldPanel that is only rendered while its feature flag is enabled.
+class GenerateWithAIFieldPanel(FieldPanel):
+    """A FieldPanel with a "Generate with AI" button that fills it from MIT Learn.
 
-    Lets a field ship (and accumulate a migration) ahead of the functionality
-    that consumes it, without exposing a field that does nothing to CMS authors.
+    The button only renders while MIT Learn is configured and the credential
+    metadata authoring flag is on. The field itself renders regardless, unless
+    hide_without_flag is set: that lets a field ship (and accumulate a
+    migration) ahead of the functionality that consumes it, without exposing a
+    field that does nothing to CMS authors.
     """
 
-    def __init__(self, field_name, feature_flag, **kwargs):
+    def __init__(
+        self, field_name, metadata_field, *, hide_without_flag=False, **kwargs
+    ):
         super().__init__(field_name, **kwargs)
-        self.feature_flag = feature_flag
+        self.metadata_field = metadata_field
+        self.hide_without_flag = hide_without_flag
 
     def clone_kwargs(self):
-        """Carry the flag across clones.
+        """Carry our kwargs across clones.
 
         Wagtail clones panels when binding them to a model/instance, so without
-        this the flag is lost and the panel reverts to always rendering.
+        this they are lost and the panel reverts to a plain FieldPanel.
         """
         kwargs = super().clone_kwargs()
-        kwargs["feature_flag"] = self.feature_flag
+        kwargs["metadata_field"] = self.metadata_field
+        kwargs["hide_without_flag"] = self.hide_without_flag
         return kwargs
 
     class BoundPanel(FieldPanel.BoundPanel):
-        """Bound panel that also consults the feature flag."""
+        """Bound panel that adds the button and consults the feature flag."""
+
+        template_name = "cms/panels/generate_with_ai_field_panel.html"
+
+        class Media:
+            js = ["js/credential_metadata_admin.js"]
+
+        @cached_property
+        def flag_enabled(self):
+            """Whether credential metadata authoring is switched on"""
+            return is_enabled(features.ENABLE_CREDENTIAL_METADATA_AUTHORING)
 
         def is_shown(self):
-            """Hide the panel entirely while the feature flag is disabled."""
-            return is_enabled(self.panel.feature_flag) and super().is_shown()
+            """Hide the panel entirely if it is flag-gated and the flag is off."""
+            if self.panel.hide_without_flag and not self.flag_enabled:
+                return False
+            return super().is_shown()
+
+        def get_context_data(self, parent_context=None):
+            """Add the URL the button reads MIT Learn's draft from."""
+            context = super().get_context_data(parent_context)
+            parent_page = getattr(self.form, "parent_page", None)
+            context["metadata_field"] = self.panel.metadata_field
+            context["metadata_url"] = (
+                reverse("cms_credential_metadata", args=[parent_page.id])
+                if parent_page
+                and self.flag_enabled
+                and credential_metadata.is_configured()
+                else None
+            )
+            return context
 
 
 class CertificatePage(CourseProgramChildPage):
@@ -361,6 +396,16 @@ class CertificatePage(CourseProgramChildPage):
 
     template = "certificate_page.html"
     parent_page_types = ["CoursePage", "ProgramPage"]
+
+    def get_certificate_revision(self):
+        """
+        Return the revision new certificates should be pinned to: the published
+        one, so a later "Save draft" doesn't leak unpublished content onto
+        certificates. Falls back to the latest revision for a live page with no
+        recorded live revision (e.g. one saved live without going through
+        Wagtail's publish flow).
+        """
+        return self.live_revision or self.get_latest_revision()
 
     product_name = models.CharField(
         max_length=250,
@@ -409,7 +454,6 @@ class CertificatePage(CourseProgramChildPage):
         help_text="For verifiable credentials issued for this certificate, this is the criteria narrative field. It should be something descriptive, like a list of completed courses, and may be plaintext or markdown. If it is not supplied, no verifiable credential will be provisioned for those certificates.",
     )
 
-    # NOTE: not yet wired into credential issuance -- see mitodl/hq#13417.
     verifiable_credential_description = models.TextField(  # noqa: DJ001
         null=True,
         blank=True,
@@ -429,16 +473,18 @@ class CertificatePage(CourseProgramChildPage):
         MultiFieldPanel(
             [
                 FieldPanel("should_provision_verifiable_credential"),
-                FeatureFlaggedFieldPanel(
+                GenerateWithAIFieldPanel(
                     "verifiable_credential_description",
-                    feature_flag=features.ENABLE_CREDENTIAL_METADATA_AUTHORING,
+                    metadata_field="description",
+                    hide_without_flag=True,
                     widget=Textarea,
                 ),
                 # Set on the panel, not the field: panel help text carries
                 # markup and isn't migration-tracked, so this copy can be
                 # revised without one.
-                FieldPanel(
+                GenerateWithAIFieldPanel(
                     "verifiable_credential_criteria",
+                    metadata_field="criteria",
                     widget=Textarea,
                     help_text=mark_safe(
                         "Describe what the learner did in order to earn the "
@@ -841,12 +887,22 @@ class ProductPageTestimonial(Orderable):
         related_name="+",
         help_text="Optional photo of the person quoted.",
     )
+    # Defaults to today so revisions saved before this field existed rehydrate
+    # without tripping the NOT NULL column.
+    date_published = models.DateField(
+        default=timezone.localdate,
+        help_text=(
+            "When this testimonial was published. Shown to search engines as the "
+            "review date, not displayed on the page."
+        ),
+    )
 
     panels = [
         FieldPanel("quote"),
         FieldPanel("name"),
         FieldPanel("title"),
         FieldPanel("image"),
+        FieldPanel("date_published"),
     ]
 
     def __str__(self):
@@ -927,11 +983,6 @@ class HomePage(VideoPlayerConfigMixin):
         "InstructorIndexPage",
         "ProgramPage",
     ]
-
-    def _get_child_page_of_type(self, cls):
-        """Gets the first child page of the given type if it exists"""
-        child = self.get_children().type(cls).live().first()
-        return child.specific if child else None
 
     @property
     def get_cached_featured_products(self):
@@ -1300,11 +1351,10 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         blank=True,
         help_text="URL to the video to be displayed for this course/program. It can be an HLS or Youtube video URL.",
     )
-    # this field should be required, since VC creation depends on it
     what_you_learn = RichTextField(
         null=True,
         blank=True,
-        help_text="*Required for Verifiable Credential generation. What you will learn from this course.",
+        help_text="What you will learn from this course.",
     )
     hubspot_form_id = models.CharField(
         max_length=50,
@@ -1485,9 +1535,8 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         return super().save(clean=clean, user=user, log_action=log_action, **kwargs)
 
     def _get_child_page_of_type(self, cls):
-        """Gets the first child page of the given type if it exists"""
-        child = self.get_children().type(cls).live().first()
-        return child.specific if child else None
+        """Gets the first live child page of the given type, or None."""
+        return cls.objects.child_of(self).live().first()
 
     @property
     def certificate_page(self):

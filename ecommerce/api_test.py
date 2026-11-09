@@ -22,13 +22,17 @@ from django.urls import reverse
 from factory import Faker, fuzzy
 from mitol.common.utils.datetime import now_in_utc
 from mitol.payment_gateway.api import CartItem, PaymentGateway, ProcessorResponse
-from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_STRIPE
+from mitol.payment_gateway.constants import (
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+    MITOL_PAYMENT_GATEWAY_STRIPE,
+)
 from reversion.models import Version
-from stripe import convert_to_stripe_object
+from stripe import APIConnectionError, convert_to_stripe_object
 from zeal import zeal_context
 
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE
 from b2b.factories import ContractPageFactory
+from compliance.exceptions import ExportComplianceDataError
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.factories import (
     CourseRunEnrollmentFactory,
@@ -36,6 +40,7 @@ from courses.factories import (
     ProgramEnrollmentFactory,
     ProgramFactory,
 )
+from courses.models import PaidCourseRun
 from ecommerce.api import (
     ANONYMOUS_BASKET_SESSION_KEY,
     _retrieve_pending_cybersource_orders,
@@ -47,14 +52,18 @@ from ecommerce.api import (
     check_for_duplicate_discount_redemptions,
     claim_anonymous_basket,
     create_verified_program_course_run_enrollment,
+    create_verified_program_course_run_order,
     create_verified_program_discount,
     cull_anonymous_baskets,
+    cull_stale_pending_orders,
     downgrade_enrollments_from_order,
     downgrade_learner_from_order,
     establish_basket,
     establish_basket_for_request,
     find_order_for_stripe_payment_intent,
+    find_paid_program_order_for_zero_value_order,
     fulfill_completed_order,
+    fulfill_order_from_cybersource_transaction,
     generate_checkout_payload,
     get_anonymous_basket_id,
     get_auto_apply_discounts_for_basket,
@@ -68,6 +77,7 @@ from ecommerce.api import (
     unenroll_learner_from_order,
 )
 from ecommerce.constants import (
+    ADMIN_FULFILLED_PAYMENT_DATA,
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
@@ -78,6 +88,7 @@ from ecommerce.constants import (
     STRIPE_EVENT_CHARGE_REFUND_UPDATED,
     STRIPE_EVENT_CHECKOUT_SESSION_EXPIRED,
     STRIPE_EVENT_REFUND_UPDATED,
+    STRIPE_OBJECT_CHECKOUT_SESSION,
     STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
     STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
     STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
@@ -92,6 +103,7 @@ from ecommerce.constants import (
     STRIPE_PAYMENT_STATUS_NPR,
     STRIPE_PAYMENT_STATUS_PAID,
     STRIPE_PAYMENT_STATUS_UNPAID,
+    STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
     TRANSACTION_TYPE_PAYMENT,
     TRANSACTION_TYPE_REFUND,
     ZERO_PAYMENT_DATA,
@@ -99,6 +111,7 @@ from ecommerce.constants import (
 from ecommerce.exceptions import (
     VerifiedProgramCourseNotInProgramError,
     VerifiedProgramNoEnrollmentError,
+    VerifiedProgramNoProductError,
 )
 from ecommerce.factories import (
     DiscountRedemptionFactory,
@@ -126,6 +139,7 @@ from ecommerce.models import (
     DiscountProduct,
     DiscountRedemption,
     FulfilledOrder,
+    Line,
     Order,
     OrderStatus,
     PendingOrder,
@@ -140,6 +154,7 @@ from flexiblepricing.factories import (
     FlexiblePriceTierFactory,
     approve_flexible_price,
 )
+from main.constants import USER_MSG_TYPE_PROFILE_INCOMPLETE
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.factories import OpenEdxUserFactory
 from users.factories import UserFactory
@@ -576,6 +591,198 @@ def test_order_refund_missing_transaction_id_in_data(mocker, fulfilled_order):
     assert refund_success is True
 
 
+@pytest.mark.parametrize(
+    ("redeems_program_discount", "later_program_purchase"),
+    [(True, False), (True, True), (False, False)],
+)
+def test_order_refund_zero_payment(
+    mocker, user, redeems_program_discount, later_program_purchase
+):
+    """
+    A $0 order isn't refunded, and the message points at the paid program
+    order whose internal discount granted it, if there is one - not a later
+    purchase of another program with the same course, and not for a $0 order
+    that didn't come from a program.
+    """
+    run = CourseRunFactory.create()
+    program = ProgramFactory.create()
+    program.add_requirement(run.course)
+    program_order = make_purchase(user, program, Decimal("1524.60")).order
+    zero_order = make_purchase(user, run, Decimal("1000.00"), paid=Decimal(0)).order
+    if redeems_program_discount:
+        DiscountRedemption.objects.create(
+            redemption_date=now_in_utc(),
+            redeemed_by=user,
+            redeemed_discount=create_verified_program_discount(program),
+            redeemed_order=zero_order,
+        )
+    if later_program_purchase:
+        other_program = ProgramFactory.create()
+        other_program.add_requirement(run.course)
+        other_order = make_purchase(user, other_program, Decimal("900.00")).order
+    TransactionFactory.create(
+        order=zero_order,
+        amount=0,
+        transaction_id=str(uuid.uuid4()),
+        data=ZERO_PAYMENT_DATA,
+    )
+    start_refund_mock = mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.start_refund"
+    )
+    downgrade_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_downgrade_from_order.delay"
+    )
+
+    refund_success, message = refund_order(
+        reference_number=zero_order.reference_number, unenroll=True
+    )
+
+    assert refund_success is False
+    assert f"Order {zero_order.reference_number} is a $0 order" in message
+    if redeems_program_discount:
+        assert program_order.reference_number in message
+    else:
+        assert "program order" not in message
+    if later_program_purchase:
+        assert other_order.reference_number not in message
+    start_refund_mock.assert_not_called()
+    downgrade_task_mock.assert_not_called()
+    zero_order.refresh_from_db()
+    assert zero_order.state == OrderStatus.FULFILLED
+    assert not zero_order.transactions.filter(
+        transaction_type=TRANSACTION_TYPE_REFUND
+    ).exists()
+
+
+@pytest.mark.parametrize(
+    ("program_payment_data", "expected_ending"),
+    [
+        (
+            {"transaction_id": "1234", "req_amount": "1524.60", "req_currency": "USD"},
+            " - refund that order instead.",
+        ),
+        (
+            ADMIN_FULFILLED_PAYMENT_DATA,
+            ", which has no payment gateway transaction to refund - Finance needs to refund it manually.",
+        ),
+        (
+            {
+                "transaction_id": "1234",
+                "req_amount": "1524.60",
+                "req_currency": "USD",
+                "paypal_token": "EC-1234",
+            },
+            ", which has no payment gateway transaction to refund - Finance needs to refund it manually.",
+        ),
+    ],
+)
+def test_order_refund_zero_payment_program_order_payment(
+    user, program_payment_data, expected_ending
+):
+    """
+    The $0 refund message only says to refund the program order when its
+    payment can be refunded through the gateway; an administratively fulfilled
+    or PayPal program order is named, but left to Finance.
+    """
+    run = CourseRunFactory.create()
+    program = ProgramFactory.create()
+    program.add_requirement(run.course)
+    program_order = make_purchase(user, program, Decimal("1524.60")).order
+    TransactionFactory.create(
+        order=program_order,
+        transaction_type=TRANSACTION_TYPE_PAYMENT,
+        transaction_id=str(uuid.uuid4()),
+        data=program_payment_data,
+    )
+    zero_order = make_purchase(user, run, Decimal("1000.00"), paid=Decimal(0)).order
+    DiscountRedemptionFactory.create(
+        redeemed_by=user,
+        redeemed_discount=create_verified_program_discount(program),
+        redeemed_order=zero_order,
+    )
+    TransactionFactory.create(
+        order=zero_order,
+        amount=0,
+        transaction_id=str(uuid.uuid4()),
+        data=ZERO_PAYMENT_DATA,
+    )
+
+    refund_success, message = refund_order(reference_number=zero_order.reference_number)
+
+    assert refund_success is False
+    assert message.endswith(
+        f"granted by program order {program_order.reference_number}{expected_ending}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("purchases", "expected_index"),
+    [
+        (["paid", "zero", "paid"], 0),
+        (["zero", "paid"], None),
+        (["paid", "paid", "zero"], None),
+        (["free_with_paid_course", "zero"], None),
+    ],
+)
+def test_find_paid_program_order_for_zero_value_order(user, purchases, expected_index):
+    """
+    Only a single order placed before the $0 order, with a paid line for the
+    program, is the granting order. Later, ambiguous, and fully discounted
+    program purchases aren't.
+    """
+    run = CourseRunFactory.create()
+    program = ProgramFactory.create()
+    program.add_requirement(run.course)
+    with reversion.create_revision():
+        run_product = ProductFactory.create(purchasable_object=run, price=1000)
+        program_product = ProductFactory.create(purchasable_object=program, price=1524)
+        other_product = ProductFactory.create(
+            purchasable_object=CourseRunFactory.create(), price=500
+        )
+
+    def place_order(*lines):
+        order = OrderFactory.create(
+            purchaser=user,
+            state=OrderStatus.FULFILLED,
+            total_price_paid=sum(paid for _, paid in lines),
+        )
+        for product, paid in lines:
+            Line.objects.create(
+                order=order,
+                purchased_object_id=product.object_id,
+                purchased_content_type_id=product.content_type_id,
+                product_version=Version.objects.get_for_object(product).first(),
+                quantity=1,
+                discounted_unit_price=paid,
+            )
+        return order
+
+    program_orders = []
+    zero_order = None
+    for purchase in purchases:
+        if purchase == "zero":
+            zero_order = place_order((run_product, Decimal(0)))
+        elif purchase == "paid":
+            program_orders.append(place_order((program_product, Decimal(1524))))
+        else:
+            # A free program bought alongside a paid course: the order total
+            # is positive, but nothing was paid for the program.
+            program_orders.append(
+                place_order(
+                    (program_product, Decimal(0)), (other_product, Decimal(500))
+                )
+            )
+
+    DiscountRedemptionFactory.create(
+        redeemed_by=user,
+        redeemed_discount=create_verified_program_discount(program),
+        redeemed_order=zero_order,
+    )
+
+    expected = None if expected_index is None else program_orders[expected_index]
+    assert find_paid_program_order_for_zero_value_order(zero_order) == expected
+
+
 def test_paypal_refunds(fulfilled_paypal_transaction):
     """PayPal transactions should fail before they get to the payment gateway."""
 
@@ -906,6 +1113,77 @@ def test_check_and_process_pending_orders_for_resolution(mocker, test_type):
         assert (fulfilled, cancelled, errored) == (1, 0, 0)
 
 
+@pytest.mark.parametrize(
+    ("scenario", "error"),
+    [
+        ("success", None),
+        ("other_order", "is for order"),
+        ("unsuccessful", "wasn't successful"),
+    ],
+)
+def test_fulfill_order_from_cybersource_transaction(mocker, scenario, error):
+    """
+    The order is fulfilled from the transaction fetched by ID, but only if the
+    transaction is for this order and succeeded.
+    """
+    order = OrderFactory.create(state=OrderStatus.PENDING)
+    mocker.patch("ecommerce.models.OrderFlow.create_enrollments", return_value=True)
+    payload = {
+        "reason_code": "481" if scenario == "unsuccessful" else "100",
+        "req_reference_number": "mitxonline-other-1"
+        if scenario == "other_order"
+        else order.reference_number,
+        "transaction_id": "7895121780166965604127",
+        "req_amount": "10",
+    }
+    mocked_details = mocker.patch(
+        "mitol.payment_gateway.api.CyberSourcePaymentGateway.get_transaction_details",
+        return_value=(None, payload),
+    )
+
+    if error:
+        with pytest.raises(ValueError, match=error):
+            fulfill_order_from_cybersource_transaction(
+                order.reference_number, "7895121780166965604127"
+            )
+    else:
+        fulfill_order_from_cybersource_transaction(
+            order.reference_number, "7895121780166965604127"
+        )
+
+    mocked_details.assert_called_once_with("7895121780166965604127")
+    order.refresh_from_db()
+    if error:
+        assert order.state == OrderStatus.PENDING
+        assert not order.transactions.exists()
+    else:
+        assert order.state == OrderStatus.FULFILLED
+        assert order.transactions.get().transaction_id == "7895121780166965604127"
+
+
+@pytest.mark.parametrize(
+    ("state", "gateway_type"),
+    [
+        (OrderStatus.FULFILLED, MITOL_PAYMENT_GATEWAY_CYBERSOURCE),
+        (OrderStatus.CANCELED, MITOL_PAYMENT_GATEWAY_CYBERSOURCE),
+        (OrderStatus.PENDING, MITOL_PAYMENT_GATEWAY_STRIPE),
+    ],
+)
+def test_fulfill_order_from_cybersource_transaction_wrong_order(
+    mocker, state, gateway_type
+):
+    """Only Pending CyberSource orders can be fulfilled this way."""
+    order = OrderFactory.create(state=state, gateway_type=gateway_type)
+    mocked_details = mocker.patch(
+        "mitol.payment_gateway.api.CyberSourcePaymentGateway.get_transaction_details"
+    )
+
+    with pytest.raises(Order.DoesNotExist):
+        fulfill_order_from_cybersource_transaction(order.reference_number, "123")
+
+    mocked_details.assert_not_called()
+
+
 def test_check_and_process_pending_orders_options(mocker):
     """
     Test that the flags for no-check and no-fulfill do what we expect.
@@ -1137,7 +1415,82 @@ def test_create_verified_program_course_run_enrollment(
     mock_create_run_enrollments.side_effect = mock_cre_side_effect
 
 
-def test_create_vpcre_no_program(bootstrapped_verified_program, user):
+def test_create_verified_program_course_run_order(
+    mocker,
+    mock_create_run_enrollments,
+    mock_hubspot_order,
+    bootstrapped_verified_program,
+    user,
+):
+    """
+    A program-verified learner gets a run enrollment backed by a fulfilled,
+    zero-value order redeeming the program's discount. The user's basket is
+    left alone and no receipt is sent.
+    """
+
+    mock_send_receipt = mocker.patch(
+        "ecommerce.tasks.send_ecommerce_order_receipt.delay"
+    )
+    (program, prog_product, _, courserun, cr_product) = bootstrapped_verified_program
+    ProgramEnrollmentFactory.create(
+        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    basket = Basket.objects.create(user=user)
+    BasketItem.objects.create(basket=basket, product=prog_product, quantity=1)
+    mock_create_run_enrollments.side_effect = (
+        lambda user, runs, *, mode=EDX_ENROLLMENT_VERIFIED_MODE, **kwargs: (  # noqa: ARG005
+            [
+                CourseRunEnrollmentFactory.create(
+                    run=runs[0], user=user, enrollment_mode=mode
+                )
+            ],
+            True,
+        )
+    )
+
+    enrollment = create_verified_program_course_run_order(user, courserun, program)
+
+    assert enrollment.run == courserun
+    assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    order = Order.objects.get(purchaser=user, lines__purchased_object_id=courserun.id)
+    assert order.state == OrderStatus.FULFILLED
+    assert order.total_price_paid == 0
+    assert order.lines.get().product_version.object_id == str(cr_product.id)
+    assert order.discounts.get().redeemed_discount == create_verified_program_discount(
+        program
+    )
+    assert PaidCourseRun.objects.filter(
+        user=user, course_run=courserun, order=order
+    ).exists()
+    assert list(basket.basket_items.values_list("product", flat=True)) == [
+        prog_product.id
+    ]
+    mock_send_receipt.assert_not_called()
+
+
+def test_create_vpcro_no_product(bootstrapped_verified_program, user):
+    """
+    A run with no active product is refused before an order or the program's
+    discount is created.
+    """
+
+    (program, _, _, courserun, cr_product) = bootstrapped_verified_program
+    ProgramEnrollmentFactory.create(
+        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    cr_product.is_active = False
+    cr_product.save()
+
+    with pytest.raises(VerifiedProgramNoProductError):
+        create_verified_program_course_run_order(user, courserun, program)
+
+    assert not Order.objects.filter(purchaser=user).exists()
+    assert not DiscountProduct.objects.filter(
+        discount__redemption_type=REDEMPTION_TYPE_INTERNAL
+    ).exists()
+
+
+def test_create_vpcro_no_program(bootstrapped_verified_program, user):
     """
     Test that creating a verified course run enrollment for a program fails if
     there's no program enrollment.
@@ -1154,7 +1507,7 @@ def test_create_vpcre_no_program(bootstrapped_verified_program, user):
     assert "No verified enrollment" in str(exc.value)
 
 
-def test_create_vpcre_run_not_in_program(bootstrapped_verified_program, user):
+def test_create_vpcro_run_not_in_program(bootstrapped_verified_program, user):
     """
     The program's discount prices anything it is attached to, so a run whose
     course is outside the program's requirements is refused before a basket
@@ -1175,7 +1528,7 @@ def test_create_vpcre_run_not_in_program(bootstrapped_verified_program, user):
     assert not BasketDiscount.objects.filter(redeemed_by=user).exists()
 
 
-def test_create_vpcre_bad_basket(
+def test_create_vpcro_bad_basket(
     mocker,
     mock_hubspot_order,
     mock_create_run_enrollments,
@@ -1880,7 +2233,7 @@ def test_establish_basket_calls_create_user(mocker, no_delay):
 
     OpenEdxUserFactory.create(user=user)
     if not no_delay:
-        del user.openedx_user
+        user.clear_openedx_user_cache()
 
     basket.delete()
 
@@ -2067,6 +2420,114 @@ def test_cull_anonymous_baskets(settings, user):
     assert not Basket.objects.filter(pk=old_anon_basket.pk).exists()
     assert Basket.objects.filter(pk=recent_anon_basket.pk).exists()
     assert Basket.objects.filter(pk=old_user_basket.pk).exists()
+
+
+def test_cull_stale_pending_orders(settings, user):
+    """
+    Only pending orders older than the cutoff with no payment activity or
+    funded redemptions should be removed.
+    """
+    settings.PENDING_ORDER_CULL_AGE_DAYS = 60
+    old = now_in_utc() - timedelta(days=61)
+
+    def age_order(order, created_on=old):
+        Order.objects.filter(pk=order.pk).update(created_on=created_on)
+        return order
+
+    def make_order(state=OrderStatus.PENDING, *, created_on=old):
+        return age_order(OrderFactory.create(purchaser=user, state=state), created_on)
+
+    def make_pending_line():
+        line = make_purchase(
+            user, CourseRunFactory.create(), Decimal(100), state=OrderStatus.PENDING
+        )
+        age_order(line.order)
+        return line
+
+    stale_line = make_pending_line()
+    stale = stale_line.order
+    stale_redemption = DiscountRedemptionFactory.create(redeemed_order=stale)
+    recent = make_order(created_on=now_in_utc() - timedelta(days=59))
+    old_fulfilled = make_order(OrderStatus.FULFILLED)
+    old_canceled = make_order(OrderStatus.CANCELED)
+    with_transaction = make_order()
+    TransactionFactory.create(order=with_transaction, transaction_id="paid")
+    with_stripe_event = make_order()
+    StripeEventLog.objects.create(
+        event_id="evt_test", event_data={}, related_order=with_stripe_event
+    )
+    funding_line = make_pending_line()
+    DiscountRedemptionFactory.create(source_line=funding_line)
+
+    cull_stale_pending_orders()
+
+    assert not Order.objects.filter(pk=stale.pk).exists()
+    assert not Line.objects.filter(pk=stale_line.pk).exists()
+    assert not DiscountRedemption.objects.filter(pk=stale_redemption.pk).exists()
+    for kept in [
+        recent,
+        old_fulfilled,
+        old_canceled,
+        with_transaction,
+        with_stripe_event,
+        funding_line.order,
+    ]:
+        assert Order.objects.filter(pk=kept.pk).exists()
+
+
+@pytest.mark.parametrize(
+    "stripe_status",
+    [
+        STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
+        STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+        STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+        None,
+    ],
+)
+def test_cull_stale_pending_orders_checks_stripe(mocker, settings, user, stripe_status):
+    """
+    Stale Stripe orders should be checked with Stripe first: only cancelled
+    sessions are culled, paid ones are resolved, and the rest are kept. A
+    status of None means the Stripe lookup failed.
+    """
+    settings.PENDING_ORDER_CULL_AGE_DAYS = 60
+    mock_status = mocker.patch(
+        "ecommerce.api.process_stripe_checkout_session_status",
+        return_value={"status": stripe_status, "transaction": {"id": "cs_test"}},
+        side_effect=None if stripe_status else APIConnectionError("Stripe is down"),
+    )
+    mock_fulfill = mocker.patch("ecommerce.models.OrderFlow.fulfill")
+    mocker.patch("ecommerce.api.sync_hubspot_deal")
+
+    order = OrderFactory.create(
+        purchaser=user, gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE
+    )
+    TransactionFactory.create(
+        order=order,
+        transaction_id="cs_test_stale",
+        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+        data={"object": STRIPE_OBJECT_CHECKOUT_SESSION, "id": "cs_test_stale"},
+    )
+    Order.objects.filter(pk=order.pk).update(
+        created_on=now_in_utc() - timedelta(days=61)
+    )
+
+    if stripe_status:
+        cull_stale_pending_orders()
+    else:
+        with pytest.raises(APIConnectionError):
+            cull_stale_pending_orders()
+
+    mock_status.assert_called_once_with("cs_test_stale")
+    assert Order.objects.filter(pk=order.pk).exists() is not (
+        stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED
+    )
+    if stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
+        mock_fulfill.assert_called_once_with(
+            {"id": "cs_test"}, already_enrolled=False, skip_receipt=False
+        )
+    else:
+        mock_fulfill.assert_not_called()
 
 
 def test_log_stripe_event():
@@ -2410,8 +2871,6 @@ def test_apply_user_discounts_validates_against_the_whole_basket(
     paid_amount_off_source,
 ):
     """A user discount linked to the second basket item is applied, not refused against the first."""
-    request = RequestFactory().get("/")
-    request.user = paid_amount_off_source.user
     basket = Basket.objects.create(user=paid_amount_off_source.user)
     BasketItem.objects.create(
         basket=basket, product=ProductFactory.create(), quantity=1
@@ -2423,7 +2882,7 @@ def test_apply_user_discounts_validates_against_the_whole_basket(
         user=paid_amount_off_source.user, discount=paid_amount_off_source.discount
     )
 
-    apply_user_discounts(request)
+    apply_user_discounts(basket)
 
     assert basket.discounts.get().redeemed_discount == paid_amount_off_source.discount
 
@@ -2437,8 +2896,6 @@ def test_revalidation_passes_a_resolvable_program_child_purchase_discount(
     check_basket_discounts_for_validity wipes every basket discount and blocks
     checkout.
     """
-    request = RequestFactory().get("/")
-    request.user = paid_amount_off_source.user
     basket = Basket.objects.create(user=paid_amount_off_source.user)
     BasketItem.objects.create(
         basket=basket, product=paid_amount_off_source.program_product, quantity=1
@@ -2447,10 +2904,10 @@ def test_revalidation_passes_a_resolvable_program_child_purchase_discount(
         user=paid_amount_off_source.user, discount=paid_amount_off_source.discount
     )
 
-    apply_user_discounts(request)
+    apply_user_discounts(basket)
 
     assert basket.discounts.get().redeemed_discount == paid_amount_off_source.discount
-    assert check_basket_discounts_for_validity(request) is True
+    assert check_basket_discounts_for_validity(basket) is True
 
 
 STRIPE_TEST_PAYMENT_INTENT_ID = "pi_1GszsK2eZvKYlo2CfhZyoZLp"
@@ -2784,3 +3241,31 @@ def test_generate_checkout_payload_b2b_optional_run(
         assert "error" in result
     else:
         assert "error" not in result
+
+
+@pytest.mark.parametrize("raise_compliance_data_errors", [False, True])
+def test_generate_checkout_payload_compliance_data_error(
+    mocker, user, products, raise_compliance_data_errors
+):
+    """
+    Profile data the export compliance check can't use comes back as a
+    profile_incomplete payload naming the fields (for the cart), or is raised
+    (for callers whose errors the API exception handler turns into CS_701).
+    """
+    create_basket(user, products)
+    mocker.patch(
+        "ecommerce.models.Basket.has_user_blocked_products",
+        side_effect=ExportComplianceDataError(user, ["last_name"]),
+    )
+    request = authed_request(user)
+
+    if raise_compliance_data_errors:
+        with pytest.raises(ExportComplianceDataError):
+            generate_checkout_payload(request, raise_compliance_data_errors=True)
+    else:
+        assert generate_checkout_payload(request) == {
+            "profile_incomplete": True,
+            "error": USER_MSG_TYPE_PROFILE_INCOMPLETE,
+            "missing_fields": ["last_name"],
+        }
+    assert not PendingOrder.objects.filter(purchaser=user).exists()

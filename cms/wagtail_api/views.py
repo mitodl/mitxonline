@@ -3,14 +3,30 @@ Views for Wagtail API
 """
 
 from enum import Enum
+from functools import cached_property
 
-from django.db.models import F
+from django.db.models import F, Q
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    PolymorphicProxySerializer,
+    extend_schema,
+)
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework_api_key.permissions import HasAPIKey
 from wagtail.api.v2.views import PagesAPIViewSet
+from wagtail.models import Page
 
 from cms.models import CertificatePage
 from cms.wagtail_api.filters import ReadableIDFilter
+from cms.wagtail_api.schema.serializers import (
+    CertificatePageSerializer,
+    CoursePageItemSerializer,
+    PageListSerializer,
+    PageSerializer,
+    ProgramPageItemSerializer,
+)
+from main.versioning import V2Versioning
 
 
 class PageType(Enum):
@@ -39,6 +55,8 @@ class WagtailPagesAPIViewSet(PagesAPIViewSet):
     additional filtering and metadata fields.
     """
 
+    versioning_class = V2Versioning
+
     filter_backends = [ReadableIDFilter, *PagesAPIViewSet.filter_backends]
     meta_fields = [*PagesAPIViewSet.meta_fields, "live", "last_published_at"]
     listing_default_fields = [
@@ -58,6 +76,46 @@ class WagtailPagesAPIViewSet(PagesAPIViewSet):
         if page_type in PageType.anonymous_access_allowed_types():
             return [AllowAny()]
         return [IsAuthenticated()]
+
+    def get_serializer_class(self):
+        """
+        drf-spectacular's mocked schema-generation request never has
+        `wagtailapi_router` set (only real requests dispatched through
+        Wagtail's own router do), which the base implementation needs.
+        Fall back to a plain serializer in that case - the @extend_schema
+        decorators above already declare the real response shape.
+        """
+        if not hasattr(self.request, "wagtailapi_router"):
+            return PageSerializer
+        return super().get_serializer_class()
+
+    @cached_property
+    def _is_keyed_course_request(self):
+        """
+        True for a course page request carrying a valid API key (MIT Learn's
+        ETL key). HasAPIKey doesn't authenticate a user, so request.user is
+        still anonymous here.
+        """
+        return self.request.GET.get(
+            "type", ""
+        ).lower() == PageType.COURSE.value and HasAPIKey().has_permission(
+            self.request, self
+        )
+
+    def get_base_queryset(self):
+        """
+        Wagtail only exposes live pages. For keyed course requests, also expose
+        unpublished pages in Learn "test mode" (ingest_content_files_for_ai on).
+        """
+        queryset = super().get_base_queryset()
+        if self._is_keyed_course_request:
+            # Deliberately not limited to live pages: Learn needs the pages of
+            # unpublished test-mode courses. Live pages are already in `queryset`.
+            return Page.objects.filter(
+                Q(pk__in=queryset.values("pk"))
+                | Q(coursepage__ingest_content_files_for_ai=True)
+            )
+        return queryset
 
     def get_queryset(self):
         """
@@ -94,10 +152,67 @@ class WagtailPagesAPIViewSet(PagesAPIViewSet):
                     include_in_learn_catalog=True,
                 )
             elif model_type == PageType.COURSE.value:
-                queryset = queryset.filter(include_in_learn_catalog=True)
+                catalog = Q(include_in_learn_catalog=True)
+                if self._is_keyed_course_request:
+                    # test-mode courses are returned even if hidden from the catalog
+                    catalog |= Q(ingest_content_files_for_ai=True)
+                queryset = queryset.filter(catalog)
 
         return queryset
 
+    @extend_schema(
+        summary="List all Wagtail Pages",
+        description="Returns pages of all types",
+        operation_id="pages_list",
+        parameters=[
+            OpenApiParameter(
+                name="type",
+                required=False,
+                type=str,
+                description="Filter by Wagtail page type",
+            ),
+            OpenApiParameter(
+                name="fields",
+                required=False,
+                type=str,
+                description="Specify fields (e.g. `*`)",
+            ),
+        ],
+        responses=PageListSerializer,
+    )
+    def listing_view(self, request):
+        return super().listing_view(request)
+
+    @extend_schema(
+        summary="Get Wagtail Page Details",
+        description="Returns details of a specific Wagtail page by ID",
+        operation_id="pages_retrieve",
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                required=True,
+                description="ID of the Wagtail page",
+            ),
+            OpenApiParameter(
+                name="revision_id",
+                required=False,
+                type=int,
+                description="Optional certificate revision ID to retrieve a specific revision of the certificate page",
+            ),
+        ],
+        responses=PolymorphicProxySerializer(
+            component_name="PageDetail",
+            serializers=[
+                CoursePageItemSerializer,
+                ProgramPageItemSerializer,
+                CertificatePageSerializer,
+                PageSerializer,
+            ],
+            resource_type_field_name=None,
+        ),
+    )
     def detail_view(self, request, pk):  # noqa: ARG002
         """
         Returns the detail view of a page instance.

@@ -10,7 +10,7 @@ from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROG
 from courses.utils import get_approved_flexible_price_exists
 from ecommerce.serializers import ProductFlexibilePriceSerializer
 from ecommerce.serializers.v0 import BaseProductSerializer
-from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.constants import EDX_ENROLLMENT_MODES
 
 
 class EnrollmentModeSerializer(serializers.ModelSerializer):
@@ -171,9 +171,7 @@ class CourseRunGradeSerializer(serializers.ModelSerializer):
 
 class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
     certificate = CourseRunCertificateSerializer(read_only=True, allow_null=True)
-    enrollment_mode = serializers.ChoiceField(
-        (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE), read_only=True
-    )
+    enrollment_mode = serializers.ChoiceField(EDX_ENROLLMENT_MODES, read_only=True)
     grades = CourseRunGradeSerializer(many=True, read_only=True)
 
     class Meta:

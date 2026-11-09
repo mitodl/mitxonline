@@ -443,8 +443,11 @@ def test_add_basket_item(user_drf_client, user):
 @pytest.mark.parametrize("add_discount", [True, False])
 @pytest.mark.parametrize("bad_product", [True, False])
 @override_settings(ENABLE_MULTIPLE_CART_ITEMS=True)
-@pytest.mark.zeal_allow("ecommerce.Product", "get()")
+# A multi-item basket pays per item: the update_or_create write, and a
+# purchasable_object read in both the flexible pricing lookup and the
+# response serializer, each of which reloads the products from basket_items.
 @pytest.mark.zeal_allow("ecommerce.BasketItem", "get()")
+@pytest.mark.zeal_allow("ecommerce.Product", "purchasable_object")
 def test_create_basket_with_products(
     user, user_client, existing_basket, add_discount, bad_product
 ):
@@ -453,14 +456,22 @@ def test_create_basket_with_products(
     products = ProductFactory.create_batch(size=2)
 
     basket = BasketFactory(user=user) if existing_basket else None
+    if bad_product and basket:
+        BasketItemFactory(basket=basket, product=products[0], quantity=2)
+    original_items = list(
+        BasketItem.objects.filter(basket__user=user).values_list(
+            "id", "product_id", "quantity"
+        )
+    )
 
     url = reverse("v0:baskets_api-create_with_products")
     payload = {
         "product_ids": [
-            {"product_id": -3 if bad_product else product.id, "quantity": 1}
-            for product in products
+            {"product_id": product.id, "quantity": 1} for product in products
         ],
     }
+    if bad_product:
+        payload["product_ids"][1]["product_id"] = -3
 
     if add_discount:
         discount = DiscountFactory(discount_type="fixed-price", amount=100)
@@ -474,6 +485,14 @@ def test_create_basket_with_products(
 
     if bad_product:
         assert response.status_code == 404
+        assert (
+            list(
+                BasketItem.objects.filter(basket__user=user).values_list(
+                    "id", "product_id", "quantity"
+                )
+            )
+            == original_items
+        )
         return
 
     assert response.status_code == 200
@@ -1542,7 +1561,6 @@ def test_start_checkout_with_discounts(user, user_drf_client, products, discount
     assert order.state == OrderStatus.PENDING
 
 
-@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 def test_start_checkout_with_no_lines(user, user_drf_client):
     """Test that checking out with an empty cart generates an error."""
 
@@ -1639,6 +1657,8 @@ def test_start_checkout_with_incomplete_profile(
         product = ProductFactory.create(purchasable_object=courserun)
     basket = BasketFactory.create(user=user)
     BasketItemFactory.create(basket=basket, product=product)
+    # A country that doesn't require state/postal code, so only these are missing
+    user.legal_address.country = "GB"
     user.legal_address.street_address_1 = ""
     user.legal_address.city = ""
     user.legal_address.save()
@@ -1648,6 +1668,7 @@ def test_start_checkout_with_incomplete_profile(
     assert resp.status_code == 400
     resp_body = resp.json()
     assert resp_body["error"] == USER_MSG_TYPE_PROFILE_INCOMPLETE
+    assert resp_body["missing_fields"] == ["city", "street_address_1"]
     mock_client.return_value.validate_export_compliance.assert_not_called()
 
 
@@ -2146,13 +2167,16 @@ def test_refund_request_no_consent(user, user_drf_client):
 def test_refund_request_b2b_order(user, user_drf_client):
     """B2B contract orders are excluded from self-service refund requests."""
     contract = ContractPageFactory.create()
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_contracts=[contract])
     with reversion.create_revision():
         product = ProductFactory.create(purchasable_object=courserun)
     product_version = Version.objects.get_for_object(product).last()
     order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
     LineFactory.create(
-        order=order, purchased_object=courserun, product_version=product_version
+        order=order,
+        purchased_object=courserun,
+        product_version=product_version,
+        b2b_contract=contract,
     )
 
     resp = user_drf_client.post(

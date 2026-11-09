@@ -1,6 +1,103 @@
 Release Notes
 =============
 
+.. note::
+
+   This file is no longer updated. Releases after 1.171.0 use calendar versions
+   and are cut by the Concourse release workflow. Their release notes are in
+   `CHANGELOG.md <CHANGELOG.md>`_.
+
+Version 1.171.0
+---------------
+
+- Skip the live export compliance check on support deferrals (#4184)
+- Back program-purchase run upgrades with zero-value orders (#4155)
+- Keep learner PII out of Sentry for export checks (#4182)
+- fix: ignore google-api-core's Python 3.11 deprecation warning in tests (#4189)
+- feat: push CourseRun.upgrade_deadline into the edX verified course mode (#3814)
+- fix: update dependency djangorestframework to v3.18.3 [SECURITY] (#4178)
+- Revert "Program Entitlement bug fix" (#4180)
+- Add certifi>=2026.10.19 constraint (eMudhra CA compromise) (#4181)
+- Bump certifi to 2026.10.19 (eMudhra CA compromise) (#4179)
+- Program Entitlement bug fix (#4154)
+- Add quick and dirty status breakdown on verifiable creds (#4169)
+
+Version 1.170.10
+----------------
+
+- Enroll users in archived courses from the admin dashboard (#4174)
+- Requirements editor: description on requirement groups (#4171)
+
+Version 1.170.9
+---------------
+
+- Add form validation for Verifiable Credentials fields in Wagtail, management command to get status breakdown for all certificates. (#4161)
+- Remove stale verifiable-credential note from What you learn field (#4166)
+
+Version 1.170.8
+---------------
+
+- Resolve PENDING order using transaction id (#4163)
+- Transfer all orders and entitlements and Fix bug in transfer user course enrollment (#4164)
+
+Version 1.170.7
+---------------
+
+- Nix sass-lint, update lockfile (#4162)
+- Report course staff roles on enrollments (#4074)
+- Add ability to run rerun_courserun without making a course run in edX (#4156)
+
+Version 1.170.6
+---------------
+
+- Bump anyio package (#4159)
+- fix(13891): B2b Code Redemption Fixes (#4158)
+- Report a contract's variant coverage from setup-status and check_contract_variant (#4115)
+- Re-check the code and the contract's seats under the lock when redeeming an enrollment code (#4102)
+- feat(notifications): proxy Open edX notification preferences (#3897)
+- Apply contract enrollment codes to baskets for B2B members (#4133)
+- Fix flaky test_create_edx_user by giving OpenEdxApiAuthFactory a fixed expiry (#4151)
+
+Version 1.170.5
+---------------
+
+- Add a staff API route that creates a contract's missing variant runs (#4112)
+- Add a contracts section to the staff dashboard (#4121)
+- Add updated pyjwt, remove unused mitol package, bump cybersource (#4101)
+- Update contract add/append logic; add a reconciliation function (#4125)
+- Clear the oasdiff ignore list now that its changes have shipped (#4149)
+
+Version 1.170.4
+---------------
+
+- Makes org reconciliation in user session more reliable (#4145)
+
+Version 1.170.3
+---------------
+
+- Remove line item sync call during unenrollment (#4117)
+- Yarn up for js deps with critical severity issues. (#4131)
+- Requirements editor: reorder groups, tracks and courses; unclip the course picker (#4146)
+
+Version 1.170.2
+---------------
+
+- Add a publication date to product page testimonials (#4137)
+- Fix OpenAPI spec partitioning (#4098)
+- chore(deps): move pytest-lazy-fixtures and datamodel-code-generator to dev (#4144)
+- Retry adding unconfirmed org members to Keycloak on a schedule (#4141)
+- Take the contract assignment lock in b2b_codes and in code redemption (#4096)
+- fix(docker): drop unused libcairo2-dev so the image runs on DHI Python (#4143)
+
+Version 1.170.1
+---------------
+
+- Retry rate-limited course list batches and sync with client credentials (#4076)
+- Make the provisioning API the only writer of an organization's name, description and Keycloak link (#4089)
+- If the product's purchasable object is not B2B, don't change its price (#4132)
+- Program tracks: track nodes, the learner's chosen track, and the admin editor (#4093)
+- Scope B2B enrollment codes to their contract (#4099)
+
 Version 1.170.0
 ---------------
 

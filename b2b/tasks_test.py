@@ -5,6 +5,7 @@ import pytest
 from b2b.factories import ContractPageFactory
 from b2b.tasks import (
     create_program_contract_runs,
+    push_unconfirmed_org_members_to_keycloak,
     push_upgraded_enrollments_to_edx,
 )
 from courses.factories import (
@@ -104,7 +105,7 @@ def create_course_with_hindi_variant():
 def contract_runs(contract, course):
     """Return the contract's runs for a course."""
 
-    return CourseRun.objects.filter(course=course, b2b_contract=contract)
+    return CourseRun.objects.filter(course=course, b2b_contracts=contract)
 
 
 @pytest.mark.parametrize(
@@ -145,6 +146,22 @@ def test_create_program_contract_runs_passes_the_org_prefix():
     assert run.courseware_id.startswith(
         f"course-v1:PFX-{contract.organization.org_key}+"
     )
+
+
+@pytest.mark.usefixtures("mocked_lock")
+def test_create_program_contract_runs_nested_programs():
+    """Courses of nested programs get contract runs, including when the program has no courses of its own."""
+    contract = ContractPageFactory.create()
+    program = ProgramFactory.create()
+    nested_program = ProgramFactory.create()
+    program.add_program_requirement(nested_program)
+    nested_course = create_course()
+    add_courses_to_program(nested_program, [nested_course])
+
+    result = create_program_contract_runs.apply(args=[contract.id, program.id])
+
+    assert result.successful()
+    assert contract_runs(contract, nested_course).count() == 1
 
 
 def test_create_program_contract_runs_lock_not_acquired(mocker):
@@ -253,6 +270,16 @@ def test_create_program_contract_runs_exception_releases_lock(mocker, mocked_loc
         create_program_contract_runs.apply(args=[contract.id, program.id])
 
     mocked_lock.assert_called_once_with(lock_key(contract, program))
+
+
+def test_push_unconfirmed_org_members_to_keycloak(mocker):
+    """The task runs the push."""
+
+    mocked_push = mocker.patch("b2b.provisioning.push_unconfirmed_members_to_keycloak")
+
+    push_unconfirmed_org_members_to_keycloak()
+
+    mocked_push.assert_called_once_with()
 
 
 def test_push_upgraded_enrollments_to_edx(mocker):

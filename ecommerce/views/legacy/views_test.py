@@ -20,6 +20,7 @@ from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
 from compliance.api import verify_user_with_exports
+from compliance.exceptions import ExportComplianceDataError
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
@@ -27,7 +28,12 @@ from courses.factories import (
     ProgramFactory,
     ProgramRunFactory,
 )
-from courses.models import CourseRunEnrollment, PaidCourseRun, ProgramEnrollment
+from courses.models import (
+    CourseRunEnrollment,
+    PaidCourseRun,
+    PaidProgram,
+    ProgramEnrollment,
+)
 from ecommerce import api
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
@@ -43,6 +49,7 @@ from ecommerce.factories import (
     BasketItemFactory,
     DiscountFactory,
     LineFactory,
+    OrderFactory,
     PaidAmountOffDiscountFactory,
     ProductFactory,
     UnlimitedUseDiscountFactory,
@@ -72,6 +79,7 @@ from main.constants import (
     USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_ENROLL_FAILED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
     USER_MSG_TYPE_PROFILE_INCOMPLETE,
@@ -514,7 +522,6 @@ def test_redeem_time_limited_discount(  # noqa: PLR0913
         assert "not found" in resp_json
 
 
-@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 def test_start_checkout_with_invalid_discounts(user, user_client, products, discounts):
     """
     Applies a discount, invalidates all the discounts, then hits the start
@@ -568,7 +575,13 @@ def test_start_checkout_with_discounts_and_b2b(
     product.refresh_from_db()
 
     if apply_discount:
-        discount = UnlimitedUseDiscountFactory.create(amount=1, b2b_contract=contract)
+        # Only members may redeem a contract's code, and the checkout's
+        # contract-pricing pass reuses the contract's own bulk code rather
+        # than minting another.
+        user.b2b_contracts.add(contract)
+        discount = UnlimitedUseDiscountFactory.create(
+            amount=1, b2b_contract=contract, is_bulk=True
+        )
         discount_product = DiscountProduct.objects.create(
             discount=discount, product=product
         )
@@ -923,6 +936,12 @@ def test_checkout_product(
     assert [item.product for item in basket.basket_items.all()] == [product]
 
 
+def _pay_for_program(user, program):
+    """Record that the user bought the program"""
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    return PaidProgram.objects.create(user=user, program=program, order=order)
+
+
 @pytest.mark.dont_mock_enrollments
 def test_checkout_product_with_no_active_product_uses_cart(user, user_client):
     """
@@ -944,6 +963,7 @@ def test_checkout_product_with_no_active_product_uses_cart(user, user_client):
         enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
         active=True,
     )
+    _pay_for_program(user, program)
 
     resp = user_client.get(
         reverse("checkout-product"), {"course_id": course_run.courseware_id}
@@ -955,20 +975,61 @@ def test_checkout_product_with_no_active_product_uses_cart(user, user_client):
 
 
 @pytest.mark.dont_mock_enrollments
-@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
-def test_checkout_product_with_verified_program_enrollment(user, user_client):
+@pytest.mark.parametrize("by_product_id", [True, False])
+def test_checkout_product_with_verified_program_enrollment(
+    user, user_client, by_product_id
+):
     """
-    Verifies that /cart/add?course_id=? skips the cart and redirects straight
-    to the dashboard, creating a verified enrollment directly, when the
-    learner already holds a verified enrollment in a program the course
-    belongs to.
+    Verifies that /cart/add?course_id=? and /cart/add?product_id=? skip the
+    cart and redirect straight to the dashboard, creating a verified
+    enrollment directly, when the learner already holds a verified enrollment
+    in a program the course belongs to.
     """
     program = ProgramFactory.create()
     course_run = CourseRunFactory.create()
     program.add_requirement(course_run.course)
     with reversion.create_revision():
         ProductFactory.create(purchasable_object=program)
-        ProductFactory.create(purchasable_object=course_run)
+        run_product = ProductFactory.create(purchasable_object=course_run)
+
+    ProgramEnrollmentFactory.create(
+        program=program,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+    )
+    _pay_for_program(user, program)
+
+    resp = user_client.get(
+        reverse("checkout-product"),
+        {"product_id": run_product.id}
+        if by_product_id
+        else {"course_id": course_run.courseware_id},
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("user-dashboard")
+
+    enrollment = CourseRunEnrollment.objects.get(user=user, run=course_run)
+    assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    assert not Basket.objects.filter(user=user).exists()
+
+
+@pytest.mark.dont_mock_enrollments
+def test_checkout_product_with_unpaid_verified_program_enrollment_uses_cart(
+    user, user_client
+):
+    """
+    A verified program enrollment the learner didn't pay for (e.g. one staff
+    changed to verified) doesn't get the program's courses for free:
+    /cart/add uses the normal cart flow.
+    """
+    program = ProgramFactory.create()
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        ProductFactory.create(purchasable_object=program)
+        run_product = ProductFactory.create(purchasable_object=course_run)
 
     ProgramEnrollmentFactory.create(
         program=program,
@@ -982,11 +1043,43 @@ def test_checkout_product_with_verified_program_enrollment(user, user_client):
     )
 
     assert resp.status_code == 302
-    assert resp.url == reverse("user-dashboard")
+    assert resp.url == reverse("cart")
+    basket = Basket.objects.get(user=user)
+    assert [item.product for item in basket.basket_items.all()] == [run_product]
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
 
-    enrollment = CourseRunEnrollment.objects.get(user=user, run=course_run)
-    assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
-    assert not Basket.objects.filter(user=user).exists()
+
+@pytest.mark.dont_mock_enrollments
+def test_checkout_product_verified_program_shortcut_with_unusable_profile(
+    mocked_export_compliance, user, user_client
+):
+    """
+    When the learner's profile can't pass the export compliance check, the
+    verified-program shortcut errors rather than falling through to the cart,
+    where the course would be charged at full price.
+    """
+    program = ProgramFactory.create()
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        ProductFactory.create(purchasable_object=program)
+        ProductFactory.create(purchasable_object=course_run)
+    ProgramEnrollmentFactory.create(
+        program=program,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+    )
+    _pay_for_program(user, program)
+    mocked_export_compliance.side_effect = ExportComplianceDataError(
+        user, ["last_name"]
+    )
+
+    with pytest.raises(ExportComplianceDataError):
+        user_client.get(
+            reverse("checkout-product"), {"course_id": course_run.courseware_id}
+        )
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
 
 
 @pytest.mark.dont_mock_enrollments
@@ -1010,6 +1103,7 @@ def test_checkout_product_with_existing_verified_run_enrollment(user, user_clien
         enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
         active=True,
     )
+    _pay_for_program(user, program)
     CourseRunEnrollmentFactory.create(
         user=user,
         run=course_run,
@@ -1026,10 +1120,14 @@ def test_checkout_product_with_existing_verified_run_enrollment(user, user_clien
     assert not Basket.objects.filter(user=user).exists()
 
 
-def test_checkout_product_with_audit_program_enrollment_uses_cart(user, user_client):
+@pytest.mark.parametrize("by_product_id", [True, False])
+def test_checkout_product_with_audit_program_enrollment_uses_cart(
+    user, user_client, by_product_id
+):
     """
-    Verifies that /cart/add?course_id=? still falls back to the normal cart
-    flow when the learner's program enrollment isn't verified.
+    Verifies that /cart/add?course_id=? and /cart/add?product_id=? still fall
+    back to the normal cart flow when the learner's program enrollment isn't
+    verified.
     """
     program = ProgramFactory.create()
     course_run = CourseRunFactory.create()
@@ -1041,7 +1139,10 @@ def test_checkout_product_with_audit_program_enrollment_uses_cart(user, user_cli
     )
 
     resp = user_client.get(
-        reverse("checkout-product"), {"course_id": course_run.courseware_id}
+        reverse("checkout-product"),
+        {"product_id": product.id}
+        if by_product_id
+        else {"course_id": course_run.courseware_id},
     )
 
     assert resp.status_code == 302
@@ -1049,6 +1150,37 @@ def test_checkout_product_with_audit_program_enrollment_uses_cart(user, user_cli
 
     basket = Basket.objects.get(user=user)
     assert [item.product for item in basket.basket_items.all()] == [product]
+
+
+def test_checkout_product_with_program_product_id_uses_cart(user, user_client):
+    """
+    Verifies that /cart/add?product_id=? for a program's product uses the
+    normal cart flow, even with a verified enrollment in that program: the
+    shortcut only covers course runs.
+    """
+    program = ProgramFactory.create()
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        program_product = ProductFactory.create(purchasable_object=program)
+        ProductFactory.create(purchasable_object=course_run)
+    ProgramEnrollmentFactory.create(
+        program=program,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+    )
+    _pay_for_program(user, program)
+
+    resp = user_client.get(
+        reverse("checkout-product"), {"product_id": program_product.id}
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+    basket = Basket.objects.get(user=user)
+    assert [item.product for item in basket.basket_items.all()] == [program_product]
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
 
 
 @pytest.mark.parametrize(
@@ -1670,6 +1802,8 @@ def test_checkout_interstitial_incomplete_profile(
     """An incomplete legal address should send the learner back to the cart to fix it."""
     mocked_export_compliance.side_effect = verify_user_with_exports
     mocker.patch("compliance.api.get_cybersource_client")
+    # A country that doesn't require state/postal code, so only this is missing
+    user.legal_address.country = "GB"
     user.legal_address.street_address_1 = ""
     user.legal_address.save()
     create_basket_with_product(user, products[0])
@@ -1677,11 +1811,48 @@ def test_checkout_interstitial_incomplete_profile(
     resp = user_client.get(reverse("checkout_interstitial_page"))
 
     assert resp.status_code == 302
-    assert resp.url == reverse("cart")
+    # The cart opens its profile dialog on the fields named here.
+    assert resp.url == f"{reverse('cart')}?profile_incomplete=street_address_1"
     assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
         {"type": USER_MSG_TYPE_PROFILE_INCOMPLETE}
     )
     assert not PendingOrder.objects.filter(purchaser=user).exists()
+
+
+@pytest.mark.parametrize(
+    ("missing_fields", "expected_url", "expected_message"),
+    [
+        (["email"], "/cart/", USER_MSG_TYPE_ENROLL_FAILED),
+        (
+            ["email", "last_name"],
+            "/cart/?profile_incomplete=last_name",
+            USER_MSG_TYPE_PROFILE_INCOMPLETE,
+        ),
+    ],
+)
+def test_checkout_interstitial_rejected_email(  # noqa: PLR0913
+    mocker, user, user_client, missing_fields, expected_url, expected_message
+):
+    """
+    The cart's profile dialog can't edit the email address, so a rejection of
+    only that sends the learner to support rather than to an empty dialog.
+    """
+    mocker.patch(
+        "ecommerce.views.legacy.api.generate_checkout_payload",
+        return_value={
+            "profile_incomplete": True,
+            "error": USER_MSG_TYPE_PROFILE_INCOMPLETE,
+            "missing_fields": missing_fields,
+        },
+    )
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+    assert resp.url == expected_url
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": expected_message}
+    )
 
 
 @pytest.mark.skip_nplusone_check
@@ -2002,7 +2173,6 @@ def test_bulk_discount_create(admin_drf_client, use_redemption_type_flags):
     assert discounts[0].is_bulk
 
 
-@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 def test_checkout_interstitial_google_analytics_object(
     mocker, settings, user, user_client, products
 ):
@@ -2033,7 +2203,6 @@ def test_checkout_interstitial_google_analytics_object(
         assert isinstance(item["quantity"], int)
 
 
-@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 def test_checkout_interstitial_no_ga_flag_without_global_id(
     mocker, settings, user_client, products
 ):

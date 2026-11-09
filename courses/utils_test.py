@@ -7,9 +7,12 @@ from datetime import timedelta
 from types import SimpleNamespace
 
 import pytest
+import reversion
 from mitol.common.utils import now_in_utc
 from requests.exceptions import HTTPError
 
+from b2b.factories import ContractPageFactory
+from cms.models import ProgramPage
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
@@ -31,6 +34,7 @@ from courses.utils import (
     is_uai_course_run,
     is_uai_order,
 )
+from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 
 
 def test_get_program_certificate_by_enrollment(user, program_with_requirements):  # noqa: F811
@@ -77,13 +81,12 @@ def test_get_program_certificate_by_enrollment_program_does_not_exist(user):
 def test_get_program_certificate_by_enrollment_program_page_does_not_exist(
     user,
     program_with_requirements,  # noqa: F811
+    mocker,
 ):
     """
     Test that get_program_certificate_by_enrollment returns None if program page does not exist
     """
     program = program_with_requirements.program
-
-    program.page.delete()
 
     course = program_with_requirements.program.courses[0][0]
     course_run = CourseRunFactory.create(course=course)
@@ -92,6 +95,13 @@ def test_get_program_certificate_by_enrollment_program_page_does_not_exist(
     program_enrollment = ProgramEnrollmentFactory.create(user=user, program=program)
 
     program_certificate = ProgramCertificateFactory.create(program=program, user=user)
+
+    # A certificate can no longer be created without a live program page (it
+    # needs one to derive certificate_page_revision from), so simulate a
+    # missing page by overriding the cached_property directly on this
+    # instance rather than deleting the page out from under an existing
+    # certificate.
+    mocker.patch.object(program, "program_page", None)
 
     assert (
         get_program_certificate_by_enrollment(course_enrollment, program)
@@ -107,14 +117,12 @@ def test_get_program_certificate_by_enrollment_program_page_does_not_exist(
 def test_get_program_certificate_by_enrollment_program_certificate_page_does_not_exist(
     user,
     program_with_requirements,  # noqa: F811
+    mocker,
 ):
     """
     Test that get_program_certificate_by_enrollment returns None if program certificate page does not exist
     """
     program = program_with_requirements.program
-
-    program.page.certificate_page.delete()
-    program.page.delete()
 
     course = program_with_requirements.program.courses[0][0]
     course_run = CourseRunFactory.create(course=course)
@@ -123,6 +131,12 @@ def test_get_program_certificate_by_enrollment_program_certificate_page_does_not
     program_enrollment = ProgramEnrollmentFactory.create(user=user, program=program)
 
     program_certificate = ProgramCertificateFactory.create(program=program, user=user)
+
+    # A certificate can no longer be created without a live certificate page,
+    # so simulate a missing one by patching the (plain, uncached) property
+    # instead of deleting the page an existing certificate's revision points
+    # to - that would cascade-delete the certificate along with it.
+    mocker.patch.object(ProgramPage, "certificate_page", new=None)
 
     assert (
         get_program_certificate_by_enrollment(course_enrollment) != program_certificate
@@ -282,35 +296,26 @@ def test_get_dated_courseruns():
     assert instructor_paced_course_run in dated_courseruns
 
 
-def test_is_contract_order_true_for_course_run_with_contract():
-    """Test that is_contract_order returns True when a line has a contract course run."""
-    contract_course_run = CourseRun(b2b_contract_id=1)
-    line = SimpleNamespace(
-        product=SimpleNamespace(purchasable_object=contract_course_run)
+@pytest.mark.django_db
+@pytest.mark.parametrize("bought_through_contract", [True, False])
+def test_is_contract_order_follows_the_line_contract(bought_through_contract):
+    """
+    Buying a run that is also in a contract is a contract order only when the
+    line was bought through the contract, so public buyers still get a receipt.
+    """
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(b2b_contracts=[contract])
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run)
+    order = OrderFactory.create()
+    LineFactory.create(
+        order=order,
+        purchased_object=run,
+        product_version=reversion.models.Version.objects.get_for_object(product).last(),
+        b2b_contract=contract if bought_through_contract else None,
     )
-    order = SimpleNamespace(lines=SimpleNamespace(all=lambda: [line]))
 
-    assert is_contract_order(order) is True
-
-
-def test_is_contract_order_false_for_course_run_without_contract():
-    """Test that is_contract_order returns False when course runs have no contract."""
-    non_contract_course_run = CourseRun(b2b_contract=None)
-    line = SimpleNamespace(
-        product=SimpleNamespace(purchasable_object=non_contract_course_run)
-    )
-    order = SimpleNamespace(lines=SimpleNamespace(all=lambda: [line]))
-
-    assert is_contract_order(order) is False
-
-
-def test_is_contract_order_false_for_non_course_run_product():
-    """Test that is_contract_order ignores non-CourseRun purchasable objects."""
-    non_course_run = SimpleNamespace(b2b_contract=object())
-    line = SimpleNamespace(product=SimpleNamespace(purchasable_object=non_course_run))
-    order = SimpleNamespace(lines=SimpleNamespace(all=lambda: [line]))
-
-    assert is_contract_order(order) is False
+    assert is_contract_order(order) is bought_through_contract
 
 
 @pytest.mark.django_db

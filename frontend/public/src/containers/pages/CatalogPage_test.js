@@ -688,7 +688,8 @@ describe("CatalogPage", function() {
 
     // Mock the second page of course API results.
     helper.handleRequestStub.returns({
-      body: {
+      status: 200,
+      body:   {
         next:    null,
         results: [course2]
       }
@@ -705,7 +706,10 @@ describe("CatalogPage", function() {
     )
 
     // Should expect 2 courses to be visually displayed in the catalog now. Total count should stay 2.
-    expect(inner.state().courseQueryPage).equals(2)
+    expect(inner.state().courseQueryPage).equals(3)
+    expect(JSON.stringify(inner.state().allCoursesRetrieved)).equals(
+      JSON.stringify([...courses, course2])
+    )
     expect(inner.instance().renderNumberOfCatalogItems()).equals(2)
   })
 

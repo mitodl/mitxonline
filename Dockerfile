@@ -15,7 +15,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       htop \
       iputils-ping \
       less \
-      libcairo2-dev \
       lsof \
       nano \
       ngrep \
@@ -25,6 +24,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 FROM base AS deps
 
 # Trusted certs (org PKI + local-dev mkcert root injected at deploy time).
+# COPY --chmod also applies to directories it creates; make them first so
+# /usr/local/share stays traversable (perl, pg_config need it).
+RUN mkdir -p /usr/local/share/ca-certificates
 COPY --chmod=644 certs/ /usr/local/share/ca-certificates/
 RUN update-ca-certificates
 

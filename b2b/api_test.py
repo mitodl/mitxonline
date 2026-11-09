@@ -11,10 +11,12 @@ import pytest
 import reversion
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
+from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.test import RequestFactory
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
+from requests import HTTPError, Response
 
 from b2b import factories
 from b2b.api import (
@@ -24,6 +26,7 @@ from b2b.api import (
     _get_source_runs_for_course,
     _handle_extra_enrollment_codes,
     _validate_b2b_enrollment_prerequisites,
+    apply_contract_discounts_to_basket,
     create_b2b_enrollment,
     create_contract_run,
     create_contract_run_key,
@@ -36,6 +39,7 @@ from b2b.api import (
     get_contract_runs_without_products,
     get_user_b2b_organizations,
     import_and_create_contract_run,
+    move_run_to_retirement_contract,
     process_add_org_membership,
     process_remove_org_membership,
     reconcile_keycloak_orgs,
@@ -90,12 +94,16 @@ from ecommerce.factories import (
 from ecommerce.models import (
     Basket,
     BasketDiscount,
+    BasketItem,
+    Discount,
     DiscountProduct,
     DiscountRedemption,
     Line,
     OrderStatus,
 )
 from main.constants import (
+    B2B_USER_LATEST_SESSION_CACHE,
+    B2B_USER_ORG_MEMBERSHIP_CACHE,
     USER_MSG_TYPE_B2B_DISALLOWED,
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
     USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED,
@@ -162,7 +170,7 @@ def test_create_single_course_run(mocker, contract_ready_course, has_start, has_
     assert run.run_tag == B2B_RUN_TAG_FORMAT.format(
         run_idx=1, year=now_time.year, contract_id=contract.id
     )
-    assert run.b2b_contract == contract
+    assert run.contract_group_ids == {contract.id}
 
     if has_start:
         assertable_start = date_to_datetime(contract.contract_start, settings.TIME_ZONE)
@@ -776,7 +784,7 @@ def test_create_contract_run_falls_back_to_newest_non_b2b_run(mocker):
         contract, course, require_designated_source_run=False
     )
 
-    assert created_run.b2b_contract == contract
+    assert created_run.b2b_contracts.filter(pk=contract.id).exists()
     assert older_run.id < newest_run.id
     mocked_clone_run.assert_called_once_with(created_run.id, newest_run.courseware_id)
 
@@ -886,7 +894,7 @@ def test_create_contract_run_variants(mocker):
         course.courseruns.filter(courseware_id__startswith=target_course_id).count()
         == 5
     )
-    run_check_qs = course.courseruns.filter(b2b_contract=contract)
+    run_check_qs = course.courseruns.filter(b2b_contracts=contract)
 
     found_count = 0
     for language, variant_industry, variant_length in [
@@ -921,9 +929,9 @@ def test_create_contract_run_variants(mocker):
     create_contract_run(contract, course, no_reruns=False)
     mocked_clone_run.assert_called()
 
-    assert course.courseruns.filter(b2b_contract=contract).count() == 10
+    assert course.courseruns.filter(b2b_contracts=contract).count() == 10
     run_check_qs = course.courseruns.filter(
-        b2b_contract=contract, courseware_id__startswith=target_course_id
+        b2b_contracts=contract, courseware_id__startswith=target_course_id
     )
 
     found_count = 0
@@ -953,6 +961,8 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
     """Test that we can get a list of B2B orgs from somewhere and fix a user's associations."""
 
     user = UserFactory.create()
+    user_org_cache_key = B2B_USER_ORG_MEMBERSHIP_CACHE.format(user.global_id)
+
     organization_to_add = OrganizationPageFactory.create()
     organization_to_ignore = OrganizationPageFactory.create()
     organization_to_remove = OrganizationPageFactory.create()
@@ -964,8 +974,12 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
     # Step 1: pass in an org to a user that's not in anything
     # We should get back one addition, which is the org we're adding
 
+    caches["redis"].delete(user_org_cache_key)
     added, removed = reconcile_user_orgs(
-        user, [organization_to_add.sso_organization_id]
+        user,
+        [
+            str(organization_to_add.sso_organization_id),
+        ],
     )
 
     assert added == 1
@@ -986,8 +1000,12 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
 
     assert user.b2b_organizations.count() == 2
 
+    caches["redis"].delete(user_org_cache_key)
     added, removed = reconcile_user_orgs(
-        user, [organization_to_add.sso_organization_id]
+        user,
+        [
+            str(organization_to_add.sso_organization_id),
+        ],
     )
 
     assert added == 0
@@ -1007,8 +1025,12 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
 
     assert user.b2b_organizations.count() == 2
 
+    caches["redis"].delete(user_org_cache_key)
     added, removed = reconcile_user_orgs(
-        user, [organization_to_add.sso_organization_id]
+        user,
+        [
+            str(organization_to_add.sso_organization_id),
+        ],
     )
 
     assert added == 0
@@ -1022,11 +1044,12 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
 
     # Step 3.5: now reconcile with the remove org, we should clear the flag
 
+    caches["redis"].delete(user_org_cache_key)
     added, removed = reconcile_user_orgs(
         user,
         [
-            organization_to_add.sso_organization_id,
-            organization_to_remove.sso_organization_id,
+            str(organization_to_add.sso_organization_id),
+            str(organization_to_remove.sso_organization_id),
         ],
     )
 
@@ -1046,11 +1069,12 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
         user=user, organization=weird_organization, keep_until_seen=False
     )
 
+    caches["redis"].delete(user_org_cache_key)
     added, removed = reconcile_user_orgs(
         user,
         [
-            organization_to_add.sso_organization_id,
-            organization_to_remove.sso_organization_id,
+            str(organization_to_add.sso_organization_id),
+            str(organization_to_remove.sso_organization_id),
         ],
     )
 
@@ -1060,6 +1084,96 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
     user.refresh_from_db()
     assert user.b2b_organizations.count() == 3
     assert user.b2b_organizations.filter(pk=weird_organization.id).exists()
+
+
+def test_reconcile_user_orgs_empty_cache_is_a_hit(django_assert_num_queries):
+    """Test that a cached empty org list counts as a cache hit, not a miss."""
+
+    user = UserFactory.create()
+    user_org_cache_key = B2B_USER_ORG_MEMBERSHIP_CACHE.format(user.global_id)
+    caches["redis"].set(user_org_cache_key, [])
+
+    with django_assert_num_queries(0):
+        added, removed = reconcile_user_orgs(user, [])
+
+    assert added == 0
+    assert removed == 0
+
+    # A payload that doesn't match the cache still reconciles
+    org = OrganizationPageFactory.create()
+
+    added, removed = reconcile_user_orgs(user, [str(org.sso_organization_id)])
+
+    assert added == 1
+    assert caches["redis"].get(user_org_cache_key) == [
+        (str(org.sso_organization_id), True)
+    ]
+
+
+def test_reconcile_user_orgs_stale_session():
+    """
+    Test that reconciliation is skipped for a session that's older than the
+    newest one we've seen for the user.
+    """
+
+    user = UserFactory.create()
+    user_org_cache_key = B2B_USER_ORG_MEMBERSHIP_CACHE.format(user.global_id)
+    latest_session_cache_key = B2B_USER_LATEST_SESSION_CACHE.format(user.global_id)
+
+    org_1, org_2 = OrganizationPageFactory.create_batch(2)
+    org_3 = OrganizationPageFactory.create(sso_organization_id=None)
+    user.b2b_organizations.add(org_3)
+
+    assert user.b2b_organizations.count() == 1
+
+    old_session = int((now_in_utc() - timedelta(minutes=120)).timestamp())
+    new_session = int(now_in_utc().timestamp())
+
+    # Older session, first one we've seen - this should reconcile
+    added, removed = reconcile_user_orgs(
+        user, [str(org_1.sso_organization_id)], session_auth_time=old_session
+    )
+
+    assert added == 1
+    assert removed == 0
+    assert caches["redis"].get(latest_session_cache_key) == old_session
+    assert user.b2b_organizations.count() == 2
+
+    # Newer session with another org - this should reconcile and move the mark
+    added, removed = reconcile_user_orgs(
+        user,
+        [
+            str(org_1.sso_organization_id),
+            str(org_2.sso_organization_id),
+        ],
+        session_auth_time=new_session,
+    )
+
+    assert added == 1
+    assert removed == 0
+    assert caches["redis"].get(latest_session_cache_key) == new_session
+    assert user.b2b_organizations.count() == 3
+
+    # The older session comes back with its stale (empty) org list. Nothing
+    # should change, even with the org membership cache cleared.
+    caches["redis"].delete(user_org_cache_key)
+
+    added, removed = reconcile_user_orgs(user, [], session_auth_time=old_session)
+
+    assert added == 0
+    assert removed == 0
+    assert caches["redis"].get(latest_session_cache_key) == new_session
+    assert user.b2b_organizations.count() == 3
+
+    # A different user's sessions are tracked separately
+    other_user = UserFactory.create()
+
+    added, removed = reconcile_user_orgs(
+        other_user, [str(org_1.sso_organization_id)], session_auth_time=old_session
+    )
+
+    assert added == 1
+    assert other_user.b2b_organizations.count() == 1
 
 
 @pytest.mark.parametrize(
@@ -1349,9 +1463,28 @@ def test_b2b_org_attach_calls_keycloak(mocked_b2b_org_attach, has_id):
     org = OrganizationPageFactory.create(sso_organization_id=has_id)
     user = UserFactory.create()
 
-    process_add_org_membership(user, org)
+    membership = process_add_org_membership(user, org)
 
     mocked_b2b_org_attach.assert_called() if has_id else mocked_b2b_org_attach.assert_not_called()
+    assert (membership.added_to_keycloak_at is not None) is bool(has_id)
+
+
+def test_b2b_org_attach_failure_leaves_the_member_for_the_push(mocker):
+    """A member Keycloak refused has no timestamp, so the periodic push retries."""
+
+    response = Response()
+    response.status_code = 500
+    mocker.patch(
+        "b2b.api.add_user_org_membership", side_effect=HTTPError(response=response)
+    )
+
+    membership = process_add_org_membership(
+        UserFactory.create(), OrganizationPageFactory.create(), keep_until_seen=True
+    )
+
+    membership.refresh_from_db()
+    assert membership.keep_until_seen is True
+    assert membership.added_to_keycloak_at is None
 
 
 @pytest.mark.parametrize(
@@ -2094,7 +2227,7 @@ def test_create_contract_run_single_language_legacy(mocker):
     results = create_contract_run(contract, course, require_designated_source_run=True)
     assert len(results) == 1
     run, product = results[0]
-    assert run.b2b_contract == contract
+    assert run.contract_group_ids == {contract.id}
     assert product.object_id == run.id
 
 
@@ -2401,8 +2534,6 @@ def test_get_user_b2b_organizations_excludes_inactive_contracts():
         organization=user_org.organization,
         parent=user_org.organization,
     )
-    # Use .objects (Wagtail's unfiltered manager) to avoid DoesNotExist from
-    # ContractPage._default_manager (ActiveContractManager) filtering active=False.
     ContractPage.objects.filter(id=contract.id).update(active=False)
     user.b2b_contracts.add(contract)
 
@@ -3280,6 +3411,26 @@ def test_reconcile_keeps_the_members_of_a_page_it_links(reconcile_realm):
     ).exists()
 
 
+def test_reconcile_pushes_members_added_to_a_previous_link(reconcile_realm):
+    """A timestamp from an earlier Keycloak organization doesn't skip the push."""
+
+    reconcile, connection = reconcile_realm
+    legacy = factories.OrganizationPageFactory.create(
+        org_key="UTK", sso_organization_id=None
+    )
+    member = factories.UserOrganizationFactory.create(
+        organization=legacy, added_to_keycloak_at=now_in_utc()
+    )
+    org = factories.OrganizationRepresentationFactory.create(alias="utk")
+
+    reconcile(org)
+
+    legacy.refresh_from_db()
+    connection.organizations.associate.assert_called_once_with(
+        "members", legacy.sso_organization_id, member.user.global_id
+    )
+
+
 def test_reconcile_leaves_the_members_of_a_linked_page_alone(reconcile_realm):
     """Only the pass that links a page touches its members."""
 
@@ -3579,3 +3730,195 @@ def test_upgrade_enrollments_keeps_existing_contract(mocked_edx_upgrade_push):
     enrollment.refresh_from_db()
     assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
     assert enrollment.b2b_contract == other_contract
+
+
+@pytest.fixture
+def public_contract_run():
+    """A public run, priced at 100, that's also in a contract priced at 10."""
+
+    contract = factories.ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED,
+        enrollment_fixed_price=Decimal(10),
+    )
+    run = CourseRunFactory.create(b2b_only=False, b2b_contracts=[contract])
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run, price=Decimal(100))
+
+    return {"contract": contract, "run": run, "product": product}
+
+
+def _basket_with(user, product, contract=None):
+    """Make a basket for the user with the product in it."""
+
+    basket = BasketFactory.create(user=user)
+    BasketItem.objects.create(
+        basket=basket, product=product, quantity=1, b2b_contract=contract
+    )
+    return basket
+
+
+@pytest.mark.parametrize("code_exists", [True, False])
+def test_apply_contract_discounts_to_basket(public_contract_run, code_exists):
+    """
+    A contract member with a contract's run in the basket should get the
+    contract's code, creating one if there isn't one, and the item should be
+    tied to the contract.
+    """
+
+    contract = public_contract_run["contract"]
+    product = public_contract_run["product"]
+    existing = (
+        _attach_bulk_discount(contract, product, amount=Decimal(10))
+        if code_exists
+        else None
+    )
+    user = _make_contract_user({"c": contract}, ["c"])
+    basket = _basket_with(user, product)
+
+    updated = apply_contract_discounts_to_basket(basket)
+
+    item = basket.basket_items.get()
+    assert updated == [item]
+    assert item.b2b_contract == contract
+    discount = basket.discounts.get().redeemed_discount
+    if code_exists:
+        assert discount == existing
+    assert discount.is_bulk
+    assert discount.products.filter(product=product).exists()
+    assert item.discounted_price == Decimal(10)
+
+    # Running it again shouldn't change anything.
+    assert apply_contract_discounts_to_basket(basket) == []
+    assert basket.discounts.get().redeemed_discount == discount
+    assert Discount.objects.filter(products__product=product).count() == 1
+
+
+def test_apply_contract_discounts_to_basket_not_member(public_contract_run):
+    """A learner who isn't in the contract pays the regular price."""
+
+    basket = _basket_with(UserFactory.create(), public_contract_run["product"])
+
+    assert apply_contract_discounts_to_basket(basket) == []
+    assert basket.basket_items.get().b2b_contract is None
+    assert not basket.discounts.exists()
+    assert not Discount.objects.exists()
+
+
+def test_apply_contract_discounts_to_basket_anonymous(public_contract_run):
+    """Anonymous baskets get nothing."""
+
+    basket = BasketFactory.create(user=None, anonymous_id=uuid4())
+    BasketItem.objects.create(
+        basket=basket, product=public_contract_run["product"], quantity=1
+    )
+
+    assert apply_contract_discounts_to_basket(basket) == []
+    assert not basket.discounts.exists()
+
+
+def test_apply_contract_discounts_to_basket_better_discount(public_contract_run):
+    """If the basket already has a better deal, it's kept."""
+
+    contract = public_contract_run["contract"]
+    product = public_contract_run["product"]
+    user = _make_contract_user({"c": contract}, ["c"])
+    basket = _basket_with(user, product)
+    better = UnlimitedUseDiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_FIXED_PRICE, amount=Decimal(5)
+    )
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=better,
+        redeemed_basket=basket,
+    )
+
+    assert apply_contract_discounts_to_basket(basket) == []
+    assert basket.basket_items.get().b2b_contract is None
+    assert basket.discounts.get().redeemed_discount == better
+
+
+def test_apply_contract_discounts_to_basket_cheapest_contract(public_contract_run):
+    """A learner in several contracts with the run gets the cheapest one."""
+
+    contract = public_contract_run["contract"]
+    run = public_contract_run["run"]
+    product = public_contract_run["product"]
+    cheaper = factories.ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED,
+        enrollment_fixed_price=Decimal(3),
+    )
+    run.b2b_contracts.add(cheaper)
+    cheaper_code = _attach_bulk_discount(cheaper, product, amount=Decimal(3))
+    user = _make_contract_user({"c": contract, "d": cheaper}, ["c", "d"])
+    basket = _basket_with(user, product)
+
+    apply_contract_discounts_to_basket(basket)
+
+    item = basket.basket_items.get()
+    assert item.b2b_contract == cheaper
+    assert basket.discounts.get().redeemed_discount == cheaper_code
+    assert item.discounted_price == Decimal(3)
+
+
+@pytest.mark.parametrize("user_in_contract", [True, False])
+def test_apply_contract_discounts_to_basket_tied_item(
+    public_contract_run, user_in_contract
+):
+    """
+    An item already tied to a contract only gets that contract's code, and only
+    if the learner is in it.
+    """
+
+    contract = public_contract_run["contract"]
+    product = public_contract_run["product"]
+    user = UserFactory.create()
+    if user_in_contract:
+        user.b2b_contracts.add(contract)
+    basket = _basket_with(user, product, contract)
+
+    assert apply_contract_discounts_to_basket(basket) == []
+    assert basket.basket_items.get().b2b_contract == contract
+    assert basket.discounts.exists() is user_in_contract
+
+
+def test_apply_user_discounts_applies_contract_code(public_contract_run):
+    """The cart page's discount step should pick up contract pricing."""
+
+    from ecommerce.api import apply_user_discounts  # noqa: PLC0415
+
+    contract = public_contract_run["contract"]
+    product = public_contract_run["product"]
+    user = _make_contract_user({"c": contract}, ["c"])
+    basket = _basket_with(user, product)
+
+    apply_user_discounts(basket)
+
+    item = basket.basket_items.get()
+    assert item.b2b_contract == contract
+    assert item.discounted_price == Decimal(10)
+
+
+@pytest.mark.parametrize("old_contract_state", ["expired", "inactive"])
+def test_move_run_to_retirement_contract_removes_old_contract(old_contract_state):
+    """Retirement removes old associations even when related managers hide them."""
+    old_contract = ContractPageFactory.create(
+        active=old_contract_state != "inactive",
+        contract_end=(
+            now_in_utc() - timedelta(days=1)
+            if old_contract_state == "expired"
+            else None
+        ),
+    )
+    run = CourseRunFactory.create()
+    run.b2b_contracts.add(old_contract)
+    memberships = run.b2b_contracts.through.objects.filter(courserun_id=run.pk)
+
+    assert memberships.filter(contractpage_id=old_contract.pk).exists()
+    assert not run.b2b_contracts.filter(pk=old_contract.pk).exists()
+
+    retirement_contract = move_run_to_retirement_contract(run)
+
+    assert set(memberships.values_list("contractpage_id", flat=True)) == {
+        retirement_contract.pk
+    }

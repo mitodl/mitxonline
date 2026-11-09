@@ -7,20 +7,38 @@ import contextlib
 from django.contrib import admin, messages
 from django.contrib.admin.decorators import display
 from django.contrib.contenttypes.admin import GenericTabularInline
+from django.core.exceptions import PermissionDenied
 from django.db import models
+from django.db.models import Prefetch
 from django.forms import TextInput
+from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils.html import format_html
 from mitol.common.admin import TimestampedModelAdmin
 
 import cms.admin  # noqa: F401
-from courses.api import create_verifiable_credential, downgrade_learner
-from courses.forms import ProgramAdminForm
+from courses.api import (
+    VERIFIABLE_CREDENTIAL_STATUS_DISABLED,
+    VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA,
+    VERIFIABLE_CREDENTIAL_STATUS_ENABLED,
+    VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA,
+    create_run_enrollments,
+    create_verifiable_credential,
+    downgrade_learner,
+    summarize_verifiable_credential_certificate_statuses,
+    undo_program_course_run_verification,
+)
+from courses.forms import (
+    ADMIN_ENROLL_RUN_SUFFIX,
+    AdminEnrollUserInRunsForm,
+    ProgramAdminForm,
+)
 from courses.models import (
     BlockedCountry,
     Course,
     CourseRun,
+    CourseRunAccessRole,
     CourseRunCertificate,
     CourseRunEnrollment,
     CourseRunEnrollmentAudit,
@@ -50,11 +68,25 @@ from main.admin import (
 from main.utils import get_field_names
 from openedx.api import get_edx_api_service_client, get_edx_course_modes
 from openedx.constants import (
+    CANNOT_CLEAR_DEADLINE_HINT,
     EDX_ENROLLMENT_AUDIT_MODE,
     EDX_ENROLLMENT_VERIFIED_MODE,
     OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES,
 )
 from openedx.tasks import retry_failed_edx_enrollments
+
+VERIFIABLE_CREDENTIAL_STATUS_DESCRIPTIONS = [
+    (VERIFIABLE_CREDENTIAL_STATUS_ENABLED, "Enabled, with criteria populated"),
+    (
+        VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA,
+        "Enabled, but no criteria populated. No credentials will be issued until criteria is populated.",
+    ),
+    (VERIFIABLE_CREDENTIAL_STATUS_DISABLED, "Disabled, with criteria populated"),
+    (
+        VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA,
+        "Disabled, with no criteria populated",
+    ),
+]
 
 
 class VerifiableCredentialBackfillAdminMixin:
@@ -109,7 +141,6 @@ class CourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
         "language",
         "variant_length",
         "variant_industry",
-        "b2b_contract",
         "live",
         "start_date",
         "end_date",
@@ -125,7 +156,6 @@ class CourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
         "language",
         "variant_length",
         "variant_industry",
-        "b2b_contract",
         "live",
         "start_date",
         "end_date",
@@ -443,7 +473,7 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         "is_source_run",
         "language",
         "course",
-        "b2b_contract",
+        "b2b_contracts",
     ]
     raw_id_fields = ("course",)
     fieldsets = [
@@ -492,7 +522,6 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
             {
                 "fields": [
                     "b2b_only",
-                    "b2b_contract",
                 ],
             },
         ),
@@ -503,7 +532,10 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         models.TextField: {"widget": TextInput(attrs={"size": "100"})},
     }
 
-    actions = ["populate_verifiable_credentials_for_courserun"]
+    actions = [
+        "populate_verifiable_credentials_for_courserun",
+        "push_upgrade_deadline_to_edx",
+    ]
 
     inlines = [
         CourseRunContractPageInline,
@@ -523,29 +555,112 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         )
         self.populate_verifiable_credentials_for_certificate(request, certificates)
 
+    @admin.action(description="Push upgrade deadline to edX", permissions=["change"])
+    def push_upgrade_deadline_to_edx(self, request, queryset):
+        """
+        Queue a push of each selected run's upgrade deadline to edX.
+
+        Saving only pushes a deadline that changed, so this is the way to send
+        one that didn't: a run added after its edX course existed, an edx_missing
+        run, or a push that failed.
+        """
+        from courses.tasks import sync_courserun_upgrade_deadline  # noqa: PLC0415
+
+        run_ids = list(
+            queryset.filter(upgrade_deadline__isnull=False).values_list("id", flat=True)
+        )
+        for run_id in run_ids:
+            sync_courserun_upgrade_deadline.delay(run_id)
+
+        skipped = queryset.count() - len(run_ids)
+        messages.info(
+            request,
+            f"Queued an upgrade deadline push to edX for {len(run_ids)} run(s)."
+            + (
+                f" Skipped {skipped} run(s) with no upgrade deadline."
+                if skipped
+                else ""
+            ),
+        )
+
     def get_queryset(self, request):  # noqa: ARG002
         """Use the all_objects manager so we can see source runs."""
 
-        return self.model.all_objects
+        # Imported here to avoid a circular dependency at module load time,
+        # matching ProgramContractPageInline above.
+        from b2b.models import ContractPage  # noqa: PLC0415
+
+        # Prefetch through ContractPage.objects, since the b2b_contracts related
+        # manager hides inactive contracts.
+        return self.model.all_objects.prefetch_related(
+            Prefetch(
+                "b2b_contracts",
+                queryset=ContractPage.objects.order_by("id"),
+                to_attr="all_b2b_contracts",
+            )
+        )
+
+    def save_model(self, request, obj, form, change):
+        """
+        Save the run, then tell the operator what we did about the edX side.
+
+        The push itself is queued by the CourseRun post_save signal so that
+        every write path gets it. This only adds the admin feedback, because a
+        cleared deadline cannot be propagated (edX's course modes API has no way
+        to unset an existing expiration date) and a warning buried in the celery
+        log would never be seen by the person who made the change.
+        """
+        deadline_changed = "upgrade_deadline" in (form.changed_data or [])
+        super().save_model(request, obj, form, change)
+
+        if not change:
+            # New runs aren't pushed (see the CourseRun post_save receiver).
+            if obj.upgrade_deadline is not None:
+                messages.warning(
+                    request,
+                    (
+                        f"New runs aren't pushed to edX, so the upgrade deadline "
+                        f"for {obj.courseware_id} is saved in MITx Online only. If "
+                        f"this run already exists in edX, select it in the course "
+                        f'run list and run the "Push upgrade deadline to edX" '
+                        f"action."
+                    ),
+                )
+            return
+
+        if not deadline_changed:
+            return
+
+        if obj.upgrade_deadline is None:
+            messages.warning(
+                request,
+                (
+                    f"Upgrade deadline cleared for {obj.courseware_id}; edX keeps "
+                    f"any deadline it already has. {CANNOT_CLEAR_DEADLINE_HINT}"
+                ),
+            )
+        else:
+            messages.info(
+                request,
+                (
+                    f"Queued a sync to push the upgrade deadline "
+                    f"{obj.upgrade_deadline} to the edX verified mode of "
+                    f"{obj.courseware_id}."
+                ),
+            )
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """
-        Show inactive contracts in the b2b_contract dropdown.
+        Show every contract in the b2b_contract dropdown, in a stable order.
 
-        By default the admin builds this field from
-        ``ContractPage._default_manager``. ContractPage declares
-        ``active_objects`` as its only local manager, and Django orders local
-        managers ahead of ones inherited from the concrete parent, so
-        ``_default_manager`` is ``ActiveContractManager`` and filters
-        ``active=True``.
-
-        That means a run attached to an inactive contract - a retired run parked
-        in the holding contract, or any run on an expired contract - renders with
-        an empty dropdown, because its current value isn't among the choices.
-        Since the field is ``null=True, blank=True``, saving that form is valid
-        and silently sets ``b2b_contract`` to NULL, which turns a B2B run into a
-        public-catalog run (``CourseRunQuerySet.exclude_b2b`` treats a null
-        contract as "not B2B").
+        The dropdown has to include inactive contracts. A run attached to one
+        - a retired run parked in the holding contract, or any run on an
+        expired contract - would otherwise render with an empty dropdown,
+        because its current value isn't among the choices. Since the field is
+        ``null=True, blank=True``, saving that form is valid and silently sets
+        ``b2b_contract`` to NULL, which turns a B2B run into a public-catalog
+        run (``CourseRunQuerySet.exclude_b2b`` treats a null contract as "not
+        B2B"). ``ContractPage.objects`` is the unfiltered manager.
         """
 
         if db_field.name == "b2b_contract":
@@ -569,10 +684,10 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         """Return the source run flag."""
         return obj.is_source_run
 
-    @admin.display(description="Contract", ordering="b2b_contract")
+    @admin.display(description="Contract")
     def contract(self, obj):
-        """Return the B2B contract title."""
-        return obj.b2b_contract.name if obj.b2b_contract else ""
+        """Return the B2B contract names."""
+        return ", ".join(contract.name for contract in obj.all_b2b_contracts)
 
 
 class ProgramEnrollmentAuditInline(admin.TabularInline):
@@ -774,8 +889,89 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
         "retry_all_failed_edx_enrollment",
         "reset_edx_enrollment_retry_count",
         "downgrade_enrollment",
+        "undo_program_entitlement_verification",
     ]
     run_for_all_actions = ["retry_all_failed_edx_enrollment"]
+    change_list_template = "admin/courses/courserunenrollment/change_list.html"
+
+    def get_urls(self):
+        """Add the enroll-in-runs page to this admin's URLs."""
+        custom = [
+            path(
+                "enroll-in-runs/",
+                self.admin_site.admin_view(self.enroll_in_runs_view),
+                name="courses_courserunenrollment_enroll_in_runs",
+            )
+        ]
+        return custom + super().get_urls()
+
+    def enroll_in_runs_view(self, request):
+        """
+        Enroll a single user, in audit mode, in a staff-selected set of course
+        runs whose courseware_id ends with ADMIN_ENROLL_RUN_SUFFIX. Each run is
+        enrolled separately so one failure doesn't block the rest.
+
+        These are archived runs enrolled by staff, so the export compliance
+        check is skipped.
+        """
+        if not self.has_add_permission(request):
+            raise PermissionDenied
+
+        form = AdminEnrollUserInRunsForm(request.POST or None)
+        if request.method == "POST" and form.is_valid():
+            user = form.cleaned_data["user"]
+            mode = EDX_ENROLLMENT_AUDIT_MODE
+            for run in form.cleaned_data["runs"]:
+                try:
+                    enrollments, edx_success = create_run_enrollments(
+                        user, [run], mode=mode, skip_compliance_check=True
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    self.message_user(
+                        request,
+                        f"Failed to enroll {user.email} in {run.courseware_id}: {exc}",
+                        messages.ERROR,
+                    )
+                    continue
+                if not enrollments:
+                    reason = (
+                        "the edX enrollment failed, so no enrollment was created"
+                        if not edx_success
+                        else "the enrollment record could not be saved"
+                    )
+                    self.message_user(
+                        request,
+                        f"Failed to enroll {user.email} in {run.courseware_id}: "
+                        f"{reason}. Check the logs for details.",
+                        messages.ERROR,
+                    )
+                elif not edx_success:
+                    self.message_user(
+                        request,
+                        f"Enrolled {user.email} in {run.courseware_id} locally, "
+                        "but the edX enrollment failed (it will be retried)",
+                        messages.WARNING,
+                    )
+                else:
+                    self.message_user(
+                        request,
+                        f"Enrolled {user.email} in {run.courseware_id} ({mode})",
+                        messages.SUCCESS,
+                    )
+            return redirect(
+                reverse("admin:courses_courserunenrollment_changelist")
+                + f"?q={user.email}"
+            )
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": f"Enroll a user in {ADMIN_ENROLL_RUN_SUFFIX} course runs",
+            "opts": self.model._meta,  # noqa: SLF001
+            "form": form,
+        }
+        return TemplateResponse(
+            request, "admin/courses/courserunenrollment/enroll_in_runs.html", context
+        )
 
     @admin.display(
         description="Repair exhausted",
@@ -867,6 +1063,44 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
                 request,
                 f"Successfully downgraded users enrollment from verified to audit: {enrollment.user.email}.",
             )
+
+    @admin.action(description="Undo verification from program entitlement")
+    def undo_program_entitlement_verification(self, request, queryset):
+        """
+        Admin action to undo the selected enrollments' verification that came
+        from a program entitlement: cancel the zero-value program orders for
+        the run and downgrade the enrollment to audit.
+        """
+        for enrollment in queryset.select_related("user", "run"):
+            try:
+                orders, edx_success = undo_program_course_run_verification(enrollment)
+            except ValueError as exc:
+                self.message_user(request, f"Skipped: {exc}", messages.ERROR)
+                continue
+            references = ", ".join(order.reference_number for order in orders)
+            if not enrollment.active:
+                self.message_user(
+                    request,
+                    f"Set {enrollment.user.email}'s inactive enrollment in "
+                    f"{enrollment.run.courseware_id} to audit (left inactive, "
+                    f"edX unchanged) and canceled order(s) {references}.",
+                    messages.SUCCESS,
+                )
+            elif edx_success:
+                self.message_user(
+                    request,
+                    f"Downgraded {enrollment.user.email} to audit in "
+                    f"{enrollment.run.courseware_id} and canceled order(s) {references}.",
+                    messages.SUCCESS,
+                )
+            else:
+                self.message_user(
+                    request,
+                    f"Downgraded {enrollment.user.email} to audit in "
+                    f"{enrollment.run.courseware_id} and canceled order(s) {references}, "
+                    "but the edX downgrade failed. Check the logs for details.",
+                    messages.WARNING,
+                )
 
 
 @admin.register(CourseRunEnrollmentAudit)
@@ -1096,25 +1330,6 @@ class PaidProgramAdmin(TimestampedModelAdmin):
         return obj.order.state
 
 
-class HasCertificateRevisionFilter(admin.SimpleListFilter):
-    title = "Has Certificate Revision"
-    parameter_name = "has_certificate_revision"
-
-    def lookups(self, request, model_admin):  # noqa: ARG002
-        return (
-            ("yes", "Yes"),
-            ("no", "No"),
-        )
-
-    def queryset(self, request, queryset):  # noqa: ARG002
-        value = self.value()
-        if value == "yes":
-            return queryset.filter(certificate_page_revision__isnull=False)
-        if value == "no":
-            return queryset.filter(certificate_page_revision__isnull=True)
-        return queryset
-
-
 @admin.register(CourseRunCertificate)
 class CourseRunCertificateAdmin(TimestampedModelAdmin):
     """Admin for CourseRunCertificate"""
@@ -1127,7 +1342,6 @@ class CourseRunCertificateAdmin(TimestampedModelAdmin):
         "course_run",
         "get_certificate_page_title",
         "get_revoked_state",
-        "get_has_certificate_revision",
     ]
     search_fields = [
         "uuid",
@@ -1136,7 +1350,7 @@ class CourseRunCertificateAdmin(TimestampedModelAdmin):
         "user__username",
         "user__email",
     ]
-    list_filter = ["is_revoked", HasCertificateRevisionFilter, "course_run__course"]
+    list_filter = ["is_revoked", "course_run__course"]
     raw_id_fields = ("user", "course_run", "verifiable_credential")
     autocomplete_fields = ("certificate_page_revision",)
 
@@ -1167,14 +1381,6 @@ class CourseRunCertificateAdmin(TimestampedModelAdmin):
         """Return the revoked state"""
         return obj.is_revoked is not True
 
-    @admin.display(
-        description="Has Certificate Revision",
-        boolean=True,
-    )
-    def get_has_certificate_revision(self, obj):
-        """Return whether a certificate page revision is associated"""
-        return obj.certificate_page_revision is not None
-
     def get_queryset(self, request):  # noqa: ARG002
         return self.model.all_objects.get_queryset().select_related(
             "user", "course_run"
@@ -1192,7 +1398,6 @@ class ProgramCertificateAdmin(TimestampedModelAdmin):
         "user",
         "program",
         "get_revoked_state",
-        "get_has_certificate_revision",
     ]
     search_fields = [
         "program__readable_id",
@@ -1201,7 +1406,7 @@ class ProgramCertificateAdmin(TimestampedModelAdmin):
         "user__email",
         "uuid",
     ]
-    list_filter = ["program__title", HasCertificateRevisionFilter, "is_revoked"]
+    list_filter = ["program__title", "is_revoked"]
     raw_id_fields = ("user", "verifiable_credential", "program")
     autocomplete_fields = ("certificate_page_revision",)
 
@@ -1212,14 +1417,6 @@ class ProgramCertificateAdmin(TimestampedModelAdmin):
     def get_revoked_state(self, obj):
         """Return the revoked state"""
         return obj.is_revoked is not True
-
-    @admin.display(
-        description="Has Certificate Revision",
-        boolean=True,
-    )
-    def get_has_certificate_revision(self, obj):
-        """Return whether a certificate page revision is associated"""
-        return obj.certificate_page_revision is not None
 
     def get_queryset(self, request):  # noqa: ARG002
         return self.model.all_objects.get_queryset().select_related("user", "program")
@@ -1239,6 +1436,43 @@ class VerifiableCredentialAdmin(TimestampedModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related("programcertificate", "courseruncertificate")
+
+    def get_urls(self):
+        custom = [
+            path(
+                "stats/",
+                self.admin_site.admin_view(self.stats_view),
+                name="courses_verifiablecredential_stats",
+            )
+        ]
+        return custom + super().get_urls()
+
+    def _get_stats(self):
+        breakdown = summarize_verifiable_credential_certificate_statuses(
+            return_objects=True
+        )
+        return [
+            {
+                "status": status,
+                "description": description,
+                "pages": breakdown.get(status, []),
+            }
+            for status, description in VERIFIABLE_CREDENTIAL_STATUS_DESCRIPTIONS
+        ]
+
+    def stats_view(self, request):
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Verifiable Credential Stats",
+            "opts": self.model._meta,  # noqa: SLF001
+            "stats": self._get_stats(),
+        }
+        return TemplateResponse(
+            request, "admin/courses/verifiablecredential/stats.html", context
+        )
 
 
 class PartnerSchoolProgramInline(admin.TabularInline):
@@ -1339,3 +1573,22 @@ class EnrollmentModeAdmin(admin.ModelAdmin):
     list_filter = [
         "requires_payment",
     ]
+
+
+@admin.register(CourseRunAccessRole)
+class CourseRunAccessRoleAdmin(TimestampedModelAdmin):
+    """Admin for CourseRunAccessRole"""
+
+    model = CourseRunAccessRole
+    search_fields = [
+        "user__email",
+        "user__username",
+        "run__courseware_id",
+        "run__title",
+    ]
+    list_display = ("id", "user__email", "run__courseware_id", "role")
+    list_filter = ["role"]
+    raw_id_fields = ("user", "run")
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("user", "run")

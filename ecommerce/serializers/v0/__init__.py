@@ -1162,9 +1162,24 @@ class CheckoutPayloadSerializer(serializers.Serializer):
             USER_MSG_TYPE_PROFILE_INCOMPLETE,
         ),
     )
+    missing_fields = serializers.ListField(
+        child=serializers.CharField(),
+        read_only=True,
+        required=False,
+        default=list,
+        help_text="With a profile-incomplete error, the profile fields to fix.",
+    )
 
     class Meta:
-        fields = ["no_checkout", "url", "method", "payload", "order_id", "error"]
+        fields = [
+            "no_checkout",
+            "url",
+            "method",
+            "payload",
+            "order_id",
+            "error",
+            "missing_fields",
+        ]
 
 
 class OrderStatusSerializer(serializers.ModelSerializer):

@@ -8,7 +8,7 @@ import re
 import django_filters
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models import Prefetch, Q
+from django.db.models import Exists, OuterRef, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
@@ -25,7 +25,6 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from b2b.models import ContractPage
-from compliance.exceptions import ExportComplianceCheckError
 from courses.api import (
     check_enrollment_eligibility,
     create_program_enrollments,
@@ -36,6 +35,7 @@ from courses.exceptions import EnrollmentError
 from courses.models import (
     Course,
     CourseRun,
+    CourseRunAccessRole,
     CourseRunEnrollment,
     Program,
     ProgramEnrollment,
@@ -56,6 +56,7 @@ from courses.utils import get_enrollable_courseruns_qs
 from ecommerce.models import Product
 from main import features
 from openedx.api import get_edx_course_outline
+from openedx.constants import OPENEDX_COURSE_STAFF_ROLES
 from openedx.exceptions import EdxApiCourseOutlineError
 
 log = logging.getLogger(__name__)
@@ -103,6 +104,18 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
     ),
 )
 class UserEnrollmentsApiViewSet(
+    # CreateModelMixin is inherited but POST cannot currently succeed: the v3
+    # serializer's create() reads validated_data["run_id"] while never
+    # declaring run_id as a field, so DRF drops it and the lookup raises
+    # KeyError. v1 and v2 both declare it; the dashboard creates through v1.
+    #
+    # Whoever fixes that must also annotate the created instance before it is
+    # serialized. get_queryset() annotates has_course_staff_role, and the
+    # serializer reads that attribute directly rather than defaulting it, so a
+    # response built from an unannotated instance raises AttributeError. The
+    # mixin is left in place rather than removed because dropping it would
+    # delete POST /api/v3/enrollments/ from the spec, which the oasdiff gate
+    # reads as a breaking change.
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.ListModelMixin,
@@ -142,7 +155,21 @@ class UserEnrollmentsApiViewSet(
 
     def get_queryset(self):
         """Get the queryset for user enrollments."""
-        return super().get_queryset().filter(user=self.request.user)
+        return (
+            super()
+            .get_queryset()
+            .filter(user=self.request.user)
+            # One subquery for the whole page instead of a lookup per card.
+            .annotate(
+                has_course_staff_role=Exists(
+                    CourseRunAccessRole.objects.filter(
+                        user_id=OuterRef("user_id"),
+                        run_id=OuterRef("run_id"),
+                        role__in=OPENEDX_COURSE_STAFF_ROLES,
+                    )
+                )
+            )
+        )
 
     def get_serializer_context(self):
         """Get the serializer context."""
@@ -264,13 +291,7 @@ class UserProgramEnrollmentsViewSet(
             return Response(response_serializer.data, status=status.HTTP_200_OK)
 
         # Create the enrollment using default enrollment mode (audit)
-        try:
-            enrollments = create_program_enrollments(request.user, [program])
-        except ExportComplianceCheckError as exc:
-            # Don't propagate the specifics of the compliance decision to the
-            # client - only an opaque support code, if the cause declares one.
-            # The underlying cause is logged where it's raised.
-            raise EnrollmentError.from_cause(exc) from exc
+        enrollments = create_program_enrollments(request.user, [program])
 
         if not enrollments:
             log.error(

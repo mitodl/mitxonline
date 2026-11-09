@@ -17,10 +17,15 @@ from courses.factories import (
     CourseRunGradeFactory,
 )
 from courses.models import (
+    CourseRunAccessRole,
     CourseRunCertificate,
     CourseRunEnrollment,
 )
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.exceptions import (
+    EdxApiNotificationPreferencesError,
+    NoEdxApiAuthError,
+)
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -204,7 +209,16 @@ class TestEdxEnrollmentWebhook:
         api_client,
         oauth_token,
     ):
-        """Test returns 500 when enrollment creation raises an exception"""
+        """
+        An unexpected enrollment failure propagates rather than being answered.
+
+        A 500 means something is broken, so it is not something this view hands
+        back deliberately: the exception is logged and re-raised, which puts it
+        in the error tracker and lets DRF render the 5xx the sender needs in
+        order to retry. Answering 400 instead would be worse than either, since
+        the sender drops a non-transient 4xx without retrying and would lose a
+        grant a second attempt would have mirrored.
+        """
         user = UserFactory.create()
         course_run = CourseRunFactory.create()
 
@@ -213,9 +227,16 @@ class TestEdxEnrollmentWebhook:
             "course_id": course_run.courseware_id,
             "role": "instructor",
         }
-        response = self._post_webhook(api_client, payload, token=oauth_token.token)
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Failed to create enrollment" in response.data["error"]
+        with pytest.raises(Exception, match="Unexpected error"):
+            self._post_webhook(api_client, payload, token=oauth_token.token)
+
+        # The role is recorded before the enrollment precisely so it survives
+        # this. They are independent facts, and Open edX has already granted
+        # the role whether or not we manage to mirror the enrollment. It is not
+        # rolled back by the exception because ATOMIC_REQUESTS is off.
+        assert CourseRunAccessRole.objects.filter(
+            user=user, run=course_run, role="instructor"
+        ).exists()
 
     def test_already_enrolled_user(self, api_client, oauth_token):
         """Test that webhook succeeds for an already-enrolled user (idempotent)"""
@@ -318,6 +339,136 @@ class TestEdxEnrollmentWebhook:
         )
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
+    @pytest.mark.parametrize("role", ["instructor", "staff"])
+    def test_course_staff_role_is_recorded(self, api_client, oauth_token, role):
+        """A course staff role in the payload is recorded against the run"""
+        user = UserFactory.create()
+        course_run = CourseRunFactory.create()
+
+        response = self._post_webhook(
+            api_client,
+            {
+                "email": user.email,
+                "course_id": course_run.courseware_id,
+                "role": role,
+            },
+            token=oauth_token.token,
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert CourseRunAccessRole.objects.filter(
+            user=user, run=course_run, role=role
+        ).exists()
+
+    def test_recording_a_role_twice_keeps_one_row(self, api_client, oauth_token):
+        """
+        The same role arriving twice leaves one row.
+
+        Open edX re-emits COURSE_ACCESS_ROLE_ADDED if a role is re-granted, and
+        the backfill command can overlap with live events, so the endpoint has
+        to be idempotent.
+        """
+        user = UserFactory.create()
+        course_run = CourseRunFactory.create()
+        payload = {
+            "email": user.email,
+            "course_id": course_run.courseware_id,
+            "role": "staff",
+        }
+
+        first = self._post_webhook(api_client, payload, token=oauth_token.token)
+        second = self._post_webhook(api_client, payload, token=oauth_token.token)
+
+        assert first.status_code == status.HTTP_201_CREATED
+        assert second.status_code == status.HTTP_200_OK
+        assert (
+            CourseRunAccessRole.objects.filter(
+                user=user, run=course_run, role="staff"
+            ).count()
+            == 1
+        )
+
+    def test_role_grant_does_not_reactivate_a_deactivated_enrollment(
+        self, api_client, oauth_token
+    ):
+        """
+        A role grant leaves a deactivated enrollment deactivated.
+
+        Someone unenrolling is a decision. Re-granting a role, or re-running
+        the backfill over rows that already existed, is not an enrollment event
+        and must not quietly reverse it. An enrollment event -- a payload with
+        a mode -- still reactivates, because that is Open edX telling us the
+        user really was enrolled again.
+        """
+        user = UserFactory.create()
+        course_run = CourseRunFactory.create()
+        enrollment = CourseRunEnrollment.all_objects.create(
+            user=user,
+            run=course_run,
+            edx_enrolled=True,
+            enrollment_mode="audit",
+            active=False,
+        )
+
+        role_only = self._post_webhook(
+            api_client,
+            {
+                "email": user.email,
+                "course_id": course_run.courseware_id,
+                "role": "staff",
+            },
+            token=oauth_token.token,
+        )
+
+        assert role_only.status_code == status.HTTP_200_OK
+        enrollment.refresh_from_db()
+        assert enrollment.active is False
+        # The role is still recorded -- that is the part a role grant is about.
+        assert CourseRunAccessRole.objects.filter(
+            user=user, run=course_run, role="staff"
+        ).exists()
+
+        # An actual enrollment event does reactivate.
+        self._post_webhook(
+            api_client,
+            {
+                "email": user.email,
+                "course_id": course_run.courseware_id,
+                "mode": EDX_ENROLLMENT_AUDIT_MODE,
+            },
+            token=oauth_token.token,
+        )
+        enrollment.refresh_from_db()
+        assert enrollment.active is True
+
+    @pytest.mark.parametrize("role", ["data_researcher", "beta_testers", ""])
+    def test_non_staff_role_is_not_recorded(self, api_client, oauth_token, role):
+        """
+        Roles outside OPENEDX_COURSE_STAFF_ROLES are not recorded, so they
+        cannot switch the dashboard's early access on.
+
+        Not the same as "roles Open edX keeps out before the start date" -
+        beta testers get in early too, via days_early_for_beta. We just do not
+        mirror that.
+        """
+        user = UserFactory.create()
+        course_run = CourseRunFactory.create()
+
+        response = self._post_webhook(
+            api_client,
+            {
+                "email": user.email,
+                "course_id": course_run.courseware_id,
+                "role": role,
+            },
+            token=oauth_token.token,
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert not CourseRunAccessRole.objects.filter(
+            user=user, run=course_run
+        ).exists()
+
 
 class TestEdxCertificateWebhook:
     """Tests for the edx_certificate_webhook view"""
@@ -410,9 +561,6 @@ class TestEdxCertificateWebhook:
             "audit_passed",
         ],
     )
-    # Certificate creation catches exceptions broadly and logs them, so without
-    # this the zeal warning surfaces only as a missing certificate.
-    @pytest.mark.zeal_allow("cms.CertificatePage", "get()")
     def test_certificate_status(  # noqa: PLR0913
         self,
         mocker,
@@ -458,9 +606,6 @@ class TestEdxCertificateWebhook:
             == cert_should_exist
         )
 
-    # Certificate creation catches exceptions broadly and logs them, so without
-    # this the zeal warning surfaces only as a missing certificate.
-    @pytest.mark.zeal_allow("cms.CertificatePage", "get()")
     def test_idempotent_certificate_already_exists(
         self,
         mocker,
@@ -512,3 +657,207 @@ class TestEdxCertificateWebhook:
             ).count()
             == 1
         )
+
+
+NOTIFICATION_PREFERENCES_URL = "notification-preferences"
+
+PREFERENCES_PAYLOAD = {
+    "status": "success",
+    "show_preferences": True,
+    "show_email_preferences": True,
+    "data": {
+        "discussion": {
+            "enabled": True,
+            "non_editable": [],
+            "notification_types": {
+                "new_discussion_post": {
+                    "web": False,
+                    "push": False,
+                    "email": False,
+                    "email_cadence": "Daily",
+                    "info": "",
+                }
+            },
+        }
+    },
+}
+
+
+def test_notification_preferences_requires_auth(client):
+    """Anonymous users cannot read notification preferences"""
+    response = client.get(reverse(NOTIFICATION_PREFERENCES_URL))
+    assert response.status_code in (
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_403_FORBIDDEN,
+    )
+
+
+def test_notification_preferences_get(mocker, user_client, user):
+    """GET proxies the learner's preferences straight through"""
+    api_mock = mocker.patch(
+        "openedx.views.get_notification_preferences",
+        return_value=PREFERENCES_PAYLOAD,
+    )
+
+    response = user_client.get(reverse(NOTIFICATION_PREFERENCES_URL))
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == PREFERENCES_PAYLOAD
+    api_mock.assert_called_once_with(user)
+
+
+def test_notification_preferences_get_not_synced(mocker, user_client):
+    """A learner without Open edX auth gets a 409, not a 500"""
+    mocker.patch(
+        "openedx.views.get_notification_preferences",
+        side_effect=NoEdxApiAuthError("not synced"),
+    )
+
+    response = user_client.get(reverse(NOTIFICATION_PREFERENCES_URL))
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert "detail" in response.json()
+
+
+def test_notification_preferences_get_upstream_error(mocker, user_client):
+    """An upstream failure surfaces as a 502"""
+    mocker.patch(
+        "openedx.views.get_notification_preferences",
+        side_effect=EdxApiNotificationPreferencesError("boom"),
+    )
+
+    response = user_client.get(reverse(NOTIFICATION_PREFERENCES_URL))
+
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {
+            "notification_app": "discussion",
+            "notification_type": "new_discussion_post",
+            "notification_channel": "web",
+            "value": True,
+        },
+        {
+            "notification_app": "discussion",
+            "notification_type": "grouped_notification",
+            "notification_channel": "email_cadence",
+            "email_cadence": "Weekly",
+        },
+    ],
+)
+def test_notification_preferences_put(mocker, user_client, user, body):
+    """PUT forwards a validated single-field change"""
+    api_mock = mocker.patch(
+        "openedx.views.update_notification_preference",
+        return_value={"status": "success"},
+    )
+
+    response = user_client.put(
+        reverse(NOTIFICATION_PREFERENCES_URL), body, content_type="application/json"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    api_mock.assert_called_once_with(user, body)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        # boolean channel with no value
+        {
+            "notification_app": "discussion",
+            "notification_type": "new_discussion_post",
+            "notification_channel": "email",
+        },
+        # cadence channel with no cadence
+        {
+            "notification_app": "discussion",
+            "notification_type": "new_discussion_post",
+            "notification_channel": "email_cadence",
+        },
+        # unknown channel
+        {
+            "notification_app": "discussion",
+            "notification_type": "new_discussion_post",
+            "notification_channel": "carrier_pigeon",
+            "value": True,
+        },
+        # bad cadence
+        {
+            "notification_app": "discussion",
+            "notification_type": "new_discussion_post",
+            "notification_channel": "email_cadence",
+            "email_cadence": "Hourly",
+        },
+        # missing required identifiers
+        {"notification_channel": "web", "value": True},
+    ],
+)
+def test_notification_preferences_put_validation(mocker, user_client, body):
+    """Malformed changes are rejected locally, never forwarded to the LMS"""
+    api_mock = mocker.patch("openedx.views.update_notification_preference")
+
+    response = user_client.put(
+        reverse(NOTIFICATION_PREFERENCES_URL), body, content_type="application/json"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    api_mock.assert_not_called()
+
+
+def test_notification_preferences_put_not_synced(mocker, user_client):
+    """A learner without Open edX auth gets a 409 on write too"""
+    mocker.patch(
+        "openedx.views.update_notification_preference",
+        side_effect=NoEdxApiAuthError("not synced"),
+    )
+
+    response = user_client.put(
+        reverse(NOTIFICATION_PREFERENCES_URL),
+        {
+            "notification_app": "discussion",
+            "notification_type": "new_discussion_post",
+            "notification_channel": "web",
+            "value": True,
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+
+
+def test_notification_preferences_put_throttled_upstream(mocker, user_client):
+    """An LMS throttle is passed through as a 429, not flattened to a 502"""
+    mocker.patch(
+        "openedx.views.update_notification_preference",
+        side_effect=EdxApiNotificationPreferencesError("slow down", status_code=429),
+    )
+
+    response = user_client.put(
+        reverse(NOTIFICATION_PREFERENCES_URL),
+        {
+            "notification_app": "discussion",
+            "notification_type": "new_discussion_post",
+            "notification_channel": "web",
+            "value": True,
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+    assert "wait a moment" in response.json()["detail"]
+
+
+def test_notification_preferences_get_throttled_upstream(mocker, user_client):
+    """A throttled read is also passed through as a 429"""
+    mocker.patch(
+        "openedx.views.get_notification_preferences",
+        side_effect=EdxApiNotificationPreferencesError("slow down", status_code=429),
+    )
+
+    response = user_client.get(reverse(NOTIFICATION_PREFERENCES_URL))
+
+    assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS

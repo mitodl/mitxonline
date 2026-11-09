@@ -17,7 +17,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Manager, Prefetch, Q
+from django.db.models import Count, F, Manager, Prefetch, Q
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
 from pydantic import BaseModel, ConfigDict, Field
@@ -89,6 +89,7 @@ from ecommerce.models import (
     Discount,
     DiscountProduct,
     Order,
+    OrderStatus,
     Product,
 )
 from hubspot_sync.task_helpers import sync_hubspot_cart_add
@@ -299,13 +300,24 @@ def move_run_to_retirement_contract(run: CourseRun) -> ContractPage:
 
     contract = get_or_create_retirement_contract()
 
-    if run.b2b_contracts.filter(pk=contract.pk).exists():
+    # The holding contract is inactive, so the (active-only) related manager
+    # can't be used to look at the run's current contracts.
+    current_contract_ids = set(
+        CourseRun.b2b_contracts.through.objects.filter(courserun_id=run.pk).values_list(
+            "contractpage_id", flat=True
+        )
+    )
+
+    if current_contract_ids == {contract.pk}:
         return contract
 
     check_retirement_contract_collision(run, contract)
 
-    run.b2b_contract = contract
-    run.save()
+    other_contract_ids = current_contract_ids - {contract.pk}
+    if other_contract_ids:
+        CourseRun.b2b_contracts.through.objects.filter(courserun_id=run.pk).exclude(
+            contractpage_id=contract.pk
+        ).delete()
     run.b2b_contracts.add(contract)
 
     log.info("Moved course run %s to %s", run.courseware_id, contract)
@@ -706,9 +718,7 @@ def create_contract_run(  # noqa: PLR0913
                 variant_industry=clone_course_run.variant_industry,
                 variant_length=clone_course_run.variant_length,
             )
-            .filter(
-                Q(b2b_contract=contract) | Q(b2b_contracts__in=[contract]),
-            )
+            .filter(b2b_contracts=contract)
             .exists()
             and no_reruns
         ):
@@ -731,7 +741,6 @@ def create_contract_run(  # noqa: PLR0913
             certificate_available_date=start_date,
             is_self_paced=True,
             live=True,
-            b2b_contract=contract,
             b2b_only=True,
             language=clone_course_run.language,
             is_primary_language=clone_course_run.is_primary_language,
@@ -795,10 +804,6 @@ def create_contract_run(  # noqa: PLR0913
     if queue_codes:
         queue_enrollment_code_check.delay(contract.id)
 
-    # Saving the contract does not generate enrollment codes; ContractPage.save
-    # only sets the title. Pass queue_codes, or queue the check separately.
-    contract.save()
-
     return results
 
 
@@ -842,33 +847,29 @@ def is_product_program(product) -> bool:
     return isinstance(product.purchasable_object, Program)
 
 
-def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> bool:
+def is_discount_supplied_for_b2b_purchase(
+    basket: Basket, active_contracts=None
+) -> bool:
     """
     Check if a discount is supplied for B2B purchase.
 
     Args:
-        request: The HTTP request object containing the basket data.
+        basket: The basket being purchased, owned by the purchasing user.
         active_contracts: List of active contracts to check against.
 
     Returns:
         bool: True if discount is supplied or not needed, False otherwise.
     """
-    from ecommerce.api import establish_basket  # noqa: PLC0415
-
     if not active_contracts:
         # No contracts = nothing to validate
         return True
-
-    basket = establish_basket(request)
-    if not basket:
-        return False
 
     free_contracts, nonfree_contracts = get_free_and_nonfree_contracts(active_contracts)
 
     # Find free contracts the user is NOT associated with
     remaining_free_contract_qset = ContractPage.objects.filter(
         Q(pk__in=[c.pk for c in free_contracts])
-        & ~Q(pk__in=request.user.b2b_contracts.values_list("pk", flat=True))
+        & ~Q(pk__in=basket.user.b2b_contracts.values_list("pk", flat=True))
     )
 
     if not remaining_free_contract_qset.exists() and not nonfree_contracts:
@@ -908,7 +909,7 @@ def get_active_contracts_from_basket_items(basket: Basket):
     return []
 
 
-def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
+def validate_basket_for_b2b_purchase(basket: Basket, active_contracts=None) -> bool:
     """
     Validate the basket for a B2B purchase.
 
@@ -922,16 +923,11 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     linked to contracts the user's also associated with.
 
     Args:
-        request: The HTTP request object containing the basket data.
+        basket: The basket being purchased, owned by the purchasing user.
+        active_contracts: List of active contracts to check against.
 
     Returns: bool, True if the basket is valid for B2B purchase, False otherwise.
     """
-    from ecommerce.api import establish_basket  # noqa: PLC0415
-
-    basket = establish_basket(request)
-    if not basket:
-        return False
-
     if not active_contracts:
         active_contracts = []
 
@@ -940,7 +936,7 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     # Find free contracts the user is NOT associated with
     remaining_free_contract_qset = ContractPage.objects.filter(
         Q(pk__in=[c.pk for c in free_contracts])
-        & ~Q(pk__in=request.user.b2b_contracts.values_list("pk", flat=True))
+        & ~Q(pk__in=basket.user.b2b_contracts.values_list("pk", flat=True))
     )
 
     if not remaining_free_contract_qset.exists() and not nonfree_contracts:
@@ -1679,16 +1675,33 @@ def _prepare_basket_for_b2b_enrollment(
     return basket
 
 
-def _apply_available_discount(
-    request, product: Product, basket: Basket, contract: ContractPage
-) -> None:
-    """Apply available discount to the basket if one exists."""
+def _get_or_create_contract_discount(
+    product: Product, contract: ContractPage
+) -> Discount:
+    """
+    Get an available enrollment code for the product, or create one.
 
-    # Changed to only check redemption count if the discount isn't unlimited -
-    # which it will be if the contract has unlimited seats - and order by ID
-    # so it matches what we send out to people.
+    A code is available if it hasn't been used for an order yet, or if it's
+    unlimited (which it will be if the contract has unlimited seats). Codes are
+    ordered by ID so the one picked matches what we send out to people.
+
+    Raises:
+        ValueError: if the product isn't for a course run in the contract.
+    """
+
     applicable_discounts_qs = (
-        product.discounts.annotate(redemptions=Count("discount__order_redemptions"))
+        product.discounts.annotate(
+            redemptions=Count(
+                "discount__order_redemptions",
+                filter=Q(
+                    discount__order_redemptions__redeemed_order__state__in=[
+                        OrderStatus.FULFILLED,
+                        OrderStatus.REFUNDED,
+                        OrderStatus.PARTIALLY_REFUNDED,
+                    ]
+                ),
+            ),
+        )
         .filter(
             discount__is_bulk=True,
             discount__products__product=product,
@@ -1701,37 +1714,43 @@ def _apply_available_discount(
     )
 
     if applicable_discounts_qs.exists():
-        # We have unused codes for this product, so we should apply one.
-        discount = applicable_discounts_qs.first().discount
-    else:
-        # At this point we've checked for available seats, and we've checked for
-        # an appropriate discount, and we couldn't find one, so now we need to
-        # make one for the learner (or for the contract).
+        # We have unused codes for this product, so we should use one.
+        return applicable_discounts_qs.first().discount
 
-        if (
-            not product.purchasable_object
-            or not product.purchasable_object.b2b_contracts.filter(
-                pk=contract.id
-            ).exists()
-        ):
-            msg = f"Product {product} has no purchasable object or the purchasable object is not in contract {contract}"
-            raise ValueError(msg)
+    # We've checked for an appropriate discount, and we couldn't find one, so
+    # now we need to make one for the learner (or for the contract).
 
-        discount_amount = contract.enrollment_fixed_price
-        redemption_type = (
-            REDEMPTION_TYPE_ONE_TIME
-            if contract.max_learners and contract.max_learners > 0
-            else REDEMPTION_TYPE_UNLIMITED
-        )
+    if (
+        not product.purchasable_object
+        or not product.purchasable_object.b2b_contracts.filter(pk=contract.id).exists()
+    ):
+        msg = f"Product {product} has no purchasable object or the purchasable object is not in contract {contract}"
+        raise ValueError(msg)
 
-        log.error("B2B enroll: had to create a discount for %s", product)
+    discount_amount = contract.enrollment_fixed_price
+    redemption_type = (
+        REDEMPTION_TYPE_ONE_TIME
+        if contract.max_learners and contract.max_learners > 0
+        else REDEMPTION_TYPE_UNLIMITED
+    )
 
-        discount = _create_discount_with_product(
-            contract,
-            product,
-            discount_amount if discount_amount else Decimal(0),
-            redemption_type,
-        )
+    discount = _create_discount_with_product(
+        contract,
+        product,
+        discount_amount if discount_amount else Decimal(0),
+        redemption_type,
+    )
+    log.error("B2B enroll: had to create a discount for %s", product)
+
+    return discount
+
+
+def _apply_available_discount(
+    request, product: Product, basket: Basket, contract: ContractPage
+) -> None:
+    """Apply available discount to the basket if one exists."""
+
+    discount = _get_or_create_contract_discount(product, contract)
 
     basket_discount = BasketDiscount.objects.create(
         redemption_date=now_in_utc(),
@@ -1740,6 +1759,86 @@ def _apply_available_discount(
         redeemed_basket=basket,
     )
     basket_discount.save()
+
+
+def apply_contract_discounts_to_basket(basket: Basket) -> list[BasketItem]:
+    """
+    Apply enrollment codes for the basket user's contracts to the basket.
+
+    A learner can add a course run to their basket through the regular cart
+    flow when the run is also in a contract they belong to. In that case they
+    should get the contract's pricing, so this finds (or creates) the
+    contract's enrollment code for the product and applies it. If the code
+    wins - i.e. it prices the item at or below whatever the basket already
+    charges for it - the basket item is tied to the contract, so the order line
+    and enrollment are recorded against it.
+
+    An item that's already tied to a contract only gets that contract's code,
+    and only if the learner is in the contract - otherwise the learner has to
+    supply a code themselves, so it's left alone. Only course run products are
+    considered, since contract enrollment codes are only made for course runs.
+    If the learner is in more than one contract with the run, the cheapest
+    contract is used (lowest ID on a tie).
+
+    This should run after any other discounts are applied, so the basket ends
+    up with the contract's code whenever it's tied an item to the contract.
+
+    Args:
+        basket (Basket): the basket to check
+    Returns:
+        list of BasketItem: the items that were tied to a contract
+    """
+    from ecommerce.api import apply_discount_to_basket  # noqa: PLC0415
+
+    user = basket.user
+    if not user or not user.is_authenticated:
+        return []
+
+    course_run_ct = ContentType.objects.get_for_model(CourseRun)
+    items = basket.basket_items.filter(
+        product__content_type=course_run_ct
+    ).select_related("product")
+    updated_items = []
+
+    for item in items:
+        contracts_qs = ContractPage.active_objects.filter(
+            users=user, course_runs__id=item.product.object_id
+        )
+        if item.b2b_contract_id:
+            contracts_qs = contracts_qs.filter(pk=item.b2b_contract_id)
+
+        contract = contracts_qs.order_by(
+            F("enrollment_fixed_price").asc(nulls_first=True), "id"
+        ).first()
+
+        if not contract:
+            continue
+
+        with transaction.atomic():
+            lock_contract_for_code_assignment(contract)
+            discount = _get_or_create_contract_discount(item.product, contract)
+
+        if not basket.discounts.filter(redeemed_discount=discount).exists():
+            apply_discount_to_basket(basket, discount)
+
+            if not basket.discounts.filter(redeemed_discount=discount).exists():
+                # Something else in the basket is a better deal.
+                continue
+
+            log.info(
+                "Applied contract %s code %s to basket %s for %s",
+                contract,
+                discount,
+                basket,
+                item.product,
+            )
+
+        if not item.b2b_contract_id:
+            item.b2b_contract = contract
+            item.save(update_fields=["b2b_contract", "updated_on"])
+            updated_items.append(item)
+
+    return updated_items
 
 
 def create_b2b_enrollment(
@@ -1827,7 +1926,9 @@ def create_b2b_enrollment(
 
     if basket_price == 0:
         # This call should go ahead and fulfill the order.
-        response = generate_checkout_payload(request)
+        response = generate_checkout_payload(
+            request, basket=basket, raise_compliance_data_errors=True
+        )
 
         if "no_checkout" in response:
             # Course run enrollment succeeded - now handle program enrollment
@@ -1911,7 +2012,7 @@ def _enroll_in_program_for_b2b(
     )
 
 
-def reconcile_user_orgs(user, organizations):
+def reconcile_user_orgs(user, organizations, *, session_auth_time=None):
     """
     Reconcile the specified user with the provided organization list.
 
@@ -1938,6 +2039,12 @@ def reconcile_user_orgs(user, organizations):
     try to keep the query count low. The cache is a list of tuples of (org_uuid,
     not_expected_in_payload).
 
+    The user may have more than one APISIX session open, and each one carries
+    the org list from when it was created, so an older session can have stale
+    data. If session_auth_time is given, we keep the newest one we've seen for
+    the user in redis and skip reconciliation for any session older than that.
+    Otherwise, the older session would undo changes the newer one picked up.
+
     If the user is enrolled in any courses that are in a contract they'll be
     removed from, they will be left there. Not real sure what we should do in
     that case.
@@ -1945,15 +2052,53 @@ def reconcile_user_orgs(user, organizations):
     Args:
     - user (User): the user to work with
     - organizations (dict[str]): UUIDs of the organizations for the user
+    - session_auth_time (int|None): when the user authenticated for the session
+      the organizations came from (epoch seconds), if known
 
     Returns:
     - tuple(int, int); contracts added and contracts removed
     """
 
-    user_org_cache_key = f"org-membership-cache-{user.id}"
+    user_org_cache_key = main_constants.B2B_USER_ORG_MEMBERSHIP_CACHE.format(
+        user.global_id
+    )
+
+    log.debug("reconcile_user_orgs: --> start - user %s", user.global_id)
+
+    if session_auth_time is not None:
+        latest_session_cache_key = main_constants.B2B_USER_LATEST_SESSION_CACHE.format(
+            user.global_id
+        )
+        latest_session_auth_time = caches["redis"].get(latest_session_cache_key)
+
+        if (
+            latest_session_auth_time is not None
+            and session_auth_time < latest_session_auth_time
+        ):
+            log.debug(
+                "reconcile_user_orgs: there's a newer session for user %s - skipping reconciliation (%s vs %s)",
+                user.global_id,
+                session_auth_time,
+                latest_session_auth_time,
+            )
+            return (
+                0,
+                0,
+            )
+
+        # Refresh the timeout on every request so the mark doesn't expire out
+        # from under a session that's still in use.
+        caches["redis"].set(
+            latest_session_cache_key,
+            session_auth_time,
+            timeout=settings.B2B_USER_LATEST_SESSION_CACHE_TIMEOUT,
+        )
+
     cached_org_membership = caches["redis"].get(user_org_cache_key, False)
 
-    if cached_org_membership:
+    if cached_org_membership is not False:
+        log.debug("reconcile_user_orgs: orgs passed: %s", ",".join(organizations))
+        log.debug("reconcile_user_orgs: cached membership: %s", cached_org_membership)
         cached_expected_org_membership = [
             str(org_id)
             for org_id, not_expected_in_payload in cached_org_membership
@@ -1961,16 +2106,18 @@ def reconcile_user_orgs(user, organizations):
         ]
 
         if sorted(cached_expected_org_membership) == sorted(organizations):
-            log.info(
-                "reconcile_user_orgs: everything OK, skipping reconcilation for %s",
+            log.debug(
+                "reconcile_user_orgs: everything OK, skipping reconcilation for %s (cache %s - sent %s)",
                 user.id,
+                ",".join(cached_expected_org_membership),
+                ",".join(organizations),
             )
             return (
                 0,
                 0,
             )
 
-    log.info("reconcile_user_orgs: running reconcilation for %s", user.id)
+    log.debug("reconcile_user_orgs: running reconcilation for %s", user.id)
 
     # we've checked the cached org membership, so now figure out what orgs
     # we're in but aren't in the list, and vice versa
@@ -1993,12 +2140,12 @@ def reconcile_user_orgs(user, organizations):
         )
 
         add_org.add_user_contracts(user)
-        log.info("reconcile_user_orgs: added user %s to org %s", user.id, add_org)
+        log.debug("reconcile_user_orgs: added user %s to org %s", user.id, add_org)
 
     for remove_org in orgs_to_remove:
         # remove org, remove contracts
         remove_org.organization.remove_user_contracts(user)
-        log.info(
+        log.debug(
             "reconcile_user_orgs: removed user %s from org %s", user.id, remove_org
         )
         remove_org.delete()
@@ -2013,8 +2160,14 @@ def reconcile_user_orgs(user, organizations):
         organization__sso_organization_id__in=organizations, keep_until_seen=True
     ).update(keep_until_seen=False)
 
-    user_org_cache_key = f"org-membership-cache-{user.id}"
     caches["redis"].set(user_org_cache_key, sorted(orgs))
+
+    log.debug(
+        "reconcile_user_orgs: set cache for key %s (user %s) to %s",
+        user_org_cache_key,
+        user.id,
+        ",".join([cachedata[0] for cachedata in sorted(orgs)]),
+    )
 
     return (len(orgs_to_add), len(orgs_to_remove))
 
@@ -2156,7 +2309,9 @@ def reconcile_keycloak_orgs():
                     ).exists()
                 )
                 if linked:
-                    page.organization_users.update(keep_until_seen=True)
+                    page.organization_users.update(
+                        keep_until_seen=True, added_to_keycloak_at=None
+                    )
 
                 if created:
                     parent_org_page.add_child(instance=page)
@@ -2342,6 +2497,29 @@ def add_user_org_membership(org, user):
     return org_model.associate("members", org.sso_organization_id, user.global_id)
 
 
+def lock_contract_for_code_assignment(contract: ContractPage) -> None:
+    """
+    Serialize code assignment for a contract until the transaction ends.
+
+    Assigning checks which codes are free and then inserts assignment rows.
+    Locking the candidate discounts would not close that gap, because a
+    concurrent assignment inserts a redemption row and never updates the
+    discount, so Postgres has nothing to re-check. Holding the contract row
+    instead makes the second request wait and then read the first one's rows.
+    Only the contract's own table is locked, not the Wagtail page row.
+
+    FOR NO KEY UPDATE serializes callers of this against each other but does
+    not conflict with the key-share lock an insert referencing the contract
+    takes. A transaction may therefore take this after writing rows that
+    reference the contract without deadlocking another caller, and those
+    writes elsewhere don't wait on an assignment holding it.
+    """
+
+    ContractPage.objects.select_for_update(of=("self",), no_key=True).get(
+        pk=contract.pk
+    )
+
+
 def process_add_org_membership(user, organization, *, keep_until_seen=False):
     """
     Add a user to an org, and kick off contract processing.
@@ -2364,8 +2542,12 @@ def process_add_org_membership(user, organization, *, keep_until_seen=False):
         obj.keep_until_seen = keep_until_seen
         obj.save()
         try:
-            organization.attach_user(user)
-        except ConnectionError:
+            if organization.attach_user(user):
+                obj.added_to_keycloak_at = now_in_utc()
+                obj.save(update_fields=["added_to_keycloak_at"])
+        # requests' ConnectionError and Timeout are not the builtin
+        # ConnectionError, so Keycloak being unreachable needs the second one.
+        except (ConnectionError, requests.exceptions.RequestException):
             log.exception(
                 "Could not attach %s to Keycloak org for %s", user, organization
             )
@@ -2518,9 +2700,15 @@ def process_mailgun_webhook_for_enrollment_code_emails(payload):
     # Save it to the row corresponding to the event we just got and move on with our lives
     message_id = event_data["message"]["headers"]["message-id"]
     message_timestamp = datetime.fromtimestamp(event_data["timestamp"], tz=UTC)
-    assignment = DiscountContractAttachmentRedemption.objects.get(
+    assignment = DiscountContractAttachmentRedemption.objects.filter(
         email_message_id=message_id
-    )
+    ).first()
+
+    # This can happen if a user was sent a reminder and then later clicks on the original email.
+    # The DCAR currently only tracks the most recently sent email, so if the user clicks on an older one,
+    # we won't have a record of it. In that case, we just ignore the event.
+    if not assignment:
+        return None
 
     # We want to store event with the most recent timestamp we get from mailgun.
     # Event receipt/processing is not guaranteed to be chronologically ordered, so this prevents older events from

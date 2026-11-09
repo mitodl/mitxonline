@@ -117,6 +117,12 @@ class Command(BaseCommand):
             default=None,
             help="Base URL to send the webhook to. Defaults to settings.SITE_BASE_URL.",
         )
+        parser.add_argument(
+            "--retain-message-id",
+            action="store_true",
+            default=False,
+            help="If specified, the command will not overwrite the message_id on the record, and will use the existing one instead.",
+        )
 
     def handle(self, *args, **kwargs):  # noqa: ARG002
         """Send the synthetic webhook payload. This won't work with signature validation enabled"""
@@ -124,6 +130,7 @@ class Command(BaseCommand):
         record_id = kwargs["record_id"]
         event_type = kwargs["event_type"]
         host = kwargs["host"] or settings.SITE_BASE_URL
+        retain_message_id = kwargs["retain_message_id"]
 
         try:
             record = DiscountContractAttachmentRedemption.objects.get(pk=record_id)
@@ -131,11 +138,17 @@ class Command(BaseCommand):
             msg = f"DiscountContractAttachmentRedemption {record_id} does not exist."
             raise CommandError(msg) from None
 
-        message_id = kwargs["message_id"] or (
-            f"{uuid.uuid4().hex}@{settings.MAILGUN_SENDER_DOMAIN}"
-        )
-        record.email_message_id = message_id
-        record.save()
+        if not retain_message_id:
+            message_id = kwargs["message_id"] or (
+                f"{uuid.uuid4().hex}@{settings.MAILGUN_SENDER_DOMAIN}"
+            )
+            record.email_message_id = message_id
+            record.save()
+        else:
+            # Either use the message ID passed in (useful for testing negative cases where one should not be found)
+            # or use the existing one on the record as shorthand for the
+            # happy path where you just want to move a specific record along
+            message_id = kwargs["message_id"] or record.email_message_id
 
         self.stdout.write(f"Using message ID {message_id} for record {record_id}.")
 

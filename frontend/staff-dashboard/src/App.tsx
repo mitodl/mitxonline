@@ -13,7 +13,11 @@ import { DashboardPage } from "pages/dashboard";
 import { DiscountList, DiscountEdit, DiscountShow, DiscountCreate, BulkDiscountCreate } from "pages/discounts";
 import { FlexiblePricingList } from "./pages/flexible_pricing";
 import {
+  ContractCreate,
+  ContractEdit,
+  ContractShow,
   IdentityProviderCreate,
+  IdentityProviderEdit,
   OrganizationCreate,
   OrganizationEdit,
   OrganizationList,
@@ -140,6 +144,38 @@ export default function App() {
                 element={
                   <CanAccess resource={PROVISIONING_RESOURCE} action="create" fallback={<ErrorComponent />}>
                     <IdentityProviderCreate />
+                  </CanAccess>
+                }
+              />
+              <Route
+                path="/b2b_organizations/show/:orgKey/identity-providers/:alias/edit"
+                element={
+                  <CanAccess resource={PROVISIONING_RESOURCE} action="edit" fallback={<ErrorComponent />}>
+                    <IdentityProviderEdit />
+                  </CanAccess>
+                }
+              />
+              <Route
+                path="/b2b_organizations/show/:orgKey/contracts/create"
+                element={
+                  <CanAccess resource={PROVISIONING_RESOURCE} action="create" fallback={<ErrorComponent />}>
+                    <ContractCreate />
+                  </CanAccess>
+                }
+              />
+              <Route
+                path="/b2b_organizations/show/:orgKey/contracts/:contractId"
+                element={
+                  <CanAccess resource={PROVISIONING_RESOURCE} action="show" fallback={<ErrorComponent />}>
+                    <ContractShow />
+                  </CanAccess>
+                }
+              />
+              <Route
+                path="/b2b_organizations/show/:orgKey/contracts/:contractId/edit"
+                element={
+                  <CanAccess resource={PROVISIONING_RESOURCE} action="edit" fallback={<ErrorComponent />}>
+                    <ContractEdit />
                   </CanAccess>
                 }
               />
