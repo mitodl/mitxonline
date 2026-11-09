@@ -104,8 +104,7 @@ def checkout_validate_basket(request, basket, options):
 
     Raises:
     - ExportComplianceDataError: if the user's profile can't be checked for
-      export compliance. generate_checkout_payload turns this into a
-      profile_incomplete payload, or re-raises it if asked to.
+      export compliance and raise_compliance_data_errors is set to True
     """
 
 
