@@ -89,6 +89,7 @@ from openedx.exceptions import (
     EdxApiNotificationPreferencesError,
     EdxApiRegistrationValidationException,
     EdxApiUserUpdateError,
+    EdxEnrollmentsJwtError,
     NoEdxApiAuthError,
     OpenEdXOAuth2Error,
     OpenEdxUserMissingError,
@@ -1372,6 +1373,45 @@ def test_unenroll_edx_course_run_v2_token_failure(
     assert exc_info.value.base_exc is token_error
 
 
+def _reject_jwt_and_fail_its_refresh(method, url, body):
+    """
+    Mock edX rejecting the first enrollments JWT, then refusing the request
+    for a new one
+    """
+    token_url = f"http://example.com{OPENEDX_OAUTH2_ACCESS_TOKEN_PATH}"
+    responses.add(
+        responses.POST,
+        token_url,
+        json={"access_token": "rejected_jwt", "expires_in": 3600},
+    )
+    responses.add(responses.POST, token_url, status=status.HTTP_401_UNAUTHORIZED)
+    responses.add(
+        method,
+        f"http://example.com{url}",
+        json=body,
+        status=status.HTTP_401_UNAUTHORIZED,
+    )
+
+
+@responses.activate
+def test_unenroll_edx_course_run_v2_jwt_refresh_failure(enrollments_v2_settings):
+    """
+    A failed request for a new JWT after edX rejects the cached one is raised
+    as UnknownEdxApiEnrollException, not as a 4xx from the enrollment call that
+    would count against the enrollment's retries
+    """
+    run_enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
+    _reject_jwt_and_fail_its_refresh(
+        responses.POST, CourseEnrollmentsV2.enrollment_url, {}
+    )
+
+    with pytest.raises(UnknownEdxApiEnrollException) as exc_info:
+        unenroll_edx_course_run(run_enrollment)
+
+    assert isinstance(exc_info.value.base_exc, EdxEnrollmentsJwtError)
+    assert _is_permanent_enrollment_failure(exc_info.value) is False
+
+
 @pytest.mark.parametrize(
     ("failure", "expected_level"),
     [
@@ -2178,6 +2218,24 @@ def test_sync_enrollments_with_edx_v2_token_failure(
     """
     CourseRunEnrollmentFactory.create(user=user, active=True)
     mocker.patch("openedx.api.get_edx_api_enrollments_client", side_effect=token_error)
+    patched_log = mocker.patch("openedx.api.log")
+
+    assert sync_enrollments_with_edx(user) == SyncResult()
+    patched_log.exception.assert_called_once()
+
+
+@responses.activate
+def test_sync_enrollments_with_edx_v2_jwt_refresh_failure(
+    mocker, enrollments_v2_settings, user
+):
+    """
+    With the v2 enrollment API, a failed request for a new JWT after edX
+    rejects the cached one is logged and the sync is skipped
+    """
+    CourseRunEnrollmentFactory.create(user=user, active=True)
+    _reject_jwt_and_fail_its_refresh(
+        responses.GET, CourseEnrollmentsV2.enrollment_url, {}
+    )
     patched_log = mocker.patch("openedx.api.log")
 
     assert sync_enrollments_with_edx(user) == SyncResult()

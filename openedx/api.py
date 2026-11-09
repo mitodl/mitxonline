@@ -53,6 +53,7 @@ from openedx.exceptions import (
     EdxApiNotificationPreferencesError,
     EdxApiRegistrationValidationException,
     EdxApiUserUpdateError,
+    EdxEnrollmentsJwtError,
     NoEdxApiAuthError,
     OpenEdXOAuth2Error,
     OpenEdxUserMissingError,
@@ -1247,8 +1248,14 @@ def _retry_with_fresh_enrollments_jwt(session):
         if response.status_code != status.HTTP_401_UNAUTHORIZED:
             return response
         cache.delete(_enrollments_jwt_cache_key())
+        try:
+            access_token = _get_enrollments_jwt()
+        except ENROLLMENTS_JWT_REQUEST_ERRORS as exc:
+            # Raised as an HTTPError, a 4xx from the token endpoint would be
+            # taken for the enrollment call's own and count against its retries.
+            raise EdxEnrollmentsJwtError from exc
         token_type = session.headers["Authorization"].split()[0]
-        session.headers["Authorization"] = f"{token_type} {_get_enrollments_jwt()}"
+        session.headers["Authorization"] = f"{token_type} {access_token}"
         retry = response.request.copy()
         retry.headers["Authorization"] = session.headers["Authorization"]
         # The retry goes out without this hook, so a 401 for the new JWT is
@@ -1711,7 +1718,7 @@ def update_edx_user_name(user):
         )
 
 
-def _get_edx_enrollments_to_sync(user):
+def _get_edx_enrollments_to_sync(user):  # noqa: PLR0911
     """
     Get the user's enrollments from edX for sync_enrollments_with_edx
 
@@ -1743,6 +1750,13 @@ def _get_edx_enrollments_to_sync(user):
         return None
     try:
         return enrollments_client.get_student_enrollments(username=user.edx_username)
+    except EdxEnrollmentsJwtError:
+        # edX rejected the cached JWT and the request for a new one failed.
+        log.exception(
+            "Skipped edX enrollment sync for %s: could not get a JWT",
+            user.edx_username,
+        )
+        return None
     except HTTPError as exc:
         # Every learner's sync now shares the service user's throttle, so
         # a busy minute shouldn't fail the dashboard load that triggered it.
