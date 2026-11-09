@@ -870,10 +870,13 @@ def test_auto_refund_request_claims_request_before_gateway_call(
     """The request is already approved, and committed, when the gateway is called."""
     request = _refund_request(fulfilled_transaction.order)
     statuses = []
-    auto_refund_gateway.side_effect = lambda *args, **kwargs: (
+    gateway_response = auto_refund_gateway.return_value
+
+    def record_status(*_args, **_kwargs):
         statuses.append(RefundRequest.objects.get(pk=request.pk).status)
-        or auto_refund_gateway.return_value
-    )
+        return gateway_response
+
+    auto_refund_gateway.side_effect = record_status
 
     assert auto_refund_request(request.id) == (True, "")
 
