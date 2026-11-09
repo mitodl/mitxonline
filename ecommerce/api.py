@@ -208,13 +208,10 @@ def _run_checkout_preflight(
     ):
         return result
 
-    if not skip_discount_check:
-        pm.hook.checkout_apply_discounts(request=request, basket=basket)
-
-        if result := pm.hook.checkout_validate_discounts(
-            request=request, basket=basket
-        ):
-            return result
+    if not skip_discount_check and (
+        result := pm.hook.checkout_validate_discounts(request=request, basket=basket)
+    ):
+        return result
 
     return pm.hook.checkout_finalize_basket(request=request, basket=basket)
 
@@ -251,6 +248,7 @@ def generate_checkout_payload(  # noqa: PLR0913
     - raise_compliance_data_errors: raise ExportComplianceDataError rather than
       returning a profile_incomplete payload (default False)
     """
+    from b2b.api import apply_contract_discounts_to_basket  # noqa: PLC0415
 
     if basket is None:
         basket = establish_basket(request)
@@ -275,6 +273,9 @@ def generate_checkout_payload(  # noqa: PLR0913
 
     if preflight_error:
         return preflight_error
+
+    if not skip_discount_check:
+        apply_contract_discounts_to_basket(basket)
 
     order = PendingOrder.create_from_basket(basket, gateway_type=gateway_type)
     total_price = 0

@@ -133,17 +133,6 @@ def test_check_basket_finalized(mocker, basket_request, b2b_error, basket_empty)
         assert result is None
 
 
-def test_apply_contract_discounts(mocker, basket_request):
-    """The apply step should pass the basket to the contract discount step."""
-
-    request, basket = basket_request
-    mocked_apply = mocker.patch("b2b.api.apply_contract_discounts_to_basket")
-
-    CheckoutPreflight().apply_contract_discounts(request, basket)
-
-    mocked_apply.assert_called_once_with(basket)
-
-
 def test_checkout_preflight_registered():
     """The pre-flight hookimpls should be registered with the plugin manager."""
 
@@ -167,10 +156,6 @@ class _Recorder:
     def validate_basket(self, request, basket):  # noqa: ARG002
         return self._record("validate_basket")
 
-    @hookimpl(specname="checkout_apply_discounts")
-    def apply_discounts(self, request, basket):  # noqa: ARG002
-        self._record("apply_discounts")
-
     @hookimpl(specname="checkout_validate_discounts")
     def validate_discounts(self, request, basket):  # noqa: ARG002
         return self._record("validate_discounts")
@@ -182,7 +167,6 @@ class _Recorder:
 
 ALL_STEPS = [
     "validate_basket",
-    "apply_discounts",
     "validate_discounts",
     "finalize_basket",
 ]
@@ -194,7 +178,7 @@ ALL_STEPS = [
         (None, False, ALL_STEPS),
         (None, True, ["validate_basket", "finalize_basket"]),
         ("validate_basket", False, ["validate_basket"]),
-        ("validate_discounts", False, ALL_STEPS[:3]),
+        ("validate_discounts", False, ALL_STEPS[:2]),
         ("validate_discounts", True, ["validate_basket", "finalize_basket"]),
         ("finalize_basket", False, ALL_STEPS),
     ],

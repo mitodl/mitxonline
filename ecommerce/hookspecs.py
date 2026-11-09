@@ -109,20 +109,6 @@ def checkout_validate_basket(request, basket, options):
     """
 
 
-@hookspec
-def checkout_apply_discounts(request, basket):
-    """
-    Apply any discounts the basket should get automatically.
-
-    This runs after checkout_validate_basket, and is skipped if the checkout
-    is set to skip discount checks. Every hook runs; return values are ignored.
-
-    Args:
-    request (HttpRequest): the current request
-    basket (Basket): the current basket
-    """
-
-
 @hookspec(firstresult=True)
 def checkout_validate_discounts(request, basket):
     """

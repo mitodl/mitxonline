@@ -123,14 +123,6 @@ class CheckoutPreflight:
 
         return _check_basket_purchasable(request, basket, options)
 
-    @hookimpl(specname="checkout_apply_discounts")
-    def apply_contract_discounts(self, request, basket) -> None:  # noqa: ARG002
-        """Pick up contract pricing for items in the user's contracts."""
-
-        from b2b.api import apply_contract_discounts_to_basket  # noqa: PLC0415
-
-        apply_contract_discounts_to_basket(basket)
-
     @hookimpl(specname="checkout_validate_discounts")
     def check_basket_discounts(self, request, basket) -> dict | None:
         """Call the internal function (so we can test it)"""
