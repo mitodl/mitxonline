@@ -21,8 +21,9 @@ log = logging.getLogger()
 # offending row -- on a users table that is the learner's name, email and
 # external UUID.  psycopg puts it in str(exc), so it ships inside the exception
 # value, where no SDK privacy setting reaches it: data_collection governs
-# user/cookie/header capture and max_request_body_size governs request bodies,
-# and neither touches exception text.
+# user/cookie/header capture and, through http_bodies, whether request bodies
+# are attached at all (max_request_body_size only bounds their size), and
+# neither touches exception text.
 #
 # The newline is matched both raw and as a literal backslash-n: the SDK repr()s
 # frame locals and non-string logging params during serialization, so there the
@@ -75,19 +76,31 @@ def build_event_scrubber(*, collect_user_info):
 
 
 def build_data_collection(*, collect_user_info):
-    """Return the data_collection option that matches send_default_pii.
+    """Return the data_collection option that replaces send_default_pii.
 
-    Follows sentry_sdk.data_collection._map_from_send_default_pii, which is
-    what the SDK derives from send_default_pii, so moving off the deprecated
-    option leaves collection as it was. Header and query-param terms are the
-    extra keys send_default_pii=False filtered (proxy and remote address
-    headers); the SDK's own sensitive denylist (auth, token, session, csrf,
-    ...) applies in denylist mode either way. Request bodies stay on
-    regardless: max_request_body_size in init_sentry is what bounds them.
+    Follows sentry_sdk.data_collection._map_from_send_default_pii, the
+    mapping the SDK derives from send_default_pii. Header and query-param
+    terms are the extra keys that mapping filters without user info; the
+    SDK's own sensitive denylist (auth, token, session, csrf, ...) applies in
+    denylist mode either way. Request bodies stay on regardless:
+    max_request_body_size in init_sentry is what bounds them.
 
-    One departure from that mapping: without user info, cookies are off.
-    The mapping sends them through the denylist, but send_default_pii=False
-    sent no cookies at all (RequestExtractor.extract_into_event).
+    This does not reproduce the old collection exactly:
+
+    - database_query_data is off in both modes. The mapping turns it on with
+      user info, which puts SQL bind params (learner emails and the like) in
+      db.params on Django DB spans; the old path sent none, since it only did
+      so under _experiments.record_sql_params. It also hides Redis command
+      arguments, which the old path sent with user info.
+    - Without user info, cookies are off. The mapping sends them through the
+      denylist, but send_default_pii=False sent no cookies at all
+      (RequestExtractor.extract_into_event).
+    - Without user info, the mapping's terms filter more headers than the old
+      path's fixed list (SENSITIVE_HEADERS in sentry_sdk's _wsgi_common):
+      "via" and "-user" also drop Via and X-Remote-User.
+    - Query strings are filtered in both modes. The old path sent them raw
+      (WSGI's _make_wsgi_event_processor); now the sensitive denylist, plus
+      the terms without user info, applies to their keys.
     """
     terms = [] if collect_user_info else ["forwarded", "-ip", "remote-", "via", "-user"]
     return {
@@ -102,7 +115,7 @@ def build_data_collection(*, collect_user_info):
         "url_query_params": {"mode": "denylist", "terms": terms},
         "graphql": {"document": collect_user_info, "variables": collect_user_info},
         "gen_ai": {"inputs": collect_user_info, "outputs": collect_user_info},
-        "database_query_data": collect_user_info,
+        "database_query_data": False,
         "queues": collect_user_info,
         "stack_frame_variables": True,
         "frame_context_lines": 5,

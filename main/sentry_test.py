@@ -6,10 +6,12 @@ from dataclasses import dataclass
 
 import pytest
 import sentry_sdk
-from django.test import override_settings
+from django.core.handlers.wsgi import WSGIHandler
+from django.core.signals import request_finished, request_started
+from django.db import close_old_connections
+from django.test import RequestFactory, override_settings
 from django.urls import path
 from sentry_sdk.data_collection import _map_from_send_default_pii, _resolve_explicit
-from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.scope import Scope, ScopeType, use_isolation_scope, use_scope
 from sentry_sdk.scrubber import EventScrubber
@@ -292,23 +294,20 @@ def test_scrubber_blanks_nested_secret_keys():
     assert frame_vars["data"]["alias"] == "partner"
 
 
-def _init_scrubbing_sdk(*, collect_user_info, **kwargs):
-    """Initialize the real SDK with our data_collection and scrubbing, as init_sentry does."""
-    transport = FakeTransport()
-    sentry_sdk.init(
+def _init_scrubbing_sdk(*, collect_user_info, traces_sample_rate=0):
+    """Run the real init_sentry, then swap in a transport that collects events."""
+    init_sentry(
         dsn="https://k@o0.ingest.sentry.io/0",
-        transport=transport,
-        before_send=before_send,
-        data_collection=build_data_collection(collect_user_info=collect_user_info),
-        default_integrations=False,
-        integrations=[
-            LoggingIntegration(level=logging.INFO, event_level=logging.ERROR)
-        ],
-        **kwargs,
+        environment="test",
+        version="0.0.0",
+        collect_user_info=collect_user_info,
+        log_level="INFO",
+        heroku_app_name=None,
+        traces_sample_rate=traces_sample_rate,
+        profiles_sample_rate=0,
     )
-    sentry_sdk.get_client().options["event_scrubber"] = build_event_scrubber(
-        collect_user_info=collect_user_info
-    )
+    transport = FakeTransport()
+    sentry_sdk.get_client().transport = transport
     return transport
 
 
@@ -344,7 +343,7 @@ def test_real_sdk_keeps_the_oidc_secret_out(scrubbing_sentry_transport):
 
 @pytest.mark.parametrize("collect_user_info", [True, False])
 def test_data_collection_matches_send_default_pii(collect_user_info):
-    """Resolved by the SDK, it collects exactly what send_default_pii did."""
+    """Resolved by the SDK, it matches the SDK's send_default_pii mapping, with two exceptions."""
     resolved = _resolve_explicit(
         build_data_collection(collect_user_info=collect_user_info)
     )
@@ -360,6 +359,10 @@ def test_data_collection_matches_send_default_pii(collect_user_info):
         # send them through its denylist instead.
         assert resolved.pop("cookies") == {"mode": "off"}
         expected.pop("cookies")
+    # SQL bind params and Redis args stay off in both modes; the mapping
+    # would send them with user info.
+    assert resolved.pop("database_query_data") is False
+    expected.pop("database_query_data")
     assert resolved == expected
 
 
@@ -367,8 +370,8 @@ def test_data_collection_matches_send_default_pii(collect_user_info):
 def test_init_sentry_configures_data_collection(collect_user_info):
     """init_sentry no longer sets the deprecated option, and keeps its hooks.
 
-    pytest turns warnings into errors, so a send_default_pii or ignored
-    event_scrubber deprecation warning fails this test.
+    pytest turns warnings into errors, so the send_default_pii deprecation
+    warning or the UserWarning for an ignored event_scrubber fails this test.
     """
     try:
         init_sentry(
@@ -439,8 +442,9 @@ def test_init_sentry_scrubs_keys_nested_past_the_serializer_depth(collect_user_i
         )
         sentry_sdk.get_client().transport = transport
         nested = {"a": {"b": {"c": {"d": {"e": {"password": DEEP_SECRET}}}}}}
-        sentry_sdk.set_extra("cfg", nested)
-        sentry_sdk.capture_message("boom")
+        with sentry_sdk.isolation_scope():
+            sentry_sdk.set_extra("cfg", nested)
+            sentry_sdk.capture_message("boom")
         sentry_sdk.flush()
     finally:
         sentry_sdk.get_global_scope().set_client(None)
@@ -469,8 +473,9 @@ def test_real_sdk_scrubs_secret_keys_in_transactions(scrubbing_sentry_transport)
 
 def test_real_sdk_keeps_the_explicit_user(scrubbing_sentry_transport):
     """A user set on the scope reaches before_send whatever user_info says."""
-    sentry_sdk.set_user(dict(LEARNER_USER))
-    sentry_sdk.capture_message("boom")
+    with sentry_sdk.isolation_scope():
+        sentry_sdk.set_user(dict(LEARNER_USER))
+        sentry_sdk.capture_message("boom")
     sentry_sdk.flush()
 
     (event,) = scrubbing_sentry_transport.events
@@ -492,18 +497,7 @@ urlpatterns = [path("sentry-boom/", failing_view), *main_urlpatterns]
 def test_django_request_event(client, collect_user_info):
     """The request user and cookies are sent only with user info, as with send_default_pii."""
     user = UserFactory.create()
-    transport = FakeTransport()
-    sentry_sdk.init(
-        dsn="https://k@o0.ingest.sentry.io/0",
-        transport=transport,
-        before_send=before_send,
-        data_collection=build_data_collection(collect_user_info=collect_user_info),
-        max_request_body_size="small",
-        integrations=[DjangoIntegration()],
-    )
-    sentry_sdk.get_client().options["event_scrubber"] = build_event_scrubber(
-        collect_user_info=collect_user_info
-    )
+    transport = _init_scrubbing_sdk(collect_user_info=collect_user_info)
     try:
         client.force_login(user)
         client.cookies["tracking"] = "abc"
@@ -538,6 +532,63 @@ def test_django_request_event(client, collect_user_info):
     else:
         assert "user" not in event
         assert "cookies" not in request
+
+
+@pytest.mark.django_db
+@override_settings(ROOT_URLCONF=__name__, DEBUG_PROPAGATE_EXCEPTIONS=True)
+@pytest.mark.parametrize("collect_user_info", [True, False])
+def test_wsgi_request_headers_and_query_string(collect_user_info):
+    """Headers and query strings go through SentryWsgiMiddleware's filtering.
+
+    The test client skips the WSGI middleware, so this calls Django's WSGI
+    handler, which DjangoIntegration wraps, with a raw environ.
+    """
+    environ = (
+        RequestFactory()
+        .get(
+            "/sentry-boom/",
+            {"alias": "partner", "client-ip": "192.0.2.10", "token": "t0k"},
+            HTTP_X_CUSTOM="keep",
+            HTTP_VIA="1.1 proxy",
+            HTTP_X_REMOTE_USER="ada",
+            HTTP_AUTHORIZATION="Bearer abc",
+        )
+        .environ
+    )
+    transport = _init_scrubbing_sdk(collect_user_info=collect_user_info)
+    # As the test client does, keep the request signals from closing the test
+    # transaction's DB connection.
+    request_started.disconnect(close_old_connections)
+    request_finished.disconnect(close_old_connections)
+    try:
+        with pytest.raises(RuntimeError, match="boom"):
+            WSGIHandler()(environ, lambda *_args, **_kwargs: None)
+        sentry_sdk.flush()
+    finally:
+        request_started.connect(close_old_connections)
+        request_finished.connect(close_old_connections)
+        sentry_sdk.get_global_scope().set_client(None)
+
+    (event,) = [
+        event
+        for event in transport.events
+        if event["exception"]["values"][-1]["value"] == "boom"
+    ]
+    request = event["request"]
+    headers = request["headers"]
+    query_string = request["query_string"]
+    assert headers["X-Custom"] == "keep"
+    assert headers["Authorization"] == "[Filtered]"
+    assert "alias=partner" in query_string
+    assert "t0k" not in query_string
+    if collect_user_info:
+        assert headers["Via"] == "1.1 proxy"
+        assert headers["X-Remote-User"] == "ada"
+        assert "192.0.2.10" in query_string
+    else:
+        assert headers["Via"] == "[Filtered]"
+        assert headers["X-Remote-User"] == "[Filtered]"
+        assert "192.0.2.10" not in query_string
 
 
 LEARNER_ADDRESS = "77 Massachusetts Ave"
