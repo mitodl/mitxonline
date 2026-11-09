@@ -875,7 +875,7 @@ class ContractPage(Page, ClusterableModel):
         managed = 0
         no_source = 0
 
-        for course in program.courses_qset.all():
+        for course in program.courses_qset.prefetch_related("possible_variant_sets"):
             try:
                 created_runs = create_contract_run(
                     self,

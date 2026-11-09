@@ -279,6 +279,7 @@ def test_add_course_with_no_shared_variant_is_a_400(admin_drf_client):
 
 
 @pytest.mark.usefixtures("mocked_tasks")
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
 def test_add_program_skips_a_course_with_no_shared_variant(admin_drf_client):
     """One course with no usable source run doesn't stop the rest of the program."""
 
