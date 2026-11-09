@@ -385,7 +385,7 @@ def test_cybersource_order_no_transaction(fulfilled_order):
         (ProcessorResponse.STATE_DUPLICATE, False),
     ],
 )
-def test_order_refund_success(  # noqa: PLR0913
+def test_order_refund_success(
     mocker,
     order_state,
     unenroll,
