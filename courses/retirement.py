@@ -367,7 +367,11 @@ def build_snapshot(audit: RunAudit, *, reason: str = "", source: str = "") -> di
             "enrollment_end": _dt(run.enrollment_end),
             "expiration_date": _dt(run.expiration_date),
             "upgrade_deadline": _dt(run.upgrade_deadline),
-            "b2b_contract_id": run.b2b_contract_id,
+            "b2b_contract_ids": sorted(
+                CourseRun.b2b_contracts.through.objects.filter(
+                    courserun_id=run.id
+                ).values_list("contractpage_id", flat=True)
+            ),
         },
         "edx": audit.edx_details,
         "edx_error": audit.edx_error,

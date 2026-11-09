@@ -137,7 +137,10 @@ def test_admin_refund_order_post_refund_failed(client, admin_user, mocker):
     _login_admin(client, admin_user)
     order = OrderFactory.create(state=OrderStatus.FULFILLED)
 
-    mocker.patch("ecommerce.admin.refund_order", return_value=(False, "error"))
+    mocker.patch(
+        "ecommerce.admin.refund_order",
+        return_value=(False, "Refund program order X instead."),
+    )
 
     post_data = {
         "order": str(order.id),
@@ -150,12 +153,15 @@ def test_admin_refund_order_post_refund_failed(client, admin_user, mocker):
 
     assert response.status_code == 302
     assert response.url == reverse(
-        "admin:ecommerce_refundedorder_change", args=(order.id,)
+        "admin:ecommerce_fulfilledorder_change", args=(order.id,)
     )
 
     messages = list(get_messages(response.wsgi_request))
     assert len(messages) == 1
-    assert str(messages[0].message) == f"Order {order.reference_number} refund failed."
+    assert (
+        str(messages[0].message)
+        == f"Order {order.reference_number} refund failed. Refund program order X instead."
+    )
 
 
 def test_admin_refund_order_post_invalid_form(client, admin_user, mocker):

@@ -20,6 +20,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from courses.api import create_run_enrollments
+from courses.exceptions import CountryBlockedError
 from courses.models import CourseRun, PaidCourseRun
 from ecommerce.api import fulfill_completed_order
 from ecommerce.constants import PAYMENT_TYPE_FINANCIAL_ASSISTANCE, ZERO_PAYMENT_DATA
@@ -131,20 +132,20 @@ class Command(BaseCommand):
         if discounted_price > 0:
             raise CommandError("Enrollment code is not 100% off")  # noqa: EM101
 
-        if run.course.is_country_blocked(user):
-            raise CommandError(
-                "Enrollment is blocked of this course with courseware_id={} for user {}".format(  # noqa: EM103
-                    options["run"], options["user"]
-                )
-            )
-
         with transaction.atomic():
-            successful_enrollments, edx_request_success = create_run_enrollments(
-                user,
-                [run],
-                keep_failed_enrollments=options["keep_failed_enrollments"],
-                mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            )
+            try:
+                successful_enrollments, edx_request_success = create_run_enrollments(
+                    user,
+                    [run],
+                    keep_failed_enrollments=options["keep_failed_enrollments"],
+                    mode=EDX_ENROLLMENT_VERIFIED_MODE,
+                )
+            except CountryBlockedError:
+                raise CommandError(  # noqa: B904
+                    "Enrollment is blocked for this course with courseware_id={} for user {}".format(  # noqa: EM103
+                        options["run"], options["user"]
+                    )
+                )
             if not successful_enrollments:
                 raise CommandError("Failed to create the enrollment record")  # noqa: EM101
             order = PendingOrder.create_from_product(product, user, discount)

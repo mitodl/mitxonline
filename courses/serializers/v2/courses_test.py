@@ -32,9 +32,6 @@ pytestmark = [pytest.mark.django_db]
 
 @pytest.mark.parametrize("is_anonymous", [True, False])
 @pytest.mark.parametrize(
-    "certificate_type", ["MicroMasters Credential", "Certificate of Completion"]
-)
-@pytest.mark.parametrize(
     "cert_available",
     [
         True,
@@ -44,7 +41,6 @@ pytestmark = [pytest.mark.django_db]
 def test_serialize_course(
     mock_context,
     is_anonymous,
-    certificate_type,
     cert_available,
 ):
     """Test Course serialization"""
@@ -74,11 +70,9 @@ def test_serialize_course(
     course.page.topics.set([topics[0], topics[1], topics[2]])
     department = "a course departments"
     course.departments.set([Department.objects.create(name=department)])
-    program = ProgramFactory.create(program_type="Series")
-    if certificate_type == "MicroMasters Credential":
-        program.program_type = "MicroMasters®"
+    # Only the program awards the MicroMasters credential, not its courses
+    program = ProgramFactory.create(program_type="MicroMasters®")
     program.add_requirement(course)
-    program.save()
 
     CourseRunEnrollmentFactory.create(
         run=courseRun1, **({} if is_anonymous else {"user": user})
@@ -108,7 +102,7 @@ def test_serialize_course(
             "min_weekly_hours": course.page.min_weekly_hours,
             "departments": [{"name": department}],
             "page": CoursePageSerializer(course.page).data,
-            "certificate_type": certificate_type,
+            "certificate_type": "Certificate of Completion",
             "certificate_available": cert_available,
             "availability": "dated",
             "topics": [{"name": topic.name} for topic in topics],
@@ -382,7 +376,6 @@ def test_course_serializer_canonical_run_per_tag(mock_context):
         language="en",
         is_primary_language=True,
         courseware_id="course-v1:T+C+1T2026-en",
-        b2b_contract=None,
     )
     CourseRunFactory.create(
         course=course,
@@ -390,7 +383,6 @@ def test_course_serializer_canonical_run_per_tag(mock_context):
         language="zh",
         is_primary_language=False,
         courseware_id="course-v1:T+C+1T2026-zh",
-        b2b_contract=None,
     )
     serializer = CourseWithCourseRunsSerializer(course, context=mock_context)
     assert len(serializer.data["courseruns"]) == 1
@@ -406,7 +398,6 @@ def test_course_serializer_canonical_run_fallback_to_oldest(mock_context):
         language="en",
         is_primary_language=False,
         courseware_id="course-v1:T+C+1T2026-en",
-        b2b_contract=None,
     )
     CourseRunFactory.create(
         course=course,
@@ -414,11 +405,50 @@ def test_course_serializer_canonical_run_fallback_to_oldest(mock_context):
         language="zh",
         is_primary_language=False,
         courseware_id="course-v1:T+C+1T2026-zh",
-        b2b_contract=None,
     )
     serializer = CourseWithCourseRunsSerializer(course, context=mock_context)
     assert len(serializer.data["courseruns"]) == 1
     assert serializer.data["courseruns"][0]["courseware_id"] == run_first.courseware_id
+
+
+@pytest.mark.parametrize(
+    ("context_key", "expected_key"),
+    [
+        (None, None),
+        ("contract_id", "second"),
+        ("org_id", "second"),
+    ],
+)
+def test_course_run_serializer_b2b_contract(mock_context, context_key, expected_key):
+    """
+    The b2b_contract field returns the contract the request was scoped to, or
+    to None.
+    """
+    contracts = {
+        "first": ContractPageFactory.create(),
+        "second": ContractPageFactory.create(),
+    }
+    run = CourseRunFactory.create(b2b_only=True, b2b_contracts=list(contracts.values()))
+
+    context = {**mock_context}
+    if context_key == "contract_id":
+        context["contract_id"] = str(contracts["second"].id)
+    elif context_key == "org_id":
+        context["org_id"] = str(contracts["second"].organization_id)
+
+    data = CourseRunSerializer(run, context=context).data
+
+    if expected_key:
+        assert data["b2b_contract"] == contracts[expected_key].id
+    else:
+        assert not data["b2b_contract"]
+
+    assert (
+        CourseRunSerializer(CourseRunFactory.create(), context=context).data[
+            "b2b_contract"
+        ]
+        is None
+    )
 
 
 def test_course_run_serializer_b2b_only():

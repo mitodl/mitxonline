@@ -1,6 +1,9 @@
-.tox.tox
+.tox
 .cache
 htmlcov
 .coverage
-node_modules
+**/node_modules
+.venv
 staticfiles/
+**/*.egg-info
+shims/*/build

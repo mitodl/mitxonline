@@ -235,3 +235,15 @@ def test_user_profile_edx_properties(should_exist):
         if should_exist
         else user.legal_address.edx_us_state is None
     )
+
+
+def test_clear_openedx_user_cache_rereads_a_row_written_after_the_first_read():
+    """A cold cache is a no-op; a warm one is dropped so the next read re-queries."""
+    user = UserFactory.create(no_openedx_user=True)
+    user.clear_openedx_user_cache()
+    assert user.edx_username is None
+
+    openedx_user = OpenEdxUserFactory.create(user=user)
+    assert user.edx_username is None
+    user.clear_openedx_user_cache()
+    assert user.edx_username == openedx_user.edx_username

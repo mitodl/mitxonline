@@ -1,0 +1,257 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <style>
+    .debug-section { margin-bottom: 1.5rem; }
+    .debug-section > summary { cursor: pointer; font-size: 1rem; font-weight: bold; padding: 8px 0; }
+    .debug-table { border-collapse: collapse; width: 100%; margin-bottom: 1rem; }
+    .debug-table th, .debug-table td { padding: 6px 10px; border: 1px solid var(--hairline-color, #ddd); text-align: left; vertical-align: top; }
+    .debug-table thead th { background: var(--darkened-bg, #f8f8f8); }
+    .debug-summary th { width: 15rem; background: var(--darkened-bg, #f8f8f8); }
+    .debug-inactive { color: var(--body-quiet-color, #666); }
+    .debug-warning { color: var(--error-fg, #ba2121); font-weight: bold; }
+    .debug-org { margin-bottom: 1rem; }
+  </style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url 'admin:users_user_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; <a href="{{ user_change_url }}">{{ debug_user }}</a>
+  &rsaquo; Debug
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+
+  {# Section 1: summary (not collapsible) #}
+  <div class="debug-section">
+    <h2>Summary</h2>
+    <table class="debug-table debug-summary">
+      <tr><th>User</th><td><a href="{{ user_change_url }}">{{ debug_user.email }}</a> (ID {{ debug_user.pk }})</td></tr>
+      <tr><th>Name</th><td>{{ debug_user.name|default:"—" }}</td></tr>
+      <tr><th>Global ID</th><td>{{ debug_user.global_id|default:"—" }}</td></tr>
+      <tr><th>Email</th><td>{{ debug_user.email }}</td></tr>
+      <tr><th>Active</th><td>{{ debug_user.is_active|yesno }}</td></tr>
+      <tr><th>Staff / Superuser</th><td>{{ debug_user.is_staff|yesno }} / {{ debug_user.is_superuser|yesno }}</td></tr>
+      <tr><th>Created</th><td>{{ debug_user.created_on }}</td></tr>
+      <tr><th>Last login</th><td>{{ debug_user.last_login|default:"Never" }}</td></tr>
+      <tr>
+        <th>edX user</th>
+        <td>
+          {% for edx_user in summary.edx_users %}
+            <div>
+              <a href="{% url 'admin:openedx_openedxuser_change' edx_user.pk %}">{{ edx_user.edx_username|default:"(no username)" }}</a>
+              on {{ edx_user.platform }} —
+              desired username: {{ edx_user.desired_edx_username|default:"—" }},
+              synced: {{ edx_user.has_been_synced|yesno }},
+              sync error: {% if edx_user.has_sync_error %}<span class="debug-warning">yes</span>{% else %}no{% endif %}
+            </div>
+          {% empty %}
+            <span class="debug-warning">No edX user record</span>
+          {% endfor %}
+        </td>
+      </tr>
+      <tr>
+        <th>Legal address</th>
+        <td>
+          {% with address=summary.legal_address %}
+            {% if address %}
+              {{ address.first_name }} {{ address.last_name }}<br>
+              {% if address.street_address_1 %}{{ address.street_address_1 }}<br>{% endif %}
+              {% if address.street_address_2 %}{{ address.street_address_2 }}<br>{% endif %}
+              {% if address.city %}{{ address.city }}, {% endif %}{{ address.state|default:"" }} {{ address.postal_code }}<br>
+              {{ address.country }}
+            {% else %}
+              <span class="debug-warning">No legal address</span>
+            {% endif %}
+          {% endwith %}
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  {# Section 2: enrollments #}
+  <details class="debug-section" open>
+    <summary>Enrollments ({{ enrollments.program_enrollments|length }} program, {{ enrollments.run_enrollments|length }} course run)</summary>
+
+    <h3>Program enrollments</h3>
+    {% if enrollments.program_enrollments %}
+      <table class="debug-table">
+        <thead>
+          <tr><th>Enrollment</th><th>Program</th><th>Active</th><th>Mode</th><th>Change status</th><th>Contract</th><th>Created</th><th>Certificate</th></tr>
+        </thead>
+        <tbody>
+          {% for item in enrollments.program_enrollments %}
+            {% with enrollment=item.enrollment %}
+              <tr{% if not enrollment.active %} class="debug-inactive"{% endif %}>
+                <td><a href="{{ item.url }}">{{ enrollment.pk }}</a></td>
+                <td><a href="{{ item.program_url }}">{{ enrollment.program.readable_id }}</a><br>{{ enrollment.program.title }}</td>
+                <td>{{ enrollment.active|yesno }}</td>
+                <td>{{ enrollment.enrollment_mode }}</td>
+                <td>{{ enrollment.change_status|default:"—" }}</td>
+                <td>{% if enrollment.b2b_contract %}<a href="{{ item.contract_url }}">{{ enrollment.b2b_contract.name }}</a>{% else %}—{% endif %}</td>
+                <td>{{ enrollment.created_on }}</td>
+                <td>
+                  {% if item.certificate %}
+                    <a href="{{ item.certificate_url }}">{{ item.certificate.uuid }}</a>
+                    {% if item.certificate.is_revoked %}<span class="debug-warning">(revoked)</span>{% endif %}
+                  {% else %}—{% endif %}
+                </td>
+              </tr>
+            {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No program enrollments.</p>
+    {% endif %}
+
+    <h3>Course run enrollments</h3>
+    {% if enrollments.run_enrollments %}
+      <table class="debug-table">
+        <thead>
+          <tr><th>Enrollment</th><th>Course run</th><th>Active</th><th>Mode</th><th>Change status</th><th>edX enrolled</th><th>Contract</th><th>Created</th><th>Certificate</th></tr>
+        </thead>
+        <tbody>
+          {% for item in enrollments.run_enrollments %}
+            {% with enrollment=item.enrollment %}
+              <tr{% if not enrollment.active %} class="debug-inactive"{% endif %}>
+                <td><a href="{{ item.url }}">{{ enrollment.pk }}</a></td>
+                <td><a href="{{ item.run_url }}">{{ enrollment.run.courseware_id }}</a><br>{{ enrollment.run.title }}</td>
+                <td>{{ enrollment.active|yesno }}</td>
+                <td>{{ enrollment.enrollment_mode }}</td>
+                <td>{{ enrollment.change_status|default:"—" }}</td>
+                <td>{% if enrollment.edx_enrolled %}yes{% else %}<span class="debug-warning">no</span>{% endif %}</td>
+                <td>{% if enrollment.b2b_contract %}<a href="{{ item.contract_url }}">{{ enrollment.b2b_contract.name }}</a>{% else %}—{% endif %}</td>
+                <td>{{ enrollment.created_on }}</td>
+                <td>
+                  {% if item.certificate %}
+                    <a href="{{ item.certificate_url }}">{{ item.certificate.uuid }}</a>
+                    {% if item.certificate.is_revoked %}<span class="debug-warning">(revoked)</span>{% endif %}
+                  {% else %}—{% endif %}
+                </td>
+              </tr>
+            {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No course run enrollments.</p>
+    {% endif %}
+  </details>
+
+  {# Section 3: B2B #}
+  <details class="debug-section" open>
+    <summary>B2B ({{ b2b_groups|length }} organization{{ b2b_groups|length|pluralize }})</summary>
+
+    {% for group in b2b_groups %}
+      <div class="debug-org">
+        <h3><a href="{{ group.organization_url }}">{{ group.organization.name }}</a></h3>
+        {% if group.membership %}
+          <table class="debug-table debug-summary">
+            <tr><th>Membership</th><td><a href="{{ group.membership_url }}">{{ group.membership.pk }}</a></td></tr>
+            <tr><th>Keep until seen</th><td>{{ group.membership.keep_until_seen|yesno }}</td></tr>
+            <tr><th>Manager</th><td>{{ group.membership.is_manager|yesno }}</td></tr>
+            <tr><th>Added to Keycloak</th><td>{{ group.membership.added_to_keycloak_at|default:"—" }}</td></tr>
+          </table>
+        {% else %}
+          <p class="debug-warning">The user is attached to contracts in this organization but is not a member of it.</p>
+        {% endif %}
+
+        {% if group.contracts %}
+          <table class="debug-table">
+            <thead>
+              <tr><th>Contract</th><th>Active</th><th>Membership type</th><th>Consented to data sharing</th><th>Consent modified</th><th>Attached</th></tr>
+            </thead>
+            <tbody>
+              {% for item in group.contracts %}
+                <tr>
+                  <td><a href="{{ item.contract_url }}">{{ item.contract.name }}</a></td>
+                  <td>{{ item.contract.active|yesno }}</td>
+                  <td>{{ item.contract.membership_type }}</td>
+                  <td>{{ item.attachment.consented_to_data_sharing|yesno:"yes,no,not answered" }}</td>
+                  <td>{{ item.attachment.consent_modified_at|default:"—" }}</td>
+                  <td>{{ item.attachment.created_on }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <p>No contracts attached in this organization.</p>
+        {% endif %}
+      </div>
+    {% empty %}
+      <p>No organizations or contracts.</p>
+    {% endfor %}
+  </details>
+
+  {# Section 4: orders #}
+  <details class="debug-section" open>
+    <summary>Orders ({{ orders|length }})</summary>
+    {% if orders %}
+      <table class="debug-table">
+        <thead>
+          <tr><th>Reference number</th><th>State</th><th>Created</th><th>Updated</th><th>Total paid</th><th>Items</th></tr>
+        </thead>
+        <tbody>
+          {% for item in orders %}
+            {% with order=item.order %}
+              <tr>
+                <td><a href="{{ item.url }}">{{ order.reference_number|default:order.pk }}</a></td>
+                <td>{{ order.get_state_display }}</td>
+                <td>{{ order.created_on }}</td>
+                <td>{{ order.updated_on }}</td>
+                <td>{{ order.total_price_paid|floatformat:2 }}</td>
+                <td>{{ order.line_count }}</td>
+              </tr>
+            {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No orders.</p>
+    {% endif %}
+  </details>
+
+  {# Section 5: financial assistance #}
+  <details class="debug-section" open>
+    <summary>Financial assistance requests ({{ flexible_prices|length }})</summary>
+    {% if flexible_prices %}
+      <table class="debug-table">
+        <thead>
+          <tr><th>Request</th><th>Submitted</th><th>Status</th><th>Approved tier</th><th>Courseware</th></tr>
+        </thead>
+        <tbody>
+          {% for item in flexible_prices %}
+            {% with fp=item.request %}
+              <tr>
+                <td><a href="{{ item.url }}">{{ fp.pk }}</a></td>
+                <td>{{ fp.created_on }}</td>
+                <td>{{ fp.status }}</td>
+                <td>
+                  {% if item.tier %}
+                    Threshold ${{ item.tier.income_threshold_usd|floatformat:0 }} —
+                    {{ item.tier.discount.discount_type }} {{ item.tier.discount.amount|floatformat:2 }}
+                  {% else %}—{% endif %}
+                </td>
+                <td>
+                  {% if item.courseware_url %}<a href="{{ item.courseware_url }}">{{ item.courseware.readable_id }}</a>{% else %}{{ item.courseware.readable_id|default:item.courseware }}{% endif %}
+                </td>
+              </tr>
+            {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No financial assistance requests.</p>
+    {% endif %}
+  </details>
+
+</div>
+{% endblock %}

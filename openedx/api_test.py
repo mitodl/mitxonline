@@ -2,16 +2,19 @@
 
 # pylint: disable=redefined-outer-name
 import itertools
+import json
 import logging
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import ANY, call, patch
 from urllib.parse import parse_qsl
 
 import factory
 import pytest
+import requests
 import responses
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ImproperlyConfigured
+from edx_api.course_detail.models import CourseMode
 from edx_api.course_runs.exceptions import CourseRunAPIError
 from freezegun import freeze_time
 from mitol.common.utils.datetime import now_in_utc
@@ -30,6 +33,7 @@ from main.test_utils import MockHttpError, MockResponse
 from openedx.api import (
     ACCESS_TOKEN_HEADER_NAME,
     OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS,
+    OPENEDX_NOTIFICATION_PREFERENCES_PATH,
     OPENEDX_REGISTRATION_VALIDATION_PATH,
     bulk_retire_edx_users,
     create_edx_auth_token,
@@ -39,8 +43,10 @@ from openedx.api import (
     existing_edx_enrollment,
     generate_unique_username,
     get_edx_api_client,
+    get_edx_api_course_list_client,
     get_edx_course_outline,
     get_edx_retirement_service_client,
+    get_notification_preferences,
     get_valid_edx_api_auth,
     process_course_run_clone,
     push_edx_modes_from_run,
@@ -50,12 +56,14 @@ from openedx.api import (
     repair_faulty_openedx_users,
     retry_failed_edx_enrollments,
     subscribe_to_edx_course_emails,
+    sync_courserun_upgrade_deadline_to_edx,
     sync_enrollments_with_edx,
     unenroll_edx_course_run,
     unsubscribe_from_edx_course_emails,
     update_edx_user_email,
     update_edx_user_name,
     update_edx_user_profile,
+    update_notification_preference,
     validate_username_email_with_edx,
 )
 from openedx.constants import (
@@ -66,14 +74,17 @@ from openedx.constants import (
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
     OPENEDX_USERNAME_MAX_LEN,
     PLATFORM_EDX,
+    UpgradeDeadlineSyncResult,
 )
 from openedx.exceptions import (
     EdxApiCourseOutlineError,
     EdxApiEmailSettingsErrorException,
     EdxApiEnrollErrorException,
+    EdxApiNotificationPreferencesError,
     EdxApiRegistrationValidationException,
     EdxApiUserUpdateError,
     NoEdxApiAuthError,
+    OpenEdXOAuth2Error,
     OpenEdxUserMissingError,
     UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
@@ -315,6 +326,32 @@ def test_create_edx_user(  # noqa: PLR0913
         assert user.openedx_users.first().edx_username == original_username
 
 
+@pytest.mark.usefixtures("application")
+@responses.activate
+def test_create_edx_user_logs_failed_existence_check(mocker, settings):
+    """A failed edX user lookup is logged instead of swallowed"""
+    patched_log_warning = mocker.patch("openedx.api.log.warning")
+    user = UserFactory.create(openedx_user__has_been_synced=True)
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/mobile/v0.5/my_user_info",
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+    registration = responses.add(
+        responses.POST,
+        f"{settings.OPENEDX_API_BASE_URL}/user_api/v1/account/registration/",
+        json=dict(success=True),  # noqa: C408
+        status=status.HTTP_200_OK,
+    )
+
+    assert create_edx_user(user) is True
+
+    patched_log_warning.assert_called_once_with(
+        "_edx_user_exists: could not verify edX user for: %s", user.id, exc_info=True
+    )
+    assert registration.call_count == 0
+
+
 @responses.activate
 @pytest.mark.usefixtures("application")
 @pytest.mark.parametrize(
@@ -468,6 +505,7 @@ def test_create_edx_user_conflict(  # noqa: PLR0913
         status=status.HTTP_200_OK,
     )
     edx_username_validation_response_mock(False, settings)  # noqa: FBT003
+    cached_username = user.edx_username
 
     create_edx_user(user)
 
@@ -475,14 +513,14 @@ def test_create_edx_user_conflict(  # noqa: PLR0913
     assert resp2.call_count == 1
     assert resp3.call_count == 1
 
-    user.refresh_from_db()
-
     edx_user = user.openedx_users.first()
 
     assert edx_user.has_been_synced is True
     assert expected_username_pattern(edx_user.edx_username), (
         f"Username {edx_user.edx_username} doesn't match expected pattern for {test_description}"
     )
+    assert user.edx_username != cached_username
+    assert user.edx_username == edx_user.edx_username
 
 
 @responses.activate
@@ -1074,6 +1112,111 @@ def test_get_edx_retirement_service_client(mocker, settings):
     assert client.base_url == settings.OPENEDX_API_BASE_URL
 
 
+@pytest.mark.parametrize("has_client_credentials", [True, False])
+def test_get_edx_api_course_list_client(mocker, settings, has_client_credentials):
+    """
+    get_edx_api_course_list_client uses a client-credentials JWT when the courses
+    service worker is configured, and the static service worker token otherwise
+    """
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "static_token"  # noqa: S105
+    settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID = (
+        "courses_client_id" if has_client_credentials else None
+    )
+    settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET = (
+        "courses_client_secret" if has_client_credentials else None
+    )
+    mock_resp = mocker.Mock()
+    mock_resp.json.return_value = {"access_token": "a_jwt"}
+    mock_resp.raise_for_status.side_effect = None
+    mock_post = mocker.patch("openedx.api.requests.post", return_value=mock_resp)
+
+    course_list, using_jwt = get_edx_api_course_list_client()
+
+    auth_header = course_list._requester.headers["Authorization"]  # noqa: SLF001
+    assert using_jwt is has_client_credentials
+    if has_client_credentials:
+        assert auth_header == "jwt a_jwt"
+        assert mock_post.call_args.kwargs["data"] == {
+            "grant_type": "client_credentials",
+            "client_id": "courses_client_id",
+            "client_secret": "courses_client_secret",
+            "token_type": "jwt",
+        }
+        assert mock_post.call_args.kwargs["timeout"] == settings.EDX_API_CLIENT_TIMEOUT
+    else:
+        assert auth_header == "Bearer static_token"
+        mock_post.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("failure", "expected_level"),
+    [
+        ("http_400", logging.ERROR),
+        ("http_503", logging.WARNING),
+        ("connection_error", logging.WARNING),
+        ("timeout", logging.WARNING),
+        ("missing_access_token", logging.ERROR),
+        ("invalid_json", logging.ERROR),
+    ],
+)
+def test_get_edx_api_course_list_client_falls_back_to_static_token(
+    mocker, settings, caplog, failure, expected_level
+):
+    """
+    If the client-credentials JWT can't be obtained, the course list client uses
+    the static service worker token instead of failing. A 4xx from the token
+    endpoint, or a response without a usable token, means the app is set up
+    wrong, so it's logged as an error; other failures are logged as warnings. Neither log includes the client secret.
+    """
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "static_token"  # noqa: S105
+    settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID = "authorization_code_app"
+    settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET = "a_client_secret"  # noqa: S105
+    mock_resp = mocker.Mock()
+    mock_resp.json.return_value = {"access_token": "a_jwt"}
+    mock_post = mocker.patch("openedx.api.requests.post", return_value=mock_resp)
+    if failure.startswith("http_"):
+        mock_resp.raise_for_status.side_effect = HTTPError(
+            response=mocker.Mock(status_code=int(failure.removeprefix("http_")))
+        )
+    elif failure == "connection_error":
+        mock_post.side_effect = requests.ConnectionError
+    elif failure == "timeout":
+        mock_post.side_effect = requests.Timeout
+    elif failure == "missing_access_token":
+        mock_resp.json.return_value = {}
+    else:
+        mock_resp.json.side_effect = ValueError
+
+    with caplog.at_level(logging.WARNING, logger="openedx.api"):
+        course_list, using_jwt = get_edx_api_course_list_client()
+
+    auth_header = course_list._requester.headers["Authorization"]  # noqa: SLF001
+    assert auth_header == "Bearer static_token"
+    assert using_jwt is False
+    (record,) = caplog.records
+    assert record.levelno == expected_level
+    assert record.exc_info is None
+    assert "a_client_secret" not in caplog.text
+
+
+def test_get_edx_api_course_list_client_static_token_only(mocker, settings):
+    """With use_jwt=False the course list client uses the static token without requesting a JWT"""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "static_token"  # noqa: S105
+    settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID = "courses_client_id"
+    settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET = "courses_client_secret"  # noqa: S105
+    mock_post = mocker.patch("openedx.api.requests.post")
+
+    course_list, using_jwt = get_edx_api_course_list_client(use_jwt=False)
+
+    assert using_jwt is False
+    auth_header = course_list._requester.headers["Authorization"]  # noqa: SLF001
+    assert auth_header == "Bearer static_token"
+    mock_post.assert_not_called()
+
+
 @pytest.mark.parametrize("has_edx_username", [True, False])
 def test_enroll_in_edx_course_runs(settings, mocker, user, has_edx_username):
     """Tests that enroll_in_edx_course_runs uses the EdxApi client to enroll in course runs"""
@@ -1159,6 +1302,7 @@ def test_enroll_in_edx_course_runs_repairs_when_not_synced(mocker):
     genuinely faulty user is preserved.
     """
     user = UserFactory.create(no_openedx_user=True)
+    assert user.edx_username is None  # cached on the instance, as a caller would
     mock_client = mocker.MagicMock()
     mock_client.enrollments.create_student_enrollment = mocker.Mock(
         return_value=mocker.Mock(is_active=True)
@@ -1177,6 +1321,39 @@ def test_enroll_in_edx_course_runs_repairs_when_not_synced(mocker):
     enroll_in_edx_course_runs(user, [course_run])
 
     patched_repair.assert_called_once_with(user)
+    assert (
+        mock_client.enrollments.create_student_enrollment.call_args.kwargs["username"]
+        == user.openedx_users.get().edx_username
+    )
+
+
+def test_enroll_in_edx_course_runs_reads_a_username_written_since_the_caller_cached_it(
+    mocker,
+):
+    """
+    establish_basket reads user.edx_username before the OpenEdxUser row exists
+    and queues its creation; by the time the same instance reaches enrollment
+    the row is there, and the enrollment must carry its username.
+    """
+    user = UserFactory.create(no_openedx_user=True)
+    assert user.edx_username is None  # cached on the instance, as a caller would
+    OpenEdxUserFactory.create(user=user, has_been_synced=True)  # the task's write
+    mock_client = mocker.MagicMock()
+    mock_client.enrollments.create_student_enrollment = mocker.Mock(
+        return_value=mocker.Mock(is_active=True)
+    )
+    mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
+    mocker.patch("openedx.api.get_edx_api_service_client", return_value=mock_client)
+    patched_repair = mocker.patch("openedx.api.repair_faulty_edx_user")
+    course_run = CourseRunFactory.build()
+
+    enroll_in_edx_course_runs(user, [course_run])
+
+    patched_repair.assert_not_called()
+    assert (
+        mock_client.enrollments.create_student_enrollment.call_args.kwargs["username"]
+        == user.openedx_users.get().edx_username
+    )
 
 
 def test_enroll_api_fail(mocker, user):
@@ -2035,36 +2212,50 @@ def test_update_edx_user_profile_error(mock_session, mock_get_auth, mocker, user
 
 
 def test_push_edx_modes_from_run(mocker):
-    """Test that we can push modes into edX from a course"""
+    """
+    Test that we can push modes into edX from a course. The verified mode gets
+    the run's upgrade deadline as its expiration; other modes get none.
+    """
 
     mocked_edx_modes = mocker.patch("openedx.api.get_edx_course_modes", return_value=[])
     mocked_create_edx_mode = mocker.patch("openedx.api.create_edx_course_mode")
 
-    course_run = CourseRunFactory.create()
-    mxo_modes = EnrollmentModeFactory.create_batch(2)
-    calls = []
-
-    for mode in mxo_modes:
-        course_run.enrollment_modes.add(mode)
-        calls.append(
-            call(
-                course_id=course_run.courseware_id,
-                mode_slug=mode.mode_slug,
-                mode_display_name=mode.mode_display_name,
-                min_price=(1 if mode.requires_payment else 0),
-                client=ANY,
-            )
-        )
+    course_run = CourseRunFactory.create(upgrade_deadline=now_in_utc())
+    audit = EnrollmentModeFactory.create(
+        mode_slug=EDX_ENROLLMENT_AUDIT_MODE, requires_payment=False
+    )
+    verified = EnrollmentModeFactory.create(
+        mode_slug=EDX_ENROLLMENT_VERIFIED_MODE, requires_payment=True
+    )
+    course_run.enrollment_modes.add(audit, verified)
 
     assert course_run.edx_modes == []
-    assert course_run.enrollment_modes.count() == 2
     assert mocked_edx_modes.called
 
     created = push_edx_modes_from_run(course_run)
 
-    assert created == course_run.enrollment_modes.count()
-    assert mocked_create_edx_mode.called
-    mocked_create_edx_mode.assert_has_calls(calls, any_order=True)
+    assert created == 2
+    mocked_create_edx_mode.assert_has_calls(
+        [
+            call(
+                course_id=course_run.courseware_id,
+                mode_slug=EDX_ENROLLMENT_AUDIT_MODE,
+                mode_display_name=audit.mode_display_name,
+                min_price=0,
+                expiration_datetime=None,
+                client=ANY,
+            ),
+            call(
+                course_id=course_run.courseware_id,
+                mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+                mode_display_name=verified.mode_display_name,
+                min_price=1,
+                expiration_datetime=course_run.upgrade_deadline,
+                client=ANY,
+            ),
+        ],
+        any_order=True,
+    )
 
 
 def _course_run_api_error(status_code):
@@ -2267,3 +2458,524 @@ def test_update_edx_user_email_no_openedx_user(mocker, user, caplog):
     assert "Skipping user email update" in caplog.text
     mock_create_session.assert_not_called()
     mock_session.return_value.get.assert_not_called()
+
+
+NOTIFICATION_PREFERENCES_RESPONSE = {
+    "status": "success",
+    "message": "Notification preferences retrieved successfully.",
+    "show_preferences": True,
+    "show_email_preferences": True,
+    "data": {
+        "discussion": {
+            "enabled": True,
+            "non_editable": [],
+            "notification_types": {
+                "new_discussion_post": {
+                    "web": False,
+                    "push": False,
+                    "email": False,
+                    "email_cadence": "Daily",
+                    "info": "",
+                }
+            },
+        }
+    },
+}
+
+
+@pytest.fixture
+def synced_user(user):
+    """
+    A user with a known, unexpired Open edX bearer token.
+
+    UserFactory already attaches an OpenEdxApiAuth via RelatedFactory, so this
+    pins its token to a predictable value rather than creating a second row
+    (OpenEdxApiAuth.user is unique).
+    """
+    OpenEdxApiAuth.objects.filter(user=user).update(
+        access_token="edx-access-token",  # noqa: S106
+        access_token_expires_on=now_in_utc() + timedelta(hours=1),
+    )
+    return user
+
+
+@responses.activate
+def test_get_notification_preferences(settings, mocker, synced_user):
+    """get_notification_preferences returns the LMS payload for the learner"""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    resp = responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}{OPENEDX_NOTIFICATION_PREFERENCES_PATH}",
+        json=NOTIFICATION_PREFERENCES_RESPONSE,
+        status=status.HTTP_200_OK,
+    )
+
+    assert get_notification_preferences(synced_user) == (
+        NOTIFICATION_PREFERENCES_RESPONSE
+    )
+    assert resp.call_count == 1
+    assert (
+        responses.calls[0].request.headers["Authorization"] == "Bearer edx-access-token"
+    )
+
+
+@responses.activate
+def test_get_notification_preferences_upstream_error(settings, mocker, synced_user):
+    """get_notification_preferences raises when the LMS does not return a 200"""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}{OPENEDX_NOTIFICATION_PREFERENCES_PATH}",
+        json={"detail": "nope"},
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+    with pytest.raises(EdxApiNotificationPreferencesError):
+        get_notification_preferences(synced_user)
+
+
+@responses.activate
+def test_update_notification_preference(settings, mocker, synced_user):
+    """update_notification_preference forwards the validated body verbatim"""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    responses.add(
+        responses.PUT,
+        f"{settings.OPENEDX_API_BASE_URL}{OPENEDX_NOTIFICATION_PREFERENCES_PATH}",
+        json={"status": "success"},
+        status=status.HTTP_200_OK,
+    )
+    preference = {
+        "notification_app": "discussion",
+        "notification_type": "new_discussion_post",
+        "notification_channel": "email",
+        "value": True,
+    }
+
+    assert update_notification_preference(synced_user, preference) == {
+        "status": "success"
+    }
+    assert json.loads(responses.calls[0].request.body) == preference
+    assert (
+        responses.calls[0].request.headers["Authorization"] == "Bearer edx-access-token"
+    )
+
+
+@responses.activate
+def test_update_notification_preference_upstream_error(settings, mocker, synced_user):
+    """update_notification_preference raises when the LMS rejects the write"""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    responses.add(
+        responses.PUT,
+        f"{settings.OPENEDX_API_BASE_URL}{OPENEDX_NOTIFICATION_PREFERENCES_PATH}",
+        json={"status": "error"},
+        status=status.HTTP_400_BAD_REQUEST,
+    )
+
+    with pytest.raises(EdxApiNotificationPreferencesError):
+        update_notification_preference(
+            synced_user,
+            {
+                "notification_app": "discussion",
+                "notification_type": "new_discussion_post",
+                "notification_channel": "web",
+                "value": False,
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    ("method", "api_func"),
+    [
+        (responses.GET, get_notification_preferences),
+        (responses.PUT, lambda user: update_notification_preference(user, {})),
+    ],
+)
+@pytest.mark.parametrize(
+    "network_error",
+    [requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError],
+)
+@responses.activate
+def test_notification_preferences_network_error(  # noqa: PLR0913
+    settings, mocker, synced_user, method, api_func, network_error
+):
+    """A timeout or dropped connection to the LMS is an upstream error, not a crash"""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    responses.add(
+        method,
+        f"{settings.OPENEDX_API_BASE_URL}{OPENEDX_NOTIFICATION_PREFERENCES_PATH}",
+        body=network_error("unreachable"),
+    )
+
+    with pytest.raises(EdxApiNotificationPreferencesError) as exc_info:
+        api_func(synced_user)
+
+    assert exc_info.value.status_code is None
+
+
+@pytest.mark.parametrize(
+    ("method", "api_func"),
+    [
+        (responses.GET, get_notification_preferences),
+        (responses.PUT, lambda user: update_notification_preference(user, {})),
+    ],
+)
+@responses.activate
+def test_notification_preferences_invalid_json(
+    settings, mocker, synced_user, method, api_func
+):
+    """A 200 whose body is not JSON is an upstream error, not a crash"""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    responses.add(
+        method,
+        f"{settings.OPENEDX_API_BASE_URL}{OPENEDX_NOTIFICATION_PREFERENCES_PATH}",
+        body="<html>not json</html>",
+        status=status.HTTP_200_OK,
+    )
+
+    with pytest.raises(EdxApiNotificationPreferencesError):
+        api_func(synced_user)
+
+
+def test_notification_preferences_token_service_unreachable(mocker, user):
+    """A network failure while refreshing the token is an upstream error, not a crash"""
+    mocker.patch(
+        "openedx.api.create_edx_auth_token",
+        side_effect=requests.exceptions.ReadTimeout("token service timed out"),
+    )
+
+    with pytest.raises(EdxApiNotificationPreferencesError):
+        get_notification_preferences(user)
+
+
+@pytest.mark.parametrize(
+    "api_func",
+    [
+        get_notification_preferences,
+        lambda user: update_notification_preference(user, {}),
+    ],
+)
+def test_notification_preferences_not_synced(mocker, user, api_func):
+    """Both helpers raise NoEdxApiAuthError when the user is not synced with edX"""
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=None)
+
+    with pytest.raises(NoEdxApiAuthError):
+        api_func(user)
+
+
+def test_notification_preferences_missing_auth_record(mocker, user):
+    """A user with no OpenEdxApiAuth row raises NoEdxApiAuthError, not DoesNotExist"""
+    OpenEdxApiAuth.objects.filter(user=user).delete()
+    # create_edx_auth_token returning truthy without leaving a row is the
+    # pathological case: the lookup must surface as NoEdxApiAuthError.
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+
+    with pytest.raises(NoEdxApiAuthError):
+        get_notification_preferences(user)
+
+
+def _http_error(status_code):
+    """An HTTPError carrying a response, the way raise_for_status raises it"""
+    response = MockResponse({}, status_code=status_code)
+    return HTTPError(f"{status_code} from the token endpoint", response=response)
+
+
+@pytest.mark.parametrize("upstream_status", [400, 401, 403, 500, 502, 503])
+def test_notification_preferences_token_service_failure_is_not_a_409(
+    mocker, user, upstream_status
+):
+    """
+    A token-service or credentials failure is not this learner's account being
+    unprovisioned -- it must not masquerade as the 409 "still being set up"
+    state, or a synced learner gets a permanent, non-retryable message. That
+    includes a 400: a dead grant never gets this far, because the refresh
+    recovers from invalid_grant itself.
+    """
+    mocker.patch(
+        "openedx.api.create_edx_auth_token",
+        side_effect=_http_error(upstream_status),
+    )
+
+    with pytest.raises(EdxApiNotificationPreferencesError) as exc_info:
+        get_notification_preferences(user)
+
+    assert exc_info.value.status_code == upstream_status
+
+
+def test_notification_preferences_oauth_handshake_failure_is_not_a_409(mocker, user):
+    """An incomplete OAuth handshake is a configuration/flow fault, not a 409"""
+    mocker.patch(
+        "openedx.api.create_edx_auth_token",
+        side_effect=OpenEdXOAuth2Error("redirected somewhere unexpected"),
+    )
+
+    with pytest.raises(EdxApiNotificationPreferencesError):
+        get_notification_preferences(user)
+
+
+def test_notification_preferences_dead_grant_without_account_is_a_409(mocker, user):
+    """
+    A dead refresh token with no synced account to re-authorize against is the
+    one refresh failure that means this learner has no usable auth: the refresh
+    raises NoEdxApiAuthError itself, and that must still surface as a 409.
+    """
+    OpenEdxApiAuth.objects.filter(user=user).update(
+        access_token_expires_on=now_in_utc() - timedelta(hours=1)
+    )
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    mocker.patch(
+        "openedx.api._refresh_edx_api_auth",
+        side_effect=NoEdxApiAuthError("no synced account to re-authorize"),
+    )
+
+    with pytest.raises(NoEdxApiAuthError):
+        get_notification_preferences(user)
+
+
+@pytest.mark.parametrize("upstream_status", [400, 503])
+def test_notification_preferences_refresh_failure_is_not_a_409(
+    mocker, user, upstream_status
+):
+    """
+    A refresh HTTPError that escapes is unrecoverable misconfiguration (400) or
+    an outage (503), not a missing account, so it must not read as a 409
+    """
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    mocker.patch(
+        "openedx.api.get_valid_edx_api_auth",
+        side_effect=_http_error(upstream_status),
+    )
+
+    with pytest.raises(EdxApiNotificationPreferencesError) as exc_info:
+        get_notification_preferences(user)
+
+    assert exc_info.value.status_code == upstream_status
+
+
+@responses.activate
+def test_notification_preferences_error_carries_upstream_status(
+    settings, mocker, synced_user
+):
+    """The upstream status is preserved so the view can honour a throttle"""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=mocker.Mock())
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}{OPENEDX_NOTIFICATION_PREFERENCES_PATH}",
+        json={"detail": "slow down"},
+        status=status.HTTP_429_TOO_MANY_REQUESTS,
+    )
+
+    with pytest.raises(EdxApiNotificationPreferencesError) as exc_info:
+        get_notification_preferences(synced_user)
+
+    assert exc_info.value.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+
+
+def _edx_mode(
+    mode_slug=EDX_ENROLLMENT_VERIFIED_MODE, expiration_datetime=None, **extra
+):
+    """Build an edx-api-client CourseMode the way the modes endpoint returns one."""
+    payload = {
+        "course_id": "course-v1:edX+Test+Run",
+        "mode_slug": mode_slug,
+        "mode_display_name": mode_slug.title(),
+        "min_price": 100,
+        "currency": "usd",
+        "description": "a description",
+        "expiration_datetime": expiration_datetime,
+        **extra,
+    }
+    return CourseMode(payload)
+
+
+def test_sync_upgrade_deadline_no_verified_mode(mocker):
+    """A run with only an audit mode in edX has nothing to set a deadline on."""
+    mocker.patch(
+        "openedx.api.get_edx_course_modes",
+        return_value=[_edx_mode(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)],
+    )
+    mocked_update = mocker.patch("openedx.api.update_edx_course_mode")
+    mocker.patch("openedx.api.get_edx_api_service_client")
+
+    run = CourseRunFactory.create(upgrade_deadline=now_in_utc())
+
+    assert (
+        sync_courserun_upgrade_deadline_to_edx(run)
+        == UpgradeDeadlineSyncResult.NO_VERIFIED_MODE
+    )
+    mocked_update.assert_not_called()
+
+
+def test_sync_upgrade_deadline_pushes_new_deadline(mocker):
+    """
+    A changed deadline is pushed, and the rest of the mode's fields are echoed
+    back so the PATCH only moves expiration_datetime.
+
+    min_price especially: update_edx_course_mode defaults it to 0, and
+    edx-api-client only strips None, so omitting it would zero out the price of
+    the paid mode in edX.
+    """
+    deadline = now_in_utc() + timedelta(days=30)
+    mocker.patch(
+        "openedx.api.get_edx_course_modes",
+        return_value=[_edx_mode(expiration_datetime="2020-01-01T00:00:00Z")],
+    )
+    mocked_update = mocker.patch("openedx.api.update_edx_course_mode")
+    mocker.patch("openedx.api.get_edx_api_service_client")
+
+    run = CourseRunFactory.create(upgrade_deadline=deadline)
+
+    assert (
+        sync_courserun_upgrade_deadline_to_edx(run) == UpgradeDeadlineSyncResult.UPDATED
+    )
+    mocked_update.assert_called_once_with(
+        course_id=run.courseware_id,
+        mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+        mode_display_name="Verified",
+        description="a description",
+        currency="usd",
+        min_price=100,
+        expiration_datetime=deadline,
+        client=ANY,
+    )
+
+
+def test_sync_upgrade_deadline_skips_when_already_matching(mocker):
+    """An identical, explicitly set deadline in edX should not produce a write."""
+    deadline = datetime(2030, 6, 1, tzinfo=UTC)
+    mocker.patch(
+        "openedx.api.get_edx_course_modes",
+        return_value=[
+            _edx_mode(
+                expiration_datetime="2030-06-01T00:00:00Z",
+                expiration_datetime_is_explicit=True,
+            )
+        ],
+    )
+    mocked_update = mocker.patch("openedx.api.update_edx_course_mode")
+    mocker.patch("openedx.api.get_edx_api_service_client")
+
+    run = CourseRunFactory.create(upgrade_deadline=deadline)
+
+    assert (
+        sync_courserun_upgrade_deadline_to_edx(run)
+        == UpgradeDeadlineSyncResult.UNCHANGED
+    )
+    mocked_update.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "explicit_flag", [{"expiration_datetime_is_explicit": False}, {}]
+)
+def test_sync_upgrade_deadline_pins_matching_default_deadline(mocker, explicit_flag):
+    """
+    A matching date that isn't marked explicit in edX is still pushed. Until the
+    flag is set, edX treats the date as its own default (course end minus a
+    window) and rewrites it on every Studio publish.
+    """
+    deadline = datetime(2030, 6, 1, tzinfo=UTC)
+    mocker.patch(
+        "openedx.api.get_edx_course_modes",
+        return_value=[
+            _edx_mode(expiration_datetime="2030-06-01T00:00:00Z", **explicit_flag)
+        ],
+    )
+    mocked_update = mocker.patch("openedx.api.update_edx_course_mode")
+    mocker.patch("openedx.api.get_edx_api_service_client")
+
+    run = CourseRunFactory.create(upgrade_deadline=deadline)
+
+    assert (
+        sync_courserun_upgrade_deadline_to_edx(run) == UpgradeDeadlineSyncResult.UPDATED
+    )
+    mocked_update.assert_called_once()
+    assert mocked_update.call_args.kwargs["expiration_datetime"] == deadline
+    assert mocked_update.call_args.kwargs["min_price"] == 100
+
+
+def test_sync_upgrade_deadline_cannot_clear_existing_edx_deadline(mocker, caplog):
+    """
+    Clearing the deadline here cannot be propagated: edX's serializer rejects a
+    null expiration_datetime and edx-api-client drops None from the payload, so
+    the write would silently do nothing. Report it instead of pretending.
+    """
+    mocker.patch(
+        "openedx.api.get_edx_course_modes",
+        return_value=[_edx_mode(expiration_datetime="2030-06-01T00:00:00Z")],
+    )
+    mocked_update = mocker.patch("openedx.api.update_edx_course_mode")
+    mocker.patch("openedx.api.get_edx_api_service_client")
+
+    run = CourseRunFactory.create(upgrade_deadline=None)
+
+    with caplog.at_level(logging.WARNING):
+        result = sync_courserun_upgrade_deadline_to_edx(run)
+
+    assert result == UpgradeDeadlineSyncResult.CLEAR_UNSUPPORTED
+    mocked_update.assert_not_called()
+    assert "cannot unset an existing deadline" in caplog.text
+    assert run.courseware_id in caplog.text
+
+
+def test_sync_upgrade_deadline_no_deadline_on_either_side(mocker):
+    """No deadline here and none in edX is already consistent."""
+    mocker.patch(
+        "openedx.api.get_edx_course_modes",
+        return_value=[_edx_mode(expiration_datetime=None)],
+    )
+    mocked_update = mocker.patch("openedx.api.update_edx_course_mode")
+    mocker.patch("openedx.api.get_edx_api_service_client")
+
+    run = CourseRunFactory.create(upgrade_deadline=None)
+
+    assert (
+        sync_courserun_upgrade_deadline_to_edx(run)
+        == UpgradeDeadlineSyncResult.UNCHANGED
+    )
+    mocked_update.assert_not_called()
+
+
+def test_sync_upgrade_deadline_tolerates_unparseable_edx_value(mocker):
+    """
+    edx-api-client parses expiration_datetime with dateutil and only guards
+    against a missing key, so a non-null unparseable value raises. Treat it as
+    "no deadline set" and push ours rather than blowing up the caller.
+    """
+    deadline = now_in_utc() + timedelta(days=10)
+    mocker.patch(
+        "openedx.api.get_edx_course_modes",
+        return_value=[_edx_mode(expiration_datetime="")],
+    )
+    mocked_update = mocker.patch("openedx.api.update_edx_course_mode")
+    mocker.patch("openedx.api.get_edx_api_service_client")
+
+    run = CourseRunFactory.create(upgrade_deadline=deadline)
+
+    assert (
+        sync_courserun_upgrade_deadline_to_edx(run) == UpgradeDeadlineSyncResult.UPDATED
+    )
+    assert mocked_update.call_args.kwargs["expiration_datetime"] == deadline
+
+
+def test_sync_upgrade_deadline_propagates_edx_errors(mocker):
+    """Failures from edX should surface so the celery task can retry them."""
+    mocker.patch(
+        "openedx.api.get_edx_course_modes",
+        return_value=[_edx_mode(expiration_datetime=None)],
+    )
+    mocker.patch(
+        "openedx.api.update_edx_course_mode",
+        side_effect=HTTPError(response=MockResponse({}, status.HTTP_502_BAD_GATEWAY)),
+    )
+    mocker.patch("openedx.api.get_edx_api_service_client")
+
+    run = CourseRunFactory.create(upgrade_deadline=now_in_utc())
+
+    with pytest.raises(HTTPError):
+        sync_courserun_upgrade_deadline_to_edx(run)

@@ -78,6 +78,45 @@ export const legalAddressCountryValidation = yup.object().shape({
   })
 })
 
+// Countries where export compliance (CyberSource) also needs a state and postal code.
+const SUBDIVISION_COUNTRIES = ["US", "CA"]
+
+export const complianceAddressValidation = legalAddressCountryValidation.concat(
+  yup.object().shape({
+    legal_address: yup.object().shape({
+      first_name:       yup.string().trim().required().label("First Name"),
+      last_name:        yup.string().trim().required().label("Last Name"),
+      street_address_1: yup.string().trim().required().label("Address"),
+      city:             yup.string().trim().required().label("City"),
+      postal_code:      yup
+        .string()
+        .label("Postal Code")
+        .when("country", {
+          is:        value => SUBDIVISION_COUNTRIES.includes(value),
+          then:      yup.string().trim().required(),
+          otherwise: yup.string()
+        })
+    })
+  })
+)
+
+/*
+ * Whether the user has to fill in more of their legal address before checkout.
+ * compliance_missing_fields always reports state and postal code when they're
+ * empty, but they only block the export compliance check for US/CA, so they
+ * are ignored elsewhere - otherwise those learners could never clear the gate.
+ */
+export const needsComplianceInfo = (user: ?CurrentUser): boolean => {
+  if (!user || !user.is_authenticated) {
+    return false
+  }
+  const missing = user.compliance_missing_fields || []
+  const country = user.legal_address ? user.legal_address.country : ""
+  return SUBDIVISION_COUNTRIES.includes(country) ?
+    missing.length > 0 :
+    missing.some(field => field !== "state" && field !== "postal_code")
+}
+
 export const newAccountValidation = yup.object().shape({
   password: newPasswordField.label("Password"),
   username: usernameField
@@ -128,7 +167,7 @@ type AddlProfileFieldsProps = {
   requireAddlFields: ?boolean
 }
 
-const findStates = (country: string, countries: Array<Country>) => {
+export const findStates = (country: string, countries: Array<Country>) => {
   if (!countries) {
     return null
   }
@@ -179,18 +218,25 @@ const renderYearOfBirthField = errors => {
 export const LegalAddressCountryFields = ({
   errors,
   countries,
-  values
-}: LegalAddressProps) => {
-  const addressErrors = errors && errors.legal_address
+  values,
+  rejectedFields = []
+}: LegalAddressProps & { rejectedFields?: Array<string> }) => {
+  const addressErrors = (errors && errors.legal_address) || {}
+  // Checkout rejected the field (e.g. a state CyberSource refused), and the
+  // form's own validation, which takes precedence, hasn't flagged it.
+  const rejected = name => rejectedFields.includes(name) && !addressErrors[name]
   const [showYearOfBirthField, setShowYearOfBirthField] = React.useState(
     values.user_profile.year_of_birth === ""
   )
-  // Show country field if country is not set, or if it's set to US or CA, and no state is selected
+  // Show country field if country is not set, or if it's set to US or CA, and no state is selected,
+  // or if checkout rejected the country or state
   const [showCountryField, setShowCountryField] = React.useState(
     values.legal_address.country === "" ||
       ((values.legal_address.country === "US" ||
         values.legal_address.country === "CA") &&
-        !values.legal_address.state)
+        !values.legal_address.state) ||
+      rejectedFields.includes("country") ||
+      rejectedFields.includes("state")
   )
 
   React.useEffect(() => {
@@ -229,10 +275,12 @@ export const LegalAddressCountryFields = ({
               name="legal_address.country"
               id="legal_address.country"
               aria-invalid={
-                addressErrors && addressErrors.country ? "true" : null
+                addressErrors.country || rejected("country") ? "true" : null
               }
               aria-describedby={
-                addressErrors && addressErrors.country ? "country-error" : null
+                addressErrors.country || rejected("country") ?
+                  "country-error" :
+                  null
               }
               className="form-control"
               autoComplete="country"
@@ -248,11 +296,17 @@ export const LegalAddressCountryFields = ({
                 )) :
                 null}
             </Field>
-            <ErrorMessage
-              id="country-error"
-              name="legal_address.country"
-              component={FormError}
-            />
+            {rejected("country") ? (
+              <FormError id="country-error">
+                Please enter a valid country.
+              </FormError>
+            ) : (
+              <ErrorMessage
+                id="country-error"
+                name="legal_address.country"
+                component={FormError}
+              />
+            )}
           </div>
           {findStates(values.legal_address.country, countries) ? (
             <div className="form-group">
@@ -266,10 +320,12 @@ export const LegalAddressCountryFields = ({
                 name="legal_address.state"
                 id="legal_address.state"
                 aria-invalid={
-                  addressErrors && addressErrors.state ? "true" : null
+                  addressErrors.state || rejected("state") ? "true" : null
                 }
                 aria-describedby={
-                  addressErrors && addressErrors.state ? "state-error" : null
+                  addressErrors.state || rejected("state") ?
+                    "state-error" :
+                    null
                 }
                 aria-description="The state, territory, or province where you live."
                 className="form-control"
@@ -288,15 +344,145 @@ export const LegalAddressCountryFields = ({
                   ) :
                   null}
               </Field>
-              <ErrorMessage
-                id="state-error"
-                name="legal_address.state"
-                component={FormError}
-              />
+              {rejected("state") ? (
+                <FormError id="state-error">
+                  Please enter a valid state.
+                </FormError>
+              ) : (
+                <ErrorMessage
+                  id="state-error"
+                  name="legal_address.state"
+                  component={FormError}
+                />
+              )}
             </div>
           ) : null}
         </div>
       ) : null}
+    </React.Fragment>
+  )
+}
+
+// maxLength mirrors the LegalAddressSerializer limits.
+const COMPLIANCE_TEXT_FIELDS = [
+  {
+    name:         "first_name",
+    label:        "First Name",
+    autoComplete: "given-name",
+    maxLength:    60
+  },
+  {
+    name:         "last_name",
+    label:        "Last Name",
+    autoComplete: "family-name",
+    maxLength:    60
+  },
+  {
+    name:         "street_address_1",
+    label:        "Address",
+    autoComplete: "address-line1",
+    maxLength:    255
+  },
+  // Optional, so only shown when checkout rejected it.
+  {
+    name:         "street_address_2",
+    label:        "Address Line 2",
+    autoComplete: "address-line2",
+    maxLength:    255,
+    optional:     true
+  },
+  {
+    name:         "city",
+    label:        "City",
+    autoComplete: "address-level2",
+    maxLength:    255
+  },
+  {
+    name:         "postal_code",
+    label:        "Postal Code",
+    autoComplete: "postal-code",
+    maxLength:    20
+  }
+]
+
+/*
+ * The legal address fields export compliance needs beyond country/state.
+ * Only fields that were empty when the form opened are shown, so a field
+ * doesn't disappear while the learner types into it - plus any checkout
+ * rejected (rejectedFields: e.g. a last name CyberSource refused), which are
+ * flagged even though they're filled in.
+ */
+export const LegalAddressComplianceFields = ({
+  errors,
+  values,
+  rejectedFields = []
+}: {
+  errors: Object,
+  values: Object,
+  rejectedFields?: Array<string>
+}) => {
+  const addressErrors = (errors && errors.legal_address) || {}
+  const [emptyOnOpen] = React.useState(() =>
+    COMPLIANCE_TEXT_FIELDS.filter(
+      field =>
+        !field.optional && !(values.legal_address[field.name] || "").trim()
+    ).map(field => field.name)
+  )
+  const showsPostalCode = SUBDIVISION_COUNTRIES.includes(
+    values.legal_address.country
+  )
+
+  return (
+    <React.Fragment>
+      {COMPLIANCE_TEXT_FIELDS.filter(
+        field =>
+          (emptyOnOpen.includes(field.name) ||
+            rejectedFields.includes(field.name)) &&
+          (field.name !== "postal_code" ||
+            showsPostalCode ||
+            rejectedFields.includes("postal_code"))
+      ).map(field => {
+        const fieldName = `legal_address.${field.name}`
+        const errorId = `${field.name}-error`
+        // The form's own validation error takes precedence over the rejection.
+        const rejected =
+          rejectedFields.includes(field.name) && !addressErrors[field.name]
+        return (
+          <div className="form-group" key={field.name}>
+            <CardLabel
+              htmlFor={fieldName}
+              isRequired={!field.optional}
+              label={field.label}
+            />
+            <Field
+              type="text"
+              name={fieldName}
+              id={fieldName}
+              className="form-control"
+              autoComplete={field.autoComplete}
+              maxLength={field.maxLength}
+              aria-invalid={
+                addressErrors[field.name] || rejected ? "true" : null
+              }
+              aria-describedby={
+                addressErrors[field.name] || rejected ? errorId : null
+              }
+              required={!field.optional}
+            />
+            {rejected ? (
+              <FormError id={errorId}>
+                Please enter a valid {field.label.toLowerCase()}.
+              </FormError>
+            ) : (
+              <ErrorMessage
+                id={errorId}
+                name={fieldName}
+                component={FormError}
+              />
+            )}
+          </div>
+        )
+      })}
     </React.Fragment>
   )
 }

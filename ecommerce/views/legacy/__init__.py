@@ -4,10 +4,12 @@ MITxOnline ecommerce views
 
 import logging
 from distutils.util import strtobool  # noqa: F401
+from urllib.parse import urlencode
 
 import django_filters
 from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Count, Q
@@ -42,6 +44,7 @@ from courses.models import (
     Course,
     CourseRun,
     CourseRunEnrollment,
+    PaidProgram,
     Program,
     ProgramEnrollment,
     ProgramRun,
@@ -96,12 +99,14 @@ from main.constants import (
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_ENROLL_FAILED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
     USER_MSG_TYPE_PAYMENT_CANCELLED,
     USER_MSG_TYPE_PAYMENT_DECLINED,
     USER_MSG_TYPE_PAYMENT_ERROR,
     USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
+    USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 from main.utils import redirect_with_user_message
 from main.views import RefinePagination
@@ -785,7 +790,9 @@ class CheckoutApiViewSet(ViewSet):
         Returns the current cart, with the product info embedded.
         """
         if request.user.is_authenticated:
-            basket = Basket.objects.filter(user=request.user).first()
+            basket = (
+                Basket.objects.filter(user=request.user).select_related("user").first()
+            )
         else:
             anonymous_id = api.get_anonymous_basket_id(request, create=False)
             basket = (
@@ -803,7 +810,7 @@ class CheckoutApiViewSet(ViewSet):
             )
 
         if request.user.is_authenticated:
-            api.apply_user_discounts(request)
+            api.apply_user_discounts(basket)
 
         return Response(BasketWithProductSerializer(basket).data)
 
@@ -1058,7 +1065,7 @@ class CheckoutProductView(RedirectView):
 
         return super().get_redirect_url(*args, **kwargs)
 
-    def _enroll_via_verified_program(
+    def _enroll_via_verified_program(  # noqa: PLR0911
         self, product_ids, course_run_ids, courseware_ids, program_ids
     ):
         """
@@ -1068,22 +1075,36 @@ class CheckoutProductView(RedirectView):
         paid for it via the program) and return the dashboard URL to redirect
         to instead of the cart.
 
+        The run can be requested by courseware id (external checkout) or by
+        the id of its product (in-app "Add to Cart" buttons).
+
         Returns None if the request doesn't qualify for the shortcut, so the
         caller falls back to the normal basket flow.
         """
-        if product_ids or program_ids or not self.request.user.is_authenticated:
+        if program_ids or not self.request.user.is_authenticated:
+            return None
+
+        products = Product.objects.filter(id__in=product_ids)
+        if products.exclude(
+            content_type=ContentType.objects.get_for_model(CourseRun)
+        ).exists():
+            # A program (or anything else that isn't a run) is in the request.
             return None
 
         runs = list(
             CourseRun.objects.filter(
                 Q(courseware_id__in=course_run_ids)
                 | Q(courseware_id__in=courseware_ids)
+                | Q(id__in=products.values_list("object_id", flat=True))
             )
         )
         if len(runs) != 1:
             return None
         run = runs[0]
 
+        # Only a program the learner actually paid for counts - a verified
+        # enrollment can also be set without a purchase (e.g. by staff), and
+        # that shouldn't make the program's courses free.
         # order_by keeps this deterministic if the learner somehow holds more
         # than one matching verified program enrollment (e.g. the course is
         # in multiple programs) -- prefer the most recently created one.
@@ -1093,6 +1114,9 @@ class CheckoutProductView(RedirectView):
                 enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
                 active=True,
                 program__all_requirements__course=run.course,
+                program__id__in=PaidProgram.objects.filter(
+                    user=self.request.user
+                ).values_list("program__id", flat=True),
             )
             .distinct()
             .order_by("-id")
@@ -1193,6 +1217,23 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             return redirect_with_user_message(
                 reverse("user-dashboard"),
                 {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
+            )
+        if "profile_incomplete" in checkout_payload:
+            # The cart opens its profile dialog on these fields. It can't edit
+            # the email address, so a rejection of only that goes to support.
+            missing_fields = [
+                field
+                for field in checkout_payload["missing_fields"]
+                if field != "email"
+            ]
+            if not missing_fields:
+                return redirect_with_user_message(
+                    reverse("cart"), {"type": USER_MSG_TYPE_ENROLL_FAILED}
+                )
+            params = urlencode({"profile_incomplete": ",".join(missing_fields)})
+            return redirect_with_user_message(
+                f"{reverse('cart')}?{params}",
+                {"type": USER_MSG_TYPE_PROFILE_INCOMPLETE},
             )
         if "no_checkout" in checkout_payload:
             order = checkout_payload["order"]

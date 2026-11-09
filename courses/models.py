@@ -366,6 +366,19 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         page = self.program_page
         return page.certificate_page if page else None
 
+    def get_certificate_page_revision(self):
+        """
+        Return the published revision of this program's live certificate page
+        (see CertificatePage.get_certificate_revision), or ``None``.
+
+        Unlike the certificate_page cached_property, this re-reads the page
+        on every call, so a batch that reuses the same Program object for
+        many users sees publish/unpublish changes made mid-batch.
+        """
+        page = self.program_page
+        certificate_page = page.certificate_page if page else None
+        return certificate_page.get_certificate_revision() if certificate_page else None
+
     def get_requirements_root(self, *, for_update=False):
         """The root of the requirements tree"""
         query = ProgramRequirement.get_root_nodes().filter(program=self)
@@ -496,6 +509,51 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             .prefetch_related("courseruns", "departments")
         )
 
+    @property
+    def courses_qset_recursive(self):
+        """
+        Returns a QuerySet of the related courses for this program and for every
+        program nested in its requirements tree, at any depth, required or
+        elective.
+        """
+
+        return (
+            Course.objects.filter(
+                in_programs__program_id__in=Program.expand_nested_program_ids([self.id])
+            )
+            .distinct()
+            .prefetch_related("courseruns", "departments")
+        )
+
+    @staticmethod
+    def expand_nested_program_ids(program_ids):
+        """
+        Returns the given program ids plus the ids of every program nested in
+        their requirements trees, at any depth, required or elective.
+
+        Args:
+        - program_ids (iterable of int): the programs to start from
+        Returns:
+        - set of int: the program ids
+        """
+
+        program_ids = set(program_ids)
+        frontier = set(program_ids)
+        while frontier:
+            frontier = (
+                set(
+                    ProgramRequirement.objects.filter(
+                        program_id__in=frontier,
+                        node_type=ProgramRequirementNodeType.PROGRAM,
+                        required_program__isnull=False,
+                    ).values_list("required_program_id", flat=True)
+                )
+                - program_ids
+            )
+            program_ids |= frontier
+
+        return program_ids
+
     def _get_operator_course_requirements(self, main_ops):
         """
         Helper method to fetch all course requirements under operator nodes.
@@ -554,28 +612,31 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             elif op.elective_flag and elective_title == "Elective Courses":
                 elective_title = op.title or elective_title
 
+        # A course can sit in more than one group (two tracks, or overlapping
+        # elective groups); list it once, where it first appears, and as
+        # required if any of its groups is required. Otherwise the learner
+        # record and the API show it twice.
+        required_course_ids = {
+            req.course_id
+            for req in course_reqs
+            if req.course
+            and (op := self._find_parent_operator(req, path_to_operator))
+            and not op.elective_flag
+        }
+        seen_course_ids = set()
         for req in course_reqs:
-            if not req.course:
+            if (
+                not req.course
+                or req.course_id in seen_course_ids
+                or self._find_parent_operator(req, path_to_operator) is None
+            ):
                 continue
-
-            # Find which operator this requirement belongs to
-            parent_op = self._find_parent_operator(req, path_to_operator)
-            if parent_op is None:
-                continue
-
-            requirement_type = (
-                "Required Courses"
-                if not parent_op.elective_flag
-                else "Elective Courses"
-            )
-
-            # Build course tuples and separate lists
-            course_tuple = (req.course, requirement_type)
-            courses.append(course_tuple)
-
-            if not parent_op.elective_flag:
+            seen_course_ids.add(req.course_id)
+            if req.course_id in required_course_ids:
+                courses.append((req.course, "Required Courses"))
                 required_courses.append(req.course)
             else:
+                courses.append((req.course, "Elective Courses"))
                 elective_courses.append(req.course)
 
         return {
@@ -1144,6 +1205,19 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         page = self.course_page
         return page.certificate_page if page else None
 
+    def get_certificate_page_revision(self):
+        """
+        Return the published revision of this course's live certificate page
+        (see CertificatePage.get_certificate_revision), or ``None``.
+
+        Unlike the certificate_page cached_property, this re-reads the page
+        on every call, so a batch that reuses the same Course object for
+        many users sees publish/unpublish changes made mid-batch.
+        """
+        page = self.course_page
+        certificate_page = page.certificate_page if page else None
+        return certificate_page.get_certificate_revision() if certificate_page else None
+
     @cached_property
     def course_number(self):
         """
@@ -1396,19 +1470,15 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
 
         if org_id is not None:
             courseruns = filter(
-                lambda run: (
-                    run.b2b_contract_organization_id == org_id
-                    or any(c.organization_id == org_id for c in run.b2b_contracts.all())
+                lambda run: any(
+                    c.organization_id == org_id for c in run.b2b_contracts.all()
                 ),
                 courseruns,
             )
 
         if contract_id is not None:
             courseruns = filter(
-                lambda run: (
-                    run.b2b_contract_id == contract_id
-                    or any(c.id == contract_id for c in run.b2b_contracts.all())
-                ),
+                lambda run: any(c.id == contract_id for c in run.b2b_contracts.all()),
                 courseruns,
             )
 
@@ -1426,7 +1496,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
                 language=run.language,
                 variant_length=run.variant_length,
                 variant_industry=run.variant_industry,
-                b2b_only=bool(run.b2b_contract),
+                b2b_only=run.has_b2b_contracts,
             ).exists()
         )
 
@@ -1651,13 +1721,6 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
         EnrollmentMode, blank=True, related_name="+"
     )
 
-    b2b_contract = models.ForeignKey(
-        "b2b.ContractPage",
-        null=True,
-        blank=True,
-        on_delete=models.DO_NOTHING,
-        related_name="+",
-    )
     b2b_contracts = models.ManyToManyField(
         "b2b.ContractPage",
         blank=True,
@@ -1693,7 +1756,7 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
     class Meta:
         # The ``unique_primary_language_per_group`` and
         # ``unique_language_per_group`` rules used to live here as database
-        # UniqueConstraints that included the now-deprecated ``b2b_contract``
+        # UniqueConstraints that included the now-removed ``b2b_contract``
         # FK. A run can now belong to multiple contracts through the
         # ``b2b_contracts`` ManyToManyField, and M2M fields cannot participate
         # in a UniqueConstraint, so the rules are enforced in application code
@@ -1875,10 +1938,6 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
 
         if self.pk:
             self.validate_b2b_contract_group_uniqueness(self.contract_group_ids)
-        elif self.b2b_contract_id:
-            # The deprecated FK is populated before the first save, so the
-            # group it names is already known and can be checked now.
-            self.validate_b2b_contract_group_uniqueness([self.b2b_contract_id])
         elif not self.b2b_only:
             # An unsaved row has no primary key, so `b2b_contracts` can't be
             # queried yet - B2B runs get their contracts attached immediately
@@ -1915,33 +1974,37 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
             update_fields=update_fields,
         )
 
-    @cached_property
-    def b2b_contract_organization_id(self) -> int | None:
+    @property
+    def has_b2b_contracts(self) -> bool:
         """
-        Organization owning the deprecated single-contract ``b2b_contract`` FK.
+        Return True if the run is attached to any B2B contract.
 
-        This is the lazy path, for callers that reach a run without annotating.
-        ``CourseViewSet`` annotates this same name onto its ``courseruns``
-        prefetch; ``cached_property`` is a non-data descriptor, so the value the
-        annotation writes into the instance ``__dict__`` shadows this method and
-        the contract page is never loaded there.
+        This checks the M2M's through table directly, since the
+        ``b2b_contracts`` related manager is filtered to active contracts and a
+        run in an inactive (or expired) contract is still a contract run.
         """
-        if self.b2b_contract_id is None:
-            return None
-        return self.b2b_contract.organization_id
+        if not self.pk:
+            return False
+
+        return CourseRun.b2b_contracts.through.objects.filter(
+            courserun_id=self.pk
+        ).exists()
 
     @property
     def contract_group_ids(self):
         """
-        Return the ids of every contract group this run belongs to, combining
-        the ``b2b_contracts`` M2M with the deprecated ``b2b_contract`` FK.
+        Return the ids of every contract group this run belongs to.
         """
-        ids = set(self.b2b_contracts.values_list("id", flat=True)) if self.pk else set()
+        if not self.pk:
+            return set()
 
-        if self.b2b_contract_id:
-            ids.add(self.b2b_contract_id)
-
-        return ids
+        # Read the through table directly - the related manager only returns
+        # active contracts, but inactive ones are still contract groups.
+        return set(
+            CourseRun.b2b_contracts.through.objects.filter(
+                courserun_id=self.pk
+            ).values_list("contractpage_id", flat=True)
+        )
 
     def validate_b2b_contract_group_uniqueness(self, contract_ids):
         """
@@ -1949,7 +2012,7 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
         ``unique_primary_language_per_group`` and ``unique_language_per_group``
         database constraints.
 
-        Those constraints grouped runs by contract using the deprecated
+        Those constraints grouped runs by contract using the now-removed
         ``b2b_contract`` FK. Now that a run can be attached to several
         contracts via ``b2b_contracts``, the rules are applied once per
         contract group: within a given contract (or within the "no contract"
@@ -1979,17 +2042,10 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
                 is_source_run=self.is_source_run,
             ).exclude(pk=self.pk)
 
-            # Runs can be linked to a contract through the M2M or through the
-            # deprecated FK (which is still written directly in places), so
-            # both have to be considered when building a group.
             siblings = (
-                siblings.filter(
-                    Q(b2b_contracts__id=contract_id) | Q(b2b_contract_id=contract_id)
-                )
+                siblings.filter(b2b_contracts__id=contract_id)
                 if contract_id is not None
-                else siblings.filter(
-                    b2b_contracts__isnull=True, b2b_contract__isnull=True
-                )
+                else siblings.filter(b2b_contracts__isnull=True)
             )
             if (
                 self.is_primary_language
@@ -2118,9 +2174,17 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
     )
     certificate_page_revision = models.ForeignKey(
         Revision,
-        null=True,
+        null=False,
+        # blank=True so the admin form can be left empty: clean()/save() then
+        # fill in the certificate page's published revision.
         blank=True,
-        on_delete=models.CASCADE,
+        # PROTECT, not CASCADE: every certificate now points at a revision,
+        # and Wagtail's purge_revisions deletes non-latest revisions, relying
+        # on ProtectedError to skip ones still referenced. CASCADE would
+        # silently delete issued certificates. (Deleting the page itself
+        # removes all its revisions, so it's blocked up front by the
+        # before_delete_page hook in cms/wagtail_hooks.py.)
+        on_delete=models.PROTECT,
         limit_choices_to=limit_to_certificate_pages,
     )
 
@@ -2160,9 +2224,23 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
     def clean(self):
         from cms.models import CertificatePage, CoursePage  # noqa: PLC0415
 
-        # Skip validation if certificate_page_revision is not set (e.g., when revoking)
-        if self.certificate_page_revision is None:
+        # Check the raw FK ids, as save() does: an unset FK raises
+        # RelatedObjectDoesNotExist through the descriptor rather than
+        # returning None.
+        if not self.course_run_id:
             return
+
+        # Left blank (e.g. in the admin): use the published revision, or fail if
+        # there isn't one rather than hitting the NOT NULL constraint on save.
+        if not self.certificate_page_revision_id:
+            revision = self.course_run.course.get_certificate_page_revision()
+            if not revision:
+                raise ValidationError(
+                    {
+                        "certificate_page_revision": "This course has no live certificate page with a saved revision."
+                    }
+                )
+            self.certificate_page_revision = revision
 
         certpage = CertificatePage.objects.filter(
             pk=int(self.certificate_page_revision.object_id),
@@ -2188,10 +2266,14 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
             )
 
     def save(self, *args, **kwargs):  # noqa: DJ012
-        if not self.certificate_page_revision:
-            certificate_page = self.course_run.course.certificate_page
-            if certificate_page:
-                self.certificate_page_revision = certificate_page.get_latest_revision()
+        # Check the raw FK id, not self.certificate_page_revision: now that
+        # the field is non-nullable, accessing an unset FK through the
+        # descriptor raises RelatedObjectDoesNotExist instead of returning
+        # None, which would break this exact "is it set yet?" check.
+        if not self.certificate_page_revision_id:
+            self.certificate_page_revision = (
+                self.course_run.course.get_certificate_page_revision()
+            )
 
         super(CourseRunCertificate, self).save(*args, **kwargs)  # noqa: UP008
 
@@ -2204,9 +2286,17 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
     program = models.ForeignKey(Program, null=False, on_delete=models.CASCADE)
     certificate_page_revision = models.ForeignKey(
         Revision,
-        null=True,
+        null=False,
+        # blank=True so the admin form can be left empty: clean()/save() then
+        # fill in the certificate page's published revision.
         blank=True,
-        on_delete=models.CASCADE,
+        # PROTECT, not CASCADE: every certificate now points at a revision,
+        # and Wagtail's purge_revisions deletes non-latest revisions, relying
+        # on ProtectedError to skip ones still referenced. CASCADE would
+        # silently delete issued certificates. (Deleting the page itself
+        # removes all its revisions, so it's blocked up front by the
+        # before_delete_page hook in cms/wagtail_hooks.py.)
+        on_delete=models.PROTECT,
         limit_choices_to=limit_to_certificate_pages,
     )
 
@@ -2253,9 +2343,23 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
     def clean(self):
         from cms.models import CertificatePage, ProgramPage  # noqa: PLC0415
 
-        # Skip validation if certificate_page_revision is not set (e.g., when revoking)
-        if self.certificate_page_revision is None:
+        # Check the raw FK ids, as save() does: an unset FK raises
+        # RelatedObjectDoesNotExist through the descriptor rather than
+        # returning None.
+        if not self.program_id:
             return
+
+        # Left blank (e.g. in the admin): use the published revision, or fail if
+        # there isn't one rather than hitting the NOT NULL constraint on save.
+        if not self.certificate_page_revision_id:
+            revision = self.program.get_certificate_page_revision()
+            if not revision:
+                raise ValidationError(
+                    {
+                        "certificate_page_revision": "This program has no live certificate page with a saved revision."
+                    }
+                )
+            self.certificate_page_revision = revision
 
         certpage = CertificatePage.objects.filter(
             pk=int(self.certificate_page_revision.object_id),
@@ -2281,10 +2385,14 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
             )
 
     def save(self, *args, **kwargs):  # pylint: disable=signature-differs  # noqa: DJ012
-        if not self.certificate_page_revision:
-            certificate_page = self.program.certificate_page
-            if certificate_page:
-                self.certificate_page_revision = certificate_page.get_latest_revision()
+        # Check the raw FK id, not self.certificate_page_revision: now that
+        # the field is non-nullable, accessing an unset FK through the
+        # descriptor raises RelatedObjectDoesNotExist instead of returning
+        # None, which would break this exact "is it set yet?" check.
+        if not self.certificate_page_revision_id:
+            self.certificate_page_revision = (
+                self.program.get_certificate_page_revision()
+            )
 
         super().save(*args, **kwargs)
 
@@ -2579,6 +2687,44 @@ class CourseRunEnrollmentAudit(AuditModel):
         return "enrollment"
 
 
+class CourseRunAccessRole(TimestampedModel):
+    """
+    A course access role a user holds in Open edX for a given course run.
+
+    Open edX is the system of record. Rows here are mirrored from its
+    COURSE_ACCESS_ROLE_ADDED event by the enrollment webhook, so that MITx
+    Online can answer "is this user on the course team?" locally instead of
+    calling Open edX once per enrollment when the dashboard loads. The
+    plugin's `sync_course_access_roles` management command posts to the same
+    webhook to backfill roles granted before we started recording them; it
+    skips org-wide roles, which have no single run to attach to.
+
+    Two limits worth knowing. A row only lands here if the role passes both
+    the plugin's ENROLLMENT_COURSE_ACCESS_ROLES setting and our own
+    OPENEDX_COURSE_STAFF_ROLES, so this is not a complete picture of a run's
+    course team. And nothing removes a row, because Open edX's
+    COURSE_ACCESS_ROLE_REMOVED event is not forwarded, so a revoked role stays
+    recorded until it is deleted by hand.
+    """
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="course_run_access_roles"
+    )
+    run = models.ForeignKey(
+        "courses.CourseRun", on_delete=models.CASCADE, related_name="access_roles"
+    )
+    role = models.CharField(
+        max_length=64,
+        help_text="The Open edX course access role name, e.g. 'staff' or 'instructor'.",
+    )
+
+    class Meta:
+        unique_together = ("user", "run", "role")
+
+    def __str__(self):
+        return f"{self.role} for {self.user} in {self.run.courseware_id}"
+
+
 class ProgramEnrollmentCertificatePrefetcher(Prefetcher):
     """Prefetcher for ProgramEnrollment certificates"""
 
@@ -2637,12 +2783,31 @@ class ProgramEnrollment(EnrollmentModel):
         null=True,
         blank=True,
     )
+    # The chosen track only selects which view of the program the learner sees;
+    # certificates and the nightly upgrade never read it, so deleting the track
+    # node just clears the choice.
+    track = models.ForeignKey(
+        "courses.ProgramRequirement",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="The track the learner chose, a track node of this program",
+    )
 
     objects = ActiveProgramEnrollmentManager()
     all_objects = ProgramEnrollmentManager()
 
     class Meta:
         unique_together = ("user", "program")
+
+    def clean(self):
+        """Require track, when set, to be a track node of this program"""
+        super().clean()
+        if self.track is not None and not (
+            self.track.is_track and self.track.program_id == self.program_id
+        ):
+            raise ValidationError({"track": "Must be a track of this program."})
 
     @property
     def is_ended(self):
@@ -2851,17 +3016,21 @@ class ProgramRequirementNodeType(models.TextChoices):
     OPERATOR = "operator", "Operator"
     COURSE = "course", "Course"
     PROGRAM = "program", "Program"
+    TRACK = "track", "Track"
 
 
 class ProgramRequirement(MP_Node):
     """
     A representation of program requirements.
 
-    There are 3 types of nodes that exist in a requirement tree:
+    The types of nodes that exist in a requirement tree:
 
     Root nodes - these represent a program
-    Operator nodes - these represent a logical operation over a set of courses
+    Operator nodes - these represent a logical operation over a set of requirements
     Course nodes - these represent a reference to a course
+    Program nodes - these represent a reference to another program
+    Track nodes - a named, described alternative; the program requires any one
+        whole track, and a track is satisfied when all of its operator nodes are
 
     Usage:
 
@@ -2885,6 +3054,10 @@ class ProgramRequirement(MP_Node):
     the requirement-tree serializer accept only the shapes
     courses.requirement_tree.validate_requirement_tree allows. The evaluator
     itself handles any nesting.
+
+    Tracks sit at depth 3, under one MIN_NUMBER_OF operator at depth 2 whose
+    children are all tracks (the tracks container), and hold operator nodes of
+    their own.
     """
 
     # extended alphabet from the default to the recommended one for postgres
@@ -2931,6 +3104,7 @@ class ProgramRequirement(MP_Node):
     )
 
     title = models.TextField(null=True, blank=True, default="")  # noqa: DJ001
+    description = models.TextField(blank=True, default="")
     elective_flag = models.BooleanField(null=True, blank=True, default=False)
 
     @property
@@ -2983,6 +3157,11 @@ class ProgramRequirement(MP_Node):
         """True if the node is the root"""
         return self.node_type == ProgramRequirementNodeType.PROGRAM_ROOT
 
+    @property
+    def is_track(self):
+        """True if the node is a track"""
+        return self.node_type == ProgramRequirementNodeType.TRACK
+
     def add_child(self, **kwargs):
         """Children must always have the same program"""
         kwargs["program"] = self.program
@@ -3002,6 +3181,8 @@ class ProgramRequirement(MP_Node):
             attrs["course"] = self.course
         elif self.is_program:
             attrs["required_program"] = self.required_program
+        elif self.is_track:
+            attrs["title"] = self.title
 
         return " ".join(f"{key}={value}" for key, value in attrs.items())
 
@@ -3045,6 +3226,16 @@ class ProgramRequirement(MP_Node):
                         course__isnull=True,
                         required_program__isnull=False,
                         depth__gt=1,
+                    )
+                    # track nodes: depth 3, inside the depth-2 tracks container;
+                    # validate_requirement_tree checks the parent and children
+                    | Q(
+                        node_type=ProgramRequirementNodeType.TRACK.value,
+                        operator__isnull=True,
+                        operator_value__isnull=True,
+                        course__isnull=True,
+                        required_program__isnull=True,
+                        depth=3,
                     )
                 ),
             ),

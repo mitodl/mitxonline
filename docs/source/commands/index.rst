@@ -13,6 +13,7 @@ MITx Online Commands
    create_user
    generate_discount_code
    import_courserun
+   seed_local_instance
 
 Indices and tables
 ==================

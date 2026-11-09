@@ -26,11 +26,52 @@ def queue_enrollment_code_check(contract_id: int):
 
 
 @app.task(acks_late=True)
+def push_upgraded_enrollments_to_edx(enrollment_ids: list[int]):
+    """
+    Push enrollments that were upgraded to verified locally into edX.
+
+    Each enrollment is pushed on its own, so one bad run doesn't block the
+    rest. Failures are left with edx_enrolled=False for
+    retry_failed_edx_enrollments to pick up.
+    """
+    from courses.models import CourseRunEnrollment
+    from openedx.api import enroll_in_edx_course_runs
+
+    enrollments = CourseRunEnrollment.objects.filter(
+        id__in=enrollment_ids, edx_enrolled=False
+    ).select_related("user", "run")
+
+    for enrollment in enrollments:
+        try:
+            enroll_in_edx_course_runs(
+                enrollment.user, [enrollment.run], mode=enrollment.enrollment_mode
+            )
+        except Exception:  # noqa: BLE001
+            log.warning(
+                "Couldn't push upgraded enrollment %s to edX, leaving it for retry",
+                enrollment.id,
+                exc_info=True,
+            )
+            continue
+
+        enrollment.edx_enrolled = True
+        enrollment.save_and_log(None)
+
+
+@app.task(acks_late=True)
 def queue_organization_sync():
     """Queue the sync_organizations call."""
     from b2b.api import reconcile_keycloak_orgs
 
     reconcile_keycloak_orgs()
+
+
+@app.task(acks_late=True)
+def push_unconfirmed_org_members_to_keycloak():
+    """Retry adding members to Keycloak that it has not confirmed yet."""
+    from b2b.provisioning import push_unconfirmed_members_to_keycloak
+
+    push_unconfirmed_members_to_keycloak()
 
 
 @app.task(bind=True)
@@ -73,13 +114,15 @@ def create_program_contract_runs(
         created_count = 0
         skipped_count = 0
 
+        courses = program.courses_qset_recursive
+
         # Get courses with source runs
-        courses_with_source = program.courses_qset.filter(
+        courses_with_source = courses.filter(
             Q(courseruns__is_source_run=True) | Q(courseruns__run_tag="SOURCE")
         )
 
         # Count courses without source runs
-        courses_without_source = program.courses_qset.exclude(
+        courses_without_source = courses.exclude(
             Q(courseruns__is_source_run=True) | Q(courseruns__run_tag="SOURCE")
         ).count()
 
@@ -94,7 +137,7 @@ def create_program_contract_runs(
                 continue
 
             # Check if run already exists
-            if CourseRun.objects.filter(course=course, b2b_contract=contract).exists():
+            if CourseRun.objects.filter(course=course, b2b_contracts=contract).exists():
                 skipped_count += 1
                 log.debug(
                     "Contract run already exists for course %s in contract %s",

@@ -19,7 +19,10 @@ fake = Faker()
 # the parent chain is prefetched by name instead, which costs a query per
 # level rather than riding along on a select_related. Still flat: 22 at 1, 5
 # and 20 courses.
-INGESTIBLE_COURSES_QUERY_BUDGET = 22
+#
+# Went 22 -> 23 when the course run serializer's b2b_contract field moved from
+# the removed FK to the b2b_contracts M2M, which needs its own prefetch.
+INGESTIBLE_COURSES_QUERY_BUDGET = 23
 
 
 def _get_courses(client, page_size):

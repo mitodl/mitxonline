@@ -36,6 +36,7 @@ from courses.api import (
     partner_schools_for_program,
 )
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
+from courses.exceptions import CountryBlockedError
 from courses.models import (
     Course,
     CourseRun,
@@ -169,39 +170,16 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = CourseFilterSet
 
     def get_queryset(self):
-        courserun_is_enrollable = self.request.query_params.get(
-            "courserun_is_enrollable", None
+        # Filtering by courserun_is_enrollable is CourseFilterSet's job; the
+        # queryset is the same either way.
+        return Course.objects.select_related("page").prefetch_related(
+            "departments",
+            "courseruns__products",
+            Prefetch(
+                "courseruns__enrollment_modes",
+                to_attr="prefetched_enrollment_modes",
+            ),
         )
-
-        if courserun_is_enrollable:
-            queryset = (
-                Course.objects.filter()
-                .select_related("page")
-                .prefetch_related(
-                    "departments",
-                    Prefetch(
-                        "courseruns__enrollment_modes",
-                        to_attr="prefetched_enrollment_modes",
-                    ),
-                )
-                .all()
-            )
-        else:
-            queryset = (
-                Course.objects.filter()
-                .select_related("page")
-                .prefetch_related(
-                    "courseruns",
-                    "departments",
-                    Prefetch(
-                        "courseruns__enrollment_modes",
-                        to_attr="prefetched_enrollment_modes",
-                    ),
-                )
-                .all()
-            )
-
-        return queryset
 
     def get_serializer_context(self):
         added_context = {}
@@ -308,18 +286,6 @@ def _validate_enrollment_post_request(
             "Attempting to enroll in a non-existent run (id: %s)", str(run_id_str)
         )
         return HttpResponseRedirect(request.headers["Referer"]), None, None
-    if run.course.is_country_blocked(user):
-        resp = HttpResponseRedirect(request.headers["Referer"])
-        resp.set_cookie(
-            key=USER_MSG_COOKIE_NAME,
-            value=encode_json_cookie_value(
-                {
-                    "type": USER_MSG_TYPE_ENROLL_BLOCKED,
-                }
-            ),
-            max_age=USER_MSG_COOKIE_MAX_AGE,
-        )
-        return resp, None, None
     if (
         PaidCourseRun.fulfilled_paid_course_run_exists(user, run)
         or CourseRunEnrollment.objects.filter(
@@ -356,6 +322,14 @@ class CreateEnrollmentView(APIView):
         if resp is not None:
             return resp
 
+        # Check early so a blocked learner isn't provisioned an edX account.
+        # create_run_enrollments remains the authoritative check.
+        if run.course.is_country_blocked(user):
+            return redirect_with_user_message(
+                reverse("user-dashboard"),
+                {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
+            )
+
         if not user.openedx_user_exists:
             create_user(user)
             user.refresh_from_db()
@@ -368,7 +342,7 @@ class CreateEnrollmentView(APIView):
                     features.IGNORE_EDX_FAILURES, False
                 ),
             )
-        except ExportComplianceCheckError:
+        except (CountryBlockedError, ExportComplianceCheckError):
             # Don't propagate the specifics of the compliance decision to the
             # client - the underlying cause is logged where it's raised.
             return redirect_with_user_message(
@@ -517,9 +491,22 @@ class UserEnrollmentsApiViewSet(
                     NoEdxApiAuthError,
                     HTTPError,
                     RequestsConnectionError,
-                ) as exc:
-                    log.exception(str(exc))  # noqa: TRY401
-                    return Response(data=str(exc), status=status.HTTP_400_BAD_REQUEST)
+                ):
+                    # Log full details for debugging
+                    log.exception(
+                        "Failed to update email subscription for user %s, enrollment %s, receive_emails=%s",
+                        request.user.id,
+                        enrollment.id,
+                        receive_emails,
+                    )
+
+                    # Return user-friendly error
+                    return Response(
+                        data={
+                            "error": "Unable to update email preferences at this time. Please try again later or contact support."
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
         else:
             # only designed to update edx_emails_subscription field
             # TODO: In the future please add the implementation  # noqa: FIX002, TD002, TD003

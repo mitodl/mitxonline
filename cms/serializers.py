@@ -289,6 +289,7 @@ class ProductPageTestimonialSerializer(serializers.Serializer):
     quote = serializers.CharField(read_only=True)
     name = serializers.CharField(read_only=True)
     title = serializers.CharField(read_only=True)
+    date_published = serializers.DateField(read_only=True)
     image_src = serializers.SerializerMethodField()
 
     @extend_schema_field(serializers.CharField(allow_null=True))

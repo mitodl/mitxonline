@@ -34,7 +34,11 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
-from b2b.api import is_product_courserun, is_product_program
+from b2b.api import (
+    apply_contract_discounts_to_basket,
+    is_product_courserun,
+    is_product_program,
+)
 from b2b.serializers.v0.manager import DetailErrorSerializer
 from courses.models import (
     Course,
@@ -68,6 +72,7 @@ from ecommerce.models import (
     OrderStatus,
     Product,
     UserDiscount,
+    b2b_order_exists,
 )
 from ecommerce.serializers import BulkDiscountSerializer
 from ecommerce.serializers.v0 import (
@@ -312,6 +317,10 @@ def _create_basket_from_product(
                 except Discount.DoesNotExist:
                     pass
 
+            # Contract pricing goes last - if it wins, the item gets tied to the
+            # contract, and that only holds if nothing replaces its code after.
+            apply_contract_discounts_to_basket(basket)
+
     basket.refresh_from_db()
 
     if checkout:
@@ -420,20 +429,21 @@ def create_basket_with_products(request):
     product_ids = serializer.validated_data["product_ids"]
 
     basket = establish_basket(request)
-    products = []
 
-    try:
-        products = [
-            (
-                Product.objects.get(id=item["product_id"]),
-                item["quantity"],
-            )
-            for item in product_ids
-        ]
-    except Product.DoesNotExist:
+    requested_ids = {item["product_id"] for item in product_ids}
+    # sync_hubspot_cart_add's arguments below read each product's
+    # purchasable_object, a GenericForeignKey that no queryset loads without an
+    # explicit prefetch_related.
+    products_by_id = Product.objects.prefetch_related("purchasable_object").in_bulk(
+        requested_ids
+    )
+    if len(products_by_id) != len(requested_ids):
         return Response(
             {"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND
         )
+    products = [
+        (products_by_id[item["product_id"]], item["quantity"]) for item in product_ids
+    ]
 
     allow_multiple_items = getattr(settings, "ENABLE_MULTIPLE_CART_ITEMS", False)
     if not allow_multiple_items:
@@ -484,6 +494,8 @@ def create_basket_with_products(request):
             apply_discount_to_basket(basket, discount)
         except Discount.DoesNotExist:
             pass
+
+    apply_contract_discounts_to_basket(basket)
 
     basket.refresh_from_db()
 
@@ -1054,6 +1066,8 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
             )
             # Read by Order.refund_status for every fulfilled row.
             .annotate(funds_fulfilled_redemption=funds_fulfilled_redemption_exists())
+            # Read by Order.refund_status and the serializer for every row.
+            .annotate(is_b2b_order=b2b_order_exists())
             .order_by("-created_on")
             .all()
         )

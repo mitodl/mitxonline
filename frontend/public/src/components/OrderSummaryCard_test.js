@@ -111,4 +111,19 @@ describe("OrderSummaryCard", () => {
       Object.defineProperty(window, "location", originalDescriptor)
     }
   })
+
+  it("hands the checkout url to onCheckout instead of redirecting when given", async () => {
+    const onCheckout = sandbox.stub()
+    const wrapper = shallow(
+      <OrderSummaryCard
+        {...baseProps}
+        isAuthenticated={true}
+        onCheckout={onCheckout}
+      />
+    )
+    await wrapper.instance().handlePlaceOrder()
+
+    sinon.assert.calledOnce(onCheckout)
+    sinon.assert.calledWithExactly(onCheckout, "/checkout/to_payment")
+  })
 })

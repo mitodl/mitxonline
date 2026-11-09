@@ -2538,50 +2538,6 @@ def _upsert_target_deal_line_item(
         )
 
 
-def _ensure_target_line_item_for_line(
-    line: Line, hubspot_client: HubspotApi
-) -> str | None:
-    """Return a target-account line item id, creating one when missing."""
-    line_item_input = _build_target_line_item_message(line, hubspot_client)
-    unique_app_id = str(line_item_input.properties.get("unique_app_id") or "")
-
-    if unique_app_id:
-        existing_line_item_id = _find_target_line_item_id_by_unique_app_id(
-            hubspot_client, unique_app_id
-        )
-        if existing_line_item_id:
-            # Update the line item with latest data (enrollment_mode can change over time)
-            wait_for_hubspot_rate_limit()
-            hubspot_client.crm.objects.basic_api.update(
-                object_type=HubspotObjectType.LINES.value,
-                object_id=existing_line_item_id,
-                simple_public_object_input=line_item_input,
-            )
-            content_type = ContentType.objects.get_for_model(Line)
-            HubspotObject.objects.update_or_create(
-                object_id=line.id,
-                content_type=content_type,
-                defaults={"hubspot_id": existing_line_item_id},
-            )
-            return existing_line_item_id
-
-    wait_for_hubspot_rate_limit()
-    created_line_item = hubspot_client.crm.objects.basic_api.create(
-        object_type=HubspotObjectType.LINES.value,
-        simple_public_object_input_for_create=line_item_input,
-    )
-
-    # Update the local HubspotObject mapping for newly created line item
-    content_type = ContentType.objects.get_for_model(Line)
-    HubspotObject.objects.update_or_create(
-        object_id=line.id,
-        content_type=content_type,
-        defaults={"hubspot_id": created_line_item.id},
-    )
-
-    return created_line_item.id
-
-
 def _ensure_target_hubspot_product_for_line(
     line: Line, hubspot_client: HubspotApi
 ) -> str | None:

@@ -59,7 +59,7 @@ def contract_with_sheet_courseruns(contract_with_sheet, mocker):
     """Expand on contract_with_sheet and add course runs/enrollment codes."""
 
     runs = CourseRunFactory.create_batch(
-        3, b2b_only=True, b2b_contract=contract_with_sheet
+        3, b2b_only=True, b2b_contracts=[contract_with_sheet]
     )
 
     mocker.patch("b2b.tasks.queue_contract_sheet_update_post_save.delay")
