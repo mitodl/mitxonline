@@ -954,7 +954,8 @@ class OrderFlow:
             reason=reason,
         )
 
-        send_order_refund_email.delay(self.order.id)
+        # Queue after commit so the worker can see the refund transaction.
+        transaction.on_commit(lambda: send_order_refund_email.delay(self.order.id))
 
         return refund_transaction
 
@@ -1253,15 +1254,6 @@ class Order(TimestampedModel):
         )
 
     @property
-    def is_paypal_payment(self):
-        """
-        True when the payment transaction came through PayPal, which
-        `refund_order` refuses to refund through the gateway.
-        """
-        payment = self.transactions.first()
-        return bool(payment and "paypal_token" in (payment.data or {}))
-
-    @property
     def is_auto_refund_eligible(self):
         """
         True when a refund request for this order can be approved and refunded
@@ -1269,8 +1261,9 @@ class Order(TimestampedModel):
         window, and none of the cases that need a decision.
 
         Those are an order that received a paid-amount-off ("complete your
-        program") discount, one that funded such a discount on another order,
-        and a PayPal payment. Program orders are held back too: refunding
+        program") discount, and one that funded such a discount on another
+        order. Whether the payment can be refunded through the gateway is
+        checked separately, in `auto_refund_request`. Program orders are held back too: refunding
         them with unenrollment mishandles nested programs (hq#13818), so they
         stay manual until that is fixed.
         """
@@ -1283,7 +1276,6 @@ class Order(TimestampedModel):
                 redeemed_discount__discount_type=DISCOUNT_TYPE_PAID_AMOUNT_OFF
             ).exists()
             and not self.funds_fulfilled_redemption
-            and not self.is_paypal_payment
         )
 
     def _generate_reference_number(self):
