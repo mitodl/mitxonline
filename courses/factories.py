@@ -357,7 +357,9 @@ class ProgramCertificateFactory(DjangoModelFactory):
 
     program = factory.SubFactory(ProgramFactory)
     user = factory.SubFactory(UserFactory)
-    certificate_page_revision = None
+    certificate_page_revision = factory.LazyAttribute(
+        lambda cert: cert.program.get_certificate_page_revision()
+    )
 
     class Meta:
         model = ProgramCertificate
@@ -396,7 +398,9 @@ class CourseRunCertificateFactory(DjangoModelFactory):
 
     course_run = factory.SubFactory(CourseRunFactory)
     user = factory.SubFactory(UserFactory)
-    certificate_page_revision = None
+    certificate_page_revision = factory.LazyAttribute(
+        lambda cert: cert.course_run.course.get_certificate_page_revision()
+    )
 
     class Meta:
         model = CourseRunCertificate

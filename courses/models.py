@@ -366,6 +366,19 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         page = self.program_page
         return page.certificate_page if page else None
 
+    def get_certificate_page_revision(self):
+        """
+        Return the published revision of this program's live certificate page
+        (see CertificatePage.get_certificate_revision), or ``None``.
+
+        Unlike the certificate_page cached_property, this re-reads the page
+        on every call, so a batch that reuses the same Program object for
+        many users sees publish/unpublish changes made mid-batch.
+        """
+        page = self.program_page
+        certificate_page = page.certificate_page if page else None
+        return certificate_page.get_certificate_revision() if certificate_page else None
+
     def get_requirements_root(self, *, for_update=False):
         """The root of the requirements tree"""
         query = ProgramRequirement.get_root_nodes().filter(program=self)
@@ -1191,6 +1204,19 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         """Return this course's certificate page, or ``None``."""
         page = self.course_page
         return page.certificate_page if page else None
+
+    def get_certificate_page_revision(self):
+        """
+        Return the published revision of this course's live certificate page
+        (see CertificatePage.get_certificate_revision), or ``None``.
+
+        Unlike the certificate_page cached_property, this re-reads the page
+        on every call, so a batch that reuses the same Course object for
+        many users sees publish/unpublish changes made mid-batch.
+        """
+        page = self.course_page
+        certificate_page = page.certificate_page if page else None
+        return certificate_page.get_certificate_revision() if certificate_page else None
 
     @cached_property
     def course_number(self):
@@ -2148,9 +2174,17 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
     )
     certificate_page_revision = models.ForeignKey(
         Revision,
-        null=True,
+        null=False,
+        # blank=True so the admin form can be left empty: clean()/save() then
+        # fill in the certificate page's published revision.
         blank=True,
-        on_delete=models.CASCADE,
+        # PROTECT, not CASCADE: every certificate now points at a revision,
+        # and Wagtail's purge_revisions deletes non-latest revisions, relying
+        # on ProtectedError to skip ones still referenced. CASCADE would
+        # silently delete issued certificates. (Deleting the page itself
+        # removes all its revisions, so it's blocked up front by the
+        # before_delete_page hook in cms/wagtail_hooks.py.)
+        on_delete=models.PROTECT,
         limit_choices_to=limit_to_certificate_pages,
     )
 
@@ -2190,9 +2224,23 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
     def clean(self):
         from cms.models import CertificatePage, CoursePage  # noqa: PLC0415
 
-        # Skip validation if certificate_page_revision is not set (e.g., when revoking)
-        if self.certificate_page_revision is None:
+        # Check the raw FK ids, as save() does: an unset FK raises
+        # RelatedObjectDoesNotExist through the descriptor rather than
+        # returning None.
+        if not self.course_run_id:
             return
+
+        # Left blank (e.g. in the admin): use the published revision, or fail if
+        # there isn't one rather than hitting the NOT NULL constraint on save.
+        if not self.certificate_page_revision_id:
+            revision = self.course_run.course.get_certificate_page_revision()
+            if not revision:
+                raise ValidationError(
+                    {
+                        "certificate_page_revision": "This course has no live certificate page with a saved revision."
+                    }
+                )
+            self.certificate_page_revision = revision
 
         certpage = CertificatePage.objects.filter(
             pk=int(self.certificate_page_revision.object_id),
@@ -2218,10 +2266,14 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
             )
 
     def save(self, *args, **kwargs):  # noqa: DJ012
-        if not self.certificate_page_revision:
-            certificate_page = self.course_run.course.certificate_page
-            if certificate_page:
-                self.certificate_page_revision = certificate_page.get_latest_revision()
+        # Check the raw FK id, not self.certificate_page_revision: now that
+        # the field is non-nullable, accessing an unset FK through the
+        # descriptor raises RelatedObjectDoesNotExist instead of returning
+        # None, which would break this exact "is it set yet?" check.
+        if not self.certificate_page_revision_id:
+            self.certificate_page_revision = (
+                self.course_run.course.get_certificate_page_revision()
+            )
 
         super(CourseRunCertificate, self).save(*args, **kwargs)  # noqa: UP008
 
@@ -2234,9 +2286,17 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
     program = models.ForeignKey(Program, null=False, on_delete=models.CASCADE)
     certificate_page_revision = models.ForeignKey(
         Revision,
-        null=True,
+        null=False,
+        # blank=True so the admin form can be left empty: clean()/save() then
+        # fill in the certificate page's published revision.
         blank=True,
-        on_delete=models.CASCADE,
+        # PROTECT, not CASCADE: every certificate now points at a revision,
+        # and Wagtail's purge_revisions deletes non-latest revisions, relying
+        # on ProtectedError to skip ones still referenced. CASCADE would
+        # silently delete issued certificates. (Deleting the page itself
+        # removes all its revisions, so it's blocked up front by the
+        # before_delete_page hook in cms/wagtail_hooks.py.)
+        on_delete=models.PROTECT,
         limit_choices_to=limit_to_certificate_pages,
     )
 
@@ -2283,9 +2343,23 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
     def clean(self):
         from cms.models import CertificatePage, ProgramPage  # noqa: PLC0415
 
-        # Skip validation if certificate_page_revision is not set (e.g., when revoking)
-        if self.certificate_page_revision is None:
+        # Check the raw FK ids, as save() does: an unset FK raises
+        # RelatedObjectDoesNotExist through the descriptor rather than
+        # returning None.
+        if not self.program_id:
             return
+
+        # Left blank (e.g. in the admin): use the published revision, or fail if
+        # there isn't one rather than hitting the NOT NULL constraint on save.
+        if not self.certificate_page_revision_id:
+            revision = self.program.get_certificate_page_revision()
+            if not revision:
+                raise ValidationError(
+                    {
+                        "certificate_page_revision": "This program has no live certificate page with a saved revision."
+                    }
+                )
+            self.certificate_page_revision = revision
 
         certpage = CertificatePage.objects.filter(
             pk=int(self.certificate_page_revision.object_id),
@@ -2311,10 +2385,14 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
             )
 
     def save(self, *args, **kwargs):  # pylint: disable=signature-differs  # noqa: DJ012
-        if not self.certificate_page_revision:
-            certificate_page = self.program.certificate_page
-            if certificate_page:
-                self.certificate_page_revision = certificate_page.get_latest_revision()
+        # Check the raw FK id, not self.certificate_page_revision: now that
+        # the field is non-nullable, accessing an unset FK through the
+        # descriptor raises RelatedObjectDoesNotExist instead of returning
+        # None, which would break this exact "is it set yet?" check.
+        if not self.certificate_page_revision_id:
+            self.certificate_page_revision = (
+                self.program.get_certificate_page_revision()
+            )
 
         super().save(*args, **kwargs)
 
