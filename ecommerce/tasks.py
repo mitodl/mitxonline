@@ -74,6 +74,13 @@ def perform_cull_anonymous_baskets():
     cull_anonymous_baskets()
 
 
+@app.task(acks_late=True)
+def perform_cull_stale_pending_orders():
+    from ecommerce.api import cull_stale_pending_orders
+
+    cull_stale_pending_orders()
+
+
 @app.task
 def send_refund_request_notification_email(refund_request_id):
     from ecommerce.mail_api import send_refund_request_notification

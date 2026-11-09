@@ -76,6 +76,18 @@ def test_s3_settings(settings_sandbox):
         settings_vars.get("STORAGES", {}).get("default", {}).get("BACKEND")
         == "storages.backends.s3boto3.S3Boto3Storage"
     )
+    assert settings_vars["AWS_S3_CUSTOM_DOMAIN"] is None
+
+    settings_vars = settings_sandbox.patch(
+        {
+            "MITX_ONLINE_USE_S3": "True",
+            "AWS_ACCESS_KEY_ID": "1",
+            "AWS_SECRET_ACCESS_KEY": "2",
+            "AWS_STORAGE_BUCKET_NAME": "3",
+            "AWS_S3_CUSTOM_DOMAIN": "mitxonline.example.com/media",
+        }
+    )
+    assert settings_vars["AWS_S3_CUSTOM_DOMAIN"] == "mitxonline.example.com/media"
 
 
 def test_admin_settings(settings_sandbox, settings):

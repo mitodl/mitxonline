@@ -2,7 +2,7 @@
 
 from rest_framework import permissions
 
-from b2b.models import is_organization_manager
+from b2b.models import ContractPage, is_organization_manager
 
 
 class IsOrganizationManager(permissions.BasePermission):
@@ -51,10 +51,16 @@ class IsOrganizationManager(permissions.BasePermission):
             elif hasattr(obj, "organization"):
                 return obj.organization.id == int(org_id)
             elif hasattr(obj, "b2b_contract"):
-                # For course runs and enrollments
+                # For enrollments
                 return obj.b2b_contract.organization_id == int(org_id)
-            elif hasattr(obj, "run") and hasattr(obj.run, "b2b_contract"):
-                # For enrollments via course run
-                return obj.run.b2b_contract.organization_id == int(org_id)
+
+            # For course runs, and for enrollments via course run
+            run = obj if hasattr(obj, "b2b_contracts") else getattr(obj, "run", None)
+            if hasattr(run, "b2b_contracts"):
+                # ContractPage.objects, not the run's (active-only) related
+                # manager, so runs in inactive contracts are still covered.
+                return ContractPage.objects.filter(
+                    course_runs=run, organization_id=int(org_id)
+                ).exists()
 
         return False

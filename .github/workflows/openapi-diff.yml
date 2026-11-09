@@ -7,16 +7,19 @@ jobs:
   openapi-diff:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout HEAD
+      # The default pull_request checkout is the merge ref, so a branch that's
+      # behind the base doesn't report the base's newer changes as its own.
+      - name: Checkout the merge result
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          ref: ${{ github.head_ref }}
           path: head
+          fetch-depth: 2
+          persist-credentials: false
+      # Diff against the merge commit's first parent, the base it was built
+      # from. The base branch's tip can be newer (a queued job, a re-run), and
+      # its changes would then show up reversed.
       - name: Checkout BASE
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ github.base_ref }}
-          path: base
+        run: git -C head worktree add "$GITHUB_WORKSPACE/base" HEAD^1
       - name: Generate oasdiff changelog
         run: | # Write the full comment body to a file rather than a step output.
           # A large changelog interpolated into a JS action's `body:` input becomes a
@@ -47,7 +50,6 @@ jobs:
             done
             echo '```'
             echo ""
-            echo "Unexpected changes? Ensure your branch is up-to-date with \`main\` (consider rebasing)."
             echo "</details>"
           } > comment_body.md
       - name: Find existing comment
@@ -70,26 +72,41 @@ jobs:
           body-path: comment_body.md
       - name: Check for breaking changes
         id: oasdif_breaking
-        run: |
+        run: | # Check every spec before failing.
+          # The step runs under `bash -e`, so letting oasdiff's non-zero exit
+          # propagate mid-loop would abort the run and report only the first
+          # spec with breaking changes. Collect failures and fail at the end so
+          # a reviewer sees the whole picture in one run.
+          failed=()
           for spec in base/openapi/specs/*.yaml; do
             base_spec="$spec"
             head_spec="head/openapi/specs/$(basename "$spec")"
-            if [ -f "$head_spec" ]; then
-              echo "Checking $(basename "$spec") for breaking changes..."
-              err_ignore_flag=()
-              err_ignore_file="head/openapi/specs/oasdiff-err-ignore.txt"
-              if [ -f "$err_ignore_file" ]; then
-                err_ignore_flag=(--err-ignore "$err_ignore_file")
-              fi
-              docker run --rm \
-                --workdir ${{ github.workspace }} \
-                --volume ${{ github.workspace }}:${{ github.workspace }}:ro \
-                -e GITHUB_WORKSPACE=${{ github.workspace }} \
-                tufin/oasdiff breaking \
-                --fail-on ERR \
-                --format githubactions \
-                "${err_ignore_flag[@]}" \
-                "$base_spec" \
-                "$head_spec"
+            if [ ! -f "$head_spec" ]; then
+              # A base spec with no head counterpart means the whole spec file
+              # was deleted. That is always intentional-or-a-bug worth seeing,
+              # never something to pass silently.
+              echo "::error::$(basename "$spec") exists on the base branch but not on this branch - the entire spec file was removed."
+              failed+=("$(basename "$spec") (deleted)")
+              continue
             fi
+            echo "Checking $(basename "$spec") for breaking changes..."
+            err_ignore_flag=()
+            err_ignore_file="head/openapi/specs/oasdiff-err-ignore.txt"
+            if [ -f "$err_ignore_file" ]; then
+              err_ignore_flag=(--err-ignore "$err_ignore_file")
+            fi
+            docker run --rm \
+              --workdir ${{ github.workspace }} \
+              --volume ${{ github.workspace }}:${{ github.workspace }}:ro \
+              -e GITHUB_WORKSPACE=${{ github.workspace }} \
+              tufin/oasdiff breaking \
+              --fail-on ERR \
+              --format githubactions \
+              "${err_ignore_flag[@]}" \
+              "$base_spec" \
+              "$head_spec" || failed+=("$(basename "$spec")")
           done
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo "::error::Breaking changes found in: ${failed[*]}"
+            exit 1
+          fi

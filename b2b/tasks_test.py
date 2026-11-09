@@ -6,9 +6,17 @@ from b2b.api import create_contract_run_key
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.tasks import (
     create_program_contract_runs,
+    push_unconfirmed_org_members_to_keycloak,
+    push_upgraded_enrollments_to_edx,
 )
-from courses.factories import CourseFactory, CourseRunFactory, ProgramFactory
+from courses.factories import (
+    CourseFactory,
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+    ProgramFactory,
+)
 from courses.models import ProgramRequirement, ProgramRequirementNodeType
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 
 pytestmark = [pytest.mark.django_db]
 
@@ -71,6 +79,31 @@ def test_create_program_contract_runs_success(mocker):
     mock_cache_delete.assert_called_once_with(expected_lock_key)
 
 
+def test_create_program_contract_runs_nested_programs(mocker):
+    """Courses of nested programs get contract runs, including when the program has no courses of its own."""
+    contract = ContractPageFactory.create()
+    program = ProgramFactory.create()
+    nested_program = ProgramFactory.create()
+    program.add_program_requirement(nested_program)
+    nested_course = CourseFactory.create()
+    add_courses_to_program(nested_program, [nested_course])
+    CourseRunFactory.create(course=nested_course, is_source_run=True)
+
+    mocker.patch("django.core.cache.cache.add", return_value=True)
+    mocker.patch("django.core.cache.cache.delete")
+    mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
+
+    result = create_program_contract_runs.apply(
+        args=[contract.id, program.id],
+        kwargs={},
+    )
+
+    assert result.successful()
+    mock_create_contract_run.assert_called_once_with(
+        contract, nested_course, org_prefix=None
+    )
+
+
 def test_create_program_contract_runs_lock_not_acquired(mocker):
     """Test task skips execution when lock cannot be acquired."""
 
@@ -115,7 +148,7 @@ def test_create_program_contract_runs_skips_existing_runs(mocker):
     existing_courseware_id = create_contract_run_key(source_run, contract)
 
     CourseRunFactory.create(
-        course=course, courseware_id=existing_courseware_id, b2b_contract=contract
+        course=course, courseware_id=existing_courseware_id, b2b_contracts=[contract]
     )
 
     mocker.patch("django.core.cache.cache.add", return_value=True)
@@ -353,3 +386,43 @@ def test_create_program_contract_runs_logging_output(mocker):
     assert final_call[0][3] == 1
     assert final_call[0][4] == 0
     assert final_call[0][5] == 0
+
+
+def test_push_unconfirmed_org_members_to_keycloak(mocker):
+    """The task runs the push."""
+
+    mocked_push = mocker.patch("b2b.provisioning.push_unconfirmed_members_to_keycloak")
+
+    push_unconfirmed_org_members_to_keycloak()
+
+    mocked_push.assert_called_once_with()
+
+
+def test_push_upgraded_enrollments_to_edx(mocker):
+    """Pushed enrollments are marked enrolled; failures are left for retry."""
+
+    good, bad, already_done = CourseRunEnrollmentFactory.create_batch(
+        3, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE, edx_enrolled=False
+    )
+    already_done.edx_enrolled = True
+    already_done.save()
+
+    def fake_enroll(user, runs, *, mode):
+        if runs[0] == bad.run:
+            raise ConnectionError
+
+    mocked_enroll = mocker.patch(
+        "openedx.api.enroll_in_edx_course_runs", side_effect=fake_enroll
+    )
+
+    push_upgraded_enrollments_to_edx([good.id, bad.id, already_done.id])
+
+    assert mocked_enroll.call_count == 2
+    mocked_enroll.assert_any_call(
+        good.user, [good.run], mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    good.refresh_from_db()
+    bad.refresh_from_db()
+    assert good.edx_enrolled is True
+    assert bad.edx_enrolled is False

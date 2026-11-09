@@ -7,6 +7,7 @@ import logging
 
 from django.db.models import Q
 from mitol.common.utils.datetime import now_in_utc
+from requests.exceptions import HTTPError, RequestException
 
 from courses.models import (
     CourseRun,
@@ -34,6 +35,66 @@ def sync_courseruns_data():
 
     # `sync_course_runs` logs internally so no need to capture/output the returned values
     sync_course_runs(runs)
+
+
+@app.task(
+    # RequestException covers connection errors and timeouts. Permanent 4xx
+    # errors are caught in the task and never reach autoretry.
+    autoretry_for=(RequestException,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def sync_courserun_upgrade_deadline(course_run_id):
+    """
+    Push a single course run's upgrade deadline into its edX verified mode.
+
+    Queued from the CourseRun post_save signal, so it must tolerate the run
+    having been deleted between the save and the task running.
+
+    Args:
+        course_run_id (int): pk of the CourseRun to sync.
+
+    Returns:
+        str | None: the UpgradeDeadlineSyncResult value, for log/flower
+            visibility, or None when the run is gone or edX rejected the push.
+    """
+    from openedx.api import sync_courserun_upgrade_deadline_to_edx
+
+    run = CourseRun.all_objects.filter(id=course_run_id).first()
+    if run is None:
+        log.warning(
+            "CourseRun %s no longer exists, skipping upgrade deadline sync",
+            course_run_id,
+        )
+        return None
+
+    try:
+        return str(sync_courserun_upgrade_deadline_to_edx(run))
+    except HTTPError as exc:
+        status_code = exc.response.status_code if exc.response is not None else None
+        if status_code is None or status_code == 429 or status_code >= 500:  # noqa: PLR2004
+            # Rate limited or an edX outage: autoretry_for retries these.
+            raise
+        # The rest won't succeed on retry. Keep edX's response body: it carries
+        # the validation message that str(exc) leaves out.
+        body = exc.response.text[:500]
+        if status_code in (401, 403):
+            # A credentials problem affects every run, not just this one.
+            log.error(  # noqa: TRY400
+                "edX rejected the service worker token (status %s) while pushing "
+                "the upgrade deadline for %s: %s",
+                status_code,
+                run.courseware_id,
+                body,
+            )
+        else:
+            log.exception(
+                "edX rejected the upgrade deadline push for %s (status %s): %s",
+                run.courseware_id,
+                status_code,
+                body,
+            )
+        return None
 
 
 @app.task(acks_late=True)

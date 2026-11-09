@@ -197,7 +197,6 @@ class CourseRunFactory(DjangoModelFactory):
     )
 
     live = True
-    b2b_contract = None
     b2b_only = False
     is_source_run = False
     language = ""
@@ -228,23 +227,13 @@ class CourseRunFactory(DjangoModelFactory):
 
     @factory.post_generation
     def b2b_contracts(self, create, extracted, **kwargs):  # noqa: ARG002
-        """
-        Handle assignment of B2B contracts.
-
-        If the test is setting b2b_contract, then copy that into the
-        b2b_contracts many-to-many. Having this here is a deliberate
-        choice - in non-test code, it should be fixed to use the right
-        field.
-        """
+        """Handle assignment of B2B contracts."""
 
         if not create:
             return
 
         if extracted is not None:
             self.b2b_contracts.set(extracted)
-
-        if self.b2b_contract is not None:
-            self.b2b_contracts.add(self.b2b_contract)
 
     class Meta:
         model = CourseRun
@@ -368,7 +357,9 @@ class ProgramCertificateFactory(DjangoModelFactory):
 
     program = factory.SubFactory(ProgramFactory)
     user = factory.SubFactory(UserFactory)
-    certificate_page_revision = None
+    certificate_page_revision = factory.LazyAttribute(
+        lambda cert: cert.program.get_certificate_page_revision()
+    )
 
     class Meta:
         model = ProgramCertificate
@@ -407,7 +398,9 @@ class CourseRunCertificateFactory(DjangoModelFactory):
 
     course_run = factory.SubFactory(CourseRunFactory)
     user = factory.SubFactory(UserFactory)
-    certificate_page_revision = None
+    certificate_page_revision = factory.LazyAttribute(
+        lambda cert: cert.course_run.course.get_certificate_page_revision()
+    )
 
     class Meta:
         model = CourseRunCertificate
@@ -560,3 +553,59 @@ class ProgramCollectionFactory(wagtail_factories.PageFactory):
         for program in extracted:
             self.programs.add(program)
         self.save()
+
+
+def create_program_with_tracks():
+    """Create a program with a core group and two tracks, each a group of two courses"""
+    program = ProgramFactory.create()
+    core_courses = CourseFactory.create_batch(2)
+    root_node = program.requirements_root
+
+    core_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Core Courses",
+    )
+    for course in core_courses:
+        core_node.add_child(node_type=ProgramRequirementNodeType.COURSE, course=course)
+
+    tracks_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=1,
+        title="Tracks",
+        elective_flag=True,
+    )
+    track_nodes = []
+    track_courses = []
+    for title in ("General Track", "Methods Track"):
+        track_node = tracks_node.add_child(
+            node_type=ProgramRequirementNodeType.TRACK, title=title
+        )
+        group_node = track_node.add_child(
+            node_type=ProgramRequirementNodeType.OPERATOR,
+            operator=ProgramRequirement.Operator.ALL_OF,
+            title="Required",
+        )
+        courses = CourseFactory.create_batch(2)
+        for course in courses:
+            group_node.add_child(
+                node_type=ProgramRequirementNodeType.COURSE, course=course
+            )
+        track_nodes.append(track_node)
+        track_courses.append(courses)
+
+    return SimpleNamespace(
+        program=program,
+        root_node=root_node,
+        core_courses=core_courses,
+        tracks_node=tracks_node,
+        track_nodes=track_nodes,
+        track_courses=track_courses,
+    )
+
+
+@pytest.fixture
+def program_with_tracks():
+    """A program with a core group and two tracks, each one group of two courses"""
+    return create_program_with_tracks()

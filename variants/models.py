@@ -76,6 +76,18 @@ class VariantOptionsModel(models.Model):
             except LookupError as lke:
                 raise ValidationError("Course language is invalid") from lke  # noqa: EM101
 
+    @property
+    def variant_length_label(self) -> str:
+        """Return the display label for the variant length."""
+
+        return self.get_variant_length_display()
+
+    @property
+    def variant_industry_label(self) -> str:
+        """Return the display label for the variant industry."""
+
+        return self.get_variant_industry_display()
+
     @cached_property
     def language_label(self) -> str:
         """Return the label for the language, using the override if necessary"""

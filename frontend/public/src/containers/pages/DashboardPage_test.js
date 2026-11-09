@@ -52,7 +52,6 @@ describe("DashboardPage", () => {
   afterEach(() => {
     helper.cleanup()
     sandbox.restore()
-    delete global.SETTINGS
   })
 
   it("renders a dashboard", async () => {

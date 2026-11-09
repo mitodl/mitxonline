@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable  # noqa: TC003
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, List, Tuple  # noqa: UP035
@@ -14,7 +15,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import Count, Q, TextChoices
+from django.db.models import Count, Exists, OuterRef, Q, TextChoices
 from django.utils.functional import cached_property
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
@@ -56,6 +57,7 @@ from users.models import User
 
 if TYPE_CHECKING:
     from b2b.models import ContractPage
+    from ecommerce.discount_sources import SourceResolution
 
 User = get_user_model()  # noqa: F811
 
@@ -151,7 +153,13 @@ class Basket(TimestampedModel):
         return self.user_id is None
 
     def has_user_blocked_products(self, user):
-        """Return true if any of the courses in the basket block user's country"""
+        """
+        Return true if any of the courses in the basket block user's country,
+        or the user failed the export compliance check.
+
+        Raises:
+            ExportComplianceDataError: if the user's profile can't be checked
+        """
         basket_items = self.basket_items.prefetch_related("product")
 
         if basket_items.count() == 0:
@@ -167,7 +175,9 @@ class Basket(TimestampedModel):
             )
 
             try:
-                _verify_exports_compliance_for_enrollment(user, basket_items[0])
+                _verify_exports_compliance_for_enrollment(
+                    user, basket_items[0].product.purchasable_object
+                )
             except ExportComplianceError:
                 return True
 
@@ -376,6 +386,16 @@ def validate_program_child_purchase_product(*, redemption_type, product):
         raise ValidationError(PROGRAM_PRODUCTS_ONLY_ERROR)
 
 
+@dataclass(frozen=True)
+class RedemptionEligibility:
+    """
+    A user may redeem a discount. ``source`` is the qualifying prior purchase a
+    program-child-purchase discount resolved to, and None for any other type.
+    """
+
+    source: SourceResolution | None = None
+
+
 class Discount(TimestampedModel):
     """Discount model"""
 
@@ -423,6 +443,16 @@ class Discount(TimestampedModel):
         default="",
         max_length=10,
         help_text="The location of this code in the B2B contract's code sheet.",
+    )
+    # A course run can belong to several contracts, so the run's product can't
+    # say which contract an enrollment code is for.
+    b2b_contract = models.ForeignKey(
+        "b2b.ContractPage",
+        on_delete=models.DO_NOTHING,
+        related_name="discounts",
+        null=True,
+        blank=True,
+        help_text="The B2B contract this enrollment code belongs to, if it is one.",
     )
 
     class Meta:
@@ -515,14 +545,33 @@ class Discount(TimestampedModel):
 
     def is_redeemable_by(self, user: User, products: Iterable[Product] | None = None):
         """
-        Enforces the redemption rules for a given discount: whether its type is
-        learner-redeemable at all, how often it may be redeemed, whether it is
-        inside its date window, and — for a program-child-purchase redemption —
-        whether this user still holds an unconsumed qualifying purchase for one
-        of the products in hand.
+        Whether ``user`` may redeem this discount. See eligibility_for.
 
         Independent of check_validity_with_products (product scope and
         liveness); is_valid_for_basket composes the two.
+
+        Args:
+            - user (User): The user requesting the discount.
+            - products (Iterable[Product] or None): the products the discount is
+              being checked against — the basket's, or the one being priced.
+        Returns:
+            - boolean
+        """
+        return self.eligibility_for(user, products) is not None
+
+    def eligibility_for(  # noqa: PLR0911
+        self, user: User, products: Iterable[Product] | None
+    ) -> RedemptionEligibility | None:
+        """
+        Enforces the redemption rules for a given discount: whether its type is
+        learner-redeemable at all, whether it is inside its date window, whether
+        this user is in the contract the code belongs to (if it is one), how
+        often it may be redeemed, and — for a program-child-purchase redemption
+        — whether this user still holds an unconsumed qualifying purchase for
+        one of the products in hand.
+
+        Every redemption rule lives here, so that is_redeemable_by and
+        discount_product (and so quote_user_price) can't disagree.
 
         ``products`` is context for the program-child-purchase arm alone.
         Omitting it means no product is in hand (a code redemption, the CMS
@@ -534,30 +583,29 @@ class Discount(TimestampedModel):
             - products (Iterable[Product] or None): the products the discount is
               being checked against — the basket's, or the one being priced.
         Returns:
-            - boolean
+            - RedemptionEligibility, carrying the program-child-purchase source it resolved;
+              or None when ``user`` may not redeem this discount
         """
-        if self.redemption_type == REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE:
-            from ecommerce.discount_sources import resolve_for_discount  # noqa: PLC0415
+        from ecommerce.discount_sources import resolve_for_discount  # noqa: PLC0415
 
-            if products is None:
-                return False
-            if resolve_for_discount(self, user, products) is None:
-                return False
-
-        return self._within_redemption_limits(user)
-
-    def _within_redemption_limits(self, user: User) -> bool:
-        """
-        The redemption-type, redemption-count and date-window rules, without the
-        source check.
-        """
         # An internal discount is attached only by application code that has
-        # already decided eligibility (see REDEMPTION_TYPE_INTERNAL). The rule
-        # belongs at this depth rather than in is_redeemable_by because
-        # discount_product, and so quote_user_price, reaches the redemption
-        # rules through here.
+        # already decided eligibility (see REDEMPTION_TYPE_INTERNAL).
         if self.redemption_type == REDEMPTION_TYPE_INTERNAL:
-            return False
+            return None
+
+        if not self.valid_now():
+            return None
+
+        # A contract's codes are for its members. Holding one doesn't make
+        # someone a member: learners join a code contract through the attach
+        # endpoint, which the code-assignment email links to, and managed and
+        # auto contracts take members from their organization.
+        if self.b2b_contract_id and not (
+            user is not None
+            and user.is_authenticated
+            and user.b2b_contracts.filter(pk=self.b2b_contract_id).exists()
+        ):
+            return None
 
         if (
             self.redemption_type == REDEMPTION_TYPE_ONE_TIME
@@ -567,7 +615,7 @@ class Discount(TimestampedModel):
             ).count()
             > 0
         ):
-            return False
+            return None
 
         if (
             self.redemption_type == REDEMPTION_TYPE_ONE_TIME_PER_USER
@@ -578,15 +626,21 @@ class Discount(TimestampedModel):
             ).count()
             > 0
         ):
-            return False
+            return None
 
         if (self.max_redemptions or 0) > 0 and DiscountRedemption.objects.filter(
             redeemed_discount=self,
             redeemed_order__state=OrderStatus.FULFILLED,
         ).count() >= self.max_redemptions:
-            return False
+            return None
 
-        return self.valid_now()
+        if self.redemption_type != REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE:
+            return RedemptionEligibility()
+
+        if products is None:
+            return None
+        source = resolve_for_discount(self, user, products)
+        return RedemptionEligibility(source=source) if source else None
 
     def applies_to_products(self, products) -> bool:
         """True when the discount has no product links, or one of ``products`` is linked."""
@@ -694,10 +748,7 @@ class Discount(TimestampedModel):
             Decimal; the discounted price, or None when ``user`` may not redeem
             this discount for ``product``
         """
-        from ecommerce.discount_sources import (  # noqa: PLC0415
-            resolve_for_discount,
-            spends_source,
-        )
+        from ecommerce.discount_sources import spends_source  # noqa: PLC0415
         from ecommerce.discounts import DiscountType  # noqa: PLC0415
 
         resolved_amounts = {}
@@ -709,37 +760,21 @@ class Discount(TimestampedModel):
             if not self.valid_now():
                 return None
         else:
-            if not self._within_redemption_limits(user):
+            eligibility = self.eligibility_for(user, [product])
+            if eligibility is None:
                 return None
-            if self.redemption_type == REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE:
-                # One resolve serves both the eligibility check and the amount.
-                resolution = resolve_for_discount(self, user, [product])
-                if resolution is None:
-                    return None
-                if spends_source(self):
-                    resolved_amounts = {self.id: resolution.amount}
+            # One resolve serves both the eligibility check and the amount.
+            if eligibility.source and spends_source(self):
+                resolved_amounts = {self.id: eligibility.source.amount}
         return DiscountType.get_discounted_price(
             [self], product, resolved_amounts=resolved_amounts
         ).quantize(Decimal("0.01"))
 
     def b2b_contracts(self):
-        """Return the applicable B2B contract(s), if any."""
+        """Return the B2B contract this code belongs to, as a queryset."""
         from b2b.models import ContractPage  # noqa: PLC0415
 
-        products_qs = self.products.select_related(
-            "product", "product__content_type"
-        ).filter(
-            product__content_type__app_label="courses",
-            product__content_type__model="courserun",
-        )
-
-        courserun_ids = products_qs.all().values_list("product__object_id", flat=True)
-
-        return ContractPage.objects.filter(
-            pk__in=CourseRun.objects.filter(pk__in=courserun_ids)
-            .all()
-            .values_list("b2b_contracts__id", flat=True)
-        ).all()
+        return ContractPage.objects.filter(pk=self.b2b_contract_id)
 
 
 class DiscountProduct(TimestampedModel):
@@ -1113,15 +1148,18 @@ class Order(TimestampedModel):
     @cached_property
     def is_b2b_order(self):
         """
-        Return True if any purchased run belongs to a B2B contract.
+        Return True if any line item belongs to a B2B contract.
 
         Reads the line's denormalized `purchased_object` rather than resolving
         `product.purchasable_object` through reversion. The two identify the same
         object: `Line` rows are created with `purchased_object_id` and
         `purchased_content_type_id` copied straight off the product, and that
         triple is the line's uniqueness constraint.
+
+        ``OrderHistoryViewSet`` annotates this same name with
+        ``b2b_order_exists()`` so a page of orders doesn't query per row.
         """
-        return any(run.b2b_contract_id for run in self.purchased_runs)
+        return any(line.b2b_contract for line in self.lines.all())
 
     @cached_property
     def funds_fulfilled_redemption(self):
@@ -1252,7 +1290,7 @@ class PendingOrder(Order):
     """An order that is pending payment"""
 
     @transaction.atomic
-    def _get_or_create(
+    def _create_with_data(
         self,
         products: List[Tuple[Product, ContractPage | None]],  # noqa: UP006
         user: User,
@@ -1260,23 +1298,35 @@ class PendingOrder(Order):
         gateway_type: str = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
     ):
         """
-        Returns an existing PendingOrder if one already exists with the same:
-        Line purchased_object_id, purchased_content_type_id, and product_version,
-        as well as the same purchaser.  If a PendingOrder matching that criteria
-        does not exist, a new one is created.  The associated Line objects are either
-        retrieved if they exist for an existing PendingOrder, otherwise new Line objects
-        are created.
+        Creates a new PendingOrder with the supplied data.
+
+        The most current version of each Product passed in is selected, and the
+        contract is attached if it is also specified. Discounts will be applied
+        if they are also provided. Discount validation is not run at this point.
 
         Args:
-            products (List[Product]):  A list of Products associated with the PendingOrder.
-            user (User):  The user expected to be associated with the PendingOrder.
-            discounts (List[Discounts]):  A list of Discounts to apply to each Line assocaited
-                with the order.
+            products (List[Product, ContractPage|None]):  A list of Products to
+                add to the order, optionally with ContractPage for B2B orders.
+            user (User):  The purchasing user.
+            discounts (List[Discounts]):  A list of Discounts to apply to each
+                Line associated with the order.
             gateway_type (str): The PaymentGateway class for the order.
 
         Returns:
-            PendingOrder: the retrieved or created PendingOrder.
+            PendingOrder
         """
+        unique_products = {}
+        for product, contract in products:
+            product_key = (product.content_type_id, product.object_id)
+            existing_product = unique_products.get(product_key)
+            if existing_product:
+                if existing_product[1] != contract:
+                    msg = "Duplicate products cannot have conflicting contracts."
+                    raise ValidationError(msg)
+                continue
+            unique_products[product_key] = (product, contract)
+        products = list(unique_products.values())
+
         # Get the details from each Product.
         product_versions, product_object_ids, product_content_types = [], [], []
         for product, _ in products:
@@ -1291,36 +1341,12 @@ class PendingOrder(Order):
             product_object_ids.append(product.object_id)
             product_content_types.append(product.content_type_id)
 
-        # Get or create a PendingOrder
-        orders = (
-            Order.objects.select_for_update()
-            .prefetch_related("discounts")
-            .filter(
-                lines__purchased_object_id__in=product_object_ids,
-                lines__purchased_content_type_id__in=product_content_types,
-                lines__product_version__in=product_versions,
-                state=OrderStatus.PENDING,
-                purchaser=user,
-                gateway_type=gateway_type,
-            )
+        order = Order.objects.create(
+            state=OrderStatus.PENDING,
+            purchaser=user,
+            total_price_paid=0,
+            gateway_type=gateway_type,
         )
-        # Previously, multiple PendingOrders could be created for a single user
-        # for the same product, if multiple exist, grab the first.
-        if orders:
-            order = orders.first()
-            # Clear discounts except for the most recent one
-            # If there aren't any discounts in the basket, clear them all
-            for old_discount in order.discounts.all():
-                old_discount.delete()
-
-            order.refresh_from_db()
-        else:
-            order = Order.objects.create(
-                state=OrderStatus.PENDING,
-                purchaser=user,
-                total_price_paid=0,
-                gateway_type=gateway_type,
-            )
 
         # Apply any discounts to the PendingOrder
         if discounts:
@@ -1338,35 +1364,21 @@ class PendingOrder(Order):
                         ),
                     )
 
-        # Create or get Line for each product.  Calculate the Order total based on Lines and discount.
+        # Create Lines for each product.  Calculate the Order total based on Lines and discount.
         total = 0
         for i, product_tuple in enumerate(products):
             product, contract = product_tuple
-            line, created = Line.objects.get_or_create(
+            line = Line.objects.create(
                 order=order,
                 purchased_object_id=product.object_id,
                 purchased_content_type_id=product.content_type_id,
-                defaults={
-                    "product_version": product_versions[i],
-                    "quantity": 1,
-                    # The column is non-null, so the price has to be in hand
-                    # before the INSERT. get_or_create resolves a callable in
-                    # `defaults` only when it creates, so the reuse path below
-                    # doesn't pay for a value it would discard.
-                    "discounted_unit_price": lambda i=i: (
-                        Line.compute_discounted_unit_price_for(
-                            order, product_versions[i]
-                        )
-                    ),
-                    "b2b_contract": contract,
-                },
+                product_version=product_versions[i],
+                quantity=1,
+                discounted_unit_price=Line.compute_discounted_unit_price_for(
+                    order, product_versions[i]
+                ),
+                b2b_contract=contract,
             )
-            if not created:
-                # get_or_create skips `defaults` on an existing line, so a reused
-                # pending order carries the contract and price from the last
-                # attempt until they're refreshed from this basket.
-                line.record_b2b_contract(contract)
-                line.record_discounted_unit_price()
             total += line.discounted_price
 
         order.total_price_paid = total
@@ -1396,7 +1408,9 @@ class PendingOrder(Order):
             basket_discount.redeemed_discount
             for basket_discount in basket.discounts.all()
         ]
-        order = cls._get_or_create(cls, products, basket.user, discounts, gateway_type)
+        order = cls._create_with_data(
+            cls, products, basket.user, discounts, gateway_type
+        )
         return order  # noqa: RET504
 
     @classmethod
@@ -1420,8 +1434,12 @@ class PendingOrder(Order):
             PendingOrder: the created pending order
         """
 
-        order = cls._get_or_create(
-            cls, [(product, None)], user, [discount], gateway_type
+        order = cls._create_with_data(
+            cls,
+            [(product, None)],
+            user,
+            [discount],
+            gateway_type,
         )
 
         return order  # noqa: RET504
@@ -1519,6 +1537,16 @@ def _product_from_version(version):
         price=field_dict["price"],
         description=field_dict["description"],
         is_active=field_dict["is_active"],
+    )
+
+
+def b2b_order_exists() -> Exists:
+    """
+    The question ``Order.is_b2b_order`` asks, as an ``Exists`` for annotating
+    an Order queryset under that same name.
+    """
+    return Exists(
+        Line.objects.filter(order_id=OuterRef("pk"), b2b_contract__isnull=False)
     )
 
 

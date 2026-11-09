@@ -1,26 +1,27 @@
 """
-Management command to migrate CourseRunCertificates/ProgramCertificates for a
-course, course run, or program to the latest certificate page revision.
+Management command to migrate every CourseRunCertificate/ProgramCertificate for
+a course, course run, or program to the certificate page's published
+revision (see CertificatePage.get_certificate_revision), after asking for
+confirmation.
 
-By default, only certificates that don't have a certificate_page_revision
-associated are updated. Pass --all to update every certificate for the
-course/run/program, even ones that already have a revision set.
+This is a targeted refresh tool for one course/run/program at a time (e.g.
+after publishing a new certificate page revision that already-issued
+certificates should pick up). Every certificate always has a revision
+(certificate_page_revision is non-nullable since
+courses/migrations/0113_certificate_page_revision_not_nullable.py, which
+backfilled the ones that didn't), so this re-points existing certificates
+rather than filling in missing ones.
 
 Check the usages of this command below:
 
-1. Update certificates with no revision associated, for a course
+1. Update all certificates for a course
 ./manage.py migrate_certificate_revisions --course=<course_readable_id>
 
-2. Update ALL certificates (including ones that already have a revision), for a course
-./manage.py migrate_certificate_revisions --course=<course_readable_id> --all
-
-3. Same operations, but for a single course run
+2. Update all certificates for a single course run
 ./manage.py migrate_certificate_revisions --courserun=<course_run_courseware_id>
-./manage.py migrate_certificate_revisions --courserun=<course_run_courseware_id> --all
 
-4. Same operations, but for a program
+3. Update all certificates for a program
 ./manage.py migrate_certificate_revisions --program=<program_readable_id>
-./manage.py migrate_certificate_revisions --program=<program_readable_id> --all
 """
 
 from django.core.management.base import BaseCommand, CommandError
@@ -42,10 +43,8 @@ class Command(BaseCommand):
     """
 
     help = (
-        "Migrate certificates of a course/course run/program to the latest "
-        "certificate page revision. By default only certificates with no revision "
-        "associated are updated; use --all to update every certificate for the "
-        "course/run/program."
+        "Migrate every certificate of a course/course run/program to the published "
+        "certificate page revision, after asking for confirmation."
     )
 
     def add_arguments(self, parser):
@@ -58,18 +57,6 @@ class Command(BaseCommand):
         parser.add_argument(
             "--program", type=str, help="The 'readable_id' value for a Program"
         )
-        parser.add_argument(
-            "--all",
-            dest="update_all",
-            action="store_true",
-            required=False,
-            help=(
-                "Update all certificates for the course/run/program to the latest "
-                "revision. By default, only certificates with no revision "
-                "associated are updated."
-            ),
-        )
-
         super().add_arguments(parser)
 
     def _resolve_certificate_scope(self, course_id, run_id, program_id):
@@ -118,7 +105,6 @@ class Command(BaseCommand):
         course_id = options.get("course")
         run_id = options.get("courserun")
         program_id = options.get("program")
-        update_all = options.get("update_all")
 
         provided = [value for value in (course_id, run_id, program_id) if value]
         if not provided:
@@ -137,30 +123,27 @@ class Command(BaseCommand):
             message = f"No certificate page found for {courseware_label}."
             raise CommandError(message)
 
-        latest_revision = certificate_page.get_latest_revision()
-        if not latest_revision:
+        revision = certificate_page.get_certificate_revision()
+        if not revision:
             message = f"Certificate page '{certificate_page.title}' (id={certificate_page.pk}) for {courseware_label} has no revisions."
             raise CommandError(message)
 
-        if not update_all:
-            certificates = certificates.filter(certificate_page_revision__isnull=True)
-        else:
-            answer = input(
-                self.style.WARNING(
-                    f"This will update {len(certificates)} certificates for {courseware_label} to "
-                    f"revision {latest_revision.pk}, including ones that already "
-                    "have a revision set. Continue? (y/n): "
-                )
-            ).lower()
-            if answer != "y":
-                self.stdout.write(self.style.WARNING("Aborted. No changes made."))
-                return
+        answer = input(
+            self.style.WARNING(
+                f"This will update all {certificates.count()} certificates for "
+                f"{courseware_label} to revision {revision.pk}. "
+                "Continue? (y/n): "
+            )
+        ).lower()
+        if answer != "y":
+            self.stdout.write(self.style.WARNING("Aborted. No changes made."))
+            return
 
-        updated_count = certificates.update(certificate_page_revision=latest_revision)
+        updated_count = certificates.update(certificate_page_revision=revision)
 
         self.stdout.write(
             self.style.SUCCESS(
                 f"Updated {updated_count} certificate(s) for {courseware_label} to "
-                f"revision {latest_revision.pk}."
+                f"revision {revision.pk}."
             )
         )
