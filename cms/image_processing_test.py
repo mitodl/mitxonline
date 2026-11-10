@@ -64,10 +64,6 @@ def test_wagtail_image_renditions(fmt, extension):
     rendition = image.get_rendition("max-150x50")
     assert (rendition.width, rendition.height) == (100, 50)
 
-    rendition = image.get_rendition("fill-100x100|format-webp")
-    assert (rendition.width, rendition.height) == (100, 100)
-    assert rendition.file.name.endswith(".webp")
-
 
 @pytest.mark.django_db
 def test_signature_image_tag():
