@@ -14,6 +14,7 @@ from flexiblepricing.constants import (
     FLEXIBLE_PRICE_EMAIL_APPROVAL_SUBJECT,
     FLEXIBLE_PRICE_EMAIL_DOCUMENTS_RECEIVED_MESSAGE,
     FLEXIBLE_PRICE_EMAIL_DOCUMENTS_RECEIVED_SUBJECT,
+    FLEXIBLE_PRICE_EMAIL_RESET_DASHBOARD_MESSAGE,
     FLEXIBLE_PRICE_EMAIL_RESET_MESSAGE,
     FLEXIBLE_PRICE_EMAIL_RESET_SUBJECT,
     FlexiblePriceStatus,
@@ -30,24 +31,25 @@ RECIPIENT_VARIABLE_NAMES = {
 
 def get_flexible_price_form_url(flexible_price):
     """
-    The absolute URL of the financial aid form the learner submitted, falling back
-    to the MIT Learn dashboard if the submission or its form page can't be found.
+    The absolute URL of the live financial aid form the learner submitted, or None
+    if there is no submission or its form page is unpublished or not routable.
     """
     submission = flexible_price.cms_submission
-    url_parts = submission.page.specific.get_url_parts() if submission else None
+    if not submission or not submission.page.live:
+        return None
+    url_parts = submission.page.specific.get_url_parts()
     if not url_parts:
-        return settings.MIT_LEARN_DASHBOARD_URL
+        return None
     return urljoin(settings.SITE_BASE_URL, url_parts[2])
 
 
 def generate_flexible_price_email(flexible_price):
     """
-    Generates the email subject and body for a FlexiblePrice status update. Accepted statuses are
-    FlexiblePriceStatus.APPROVED and FlexiblePriceStatus.PENDING_MANUAL_APPROVAL (documents have been received).
+    Sends the learner an email about a FlexiblePrice status update. Accepted statuses are
+    FlexiblePriceStatus.APPROVED, FlexiblePriceStatus.PENDING_MANUAL_APPROVAL (documents
+    have been received) and FlexiblePriceStatus.RESET.
     Args:
         flexible_price (FlexiblePrice): The FlexiblePrice object in question
-    Returns:
-        dict: {"subject": (str), "body": (str)}
     """
     program_name = flexible_price.courseware_object.title
     if flexible_price.status == FlexiblePriceStatus.APPROVED:
@@ -66,8 +68,13 @@ def generate_flexible_price_email(flexible_price):
             program_name=program_name
         )
     elif flexible_price.status == FlexiblePriceStatus.RESET:
-        message = FLEXIBLE_PRICE_EMAIL_RESET_MESSAGE.format(
-            form_url=get_flexible_price_form_url(flexible_price)
+        form_url = get_flexible_price_form_url(flexible_price)
+        message = (
+            FLEXIBLE_PRICE_EMAIL_RESET_MESSAGE.format(form_url=form_url)
+            if form_url
+            else FLEXIBLE_PRICE_EMAIL_RESET_DASHBOARD_MESSAGE.format(
+                dashboard_url=settings.MIT_LEARN_DASHBOARD_URL
+            )
         )
         subject = FLEXIBLE_PRICE_EMAIL_RESET_SUBJECT.format(program_name=program_name)
     else:

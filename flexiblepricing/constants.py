@@ -39,6 +39,10 @@ FLEXIBLE_PRICE_EMAIL_RESET_MESSAGE = (
     "As requested, we have reset your personalized course price. Please re-submit "
     "your annual income information using the financial aid form: {form_url}"
 )
+FLEXIBLE_PRICE_EMAIL_RESET_DASHBOARD_MESSAGE = (
+    "As requested, we have reset your personalized course price. You can re-submit "
+    "your annual income information from your MIT Learn dashboard: {dashboard_url}"
+)
 
 FLEXIBLE_PRICE_EMAIL_APPROVAL_SUBJECT = (
     "Your personalized course price for {program_name}"
