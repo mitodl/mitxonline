@@ -176,7 +176,9 @@ class BasketOwnerHandoffMiddleware(MiddlewareMixin):
         ):
             return False
 
-        if not expected_basket_id.isdigit():
+        # isascii() too: str.isdigit() accepts characters like "²" that int()
+        # rejects, which would turn a crafted link into a 500 on any page.
+        if not (expected_basket_id.isascii() and expected_basket_id.isdigit()):
             log.warning(
                 "Ignoring malformed %s query param: %s",
                 EXPECTED_BASKET_PARAM,

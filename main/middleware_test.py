@@ -275,7 +275,7 @@ def test_basket_owner_handoff_skips_the_reset_endpoint(rf, basket_owner_middlewa
     assert basket_owner_middleware.process_request(request) is None
 
 
-@pytest.mark.parametrize("basket_id", ["", "abc", "1; DROP TABLE", "-1"])
+@pytest.mark.parametrize("basket_id", ["", "abc", "1; DROP TABLE", "-1", "²", "١٢"])
 def test_basket_owner_handoff_ignores_unusable_basket_ids(
     rf, basket_owner_middleware, basket_id
 ):
