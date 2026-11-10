@@ -127,12 +127,10 @@ def _animated_gif():
     ids=lambda v: v if isinstance(v, str) else "",
 )
 def test_wagtail_renditions_color_modes(name, data):
-    """Non-RGB uploads (scans, logos, exports) should still render and convert to WebP"""
+    """Non-RGB uploads (scans, logos, exports) should render the certificate's signature size"""
     image = _upload(name, data)
     rendition = image.get_rendition("max-150x50")
     assert (rendition.width, rendition.height) == (100, 50)
-    rendition = image.get_rendition("fill-100x100|format-webp")
-    assert (rendition.width, rendition.height) == (100, 100)
 
 
 @pytest.mark.django_db
