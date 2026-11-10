@@ -124,9 +124,13 @@ export const ContractForm: React.FC<IContractFormProps> = ({ form, onFinish, ini
             name="google_sheet_target_tab"
             dependencies={["google_sheet_target"]}
             rules={[
-                ({ getFieldValue }) => ({
+                // Like the API, only when the sheet or tab is being changed, so a
+                // contract saved with a sheet and no tab can still be edited.
+                ({ getFieldValue, isFieldTouched }) => ({
                     validator: (_, tab: string | undefined) =>
-                        getFieldValue("google_sheet_target") && !tab?.trim()
+                        (isFieldTouched("google_sheet_target") || isFieldTouched("google_sheet_target_tab")) &&
+                        getFieldValue("google_sheet_target") &&
+                        !tab?.trim()
                             ? Promise.reject(new Error("Name the tab the codes go in."))
                             : Promise.resolve(),
                 }),
