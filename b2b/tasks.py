@@ -135,7 +135,12 @@ def queue_contract_sheet_update_post_save(
     the locations because the sheet or tab changed. It sets the locations, so
     it runs once per sheet, and a failed write is retried by the next run.
     Otherwise update_sheet, which is non-destructive, keeps each code in its
-    row. only_update always uses update_sheet.
+    row.
+
+    only_update (the scheduled sweep) never runs write_codes, and skips a
+    contract whose sheet hasn't been written yet: update_sheet there would
+    write the codes without a header and save their locations, and then
+    write_codes would never run.
     """
 
     from b2b.models import ContractPage
@@ -165,7 +170,14 @@ def queue_contract_sheet_update_post_save(
         .exists()
     )
 
-    if not only_update and never_written:
+    if never_written and only_update:
+        log.info(
+            "Google Sheet for %s hasn't been written yet; leaving it for the "
+            "next enrollment code check",
+            contract,
+        )
+        return
+    if never_written:
         log.info("Setting up Google Sheet for %s", contract)
 
         codes_written = handler.write_codes()

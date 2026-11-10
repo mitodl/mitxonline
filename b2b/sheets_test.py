@@ -387,15 +387,17 @@ def test_update_sheet(contract_with_sheet_courseruns_handler_mocks):
 
 
 @pytest.mark.parametrize(
-    ("written_before", "products_active", "only_update", "rewrites"),
+    ("written_before", "products_active", "only_update", "expected"),
     [
-        (False, True, False, True),
-        (True, True, False, False),
+        (False, True, False, "write"),
+        (True, True, False, "update"),
         # A written code still counts when its run's product is inactive, so
         # the sheet it is in isn't overwritten.
-        (True, False, False, False),
-        (False, True, True, False),
-        (True, True, True, False),
+        (True, False, False, "update"),
+        # The scheduled sweep leaves an unwritten sheet for the code check, so
+        # it can't write the codes without a header first.
+        (False, True, True, None),
+        (True, True, True, "update"),
     ],
 )
 def test_sheet_update_task_picks_write_or_update(  # noqa: PLR0913
@@ -404,11 +406,12 @@ def test_sheet_update_task_picks_write_or_update(  # noqa: PLR0913
     written_before,
     products_active,
     only_update,
-    rewrites,
+    expected,
 ):
     """
     The codes are written from scratch only while none of the contract's codes
-    has a sheet location. Otherwise they're updated in place.
+    has a sheet location, and never by the scheduled sweep. Otherwise they're
+    updated in place.
     """
 
     contract, _ = contract_with_sheet_courseruns
@@ -427,8 +430,8 @@ def test_sheet_update_task_picks_write_or_update(  # noqa: PLR0913
 
     queue_contract_sheet_update_post_save(contract.id, only_update=only_update)
 
-    assert write_codes.called is rewrites
-    assert update_sheet.called is not rewrites
+    assert write_codes.called is (expected == "write")
+    assert update_sheet.called is (expected == "update")
 
 
 @pytest.mark.parametrize("write", ["write_codes", "update_sheet"])
