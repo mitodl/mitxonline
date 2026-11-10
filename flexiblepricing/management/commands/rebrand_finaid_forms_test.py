@@ -84,8 +84,8 @@ def test_commit_publishes_live_pages():
     output = _run("--commit")
 
     page.refresh_from_db()
-    assert "support.learn.mit.edu" in page.intro
-    assert "mitlearn-support@mit.edu" in page.application_denied_text
+    assert page.intro == rebrand(OLD_INTRO)
+    assert page.application_denied_text == rebrand(OLD_DENIED)
     assert page.revisions.count() == revisions_before + 1
     assert page.live_revision == page.latest_revision
     assert "Updated 1 page(s)." in output

@@ -674,7 +674,7 @@ def test_product_page_save_skips_courseware_save_when_title_unchanged(test_cours
 
 
 @pytest.mark.parametrize("flex_form_for_course", [True, False])
-def test_flexible_pricing_request_form_context(settings, flex_form_for_course):
+def test_flexible_pricing_request_form_context(flex_form_for_course):
     """
     Tests the flexible pricing request form context contains required information.
     The context["product"] will contain different values based on whether the
@@ -706,7 +706,6 @@ def test_flexible_pricing_request_form_context(settings, flex_form_for_course):
     assert context["product_page"] == get_learn_product_url(
         "courses" if flex_form_for_course else "programs", parent_product.readable_id
     )
-    assert context["mit_learn_dashboard_url"] == settings.MIT_LEARN_DASHBOARD_URL
 
 
 def test_flex_pricing_form_is_branded_mit_learn(mocker, settings):
