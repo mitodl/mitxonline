@@ -603,6 +603,8 @@ urlpatterns = [path("boom/", _raising_view)]
 handler500 = _server_error
 
 
+# The handler's request_finished signal closes old database connections.
+@pytest.mark.django_db
 def test_real_django_request_sends_only_the_hash(settings):
     """Through the WSGI handler DjangoIntegration wraps: hashed user, no identity headers."""
     settings.SENTRY_USER_HASH_KEY = HASH_KEY.decode()
