@@ -2580,6 +2580,26 @@ def test_b2b_codes_assign_waits_for_a_concurrent_assignment(org_setup, mock_emai
     assert assignment.assigned_email == "first@example.com"
 
 
+def test_b2b_codes_assign_without_a_name(org_setup, mock_email_task):
+    """--email without --name assigns the code with a blank name."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    call_command(
+        "b2b_codes",
+        "assign",
+        "--contract",
+        str(contract_1.id),
+        "--email",
+        "nameless@example.com",
+        "--commit",
+    )
+
+    assignment = DiscountContractAttachmentRedemption.objects.get(
+        contract=contract_1, assigned_email="nameless@example.com"
+    )
+    assert assignment.assigned_name == ""
+
+
 @pytest.mark.django_db(transaction=True)
 def test_redeeming_a_code_waits_for_a_concurrent_assignment(
     org_setup, mock_email_task, mocker
