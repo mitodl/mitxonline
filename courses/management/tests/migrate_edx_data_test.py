@@ -1,13 +1,19 @@
-"""Tests for migrate_edx_data management command's user migration
-(bulk_create fix and --dry-run), repair_migrated_profiles type and letter_grades type
-"""
+"""Tests for the migrate_edx_data management command"""
 
+from datetime import UTC, datetime
 from io import StringIO
 
 import pytest
+from django.core.management.base import CommandError
 
-from courses.factories import CourseRunFactory, CourseRunGradeFactory
-from courses.management.commands.migrate_edx_data import Command
+from cms.factories import SignatoryPageFactory
+from courses.factories import CourseFactory, CourseRunFactory, CourseRunGradeFactory
+from courses.management.commands import migrate_edx_data
+from courses.management.commands.migrate_edx_data import (
+    MIGRATION_SCHEMA,
+    Command,
+    _warehouse_list,
+)
 from courses.models import CourseRunGrade, CourseRunGradeAudit
 from users.factories import UserFactory
 from users.models import LegalAddress, User, UserProfile
@@ -16,19 +22,17 @@ pytestmark = pytest.mark.django_db
 
 
 class FakeCursor:
-    """Minimal stand-in for a Trino DB-API cursor."""
+    """Minimal stand-in for a pymysql cursor."""
 
-    def __init__(self, columns, rows):
+    def __init__(self, columns, rows, executed):
         self.description = [(col,) for col in columns]
         self._rows = rows
         self._offset = 0
-        self.query = None
-        self.params = None
+        self._executed = executed
 
-    def execute(self, query, params=None):
+    def execute(self, query, args=None):
         """Record the query - the fake cursor already has its rows in memory."""
-        self.query = query
-        self.params = params
+        self._executed.append((query, args))
 
     def fetchmany(self, size):
         """Return the next slice of rows, matching the DB-API contract."""
@@ -38,17 +42,117 @@ class FakeCursor:
 
 
 class FakeConnection:
-    """Minimal stand-in for a Trino DB-API connection."""
+    """Minimal stand-in for a pymysql connection."""
 
     def __init__(self, columns, rows):
         self._columns = columns
         self._rows = rows
-        self.last_cursor = None
+        self.executed = []
 
     def cursor(self):
         """Return a fresh fake cursor over the same fixed rows."""
-        self.last_cursor = FakeCursor(self._columns, self._rows)
-        return self.last_cursor
+        return FakeCursor(self._columns, self._rows, self.executed)
+
+
+@pytest.mark.parametrize("setting", ["STARROCKS_HOST", "STARROCKS_USER"])
+def test_connect_requires_starrocks_settings(settings, mocker, setting):
+    """The command refuses to connect without a StarRocks host and user"""
+    settings.STARROCKS_HOST = "starrocks.example.com"
+    settings.STARROCKS_USER = "reader"
+    setattr(settings, setting, None)
+    connect = mocker.patch.object(migrate_edx_data.pymysql, "connect")
+
+    with pytest.raises(CommandError):
+        Command()._connect_to_warehouse()  # noqa: SLF001
+
+    connect.assert_not_called()
+
+
+def test_connect_uses_starrocks_settings(settings, mocker):
+    """The connection is opened from the STARROCKS_* settings"""
+    settings.STARROCKS_HOST = "starrocks.example.com"
+    settings.STARROCKS_PORT = 9030
+    settings.STARROCKS_USER = "reader"
+    settings.STARROCKS_PASSWORD = "secret"  # noqa: S105
+    connect = mocker.patch.object(migrate_edx_data.pymysql, "connect")
+
+    assert Command()._connect_to_warehouse() == connect.return_value  # noqa: SLF001
+
+    connect.assert_called_once_with(
+        host="starrocks.example.com",
+        port=9030,
+        user="reader",
+        password="secret",  # noqa: S106
+        ssl_verify_cert=True,
+        init_command="SET time_zone = '+00:00'",
+    )
+
+
+def test_course_certificates_query_binds_readable_ids():
+    """Course run readable ids are bound as parameters, and the table is
+    qualified with its catalog and schema
+    """
+    conn = FakeConnection(columns=[], rows=[])
+
+    Command()._migrate_course_certificates(  # noqa: SLF001
+        conn,
+        {"courserun_readable_ids": "course-v1:MITx+1+1T2024, course-v1:MITx+2'x"},
+    )
+
+    [(query, args)] = conn.executed
+    assert f"FROM {MIGRATION_SCHEMA}.edxorg_to_mitxonline_enrollments " in query
+    assert "courserun_readable_id IN (%s, %s)" in query
+    assert args == ["course-v1:MITx+1+1T2024", "course-v1:MITx+2'x"]
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ('["Jane Doe", "John Roe"]', ["Jane Doe", "John Roe"]),
+        (b'["Jane Doe"]', ["Jane Doe"]),
+        (["Jane Doe"], ["Jane Doe"]),
+        (None, []),
+    ],
+)
+def test_warehouse_list(value, expected):
+    """An array column arrives from StarRocks as JSON text"""
+    assert _warehouse_list(value) == expected
+
+
+def test_get_signatories_reads_the_array_column():
+    """signatory_names arrives as JSON text, and matches signatories by name"""
+    signatory, _ = SignatoryPageFactory.create_batch(2)
+
+    signatories = Command()._get_signatories(  # noqa: SLF001
+        f'["{signatory.name}", " "]', use_default_signatory=False
+    )
+
+    assert signatories == [signatory]
+
+
+def test_create_course_run_reads_warehouse_types():
+    """StarRocks sends timestamps naive, in the session's UTC, and booleans as 0 or 1"""
+    course = CourseFactory.create()
+    row = {
+        "courseware_id": "course-v1:MITx+1.00x+1T2024",
+        "run_tag": "1T2024",
+        "start_date": datetime(2024, 1, 2, 15, 0),  # noqa: DTZ001
+        "end_date": datetime(2024, 5, 1, 15, 0),  # noqa: DTZ001
+        "enrollment_start": datetime(2023, 12, 1, 15, 0),  # noqa: DTZ001
+        "enrollment_end": None,
+        "courserun_title": "Run",
+        "is_self_paced": 1,
+    }
+
+    run, created = Command()._create_course_run(course, row)  # noqa: SLF001
+
+    assert created
+    run.refresh_from_db()
+    assert run.start_date == datetime(2024, 1, 2, 15, 0, tzinfo=UTC)
+    assert run.end_date == datetime(2024, 5, 1, 15, 0, tzinfo=UTC)
+    assert run.enrollment_start == datetime(2023, 12, 1, 15, 0, tzinfo=UTC)
+    assert run.enrollment_end is None
+    assert run.is_self_paced is True
 
 
 USER_COLUMNS = [
@@ -468,12 +572,12 @@ def test_backfill_letter_grades_dry_run_does_not_write():
             {
                 "courserun_readable_ids": "course-v1:MITx+A+1T2020, course-v1:MITx+B+1T2020"
             },
-            " WHERE courserun_readable_id IN (?,?)",
+            " WHERE courserun_readable_id IN (%s, %s)",
             ["course-v1:MITx+A+1T2020", "course-v1:MITx+B+1T2020"],
         ),
         (
             {"courserun_readable_ids": "course-v1:MITx+A+1T2020' OR '1'='1"},
-            " WHERE courserun_readable_id IN (?)",
+            " WHERE courserun_readable_id IN (%s)",
             ["course-v1:MITx+A+1T2020' OR '1'='1"],
         ),
     ],
@@ -488,10 +592,10 @@ def test_backfill_letter_grades_binds_courserun_filter(
         conn, {**options, "limit": 5}
     )
 
-    query = conn.last_cursor.query
+    [(query, params)] = conn.executed
     assert query.endswith(f"{expected_clause or ''} LIMIT 5")
     assert "'" not in query
-    assert conn.last_cursor.params == expected_params
+    assert params == expected_params
 
 
 def test_migrate_course_certificates_binds_courserun_filter():
@@ -502,5 +606,6 @@ def test_migrate_course_certificates_binds_courserun_filter():
         conn, {"courserun_readable_ids": "course-v1:MITx+A+1T2020"}
     )
 
-    assert conn.last_cursor.query.endswith(" AND courserun_readable_id IN (?)")
-    assert conn.last_cursor.params == ["course-v1:MITx+A+1T2020"]
+    [(query, params)] = conn.executed
+    assert query.endswith(" AND courserun_readable_id IN (%s)")
+    assert params == ["course-v1:MITx+A+1T2020"]

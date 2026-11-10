@@ -1643,34 +1643,28 @@ DISABLE_USER_REPAIR_TASK = get_bool(
     description="Disable the task so it no-ops",
 )
 
-TRINO_HOST = get_string(
-    name="TRINO_HOST",
+STARROCKS_HOST = get_string(
+    name="STARROCKS_HOST",
     default=None,
-    description="Host URL for Trino server",
+    description="Host of the data platform's StarRocks FE, read by migrate_edx_data",
 )
 
-TRINO_PORT = get_int(
-    name="TRINO_PORT",
-    default=443,
-    description="Port number for Trino server",
+STARROCKS_PORT = get_int(
+    name="STARROCKS_PORT",
+    default=9030,
+    description="MySQL protocol port of the data platform's StarRocks FE",
 )
 
-TRINO_CATALOG = get_string(
-    name="TRINO_CATALOG",
+STARROCKS_USER = get_string(
+    name="STARROCKS_USER",
     default=None,
-    description="Catalog name for Trino queries",
+    description="Username for StarRocks authentication",
 )
 
-TRINO_USER = get_string(
-    name="TRINO_USER",
+STARROCKS_PASSWORD = get_string(
+    name="STARROCKS_PASSWORD",
     default=None,
-    description="Username for Trino authentication",
-)
-
-TRINO_PASSWORD = get_string(
-    name="TRINO_PASSWORD",
-    default=None,
-    description="Password for Trino authentication",
+    description="Password for StarRocks authentication",
 )
 
 VERIFIABLE_CREDENTIAL_SIGNER_URL = get_string(

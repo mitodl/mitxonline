@@ -41,7 +41,7 @@ def _run(tmp_path, **options):
 
 @pytest.fixture(autouse=True)
 def mock_edx_migration(mocker):
-    """Stage 1 always gets skipped/mocked in these tests - never hit Trino."""
+    """Stage 1 always gets skipped/mocked in these tests - never hit the warehouse."""
     return mocker.patch("users.management.commands.migrate_and_sync_users.call_command")
 
 
@@ -67,7 +67,7 @@ def test_non_positive_batch_size_is_rejected(mock_edx_migration, batch_size):
 
 @pytest.mark.django_db
 def test_limit_is_threaded_through_to_migrate_edx_data(mock_edx_migration, mocker):
-    """--limit should also limit Stage 1's Trino query, not just which
+    """--limit should also limit Stage 1's warehouse query, not just which
     mitxonline candidates get classified/synced - otherwise a small test run
     still backfills the entire edX dataset before test-syncing a handful
     of users
