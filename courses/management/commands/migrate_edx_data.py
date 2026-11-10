@@ -3,6 +3,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.db.models import Q
+from django.db.models.functions import Lower
 from reversion.models import Version
 from trino.auth import BasicAuthentication
 from trino.dbapi import connect
@@ -375,6 +376,7 @@ class Command(BaseCommand):
         """
         limit = options.get("limit")
         batch_size = options.get("batch_size", 1000)
+        dry_run = options.get("dry_run")
 
         cur = conn.cursor()
 
@@ -388,6 +390,8 @@ class Command(BaseCommand):
         GENDER_MAP = {label: code for code, label in GENDER_CHOICES}
 
         user_creation_count = 0
+        # dry-run only: lowercased emails already counted, across batches
+        dry_run_counted = set()
         while True:
             results = cur.fetchmany(batch_size)
             if not results:
@@ -400,11 +404,34 @@ class Command(BaseCommand):
             }
             emails = list(row_lookup.keys())
 
-            existing_emails = set(
-                User.objects.filter(
+            # usernames too: migrated users get username=email, so an email
+            # matching an existing username would conflict on create
+            existing_emails = {
+                value
+                for pair in User.objects.filter(
                     Q(username__in=emails) | Q(email__in=emails)
-                ).values_list("email", flat=True)
-            )
+                ).values_list("username", "email")
+                for value in pair
+            }
+
+            if dry_run:
+                # email uniqueness is case-insensitive (user_email_unique), so
+                # count the way a real run's inserts would succeed or conflict
+                existing_lower = set(
+                    User.objects.annotate(email_lower=Lower("email"))
+                    .filter(email_lower__in=[email.lower() for email in emails])
+                    .values_list("email_lower", flat=True)
+                )
+                for email in emails:
+                    key = email.lower()
+                    if (
+                        email not in existing_emails
+                        and key not in existing_lower
+                        and key not in dry_run_counted
+                    ):
+                        dry_run_counted.add(key)
+                        user_creation_count += 1
+                continue
 
             created_users = self._bulk_create_users(rows, existing_emails, batch_size)
             user_creation_count += len(created_users)
@@ -418,6 +445,14 @@ class Command(BaseCommand):
             self._bulk_create_user_profiles(
                 created_users, id_row_lookup, batch_size, GENDER_MAP
             )
+
+        if dry_run:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"[DRY RUN] Would create {user_creation_count} users"
+                )
+            )
+            return
 
         self.stdout.write(self.style.SUCCESS(f"{user_creation_count} users created"))
 

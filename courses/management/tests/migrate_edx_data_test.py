@@ -1,5 +1,5 @@
-"""Tests for migrate_edx_data management command's user-migration bulk_create
-fix and repair_migrated_profiles type
+"""Tests for migrate_edx_data management command's user migration
+(bulk_create fix and --dry-run) and repair_migrated_profiles type
 """
 
 import pytest
@@ -260,3 +260,73 @@ def test_limit_caps_number_of_users_repaired():
 
     repaired = User.objects.filter(legal_address__isnull=False).count()
     assert repaired == 1
+
+
+def test_migrate_users_dry_run_creates_no_records(capsys):
+    """--dry-run must not create any User/LegalAddress/UserProfile rows"""
+    existing_user = UserFactory.create(email="existing@example.com")
+    conn = FakeConnection(
+        columns=["user_email", "user_full_name"],
+        rows=[
+            ("new1@example.com", "New One"),
+            ("new2@example.com", "New Two"),
+            (existing_user.email, "Existing User"),
+        ],
+    )
+
+    Command()._migrate_users(conn, {"dry_run": True})  # noqa: SLF001
+
+    assert User.objects.count() == 1  # only the pre-existing user
+    output = capsys.readouterr().out
+    assert "[DRY RUN] Would create 2 users" in output
+
+
+def test_migrate_users_dry_run_respects_batching(capsys):
+    """The dry-run count must accumulate correctly across multiple fetchmany
+    batches, not just within a single batch
+    """
+    conn = FakeConnection(
+        columns=["user_email", "user_full_name"],
+        rows=[(f"new{i}@example.com", f"New {i}") for i in range(5)],
+    )
+
+    Command()._migrate_users(conn, {"dry_run": True, "batch_size": 2})  # noqa: SLF001
+
+    assert User.objects.count() == 0
+    output = capsys.readouterr().out
+    assert "[DRY RUN] Would create 5 users" in output
+
+
+def test_migrate_users_dry_run_excludes_existing_usernames(capsys):
+    """An incoming email that matches an existing user's username (but not
+    their email) would conflict on create, so dry-run must not count it
+    """
+    UserFactory.create(username="taken@example.com", email="other@example.com")
+    conn = FakeConnection(
+        columns=["user_email", "user_full_name"],
+        rows=[("taken@example.com", "Taken"), ("new@example.com", "New")],
+    )
+
+    Command()._migrate_users(conn, {"dry_run": True})  # noqa: SLF001
+
+    assert "[DRY RUN] Would create 1 users" in capsys.readouterr().out
+
+
+def test_migrate_users_dry_run_matches_emails_case_insensitively(capsys):
+    """Email uniqueness ignores case, so dry-run must not count an email that
+    differs from an existing user's only by case, or count two case variants
+    of one new email twice - including across batches
+    """
+    UserFactory.create(email="Existing@example.com")
+    conn = FakeConnection(
+        columns=["user_email", "user_full_name"],
+        rows=[
+            ("existing@example.com", "Existing"),
+            ("New@example.com", "New"),
+            ("new@example.com", "New Again"),
+        ],
+    )
+
+    Command()._migrate_users(conn, {"dry_run": True, "batch_size": 2})  # noqa: SLF001
+
+    assert "[DRY RUN] Would create 1 users" in capsys.readouterr().out
