@@ -131,3 +131,15 @@ def test_denied_email_greets_learner(mock_send_message, form_page):
     _, body, _ = _sent_email(mock_send_message)
     assert f"Dear {flexible_price.user.name}," in body
     assert "We are unable to approve your request." in body
+
+
+def test_email_greeting_without_name(mock_send_message, form_page):
+    """A learner with no name on file is greeted generically, not with "Dear ,\""""
+    flexible_price = _flexible_price(FlexiblePriceStatus.APPROVED, form_page)
+    flexible_price.user.name = ""
+    flexible_price.user.save()
+    generate_flexible_price_email(flexible_price)
+
+    _, body, _ = _sent_email(mock_send_message)
+    assert "Dear learner," in body
+    assert "Dear ," not in body
