@@ -6,9 +6,14 @@ members access to courseware. It lives under `/api/v0/b2b/provisioning/` and is
 staff-only.
 
 Most people will use it through the staff dashboard's B2B Organizations
-section, which covers organizations, onboarding state, IdPs and the change
-history. Contracts don't have a staff UI yet and are still edited in Wagtail,
-as child pages of the organization, or through the contract routes below. This
+section, which covers organizations, onboarding state, IdPs, the change
+history and contracts. A contract's page there creates and edits the contract,
+adds and removes courseware, shows how far the edX clones and enrollment codes
+have got, and assigns and expires codes. Some things on a contract still need
+Wagtail or the API: `welcome_message_extra`, the Google Sheet target and the
+order of a contract's programs, which the contract routes don't carry, and
+variant sets, which have routes and no UI yet. Every other contract field is
+read-only on the Wagtail page, and contracts can't be created there. This
 page is the reference for engineers working on the API or the UI, and for
 anyone who needs to know what a button in the dashboard actually does.
 
@@ -110,8 +115,8 @@ start at `org_created`, and so do organizations the reconciler adopts.
 
 Every change made through the provisioning functions writes an
 `OrganizationProvisioningAudit` row in the same transaction: organization
-create and update, onboarding changes, and IdP create, transition, metadata
-refresh and delete. Each row records who made the change and the data before
+create and update, onboarding changes, and IdP create, update, transition,
+metadata refresh and delete. Each row records who made the change and the data before
 and after it. `GET .../events/` returns them newest first.
 
 Partner SSO changes used to go through PR review in Pulumi. We decided on
@@ -125,6 +130,7 @@ written to it. Contract changes aren't audited here.
 GET    /api/v0/b2b/provisioning/organizations/{org_key}/identity-providers/
 POST   /api/v0/b2b/provisioning/organizations/{org_key}/identity-providers/
 GET    /api/v0/b2b/provisioning/organizations/{org_key}/identity-providers/{alias}/
+PATCH  /api/v0/b2b/provisioning/organizations/{org_key}/identity-providers/{alias}/
 DELETE /api/v0/b2b/provisioning/organizations/{org_key}/identity-providers/{alias}/
 POST   /api/v0/b2b/provisioning/organizations/{org_key}/identity-providers/{alias}/refresh-metadata/
 POST   /api/v0/b2b/provisioning/organizations/{org_key}/identity-providers/{alias}/transition/
@@ -152,8 +158,10 @@ users in with no email or name. OIDC takes `discovery_url`, `client_id` and
 Keycloak's `identity-provider/import-config` parses the metadata. The parsed
 config is stored on the `OrganizationIdentityProvider` as `metadata_artifact`,
 along with where it came from. Metadata is only fetched again when someone
-calls `refresh-metadata`. If the partner's endpoint is down, the refresh
-returns 502 and the stored config is left as it was. The OIDC client secret is
+calls `refresh-metadata`. A refresh replaces the parsed config, so a key the
+partner's metadata no longer defines (e.g. a withdrawn certificate or logout
+endpoint) is removed from Keycloak too. If the partner's endpoint is down, the
+refresh returns 502 and the stored config is left as it was. The OIDC client secret is
 sent to Keycloak but never stored in MITx Online.
 
 `parse-metadata` runs the same parse without creating anything, so staff can
@@ -167,6 +175,56 @@ send to the partner.
 
 An IdP alias is chosen by staff, not derived from `org_key`, because one
 organization can have more than one IdP.
+
+`GET` on a single IdP also returns `attribute_map` and `attribute_name_map`,
+read from Keycloak's attribute-importer mappers at request time, so it returns
+502 when that Keycloak call fails. The list and an organization's nested
+`identity_providers` leave them out, because they would cost a Keycloak call
+per IdP.
+
+### Editing an identity provider
+
+`DELETE` on an IdP is destructive beyond this API. Keycloak's IdP delete also
+deletes every user's federated identity link to that alias, so everyone who
+has signed in through the IdP has to re-link on their next login. `PATCH`
+exists so that rotating an OIDC client secret, pointing at new metadata or
+fixing a mapper doesn't cost that.
+
+`PATCH` takes any of these, and only the fields sent are changed:
+
+| Field | Protocol | Notes |
+| --- | --- | --- |
+| `display_name` | both | The only field that may be sent blank |
+| `metadata_url`, `metadata_xml` | SAML | At most one. The metadata is parsed again and replaces the stored config |
+| `discovery_url` | OIDC | Parsed again, the same as SAML metadata |
+| `client_id`, `client_secret` | OIDC | The secret goes to Keycloak and is never stored or audited |
+| `attribute_map`, `attribute_name_map` | see below | Replace the IdP's attribute mappers |
+
+The attribute maps replace the whole set of attribute mappers, they don't
+merge into it. For SAML, send both maps together (an empty object for the one
+with no entries), because sending one alone would delete the other's mappers.
+A user attribute can be in only one of the two, and the pair can't leave a
+SAML IdP with no mappers. OIDC takes `attribute_map` only, and an empty
+object clears its mappers. To change one mapping, read the current maps from
+the IdP's `GET` and send them back with the change. Mappers of other types
+added in the Keycloak console are left alone.
+
+Mappers are updated in place. An unchanged mapping leaves its mapper alone, a
+changed one keeps the rest of its config (sync mode, SAML name format, the
+mapper's name), a removed one is deleted, and a new one is created with
+`syncMode` `INHERIT` and, for SAML, the URI name format. Where two mappers
+import the same user attribute, the `GET` shows the later one and only that
+one is edited. A mapper with no user attribute or no source isn't shown and
+isn't touched.
+
+`alias` and `protocol` can't be changed. Sending either is a 400, and so is a
+field that belongs to the other protocol or a body with no fields. The
+lifecycle state doesn't change here, only through `transition/`.
+
+The update writes the IdP to Keycloak, then updates the mappers, then saves
+the MITx Online record, with no compensation. If a step fails, Keycloak is
+ahead of MITx Online and may have only some of the mapper changes. Send the
+same `PATCH` again to finish it.
 
 ### Lifecycle
 
@@ -216,6 +274,10 @@ POST   .../contracts/{id}/retry-setup/
 GET    .../contracts/{id}/codes/
 POST   .../contracts/{id}/codes/expire/
 POST   .../contracts/{id}/codes/assign/
+GET    .../contracts/{id}/variants/
+POST   .../contracts/{id}/variants/
+PATCH  .../contracts/{id}/variants/{variant_id}/
+POST   .../contracts/{id}/variants/sync/
 ```
 
 These replace running `b2b_contract`, `b2b_courseware`, `b2b_codes` and
@@ -224,7 +286,11 @@ These replace running `b2b_contract`, `b2b_courseware`, `b2b_codes` and
 
 `POST` takes `name`, `membership_type` (required), `description`,
 `welcome_message`, `contract_start`, `contract_end`, `max_learners` and
-`enrollment_fixed_price`. `PATCH` takes the same fields plus `active`.
+`enrollment_fixed_price`. `PATCH` takes the same fields plus `active`. A
+contract that is inactive, ended or not yet started can still be read and
+edited here, and switched back on. It stays out of `user.b2b_contracts`,
+`run.b2b_contracts` and `organization.contracts`, which only return contracts
+valid for use (`ContractPageManager`).
 
 `courseware/` takes a program, course or course run readable ID. The contract
 runs and their products exist once the call returns. The edX course clones and
@@ -232,14 +298,76 @@ enrollment codes are created afterwards by Celery tasks, and `setup-status`
 reports what's still pending or has failed. `retry-setup` queues the failed
 parts again. Adding the same courseware twice doesn't create a second run. A
 run that already belongs to another contract is skipped and stays where it is.
+A source run's ID is a 400 that names its course: contract runs are cloned from
+a source run, so the course is what gets added.
 
 `courseware/remove/` closes the removed runs to new enrollments. A run that
 already has enrolled learners stays linked to the contract so they keep access.
+A run another contract also holds is not closed and keeps its products and
+codes. It is unlinked from this contract, unless this contract's learners are
+enrolled in it. The codes this contract had for that run stay attached to the
+run's product, because a code belongs to a product and not to a contract. If
+this contract was the run's legacy `b2b_contract`, that moves to a contract
+that still holds the run.
+
+`variants/` lists the contract's variant sets, default first. Each set lists
+the contract's courses (from its runs and its programs) that support the same
+language, length and industry, whether each has a source run for it, and the
+contract's run for it if there is one. A course still in the contract with a
+source run and no contract run gets one from `variants/sync/`, or the next time
+its courseware is added to the contract, as long as the set is active. The list
+also shows a removed course whose closed run stays linked for its enrolled
+learners, and a course outside the contract's programs whose run in it isn't
+live. `variants/sync/` skips both. Each set also lists, as
+`unsupported_courses`, the contract's courses with no active variant set of
+their own that matches, so adding their courseware picks no source run for it.
+`contract_run` is there too, since such a course can still have a run for the
+set (e.g. its own set was turned off afterwards). `setup-status` and
+`retry-setup` return the same report as `variants`. A missing run doesn't
+change the setup status.
+`POST` adds a set (`language`, `variant_length`, `variant_industry`,
+`b2b_only`). It never adds a default, since every contract already has one, and
+a set the contract already has, active or not, is a 400. Adding a set creates
+no runs. `PATCH` takes `active` and `b2b_only`. An inactive set gets no new
+runs and its runs drop out of the contract's course list, but they stay in the
+contract and their enrollments are untouched, so turning it back on restores
+them. The default set can't be turned off or made B2B-only. Variant set changes
+are recorded in the organization's change history.
+
+`variants/sync/` creates the runs the contract's courses are missing for its
+active variant sets, so courseware added before a set doesn't have to be added
+again course by course. It takes no body. A course and variant that already has
+a run in the contract is left alone, so repeating the call creates nothing
+more. Only courses still in the contract get runs: those of its programs, and
+those with a live run in it. A removed course whose closed run stays linked for
+its enrolled learners is skipped. The response lists `runs_created`,
+`missing_source_runs` (a course supports the set and has no source run to
+clone) and `failed` (a source run exists and the contract run was not created,
+e.g. the course has no default variant set, or its readable ID doesn't make a
+valid run key). The new runs' edX clones are queued, and so is the enrollment
+code check for a contract that uses codes.
 
 The codes routes list a contract's enrollment codes, expire the unused ones,
 and assign codes to people by email the same way the manager dashboard's bulk
 assign does. They return redeemable codes, which is part of why every route
 here requires staff, including reads.
+
+The contract routes save the page without a Wagtail revision. A revision
+holds the whole page as it was when it was saved, so `ContractPage` takes the
+fields these routes write (`ContractPage.PROVISIONED_FIELDS`) from the stored
+row whenever Wagtail loads or publishes one. Publishing an old revision
+therefore can't put back a contract's old name, dates, seat cap or price.
+The same goes for which programs a contract has: a publish keeps the stored
+program links and takes only their order from the revision, so a program
+added or removed on the Wagtail page is not saved, and one removed there moves
+to the end of the order. This holds for a live page. Wagtail saves the form of
+an unpublished contract page straight to the database, so there an added or
+removed program is saved, and an added one queues run creation.
+
+`description` is Wagtail rich text. On the way in it is reduced to the markup
+Wagtail's editor stores (paragraphs, headings, bold, italic, lists, links);
+anything else is stripped, including an image or media embedded through
+Wagtail's editor.
 
 ## Errors
 
@@ -249,6 +377,7 @@ here requires staff, including reads.
 | Organization name gives a page slug that's already taken | 409 |
 | Acting on an organization with no Keycloak organization | 409 |
 | `org_key` sent on `PATCH` | 400 |
+| `alias` or `protocol` sent on an IdP `PATCH` | 400 |
 | Lifecycle transition not in the table above | 400 |
 | Database write and compensating Keycloak delete both failed | 500 |
 | A Keycloak admin API call failed | 502 |
@@ -278,5 +407,8 @@ changes an existing `org_key`.
 - Domain verification, before C2.
 - Where C2's partner invite token is stored. `OrganizationOnboarding` is the
   likely place, but it has no token field yet.
-- A contracts section in the staff dashboard, an IdP edit route, and a
-  test-login flow.
+- A test-login flow.
+- The contract fields the staff dashboard can't reach
+  (`welcome_message_extra`, `google_sheet_target`, `google_sheet_target_tab`,
+  program order) and a variant set editor. They are all the Wagtail contract
+  page is still needed for.

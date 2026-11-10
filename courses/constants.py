@@ -1,5 +1,7 @@
 """Constants for the courses app"""
 
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+
 UAI_COURSEWARE_ID_PREFIX = "UAI_"
 XPRO_COURSEWARE_ID_PREFIX = "PRO+"
 
@@ -11,7 +13,23 @@ VALID_PRODUCT_TYPES = {CONTENT_TYPE_MODEL_COURSERUN, CONTENT_TYPE_MODEL_PROGRAM}
 VALID_PRODUCT_TYPE_CHOICES = list(zip(VALID_PRODUCT_TYPES, VALID_PRODUCT_TYPES))
 
 # Program display modes
-PROGRAM_DISPLAY_MODE_CHOICES = [("course", "course")]
+PROGRAM_DISPLAY_MODE_COURSE = "course"
+PROGRAM_DISPLAY_MODE_CHOICES = [
+    (PROGRAM_DISPLAY_MODE_COURSE, PROGRAM_DISPLAY_MODE_COURSE)
+]
+
+# Program enrollment modes. "upgrade" is the program-only mode for a learner who
+# purchased the program (or was granted it through a B2B contract), and is
+# deliberately not edX's "verified", which keeps its course run meaning and must
+# not be used for runs. Nothing sets "upgrade" yet: it is published here first
+# so API consumers can handle it before program enrollments move to it
+# (hq#14063). Until then upgraded program enrollments use "verified".
+PROGRAM_ENROLLMENT_UPGRADE_MODE = "upgrade"
+PROGRAM_ENROLLMENT_MODES = (
+    EDX_ENROLLMENT_AUDIT_MODE,
+    EDX_ENROLLMENT_VERIFIED_MODE,
+    PROGRAM_ENROLLMENT_UPGRADE_MODE,
+)
 
 PROGRAM_TEXT_ID_PREFIX = "program-"
 ENROLLABLE_ITEM_ID_SEPARATOR = "+"

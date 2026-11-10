@@ -55,7 +55,14 @@ def test_basic_eligible_course(page_published):
         False,
     ],
 )
-def test_b2b_course(page_published, include_regular_run):
+@pytest.mark.parametrize(
+    "public_b2b_run",
+    [
+        True,
+        False,
+    ],
+)
+def test_b2b_course(page_published, include_regular_run, public_b2b_run):
     """
     Test with a B2B course.
 
@@ -67,7 +74,8 @@ def test_b2b_course(page_published, include_regular_run):
     contract = ContractPageFactory.create()
 
     run = CourseRunFactory.create(
-        b2b_contract=contract,
+        b2b_contracts=[contract],
+        b2b_only=(not public_b2b_run),
     )
     run.course.page.live = page_published
     run.course.page.save()
@@ -85,7 +93,7 @@ def test_b2b_course(page_published, include_regular_run):
 
     run.refresh_from_db()
     assert run.course.include_in_learn_catalog == (
-        page_published and include_regular_run
+        page_published and (include_regular_run or public_b2b_run)
     )
     # this should _always_ be true if there's a B2B run
     assert run.course.ingest_content_files_for_ai

@@ -17,12 +17,13 @@ wizard (C2) gets its own permission class scoped by invite token.
 import logging
 
 import django_filters
+from authlib.integrations.base_client.errors import OAuthError
 from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, inline_serializer
 from opaque_keys import InvalidKeyError
-from requests.exceptions import HTTPError
+from requests.exceptions import RequestException
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
@@ -32,16 +33,21 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.constants import ONBOARDING_STATE_CHOICES
 from b2b.contracts import (
+    add_contract_variant_set,
     add_courseware_to_contract,
     create_contract,
     expire_unused_enrollment_codes,
     get_contract_setup_status,
+    get_contract_variant_coverage,
     queue_enrollment_code_check_if_required,
     remove_courseware_from_contract,
     retry_contract_setup,
+    sync_contract_variants,
+    update_contract_variant_set,
 )
 from b2b.exceptions import (
     AliasCollisionError,
+    ContractVariantError,
     InvalidLifecycleTransitionError,
     OrganizationNameCollisionError,
     OrganizationNotProvisionedError,
@@ -59,10 +65,12 @@ from b2b.provisioning import (
     create_identity_provider,
     create_organization,
     delete_identity_provider,
+    get_identity_provider_attribute_maps,
     parse_identity_provider_metadata,
     refresh_identity_provider_metadata,
     set_onboarding_state,
     transition_identity_provider,
+    update_identity_provider,
     update_organization,
 )
 from b2b.serializers.v0.manager import (
@@ -73,12 +81,16 @@ from b2b.serializers.v0.manager import (
 from b2b.serializers.v0.provisioning import (
     ContractCoursewareSerializer,
     ContractSetupStatusSerializer,
+    ContractVariantSetSerializer,
+    ContractVariantSyncSerializer,
     CoursewareAdditionSerializer,
     CreateContractSerializer,
+    CreateContractVariantSetSerializer,
     CreateIdentityProviderSerializer,
     CreateOrganizationSerializer,
     ExpiredEnrollmentCodeSerializer,
     IdentityProviderTransitionSerializer,
+    OrganizationIdentityProviderDetailSerializer,
     OrganizationIdentityProviderSerializer,
     OrganizationOnboardingSerializer,
     OrganizationProvisioningAuditSerializer,
@@ -89,6 +101,8 @@ from b2b.serializers.v0.provisioning import (
     RemovedContractRunSerializer,
     SetOnboardingStateSerializer,
     UpdateContractSerializer,
+    UpdateContractVariantSetSerializer,
+    UpdateIdentityProviderSerializer,
     UpdateOrganizationSerializer,
 )
 from b2b.views.v0.manager import (
@@ -96,6 +110,8 @@ from b2b.views.v0.manager import (
     bulk_assign_enrollment_codes,
 )
 from courses.api import resolve_courseware_object_from_id
+from courses.models import CourseRun
+from main.versioning import V0Versioning
 from main.views import RefinePagination
 
 log = logging.getLogger(__name__)
@@ -132,7 +148,10 @@ class ProvisioningExceptionMixin:
                 {"detail": str(exc)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        if isinstance(exc, HTTPError):
+        # RequestException covers HTTPError as well as a connection error or a
+        # timeout, and bootstrapping the client raises OAuthError when the
+        # token request fails.
+        if isinstance(exc, RequestException | OAuthError):
             log.exception("Keycloak call failed during provisioning")
             return Response(
                 {"detail": "The Keycloak admin API call failed."},
@@ -168,6 +187,7 @@ class OrganizationProvisioningViewSet(
 ):
     """Provision and inspect B2B organizations."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAdminUser]
     serializer_class = ProvisionedOrganizationSerializer
     lookup_field = "org_key"
@@ -360,6 +380,7 @@ class IdentityProviderProvisioningViewSet(
 ):
     """Provision and manage an organization's identity providers."""
 
+    versioning_class = V0Versioning
     permission_classes = [IsAdminUser]
     serializer_class = OrganizationIdentityProviderSerializer
     lookup_field = "alias"
@@ -388,11 +409,24 @@ class IdentityProviderProvisioningViewSet(
 
         return Response(self.get_serializer(self.get_queryset(), many=True).data)
 
-    @extend_schema(responses={200: OrganizationIdentityProviderSerializer})
+    @extend_schema(
+        responses={
+            200: OrganizationIdentityProviderDetailSerializer,
+            502: DetailSerializer,
+        }
+    )
     def retrieve(self, request, alias=None, **kwargs):  # noqa: ARG002
-        """Return a single identity provider."""
+        """Return an identity provider, including its attribute mappers."""
 
-        return Response(self.get_serializer(self.get_object()).data)
+        identity_provider = self.get_object()
+        (
+            identity_provider.attribute_map,
+            identity_provider.attribute_name_map,
+        ) = get_identity_provider_attribute_maps(identity_provider)
+
+        return Response(
+            OrganizationIdentityProviderDetailSerializer(identity_provider).data
+        )
 
     @extend_schema(
         request=CreateIdentityProviderSerializer,
@@ -425,9 +459,48 @@ class IdentityProviderProvisioningViewSet(
             status=status.HTTP_201_CREATED,
         )
 
+    @extend_schema(
+        request=UpdateIdentityProviderSerializer,
+        responses={
+            200: OrganizationIdentityProviderSerializer,
+            400: DetailSerializer,
+            502: DetailSerializer,
+        },
+    )
+    def partial_update(self, request, alias=None, **kwargs):  # noqa: ARG002
+        """
+        Update an identity provider in place.
+
+        Without this, rotating a partner's OIDC client secret or fixing a
+        mapper means deleting the IdP and creating it again, and Keycloak's
+        delete takes every user's federated identity link with it.
+        """
+
+        identity_provider = self.get_object()
+
+        request_serializer = UpdateIdentityProviderSerializer(
+            data=request.data,
+            context={"protocol": identity_provider.protocol},
+        )
+        request_serializer.is_valid(raise_exception=True)
+
+        identity_provider = update_identity_provider(
+            identity_provider,
+            actor=request.user,
+            **request_serializer.validated_data,
+        )
+
+        return Response(self.get_serializer(identity_provider).data)
+
     @extend_schema(responses={204: None, 502: DetailSerializer})
     def destroy(self, request, alias=None, **kwargs):  # noqa: ARG002
-        """Unlink and delete an identity provider."""
+        """
+        Unlink and delete an identity provider.
+
+        Destructive beyond this API: Keycloak deletes every user's federated
+        identity link to the provider along with it, so everyone who has signed
+        in through it re-links on their next login. Prefer PATCH.
+        """
 
         delete_identity_provider(self.get_object(), actor=request.user)
 
@@ -510,6 +583,7 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
     the codes routes return redeemable enrollment codes.
     """
 
+    versioning_class = V0Versioning
     permission_classes = [IsAdminUser]
     serializer_class = ProvisionedContractSerializer
     pagination_class = ManagerContractOrgPagination
@@ -626,6 +700,27 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
         request_serializer = ContractCoursewareSerializer(data=request.data)
         request_serializer.is_valid(raise_exception=True)
         courseware_id = request_serializer.validated_data["courseware_id"]
+
+        # CourseRun.objects leaves source runs out, so without this a source
+        # run's ID is a 404 that reads as if the run didn't exist.
+        source_run = (
+            CourseRun.all_objects.source()
+            .filter(courseware_id=courseware_id)
+            .select_related("course")
+            .first()
+        )
+        if source_run:
+            return Response(
+                {
+                    "detail": (
+                        f"{courseware_id} is a source run. Contract runs are "
+                        "cloned from it, so it can't be added to a contract. "
+                        f"Add its course, {source_run.course.readable_id}, instead."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         courseware = self._courseware(courseware_id)
 
         # The 400 bodies are built from the requested ID, never the exception
@@ -715,7 +810,12 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
     @extend_schema(responses={200: ContractSetupStatusSerializer})
     @action(detail=True, methods=["get"], url_path="setup-status")
     def setup_status(self, request, pk=None, **kwargs):  # noqa: ARG002
-        """Report the edX clones and enrollment codes still outstanding."""
+        """
+        Report the edX clones and enrollment codes still outstanding.
+
+        Also lists, per variant set, which of the contract's courses have a
+        run for it.
+        """
 
         return Response(
             ContractSetupStatusSerializer(
@@ -738,6 +838,149 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
         return Response(
             ContractSetupStatusSerializer(get_contract_setup_status(contract)).data
         )
+
+    def _variant_set_response(self, contract, variant, response_status):
+        """Return one variant set with the courses it matches."""
+
+        coverage = next(
+            entry
+            for entry in get_contract_variant_coverage(contract)
+            if entry["variant"].id == variant.id
+        )
+        return Response(
+            ContractVariantSetSerializer(coverage).data, status=response_status
+        )
+
+    @extend_schema(responses={200: ContractVariantSetSerializer(many=True)})
+    @action(detail=True, methods=["get"], pagination_class=None)
+    def variants(self, request, pk=None, **kwargs):  # noqa: ARG002
+        """
+        List the contract's variant sets, default first.
+
+        Each set lists the contract's courses that support it, whether each has
+        a source run for it, and the contract's run for it if there is one.
+        """
+
+        return Response(
+            ContractVariantSetSerializer(
+                get_contract_variant_coverage(self.get_object()), many=True
+            ).data
+        )
+
+    @extend_schema(
+        request=CreateContractVariantSetSerializer,
+        responses={201: ContractVariantSetSerializer, 400: DetailSerializer},
+    )
+    @variants.mapping.post
+    def add_variant(self, request, pk=None, **kwargs):  # noqa: ARG002
+        """
+        Add a variant set to the contract.
+
+        Creates no runs. variants/sync creates them for the courseware already
+        in the contract.
+        """
+
+        contract = self.get_object()
+
+        request_serializer = CreateContractVariantSetSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+
+        # The 400 bodies are fixed text, never the exception's, as for courseware.
+        try:
+            variant = add_contract_variant_set(
+                contract, **request_serializer.validated_data, actor=request.user
+            )
+        except ContractVariantError:
+            return Response(
+                {
+                    "detail": (
+                        "The contract already has this variant set. If it's "
+                        "inactive, turn it back on instead."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return self._variant_set_response(contract, variant, status.HTTP_201_CREATED)
+
+    @extend_schema(
+        request=UpdateContractVariantSetSerializer,
+        responses={
+            200: ContractVariantSetSerializer,
+            400: DetailSerializer,
+            404: DetailSerializer,
+        },
+        parameters=[
+            OpenApiParameter(
+                "variant_id",
+                OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                description="The variant set's ID.",
+            )
+        ],
+    )
+    @action(
+        detail=True,
+        methods=["patch"],
+        url_path=r"variants/(?P<variant_id>[0-9]+)",
+        url_name="variant-detail",
+    )
+    def update_variant(self, request, pk=None, variant_id=None, **kwargs):  # noqa: ARG002
+        """
+        Turn a variant set on or off, or change its b2b_only flag.
+
+        Turning a set off stops new runs being created for it and drops its
+        runs from the contract's course list. Its existing runs and their
+        enrollments are left alone. The default set can't be turned off or
+        made B2B-only.
+        """
+
+        contract = self.get_object()
+        variant = get_object_or_404(contract.variant_options, id=variant_id)
+
+        request_serializer = UpdateContractVariantSetSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+
+        try:
+            update_contract_variant_set(
+                contract,
+                variant,
+                **request_serializer.validated_data,
+                actor=request.user,
+            )
+        except ContractVariantError:
+            return Response(
+                {
+                    "detail": (
+                        "The contract's default variant set can't be turned off "
+                        "or made B2B-only."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return self._variant_set_response(contract, variant, status.HTTP_200_OK)
+
+    @extend_schema(request=None, responses={200: ContractVariantSyncSerializer})
+    @action(detail=True, methods=["post"], url_path="variants/sync")
+    def sync_variants(self, request, pk=None, **kwargs):  # noqa: ARG002
+        """
+        Create the runs the contract's courses are missing for its variant sets.
+
+        Run it after adding variant sets to a contract that already has
+        courseware. Courses and variants that already have a run are left
+        alone, so repeating the call creates nothing more. The new runs' edX
+        clones are queued, and so is the enrollment code check for a contract
+        that uses codes.
+        """
+
+        contract = self.get_object()
+        synced = sync_contract_variants(contract)
+
+        if synced["runs_created"]:
+            queue_enrollment_code_check_if_required(contract)
+
+        return Response(ContractVariantSyncSerializer(synced).data)
 
     @extend_schema(responses={200: ManagerEnrollmentCodeSerializer(many=True)})
     @action(detail=True, methods=["get"])
@@ -839,6 +1082,7 @@ class ParseMetadataView(ProvisioningExceptionMixin, viewsets.ViewSet):
     needs an allowlist and a rate limit before it goes anywhere near a partner.
     """
 
+    versioning_class = V0Versioning
     permission_classes = [IsAdminUser]
 
     @extend_schema(

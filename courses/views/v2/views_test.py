@@ -28,7 +28,7 @@ from rest_framework.test import APIClient
 
 from b2b.api import create_contract_run
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
-from b2b.models import ContractProgramItem
+from b2b.models import ContractProgramItem, UserOrganization
 from cms.factories import (
     CoursePageFactory,
     FlexiblePricingFormFactory,
@@ -36,7 +36,8 @@ from cms.factories import (
 )
 from cms.models import CoursePage
 from cms.serializers import ProgramPageSerializer
-from compliance.exceptions import ExportComplianceError
+from compliance.api import verify_user_with_exports
+from compliance.exceptions import ExportComplianceDataError, ExportComplianceError
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
     CourseFactory,
@@ -871,10 +872,10 @@ def test_filter_with_org_id_combined_with_other_filters(
 def test_filter_without_org_id_authenticated_user(user_drf_client):
     course_with_contract = CourseFactory(title="Contract Course")
     contract = ContractPageFactory(active=True)
-    CourseRunFactory(course=course_with_contract, b2b_contract=contract)
+    CourseRunFactory(course=course_with_contract, b2b_contracts=[contract])
 
     course_no_contract = CourseFactory(title="No Contract Course")
-    CourseRunFactory(course=course_no_contract, b2b_contract=None)
+    CourseRunFactory(course=course_no_contract)
 
     url = reverse("v2:courses_api-list")
     response = user_drf_client.get(url)
@@ -912,6 +913,37 @@ def test_filter_by_org_id_with_contracted_user(
     assert program_with_contract.title in [
         program["title"] for program in response.data["results"]
     ]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("param", ["org_id", "contract_id"])
+def test_filter_by_org_or_contract_includes_nested_programs(param):
+    """
+    Filtering by org or contract also returns the programs nested in the
+    contract's programs, including b2b-only ones, but no other b2b-only program.
+    """
+    org = OrganizationPageFactory()
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    UserOrganization.objects.create(user=user, organization=org)
+    user.b2b_contracts.add(contract)
+
+    program = ProgramFactory.create(b2b_only=True)
+    module = ProgramFactory.create(b2b_only=True)
+    program.add_program_requirement(module)
+    ContractProgramItem(contract=contract, program=program).save(skip_run_creation=True)
+    unrelated = ProgramFactory.create(b2b_only=True)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+    response = client.get(
+        reverse("v2:programs_api-list"),
+        {param: org.id if param == "org_id" else contract.id},
+    )
+
+    ids = {result["id"] for result in response.data["results"]}
+    assert {program.id, module.id} <= ids
+    assert unrelated.id not in ids
 
 
 @pytest.mark.django_db
@@ -1091,7 +1123,7 @@ def test_next_run_id_with_org_filter(  # noqa: PLR0915
 
     # create a run for the other org, same course, and starting before b2b_run
     second_eligible_b2b_run = CourseRunFactory.create(
-        b2b_contract=third_contract_first_org,
+        b2b_contracts=[third_contract_first_org],
         b2b_only=True,
         start_date=one_month_prior - timedelta(days=5),
         enrollment_start=one_month_prior - timedelta(days=5),
@@ -1188,18 +1220,33 @@ def test_user_enrollments_b2b_organization_filter(user_drf_client, user):
     assert len(resp.json()) == 0
 
 
-def test_user_enrollments_create_b2b_run_invalid_v2(user_drf_client, user):
-    """v2 enrollments API should reject creating enrollments for B2B course runs."""
+@pytest.mark.parametrize("b2b_only", [True, False])
+def test_user_enrollments_create_b2b_run_v2(mocker, user_drf_client, user, b2b_only):
+    """
+    v2 enrollments API should reject B2B-only course runs, but a run that is
+    attached to a contract and not B2B-only is still publicly enrollable.
+    """
+    mock_edx_client = mocker.patch("openedx.api.get_edx_api_service_client")
+    mock_edx_client.return_value.enrollments.create_student_enrollment.return_value.is_active = True
     contract = ContractPageFactory.create()
     course = CourseFactory.create()
-    run = CourseRunFactory.create(course=course, b2b_contract=contract)
+    run = CourseRunFactory.create(
+        course=course, b2b_only=b2b_only, b2b_contracts=[contract]
+    )
 
     resp = user_drf_client.post(
         reverse("v2:user-enrollments-api-list"), data={"run_id": run.id}
     )
 
-    assert resp.status_code == status.HTTP_400_BAD_REQUEST
-    assert resp.json() == {"errors": {"run_id": f"Invalid course run id: {run.id}"}}
+    if b2b_only:
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.json() == {"errors": {"run_id": f"Invalid course run id: {run.id}"}}
+        assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+    else:
+        assert resp.status_code == status.HTTP_201_CREATED
+        assert CourseRunEnrollment.objects.filter(
+            user=user, run=run, active=True
+        ).exists()
 
 
 def test_user_enrollments_create_closed_run_invalid_v2(user_drf_client, user):
@@ -1258,7 +1305,30 @@ def test_user_enrollments_create_export_compliance_blocked_v2(
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
-        "detail": "Unable to complete enrollment. Please contact support."
+        "detail": "Unable to complete enrollment. Error code: CS_700.",
+        "reason_code": "CS_700",
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+def test_user_enrollments_create_export_compliance_missing_data_v2(
+    mocker, user_drf_client, user
+):
+    """Missing profile data carries the fixable-data code and the fields to fix."""
+    run = CourseRunFactory.create()
+    exc = ExportComplianceDataError(user, ["country"])
+    mocker.patch(
+        "courses.serializers.v2.courses.create_run_enrollments",
+        side_effect=exc,
+    )
+    resp = user_drf_client.post(
+        reverse("v2:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
+        "missing_fields": ["country"],
     }
     assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
 
@@ -1679,7 +1749,7 @@ def test_filter_courses_with_contract_id_authenticated_user(make_contract_ready_
 
     other_contract = ContractPageFactory(organization=org, active=True)
     unrelated_course_runs = [
-        CourseRunFactory(course=course, b2b_contract=other_contract)
+        CourseRunFactory(course=course, b2b_contracts=[other_contract])
         for course in courses
     ]
 
@@ -2033,6 +2103,48 @@ def test_add_verified_program_course_enrollment(
 
 
 @pytest.mark.skip_nplusone_check
+def test_add_verified_program_course_enrollment_incomplete_profile(
+    mocker, mocked_export_compliance, user, user_drf_client
+):
+    """An incomplete profile should be a 400, not a 500, on the verified program path."""
+    mocked_export_compliance.side_effect = verify_user_with_exports
+    mocker.patch("compliance.api.get_cybersource_client")
+    program = ProgramEnrollmentFactory.create(
+        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    ).program
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        for courseware in (program, course_run):
+            Product.objects.create(
+                price=10,
+                is_active=True,
+                object_id=courseware.id,
+                content_type=ContentType.objects.get_for_model(courseware),
+            )
+    # A country that doesn't require state/postal code, so only this is missing
+    user.legal_address.country = "GB"
+    user.legal_address.street_address_1 = ""
+    user.legal_address.save()
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={"courserun_id": course_run.courseware_id},
+        ),
+        data=[program.readable_id],
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
+        "missing_fields": ["street_address_1"],
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
+
+
+@pytest.mark.skip_nplusone_check
 @responses.activate
 def test_add_verified_program_course_enrollment_audit_only_run_falls_back_to_audit(
     user, user_drf_client
@@ -2290,7 +2402,8 @@ def test_add_verified_program_course_enrollment_export_compliance_blocked(
 
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
-        "detail": "Unable to complete enrollment. Please contact support."
+        "detail": "Unable to complete enrollment. Error code: CS_700.",
+        "reason_code": "CS_700",
     }
     assert not CourseRunEnrollment.objects.filter(user=user, run=course_run).exists()
 
@@ -2515,7 +2628,8 @@ def test_add_nested_verified_program_course_enrollment_export_compliance_blocked
 
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
-        "detail": "Unable to complete enrollment. Please contact support."
+        "detail": "Unable to complete enrollment. Error code: CS_700.",
+        "reason_code": "CS_700",
     }
     assert not ProgramEnrollment.objects.filter(user=user, program=crogram).exists()
 
@@ -2603,7 +2717,9 @@ def test_get_courses_b2b_runs(with_b2b, single, user_drf_client):
 
     contract = ContractPageFactory.create() if with_b2b else None
 
-    test_course_run = CourseRunFactory.create(b2b_only=with_b2b, b2b_contract=contract)
+    test_course_run = CourseRunFactory.create(
+        b2b_only=with_b2b, b2b_contracts=[contract] if contract else []
+    )
 
     url = reverse("v2:courses_api-list")
     response_raw = user_drf_client.get(
@@ -2685,8 +2801,8 @@ def test_get_courses_with_specified_contract_programs(user, user_drf_client):
     other_contract = ContractPageFactory.create()
 
     programs = ProgramFactory.create_batch(2)
-    course_run = CourseRunFactory.create(b2b_contract=contract)
-    CourseRunFactory.create(b2b_contract=other_contract, course=course_run.course)
+    course_run = CourseRunFactory.create(b2b_contracts=[contract])
+    CourseRunFactory.create(b2b_contracts=[other_contract], course=course_run.course)
 
     for program in programs:
         program.add_requirement(course_run.course)
@@ -3237,10 +3353,6 @@ def test_courses_list_count_query_is_pk_only(user_drf_client):
 def b2b_contracted_course(contract_ready_course, mock_course_run_clone):
     """
     A course with a run under an active contract, and a user who can see it.
-
-    Attaches the contract both ways - the deprecated ``b2b_contract`` FK and
-    the ``b2b_contracts`` M2M - because the org/contract filters and
-    ``Course.get_filtered_runs`` each consult both.
     """
     org = OrganizationPageFactory(name="Contract Org")
     contract = ContractPageFactory(organization=org, active=True)
@@ -3251,8 +3363,6 @@ def b2b_contracted_course(contract_ready_course, mock_course_run_clone):
 
     (course, _) = contract_ready_course
     create_contract_run(contract, course)
-    for run in course.courseruns.filter(b2b_contract=contract):
-        run.b2b_contracts.add(contract)
 
     client = APIClient()
     client.force_authenticate(user=user)
@@ -3267,7 +3377,7 @@ def test_courses_list_does_not_select_contract_page_columns(
     The b2b contract prefetches must not hydrate whole Wagtail pages.
 
     ``ContractPage`` is a Wagtail Page, so an unnarrowed ``b2b_contracts``
-    prefetch (or a ``select_related("b2b_contract")``) selects the full
+    prefetch selects the full
     multi-table row - ~50 columns including two RichTextFields - once per
     (run, contract) pair. Only the pk and ``organization_id`` are ever read,
     and deserializing the rest was ~900ms of a 1.4s production request.
@@ -3293,10 +3403,9 @@ def test_courses_list_does_not_select_contract_page_columns(
 
 def test_courses_list_b2b_runs_match_unprefetched_queryset(b2b_contracted_course):
     """
-    Annotated, prefetched and lazy paths must agree.
+    Prefetched and lazy paths must agree.
 
-    The viewset annotates ``b2b_contract_organization_id`` and narrows the
-    ``b2b_contracts`` prefetch; a bare ``Course.objects.get()`` has neither, so
+    The viewset narrows the ``b2b_contracts`` prefetch; a bare ``Course.objects.get()`` has neither, so
     comparing the two exercises every fallback in ``get_filtered_runs``.
     """
     client, course, org, contract = b2b_contracted_course
@@ -3347,10 +3456,9 @@ def test_course_queryset_courseruns_prefetch_avoids_contract_pages():
     """
     Inspect the queryset directly, without a request.
 
-    ``select_related("b2b_contract")`` and a bare ``"b2b_contracts"`` lookup
-    both reintroduce the full Wagtail page fetch, and neither shows up as an
-    extra query - only as a slower one - so the query-count budget cannot
-    catch a regression here.
+    A bare ``"b2b_contracts"`` lookup reintroduces the full Wagtail page
+    fetch, and that doesn't show up as an extra query - only as a slower
+    one - so the query-count budget cannot catch a regression here.
     """
     view = CourseViewSet()
     view.validated_params = CourseViewSet.validated_params
@@ -3362,7 +3470,6 @@ def test_course_queryset_courseruns_prefetch_avoids_contract_pages():
     runs_qs = prefetch.queryset
 
     assert not runs_qs.query.select_related, runs_qs.query.select_related
-    assert "b2b_contract_organization_id" in runs_qs.query.annotations
 
     contracts = next(
         lookup

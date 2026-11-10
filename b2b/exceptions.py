@@ -64,3 +64,7 @@ class OrganizationNotProvisionedError(Exception):
     the b2b_contract create --create path that made them; they need backfilling
     through this API rather than patching.
     """
+
+
+class ContractVariantError(Exception):
+    """Raised when a change to a contract's variant sets is not allowed."""

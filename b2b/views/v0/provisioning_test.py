@@ -2,8 +2,10 @@
 
 import faker
 import pytest
+from authlib.integrations.base_client.errors import OAuthError
 from django.urls import reverse
-from requests.exceptions import HTTPError
+from requests.exceptions import ConnectionError as RequestsConnectionError
+from requests.exceptions import HTTPError, Timeout
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -20,6 +22,7 @@ from b2b.constants import (
 from b2b.exceptions import AliasCollisionError, OrganizationNameCollisionError
 from b2b.factories import OrganizationIndexPageFactory, OrganizationPageFactory
 from b2b.keycloak_admin_dataclasses import (
+    IdentityProviderMapperRepresentation,
     OrganizationDomainRepresentation,
     OrganizationRepresentation,
 )
@@ -29,7 +32,7 @@ from b2b.models import (
     OrganizationPage,
     OrganizationProvisioningAudit,
 )
-from b2b.provisioning import set_onboarding_state
+from b2b.provisioning import IDP_ATTRIBUTE_MAPPERS, set_onboarding_state
 
 pytestmark = [pytest.mark.django_db]
 FAKE = faker.Faker()
@@ -59,6 +62,7 @@ def mocked_connection(mocker):
         redirect_url="https://learn.mit.edu/dashboard/organization/exampleu",
         domains=[OrganizationDomainRepresentation(name="example.edu", verified=True)],
     )
+    connection.client.list.return_value = []
     for target in (
         "b2b.views.v0.provisioning.KeycloakConnection",
         "b2b.provisioning.KeycloakConnection",
@@ -455,6 +459,262 @@ def test_create_identity_provider(admin_drf_client, mocker):
     assert response.json()["lifecycle_state"] == IDP_STATE_DRAFT
 
 
+def test_patch_identity_provider_is_staff_only(user_drf_client):
+    """A non-staff user cannot edit a partner's SSO configuration."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+
+    response = user_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu"),
+        {"display_name": "Example U"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_patch_identity_provider(admin_drf_client, mocker):
+    """An edit goes through the provisioning layer and returns the record."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    identity_provider = _identity_provider(organization)
+    mocked_update = mocker.patch(
+        "b2b.views.v0.provisioning.update_identity_provider",
+        return_value=identity_provider,
+    )
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu"),
+        {
+            "display_name": "Example U",
+            "attribute_map": {"email": "E-Mail Address"},
+            "attribute_name_map": {},
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    kwargs = mocked_update.call_args.kwargs
+    assert kwargs.pop("actor").is_staff
+    assert kwargs == {
+        "display_name": "Example U",
+        "attribute_map": {"email": "E-Mail Address"},
+        "attribute_name_map": {},
+    }
+
+
+def test_patch_identity_provider_refuses_one_saml_map_alone(admin_drf_client, mocker):
+    """
+    One map alone would delete the other's mappers.
+
+    SAML splits its mappers across friendly names and attribute names, and the
+    pair replaces the whole set, so an operator fixing one mapping must say
+    what the other holds rather than discover it emptied.
+    """
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+    mocked_update = mocker.patch("b2b.views.v0.provisioning.update_identity_provider")
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu"),
+        {"attribute_map": {"email": "E-Mail Address"}},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "attribute_name_map" in response.json()["errors"]
+    mocked_update.assert_not_called()
+
+
+def test_patch_identity_provider_refuses_one_attribute_in_both_saml_maps(
+    admin_drf_client, mocker
+):
+    """Each mapper is named after its user attribute, so the two would collide."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+    mocked_update = mocker.patch("b2b.views.v0.provisioning.update_identity_provider")
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu"),
+        {
+            "attribute_map": {"email": "E-Mail Address"},
+            "attribute_name_map": {"email": "urn:oid:0.9.2342.19200300.100.1.3"},
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    mocked_update.assert_not_called()
+
+
+def test_patch_identity_provider_rejects_attribute_name_map_for_oidc(
+    admin_drf_client, mocker
+):
+    """
+    attribute_name_map is SAML's attribute Name; OIDC only has claims.
+
+    On OIDC both maps build the same claim mapper under the same name, and the
+    replacement deletes the old set before the collision surfaces.
+    """
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    OrganizationIdentityProvider.objects.create(
+        organization=organization,
+        alias="exampleu-oidc",
+        protocol=IDP_PROTOCOL_OIDC,
+        lifecycle_state=IDP_STATE_ACTIVE,
+        metadata_source="https://idp.example.edu/.well-known/openid-configuration",
+    )
+    mocked_update = mocker.patch("b2b.views.v0.provisioning.update_identity_provider")
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu-oidc"),
+        {
+            "attribute_map": {"email": "email"},
+            "attribute_name_map": {"email": "email"},
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "attribute_name_map" in response.json()["errors"]
+    mocked_update.assert_not_called()
+
+
+def test_patch_identity_provider_takes_a_discovery_url_for_oidc(
+    admin_drf_client, mocker
+):
+    """OIDC names its metadata source discovery_url; the saga takes one source."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    identity_provider = OrganizationIdentityProvider.objects.create(
+        organization=organization,
+        alias="exampleu-oidc",
+        protocol=IDP_PROTOCOL_OIDC,
+        lifecycle_state=IDP_STATE_ACTIVE,
+        metadata_source="https://idp.example.edu/.well-known/openid-configuration",
+    )
+    mocked_update = mocker.patch(
+        "b2b.views.v0.provisioning.update_identity_provider",
+        return_value=identity_provider,
+    )
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu-oidc"),
+        {"discovery_url": "https://idp.example.edu/.well-known/openid-configuration2"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    kwargs = mocked_update.call_args.kwargs
+    assert kwargs.pop("actor").is_staff
+    assert kwargs == {
+        "metadata_url": "https://idp.example.edu/.well-known/openid-configuration2"
+    }
+
+
+def test_patch_identity_provider_rejects_an_alias_change(admin_drf_client):
+    """
+    The alias is rejected rather than ignored.
+
+    Keycloak refuses to change it, and the only other way to get a new alias is
+    delete and recreate, which unlinks every user brokered through the IdP.
+    """
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu"),
+        {"alias": "exampleu-2"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "alias" in response.json()["errors"]
+
+
+def test_patch_identity_provider_rejects_oidc_fields_on_a_saml_provider(
+    admin_drf_client,
+):
+    """A client secret on a SAML IdP would sit in its config unread."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu"),
+        {"client_id": "mitxonline", "client_secret": "shh"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_patch_identity_provider_rejects_a_blank_secret(admin_drf_client, mocker):
+    """
+    A blank client secret is an empty form field, not an instruction.
+
+    Writing it through would leave the partner's IdP with no secret and their
+    logins failing. Creation refuses the same input.
+    """
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    OrganizationIdentityProvider.objects.create(
+        organization=organization,
+        alias="exampleu-oidc",
+        protocol=IDP_PROTOCOL_OIDC,
+        lifecycle_state=IDP_STATE_ACTIVE,
+        metadata_source="https://idp.example.edu/.well-known/openid-configuration",
+    )
+    mocked_update = mocker.patch("b2b.views.v0.provisioning.update_identity_provider")
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu-oidc"),
+        {"client_secret": ""},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    mocked_update.assert_not_called()
+
+
+def test_patch_identity_provider_refuses_to_clear_saml_mappers(admin_drf_client):
+    """
+    A SAML IdP with no mappers brokers users with no email or name.
+
+    The maps replace the whole mapper set, so an edit that leaves both empty
+    would do exactly what creation refuses to do.
+    """
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu"),
+        {"attribute_map": {}, "attribute_name_map": {}},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_patch_identity_provider_rejects_an_empty_body(admin_drf_client):
+    """Nothing to change is a mistake worth reporting, not a no-op 200."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+
+    response = admin_drf_client.patch(
+        _identity_provider_url(organization.org_key, "exampleu"), {}, format="json"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
 def test_transition_rejects_skipping_testing(admin_drf_client):
     """Draft -> active is a 400: an IdP goes live only after a real login."""
 
@@ -684,6 +944,124 @@ def test_identity_provider_includes_the_service_provider_details(
         "redirect_uri": "https://sso.example.mit.edu/realms/olapps/broker/exampleu/endpoint",
         "metadata_url": "https://sso.example.mit.edu/realms/olapps/broker/exampleu/endpoint/descriptor",
     }
+
+
+def _mapper(protocol, user_attribute, **source):
+    """A Keycloak attribute-importer mapper, as the admin API returns it."""
+
+    return IdentityProviderMapperRepresentation(
+        id=str(FAKE.uuid4()),
+        name=f"exampleu-{user_attribute}-mapper",
+        identity_provider_mapper=IDP_ATTRIBUTE_MAPPERS[protocol],
+        config={"user.attribute": user_attribute, **source},
+    )
+
+
+def test_identity_provider_detail_includes_its_saml_attribute_maps(
+    staff_drf_client, mocked_connection
+):
+    """An edit replaces the whole mapper set, so the form needs the current one."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+    mocked_connection.client.list.return_value = [
+        _mapper(IDP_PROTOCOL_SAML, "email", **{"attribute.friendly.name": "mail"}),
+        _mapper(
+            IDP_PROTOCOL_SAML,
+            "firstName",
+            **{"attribute.name": "urn:oid:2.5.4.42"},
+        ),
+        _mapper(IDP_PROTOCOL_SAML, "lastName"),
+        IdentityProviderMapperRepresentation(
+            id=str(FAKE.uuid4()),
+            name="hardcoded-role",
+            identity_provider_mapper="oidc-hardcoded-role-idp-mapper",
+            config={"role": "partner"},
+        ),
+    ]
+
+    response = staff_drf_client.get(
+        _identity_provider_url(organization.org_key, "exampleu")
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["attribute_map"] == {"email": "mail"}
+    assert response.json()["attribute_name_map"] == {"firstName": "urn:oid:2.5.4.42"}
+
+
+def test_identity_provider_detail_includes_its_oidc_claim_map(
+    staff_drf_client, mocked_connection
+):
+    """OIDC has claims only, so they all arrive in attribute_map."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    identity_provider = _identity_provider(organization)
+    identity_provider.protocol = IDP_PROTOCOL_OIDC
+    identity_provider.save()
+    mocked_connection.client.list.return_value = [
+        _mapper(IDP_PROTOCOL_OIDC, "email", claim="upn"),
+    ]
+
+    response = staff_drf_client.get(
+        _identity_provider_url(organization.org_key, "exampleu")
+    )
+
+    assert response.json()["attribute_map"] == {"email": "upn"}
+    assert response.json()["attribute_name_map"] == {}
+
+
+def test_identity_provider_detail_is_a_502_when_keycloak_fails(
+    staff_drf_client, mocked_connection
+):
+    """Maps we could not read must not look like an IdP with no mappers."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+    mocked_connection.client.list.side_effect = HTTPError("boom")
+
+    response = staff_drf_client.get(
+        _identity_provider_url(organization.org_key, "exampleu")
+    )
+
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        RequestsConnectionError("refused"),
+        Timeout("timed out"),
+        OAuthError("invalid_client"),
+    ],
+)
+def test_identity_provider_detail_is_a_502_when_keycloak_is_unreachable(
+    staff_drf_client, mocker, error
+):
+    """Bootstrapping the Keycloak client fails without an HTTPError."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+    mocker.patch("b2b.provisioning.KeycloakConnection", side_effect=error)
+
+    response = staff_drf_client.get(
+        _identity_provider_url(organization.org_key, "exampleu")
+    )
+
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+
+
+def test_identity_provider_list_does_not_read_mappers(
+    staff_drf_client, mocked_connection
+):
+    """The list would cost a Keycloak call per identity provider."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+
+    response = staff_drf_client.get(_identity_providers_url(organization.org_key))
+
+    assert "attribute_map" not in response.json()[0]
+    mocked_connection.client.list.assert_not_called()
 
 
 def test_set_onboarding_state_records_who_did_it(staff_drf_client, staff_user):

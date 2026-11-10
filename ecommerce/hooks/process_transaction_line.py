@@ -48,7 +48,18 @@ def _create_courserun_enrollment(line) -> str | None:
 def _link_b2b_course_run_contracts(line) -> str | None:
     """If the purchased line was a B2B run, make the resulting enrollment a B2B enrollment"""
 
+    if not line.b2b_contract:
+        log.debug(
+            "_link_b2b_course_run_contracts: Line %s is not a B2B line (%s), skipping",
+            line,
+            line.b2b_contract,
+        )
+        return
+
+    from b2b.api import process_add_org_membership  # noqa: PLC0415
+
     purchased_run = line.purchased_object
+    line_user = line.order.purchaser
 
     if not isinstance(purchased_run, CourseRun):
         log.debug(
@@ -59,7 +70,7 @@ def _link_b2b_course_run_contracts(line) -> str | None:
 
     enrollment = CourseRunEnrollment.objects.filter(
         run=purchased_run,
-        user=line.order.purchaser,
+        user=line_user,
         enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
     ).first()
 
@@ -75,6 +86,15 @@ def _link_b2b_course_run_contracts(line) -> str | None:
     if enrollment.b2b_contract_id != line.b2b_contract_id:
         enrollment.b2b_contract_id = line.b2b_contract_id
         enrollment.save_and_log(None)
+
+    if not line_user.user_b2b_contracts.filter(
+        contract_page=line.b2b_contract
+    ).exists():
+        process_add_org_membership(
+            line_user, line.b2b_contract.organization, keep_until_seen=True
+        )
+        line_user.b2b_contracts.add(line.b2b_contract)
+        line_user.save()
 
 
 def _create_program_enrollment(line) -> str | None:

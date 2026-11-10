@@ -12,10 +12,8 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from cms.serializers import CoursePageSerializer
-from compliance.exceptions import ExportComplianceCheckError
 from courses import models
 from courses.api import create_run_enrollments
-from courses.exceptions import EnrollmentError
 from courses.serializers.utils import get_topics_from_page, has_live_certificate_page
 from courses.serializers.v1.base import (
     BaseCourseRunEnrollmentWithFlexiblePriceSerializer,
@@ -154,14 +152,11 @@ class CourseSerializer(BaseCourseSerializer):
         return []
 
     @extend_schema_field(str)
-    def get_certificate_type(self, instance):
+    def get_certificate_type(self, instance):  # noqa: ARG002
         """Return the certificate type."""
-
-        if instance.programs:
-            program = instance.programs[0]
-            if "MicroMasters" in program.program_type:
-                return "MicroMasters Credential"
-
+        # A course certificate is a certificate of completion even when the
+        # course belongs to a MicroMasters program; only the program itself
+        # awards the MicroMasters credential.
         return "Certificate of Completion"
 
     @extend_schema_field(bool)
@@ -248,6 +243,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
 
     products = serializers.SerializerMethodField(method_name="get_products")
     approved_flexible_price_exists = serializers.SerializerMethodField()
+    b2b_contract = serializers.SerializerMethodField()
 
     class Meta:
         model = models.CourseRun
@@ -271,6 +267,35 @@ class CourseRunSerializer(BaseCourseRunSerializer):
     @extend_schema_field(bool)
     def get_approved_flexible_price_exists(self, instance):
         return get_approved_flexible_price_exists(instance, self.context)
+
+    @extend_schema_field(serializers.IntegerField(allow_null=True))
+    def get_b2b_contract(self, instance):
+        """
+        Return the ID of the B2B contract this run is being displayed for.
+
+        A run can belong to several contracts. If the request was scoped to a
+        contract or an organization, the matching contract is returned;
+        otherwise, returns None.
+        """
+        contracts = sorted(instance.b2b_contracts.all(), key=lambda c: c.id)
+        if not contracts:
+            return None
+
+        contract_id = self.context.get("contract_id")
+        org_id = self.context.get("org_id")
+
+        # These come from query params, so compare as strings.
+        for contract in contracts:
+            if contract_id is not None and str(contract.id) == str(contract_id):
+                return contract.id
+            if (
+                contract_id is None
+                and org_id is not None
+                and str(contract.organization_id) == str(org_id)
+            ):
+                return contract.id
+
+        return None
 
     @extend_schema_field(BaseProductSerializer(many=True))
     def get_products(self, obj):
@@ -355,11 +380,11 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSeri
         user = self.context["user"]
         run_id = validated_data["run_id"]
         try:
-            run = models.CourseRun.objects.select_related("b2b_contract").get(id=run_id)
+            run = models.CourseRun.objects.get(id=run_id)
         except models.CourseRun.DoesNotExist:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})  # noqa: B904
 
-        if run.b2b_contract is not None:
+        if run.b2b_only:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
 
         # The enrollment window governs getting into a run. An existing active
@@ -375,18 +400,13 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSeri
                 {"run_id": f"Course run is not open for enrollment: {run_id}"}
             )
 
-        try:
-            successful_enrollments, _ = create_run_enrollments(
-                user,
-                [run],
-                keep_failed_enrollments=settings.FEATURES.get(
-                    features.IGNORE_EDX_FAILURES, False
-                ),
-            )
-        except ExportComplianceCheckError as exc:
-            # Don't propagate the specifics of the compliance decision to the
-            # client - the underlying cause is logged where it's raised.
-            raise EnrollmentError from exc
+        successful_enrollments, _ = create_run_enrollments(
+            user,
+            [run],
+            keep_failed_enrollments=settings.FEATURES.get(
+                features.IGNORE_EDX_FAILURES, False
+            ),
+        )
 
         return successful_enrollments[0] if successful_enrollments else None
 

@@ -3,14 +3,17 @@ Tests for course views
 """
 
 # pylint: disable=unused-argument, redefined-outer-name, too-many-arguments
+import json
 import operator as op
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from urllib.parse import quote
 
 import pytest
 import reversion
 from anys import ANY_STR
+from CyberSource.rest import ApiException
 from django.db.models import Count, Q
 from django.test import Client, RequestFactory
 from django.urls import reverse
@@ -24,10 +27,10 @@ from reversion.models import Version
 from b2b.factories import ContractPageFactory
 from cms.factories import ProgramPageFactory
 from cms.serializers import CoursePageSerializer, ProgramPageSerializer
+from compliance.api import verify_user_with_exports
 from compliance.exceptions import ExportComplianceDataError, ExportComplianceError
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
-    BlockedCountryFactory,
     CourseFactory,
     CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
@@ -91,6 +94,7 @@ EXAMPLE_URL = "http://example.com"
 
 @pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
+@pytest.mark.zeal_allow("courses.CourseRun", "products")
 def test_get_programs(
     user_drf_client, django_assert_max_num_queries, course_catalog_data
 ):
@@ -110,6 +114,7 @@ def test_get_programs(
 
 @pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
+@pytest.mark.zeal_allow("courses.CourseRun", "products")
 def test_get_program(
     user_drf_client, django_assert_max_num_queries, course_catalog_data
 ):
@@ -558,23 +563,114 @@ def test_user_enrollments_create_export_compliance_blocked(
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {
-        "detail": "Unable to complete enrollment. Please contact support."
+        "detail": "Unable to complete enrollment. Error code: CS_700.",
+        "reason_code": "CS_700",
     }
     assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
 
 
-def test_user_enrollments_create_b2b_run_invalid(user_drf_client, user):
-    """Creating an enrollment for a B2B course run via the public API should be rejected."""
-    contract = ContractPageFactory.create()
-    course = CourseFactory.create()
-    run = CourseRunFactory.create(course=course, b2b_contract=contract)
+def test_user_enrollments_create_export_compliance_missing_data(
+    mocker, user_drf_client, user
+):
+    """Missing profile data carries the fixable-data code and the fields to fix."""
+    run = CourseRunFactory.create()
+    exc = ExportComplianceDataError(user, ["country"])
+    mocker.patch(
+        "courses.serializers.v1.courses.create_run_enrollments",
+        side_effect=exc,
+    )
+    resp = user_drf_client.post(
+        reverse("v1:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
+        "missing_fields": ["country"],
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+def test_user_enrollments_create_cybersource_invalid_request(
+    mocker, user_drf_client, user
+):
+    """
+    Profile data CyberSource rejects as INVALID_REQUEST comes back as a 400
+    naming the field, not a 500 (mitodl/hq#13724).
+    """
+    mocker.patch("courses.api.verify_user_with_exports", verify_user_with_exports)
+    client = mocker.Mock()
+    # Body as returned by CyberSource in production for a last name of "."
+    client.validate_export_compliance.side_effect = ApiException(
+        http_resp=SimpleNamespace(
+            status=400,
+            reason="Bad Request",
+            data=json.dumps(
+                {
+                    "id": "7915649045806763404884",
+                    "status": "INVALID_REQUEST",
+                    "reason": "INVALID_DATA",
+                    "message": "Declined - One or more fields in the request contains invalid data",
+                    "details": [
+                        {
+                            "field": "orderInformation.billTo.lastName",
+                            "reason": "INVALID_DATA",
+                        }
+                    ],
+                }
+            ),
+            getheaders=dict,
+        )
+    )
+    mocker.patch("compliance.api.get_cybersource_client", return_value=client)
+    user.legal_address.first_name = "David"
+    user.legal_address.last_name = "Cohen"
+    user.legal_address.country = "IL"
+    user.legal_address.street_address_1 = "1 Rothschild Blvd"
+    user.legal_address.city = "Tel Aviv"
+    user.legal_address.save()
+    run = CourseRunFactory.create()
 
     resp = user_drf_client.post(
         reverse("v1:user-enrollments-api-list"), data={"run_id": run.id}
     )
 
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
-    assert resp.json() == {"errors": {"run_id": f"Invalid course run id: {run.id}"}}
+    assert resp.json() == {
+        "detail": "Unable to complete enrollment. Error code: CS_701.",
+        "reason_code": "CS_701",
+        "missing_fields": ["last_name"],
+    }
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+@pytest.mark.parametrize("b2b_only", [True, False])
+def test_user_enrollments_create_b2b_run(mocker, user_drf_client, user, b2b_only):
+    """
+    A B2B-only course run can't be enrolled in via the public API, but a run
+    that is attached to a contract and not B2B-only is still publicly enrollable.
+    """
+    mock_edx_client = mocker.patch("openedx.api.get_edx_api_service_client")
+    mock_edx_client.return_value.enrollments.create_student_enrollment.return_value.is_active = True
+    contract = ContractPageFactory.create()
+    course = CourseFactory.create()
+    run = CourseRunFactory.create(
+        course=course, b2b_only=b2b_only, b2b_contracts=[contract]
+    )
+
+    resp = user_drf_client.post(
+        reverse("v1:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+
+    if b2b_only:
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.json() == {"errors": {"run_id": f"Invalid course run id: {run.id}"}}
+        assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+    else:
+        assert resp.status_code == status.HTTP_201_CREATED
+        assert CourseRunEnrollment.objects.filter(
+            user=user, run=run, active=True
+        ).exists()
 
 
 def test_user_enrollments_create_closed_run_invalid(user_drf_client, user):
@@ -754,19 +850,26 @@ def test_create_enrollments_no_run(mocker, user_client):
     assert resp.url == EXAMPLE_URL
 
 
-def test_create_enrollments_blocked_country(user_client, user):
+def test_create_enrollments_blocked_country(mocker, user_client, user):
     """
-    Create enrollment view should redirect with a user message in a cookie if the attempted enrollment is blocked
+    Create enrollment view should redirect to the dashboard with a blocked message when
+    create_run_enrollments raises CountryBlockedError.
     """
+    from courses.exceptions import CountryBlockedError  # noqa: PLC0415
+
     run = CourseRunFactory.create()
-    BlockedCountryFactory.create(course=run.course, country=user.legal_address.country)
+    mocker.patch("courses.views.v1.create_user")
+    mocker.patch(
+        "courses.views.v1.create_run_enrollments",
+        side_effect=CountryBlockedError(user, run.course),
+    )
     resp = user_client.post(
         reverse("create-enrollment-via-form"),
         data={"run": str(run.id)},
         HTTP_REFERER=EXAMPLE_URL,
     )
     assert resp.status_code == status.HTTP_302_FOUND
-    assert resp.url == EXAMPLE_URL
+    assert resp.url == reverse("user-dashboard")
     assert USER_MSG_COOKIE_NAME in resp.cookies
     assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
         {
@@ -806,7 +909,7 @@ def test_create_enrollments_export_compliance_missing_data(mocker, user_client, 
     when the export compliance check can't run due to incomplete profile data.
     """
     run = CourseRunFactory.create()
-    exc = ExportComplianceDataError(user, ["postal_code", "state"])
+    exc = ExportComplianceDataError(user, ["postal_code", "administrative_area"])
     mocker.patch(
         "courses.views.v1.create_run_enrollments",
         side_effect=exc,
@@ -867,6 +970,10 @@ def test_update_user_enrollment_failure(
         data={"receive_emails": "on" if receive_emails else ""},
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    # Update assertion to check for the new generic error message
+    assert resp.json() == {
+        "error": "Unable to update email preferences at this time. Please try again later or contact support."
+    }
     patched_email_subscription.assert_called_once_with(user, run_enrollment.run)
     patched_log_exception.assert_called_once()
 

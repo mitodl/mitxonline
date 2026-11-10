@@ -1,7 +1,7 @@
 import React from "react";
 import { useApiUrl, useCustomMutation, useGo } from "@refinedev/core";
 import { Button, Card, Descriptions, Dropdown, Modal, Space, Table, Tag, Typography } from "antd";
-import { DeleteOutlined, DownOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons";
+import { DeleteOutlined, DownOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 
 import { IDP_ALLOWED_TRANSITIONS, PROVISIONING_RESOURCE, idpState } from "./constants";
@@ -98,7 +98,7 @@ export const IdentityProviders: React.FC<{ organization: IProvisionedOrganizatio
     const remove = (idp: IOrganizationIdentityProvider) =>
         confirmAndRun(
             `Delete ${idp.alias}?`,
-            "This deletes the identity provider from Keycloak. Users who sign in through it will no longer be able to, and the configuration cannot be recovered.",
+            "This deletes the identity provider from Keycloak, and with it every user's link to it. Nobody can sign in through it afterwards, and if it is created again, everyone who signed in through it before has to link their account again on their next login. The configuration cannot be recovered. To rotate a secret, point at new metadata or fix a mapping, edit it instead.",
             () =>
                 mutate(
                     {
@@ -163,6 +163,16 @@ export const IdentityProviders: React.FC<{ organization: IProvisionedOrganizatio
                             </Dropdown>
                             <Button size="small" icon={<ReloadOutlined />} disabled={isLoading} onClick={() => refreshMetadata(idp)}>
                                 Refresh metadata
+                            </Button>
+                            <Button
+                                size="small"
+                                icon={<EditOutlined />}
+                                disabled={isLoading}
+                                onClick={() =>
+                                    go({ to: `/b2b_organizations/show/${organization.org_key}/identity-providers/${idp.alias}/edit` })
+                                }
+                            >
+                                Edit
                             </Button>
                             <Button
                                 size="small"

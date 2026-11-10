@@ -8,7 +8,7 @@ from functools import cached_property
 import django_filters
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import F, Prefetch, Q
+from django.db.models import Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -30,9 +30,8 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
-from b2b.models import ContractPage
+from b2b.models import ContractPage, ContractProgramItem
 from cms.models import CoursePage
-from compliance.exceptions import ExportComplianceCheckError
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -80,6 +79,7 @@ from courses.utils import (
     verified_courserun_exists,
 )
 from ecommerce.api import create_verified_program_course_run_enrollment
+from ecommerce.exceptions import VerifiedProgramInvalidOrderError
 from ecommerce.models import Product
 from main import features
 from main.pagination import Pagination
@@ -162,16 +162,26 @@ class ProgramFilterSet(django_filters.FilterSet):
         return base_qs
 
     def filter_by_org_id(self, queryset, _, org_id):
-        """Filter according to org_id. If the user is in org_id, return only related programs."""
+        """
+        Filter according to org_id. If the user is in org_id, return only the
+        programs in its contracts, and the programs nested in those.
+        """
         if self.request and user_has_org_access(self.request.user, org_id):
             return queryset.filter(
-                contract_memberships__contract__organization__id=org_id
+                id__in=Program.expand_nested_program_ids(
+                    ContractProgramItem.objects.filter(
+                        contract__organization__id=org_id
+                    ).values_list("program_id", flat=True)
+                )
             )
         else:
             return queryset.filter(b2b_only=False)
 
     def filter_by_contract_id(self, queryset, _, contract_id):
-        """Filter according to contract_id. If the user has access to the contract, return only related programs."""
+        """
+        Filter according to contract_id. If the user has access to the contract,
+        return only its programs, and the programs nested in those.
+        """
         user = self.request.user if self.request else None
         if (
             user
@@ -179,7 +189,13 @@ class ProgramFilterSet(django_filters.FilterSet):
             and contract_id
             and user.b2b_contracts.filter(id=contract_id).exists()
         ):
-            return queryset.filter(contract_memberships__contract__id=contract_id)
+            return queryset.filter(
+                id__in=Program.expand_nested_program_ids(
+                    ContractProgramItem.objects.filter(
+                        contract__id=contract_id
+                    ).values_list("program_id", flat=True)
+                )
+            )
         return queryset.filter(b2b_only=False)
 
 
@@ -341,14 +357,8 @@ class CourseFilterSet(django_filters.FilterSet):
 
         if user_has_org_access(user, value):
             return queryset.filter(
-                Q(
-                    courseruns__b2b_contract__organization_id=value,
-                    courseruns__b2b_contract__active=True,
-                )
-                | Q(
-                    courseruns__b2b_contracts__active=True,
-                    courseruns__b2b_contracts__organization_id=value,
-                )
+                courseruns__b2b_contracts__active=True,
+                courseruns__b2b_contracts__organization_id=value,
             )
         return Course.objects.none()
 
@@ -366,14 +376,8 @@ class CourseFilterSet(django_filters.FilterSet):
             and user.b2b_contracts.filter(id=value).exists()
         ):
             return queryset.filter(
-                Q(
-                    courseruns__b2b_contract__id=value,
-                    courseruns__b2b_contract__active=True,
-                )
-                | Q(
-                    courseruns__b2b_contracts__active=True,
-                    courseruns__b2b_contracts__id=value,
-                )
+                courseruns__b2b_contracts__active=True,
+                courseruns__b2b_contracts__id=value,
             )
         return Course.objects.none()
 
@@ -472,13 +476,10 @@ class CourseViewSet(
         # prefetch selects the whole multi-table row - ~50 columns including two
         # RichTextFields - once per (run, contract) pair.
         #
-        # active_objects, not objects: the M2M related manager is built from
-        # ContractPage._default_manager, which is ActiveContractManager because
-        # active_objects is ContractPage's only *local* manager (see
-        # CourseRunAdmin.formfield_for_foreignkey for the same reasoning). So
-        # this prefetch has always filtered to active, in-window contracts, and
-        # ContractPage.objects - Wagtail's inherited, unfiltered PageManager -
-        # would silently widen it.
+        # active_objects, not objects: the M2M related manager filters to
+        # active, in-window contracts (see ContractPageManager), so this
+        # prefetch always has, and the unfiltered ContractPage.objects would
+        # silently widen it.
         #
         # ``contract.id`` stays free under only(): it is the MTI parent's pk, so
         # DeferredAttribute._check_parent_chain resolves it from the loaded
@@ -487,17 +488,11 @@ class CourseViewSet(
             "b2b_contracts",
             queryset=ContractPage.active_objects.only("organization_id"),
         )
-        # The deprecated single-contract FK is annotated rather than
-        # select_related for the same reason: the only read of it is
-        # get_filtered_runs comparing organization_id, and the serializer's
-        # "b2b_contract" field renders the pk straight off b2b_contract_id. The
-        # alias matches CourseRun.b2b_contract_organization_id, so the
-        # annotation shadows that cached_property.
         course_runs_prefetch = Prefetch(
             "courseruns",
-            queryset=CourseRun.objects.order_by("id")
-            .annotate(b2b_contract_organization_id=F("b2b_contract__organization_id"))
-            .prefetch_related(contracts_prefetch, modes_prefetch, products_prefetch),
+            queryset=CourseRun.objects.order_by("id").prefetch_related(
+                contracts_prefetch, modes_prefetch, products_prefetch
+            ),
         )
         # Topics are serialized per course along with their parent topics, whose
         # sort key is CoursesTopic.Meta.ordering == ["parent__name", "name"] -
@@ -747,7 +742,7 @@ class UserEnrollmentsApiViewSet(
             "b2b_contract",
         )
         .prefetch_related(
-            "run__b2b_contract__organization",
+            "run__b2b_contracts",
             "run__course__page",
             Prefetch("run__enrollment_modes", to_attr="prefetched_enrollment_modes"),
         )
@@ -894,17 +889,12 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
     if should_create_audit_enrollment:
         # Audit enrollments just get created, regardless of whether or not
         # the course is an elective.
-        try:
-            enrollments, _ = create_run_enrollments(
-                request.user,
-                [run],
-                mode=EDX_ENROLLMENT_AUDIT_MODE,
-                keep_failed_enrollments=True,
-            )
-        except ExportComplianceCheckError as exc:
-            # Don't propagate the specifics of the compliance decision to the
-            # client - the underlying cause is logged where it's raised.
-            raise EnrollmentError from exc
+        enrollments, _ = create_run_enrollments(
+            request.user,
+            [run],
+            mode=EDX_ENROLLMENT_AUDIT_MODE,
+            keep_failed_enrollments=True,
+        )
         if len(enrollments) == 0:
             raise EnrollmentCreationFailedError
         return _created_enrollment_response(enrollments[0])
@@ -912,9 +902,15 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
     # Everything checks out for a verified enrollment, so generate one.
     # This requires generating an order.
 
-    enrollment = create_verified_program_course_run_enrollment(
-        request, run, program_enrollment.program
-    )
+    try:
+        enrollment = create_verified_program_course_run_enrollment(
+            request, run, program_enrollment.program
+        )
+    except VerifiedProgramInvalidOrderError as exc:
+        # Checkout refused the order, e.g. a compliance denial. (Profile data the
+        # check can't use is raised before this, as ExportComplianceDataError.)
+        # The cause is logged where it's detected.
+        raise EnrollmentError.from_cause(exc) from exc
 
     return _created_enrollment_response(enrollment)
 
@@ -1145,6 +1141,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                     )
                     .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
                     .select_related("run__course__page", "b2b_contract")
+                    .prefetch_related("run__b2b_contracts")
                     .prefetch(
                         "run__course__programs",
                         "run__course__financial_assistance_form_url",

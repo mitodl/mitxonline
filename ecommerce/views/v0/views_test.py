@@ -21,6 +21,7 @@ from reversion.models import Version
 
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE, CONTRACT_MEMBERSHIP_MANAGED
 from b2b.factories import ContractPageFactory
+from compliance.api import verify_user_with_exports
 from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
 from courses.factories import (
     BlockedCountryFactory,
@@ -92,6 +93,7 @@ from main.constants import (
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 from main.settings import TIME_ZONE
 from main.test_utils import assert_drf_json_equal
@@ -441,6 +443,11 @@ def test_add_basket_item(user_drf_client, user):
 @pytest.mark.parametrize("add_discount", [True, False])
 @pytest.mark.parametrize("bad_product", [True, False])
 @override_settings(ENABLE_MULTIPLE_CART_ITEMS=True)
+# A multi-item basket pays per item: the update_or_create write, and a
+# purchasable_object read in both the flexible pricing lookup and the
+# response serializer, each of which reloads the products from basket_items.
+@pytest.mark.zeal_allow("ecommerce.BasketItem", "get()")
+@pytest.mark.zeal_allow("ecommerce.Product", "purchasable_object")
 def test_create_basket_with_products(
     user, user_client, existing_basket, add_discount, bad_product
 ):
@@ -449,14 +456,22 @@ def test_create_basket_with_products(
     products = ProductFactory.create_batch(size=2)
 
     basket = BasketFactory(user=user) if existing_basket else None
+    if bad_product and basket:
+        BasketItemFactory(basket=basket, product=products[0], quantity=2)
+    original_items = list(
+        BasketItem.objects.filter(basket__user=user).values_list(
+            "id", "product_id", "quantity"
+        )
+    )
 
     url = reverse("v0:baskets_api-create_with_products")
     payload = {
         "product_ids": [
-            {"product_id": -3 if bad_product else product.id, "quantity": 1}
-            for product in products
+            {"product_id": product.id, "quantity": 1} for product in products
         ],
     }
+    if bad_product:
+        payload["product_ids"][1]["product_id"] = -3
 
     if add_discount:
         discount = DiscountFactory(discount_type="fixed-price", amount=100)
@@ -470,6 +485,14 @@ def test_create_basket_with_products(
 
     if bad_product:
         assert response.status_code == 404
+        assert (
+            list(
+                BasketItem.objects.filter(basket__user=user).values_list(
+                    "id", "product_id", "quantity"
+                )
+            )
+            == original_items
+        )
         return
 
     assert response.status_code == 200
@@ -567,6 +590,7 @@ def test_create_basket_with_products_checkout_redirects(user_client):
         (True, True, True, "worse"),
     ],
 )
+@pytest.mark.zeal_allow("ecommerce.BasketDiscount", "get()")
 def test_create_basket_with_product(  # noqa: PLR0913
     user,
     user_client,
@@ -696,6 +720,7 @@ def test_create_basket_with_product(  # noqa: PLR0913
 # whole test in its own outer transaction, so this is the only way to
 # actually exercise (and catch regressions in) that requirement.
 @pytest.mark.django_db(transaction=True)
+@pytest.mark.zeal_allow("ecommerce.Discount", "products")
 def test_create_basket_from_product_lists_the_paid_amount_off_credit(
     mocker, user_drf_client, paid_amount_off_source
 ):
@@ -1574,7 +1599,7 @@ def test_start_checkout_with_b2b_products(
     """Test that start_checkout works when there's B2B items in the basket."""
 
     contract = ContractPageFactory.create(membership_type=contract_type)
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_contracts=[contract], b2b_only=True)
     with reversion.create_revision():
         product = ProductFactory.create(purchasable_object=courserun)
 
@@ -1618,6 +1643,33 @@ def test_start_checkout_with_blocked_country(user, user_drf_client):
     assert "error" in resp_body
     assert resp_body["error"] == USER_MSG_TYPE_ENROLL_BLOCKED
     assert resp.status_code == 400
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout_with_incomplete_profile(
+    mocker, mocked_export_compliance, user, user_drf_client
+):
+    """Checkout should ask for the missing profile fields instead of erroring."""
+    mocked_export_compliance.side_effect = verify_user_with_exports
+    mock_client = mocker.patch("compliance.api.get_cybersource_client")
+    courserun = CourseRunFactory.create()
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=courserun)
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product)
+    # A country that doesn't require state/postal code, so only these are missing
+    user.legal_address.country = "GB"
+    user.legal_address.street_address_1 = ""
+    user.legal_address.city = ""
+    user.legal_address.save()
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+
+    assert resp.status_code == 400
+    resp_body = resp.json()
+    assert resp_body["error"] == USER_MSG_TYPE_PROFILE_INCOMPLETE
+    assert resp_body["missing_fields"] == ["city", "street_address_1"]
+    mock_client.return_value.validate_export_compliance.assert_not_called()
 
 
 @pytest.mark.skip_nplusone_check
@@ -1705,6 +1757,7 @@ def test_start_checkout_with_bad_discount(user, user_drf_client):
     assert resp.status_code == 400
 
 
+@pytest.mark.zeal_allow("ecommerce.Product", "purchasable_object")
 def test_order_history_list(user, user_drf_client):
     """Test that we can get a user's order history."""
     with reversion.create_revision():
@@ -1797,6 +1850,7 @@ def _order_history_query_count(user_drf_client):
     return len(queries.captured_queries)
 
 
+@pytest.mark.zeal_allow("ecommerce.Product", "purchasable_object")
 def test_order_history_query_count_grows_only_by_the_known_page_walk(
     user, user_drf_client
 ):
@@ -2113,13 +2167,16 @@ def test_refund_request_no_consent(user, user_drf_client):
 def test_refund_request_b2b_order(user, user_drf_client):
     """B2B contract orders are excluded from self-service refund requests."""
     contract = ContractPageFactory.create()
-    courserun = CourseRunFactory.create(b2b_contract=contract)
+    courserun = CourseRunFactory.create(b2b_contracts=[contract])
     with reversion.create_revision():
         product = ProductFactory.create(purchasable_object=courserun)
     product_version = Version.objects.get_for_object(product).last()
     order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
     LineFactory.create(
-        order=order, purchased_object=courserun, product_version=product_version
+        order=order,
+        purchased_object=courserun,
+        product_version=product_version,
+        b2b_contract=contract,
     )
 
     resp = user_drf_client.post(
