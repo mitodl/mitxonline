@@ -85,7 +85,11 @@ from flexiblepricing.api import (
     determine_tier_courseware,
     is_courseware_flexible_price_approved,
 )
-from flexiblepricing.constants import FlexiblePriceStatus
+from flexiblepricing.constants import (
+    MIT_LEARN_HELP_CENTER_URL,
+    MIT_LEARN_SUPPORT_REQUEST_URL,
+    FlexiblePriceStatus,
+)
 from flexiblepricing.exceptions import NotSupportedException
 from flexiblepricing.models import (
     CurrencyExchangeRate,
@@ -2219,7 +2223,16 @@ class FlexiblePricingRequestForm(AbstractForm):
             if isinstance(product, Course) and product.active_products
             else None
         )
-        context["product_page"] = product_page.url
+        # The learner experience lives on MIT Learn, so every way out of the
+        # form leads there rather than back to an MITxOnline page.
+        context["product_page"] = get_learn_product_url(
+            "programs" if isinstance(product, Program) else "courses",
+            product.readable_id,
+        )
+        context["mit_learn_base_url"] = settings.MIT_LEARN_BASE_URL
+        context["mit_learn_dashboard_url"] = settings.MIT_LEARN_DASHBOARD_URL
+        context["mit_learn_help_center_url"] = MIT_LEARN_HELP_CENTER_URL
+        context["mit_learn_support_request_url"] = MIT_LEARN_SUPPORT_REQUEST_URL
 
         return context
 

@@ -674,7 +674,7 @@ def test_product_page_save_skips_courseware_save_when_title_unchanged(test_cours
 
 
 @pytest.mark.parametrize("flex_form_for_course", [True, False])
-def test_flexible_pricing_request_form_context(flex_form_for_course):
+def test_flexible_pricing_request_form_context(settings, flex_form_for_course):
     """
     Tests the flexible pricing request form context contains required information.
     The context["product"] will contain different values based on whether the
@@ -702,7 +702,78 @@ def test_flexible_pricing_request_form_context(flex_form_for_course):
         assert context["product"].id == product.id
     else:
         assert context["product"] is None
-    assert context["product_page"] == course_page.url
+    parent_product = parent_page.product
+    assert context["product_page"] == get_learn_product_url(
+        "courses" if flex_form_for_course else "programs", parent_product.readable_id
+    )
+    assert context["mit_learn_dashboard_url"] == settings.MIT_LEARN_DASHBOARD_URL
+
+
+def test_flex_pricing_form_is_branded_mit_learn(mocker, settings):
+    """
+    The form carries MIT Learn's title, header and footer instead of the
+    site-wide MITxOnline ones, whatever SITE_NAME is deployed as.
+    """
+    settings.SITE_NAME = "MITx Online"
+    settings.MIT_LEARN_BASE_URL = "https://learn.example.com"
+    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.example.com/dashboard"
+    course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
+    flex_form = FlexiblePricingFormFactory(selected_course=course_page.course)
+
+    content = generate_flexible_pricing_response(
+        mocker, UserFactory.create(), flex_form
+    ).rendered_content
+
+    assert f"<title>MIT Learn | {flex_form.title}</title>" in content
+    assert 'href="https://learn.example.com" class="logo-link"' in content
+    assert 'href="https://learn.example.com/dashboard"' in content
+    assert 'href="https://support.learn.mit.edu/"' in content
+    assert "mitxonline.zendesk.com" not in content
+    assert "mitxonline.mit.edu" not in content
+    # The site-wide React header (MITx Online logo) is not rendered.
+    assert '<div id="header">' not in content
+
+
+@pytest.mark.parametrize("is_program", [True, False])
+def test_flex_pricing_form_approved_links_to_mit_learn(mocker, settings, is_program):
+    """
+    Once approved, "Go to Dashboard" (program) and "Course details" (course
+    with nothing to buy) lead to MIT Learn.
+    """
+    settings.MIT_LEARN_BASE_URL = "https://learn.example.com"
+    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.example.com/dashboard"
+    if is_program:
+        parent_page = ProgramPageFactory.create()
+        flex_form = FlexiblePricingFormFactory(
+            parent=parent_page, selected_program=parent_page.program
+        )
+        courseware = parent_page.program
+    else:
+        parent_page = CoursePageFactory.create()
+        flex_form = FlexiblePricingFormFactory(
+            parent=parent_page, selected_course=parent_page.course
+        )
+        courseware = parent_page.course
+    user = UserFactory.create()
+    FlexiblePrice.objects.create(
+        user=user,
+        cms_submission=FlexiblePricingRequestSubmission.objects.create(
+            form_data=json.dumps([]), page=flex_form, user=user
+        ),
+        status=FlexiblePriceStatus.APPROVED,
+        courseware_object=courseware,
+        tier=FlexiblePriceTierFactory.create(courseware_object=courseware),
+    )
+
+    content = generate_flexible_pricing_response(
+        mocker, user, flex_form
+    ).rendered_content
+
+    if is_program:
+        assert 'href="https://learn.example.com/dashboard" class="btn' in content
+    else:
+        expected = get_learn_product_url("courses", courseware.readable_id)
+        assert f'href="{expected}" class="btn' in content
 
 
 def test_homepage_featured_products(settings, mocker):
@@ -1319,7 +1390,9 @@ def test_flexible_pricing_form_get_context_product_for_course():
     context = flex_form.get_context(request)
 
     assert context["product"] == product
-    assert context["product_page"] == course_page.url
+    assert context["product_page"] == get_learn_product_url(
+        "courses", course_page.course.readable_id
+    )
 
 
 def test_flexible_pricing_form_get_context_course_no_active_products():
@@ -1336,7 +1409,9 @@ def test_flexible_pricing_form_get_context_course_no_active_products():
     context = flex_form.get_context(request)
 
     assert context["product"] is None
-    assert context["product_page"] == course_page.url
+    assert context["product_page"] == get_learn_product_url(
+        "courses", course_page.course.readable_id
+    )
 
 
 def test_flexible_pricing_form_get_context_product_for_program():
@@ -1351,7 +1426,9 @@ def test_flexible_pricing_form_get_context_product_for_program():
     context = flex_form.get_context(request)
 
     assert context["product"] is None
-    assert context["product_page"] == program_page.url
+    assert context["product_page"] == get_learn_product_url(
+        "programs", program_page.program.readable_id
+    )
 
 
 def test_flexible_pricing_form_get_context_with_anonymous_user():
@@ -1495,7 +1572,9 @@ def test_fp_request_form_get_context_no_previous_submission():
     assert context["country_of_residence"] == "US"
 
     assert context["product"] == product
-    assert context["product_page"] == course_page.url
+    assert context["product_page"] == get_learn_product_url(
+        "courses", course_page.course.readable_id
+    )
 
 
 def test_fp_request_form_get_context_with_previous_submission():
@@ -1534,7 +1613,9 @@ def test_fp_request_form_get_context_with_previous_submission():
     assert context["country_of_residence"] == "CA"
 
     assert context["product"] == product
-    assert context["product_page"] == course_page.url
+    assert context["product_page"] == get_learn_product_url(
+        "courses", course_page.course.readable_id
+    )
 
 
 def test_fp_request_form_get_context_no_legal_address():
@@ -1557,7 +1638,9 @@ def test_fp_request_form_get_context_no_legal_address():
     assert context["country_of_residence"] == ""
 
     assert context["product"] == product
-    assert context["product_page"] == course_page.url
+    assert context["product_page"] == get_learn_product_url(
+        "courses", course_page.course.readable_id
+    )
 
 
 def test_fp_request_form_get_context_program_page():
@@ -1573,7 +1656,9 @@ def test_fp_request_form_get_context_program_page():
     context = flex_form.get_context(request)
 
     assert context["product"] is None
-    assert context["product_page"] == program_page.url
+    assert context["product_page"] == get_learn_product_url(
+        "programs", program_page.program.readable_id
+    )
 
 
 def test_fp_request_form_get_context_absolute_last_submission():
