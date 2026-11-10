@@ -537,7 +537,7 @@ class ContractFieldsMixin:
         """
         Require a Google Sheets URL, and store no sheet as a blank string.
 
-        The sheet is opened by URL, and the nightly sheet update skips
+        The sheet is opened by URL, and the scheduled sheet update skips
         contracts whose target is blank but not null ones.
         """
 

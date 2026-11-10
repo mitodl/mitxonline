@@ -300,7 +300,7 @@ def test_create_contract_with_welcome_content_and_sheet(admin_drf_client):
 def test_google_sheet_target_must_be_an_https_url(
     admin_drf_client, value, valid, stored
 ):
-    """No sheet is stored blank, not null, since the nightly update skips blanks."""
+    """No sheet is stored blank, not null, since the scheduled update skips blanks."""
 
     contract = ContractPageFactory.create(google_sheet_target="")
 
