@@ -11,7 +11,7 @@ from mitol.google_sheets.constants import GOOGLE_SHEET_FIRST_ROW
 from b2b import factories
 from b2b.api import ensure_contract_run_products, ensure_enrollment_codes_exist
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE, CONTRACT_MEMBERSHIP_MANAGED
-from b2b.models import DiscountContractAttachmentRedemption
+from b2b.models import ContractPage, DiscountContractAttachmentRedemption
 from b2b.sheets import ContractEnrollmentCodesSheetHandler
 from b2b.tasks import (
     queue_contract_sheet_update_post_save,
@@ -429,3 +429,28 @@ def test_sheet_update_task_picks_write_or_update(  # noqa: PLR0913
 
     assert write_codes.called is rewrites
     assert update_sheet.called is not rewrites
+
+
+@pytest.mark.parametrize("write", ["write_codes", "update_sheet"])
+def test_sheet_change_during_a_write_keeps_the_locations_cleared(
+    contract_with_sheet_courseruns_handler_mocks, write
+):
+    """
+    A write that started before the contract's sheet changed doesn't save the
+    old sheet's rows over the cleared locations.
+    """
+
+    contract, _, handler = contract_with_sheet_courseruns_handler_mocks
+    handler.update_code = MagicMock(side_effect=lambda *_args, **_kwargs: 9)
+    ContractPage.objects.filter(pk=contract.pk).update(
+        google_sheet_target=f"{contract.google_sheet_target}-new"
+    )
+
+    getattr(handler, write)()
+
+    assert (
+        not contract.get_discounts()
+        .exclude(b2b_sheet_location="")
+        .exclude(b2b_sheet_location__isnull=True)
+        .exists()
+    )
