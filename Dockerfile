@@ -53,11 +53,20 @@ ENV XDG_CACHE_HOME=/tmp/.cache
 # ─── Node / frontend asset build ─────────────────────────────────────────────
 FROM node:17.9 AS node
 
-COPY --from=code /src /src
 WORKDIR /src
+# Only the build inputs, so a backend-only change reuses this stage. The
+# webpack and craco configs read nothing outside frontend/ except the root
+# node_modules, and write their manifests to webpack-stats/.
+COPY package.json yarn.lock .yarnrc.yml /src/
+COPY .yarn/plugins /src/.yarn/plugins
+COPY .yarn/releases /src/.yarn/releases
+COPY frontend /src/frontend
 
 ENV NODE_ENV=production
-RUN yarn workspace mitx-online-public install --immutable && \
+# The cache mount keeps yarn's package zips across builds; node_modules is
+# extracted from them, so nothing the build outputs lives in the cache.
+RUN --mount=type=cache,target=/src/.yarn/cache \
+    yarn workspace mitx-online-public install --immutable && \
     yarn workspace mitx-online-public run build && \
     yarn workspace mitx-online-staff-dashboard install --immutable && \
     yarn workspace mitx-online-staff-dashboard run build
@@ -73,8 +82,8 @@ FROM django-server AS production
 
 # Only the compiled frontend: these are the node stage's outputs that
 # STATICFILES_DIRS and WEBPACK_LOADER in main/settings.py read. The rest of
-# its /src is the source `code` already has, plus node_modules and yarn's
-# cache, which nothing reads at runtime.
+# its /src is frontend source, which `code` already has, plus node_modules,
+# which nothing reads at runtime.
 COPY --from=node /src/frontend/public/build /src/frontend/public/build
 COPY --from=node /src/frontend/staff-dashboard/build /src/frontend/staff-dashboard/build
 COPY --from=node /src/webpack-stats /src/webpack-stats
