@@ -3,7 +3,9 @@ Utils for mail
 """
 
 import logging
+from urllib.parse import urljoin
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from mitol.mail.api import get_message_sender
 
@@ -26,6 +28,18 @@ RECIPIENT_VARIABLE_NAMES = {
 }
 
 
+def get_flexible_price_form_url(flexible_price):
+    """
+    The absolute URL of the financial aid form the learner submitted, falling back
+    to the MIT Learn dashboard if the submission or its form page can't be found.
+    """
+    submission = flexible_price.cms_submission
+    url_parts = submission.page.specific.get_url_parts() if submission else None
+    if not url_parts:
+        return settings.MIT_LEARN_DASHBOARD_URL
+    return urljoin(settings.SITE_BASE_URL, url_parts[2])
+
+
 def generate_flexible_price_email(flexible_price):
     """
     Generates the email subject and body for a FlexiblePrice status update. Accepted statuses are
@@ -39,7 +53,9 @@ def generate_flexible_price_email(flexible_price):
     if flexible_price.status == FlexiblePriceStatus.APPROVED:
         price = flexible_price.tier.discount.friendly_format()
         message = FLEXIBLE_PRICE_EMAIL_APPROVAL_MESSAGE.format(
-            program_name=program_name, price=price
+            program_name=program_name,
+            price=price,
+            dashboard_url=settings.MIT_LEARN_DASHBOARD_URL,
         )
         subject = FLEXIBLE_PRICE_EMAIL_APPROVAL_SUBJECT.format(
             program_name=program_name
@@ -50,7 +66,9 @@ def generate_flexible_price_email(flexible_price):
             program_name=program_name
         )
     elif flexible_price.status == FlexiblePriceStatus.RESET:
-        message = FLEXIBLE_PRICE_EMAIL_RESET_MESSAGE.format(program_name=program_name)
+        message = FLEXIBLE_PRICE_EMAIL_RESET_MESSAGE.format(
+            form_url=get_flexible_price_form_url(flexible_price)
+        )
         subject = FLEXIBLE_PRICE_EMAIL_RESET_SUBJECT.format(program_name=program_name)
     else:
         raise ValidationError(

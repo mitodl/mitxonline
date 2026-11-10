@@ -33,25 +33,24 @@ INCOME = "income"
 INCOME_THRESHOLD_FIELDS = [COUNTRY, INCOME]
 
 FLEXIBLE_PRICE_EMAIL_RESET_SUBJECT = (
-    "Update to your personalized course price for {program_name} MITxOnline"
+    "Update to your personalized course price for {program_name}"
 )
 FLEXIBLE_PRICE_EMAIL_RESET_MESSAGE = (
-    "As requested, we have reset your personalized course price. Please visit "
-    "the MITxOnline dashboard and re-submit your annual income information."
+    "As requested, we have reset your personalized course price. Please re-submit "
+    "your annual income information using the financial aid form: {form_url}"
 )
 
 FLEXIBLE_PRICE_EMAIL_APPROVAL_SUBJECT = (
-    "Your personalized course price for {program_name} MITxOnline"
+    "Your personalized course price for {program_name}"
 )
 FLEXIBLE_PRICE_EMAIL_APPROVAL_MESSAGE = (
     "After reviewing your income documentation, the {program_name} team has awarded you financial "
     "assistance in the amount of {price}.\n\n"
-    "You can pay for MITxOnline courses through the MITxOnline portal "
-    "(https://MITxOnline.mit.edu/dashboard). All coursework will be conducted on mitxonline.mit.edu"
+    "You can enroll in and pay for your courses from your MIT Learn dashboard: {dashboard_url}"
 )
 
 FLEXIBLE_PRICE_EMAIL_DOCUMENTS_RECEIVED_SUBJECT = (
-    "Documents received for {program_name} MITxOnline"
+    "Documents received for {program_name}"
 )
 FLEXIBLE_PRICE_EMAIL_DOCUMENTS_RECEIVED_MESSAGE = (
     "We have received your documents verifying your income. We will review and process them within "
