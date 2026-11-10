@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [2026.11.10.1] - 2026-11-10
+
+### Changes
+
+- **Update dependency dnspython to v2.9.0 [SECURITY]** (#4251) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency black to v26.10.1 [SECURITY]** (#4250) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency python-dotenv to v1.2.2 [SECURITY]** (#4249) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency pytest to v9.0.3 [SECURITY]** (#4248) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency jwcrypto to v1.5.7 [SECURITY]** (#4246) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency oauthlib to v4 [SECURITY]** (#4262) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency pyjwt to v2.15.1** (#4218) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency astral-sh/uv to v0.13.6** (#4245) by 29139614+renovate[bot]@users.noreply.github.com
+- **Fix certificate revision for certificates** (#3920) by annagav@users.noreply.github.com
+- **chore(frontend): remove more unused dependencies** (#4241) by christopher.chudzicki@gmail.com
+- **Set username to the lowercased email where it is something else** (#4206) by tmacey@mit.edu
+- **Update dependency authlib to v1.9.1 [SECURITY]** (#4197) by 29139614+renovate[bot]@users.noreply.github.com
+- **Test pull requests as their merge ref** (#4228) by christopher.chudzicki@gmail.com
+- **chore(frontend): split dev dependencies and drop unused packages** (#4237) by 1447295+shaidar@users.noreply.github.com
+- **Return test-mode course pages to MIT Learn from /api/v2/pages/** (#4230) by ahiguera@mit.edu
+- **Add an identity provider edit form to the staff dashboard** (#4111) by tmacey@mit.edu
+- **Fix some basket N+1 's, reduce zeal suppressions** (#4168) by christopher.chudzicki@gmail.com
+
 ## [2026.11.5.1] - 2026-11-05
 
 ### Changes
