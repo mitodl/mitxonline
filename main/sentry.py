@@ -288,12 +288,14 @@ def before_send(event, hint, *, user_hash_key=None):
 
 
 def before_send_transaction(event, _hint):
-    """Keep users off transactions.
+    """Keep users and the export compliance tag off transactions.
 
     The SDK finishes a request's transaction after the middleware has returned,
-    so there is no request to hash a user from.
+    so there is no request to hash a user from, and a transaction has no use for
+    the checked learner's global_id that compliance.api tags the request with.
     """
     event.pop("user", None)
+    (event.get("tags") or {}).pop(EXPORT_COMPLIANCE_USER_TAG, None)
     return event
 
 

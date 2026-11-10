@@ -534,6 +534,15 @@ def test_transactions_carry_no_user():
     assert "user" not in before_send_transaction(event, {})
 
 
+def test_transactions_lose_the_export_compliance_tag():
+    """A transaction has no use for the checked learner's global_id."""
+    event = {
+        "type": "transaction",
+        "tags": {EXPORT_COMPLIANCE_USER_TAG: "kc-uuid", "other": "kept"},
+    }
+    assert before_send_transaction(event, {})["tags"] == {"other": "kept"}
+
+
 def test_real_sdk_sends_only_the_hash(settings):
     """Through the real SDK, even with send_default_pii on, the event's user is the hash."""
     settings.SENTRY_USER_HASH_KEY = HASH_KEY.decode()
