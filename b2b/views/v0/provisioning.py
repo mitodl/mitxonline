@@ -18,6 +18,7 @@ import logging
 
 import django_filters
 from authlib.integrations.base_client.errors import OAuthError
+from django.db import transaction
 from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.types import OpenApiTypes
@@ -35,6 +36,7 @@ from b2b.constants import ONBOARDING_STATE_CHOICES
 from b2b.contracts import (
     add_contract_variant_set,
     add_courseware_to_contract,
+    clear_sheet_locations,
     create_contract,
     expire_unused_enrollment_codes,
     get_contract_setup_status,
@@ -670,11 +672,13 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
             contract, data=request.data, partial=True
         )
         request_serializer.is_valid(raise_exception=True)
-        contract = request_serializer.save()
-        new_sheet = bool(contract.google_sheet_target) and sheet_before != (
-            contract.google_sheet_target,
-            contract.google_sheet_target_tab,
-        )
+        with transaction.atomic():
+            contract = request_serializer.save()
+            if sheet_before != (
+                contract.google_sheet_target,
+                contract.google_sheet_target_tab,
+            ):
+                clear_sheet_locations(contract)
 
         # The queryset prefetches contract_programs, and that cache is stale
         # once the instance has been saved, so the response would serialize
@@ -683,7 +687,7 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
         if getattr(contract, "_prefetched_objects_cache", None):
             contract._prefetched_objects_cache = {}  # noqa: SLF001
 
-        queue_enrollment_code_check_if_required(contract, new_sheet=new_sheet)
+        queue_enrollment_code_check_if_required(contract)
 
         return Response(self.get_serializer(contract).data)
 
@@ -708,8 +712,11 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
             set_contract_program_order(
                 contract, request_serializer.validated_data["programs"]
             )
-        except ContractProgramOrderError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except ContractProgramOrderError:
+            return Response(
+                {"detail": "The order must list each of the contract's programs once."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Re-read so the response has the new order, prefetched.
         return Response(

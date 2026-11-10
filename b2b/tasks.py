@@ -16,13 +16,13 @@ log = logging.getLogger(__name__)
 
 
 @app.task()
-def queue_enrollment_code_check(contract_id: int, *, new_sheet: bool = False):
+def queue_enrollment_code_check(contract_id: int):
     """Queue the ensure_enrollment_codes_exist call."""
     from b2b.api import ensure_enrollment_codes_exist
     from b2b.models import ContractPage
 
     contract = ContractPage.objects.get(id=contract_id)
-    ensure_enrollment_codes_exist(contract, new_sheet=new_sheet)
+    ensure_enrollment_codes_exist(contract)
 
 
 @app.task(acks_late=True)
@@ -124,24 +124,23 @@ def create_program_contract_runs(
 
 @app.task(acks_late=True)
 def queue_contract_sheet_update_post_save(
-    contract_id: int, *, only_update: bool = False, new_sheet: bool = False
+    contract_id: int, *, only_update: bool = False
 ):
     """
     Write the contract's enrollment codes to its Google Sheet.
 
     write_codes sets up a (presumably blank) sheet and overwrites its rows, so
-    it runs only when the sheet or tab has just changed (new_sheet), or when
-    no code of the contract has been written to a sheet yet. Otherwise
-    update_sheet, which is non-destructive, keeps each code in its row.
-    only_update always uses update_sheet.
-
-    The contract API is the only writer of the sheet and tab and saves no
-    Wagtail revision, so the change comes in as new_sheet rather than from
-    comparing revisions.
+    it runs only while none of the contract's codes has a sheet location: the
+    contract has never been written to a sheet, or the contract API cleared
+    the locations because the sheet or tab changed. It sets the locations, so
+    it runs once per sheet, and a failed write is retried by the next run.
+    Otherwise update_sheet, which is non-destructive, keeps each code in its
+    row. only_update always uses update_sheet.
     """
 
     from b2b.models import ContractPage
     from b2b.sheets import ContractEnrollmentCodesSheetHandler
+    from ecommerce.models import Discount
 
     contract = ContractPage.objects.get(pk=contract_id)
 
@@ -156,13 +155,17 @@ def queue_contract_sheet_update_post_save(
             log.info("Contract %s is managed (no enrollment codes), skipping", contract)
         return
 
+    # Every code of the contract, not discounts_qs: that leaves out codes whose
+    # run's product is inactive, and losing those would look like "never
+    # written" on a sheet that has them.
     never_written = (
-        not contract.discounts_qs.exclude(b2b_sheet_location__isnull=True)
+        not Discount.objects.filter(b2b_contract=contract)
+        .exclude(b2b_sheet_location__isnull=True)
         .exclude(b2b_sheet_location="")
         .exists()
     )
 
-    if not only_update and (new_sheet or never_written):
+    if not only_update and never_written:
         log.info("Setting up Google Sheet for %s", contract)
 
         codes_written = handler.write_codes()

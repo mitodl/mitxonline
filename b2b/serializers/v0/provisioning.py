@@ -556,7 +556,16 @@ class ContractFieldsMixin:
         return value
 
     def validate(self, attrs):
-        """Require a tab for a contract that has a sheet: the codes go in it."""
+        """
+        Require a tab for a contract that has a sheet: the codes go in it.
+
+        Only checked when the request sets the sheet or the tab, so a contract
+        saved with a sheet and no tab before this rule can still take other
+        edits.
+        """
+
+        if not {"google_sheet_target", "google_sheet_target_tab"} & attrs.keys():
+            return attrs
 
         def current(field, default):
             if field in attrs:

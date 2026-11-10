@@ -385,21 +385,29 @@ def expected_enrollment_code_count(contract: ContractPage) -> int:
     return product_count * (contract.max_learners or 1)
 
 
-def queue_enrollment_code_check_if_required(
-    contract: ContractPage, *, new_sheet: bool = False
-):
+def queue_enrollment_code_check_if_required(contract: ContractPage):
     """
     Queue the enrollment code check for a contract that uses codes.
 
     Contracts that don't are skipped: for them the check strips codes, and
     that should stay a deliberate b2b_codes validate rather than a side effect
-    of editing the contract. The check ends by writing the codes to the
-    contract's Google Sheet; new_sheet says the sheet or tab has just changed,
-    so they are written out from scratch.
+    of editing the contract.
     """
 
     if contract.requires_enrollment_codes:
-        queue_enrollment_code_check.delay(contract.id, new_sheet=new_sheet)
+        queue_enrollment_code_check.delay(contract.id)
+
+
+def clear_sheet_locations(contract: ContractPage):
+    """
+    Forget where the contract's codes are in its Google Sheet.
+
+    Called when the sheet or tab changes. With no locations left, the next
+    sheet update writes every code out to the new sheet from the top, and
+    keeps doing so until a write succeeds.
+    """
+
+    Discount.objects.filter(b2b_contract=contract).update(b2b_sheet_location="")
 
 
 def get_contract_setup_status(contract: ContractPage) -> dict:

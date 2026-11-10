@@ -15,7 +15,6 @@ from b2b.models import DiscountContractAttachmentRedemption
 from b2b.sheets import ContractEnrollmentCodesSheetHandler
 from b2b.tasks import (
     queue_contract_sheet_update_post_save,
-    queue_enrollment_code_check,
 )
 from courses.factories import CourseRunFactory
 from ecommerce.factories import OneTimeDiscountFactory
@@ -388,13 +387,14 @@ def test_update_sheet(contract_with_sheet_courseruns_handler_mocks):
 
 
 @pytest.mark.parametrize(
-    ("written_before", "new_sheet", "only_update", "rewrites"),
+    ("written_before", "products_active", "only_update", "rewrites"),
     [
-        (False, False, False, True),
         (False, True, False, True),
+        (True, True, False, False),
+        # A written code still counts when its run's product is inactive, so
+        # the sheet it is in isn't overwritten.
         (True, False, False, False),
-        (True, True, False, True),
-        (False, False, True, False),
+        (False, True, True, False),
         (True, True, True, False),
     ],
 )
@@ -402,13 +402,13 @@ def test_sheet_update_task_picks_write_or_update(  # noqa: PLR0913
     mocker,
     contract_with_sheet_courseruns,
     written_before,
-    new_sheet,
+    products_active,
     only_update,
     rewrites,
 ):
     """
-    The codes are written from scratch only to a new sheet, or to one nothing
-    has been written to yet. Otherwise they're updated in place.
+    The codes are written from scratch only while none of the contract's codes
+    has a sheet location. Otherwise they're updated in place.
     """
 
     contract, _ = contract_with_sheet_courseruns
@@ -416,6 +416,8 @@ def test_sheet_update_task_picks_write_or_update(  # noqa: PLR0913
         discount = contract.get_discounts().first()
         discount.b2b_sheet_location = "4"
         discount.save()
+    if not products_active:
+        contract.get_products().update(is_active=False)
     write_codes = mocker.patch.object(
         ContractEnrollmentCodesSheetHandler, "write_codes", return_value=0
     )
@@ -423,34 +425,7 @@ def test_sheet_update_task_picks_write_or_update(  # noqa: PLR0913
         ContractEnrollmentCodesSheetHandler, "update_sheet", return_value=0
     )
 
-    queue_contract_sheet_update_post_save(
-        contract.id, only_update=only_update, new_sheet=new_sheet
-    )
+    queue_contract_sheet_update_post_save(contract.id, only_update=only_update)
 
     assert write_codes.called is rewrites
     assert update_sheet.called is not rewrites
-
-
-@pytest.mark.parametrize("new_sheet", [True, False])
-def test_code_check_passes_new_sheet_to_the_sheet_update(
-    mocker, contract_with_sheet_courseruns, new_sheet
-):
-    """The code check ends by queueing the sheet update, saying whether it's new."""
-
-    contract, _ = contract_with_sheet_courseruns
-    queued = mocker.patch("b2b.tasks.queue_contract_sheet_update_post_save.delay")
-
-    ensure_enrollment_codes_exist(contract, new_sheet=new_sheet)
-
-    queued.assert_called_once_with(contract.id, new_sheet=new_sheet)
-
-
-@pytest.mark.parametrize("new_sheet", [True, False])
-def test_code_check_task_forwards_new_sheet(mocker, contract_with_sheet, new_sheet):
-    """The queued code check passes new_sheet on to the code check itself."""
-
-    ensure = mocker.patch("b2b.api.ensure_enrollment_codes_exist")
-
-    queue_enrollment_code_check(contract_with_sheet.id, new_sheet=new_sheet)
-
-    ensure.assert_called_once_with(contract_with_sheet, new_sheet=new_sheet)

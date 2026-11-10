@@ -288,14 +288,18 @@ These replace running `b2b_contract`, `b2b_courseware`, `b2b_codes` and
 `max_learners`, `enrollment_fixed_price`, `google_sheet_target` and
 `google_sheet_target_tab`. `PATCH` takes the same fields plus `active`.
 `google_sheet_target` is the sheet's `https://docs.google.com/spreadsheets/`
-URL, and blank (or `null`, stored as blank) means no sheet. A contract with a
-sheet needs a non-blank `google_sheet_target_tab`. After a `PATCH` to a contract that uses
-codes, the enrollment code check runs and then writes the codes to the
-sheet. A changed sheet or tab gets every code written out from the top of the
-tab (`ContractEnrollmentCodesSheetHandler.write_codes`, which overwrites the
-rows). Otherwise each code is updated in its row, and a new one appended, so
-anything the customer added to the sheet stays. A contract none of whose
-codes has been written to a sheet yet also gets `write_codes`. A
+URL, and blank (or `null`, stored as blank) means no sheet. A request that
+sets the sheet or the tab must leave a contract with a sheet a non-blank
+`google_sheet_target_tab`. After a `PATCH` to a contract that uses codes, the
+enrollment code check runs and then writes the codes to the sheet. While none
+of the contract's codes has a sheet location (`Discount.b2b_sheet_location`),
+every code is written out from the top of the tab
+(`ContractEnrollmentCodesSheetHandler.write_codes`, which overwrites the
+rows). That is the case for a contract never written to a sheet, and after a
+`PATCH` that changes the sheet or tab, which clears the locations. The write
+sets them, so a failed one is retried by the next code check. Otherwise each
+code is updated in its row, and a new one appended, so anything the customer
+added to the sheet stays. A
 contract that is inactive, ended or not yet started can still be read and
 edited here, and switched back on. It stays out of `user.b2b_contracts`,
 `run.b2b_contracts` and `organization.contracts`, which only return contracts

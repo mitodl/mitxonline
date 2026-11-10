@@ -18,6 +18,7 @@ from b2b.contracts import add_contract_variant_set, add_courseware_to_contract
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.models import ContractProgramItem
 from courses.factories import CourseFactory, CourseRunFactory, ProgramFactory
+from ecommerce.factories import OneTimeDiscountFactory
 from openedx.constants import (
     COURSE_RUN_CLONE_STATUS_CLONED,
     COURSE_RUN_CLONE_STATUS_FAILED,
@@ -318,21 +319,37 @@ def test_google_sheet_target_must_be_an_https_url(
 
 
 @pytest.mark.parametrize(
-    ("existing_target", "payload", "valid"),
+    ("existing_target", "existing_tab", "payload", "valid"),
     [
-        (SHEET_URL, {"google_sheet_target_tab": " "}, False),
-        ("", {"google_sheet_target": SHEET_URL, "google_sheet_target_tab": ""}, False),
-        ("", {"google_sheet_target_tab": ""}, True),
-        (SHEET_URL, {"google_sheet_target": "", "google_sheet_target_tab": ""}, True),
+        (SHEET_URL, "Sheet1", {"google_sheet_target_tab": " "}, False),
+        (
+            "",
+            "Sheet1",
+            {"google_sheet_target": SHEET_URL, "google_sheet_target_tab": ""},
+            False,
+        ),
+        (SHEET_URL, "", {"google_sheet_target": f"{SHEET_URL}?other"}, False),
+        ("", "Sheet1", {"google_sheet_target_tab": ""}, True),
+        (
+            SHEET_URL,
+            "Sheet1",
+            {"google_sheet_target": "", "google_sheet_target_tab": ""},
+            True,
+        ),
+        # Saved with a sheet and no tab before the rule: other edits still go
+        # through.
+        (SHEET_URL, "", {"name": "Renamed"}, True),
     ],
 )
 @pytest.mark.zeal_allow("wagtailcore.Page", "get()")
 def test_a_contract_with_a_sheet_needs_a_tab(
-    admin_drf_client, existing_target, payload, valid
+    admin_drf_client, existing_target, existing_tab, payload, valid
 ):
     """The codes are written to a named tab, so a sheet without one is refused."""
 
-    contract = ContractPageFactory.create(google_sheet_target=existing_target)
+    contract = ContractPageFactory.create(
+        google_sheet_target=existing_target, google_sheet_target_tab=existing_tab
+    )
 
     response = admin_drf_client.patch(_contract_url(contract), payload, format="json")
 
@@ -344,31 +361,43 @@ def test_a_contract_with_a_sheet_needs_a_tab(
 
 
 @pytest.mark.parametrize(
-    ("payload", "new_sheet"),
+    ("payload", "cleared"),
     [
         ({"google_sheet_target": f"{SHEET_URL}?other"}, True),
         ({"google_sheet_target_tab": "Codes"}, True),
+        ({"google_sheet_target": ""}, True),
         ({"google_sheet_target": SHEET_URL}, False),
         ({"name": "Renamed"}, False),
-        ({"google_sheet_target": ""}, False),
     ],
 )
 @pytest.mark.zeal_allow("wagtailcore.Page", "get()")
-def test_patch_contract_sheet_change_writes_codes_to_the_new_sheet(
-    admin_drf_client, mocked_tasks, payload, new_sheet
+def test_patch_contract_sheet_change_forgets_where_codes_are(
+    admin_drf_client, mocked_tasks, payload, cleared
 ):
-    """Changing the sheet or tab writes the codes out to it from scratch."""
+    """
+    Changing the sheet or tab clears the codes' sheet locations, so the next
+    sheet update writes them all out to the new one. Other contracts' codes
+    keep theirs.
+    """
 
     contract = ContractPageFactory.create(
         membership_type=CONTRACT_MEMBERSHIP_CODE,
         google_sheet_target=SHEET_URL,
         google_sheet_target_tab="Sheet1",
     )
+    code = OneTimeDiscountFactory.create(b2b_contract=contract, b2b_sheet_location="5")
+    other_code = OneTimeDiscountFactory.create(
+        b2b_contract=ContractPageFactory.create(), b2b_sheet_location="7"
+    )
 
     response = admin_drf_client.patch(_contract_url(contract), payload, format="json")
 
     assert response.status_code == status.HTTP_200_OK, response.json()
-    mocked_tasks.code_check.assert_called_once_with(contract.id, new_sheet=new_sheet)
+    code.refresh_from_db()
+    other_code.refresh_from_db()
+    assert code.b2b_sheet_location == ("" if cleared else "5")
+    assert other_code.b2b_sheet_location == "7"
+    mocked_tasks.code_check.assert_called_once_with(contract.id)
 
 
 @pytest.fixture
@@ -823,7 +852,7 @@ def test_sync_variants(admin_drf_client, mocked_tasks):
     mocked_tasks.clone.assert_called_once_with(
         french_run.id, french_source.courseware_id
     )
-    mocked_tasks.code_check.assert_called_once_with(contract.id, new_sheet=False)
+    mocked_tasks.code_check.assert_called_once_with(contract.id)
 
     mocked_tasks.code_check.reset_mock()
     response = admin_drf_client.post(url)
