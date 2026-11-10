@@ -6,8 +6,12 @@ import pytest
 from django.core.management import call_command
 
 from cms.factories import FlexiblePricingFormFactory
+from cms.models import FlexiblePricingRequestForm
 from flexiblepricing.constants import FINAID_FORM_TEXTS
-from flexiblepricing.management.commands.rebrand_finaid_forms import rebrand
+from flexiblepricing.management.commands.rebrand_finaid_forms import (
+    Command,
+    rebrand,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -116,3 +120,26 @@ def test_pages_with_drafts_are_skipped():
     page.refresh_from_db()
     assert page.intro == OLD_INTRO
     assert "skipped: page has an unpublished draft" in output
+
+
+def test_draft_saved_after_load_is_not_published_over():
+    """
+    A draft saved after the command loaded the page, but before it publishes,
+    is still not buried: the page is re-read under a lock before saving.
+    """
+    page = FlexiblePricingFormFactory.create(intro=OLD_INTRO)
+    stale = FlexiblePricingRequestForm.objects.get(pk=page.pk)
+
+    page.application_denied_text = "editor's pending change"
+    page.save_revision()
+
+    changed = Command(stdout=StringIO()).rebrand_page(stale, commit=True)
+
+    page.refresh_from_db()
+    assert changed is False
+    assert page.intro == OLD_INTRO
+    assert page.has_unpublished_changes
+    assert (
+        page.get_latest_revision_as_object().application_denied_text
+        == "editor's pending change"
+    )

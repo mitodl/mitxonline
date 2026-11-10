@@ -15,6 +15,7 @@ import difflib
 import re
 
 from django.core.management.base import BaseCommand
+from django.db import transaction
 
 from cms.models import FlexiblePricingRequestForm
 from flexiblepricing.constants import (
@@ -139,9 +140,28 @@ class Command(BaseCommand):
             )
             return False
 
-        if commit:
-            for field, new in updates.items():
-                setattr(page, field, new)
+        return self.publish(page) if commit else True
+
+    def publish(self, page):
+        """Save and publish the rebranded text. True if it was saved."""
+        with transaction.atomic():
+            # Re-read under a row lock: an editor may have saved a draft since
+            # the page was loaded, and Wagtail's draft save updates this row,
+            # so it waits for us instead of being buried.
+            page = FlexiblePricingRequestForm.objects.select_for_update().get(
+                pk=page.pk
+            )
+            if page.has_unpublished_changes:
+                self.stdout.write(
+                    self.style.WARNING(
+                        "  skipped: a draft was saved meanwhile, update it in Wagtail"
+                    )
+                )
+                return False
+            for field in TEXT_FIELDS:
+                text = getattr(page, field)
+                if text:
+                    setattr(page, field, rebrand(text))
             revision = page.save_revision(log_action=True)
             if page.live:
                 revision.publish()
