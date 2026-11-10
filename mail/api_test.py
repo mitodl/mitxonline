@@ -4,6 +4,7 @@ from email.utils import formataddr
 
 import pytest
 from mitol.common.pytest_utils import any_instance_of
+from mitol.mail.api import render_email_templates as render_inlined_email_templates
 from pytest_lazy_fixtures import lf
 
 from mail.api import (
@@ -79,6 +80,23 @@ def test_render_email_templates(user):
         "</style>\n"
         '<a href="http://example.com">html link</a>\n'
     )
+
+
+def test_render_inlined_email_templates(user):
+    """
+    mitol-mail's renderer should inline the template's CSS.
+
+    Every TemplatedMessage (receipts, enrollment and B2B emails) renders through
+    it, using premailer, lxml and cssutils for the inlining and bs4 and html5lib
+    for the text body. Other tests only check the text body.
+    """
+    user.name = "Jane Smith"
+    context = context_for_user(user=user, extra_context={"url": "http://example.com"})
+    subject, text_body, html_body = render_inlined_email_templates("sample", context)
+    assert subject == "Welcome Jane Smith"
+    assert text_body == "html link (http://example.com)"
+    assert '<a href="http://example.com" style="color:red">html link</a>' in html_body
+    assert "<style" not in html_body
 
 
 def test_messages_for_recipients():
