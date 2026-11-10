@@ -42,11 +42,13 @@ from b2b.contracts import (
     queue_enrollment_code_check_if_required,
     remove_courseware_from_contract,
     retry_contract_setup,
+    set_contract_program_order,
     sync_contract_variants,
     update_contract_variant_set,
 )
 from b2b.exceptions import (
     AliasCollisionError,
+    ContractProgramOrderError,
     ContractVariantError,
     InvalidLifecycleTransitionError,
     OrganizationNameCollisionError,
@@ -80,6 +82,7 @@ from b2b.serializers.v0.manager import (
 )
 from b2b.serializers.v0.provisioning import (
     ContractCoursewareSerializer,
+    ContractProgramOrderSerializer,
     ContractSetupStatusSerializer,
     ContractVariantSetSerializer,
     ContractVariantSyncSerializer,
@@ -657,14 +660,21 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
         Update a contract.
 
         Queues the enrollment code check for a contract that uses codes, so a
-        changed price, seat cap or membership type reaches its codes.
+        changed price, seat cap or membership type reaches its codes. A changed
+        Google Sheet or tab gets the codes written out to it from scratch.
         """
 
+        contract = self.get_object()
+        sheet_before = (contract.google_sheet_target, contract.google_sheet_target_tab)
         request_serializer = UpdateContractSerializer(
-            self.get_object(), data=request.data, partial=True
+            contract, data=request.data, partial=True
         )
         request_serializer.is_valid(raise_exception=True)
         contract = request_serializer.save()
+        new_sheet = bool(contract.google_sheet_target) and sheet_before != (
+            contract.google_sheet_target,
+            contract.google_sheet_target_tab,
+        )
 
         # The queryset prefetches contract_programs, and that cache is stale
         # once the instance has been saved, so the response would serialize
@@ -673,9 +683,38 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
         if getattr(contract, "_prefetched_objects_cache", None):
             contract._prefetched_objects_cache = {}  # noqa: SLF001
 
-        queue_enrollment_code_check_if_required(contract)
+        queue_enrollment_code_check_if_required(contract, new_sheet=new_sheet)
 
         return Response(self.get_serializer(contract).data)
+
+    @extend_schema(
+        request=ContractProgramOrderSerializer,
+        responses={200: ProvisionedContractSerializer, 400: DetailSerializer},
+    )
+    @action(detail=True, methods=["post"], url_path="programs/order")
+    def order_programs(self, request, pk=None, **kwargs):  # noqa: ARG002
+        """
+        Put the contract's programs in order.
+
+        The list must name each of the contract's programs once. Add and
+        remove programs with the courseware routes.
+        """
+
+        contract = self.get_object()
+        request_serializer = ContractProgramOrderSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+
+        try:
+            set_contract_program_order(
+                contract, request_serializer.validated_data["programs"]
+            )
+        except ContractProgramOrderError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Re-read so the response has the new order, prefetched.
+        return Response(
+            self.get_serializer(self.get_queryset().get(pk=contract.pk)).data
+        )
 
     @extend_schema(
         request=ContractCoursewareSerializer,

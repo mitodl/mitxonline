@@ -13,13 +13,13 @@ from django.db import models, transaction
 from django.http import Http404
 from django.urls import reverse
 from django.utils.functional import cached_property
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django.utils.text import slugify
 from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
 from modelcluster.fields import ParentalKey
 from requests.exceptions import HTTPError
-from wagtail.admin.panels import FieldPanel, HelpPanel, InlinePanel, MultiFieldPanel
+from wagtail.admin.panels import FieldPanel, HelpPanel, MultiFieldPanel
 from wagtail.fields import RichTextField
 from wagtail.models import ClusterableModel, Orderable, Page, PageManager
 
@@ -127,12 +127,22 @@ class StaffDashboardContractPanel(HelpPanel):
     class BoundPanel(HelpPanel.BoundPanel):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
+            programs = self.instance.programs if self.instance.pk else []
             self.content = format_html(
-                'Edit this contract, its courseware and its enrollment codes in the <a href="{}">staff '
-                "dashboard</a>. The extra welcome message, the Google Sheet target "
-                "and tab, and the order of its programs are edited here.",
+                'Edit this contract, its programs and their order, its courseware and its enrollment codes in the <a href="{}">staff '
+                "dashboard</a>.{}",
                 f"/staff-dashboard/b2b_organizations/show/{self.instance.organization.org_key}"
                 f"/contracts/{self.instance.pk}",
+                format_html(
+                    "<p>Programs, in order:</p><ol>{}</ol>",
+                    format_html_join(
+                        "",
+                        "<li>{} ({})</li>",
+                        ((p.title, p.readable_id) for p in programs),
+                    ),
+                )
+                if programs
+                else "",
             )
 
 
@@ -571,16 +581,19 @@ class ContractPage(Page, ClusterableModel):
     # Written only by the contract API, which saves the row without a Wagtail
     # revision. A revision holds whatever these were when it was saved, so
     # with_content_json() takes them from the stored row instead. It does the
-    # same for which programs the contract has.
+    # same for the contract's programs and their order.
     PROVISIONED_FIELDS = (
         "name",
         "membership_type",
         "description",
         "welcome_message",
+        "welcome_message_extra",
         "contract_start",
         "contract_end",
         "max_learners",
         "enrollment_fixed_price",
+        "google_sheet_target",
+        "google_sheet_target_tab",
         "active",
     )
 
@@ -697,8 +710,8 @@ class ContractPage(Page, ClusterableModel):
             [
                 FieldPanel("description", read_only=True),
                 FieldPanel("welcome_message", read_only=True),
-                FieldPanel("welcome_message_extra"),
-                FieldPanel("organization"),
+                FieldPanel("welcome_message_extra", read_only=True),
+                FieldPanel("organization", read_only=True),
             ],
             heading="Basic Information",
             icon="clipboard-list",
@@ -708,8 +721,8 @@ class ContractPage(Page, ClusterableModel):
                 FieldPanel("membership_type", read_only=True),
                 FieldPanel("max_learners", read_only=True),
                 FieldPanel("enrollment_fixed_price", read_only=True),
-                FieldPanel("google_sheet_target"),
-                FieldPanel("google_sheet_target_tab"),
+                FieldPanel("google_sheet_target", read_only=True),
+                FieldPanel("google_sheet_target_tab", read_only=True),
             ],
             heading="Learner Provisioning",
             icon="user",
@@ -722,16 +735,6 @@ class ContractPage(Page, ClusterableModel):
             ],
             heading="Availability",
             icon="calendar-alt",
-        ),
-        InlinePanel(
-            "contract_programs",
-            heading="Programs",
-            help_text=(
-                "Order the programs in this contract. Add and remove programs "
-                "in the staff dashboard. On a published page a program added "
-                "or removed here is not saved. On an unpublished page it is "
-                "saved, and adding one creates its contract runs."
-            ),
         ),
     ]
 
@@ -766,7 +769,7 @@ class ContractPage(Page, ClusterableModel):
 
         Wagtail calls this to load the editor and to publish. Without it,
         publishing a revision saved before an API write puts the contract's
-        old name, dates, seat cap and price back.
+        old name, dates, seat cap, price, Google Sheet and programs back.
         """
 
         page = super().with_content_json(content)
@@ -781,26 +784,13 @@ class ContractPage(Page, ClusterableModel):
             setattr(page, field, value)
         page.title = stored["name"]
 
-        # Which programs are in the contract is the API's to say, and a
-        # revision saved before a program was linked would delete the link
-        # when published. Wagtail still orders them, so keep the stored links
-        # in the revision's order, with any it doesn't have after the rest.
-        # Wagtail saves an unpublished page's form straight to the database
-        # without coming through here, so this only protects a live page.
-        revision_position = {
-            item.program_id: position
-            for position, item in enumerate(page.contract_programs.all())
-        }
-        programs = sorted(
-            ContractProgramItem.objects.filter(contract_id=self.pk),
-            key=lambda item: (
-                revision_position.get(item.program_id, len(revision_position)),
-                item.sort_order or 0,
-            ),
+        # A revision also holds the programs and their order as they were, and
+        # publishing it would write them back, dropping a program linked since.
+        page.contract_programs = list(
+            ContractProgramItem.objects.filter(contract_id=self.pk).order_by(
+                "sort_order"
+            )
         )
-        for sort_order, item in enumerate(programs):
-            item.sort_order = sort_order
-        page.contract_programs = programs
         return page
 
     def get_learners(self):

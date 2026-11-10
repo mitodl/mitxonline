@@ -16,13 +16,13 @@ log = logging.getLogger(__name__)
 
 
 @app.task()
-def queue_enrollment_code_check(contract_id: int):
+def queue_enrollment_code_check(contract_id: int, *, new_sheet: bool = False):
     """Queue the ensure_enrollment_codes_exist call."""
     from b2b.api import ensure_enrollment_codes_exist
     from b2b.models import ContractPage
 
     contract = ContractPage.objects.get(id=contract_id)
-    ensure_enrollment_codes_exist(contract)
+    ensure_enrollment_codes_exist(contract, new_sheet=new_sheet)
 
 
 @app.task(acks_late=True)
@@ -124,14 +124,20 @@ def create_program_contract_runs(
 
 @app.task(acks_late=True)
 def queue_contract_sheet_update_post_save(
-    contract_id: int, *, only_update: bool = False
+    contract_id: int, *, only_update: bool = False, new_sheet: bool = False
 ):
     """
-    Take an appropriate action on post-save for the contract.
+    Write the contract's enrollment codes to its Google Sheet.
 
-    If the prior revision to the current has a different tab or sheet URL
-    specified, then run write_codes, which will set up the (presumably blank)
-    sheet. Otherwise, use update_sheet, which is non-destructive.
+    write_codes sets up a (presumably blank) sheet and overwrites its rows, so
+    it runs only when the sheet or tab has just changed (new_sheet), or when
+    no code of the contract has been written to a sheet yet. Otherwise
+    update_sheet, which is non-destructive, keeps each code in its row.
+    only_update always uses update_sheet.
+
+    The contract API is the only writer of the sheet and tab and saves no
+    Wagtail revision, so the change comes in as new_sheet rather than from
+    comparing revisions.
     """
 
     from b2b.models import ContractPage
@@ -150,24 +156,13 @@ def queue_contract_sheet_update_post_save(
             log.info("Contract %s is managed (no enrollment codes), skipping", contract)
         return
 
-    if not only_update:
-        has_revs = contract.revisions.count() > 1
+    never_written = (
+        not contract.discounts_qs.exclude(b2b_sheet_location__isnull=True)
+        .exclude(b2b_sheet_location="")
+        .exists()
+    )
 
-        if has_revs:
-            # We have page revisions so check to see if the sheet or the tab changed
-            # in between. If they did, then we start over.
-            # Explicitly set this sort even though the Wagtail model seems to do this anyway.
-            revs = contract.revisions.order_by("-created_at").all()[:2]
-            if (
-                revs[0].as_object().google_sheet_target
-                != revs[1].as_object().google_sheet_target
-            ) or (
-                revs[0].as_object().google_sheet_target_tab
-                != revs[1].as_object().google_sheet_target_tab
-            ):
-                has_revs = False
-
-    if not only_update and not has_revs:
+    if not only_update and (new_sheet or never_written):
         log.info("Setting up Google Sheet for %s", contract)
 
         codes_written = handler.write_codes()

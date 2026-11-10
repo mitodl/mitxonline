@@ -8,12 +8,10 @@ staff-only.
 Most people will use it through the staff dashboard's B2B Organizations
 section, which covers organizations, onboarding state, IdPs, the change
 history and contracts. A contract's page there creates and edits the contract,
-adds and removes courseware, shows how far the edX clones and enrollment codes
-have got, and assigns and expires codes. Some things on a contract still need
-Wagtail or the API: `welcome_message_extra`, the Google Sheet target and the
-order of a contract's programs, which the contract routes don't carry, and
-variant sets, which have routes and no UI yet. Every other contract field is
-read-only on the Wagtail page, and contracts can't be created there. This
+adds, removes and orders courseware, shows how far the edX clones and
+enrollment codes have got, and assigns and expires codes. Variant sets have
+routes and no UI yet. The Wagtail contract page is read-only, and contracts
+can't be created there. This
 page is the reference for engineers working on the API or the UI, and for
 anyone who needs to know what a button in the dashboard actually does.
 
@@ -269,6 +267,7 @@ GET    /api/v0/b2b/provisioning/organizations/{org_key}/contracts/{id}/
 PATCH  /api/v0/b2b/provisioning/organizations/{org_key}/contracts/{id}/
 POST   .../contracts/{id}/courseware/
 POST   .../contracts/{id}/courseware/remove/
+POST   .../contracts/{id}/programs/order/
 GET    .../contracts/{id}/setup-status/
 POST   .../contracts/{id}/retry-setup/
 GET    .../contracts/{id}/codes/
@@ -285,8 +284,18 @@ These replace running `b2b_contract`, `b2b_courseware`, `b2b_codes` and
 `b2b/contracts.py`. The management commands still work.
 
 `POST` takes `name`, `membership_type` (required), `description`,
-`welcome_message`, `contract_start`, `contract_end`, `max_learners` and
-`enrollment_fixed_price`. `PATCH` takes the same fields plus `active`. A
+`welcome_message`, `welcome_message_extra`, `contract_start`, `contract_end`,
+`max_learners`, `enrollment_fixed_price`, `google_sheet_target` and
+`google_sheet_target_tab`. `PATCH` takes the same fields plus `active`.
+`google_sheet_target` is the sheet's `https://docs.google.com/spreadsheets/`
+URL, and blank (or `null`, stored as blank) means no sheet. A contract with a
+sheet needs a non-blank `google_sheet_target_tab`. After a `PATCH` to a contract that uses
+codes, the enrollment code check runs and then writes the codes to the
+sheet. A changed sheet or tab gets every code written out from the top of the
+tab (`ContractEnrollmentCodesSheetHandler.write_codes`, which overwrites the
+rows). Otherwise each code is updated in its row, and a new one appended, so
+anything the customer added to the sheet stays. A contract none of whose
+codes has been written to a sheet yet also gets `write_codes`. A
 contract that is inactive, ended or not yet started can still be read and
 edited here, and switched back on. It stays out of `user.b2b_contracts`,
 `run.b2b_contracts` and `organization.contracts`, which only return contracts
@@ -306,6 +315,12 @@ run to clone (none at all, or none for the contract's variant sets) is skipped,
 and the response's `courses_without_source_run` counts those courses. The rest
 of the program is still added. Adding a single course with no usable source run
 is a 400.
+
+`programs/order/` takes `programs`, the readable IDs of every one of the
+contract's programs in the order learners should see them. A list that leaves
+one out, repeats one or names one the contract doesn't have is a 400 and
+changes nothing, so an order built from a stale read of the contract is
+refused.
 
 `courseware/remove/` closes the removed runs to new enrollments. A run that
 already has enrolled learners stays linked to the contract so they keep access.
@@ -362,15 +377,16 @@ The contract routes save the page without a Wagtail revision. A revision
 holds the whole page as it was when it was saved, so `ContractPage` takes the
 fields these routes write (`ContractPage.PROVISIONED_FIELDS`) from the stored
 row whenever Wagtail loads or publishes one. Publishing an old revision
-therefore can't put back a contract's old name, dates, seat cap or price.
-The same goes for which programs a contract has: a publish keeps the stored
-program links and takes only their order from the revision, so a program
-added or removed on the Wagtail page is not saved, and one removed there moves
-to the end of the order. This holds for a live page. Wagtail saves the form of
-an unpublished contract page straight to the database, so there an added or
-removed program is saved, and an added one queues run creation.
+therefore can't put back a contract's old name, dates, seat cap, price or
+Google Sheet. The same goes for its programs and their order, which are taken
+from the stored rows too. Every field on the Wagtail contract page is
+read-only and the page has no programs panel (it lists them, in order). One
+gap is left: saving an unpublished contract page in Wagtail writes back the
+programs as they were when the editor loaded them, so a program linked or
+reordered through these routes during that one request is undone.
 
-`description` is Wagtail rich text. On the way in it is reduced to the markup
+`description` and `welcome_message_extra` are Wagtail rich text. On the way in
+each is reduced to the markup
 Wagtail's editor stores (paragraphs, headings, bold, italic, lists, links);
 anything else is stripped, including an image or media embedded through
 Wagtail's editor.
@@ -414,7 +430,4 @@ changes an existing `org_key`.
 - Where C2's partner invite token is stored. `OrganizationOnboarding` is the
   likely place, but it has no token field yet.
 - A test-login flow.
-- The contract fields the staff dashboard can't reach
-  (`welcome_message_extra`, `google_sheet_target`, `google_sheet_target_tab`,
-  program order) and a variant set editor. They are all the Wagtail contract
-  page is still needed for.
+- A variant set editor in the staff dashboard.

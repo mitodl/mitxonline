@@ -1329,7 +1329,7 @@ def _handle_limited_seats(
     return (created, updated, errors)
 
 
-def ensure_enrollment_codes_exist(contract: ContractPage):
+def ensure_enrollment_codes_exist(contract: ContractPage, *, new_sheet: bool = False):
     """
     Ensure that enrollment codes exist for the given contract.
 
@@ -1353,6 +1353,12 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
     Note about SSO managed contracts: if there's no price, we don't create enrollment
     codes regardless of whether there's a learner cap or not. We'll limit the
     attachment when we log the user in.
+
+    Args:
+        contract: the contract to check
+        new_sheet: the contract's Google Sheet or tab has changed, so the
+            codes are written out to it from scratch rather than updated in
+            place.
 
     Returns:
         tuple: A tuple containing the number of created codes, updated codes,
@@ -1388,7 +1394,7 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
         total_updated += updated
         total_errors += errors
 
-    queue_contract_sheet_update_post_save.delay(contract.id)
+    queue_contract_sheet_update_post_save.delay(contract.id, new_sheet=new_sheet)
 
     return (total_created, total_updated, total_errors)
 
