@@ -1,8 +1,10 @@
 """Tests for the migrate_edx_data management command"""
 
+import ssl
 from datetime import UTC, datetime
 from io import StringIO
 
+import pymysql
 import pytest
 from django.core.management.base import CommandError
 
@@ -83,9 +85,26 @@ def test_connect_uses_starrocks_settings(settings, mocker):
         port=9030,
         user="reader",
         password="secret",  # noqa: S106
-        ssl_verify_cert=True,
+        ssl=mocker.ANY,
         init_command="SET time_zone = '+00:00'",
     )
+
+
+def test_connect_verifies_certificate_and_hostname(settings, mocker):
+    """The TLS context pymysql builds from the command's arguments checks both
+    the chain and the hostname
+    """
+    settings.STARROCKS_HOST = "starrocks.example.com"
+    settings.STARROCKS_USER = "reader"
+    connect = mocker.patch.object(migrate_edx_data.pymysql, "connect")
+
+    Command()._connect_to_warehouse()  # noqa: SLF001
+
+    conn = pymysql.connections.Connection(
+        **connect.call_args.kwargs, defer_connect=True
+    )
+    assert conn.ctx.verify_mode == ssl.CERT_REQUIRED
+    assert conn.ctx.check_hostname is True
 
 
 def test_course_certificates_query_binds_readable_ids():

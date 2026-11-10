@@ -1,4 +1,5 @@
 import json
+import ssl
 from datetime import UTC
 
 import pymysql
@@ -75,9 +76,10 @@ class Command(BaseCommand):
                 port=settings.STARROCKS_PORT,
                 user=settings.STARROCKS_USER,
                 password=settings.STARROCKS_PASSWORD,
-                # The FE's Let's Encrypt certificate names the cluster's domain,
-                # not the mysql. host clients dial, so only the chain is verified.
-                ssl_verify_cert=True,
+                # Verifies the chain against the system CAs and the hostname.
+                # pymysql skips the hostname check when ssl_ca is unset, even
+                # with ssl_verify_identity=True, so a context is passed instead.
+                ssl=ssl.create_default_context(),
                 # StarRocks renders a timestamp with time zone in the session's
                 # time zone, and sends it without one.
                 init_command="SET time_zone = '+00:00'",
