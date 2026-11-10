@@ -67,11 +67,23 @@ SENTRY_LOG_LEVEL = get_string(
 )
 SENTRY_TRACES_SAMPLE_RATE = get_float("SENTRY_TRACES_SAMPLE_RATE", 0)
 SENTRY_PROFILES_SAMPLE_RATE = get_float("SENTRY_PROFILES_SAMPLE_RATE", 0)
+SENTRY_USER_HASH_KEY = get_string(
+    name="SENTRY_USER_HASH_KEY",
+    default="",
+    description=(
+        "HMAC key for the hashed user id sent to Sentry in place of the user. "
+        "Rotating it makes every user look new to Sentry. Empty sends no user."
+    ),
+)
 init_sentry(
     dsn=SENTRY_DSN,
     environment=ENVIRONMENT,
     version=VERSION,
-    send_default_pii=True,
+    # Off: on, the SDK sends the user's email, username and IP, and every
+    # cookie but Django's session and CSRF cookies. SENTRY_USER_HASH_KEY
+    # restores user counts without the identity.
+    send_default_pii=False,
+    user_hash_key=SENTRY_USER_HASH_KEY,
     log_level=SENTRY_LOG_LEVEL,
     heroku_app_name=HEROKU_APP_NAME,
     traces_sample_rate=SENTRY_TRACES_SAMPLE_RATE,
@@ -298,6 +310,9 @@ INSTALLED_APPS = (
 #     INSTALLED_APPS += ("localdev.seed",)  # noqa: ERA001
 
 MIDDLEWARE = (
+    # Outermost, so an error raised in any later middleware can still be
+    # attributed to the user once AuthenticationMiddleware has set one.
+    "main.sentry.SentryUserHashMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
