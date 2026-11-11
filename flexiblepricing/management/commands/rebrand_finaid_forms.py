@@ -115,7 +115,7 @@ class Command(BaseCommand):
             # live. Check the live text too: the draft may already be fixed
             # while learners still see the old text. A page that isn't live
             # always counts as unpublished; its latest revision gets a new draft.
-            if updates or _updates(_text(page)):
+            if _needs_work(current) or _needs_work(_text(page)):
                 self.stdout.write(
                     self.style.WARNING(
                         f"{label}: skipped, page has an unpublished draft, "
@@ -162,6 +162,14 @@ class Command(BaseCommand):
 
 def _text(content):
     return {field: getattr(content, field) or "" for field in TEXT_FIELDS}
+
+
+def _needs_work(text_by_field):
+    """True if any field has a reference to replace or to review by hand."""
+    return any(
+        rebrand(text) != text or NEEDS_REVIEW.search(text)
+        for text in text_by_field.values()
+    )
 
 
 def _updates(text_by_field):

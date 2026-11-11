@@ -182,3 +182,18 @@ def test_live_text_is_reported_when_the_draft_is_already_rebranded():
     page.refresh_from_db()
     assert page.intro == OLD_INTRO
     assert "skipped, page has an unpublished draft" in output
+
+
+def test_unknown_references_on_pages_with_drafts_are_reported():
+    """A drafted live page with only unmapped references is still flagged."""
+    custom = '<p><a href="https://mitxonline.zendesk.com/hc/en-us/articles/123-Other">x</a></p>'
+    page = FlexiblePricingFormFactory.create(application_approved_text=custom)
+    page.application_denied_text = "editor's pending change"
+    page.save_revision()
+
+    output = _run("--commit")
+
+    page.refresh_from_db()
+    assert page.application_approved_text == custom
+    assert page.has_unpublished_changes
+    assert "skipped, page has an unpublished draft" in output
