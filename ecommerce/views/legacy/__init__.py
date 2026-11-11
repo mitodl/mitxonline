@@ -892,20 +892,19 @@ class CheckoutCallbackView(View):
         """
         Process a GET request to this endpoint.
 
-        Stripe just redirects users back to the app. We might get a checkout
-        session ID here, which we can load and check, but for now just redirect
-        back to the dashboard and wait for them to hit the webhook.
+        Stripe just redirects users back to the app, for both successful and
+        canceled checkouts, and the order is fulfilled by the webhook. So only
+        report the order as fulfilled once it is; otherwise just go back to the
+        dashboard.
         """
 
         order_ref = request.session.get("order_reference_number", None)
         if order_ref:
-            order = Order.objects.filter(reference_number=order_ref).first()
-
-            return (
-                _learn_dashboard_redirect(order)
-                if order
-                else HttpResponseRedirect(reverse("user-dashboard"))
-            )
+            order = Order.objects.filter(
+                reference_number=order_ref, state=OrderStatus.FULFILLED
+            ).first()
+            if order:
+                return _learn_dashboard_redirect(order)
 
         return HttpResponseRedirect(reverse("user-dashboard"))
 

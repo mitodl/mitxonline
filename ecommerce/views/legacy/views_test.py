@@ -770,6 +770,40 @@ def test_checkout_result_redirects_to_learn_without_global_id(
 
 
 @pytest.mark.parametrize(
+    ("order_state", "to_learn_with_order"),
+    [
+        (OrderStatus.FULFILLED, True),
+        (OrderStatus.PENDING, False),
+        (OrderStatus.CANCELED, False),
+    ],
+)
+def test_checkout_result_get_reports_only_fulfilled_orders(
+    settings, user, user_client, order_state, to_learn_with_order
+):
+    """
+    Stripe returns the learner here after both successful and canceled
+    checkouts, so only a fulfilled order sends them to Learn with order info.
+    """
+    order = OrderFactory.create(purchaser=user, state=order_state)
+    session = user_client.session
+    session["order_reference_number"] = order.reference_number
+    session.save()
+    # Sessions are signed cookies, so the saved session is a new cookie value.
+    user_client.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
+
+    resp = user_client.get(reverse("checkout-result-callback"))
+
+    assert resp.status_code == 302
+    if to_learn_with_order:
+        assert (
+            resp.url
+            == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
+        )
+    else:
+        assert resp.url == reverse("user-dashboard")
+
+
+@pytest.mark.parametrize(
     "cart_exists, cart_empty",  # noqa: PT006
     [(True, False), (True, True), (False, True)],
 )
