@@ -6,17 +6,14 @@ from django.conf import settings
 from django.contrib.auth.views import redirect_to_login
 from django.http import (
     HttpResponseNotFound,
-    HttpResponseRedirect,
+    HttpResponsePermanentRedirect,
     HttpResponseServerError,
 )
 from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.cache import never_cache
-from mitol.olposthog.features import is_enabled
 from rest_framework.pagination import LimitOffsetPagination
-
-from main import features
 
 
 def get_base_context(request):  # noqa: ARG001
@@ -42,23 +39,15 @@ def index(request, **kwargs):
 
 
 @never_cache
-def dashboard(request, **kwargs):
+def dashboard(request, **kwargs):  # noqa: ARG001
     """
-    Dashboard view - redirects to the new learn frontend if the feature flag
-    is enabled for this user, otherwise serves the legacy React app.
+    Permanently redirect to the MIT Learn dashboard, which replaced the legacy
+    MITx Online dashboard. Query parameters are passed through.
     """
-    if request.user.is_authenticated:
-        global_id = request.user.global_id
-        if global_id and is_enabled(
-            features.REDIRECT_LEARN_DASHBOARD,
-            default=False,
-            opt_unique_id=global_id,
-        ):
-            redirect_url = settings.MIT_LEARN_DASHBOARD_URL
-            if qs := request.META.get("QUERY_STRING"):
-                redirect_url = f"{redirect_url}?{qs}"
-            return HttpResponseRedirect(redirect_url)
-    return index(request, **kwargs)
+    redirect_url = settings.MIT_LEARN_DASHBOARD_URL
+    if qs := request.META.get("QUERY_STRING"):
+        redirect_url = f"{redirect_url}?{qs}"
+    return HttpResponsePermanentRedirect(redirect_url)
 
 
 @never_cache

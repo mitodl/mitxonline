@@ -1,13 +1,10 @@
 // @flow
 import React from "react"
 import moment from "moment"
-import { isNil } from "ramda"
 
-import { notNil, parseDateString, formatPrettyDateTimeAmPmTz } from "./util"
+import { parseDateString, formatPrettyDateTimeAmPmTz } from "./util"
 
 import { NODETYPE_OPERATOR, NODETYPE_COURSE, NODEOPER_ALL } from "../constants"
-
-import type Moment from "moment"
 
 import type {
   CourseRunDetail,
@@ -15,25 +12,8 @@ import type {
   CourseDetail,
   RequirementNode,
   LearnerRecord,
-  ProgramRequirement,
-  ProgramEnrollment
+  ProgramRequirement
 } from "../flow/courseTypes"
-import type { CurrentUser } from "../flow/authTypes"
-
-export const isLinkableCourseRun = (
-  run: CourseRunDetail,
-  currentUser: CurrentUser,
-  dtNow?: Moment
-): boolean => {
-  if (isNil(run.courseware_url)) {
-    return false
-  }
-  if (!currentUser.is_anonymous && currentUser.is_editor) {
-    return true
-  }
-  const now = dtNow || moment()
-  return notNil(run.start_date) && moment(run.start_date).isBefore(now)
-}
 
 export const courseRunStatusMessage = (run: CourseRun) => {
   const startDateDescription = generateStartDateText(run)
@@ -111,42 +91,6 @@ const isNodeCompleted = (
   )
 
   return course && course.grade && course.certificate
-}
-
-export const extractCoursesFromNode = (
-  node: ProgramRequirement,
-  enrollment: ProgramEnrollment
-) => {
-  // Processes the node, and returns the courses that are within it. If there
-  // are nested operators, this will walk them but it won't group the courses
-  // based on them.
-  if (typeof node !== "undefined") {
-    if (node.data.node_type === NODETYPE_COURSE) {
-      const retCourse = enrollment.program.courses.find(
-        elem => elem.id === node.data.course
-      )
-
-      if (retCourse) {
-        return [retCourse]
-      }
-
-      return []
-    } else if (node.data.node_type === NODETYPE_OPERATOR) {
-      let courseList = []
-
-      if (node.children) {
-        node.children.forEach(child => {
-          courseList = courseList.concat(
-            extractCoursesFromNode(child, enrollment)
-          )
-        })
-      }
-
-      return courseList
-    }
-  }
-
-  return []
 }
 
 export const walkNodes = (

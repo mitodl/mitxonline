@@ -128,8 +128,6 @@ export const ALERT_TYPE_SUCCESS = "success"
 export const ALERT_TYPE_DANGER = "danger"
 
 // HTML title for different pages
-export const DASHBOARD_PAGE_TITLE = "Dashboard"
-
 export const LOGIN_EMAIL_PAGE_TITLE = "Sign In"
 export const LOGIN_PASSWORD_PAGE_TITLE = LOGIN_EMAIL_PAGE_TITLE
 
