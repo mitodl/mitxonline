@@ -11,18 +11,14 @@ Without --commit this changes nothing: it prints, per page, a diff of what it
 would change and what it would leave for manual review.
 
 A live page is republished with the new text. A page that isn't live gets the
-new text as a draft built on its latest revision. A page someone is working
-on (unpublished draft, in moderation, scheduled, locked) is skipped so their
-pending work isn't buried, as is anything in a state the command doesn't
-expect; each skip says why so a person can finish it in Wagtail.
+new text as a draft. A live page with an unpublished draft (which includes a
+scheduled publish) is skipped, so the editor's pending work isn't published.
 """
 
 import difflib
 import re
 
-from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand
-from django.db import transaction
 
 from cms.models import FlexiblePricingRequestForm
 from flexiblepricing.constants import (
@@ -137,63 +133,25 @@ class Command(BaseCommand):
 
         if not updates:
             return False
-        if reason := _skip_reason(page):
+        if page.live and page.has_unpublished_changes:
+            # Publishing would put the editor's unfinished (or scheduled) draft
+            # live. A page that isn't live always counts as unpublished; its
+            # latest revision gets a new draft instead.
             self.stdout.write(
-                self.style.WARNING(f"  skipped: {reason}, update it in Wagtail")
-            )
-            return False
-
-        return self.save(page) if commit else True
-
-    def save(self, page):
-        """Save the rebranded text, publishing it if the page is live. True if saved."""
-        try:
-            with transaction.atomic():
-                return self._save_locked(page)
-        except ValidationError as error:
-            # Nothing was written: the transaction rolled back.
-            self.stdout.write(
-                self.style.ERROR(
-                    "  skipped: page fails validation, fix it in Wagtail: "
-                    + "; ".join(error.messages)
+                self.style.WARNING(
+                    "  skipped: page has an unpublished draft, update it in Wagtail"
                 )
             )
             return False
+        if not commit:
+            return True
 
-    def _save_locked(self, page):
-        # Re-read under a row lock: an editor may have saved a draft, or another
-        # run may have rebranded the page, since it was loaded. Wagtail's draft
-        # save updates this row, so it waits for us instead of being buried.
-        page = FlexiblePricingRequestForm.objects.select_for_update().get(pk=page.pk)
-        content = page.get_latest_revision_as_object()
-        updates = _updates(_text(content))
-        reason = _skip_reason(page) or (None if updates else "already rebranded")
-        if reason:
-            self.stdout.write(
-                self.style.WARNING(f"  skipped: {reason} (changed since it was read)")
-            )
-            return False
         for field, text in updates.items():
             setattr(content, field, text)
         revision = content.save_revision(log_action=True)
         if page.live:
             revision.publish()
         return True
-
-
-def _skip_reason(page):
-    """Why the page must be left to a person, or None if it's safe to change."""
-    checks = [
-        (page.alias_of_id, "page is an alias, its source page is what to change"),
-        (page.locked, "page is locked"),
-        (page.workflow_in_progress, "page is in moderation"),
-        (page.scheduled_revision, "page has a scheduled publish"),
-        # A live page's draft holds an editor's pending work; publishing our
-        # version of the live text would bury it. A page that isn't live has
-        # its only content in its latest revision, so it gets a new draft.
-        (page.live and page.has_unpublished_changes, "page has an unpublished draft"),
-    ]
-    return next((reason for hit, reason in checks if hit), None)
 
 
 def _text(content):

@@ -6,15 +6,11 @@ from io import StringIO
 import pytest
 from django.core.management import call_command
 from django.utils import timezone
-from wagtail.models import Page
 
 from cms.factories import FlexiblePricingFormFactory
 from cms.models import FlexiblePricingRequestForm
 from flexiblepricing.constants import FINAID_FORM_TEXTS
-from flexiblepricing.management.commands.rebrand_finaid_forms import (
-    Command,
-    rebrand,
-)
+from flexiblepricing.management.commands.rebrand_finaid_forms import rebrand
 
 pytestmark = pytest.mark.django_db
 
@@ -125,29 +121,6 @@ def test_pages_with_drafts_are_skipped():
     assert "skipped: page has an unpublished draft" in output
 
 
-def test_draft_saved_after_load_is_not_published_over():
-    """
-    A draft saved after the command loaded the page, but before it publishes,
-    is still not buried: the page is re-read under a lock before saving.
-    """
-    page = FlexiblePricingFormFactory.create(intro=OLD_INTRO)
-    stale = FlexiblePricingRequestForm.objects.get(pk=page.pk)
-
-    page.application_denied_text = "editor's pending change"
-    page.save_revision()
-
-    changed = Command(stdout=StringIO()).rebrand_page(stale, commit=True)
-
-    page.refresh_from_db()
-    assert changed is False
-    assert page.intro == OLD_INTRO
-    assert page.has_unpublished_changes
-    assert (
-        page.get_latest_revision_as_object().application_denied_text
-        == "editor's pending change"
-    )
-
-
 def test_pages_that_are_not_live_get_a_rebranded_draft():
     """
     A page that isn't live is rebranded as a new draft, not published, and a
@@ -183,71 +156,13 @@ def test_draft_of_page_that_is_not_live_keeps_editor_changes():
     assert draft.application_denied_text == "editor's pending change"
 
 
-def test_page_rebranded_after_load_is_not_saved_again():
-    """If another run rebranded the page meanwhile, no extra revision is saved."""
-    page = FlexiblePricingFormFactory.create(intro=OLD_INTRO)
-    stale = FlexiblePricingRequestForm.objects.get(pk=page.pk)
-    _run("--commit")
-    revisions = page.revisions.count()
-
-    changed = Command(stdout=StringIO()).rebrand_page(stale, commit=True)
-
-    assert changed is False
-    assert page.revisions.count() == revisions
-
-
-def test_locked_pages_are_skipped():
-    """A locked page is left alone, as the Wagtail admin would."""
-    page = FlexiblePricingFormFactory.create(intro=OLD_INTRO, locked=True)
-
-    output = _run("--commit")
-
-    page.refresh_from_db()
-    assert page.intro == OLD_INTRO
-    assert "skipped: page is locked" in output
-
-
 def test_scheduled_pages_are_skipped():
-    """A page with a revision scheduled to go live is left alone."""
+    """A live page with a scheduled publish counts as having a draft."""
     page = FlexiblePricingFormFactory.create(intro=OLD_INTRO)
-    page.unpublish()
     page.save_revision(approved_go_live_at=timezone.now() + timedelta(days=1))
     revisions = page.revisions.count()
 
     output = _run("--commit")
 
     assert page.revisions.count() == revisions
-    assert "skipped: page has a scheduled publish" in output
-
-
-def test_alias_pages_follow_their_source():
-    """An alias can't take revisions; it gets the text when its source is published."""
-    page = FlexiblePricingFormFactory.create(intro=OLD_INTRO)
-    alias = page.create_alias(parent=page.get_parent(), update_slug="alias")
-    out = StringIO()
-
-    assert Command(stdout=out).rebrand_page(alias, commit=True) is False
-    assert "skipped: page is an alias" in out.getvalue()
-
-    output = _run("--commit")
-
-    alias.refresh_from_db()
-    assert alias.intro == rebrand(OLD_INTRO)
-    assert "Updated 1 page(s)." in output
-
-
-def test_pages_failing_validation_are_skipped_without_stopping_the_run():
-    """A page Wagtail refuses to save is reported and the other pages still change."""
-    broken = FlexiblePricingFormFactory.create(intro=OLD_INTRO)
-    Page.objects.filter(pk=broken.pk).update(title="")
-    fine = FlexiblePricingFormFactory.create(intro=OLD_INTRO)
-
-    output = _run("--commit")
-
-    broken.refresh_from_db()
-    fine.refresh_from_db()
-    assert broken.intro == OLD_INTRO
-    assert broken.revisions.count() == 0
-    assert fine.intro == rebrand(OLD_INTRO)
-    assert "skipped: page fails validation" in output
-    assert "Updated 1 page(s)." in output
+    assert "skipped: page has an unpublished draft" in output
