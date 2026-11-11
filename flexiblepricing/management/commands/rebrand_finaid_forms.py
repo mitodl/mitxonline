@@ -10,14 +10,17 @@ person to look at.
 Without --commit this changes nothing: it prints, per page, a diff of what it
 would change and what it would leave for manual review.
 
-A live page is republished with the new text, unless it has an unpublished
-draft, which is skipped so the editor's pending work isn't buried. A page that
-isn't live gets the new text as a draft built on its latest revision.
+A live page is republished with the new text. A page that isn't live gets the
+new text as a draft built on its latest revision. A page someone is working
+on (unpublished draft, in moderation, scheduled, locked) is skipped so their
+pending work isn't buried, as is anything in a state the command doesn't
+expect; each skip says why so a person can finish it in Wagtail.
 """
 
 import difflib
 import re
 
+from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
@@ -99,9 +102,11 @@ class Command(BaseCommand):
     def rebrand_page(self, page, *, commit):
         """Report, and with commit apply, one page's changes. True if it changes."""
         label = f"[{page.id}] {page.title} ({page.url_path}, live={page.live})"
-        # save_revision() doesn't write the text to the page row, so a page that
-        # isn't live keeps its current text only in its latest revision.
-        current = _text(page.get_latest_revision_as_object())
+        # The page row itself if nothing is unpublished, else the latest draft:
+        # save_revision() doesn't write to the row, so that draft is the only
+        # place a page that isn't live keeps its current text.
+        content = page.get_latest_revision_as_object()
+        current = _text(content)
         updates = _updates(current)
         leftovers = {
             field: sorted(set(hits))
@@ -132,11 +137,9 @@ class Command(BaseCommand):
 
         if not updates:
             return False
-        if _has_pending_draft(page):
+        if reason := _skip_reason(page):
             self.stdout.write(
-                self.style.WARNING(
-                    "  skipped: page has an unpublished draft, update it in Wagtail"
-                )
+                self.style.WARNING(f"  skipped: {reason}, update it in Wagtail")
             )
             return False
 
@@ -144,42 +147,53 @@ class Command(BaseCommand):
 
     def save(self, page):
         """Save the rebranded text, publishing it if the page is live. True if saved."""
-        with transaction.atomic():
-            # Re-read under a row lock: an editor may have saved a draft, or
-            # another run may have rebranded the page, since it was loaded.
-            # Wagtail's draft save updates this row, so it waits for us.
-            page = FlexiblePricingRequestForm.objects.select_for_update().get(
-                pk=page.pk
-            )
-            if _has_pending_draft(page):
-                self.stdout.write(
-                    self.style.WARNING(
-                        "  skipped: a draft was saved meanwhile, update it in Wagtail"
-                    )
+        try:
+            with transaction.atomic():
+                return self._save_locked(page)
+        except ValidationError as error:
+            # Nothing was written: the transaction rolled back.
+            self.stdout.write(
+                self.style.ERROR(
+                    "  skipped: page fails validation, fix it in Wagtail: "
+                    + "; ".join(error.messages)
                 )
-                return False
-            content = page.get_latest_revision_as_object()
-            updates = _updates(_text(content))
-            if not updates:
-                self.stdout.write("  skipped: already rebranded meanwhile")
-                return False
-            for field, text in updates.items():
-                setattr(content, field, text)
-            revision = content.save_revision(log_action=True)
-            if page.live:
-                revision.publish()
+            )
+            return False
+
+    def _save_locked(self, page):
+        # Re-read under a row lock: an editor may have saved a draft, or another
+        # run may have rebranded the page, since it was loaded. Wagtail's draft
+        # save updates this row, so it waits for us instead of being buried.
+        page = FlexiblePricingRequestForm.objects.select_for_update().get(pk=page.pk)
+        content = page.get_latest_revision_as_object()
+        updates = _updates(_text(content))
+        reason = _skip_reason(page) or (None if updates else "already rebranded")
+        if reason:
+            self.stdout.write(
+                self.style.WARNING(f"  skipped: {reason} (changed since it was read)")
+            )
+            return False
+        for field, text in updates.items():
+            setattr(content, field, text)
+        revision = content.save_revision(log_action=True)
+        if page.live:
+            revision.publish()
         return True
 
 
-def _has_pending_draft(page):
-    """
-    True if a live page has a draft an editor hasn't published yet.
-
-    Publishing our version of the live text would bury that draft. A page that
-    isn't live always counts as having unpublished changes, but its latest
-    revision is its only content, so it's rebranded as a new draft instead.
-    """
-    return page.live and page.has_unpublished_changes
+def _skip_reason(page):
+    """Why the page must be left to a person, or None if it's safe to change."""
+    checks = [
+        (page.alias_of_id, "page is an alias, its source page is what to change"),
+        (page.locked, "page is locked"),
+        (page.workflow_in_progress, "page is in moderation"),
+        (page.scheduled_revision, "page has a scheduled publish"),
+        # A live page's draft holds an editor's pending work; publishing our
+        # version of the live text would bury it. A page that isn't live has
+        # its only content in its latest revision, so it gets a new draft.
+        (page.live and page.has_unpublished_changes, "page has an unpublished draft"),
+    ]
+    return next((reason for hit, reason in checks if hit), None)
 
 
 def _text(content):

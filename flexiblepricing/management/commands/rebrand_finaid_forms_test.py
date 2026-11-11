@@ -1,9 +1,12 @@
 """Tests for the rebrand_finaid_forms command"""
 
+from datetime import timedelta
 from io import StringIO
 
 import pytest
 from django.core.management import call_command
+from django.utils import timezone
+from wagtail.models import Page
 
 from cms.factories import FlexiblePricingFormFactory
 from cms.models import FlexiblePricingRequestForm
@@ -191,3 +194,60 @@ def test_page_rebranded_after_load_is_not_saved_again():
 
     assert changed is False
     assert page.revisions.count() == revisions
+
+
+def test_locked_pages_are_skipped():
+    """A locked page is left alone, as the Wagtail admin would."""
+    page = FlexiblePricingFormFactory.create(intro=OLD_INTRO, locked=True)
+
+    output = _run("--commit")
+
+    page.refresh_from_db()
+    assert page.intro == OLD_INTRO
+    assert "skipped: page is locked" in output
+
+
+def test_scheduled_pages_are_skipped():
+    """A page with a revision scheduled to go live is left alone."""
+    page = FlexiblePricingFormFactory.create(intro=OLD_INTRO)
+    page.unpublish()
+    page.save_revision(approved_go_live_at=timezone.now() + timedelta(days=1))
+    revisions = page.revisions.count()
+
+    output = _run("--commit")
+
+    assert page.revisions.count() == revisions
+    assert "skipped: page has a scheduled publish" in output
+
+
+def test_alias_pages_follow_their_source():
+    """An alias can't take revisions; it gets the text when its source is published."""
+    page = FlexiblePricingFormFactory.create(intro=OLD_INTRO)
+    alias = page.create_alias(parent=page.get_parent(), update_slug="alias")
+    out = StringIO()
+
+    assert Command(stdout=out).rebrand_page(alias, commit=True) is False
+    assert "skipped: page is an alias" in out.getvalue()
+
+    output = _run("--commit")
+
+    alias.refresh_from_db()
+    assert alias.intro == rebrand(OLD_INTRO)
+    assert "Updated 1 page(s)." in output
+
+
+def test_pages_failing_validation_are_skipped_without_stopping_the_run():
+    """A page Wagtail refuses to save is reported and the other pages still change."""
+    broken = FlexiblePricingFormFactory.create(intro=OLD_INTRO)
+    Page.objects.filter(pk=broken.pk).update(title="")
+    fine = FlexiblePricingFormFactory.create(intro=OLD_INTRO)
+
+    output = _run("--commit")
+
+    broken.refresh_from_db()
+    fine.refresh_from_db()
+    assert broken.intro == OLD_INTRO
+    assert broken.revisions.count() == 0
+    assert fine.intro == rebrand(OLD_INTRO)
+    assert "skipped: page fails validation" in output
+    assert "Updated 1 page(s)." in output
