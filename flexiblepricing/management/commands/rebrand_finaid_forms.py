@@ -9,6 +9,10 @@ person to look at.
 
 Without --commit this changes nothing: it prints, per page, a diff of what it
 would change and what it would leave for manual review.
+
+A live page is republished with the new text, unless it has an unpublished
+draft, which is skipped so the editor's pending work isn't buried. A page that
+isn't live gets the new text as a draft built on its latest revision.
 """
 
 import difflib
@@ -95,12 +99,10 @@ class Command(BaseCommand):
     def rebrand_page(self, page, *, commit):
         """Report, and with commit apply, one page's changes. True if it changes."""
         label = f"[{page.id}] {page.title} ({page.url_path}, live={page.live})"
-        current = {field: getattr(page, field) or "" for field in TEXT_FIELDS}
-        updates = {
-            field: rebrand(text)
-            for field, text in current.items()
-            if rebrand(text) != text
-        }
+        # save_revision() doesn't write the text to the page row, so a page that
+        # isn't live keeps its current text only in its latest revision.
+        current = _text(page.get_latest_revision_as_object())
+        updates = _updates(current)
         leftovers = {
             field: sorted(set(hits))
             for field, text in {**current, **updates}.items()
@@ -130,9 +132,7 @@ class Command(BaseCommand):
 
         if not updates:
             return False
-        if page.has_unpublished_changes:
-            # The draft holds an editor's pending work; publishing our version
-            # of the live text would bury it.
+        if _has_pending_draft(page):
             self.stdout.write(
                 self.style.WARNING(
                     "  skipped: page has an unpublished draft, update it in Wagtail"
@@ -140,32 +140,58 @@ class Command(BaseCommand):
             )
             return False
 
-        return self.publish(page) if commit else True
+        return self.save(page) if commit else True
 
-    def publish(self, page):
-        """Save and publish the rebranded text. True if it was saved."""
+    def save(self, page):
+        """Save the rebranded text, publishing it if the page is live. True if saved."""
         with transaction.atomic():
-            # Re-read under a row lock: an editor may have saved a draft since
-            # the page was loaded, and Wagtail's draft save updates this row,
-            # so it waits for us instead of being buried.
+            # Re-read under a row lock: an editor may have saved a draft, or
+            # another run may have rebranded the page, since it was loaded.
+            # Wagtail's draft save updates this row, so it waits for us.
             page = FlexiblePricingRequestForm.objects.select_for_update().get(
                 pk=page.pk
             )
-            if page.has_unpublished_changes:
+            if _has_pending_draft(page):
                 self.stdout.write(
                     self.style.WARNING(
                         "  skipped: a draft was saved meanwhile, update it in Wagtail"
                     )
                 )
                 return False
-            for field in TEXT_FIELDS:
-                text = getattr(page, field)
-                if text:
-                    setattr(page, field, rebrand(text))
-            revision = page.save_revision(log_action=True)
+            content = page.get_latest_revision_as_object()
+            updates = _updates(_text(content))
+            if not updates:
+                self.stdout.write("  skipped: already rebranded meanwhile")
+                return False
+            for field, text in updates.items():
+                setattr(content, field, text)
+            revision = content.save_revision(log_action=True)
             if page.live:
                 revision.publish()
         return True
+
+
+def _has_pending_draft(page):
+    """
+    True if a live page has a draft an editor hasn't published yet.
+
+    Publishing our version of the live text would bury that draft. A page that
+    isn't live always counts as having unpublished changes, but its latest
+    revision is its only content, so it's rebranded as a new draft instead.
+    """
+    return page.live and page.has_unpublished_changes
+
+
+def _text(content):
+    return {field: getattr(content, field) or "" for field in TEXT_FIELDS}
+
+
+def _updates(text_by_field):
+    return {
+        field: new
+        for field, text in text_by_field.items()
+        if (new := rebrand(text)) != text
+    }
 
 
 def _lines(text):

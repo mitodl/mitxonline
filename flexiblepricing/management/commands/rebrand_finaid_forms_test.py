@@ -143,3 +143,51 @@ def test_draft_saved_after_load_is_not_published_over():
         page.get_latest_revision_as_object().application_denied_text
         == "editor's pending change"
     )
+
+
+def test_pages_that_are_not_live_get_a_rebranded_draft():
+    """
+    A page that isn't live is rebranded as a new draft, not published, and a
+    second run sees that draft as already rebranded.
+    """
+    page = FlexiblePricingFormFactory.create(intro=OLD_INTRO)
+    page.unpublish()
+    page.refresh_from_db()
+    assert page.has_unpublished_changes
+
+    output = _run("--commit")
+
+    page.refresh_from_db()
+    assert "Updated 1 page(s)." in output
+    assert not page.live
+    assert page.get_latest_revision_as_object().intro == rebrand(OLD_INTRO)
+    assert "Updated 0 page(s)." in _run("--commit")
+
+
+def test_draft_of_page_that_is_not_live_keeps_editor_changes():
+    """Rebranding a page that isn't live builds on its latest draft."""
+    page = FlexiblePricingFormFactory.create(intro=OLD_INTRO)
+    page.unpublish()
+    page.application_denied_text = "editor's pending change"
+    page.save_revision()
+
+    _run("--commit")
+
+    draft = FlexiblePricingRequestForm.objects.get(
+        pk=page.pk
+    ).get_latest_revision_as_object()
+    assert draft.intro == rebrand(OLD_INTRO)
+    assert draft.application_denied_text == "editor's pending change"
+
+
+def test_page_rebranded_after_load_is_not_saved_again():
+    """If another run rebranded the page meanwhile, no extra revision is saved."""
+    page = FlexiblePricingFormFactory.create(intro=OLD_INTRO)
+    stale = FlexiblePricingRequestForm.objects.get(pk=page.pk)
+    _run("--commit")
+    revisions = page.revisions.count()
+
+    changed = Command(stdout=StringIO()).rebrand_page(stale, commit=True)
+
+    assert changed is False
+    assert page.revisions.count() == revisions
