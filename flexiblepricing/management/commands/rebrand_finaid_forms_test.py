@@ -118,7 +118,7 @@ def test_pages_with_drafts_are_skipped():
 
     page.refresh_from_db()
     assert page.intro == OLD_INTRO
-    assert "skipped: page has an unpublished draft" in output
+    assert "skipped, page has an unpublished draft" in output
 
 
 def test_pages_that_are_not_live_get_a_rebranded_draft():
@@ -165,4 +165,20 @@ def test_scheduled_pages_are_skipped():
     output = _run("--commit")
 
     assert page.revisions.count() == revisions
-    assert "skipped: page has an unpublished draft" in output
+    assert "skipped, page has an unpublished draft" in output
+
+
+def test_live_text_is_reported_when_the_draft_is_already_rebranded():
+    """
+    A live page still showing the old text is reported even when its draft
+    already has the new text, so the operator knows to publish it in Wagtail.
+    """
+    page = FlexiblePricingFormFactory.create(intro=OLD_INTRO)
+    page.intro = rebrand(OLD_INTRO)
+    page.save_revision()
+
+    output = _run("--commit")
+
+    page.refresh_from_db()
+    assert page.intro == OLD_INTRO
+    assert "skipped, page has an unpublished draft" in output

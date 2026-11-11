@@ -110,6 +110,22 @@ class Command(BaseCommand):
             if (hits := NEEDS_REVIEW.findall(text))
         }
 
+        if page.live and page.has_unpublished_changes:
+            # Publishing would put the editor's unfinished (or scheduled) draft
+            # live. Check the live text too: the draft may already be fixed
+            # while learners still see the old text. A page that isn't live
+            # always counts as unpublished; its latest revision gets a new draft.
+            if updates or _updates(_text(page)):
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"{label}: skipped, page has an unpublished draft, "
+                        "update it in Wagtail"
+                    )
+                )
+            else:
+                self.stdout.write(f"{label}: nothing to change")
+            return False
+
         if not updates and not leftovers:
             self.stdout.write(f"{label}: nothing to change")
             return False
@@ -132,16 +148,6 @@ class Command(BaseCommand):
             )
 
         if not updates:
-            return False
-        if page.live and page.has_unpublished_changes:
-            # Publishing would put the editor's unfinished (or scheduled) draft
-            # live. A page that isn't live always counts as unpublished; its
-            # latest revision gets a new draft instead.
-            self.stdout.write(
-                self.style.WARNING(
-                    "  skipped: page has an unpublished draft, update it in Wagtail"
-                )
-            )
             return False
         if not commit:
             return True
