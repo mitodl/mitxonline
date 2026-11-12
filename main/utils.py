@@ -45,6 +45,21 @@ def get_learn_product_url(product_type: str, readable_id: str) -> str:
     return f"{get_learn_base_url()}/{product_type}/{readable_id}"
 
 
+def keycloak_realm_url() -> str:
+    """
+    Build the URL of the configured Keycloak realm.
+
+    Not urljoin: a leading slash there drops any path in KEYCLOAK_BASE_URL.
+
+    Returns:
+        str: KEYCLOAK_BASE_URL, path kept, then /realms/<KEYCLOAK_REALM_NAME>
+    """
+    return (
+        f"{settings.KEYCLOAK_BASE_URL.removesuffix('/')}"
+        f"/realms/{settings.KEYCLOAK_REALM_NAME}"
+    )
+
+
 def get_js_settings(request: HttpRequest):  # noqa: ARG001
     """
     Get the set of JS settings

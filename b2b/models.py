@@ -39,6 +39,7 @@ from b2b.constants import (
 )
 from courses.models import Program
 from main.models import AuditModel, ValidateOnSaveMixin
+from main.utils import keycloak_realm_url
 from variants.models import SupportedVariant
 
 log = logging.getLogger(__name__)
@@ -1308,16 +1309,6 @@ class OrganizationIdentityProvider(TimestampedModel, ValidateOnSaveMixin):
     )
     metadata_fetched_at = models.DateTimeField(null=True, blank=True)
 
-    @staticmethod
-    def _realm_url():
-        """Return the URL of the Keycloak realm the IdPs live in."""
-
-        # Not urljoin: a leading slash there drops any path in the base URL.
-        return (
-            f"{settings.KEYCLOAK_BASE_URL.removesuffix('/')}"
-            f"/realms/{settings.KEYCLOAK_REALM_NAME}"
-        )
-
     @property
     def login_url(self):
         """
@@ -1356,7 +1347,7 @@ class OrganizationIdentityProvider(TimestampedModel, ValidateOnSaveMixin):
             }
         )
 
-        return f"{self._realm_url()}/protocol/openid-connect/auth?{query}"
+        return f"{keycloak_realm_url()}/protocol/openid-connect/auth?{query}"
 
     @property
     def service_provider(self):
@@ -1373,7 +1364,7 @@ class OrganizationIdentityProvider(TimestampedModel, ValidateOnSaveMixin):
           OIDC redirect URI) and metadata_url (the SAML SP descriptor)
         """
 
-        realm_url = self._realm_url()
+        realm_url = keycloak_realm_url()
         endpoint = f"{realm_url}/broker/{self.alias}/endpoint"
 
         if self.protocol != IDP_PROTOCOL_SAML:
