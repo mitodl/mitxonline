@@ -275,7 +275,11 @@ def test_basket_owner_handoff_skips_the_reset_endpoint(rf, basket_owner_middlewa
     assert basket_owner_middleware.process_request(request) is None
 
 
-@pytest.mark.parametrize("basket_id", ["", "abc", "1; DROP TABLE", "-1", "²", "١٢"])
+@pytest.mark.parametrize(
+    "basket_id",
+    # "9" * 4301 is past int()'s digit limit, which would raise ValueError.
+    ["", "abc", "1; DROP TABLE", "-1", "²", "١٢", "9" * 20, "9" * 4301],
+)
 def test_basket_owner_handoff_ignores_unusable_basket_ids(
     rf, basket_owner_middleware, basket_id
 ):
@@ -284,6 +288,50 @@ def test_basket_owner_handoff_ignores_unusable_basket_ids(
     request.user = UserFactory.create()
 
     assert basket_owner_middleware.process_request(request) is None
+
+
+def test_basket_owner_handoff_ignores_out_of_range_basket_id(
+    rf, basket_owner_middleware
+):
+    """A 19-digit id past bigint's range matches nothing instead of erroring."""
+    request = rf.get("/cart/", {"basket_id": "9" * 19})
+    request.user = UserFactory.create()
+
+    assert basket_owner_middleware.process_request(request) is not None
+
+
+def test_basket_owner_handoff_only_bounces_get(rf, basket_owner_middleware):
+    """A redirected POST comes back as a GET without its body, so leave it be."""
+    basket = BasketFactory.create()
+
+    request = rf.post(f"/cart/?basket_id={basket.id}")
+    request.user = UserFactory.create()
+
+    assert basket_owner_middleware.process_request(request) is None
+
+
+def test_basket_owner_handoff_round_trip(client):
+    """The middleware and switch-session agree on the parameters they hand over.
+
+    A mismatched hand-off goes out through switch-session, which drops the
+    session and sends the browser back to the cart carrying the reset marker.
+    Who it comes back as is the gateway's job and not reproducible here.
+    """
+    basket = BasketFactory.create()
+    client.force_login(UserFactory.create())
+
+    bounce = client.get("/cart/", {"basket_id": basket.id, "ecom-service": "true"})
+    assert urlparse(bounce.url).path.rstrip("/").endswith("/switch-session")
+
+    back = client.get(bounce.url)
+    assert "_auth_user_id" not in client.session
+    target = urlparse(back.url)
+    assert target.path == "/cart/"
+    assert parse_qs(target.query) == {
+        "basket_id": [str(basket.id)],
+        "ecom-service": ["true"],
+        "session_reset": ["1"],
+    }
 
 
 def test_basket_owner_handoff_ignores_anonymous_callers(rf, basket_owner_middleware):

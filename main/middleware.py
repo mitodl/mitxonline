@@ -18,6 +18,8 @@ ANONYMOUS_BASKET_HANDOFF_PARAM = "anonymous_basket_id"
 # and the marker showing this hand-off has already had one session reset.
 EXPECTED_BASKET_PARAM = "basket_id"
 SESSION_RESET_PARAM = "session_reset"
+# len(str(2**63 - 1)): the longest id a bigint primary key can hold.
+MAX_BASKET_ID_DIGITS = 19
 
 
 class CachelessAPIMiddleware(MiddlewareMixin):
@@ -170,15 +172,26 @@ class BasketOwnerHandoffMiddleware(MiddlewareMixin):
         """Whether this request names a basket its session does not own."""
         expected_basket_id = request.GET.get(EXPECTED_BASKET_PARAM)
         # The reset endpoint is where the fix happens; checking there would just
-        # add a hop, and its session is mid-teardown anyway.
-        if not expected_basket_id or request.path.rstrip("/").endswith(
-            "/switch-session"
+        # add a hop, and its session is mid-teardown anyway.  Only GET is
+        # bounced: browsers reissue a redirected POST as a GET without its body,
+        # and Learn's hand-off is a plain link.
+        if (
+            not expected_basket_id
+            or request.method != "GET"
+            or request.path.rstrip("/").endswith("/switch-session")
         ):
             return False
 
         # isascii() too: str.isdigit() accepts characters like "²" that int()
-        # rejects, which would turn a crafted link into a 500 on any page.
-        if not (expected_basket_id.isascii() and expected_basket_id.isdigit()):
+        # rejects, which would turn a crafted link into a 500 on any page.  The
+        # length cap does the same for int()'s 4300-digit limit; a value that
+        # fits but exceeds bigint matches nothing, since Django turns an
+        # out-of-range integer lookup into an empty result.
+        if not (
+            expected_basket_id.isascii()
+            and expected_basket_id.isdigit()
+            and len(expected_basket_id) <= MAX_BASKET_ID_DIGITS
+        ):
             log.warning(
                 "Ignoring malformed %s query param: %s",
                 EXPECTED_BASKET_PARAM,
