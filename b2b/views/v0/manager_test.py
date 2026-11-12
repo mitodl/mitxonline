@@ -2580,7 +2580,7 @@ def test_b2b_codes_assign_waits_for_a_concurrent_assignment(org_setup, mock_emai
     assert assignment.assigned_email == "first@example.com"
 
 
-def test_b2b_codes_assign_without_a_name(org_setup, mock_email_task):
+def test_b2b_codes_assign_without_a_name(org_setup):
     """--email without --name assigns the code with a blank name."""
     _, _, (contract_1, *_), *_ = org_setup
 
