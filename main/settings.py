@@ -1643,6 +1643,45 @@ DISABLE_USER_REPAIR_TASK = get_bool(
     description="Disable the task so it no-ops",
 )
 
+EDX_MIGRATION_WAREHOUSE = get_string(
+    name="EDX_MIGRATION_WAREHOUSE",
+    default="trino",
+    description=(
+        "Which data platform warehouse migrate_edx_data reads from: trino "
+        "(TRINO_* settings) or starrocks (STARROCKS_* settings)"
+    ),
+)
+
+TRINO_HOST = get_string(
+    name="TRINO_HOST",
+    default=None,
+    description="Host URL for Trino server",
+)
+
+TRINO_PORT = get_int(
+    name="TRINO_PORT",
+    default=443,
+    description="Port number for Trino server",
+)
+
+TRINO_CATALOG = get_string(
+    name="TRINO_CATALOG",
+    default=None,
+    description="Catalog name for Trino queries",
+)
+
+TRINO_USER = get_string(
+    name="TRINO_USER",
+    default=None,
+    description="Username for Trino authentication",
+)
+
+TRINO_PASSWORD = get_string(
+    name="TRINO_PASSWORD",
+    default=None,
+    description="Password for Trino authentication",
+)
+
 STARROCKS_HOST = get_string(
     name="STARROCKS_HOST",
     default=None,

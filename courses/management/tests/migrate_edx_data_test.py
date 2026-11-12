@@ -13,6 +13,8 @@ from courses.factories import CourseFactory, CourseRunFactory, CourseRunGradeFac
 from courses.management.commands import migrate_edx_data
 from courses.management.commands.migrate_edx_data import (
     MIGRATION_SCHEMA,
+    WAREHOUSE_STARROCKS,
+    WAREHOUSE_TRINO,
     Command,
     _warehouse_list,
 )
@@ -24,7 +26,7 @@ pytestmark = pytest.mark.django_db
 
 
 class FakeCursor:
-    """Minimal stand-in for a pymysql cursor."""
+    """Minimal stand-in for a Trino or pymysql DB-API cursor."""
 
     def __init__(self, columns, rows, executed):
         self.description = [(col,) for col in columns]
@@ -44,7 +46,7 @@ class FakeCursor:
 
 
 class FakeConnection:
-    """Minimal stand-in for a pymysql connection."""
+    """Minimal stand-in for a Trino or pymysql DB-API connection."""
 
     def __init__(self, columns, rows):
         self._columns = columns
@@ -56,26 +58,92 @@ class FakeConnection:
         return FakeCursor(self._columns, self._rows, self.executed)
 
 
-@pytest.mark.parametrize("setting", ["STARROCKS_HOST", "STARROCKS_USER"])
-def test_connect_requires_starrocks_settings(settings, mocker, setting):
-    """The command refuses to connect without a StarRocks host and user"""
+@pytest.fixture
+def trino_settings(settings):
+    """Read the migration tables from Trino"""
+    settings.EDX_MIGRATION_WAREHOUSE = WAREHOUSE_TRINO
+    settings.TRINO_HOST = "trino.example.com"
+    settings.TRINO_PORT = 443
+    settings.TRINO_USER = "reader"
+    settings.TRINO_PASSWORD = "secret"  # noqa: S105
+    settings.TRINO_CATALOG = "ol_data_lake_production"
+    return settings
+
+
+@pytest.fixture
+def starrocks_settings(settings):
+    """Read the migration tables from StarRocks"""
+    settings.EDX_MIGRATION_WAREHOUSE = WAREHOUSE_STARROCKS
     settings.STARROCKS_HOST = "starrocks.example.com"
     settings.STARROCKS_USER = "reader"
-    setattr(settings, setting, None)
+    return settings
+
+
+def test_connect_rejects_unknown_warehouse(settings, mocker):
+    """An EDX_MIGRATION_WAREHOUSE other than trino or starrocks is an error"""
+    settings.EDX_MIGRATION_WAREHOUSE = "galaxy"
+    trino_connect = mocker.patch.object(migrate_edx_data.trino.dbapi, "connect")
+    starrocks_connect = mocker.patch.object(migrate_edx_data.pymysql, "connect")
+
+    with pytest.raises(CommandError, match="galaxy"):
+        Command()._connect_to_warehouse()  # noqa: SLF001
+
+    trino_connect.assert_not_called()
+    starrocks_connect.assert_not_called()
+
+
+@pytest.mark.parametrize("setting", ["TRINO_HOST", "TRINO_USER", "TRINO_CATALOG"])
+def test_connect_requires_trino_settings(trino_settings, mocker, setting):
+    """The command refuses to connect to Trino without a host, user and catalog"""
+    setattr(trino_settings, setting, None)
+    connect = mocker.patch.object(migrate_edx_data.trino.dbapi, "connect")
+
+    with pytest.raises(CommandError, match=setting):
+        Command()._connect_to_warehouse()  # noqa: SLF001
+
+    connect.assert_not_called()
+
+
+def test_connect_uses_trino_settings(trino_settings, mocker):
+    """With EDX_MIGRATION_WAREHOUSE=trino the connection is opened from the TRINO_* settings"""
+    trino_connect = mocker.patch.object(migrate_edx_data.trino.dbapi, "connect")
+    starrocks_connect = mocker.patch.object(migrate_edx_data.pymysql, "connect")
+
+    assert Command()._connect_to_warehouse() == trino_connect.return_value  # noqa: SLF001
+
+    trino_connect.assert_called_once_with(
+        host="trino.example.com",
+        port=443,
+        user="reader",
+        auth=mocker.ANY,
+        catalog="ol_data_lake_production",
+        schema=MIGRATION_SCHEMA,
+    )
+    starrocks_connect.assert_not_called()
+
+
+@pytest.mark.parametrize("setting", ["STARROCKS_HOST", "STARROCKS_USER"])
+def test_connect_requires_starrocks_settings(starrocks_settings, mocker, setting):
+    """The command refuses to connect to StarRocks without a host and user"""
+    setattr(starrocks_settings, setting, None)
     connect = mocker.patch.object(migrate_edx_data.pymysql, "connect")
 
-    with pytest.raises(CommandError):
+    with pytest.raises(CommandError, match=setting):
         Command()._connect_to_warehouse()  # noqa: SLF001
 
     connect.assert_not_called()
 
 
 def test_connect_uses_starrocks_settings(settings, mocker):
-    """The connection is opened from the STARROCKS_* settings"""
+    """With EDX_MIGRATION_WAREHOUSE=starrocks the connection is opened from the
+    STARROCKS_* settings
+    """
+    settings.EDX_MIGRATION_WAREHOUSE = WAREHOUSE_STARROCKS
     settings.STARROCKS_HOST = "starrocks.example.com"
     settings.STARROCKS_PORT = 9030
     settings.STARROCKS_USER = "reader"
     settings.STARROCKS_PASSWORD = "secret"  # noqa: S105
+    trino_connect = mocker.patch.object(migrate_edx_data.trino.dbapi, "connect")
     connect = mocker.patch.object(migrate_edx_data.pymysql, "connect")
 
     assert Command()._connect_to_warehouse() == connect.return_value  # noqa: SLF001
@@ -88,14 +156,14 @@ def test_connect_uses_starrocks_settings(settings, mocker):
         ssl=mocker.ANY,
         init_command="SET time_zone = '+00:00'",
     )
+    trino_connect.assert_not_called()
 
 
-def test_connect_verifies_certificate_and_hostname(settings, mocker):
+@pytest.mark.usefixtures("starrocks_settings")
+def test_connect_verifies_certificate_and_hostname(mocker):
     """The TLS context pymysql builds from the command's arguments checks both
     the chain and the hostname
     """
-    settings.STARROCKS_HOST = "starrocks.example.com"
-    settings.STARROCKS_USER = "reader"
     connect = mocker.patch.object(migrate_edx_data.pymysql, "connect")
 
     Command()._connect_to_warehouse()  # noqa: SLF001
@@ -107,10 +175,17 @@ def test_connect_verifies_certificate_and_hostname(settings, mocker):
     assert conn.ctx.check_hostname is True
 
 
-def test_course_certificates_query_binds_readable_ids():
-    """Course run readable ids are bound as parameters, and the table is
-    qualified with its catalog and schema
+@pytest.mark.parametrize(
+    ("warehouse_settings", "placeholders"),
+    [("trino_settings", "?, ?"), ("starrocks_settings", "%s, %s")],
+)
+def test_course_certificates_query_binds_readable_ids(
+    request, warehouse_settings, placeholders
+):
+    """Course run readable ids are bound as parameters in the driver's paramstyle,
+    and the table is qualified with its catalog and schema
     """
+    request.getfixturevalue(warehouse_settings)
     conn = FakeConnection(columns=[], rows=[])
 
     Command()._migrate_course_certificates(  # noqa: SLF001
@@ -119,8 +194,11 @@ def test_course_certificates_query_binds_readable_ids():
     )
 
     [(query, args)] = conn.executed
-    assert f"FROM {MIGRATION_SCHEMA}.edxorg_to_mitxonline_enrollments " in query
-    assert "courserun_readable_id IN (%s, %s)" in query
+    assert (
+        f"FROM ol_data_lake_production.{MIGRATION_SCHEMA}.edxorg_to_mitxonline_enrollments "
+        in query
+    )
+    assert f"courserun_readable_id IN ({placeholders})" in query
     assert args == ["course-v1:MITx+1+1T2024", "course-v1:MITx+2'x"]
 
 
@@ -583,6 +661,7 @@ def test_backfill_letter_grades_dry_run_does_not_write():
     assert not CourseRunGradeAudit.objects.filter(course_run_grade=grade).exists()
 
 
+@pytest.mark.usefixtures("starrocks_settings")
 @pytest.mark.parametrize(
     ("options", "expected_clause", "expected_params"),
     [
@@ -617,6 +696,7 @@ def test_backfill_letter_grades_binds_courserun_filter(
     assert params == expected_params
 
 
+@pytest.mark.usefixtures("starrocks_settings")
 def test_migrate_course_certificates_binds_courserun_filter():
     """The course_certificates migration uses the same bound filter"""
     conn = FakeConnection(columns=["user_mitxonline_id"], rows=[])

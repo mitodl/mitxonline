@@ -3,6 +3,7 @@ import ssl
 from datetime import UTC
 
 import pymysql
+import trino.dbapi
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand, CommandError
@@ -11,6 +12,7 @@ from django.db.models import Q
 from django.db.models.functions import Lower
 from mitol.common.utils.datetime import now_in_utc
 from reversion.models import Version
+from trino.auth import BasicAuthentication
 
 from cms.api import create_default_courseware_page
 from cms.models import CertificatePage, SignatoryPage
@@ -33,17 +35,36 @@ from openedx.api import repair_faulty_edx_user
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import GENDER_CHOICES, LegalAddress, User, UserProfile
 
-# The data platform builds these tables in production only. The connection sets
-# no default database, so every table name is qualified with this.
-MIGRATION_SCHEMA = "ol_data_lake_production.ol_warehouse_production_migration"
+WAREHOUSE_TRINO = "trino"
+WAREHOUSE_STARROCKS = "starrocks"
+WAREHOUSE_REQUIRED_SETTINGS = {
+    WAREHOUSE_TRINO: ("TRINO_HOST", "TRINO_USER", "TRINO_CATALOG"),
+    WAREHOUSE_STARROCKS: ("STARROCKS_HOST", "STARROCKS_USER"),
+}
+
+MIGRATION_SCHEMA = "ol_warehouse_production_migration"
+# The data platform builds these tables in the production lake only. StarRocks
+# exposes it under this catalog; Trino's catalog name comes from TRINO_CATALOG.
+STARROCKS_CATALOG = "ol_data_lake_production"
+
+
+def _uses_trino():
+    return settings.EDX_MIGRATION_WAREHOUSE == WAREHOUSE_TRINO
 
 
 def _warehouse_table(table_name):
-    return f"{MIGRATION_SCHEMA}.{table_name}"
+    catalog = settings.TRINO_CATALOG if _uses_trino() else STARROCKS_CATALOG
+    return f"{catalog}.{MIGRATION_SCHEMA}.{table_name}"
+
+
+def _warehouse_placeholders(count):
+    """Query placeholders in the warehouse driver's paramstyle"""
+    placeholder = "?" if _uses_trino() else "%s"
+    return ", ".join([placeholder] * count)
 
 
 def _warehouse_list(value):
-    """Read an array column, which StarRocks sends as JSON text"""
+    """Read an array column. Trino sends a list, StarRocks sends JSON text."""
     if value is None:
         return []
     if isinstance(value, str | bytes):
@@ -53,40 +74,76 @@ def _warehouse_list(value):
 
 def _warehouse_datetime(value):
     """Read a timestamp column. StarRocks sends it naive, in the session's time zone,
-    which _connect_to_warehouse sets to UTC.
+    which _connect_to_starrocks sets to UTC.
     """
     if value is None or value.tzinfo is not None:
         return value
     return value.replace(tzinfo=UTC)
 
 
+def _connect_to_trino():
+    return trino.dbapi.connect(
+        host=settings.TRINO_HOST,
+        port=settings.TRINO_PORT,
+        user=settings.TRINO_USER,
+        auth=BasicAuthentication(settings.TRINO_USER, settings.TRINO_PASSWORD),
+        catalog=settings.TRINO_CATALOG,
+        schema=MIGRATION_SCHEMA,
+    )
+
+
+def _connect_to_starrocks():
+    return pymysql.connect(
+        host=settings.STARROCKS_HOST,
+        port=settings.STARROCKS_PORT,
+        user=settings.STARROCKS_USER,
+        password=settings.STARROCKS_PASSWORD,
+        # Verifies the chain against the system CAs and the hostname.
+        # pymysql skips the hostname check when ssl_ca is unset, even
+        # with ssl_verify_identity=True, so a context is passed instead.
+        ssl=ssl.create_default_context(),
+        # StarRocks renders a timestamp with time zone in the session's
+        # time zone, and sends it without one.
+        init_command="SET time_zone = '+00:00'",
+    )
+
+
 class Command(BaseCommand):
     help = (
-        "Migrate the edX data via the StarRocks warehouse from the data platform to the corresponding models in MITx Online "
+        "Migrate the edX data via the data platform's warehouse (Trino or StarRocks, "
+        "per EDX_MIGRATION_WAREHOUSE) to the corresponding models in MITx Online "
         "e.g Course, CourseRun, CoursePage CertificatePage, etc."
     )
 
     def _connect_to_warehouse(self):
-        if not settings.STARROCKS_HOST or not settings.STARROCKS_USER:
-            msg = "STARROCKS_HOST and STARROCKS_USER must be set to read the edX migration tables"
+        warehouse = settings.EDX_MIGRATION_WAREHOUSE
+        if warehouse not in WAREHOUSE_REQUIRED_SETTINGS:
+            msg = (
+                f"EDX_MIGRATION_WAREHOUSE must be one of "
+                f"{', '.join(WAREHOUSE_REQUIRED_SETTINGS)}, not {warehouse!r}"
+            )
+            raise CommandError(msg)
+        missing = [
+            name
+            for name in WAREHOUSE_REQUIRED_SETTINGS[warehouse]
+            if not getattr(settings, name)
+        ]
+        if missing:
+            msg = f"{', '.join(missing)} must be set to read the edX migration tables from {warehouse}"
             raise CommandError(msg)
         try:
-            conn = pymysql.connect(
-                host=settings.STARROCKS_HOST,
-                port=settings.STARROCKS_PORT,
-                user=settings.STARROCKS_USER,
-                password=settings.STARROCKS_PASSWORD,
-                # Verifies the chain against the system CAs and the hostname.
-                # pymysql skips the hostname check when ssl_ca is unset, even
-                # with ssl_verify_identity=True, so a context is passed instead.
-                ssl=ssl.create_default_context(),
-                # StarRocks renders a timestamp with time zone in the session's
-                # time zone, and sends it without one.
-                init_command="SET time_zone = '+00:00'",
+            conn = (
+                _connect_to_trino()
+                if warehouse == WAREHOUSE_TRINO
+                else _connect_to_starrocks()
             )
-            self.stdout.write(self.style.SUCCESS("Successfully connected to StarRocks"))
+            self.stdout.write(
+                self.style.SUCCESS(f"Successfully connected to {warehouse}")
+            )
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f"Failed to connect to StarRocks: {e}"))
+            self.stdout.write(
+                self.style.ERROR(f"Failed to connect to {warehouse}: {e}")
+            )
             raise
         else:
             return conn
@@ -665,7 +722,7 @@ class Command(BaseCommand):
         ]
         if not readable_ids:
             return None, []
-        placeholders = ", ".join(["%s"] * len(readable_ids))
+        placeholders = _warehouse_placeholders(len(readable_ids))
         return f"courserun_readable_id IN ({placeholders})", readable_ids
 
     def _migrate_course_certificates(self, conn, options):
