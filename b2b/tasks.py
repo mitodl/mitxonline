@@ -127,15 +127,25 @@ def queue_contract_sheet_update_post_save(
     contract_id: int, *, only_update: bool = False
 ):
     """
-    Take an appropriate action on post-save for the contract.
+    Write the contract's enrollment codes to its Google Sheet.
 
-    If the prior revision to the current has a different tab or sheet URL
-    specified, then run write_codes, which will set up the (presumably blank)
-    sheet. Otherwise, use update_sheet, which is non-destructive.
+    write_codes sets up a (presumably blank) sheet and overwrites its rows, so
+    it runs only while none of the contract's codes has a sheet location: the
+    contract has never been written to a sheet, or the contract API cleared
+    the locations because the sheet or tab changed. It sets the locations, so
+    it runs once per sheet, and a failed write is retried by the next run.
+    Otherwise update_sheet, which is non-destructive, keeps each code in its
+    row.
+
+    only_update (the scheduled sweep) never runs write_codes, and skips a
+    contract whose sheet hasn't been written yet: update_sheet there would
+    write the codes without a header and save their locations, and then
+    write_codes would never run.
     """
 
     from b2b.models import ContractPage
     from b2b.sheets import ContractEnrollmentCodesSheetHandler
+    from ecommerce.models import Discount
 
     contract = ContractPage.objects.get(pk=contract_id)
 
@@ -150,24 +160,24 @@ def queue_contract_sheet_update_post_save(
             log.info("Contract %s is managed (no enrollment codes), skipping", contract)
         return
 
-    if not only_update:
-        has_revs = contract.revisions.count() > 1
+    # Every code of the contract, not discounts_qs: that leaves out codes whose
+    # run's product is inactive, and losing those would look like "never
+    # written" on a sheet that has them.
+    never_written = (
+        not Discount.objects.filter(b2b_contract=contract)
+        .exclude(b2b_sheet_location__isnull=True)
+        .exclude(b2b_sheet_location="")
+        .exists()
+    )
 
-        if has_revs:
-            # We have page revisions so check to see if the sheet or the tab changed
-            # in between. If they did, then we start over.
-            # Explicitly set this sort even though the Wagtail model seems to do this anyway.
-            revs = contract.revisions.order_by("-created_at").all()[:2]
-            if (
-                revs[0].as_object().google_sheet_target
-                != revs[1].as_object().google_sheet_target
-            ) or (
-                revs[0].as_object().google_sheet_target_tab
-                != revs[1].as_object().google_sheet_target_tab
-            ):
-                has_revs = False
-
-    if not only_update and not has_revs:
+    if never_written and only_update:
+        log.info(
+            "Google Sheet for %s hasn't been written yet; leaving it for the "
+            "next enrollment code check",
+            contract,
+        )
+        return
+    if never_written:
         log.info("Setting up Google Sheet for %s", contract)
 
         codes_written = handler.write_codes()

@@ -16,7 +16,9 @@ from b2b.constants import (
 )
 from b2b.contracts import add_contract_variant_set, add_courseware_to_contract
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
+from b2b.models import ContractProgramItem
 from courses.factories import CourseFactory, CourseRunFactory, ProgramFactory
+from ecommerce.factories import OneTimeDiscountFactory
 from openedx.constants import (
     COURSE_RUN_CLONE_STATUS_CLONED,
     COURSE_RUN_CLONE_STATUS_FAILED,
@@ -251,6 +253,209 @@ def test_contract_description_keeps_only_rich_text_markup(admin_drf_client):
 
     assert created.status_code == status.HTTP_201_CREATED
     assert created.json()["description"] == "alert(1)Plain &amp; simple"
+
+
+SHEET_URL = "https://docs.google.com/spreadsheets/d/abc123/edit"
+
+
+def test_create_contract_with_welcome_content_and_sheet(admin_drf_client):
+    """The extra welcome message and the Google Sheet are set on create."""
+
+    organization = OrganizationPageFactory.create()
+
+    response = admin_drf_client.post(
+        _contracts_url(organization.org_key),
+        {
+            "name": "Spring cohort",
+            "membership_type": CONTRACT_MEMBERSHIP_CODE,
+            "welcome_message_extra": "<p>Hi</p><script>alert(1)</script>",
+            "google_sheet_target": SHEET_URL,
+            "google_sheet_target_tab": "Codes",
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED, response.json()
+    body = response.json()
+    assert body["welcome_message_extra"] == "<p>Hi</p>alert(1)"
+    assert body["google_sheet_target"] == SHEET_URL
+    assert body["google_sheet_target_tab"] == "Codes"
+    contract = organization.contracts.get()
+    assert contract.google_sheet_target == SHEET_URL
+    assert contract.google_sheet_target_tab == "Codes"
+
+
+@pytest.mark.parametrize(
+    ("value", "valid", "stored"),
+    [
+        (SHEET_URL, True, SHEET_URL),
+        ("", True, ""),
+        (None, True, ""),
+        ("not a url", False, None),
+        ("http://docs.google.com/spreadsheets/d/abc123", False, None),
+        ("https://example.com/spreadsheets/d/abc123", False, None),
+        ("https://docs.google.com/document/d/abc123", False, None),
+    ],
+)
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
+def test_google_sheet_target_must_be_an_https_url(
+    admin_drf_client, value, valid, stored
+):
+    """No sheet is stored blank, not null, since the scheduled update skips blanks."""
+
+    contract = ContractPageFactory.create(google_sheet_target="")
+
+    response = admin_drf_client.patch(
+        _contract_url(contract), {"google_sheet_target": value}, format="json"
+    )
+
+    if valid:
+        assert response.status_code == status.HTTP_200_OK, response.json()
+        contract.refresh_from_db()
+        assert contract.google_sheet_target == stored
+    else:
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "google_sheet_target" in response.json()["errors"]
+
+
+@pytest.mark.parametrize(
+    ("existing_target", "existing_tab", "payload", "valid"),
+    [
+        (SHEET_URL, "Sheet1", {"google_sheet_target_tab": " "}, False),
+        (
+            "",
+            "Sheet1",
+            {"google_sheet_target": SHEET_URL, "google_sheet_target_tab": ""},
+            False,
+        ),
+        (SHEET_URL, "", {"google_sheet_target": f"{SHEET_URL}?other"}, False),
+        ("", "Sheet1", {"google_sheet_target_tab": ""}, True),
+        (
+            SHEET_URL,
+            "Sheet1",
+            {"google_sheet_target": "", "google_sheet_target_tab": ""},
+            True,
+        ),
+        # Saved with a sheet and no tab before the rule: other edits still go
+        # through.
+        (SHEET_URL, "", {"name": "Renamed"}, True),
+    ],
+)
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
+def test_a_contract_with_a_sheet_needs_a_tab(
+    admin_drf_client, existing_target, existing_tab, payload, valid
+):
+    """The codes are written to a named tab, so a sheet without one is refused."""
+
+    contract = ContractPageFactory.create(
+        google_sheet_target=existing_target, google_sheet_target_tab=existing_tab
+    )
+
+    response = admin_drf_client.patch(_contract_url(contract), payload, format="json")
+
+    if valid:
+        assert response.status_code == status.HTTP_200_OK, response.json()
+    else:
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "google_sheet_target_tab" in response.json()["errors"]
+
+
+@pytest.mark.parametrize(
+    ("payload", "cleared"),
+    [
+        ({"google_sheet_target": f"{SHEET_URL}?other"}, True),
+        ({"google_sheet_target_tab": "Codes"}, True),
+        ({"google_sheet_target": ""}, True),
+        ({"google_sheet_target": SHEET_URL}, False),
+        ({"name": "Renamed"}, False),
+    ],
+)
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
+def test_patch_contract_sheet_change_forgets_where_codes_are(
+    admin_drf_client, mocked_tasks, payload, cleared
+):
+    """
+    Changing the sheet or tab clears the codes' sheet locations, so the next
+    sheet update writes them all out to the new one. Other contracts' codes
+    keep theirs.
+    """
+
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_CODE,
+        google_sheet_target=SHEET_URL,
+        google_sheet_target_tab="Sheet1",
+    )
+    code = OneTimeDiscountFactory.create(b2b_contract=contract, b2b_sheet_location="5")
+    other_code = OneTimeDiscountFactory.create(
+        b2b_contract=ContractPageFactory.create(), b2b_sheet_location="7"
+    )
+
+    response = admin_drf_client.patch(_contract_url(contract), payload, format="json")
+
+    assert response.status_code == status.HTTP_200_OK, response.json()
+    code.refresh_from_db()
+    other_code.refresh_from_db()
+    assert code.b2b_sheet_location == ("" if cleared else "5")
+    assert other_code.b2b_sheet_location == "7"
+    mocked_tasks.code_check.assert_called_once_with(contract.id)
+
+
+@pytest.fixture
+def contract_with_programs():
+    """A contract with three programs linked, in creation order."""
+
+    contract = ContractPageFactory.create()
+    programs = ProgramFactory.create_batch(3)
+    for sort_order, program in enumerate(programs):
+        ContractProgramItem(
+            contract=contract, program=program, sort_order=sort_order
+        ).save(skip_run_creation=True)
+    return contract, programs
+
+
+def test_order_programs(admin_drf_client, contract_with_programs):
+    """The programs come back, and are stored, in the order sent."""
+
+    contract, (first, second, third) = contract_with_programs
+    order = [third.readable_id, first.readable_id, second.readable_id]
+
+    response = admin_drf_client.post(
+        _contract_url(contract, "order-programs"), {"programs": order}, format="json"
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.json()
+    assert [program["readable_id"] for program in response.json()["programs"]] == order
+    assert list(contract.programs.values_list("readable_id", flat=True)) == order
+
+
+@pytest.mark.parametrize("change", ["missing", "duplicate", "unknown"])
+def test_order_programs_must_name_each_program_once(
+    admin_drf_client, contract_with_programs, change
+):
+    """An order that drops, repeats or adds a program is refused and changes nothing."""
+
+    contract, (first, second, third) = contract_with_programs
+    order = {
+        "missing": [first.readable_id, second.readable_id],
+        "duplicate": [first.readable_id, second.readable_id, second.readable_id],
+        "unknown": [
+            first.readable_id,
+            second.readable_id,
+            third.readable_id,
+            ProgramFactory.create().readable_id,
+        ],
+    }[change]
+
+    response = admin_drf_client.post(
+        _contract_url(contract, "order-programs"), {"programs": order}, format="json"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert list(contract.programs.values_list("id", flat=True)) == [
+        first.id,
+        second.id,
+        third.id,
+    ]
 
 
 def test_add_courseware_and_follow_setup(admin_drf_client, mocked_tasks):

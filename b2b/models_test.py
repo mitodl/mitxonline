@@ -567,24 +567,32 @@ def test_publishing_a_stale_contract_revision_keeps_api_written_fields():
     """A Wagtail publish does not put back fields the contract API has changed."""
 
     contract = ContractPageFactory.create(
-        name="Before", max_learners=5, welcome_message="Hello"
+        name="Before",
+        max_learners=5,
+        welcome_message="Hello",
+        welcome_message_extra="<p>Old extra</p>",
+        google_sheet_target="https://docs.google.com/spreadsheets/d/old",
+        google_sheet_target_tab="Sheet1",
     )
-    contract.welcome_message_extra = "<p>Old extra</p>"
     revision = contract.save_revision()
 
     # The contract API saves the row without a revision.
     contract.name = "After"
     contract.max_learners = 50
     contract.welcome_message = "Hello again"
+    contract.welcome_message_extra = "<p>New extra</p>"
+    contract.google_sheet_target = "https://docs.google.com/spreadsheets/d/new"
+    contract.google_sheet_target_tab = "Codes"
     contract.save()
 
     # Wagtail's editor starts from the latest revision.
     edited = contract.get_latest_revision_as_object()
     assert edited.name == "After"
     assert edited.max_learners == 50
+    assert edited.welcome_message_extra == "<p>New extra</p>"
 
-    edited.welcome_message_extra = "<p>New extra</p>"
-    edited.save_revision().publish()
+    # Republishing the revision saved before the API write.
+    revision.publish()
 
     contract.refresh_from_db()
     assert contract.name == "After"
@@ -592,22 +600,19 @@ def test_publishing_a_stale_contract_revision_keeps_api_written_fields():
     assert contract.max_learners == 50
     assert contract.welcome_message == "Hello again"
     assert contract.welcome_message_extra == "<p>New extra</p>"
-
-    # Republishing the revision saved before the API write.
-    revision.publish()
-
-    contract.refresh_from_db()
-    assert contract.name == "After"
-    assert contract.max_learners == 50
-    assert contract.welcome_message == "Hello again"
-    assert contract.welcome_message_extra == "<p>Old extra</p>"
+    assert contract.google_sheet_target == "https://docs.google.com/spreadsheets/d/new"
+    assert contract.google_sheet_target_tab == "Codes"
 
 
 @pytest.mark.zeal_allow("wagtailcore.Page", "get()")
-def test_contract_wagtail_editor_only_edits_what_the_api_does_not(admin_client):
-    """The Wagtail edit form loads, links to the dashboard, and can't change API fields."""
+def test_contract_wagtail_editor_is_read_only(admin_client):
+    """The Wagtail edit form loads, lists the programs, links to the dashboard and edits nothing."""
 
     contract = ContractPageFactory.create(name="Read only", max_learners=5)
+    program = ProgramFactory.create()
+    ContractProgramItem(contract=contract, program=program, sort_order=0).save(
+        skip_run_creation=True
+    )
 
     response = admin_client.get(f"/cms/pages/{contract.id}/edit/")
 
@@ -617,15 +622,14 @@ def test_contract_wagtail_editor_only_edits_what_the_api_does_not(admin_client):
         f"/staff-dashboard/b2b_organizations/show/{contract.organization.org_key}"
         f"/contracts/{contract.id}"
     ) in content
+    assert f"<li>{program.title} ({program.readable_id})</li>" in content
     form = response.context["form"]
-    assert not set(contract.PROVISIONED_FIELDS) & set(form.fields)
-    assert {"welcome_message_extra", "google_sheet_target"} <= set(form.fields)
+    assert not {*contract.PROVISIONED_FIELDS, "organization"} & set(form.fields)
+    assert "contract_programs" not in form.formsets
 
 
-def test_publishing_a_contract_revision_keeps_program_links_and_takes_its_order(
-    mocker,
-):
-    """A Wagtail publish reorders a contract's programs and can't add or drop one."""
+def test_publishing_a_contract_revision_keeps_its_programs_and_their_order(mocker):
+    """A Wagtail publish can't add, drop or reorder a contract's programs."""
 
     queued = mocker.patch("b2b.tasks.create_program_contract_runs.delay")
     contract = ContractPageFactory.create()
@@ -635,9 +639,12 @@ def test_publishing_a_contract_revision_keeps_program_links_and_takes_its_order(
     )
     stale = contract.save_revision()
 
-    # Linked by the contract API after the revision was saved.
+    # Linked and reordered by the contract API after the revision was saved.
     ContractProgramItem(contract=contract, program=second, sort_order=1).save(
         skip_run_creation=True
+    )
+    ContractProgramItem.objects.filter(contract=contract, program=first).update(
+        sort_order=2
     )
 
     def linked_programs():
@@ -648,31 +655,20 @@ def test_publishing_a_contract_revision_keeps_program_links_and_takes_its_order(
         )
 
     stale.publish()
-    assert linked_programs() == [first.id, second.id]
+    assert linked_programs() == [second.id, first.id]
 
-    # Wagtail's editor starts from the latest revision and sees both.
+    # Wagtail's editor starts from the stored programs.
     edited = contract.get_latest_revision_as_object()
-    items = {item.program_id: item for item in edited.contract_programs.all()}
-    assert set(items) == {first.id, second.id}
+    assert [item.program_id for item in edited.contract_programs.all()] == [
+        second.id,
+        first.id,
+    ]
 
-    items[first.id].sort_order = 1
-    items[second.id].sort_order = 0
     edited.contract_programs = [
-        items[second.id],
-        items[first.id],
-        ContractProgramItem(program=third, sort_order=2),
+        ContractProgramItem(program=third, sort_order=0),
+        *edited.contract_programs.all(),
     ]
     edited.save_revision().publish()
 
     assert linked_programs() == [second.id, first.id]
     queued.assert_not_called()
-
-    # A revision that leaves a program out doesn't unlink it. It goes after the
-    # programs the revision does have.
-    edited = contract.get_latest_revision_as_object()
-    edited.contract_programs = [
-        item for item in edited.contract_programs.all() if item.program_id == first.id
-    ]
-    edited.save_revision().publish()
-
-    assert linked_programs() == [first.id, second.id]

@@ -10,11 +10,14 @@ export interface IContractForm {
     membership_type: ContractMembershipType;
     description: string;
     welcome_message: string;
+    welcome_message_extra: string;
     contract_start: Dayjs | null;
     contract_end: Dayjs | null;
     active: boolean;
     max_learners: number | null;
     enrollment_fixed_price: string | null;
+    google_sheet_target: string;
+    google_sheet_target_tab: string;
 }
 
 const DATE_FORMAT = "YYYY-MM-DD";
@@ -23,6 +26,7 @@ export const contractToForm = (contract: IProvisionedContract): IContractForm =>
     ...contract,
     contract_start: contract.contract_start ? dayjs(contract.contract_start) : null,
     contract_end: contract.contract_end ? dayjs(contract.contract_end) : null,
+    google_sheet_target: contract.google_sheet_target ?? "",
 });
 
 // A cleared date, seat cap or price is sent as null, which is how the API
@@ -94,11 +98,50 @@ export const ContractForm: React.FC<IContractFormProps> = ({ form, onFinish, ini
             <Input maxLength={255} />
         </Form.Item>
         <Form.Item
+            label="Extra welcome content"
+            name="welcome_message_extra"
+            extra="Shown to learners below the welcome message. Stored as HTML, with the same rules as the description."
+        >
+            <Input.TextArea rows={3} />
+        </Form.Item>
+        <Form.Item
             label="Description"
             name="description"
             extra="Stored as HTML. Plain text is fine; keep any tags that are already there. Only text markup is kept on save: an embedded image or media is removed if you change this field."
         >
             <Input.TextArea rows={4} />
+        </Form.Item>
+        <Form.Item
+            label="Google Sheet"
+            name="google_sheet_target"
+            extra="The sheet's https://docs.google.com/spreadsheets/ URL. Enrollment codes are written to it. Leave blank for no sheet."
+            rules={[{ pattern: /^https:\/\/docs\.google\.com\/spreadsheets\//, message: "Enter the sheet's https://docs.google.com/spreadsheets/ URL." }]}
+        >
+            <Input maxLength={1024} />
+        </Form.Item>
+        <Form.Item
+            label="Google Sheet tab"
+            name="google_sheet_target_tab"
+            dependencies={["google_sheet_target"]}
+            rules={[
+                // Like the API, only when the sheet or tab is being changed, so a
+                // contract saved with a sheet and no tab can still be edited.
+                ({ getFieldValue, isFieldTouched }) => ({
+                    validator: (_, tab: string | undefined) =>
+                        (isFieldTouched("google_sheet_target") || isFieldTouched("google_sheet_target_tab")) &&
+                        getFieldValue("google_sheet_target") &&
+                        !tab?.trim()
+                            ? Promise.reject(new Error("Name the tab the codes go in."))
+                            : Promise.resolve(),
+                }),
+            ]}
+            extra={
+                creating
+                    ? "The title of the worksheet the codes go in."
+                    : "The title of the worksheet the codes go in. Changing the sheet or the tab writes all the codes out to it from the top."
+            }
+        >
+            <Input maxLength={100} />
         </Form.Item>
         {!creating && (
             <Form.Item

@@ -18,6 +18,7 @@ import logging
 
 import django_filters
 from authlib.integrations.base_client.errors import OAuthError
+from django.db import transaction
 from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.types import OpenApiTypes
@@ -35,6 +36,7 @@ from b2b.constants import ONBOARDING_STATE_CHOICES
 from b2b.contracts import (
     add_contract_variant_set,
     add_courseware_to_contract,
+    clear_sheet_locations,
     create_contract,
     expire_unused_enrollment_codes,
     get_contract_setup_status,
@@ -42,11 +44,13 @@ from b2b.contracts import (
     queue_enrollment_code_check_if_required,
     remove_courseware_from_contract,
     retry_contract_setup,
+    set_contract_program_order,
     sync_contract_variants,
     update_contract_variant_set,
 )
 from b2b.exceptions import (
     AliasCollisionError,
+    ContractProgramOrderError,
     ContractVariantError,
     InvalidLifecycleTransitionError,
     OrganizationNameCollisionError,
@@ -80,6 +84,7 @@ from b2b.serializers.v0.manager import (
 )
 from b2b.serializers.v0.provisioning import (
     ContractCoursewareSerializer,
+    ContractProgramOrderSerializer,
     ContractSetupStatusSerializer,
     ContractVariantSetSerializer,
     ContractVariantSyncSerializer,
@@ -657,14 +662,23 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
         Update a contract.
 
         Queues the enrollment code check for a contract that uses codes, so a
-        changed price, seat cap or membership type reaches its codes.
+        changed price, seat cap or membership type reaches its codes. A changed
+        Google Sheet or tab gets the codes written out to it from scratch.
         """
 
+        contract = self.get_object()
+        sheet_before = (contract.google_sheet_target, contract.google_sheet_target_tab)
         request_serializer = UpdateContractSerializer(
-            self.get_object(), data=request.data, partial=True
+            contract, data=request.data, partial=True
         )
         request_serializer.is_valid(raise_exception=True)
-        contract = request_serializer.save()
+        with transaction.atomic():
+            contract = request_serializer.save()
+            if sheet_before != (
+                contract.google_sheet_target,
+                contract.google_sheet_target_tab,
+            ):
+                clear_sheet_locations(contract)
 
         # The queryset prefetches contract_programs, and that cache is stale
         # once the instance has been saved, so the response would serialize
@@ -676,6 +690,38 @@ class ContractProvisioningViewSet(NestedViewSetMixin, viewsets.GenericViewSet):
         queue_enrollment_code_check_if_required(contract)
 
         return Response(self.get_serializer(contract).data)
+
+    @extend_schema(
+        request=ContractProgramOrderSerializer,
+        responses={200: ProvisionedContractSerializer, 400: DetailSerializer},
+    )
+    @action(detail=True, methods=["post"], url_path="programs/order")
+    def order_programs(self, request, pk=None, **kwargs):  # noqa: ARG002
+        """
+        Put the contract's programs in order.
+
+        The list must name each of the contract's programs once. Add and
+        remove programs with the courseware routes.
+        """
+
+        contract = self.get_object()
+        request_serializer = ContractProgramOrderSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+
+        try:
+            set_contract_program_order(
+                contract, request_serializer.validated_data["programs"]
+            )
+        except ContractProgramOrderError:
+            return Response(
+                {"detail": "The order must list each of the contract's programs once."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Re-read so the response has the new order, prefetched.
+        return Response(
+            self.get_serializer(self.get_queryset().get(pk=contract.pk)).data
+        )
 
     @extend_schema(
         request=ContractCoursewareSerializer,

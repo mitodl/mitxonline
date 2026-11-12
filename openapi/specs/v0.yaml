@@ -1202,7 +1202,8 @@ paths:
         Update a contract.
 
         Queues the enrollment code check for a contract that uses codes, so a
-        changed price, seat cap or membership type reaches its codes.
+        changed price, seat cap or membership type reaches its codes. A changed
+        Google Sheet or tab gets the codes written out to it from scratch.
       parameters:
       - in: path
         name: id
@@ -1461,6 +1462,54 @@ paths:
                   $ref: '#/components/schemas/RemovedContractRun'
           description: ''
         '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
+  /api/v0/b2b/provisioning/organizations/{parent_lookup_organization__org_key}/contracts/{id}/programs/order/:
+    post:
+      operationId: b2b_provisioning_organizations_contracts_programs_order_create
+      description: |-
+        Put the contract's programs in order.
+
+        The list must name each of the contract's programs once. Add and
+        remove programs with the courseware routes.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Contract.
+        required: true
+      - in: path
+        name: parent_lookup_organization__org_key
+        schema:
+          type: string
+        description: The organization's org key.
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContractProgramOrderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ContractProgramOrderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ContractProgramOrderRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisionedContract'
+          description: ''
+        '400':
           content:
             application/json:
               schema:
@@ -5019,6 +5068,19 @@ components:
       - readable_id
       - sort_order
       - title
+    ContractProgramOrderRequest:
+      type: object
+      description: Request body for putting a contract's programs in order.
+      properties:
+        programs:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          description: The readable IDs of every program in the contract, first to
+            last.
+      required:
+      - programs
     ContractRunSetup:
       type: object
       description: The edX clone status of one contract run.
@@ -5373,6 +5435,9 @@ components:
           type: string
           description: A welcome message for learners.
           maxLength: 255
+        welcome_message_extra:
+          type: string
+          description: Additional welcome message content for learners.
         contract_start:
           type: string
           format: date
@@ -5397,6 +5462,16 @@ components:
           nullable: true
           description: The fixed price for enrollment under this contract. (Set to
             zero or leave blank for free.)
+        google_sheet_target:
+          type: string
+          nullable: true
+          description: The URL for the Google Sheet to use to send codes and updates.
+          maxLength: 1024
+        google_sheet_target_tab:
+          type: string
+          description: The index or title of the worksheet in the Google Sheet to
+            put the codes.
+          maxLength: 100
       required:
       - membership_type
       - name
@@ -7829,6 +7904,9 @@ components:
           type: string
           description: A welcome message for learners.
           maxLength: 255
+        welcome_message_extra:
+          type: string
+          description: Additional welcome message content for learners.
         contract_start:
           type: string
           format: date
@@ -7853,6 +7931,16 @@ components:
           nullable: true
           description: The fixed price for enrollment under this contract. (Set to
             zero or leave blank for free.)
+        google_sheet_target:
+          type: string
+          nullable: true
+          description: The URL for the Google Sheet to use to send codes and updates.
+          maxLength: 1024
+        google_sheet_target_tab:
+          type: string
+          description: The index or title of the worksheet in the Google Sheet to
+            put the codes.
+          maxLength: 100
         active:
           type: boolean
           description: Whether this contract is active or not. Date rules still apply.
@@ -8201,6 +8289,10 @@ components:
           type: string
           readOnly: true
           description: A welcome message for learners.
+        welcome_message_extra:
+          type: string
+          readOnly: true
+          description: Additional welcome message content for learners.
         contract_start:
           type: string
           format: date
@@ -8231,6 +8323,16 @@ components:
           nullable: true
           description: The fixed price for enrollment under this contract. (Set to
             zero or leave blank for free.)
+        google_sheet_target:
+          type: string
+          readOnly: true
+          nullable: true
+          description: The URL for the Google Sheet to use to send codes and updates.
+        google_sheet_target_tab:
+          type: string
+          readOnly: true
+          description: The index or title of the worksheet in the Google Sheet to
+            put the codes.
         programs:
           type: array
           items:
@@ -8242,6 +8344,8 @@ components:
       - contract_start
       - description
       - enrollment_fixed_price
+      - google_sheet_target
+      - google_sheet_target_tab
       - id
       - max_learners
       - membership_type
@@ -8250,6 +8354,7 @@ components:
       - programs
       - slug
       - welcome_message
+      - welcome_message_extra
     ProvisionedOrganization:
       type: object
       description: |-

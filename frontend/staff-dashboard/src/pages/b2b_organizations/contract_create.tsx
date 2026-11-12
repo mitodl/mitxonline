@@ -33,7 +33,7 @@ export const ContractCreate: React.FC = () => {
 
     return (
         <Create title={`Add contract to ${orgKey}`} saveButtonProps={{ onClick: () => form.submit(), loading: isLoading }}>
-            <ContractForm form={form} onFinish={onFinish} creating />
+            <ContractForm form={form} onFinish={onFinish} initialValues={{ google_sheet_target_tab: "Sheet1" }} creating />
         </Create>
     );
 };

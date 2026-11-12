@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useCustomMutation } from "@refinedev/core";
 import { Alert, Button, Card, Checkbox, Descriptions, Form, Input, Modal, Space, Table, Tag, Typography } from "antd";
-import { DeleteOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons";
+import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons";
 
 import { CLONE_STATUSES, CONTRACT_SETUP_STATUSES, apiErrorNotification } from "./constants";
 import {
@@ -146,6 +146,32 @@ export const ContractCourseware: React.FC<IContractCoursewareProps> = ({ contrac
         }
     };
 
+    // The API takes the whole order, so a program added or removed elsewhere
+    // since this page loaded makes it refuse rather than guess. The order
+    // comes from the last response, not the contract prop, so a second click
+    // before the page's refetch lands builds on the first.
+    const [programs, setPrograms] = useState(contract.programs);
+    useEffect(() => setPrograms(contract.programs), [contract.programs]);
+    const move = (index: number, offset: number) => {
+        const order = programs.map((program) => program.readable_id);
+        [order[index], order[index + offset]] = [order[index + offset], order[index]];
+        mutate(
+            {
+                url: `${contractUrl}/programs/order/`,
+                method: "post",
+                values: { programs: order },
+                successNotification: { type: "success", message: "Program order saved" },
+                errorNotification: apiErrorNotification("Could not reorder the programs"),
+            },
+            {
+                onSuccess: ({ data }) => {
+                    setPrograms((data as unknown as IProvisionedContract).programs);
+                    refresh();
+                },
+            },
+        );
+    };
+
     const retry = () =>
         mutate(
             {
@@ -176,14 +202,30 @@ export const ContractCourseware: React.FC<IContractCoursewareProps> = ({ contrac
                         {codes ? (codes.expected ? `${codes.existing} of ${codes.expected}` : "Not used by this contract") : "Loading"}
                     </Descriptions.Item>
                     <Descriptions.Item label="Programs">
-                        {contract.programs.length === 0 ? (
+                        {programs.length === 0 ? (
                             "none"
                         ) : (
                             <Space direction="vertical" size={0}>
-                                {contract.programs.map((program) => (
-                                    <span key={program.readable_id}>
-                                        {program.title} <Typography.Text code copyable>{program.readable_id}</Typography.Text>
-                                    </span>
+                                {programs.map((program, index) => (
+                                    <Space key={program.readable_id} size="small">
+                                        <Button
+                                            size="small"
+                                            icon={<ArrowUpOutlined />}
+                                            aria-label={`Move ${program.title} up`}
+                                            disabled={index === 0 || isLoading}
+                                            onClick={() => move(index, -1)}
+                                        />
+                                        <Button
+                                            size="small"
+                                            icon={<ArrowDownOutlined />}
+                                            aria-label={`Move ${program.title} down`}
+                                            disabled={index === programs.length - 1 || isLoading}
+                                            onClick={() => move(index, 1)}
+                                        />
+                                        <span>
+                                            {program.title} <Typography.Text code copyable>{program.readable_id}</Typography.Text>
+                                        </span>
+                                    </Space>
                                 ))}
                             </Space>
                         )}

@@ -234,11 +234,16 @@ export interface IProvisionedContract {
     // Rich text, stored as HTML.
     description: string;
     welcome_message: string;
+    // Rich text, stored as HTML.
+    welcome_message_extra: string;
     contract_start: string | null;
     contract_end: string | null;
     active: boolean;
     max_learners: number | null;
     enrollment_fixed_price: string | null;
+    // Older contracts can store no sheet as null rather than blank.
+    google_sheet_target: string | null;
+    google_sheet_target_tab: string;
     programs: IContractProgram[];
 }
 

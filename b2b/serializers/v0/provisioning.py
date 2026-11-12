@@ -1,8 +1,10 @@
 """Serializers for the staff-only B2B provisioning API (v0)."""
 
+from urllib.parse import urlparse
+
 import bleach
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.core.validators import RegexValidator
+from django.core.validators import RegexValidator, URLValidator
 from rest_framework import serializers
 
 from b2b.constants import (
@@ -472,11 +474,14 @@ class ProvisionedContractSerializer(serializers.ModelSerializer):
             "membership_type",
             "description",
             "welcome_message",
+            "welcome_message_extra",
             "contract_start",
             "contract_end",
             "active",
             "max_learners",
             "enrollment_fixed_price",
+            "google_sheet_target",
+            "google_sheet_target_tab",
             "programs",
         ]
         read_only_fields = fields
@@ -488,9 +493,9 @@ CONTRACT_WRITABLE_FIELDS = [
     field for field in ContractPage.PROVISIONED_FIELDS if field != "active"
 ]
 
-# The text markup Wagtail's rich text editor stores for the description. The
-# staff dashboard edits it as text, so nothing else has filtered it by the
-# time it gets here. Wagtail's <embed/> (an image or media) is left out:
+# The text markup Wagtail's rich text editor stores for the description and
+# the extra welcome message. The staff dashboard edits them as text, so
+# nothing else has filtered them by the time they get here. Wagtail's <embed/> (an image or media) is left out:
 # bleach rewrites the self-closing tag Wagtail's parser looks for, so an
 # embed is dropped from a description edited through the API.
 CONTRACT_DESCRIPTION_TAGS = frozenset(
@@ -503,22 +508,81 @@ CONTRACT_DESCRIPTION_ATTRIBUTES = {
 CONTRACT_DESCRIPTION_PROTOCOLS = frozenset({"http", "https", "mailto", "tel"})
 
 
-class ContractDescriptionMixin:
-    """Strip markup Wagtail's rich text editor would not have stored."""
+def _clean_rich_text(value):
+    """Return rich text with only the markup Wagtail's editor would store."""
+
+    return bleach.clean(
+        value,
+        tags=CONTRACT_DESCRIPTION_TAGS,
+        attributes=CONTRACT_DESCRIPTION_ATTRIBUTES,
+        protocols=CONTRACT_DESCRIPTION_PROTOCOLS,
+        strip=True,
+    )
+
+
+class ContractFieldsMixin:
+    """Validation shared by the contract create and update bodies."""
 
     def validate_description(self, value):
-        """Return the description with only rich text markup left in it."""
+        """Strip markup Wagtail's rich text editor would not have stored."""
 
-        return bleach.clean(
-            value,
-            tags=CONTRACT_DESCRIPTION_TAGS,
-            attributes=CONTRACT_DESCRIPTION_ATTRIBUTES,
-            protocols=CONTRACT_DESCRIPTION_PROTOCOLS,
-            strip=True,
-        )
+        return _clean_rich_text(value)
+
+    def validate_welcome_message_extra(self, value):
+        """Strip markup Wagtail's rich text editor would not have stored."""
+
+        return _clean_rich_text(value)
+
+    def validate_google_sheet_target(self, value):
+        """
+        Require a Google Sheets URL, and store no sheet as a blank string.
+
+        The sheet is opened by URL, and the scheduled sheet update skips
+        contracts whose target is blank but not null ones.
+        """
+
+        if not value:
+            return ""
+        msg = "Enter the Google Sheet's https://docs.google.com/spreadsheets/ URL."
+        try:
+            URLValidator(schemes=["https"])(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(msg) from exc
+        url = urlparse(value)
+        if url.hostname != "docs.google.com" or not url.path.startswith(
+            "/spreadsheets/"
+        ):
+            raise serializers.ValidationError(msg)
+        return value
+
+    def validate(self, attrs):
+        """
+        Require a tab for a contract that has a sheet: the codes go in it.
+
+        Only checked when the request sets the sheet or the tab, so a contract
+        saved with a sheet and no tab before this rule can still take other
+        edits.
+        """
+
+        if not {"google_sheet_target", "google_sheet_target_tab"} & attrs.keys():
+            return attrs
+
+        def current(field, default):
+            if field in attrs:
+                return attrs[field]
+            return getattr(self.instance, field) if self.instance else default
+
+        if (
+            current("google_sheet_target", "")
+            and not (current("google_sheet_target_tab", "Sheet1") or "").strip()
+        ):
+            raise serializers.ValidationError(
+                {"google_sheet_target_tab": "Name the tab the codes go in."}
+            )
+        return attrs
 
 
-class CreateContractSerializer(ContractDescriptionMixin, serializers.ModelSerializer):
+class CreateContractSerializer(ContractFieldsMixin, serializers.ModelSerializer):
     """
     Request body for creating a contract.
 
@@ -533,7 +597,7 @@ class CreateContractSerializer(ContractDescriptionMixin, serializers.ModelSerial
         extra_kwargs = {"membership_type": {"required": True}}
 
 
-class UpdateContractSerializer(ContractDescriptionMixin, serializers.ModelSerializer):
+class UpdateContractSerializer(ContractFieldsMixin, serializers.ModelSerializer):
     """
     Request body for updating a contract.
 
@@ -544,6 +608,16 @@ class UpdateContractSerializer(ContractDescriptionMixin, serializers.ModelSerial
     class Meta:
         model = ContractPage
         fields = [*CONTRACT_WRITABLE_FIELDS, "active"]
+
+
+class ContractProgramOrderSerializer(serializers.Serializer):
+    """Request body for putting a contract's programs in order."""
+
+    programs = serializers.ListField(
+        child=serializers.CharField(),
+        allow_empty=False,
+        help_text=("The readable IDs of every program in the contract, first to last."),
+    )
 
 
 class ContractCoursewareSerializer(serializers.Serializer):
