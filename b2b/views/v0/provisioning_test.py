@@ -927,17 +927,21 @@ def test_list_organizations_filters_on_onboarding_state(staff_drf_client):
     assert [org["org_key"] for org in response.json()["results"]] == [live.org_key]
 
 
-@pytest.mark.parametrize(
-    ("base_url", "realm_url"),
-    [
-        ("https://sso.example.mit.edu", "https://sso.example.mit.edu/realms/olapps"),
-        ("https://sso.example.mit.edu/", "https://sso.example.mit.edu/realms/olapps"),
-        (
-            "https://sso.example.mit.edu/auth",
-            "https://sso.example.mit.edu/auth/realms/olapps",
-        ),
-    ],
-)
+REALM_URL_CASES = [
+    ("https://sso.example.mit.edu", "https://sso.example.mit.edu/realms/olapps"),
+    ("https://sso.example.mit.edu/", "https://sso.example.mit.edu/realms/olapps"),
+    (
+        "https://sso.example.mit.edu/auth",
+        "https://sso.example.mit.edu/auth/realms/olapps",
+    ),
+    (
+        "https://sso.example.mit.edu/auth/",
+        "https://sso.example.mit.edu/auth/realms/olapps",
+    ),
+]
+
+
+@pytest.mark.parametrize(("base_url", "realm_url"), REALM_URL_CASES)
 def test_identity_provider_includes_the_service_provider_details(
     staff_drf_client, settings, base_url, realm_url
 ):
@@ -959,12 +963,13 @@ def test_identity_provider_includes_the_service_provider_details(
     }
 
 
+@pytest.mark.parametrize(("base_url", "realm_url"), REALM_URL_CASES)
 def test_identity_provider_includes_a_login_url_with_its_alias_as_the_hint(
-    staff_drf_client, settings
+    staff_drf_client, settings, base_url, realm_url
 ):
     """The gateway drops kc_idp_hint, so the link goes to Keycloak directly."""
 
-    settings.KEYCLOAK_BASE_URL = "https://sso.example.mit.edu"
+    settings.KEYCLOAK_BASE_URL = base_url
     settings.KEYCLOAK_REALM_NAME = "olapps"
     settings.B2B_IDP_LOGIN_CLIENT_ID = "learn-client"
     settings.B2B_IDP_LOGIN_REDIRECT_URI = "https://api.learn.example.mit.edu/login"
@@ -978,13 +983,13 @@ def test_identity_provider_includes_a_login_url_with_its_alias_as_the_hint(
     assert response.status_code == status.HTTP_200_OK
     login_url = urlsplit(response.json()["login_url"])
     assert login_url._replace(query="").geturl() == (
-        "https://sso.example.mit.edu/realms/olapps/protocol/openid-connect/auth"
+        f"{realm_url}/protocol/openid-connect/auth"
     )
     assert parse_qs(login_url.query) == {
         "response_type": ["code"],
         "client_id": ["learn-client"],
         "redirect_uri": ["https://api.learn.example.mit.edu/login"],
-        "scope": ["openid"],
+        "scope": ["openid profile email organization:*"],
         "kc_idp_hint": ["exampleu"],
     }
 
@@ -997,8 +1002,9 @@ def test_login_url_escapes_the_alias(settings):
 
     login_url = OrganizationIdentityProvider(alias="a&client_id=b").login_url
 
-    assert login_url.endswith("&kc_idp_hint=a%26client_id%3Db")
-    assert "redirect_uri=https%3A%2F%2Fapi.learn.example.mit.edu%2Flogin&" in login_url
+    query = parse_qs(urlsplit(login_url).query)
+    assert query["kc_idp_hint"] == ["a&client_id=b"]
+    assert query["client_id"] == ["learn-client"]
 
 
 @pytest.mark.parametrize(

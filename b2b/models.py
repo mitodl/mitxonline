@@ -1349,7 +1349,9 @@ class OrganizationIdentityProvider(TimestampedModel, ValidateOnSaveMixin):
                 "response_type": "code",
                 "client_id": settings.B2B_IDP_LOGIN_CLIENT_ID,
                 "redirect_uri": settings.B2B_IDP_LOGIN_REDIRECT_URI,
-                "scope": "openid",
+                # The scope partners' hand-built links send. The hint sends the
+                # browser to the IdP before the organization step that reads it.
+                "scope": "openid profile email organization:*",
                 "kc_idp_hint": self.alias,
             }
         )
