@@ -175,14 +175,15 @@ class SwitchSessionView(RedirectView):
     permanent = False
 
     def get(self, request, *args, **kwargs):
-        """Drop Django's session, then redirect.
-
-        The session is dropped here rather than in ``get_redirect_url`` so that
-        a HEAD request, which also resolves the redirect target, does not carry
-        the side effect.
-        """
+        """Drop Django's session, then redirect."""
         if request.user.is_authenticated:
             logout(request)
+        return super().get(request, *args, **kwargs)
+
+    def head(self, request, *args, **kwargs):
+        """Answer with the redirect alone, so a prefetch or link check does not
+        end the session.  ``RedirectView.head`` would call ``self.get`` above.
+        """
         return super().get(request, *args, **kwargs)
 
     def get_redirect_url(self, *args, **kwargs):  # noqa: ARG002

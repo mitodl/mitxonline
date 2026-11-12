@@ -273,3 +273,14 @@ def test_switch_session_drops_django_session(client, user):
 
     assert resp.status_code == status.HTTP_302_FOUND
     assert "_auth_user_id" not in client.session
+
+
+def test_switch_session_head_keeps_django_session(client, user):
+    """A HEAD (prefetcher, link checker) gets the redirect but no logout."""
+    client.force_login(user)
+
+    resp = client.head(f"{reverse('switch-session')}?next=/cart/")
+
+    assert resp.status_code == status.HTTP_302_FOUND
+    assert resp.url == "/cart/"
+    assert "_auth_user_id" in client.session
