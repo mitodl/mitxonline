@@ -8,7 +8,7 @@ import pytest
 
 from courses.factories import CourseRunFactory, CourseRunGradeFactory
 from courses.management.commands.migrate_edx_data import Command
-from courses.models import CourseRunGradeAudit
+from courses.models import CourseRunGrade, CourseRunGradeAudit
 from users.factories import UserFactory
 from users.models import LegalAddress, User, UserProfile
 
@@ -340,6 +340,31 @@ def test_migrate_users_dry_run_matches_emails_case_insensitively(capsys):
     Command()._migrate_users(conn, {"dry_run": True, "batch_size": 2})  # noqa: SLF001
 
     assert "[DRY RUN] Would create 1 users" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("letter_grade", ["A", None])
+def test_bulk_create_grades_sets_letter_grade(letter_grade):
+    """Migrated certificate grades get the edX.org letter grade"""
+    user = UserFactory.create()
+    run = CourseRunFactory.create()
+
+    Command._bulk_create_grades(  # noqa: SLF001
+        [
+            {
+                "user_mitxonline_id": user.id,
+                "courserun_id": run.id,
+                "courserungrade_grade": 0.9,
+                "courserungrade_is_passing": True,
+                "courserungrade_letter_grade": letter_grade,
+            }
+        ],
+        batch_size=10,
+    )
+
+    assert (
+        CourseRunGrade.objects.get(user=user, course_run=run).letter_grade
+        == letter_grade
+    )
 
 
 LETTER_GRADE_COLUMNS = [

@@ -587,6 +587,7 @@ class Command(BaseCommand):
                 course_run_id=row["courserun_id"],
                 grade=row["courserungrade_grade"],
                 passed=row["courserungrade_is_passing"],
+                letter_grade=row.get("courserungrade_letter_grade"),
             )
             for row in rows
         ]
