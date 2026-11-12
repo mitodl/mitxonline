@@ -27,7 +27,7 @@ hookimpl = pluggy.HookimplMarker("mitxonline")
 log = logging.getLogger(__name__)
 
 
-def _check_basket_purchasable(request, basket, options) -> dict | None:
+def _check_basket_purchasable(basket, options) -> dict | None:
     """Check that the user is allowed to buy what's in the basket."""
 
     raise_compliance_data_errors = options.get("raise_compliance_data_errors", False)
@@ -55,7 +55,7 @@ def _check_basket_purchasable(request, basket, options) -> dict | None:
             "error": USER_MSG_TYPE_ENROLL_BLOCKED,
         }
 
-    if basket.has_user_purchased_same_courserun(request.user):
+    if basket.has_user_purchased_same_courserun(basket.user):
         return {
             "purchased_same_courserun": True,
             "error": USER_MSG_TYPE_ENROLL_DUPLICATED,
@@ -118,10 +118,10 @@ class CheckoutPreflight:
     """The core checkout pre-flight checks."""
 
     @hookimpl(specname="checkout_validate_basket")
-    def check_basket_purchasable(self, request, basket, options) -> dict | None:
+    def check_basket_purchasable(self, request, basket, options) -> dict | None:  # noqa: ARG002
         """Call the internal function (so we can test it)"""
 
-        return _check_basket_purchasable(request, basket, options)
+        return _check_basket_purchasable(basket, options)
 
     @hookimpl(specname="checkout_validate_discounts")
     def check_basket_discounts(self, request, basket) -> dict | None:

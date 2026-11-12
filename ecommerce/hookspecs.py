@@ -113,9 +113,6 @@ def checkout_validate_discounts(request, basket):
     """
     Check that the discounts applied to the basket are valid.
 
-    This runs after checkout_apply_discounts, and is skipped if the checkout
-    is set to skip discount checks.
-
     This is a first result spec: the first hook to return something stops
     processing, and checkout returns that result to the caller.
 
