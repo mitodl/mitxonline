@@ -56,7 +56,6 @@
   },
   "scripts": {
     "build": "node ../../node_modules/.bin/webpack --bail",
-    "postinstall": "yarn build",
     "lint": "eslint ./src",
     "test": "./../../scripts/test/js_test.sh",
     "coverage": "COVERAGE=1 ./../../scripts/test/js_test.sh",

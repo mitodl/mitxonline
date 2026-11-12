@@ -7,3 +7,5 @@ htmlcov
 staticfiles/
 **/*.egg-info
 shims/*/build
+.yarn/cache
+.yarn/install-state.gz
