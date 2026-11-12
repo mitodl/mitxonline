@@ -1954,6 +1954,22 @@ wheels = [
 ]
 
 [[package]]
+name = "mitol-django-geoip"
+version = "2026.4.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+    { name = "django-stubs" },
+    { name = "factory-boy" },
+    { name = "faker" },
+    { name = "mitol-django-common" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/27/c3/fd314d14c72b7f95e2fca5ac732bebf07616a7c62f4e26a2099b10dfe990/mitol_django_geoip-2026.4.2.tar.gz", hash = "sha256:a0c4001904efab60ffc3cd94bd61c2cab51bee7e2f24d1072a68594c22b33daa", size = 9093, upload-time = "2026-04-02T15:43:28.841Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/80/87/71bce790ec3e8495b4ec82c058f9063bd701bdccc02a224c933a70b3b187/mitol_django_geoip-2026.4.2-py3-none-any.whl", hash = "sha256:148ee63fbd7df7d1acb7b3b9b844eccf1e7281bac068fe2c9b92507f3f164d0a", size = 15110, upload-time = "2026-04-02T15:43:28.043Z" },
+]
+
+[[package]]
 name = "mitol-django-google-sheets"
 version = "2025.6.13"
 source = { registry = "https://pypi.org/simple" }
@@ -2139,7 +2155,7 @@ wheels = [
 
 [[package]]
 name = "mitxonline"
-version = "2026.11.5.1"
+version = "2026.10.28.1"
 source = { virtual = "." }
 dependencies = [
     { name = "authlib" },
@@ -2181,6 +2197,7 @@ dependencies = [
     { name = "ipython" },
     { name = "mitol-django-apigateway" },
     { name = "mitol-django-common" },
+    { name = "mitol-django-geoip" },
     { name = "mitol-django-google-sheets" },
     { name = "mitol-django-google-sheets-deferrals" },
     { name = "mitol-django-google-sheets-refunds" },
@@ -2262,7 +2279,7 @@ prek = [
 
 [package.metadata]
 requires-dist = [
-    { name = "authlib", specifier = ">=1.9.0,<2" },
+    { name = "authlib", specifier = ">=1.6.3,<2" },
     { name = "beautifulsoup4", specifier = ">=4.8.2,<5" },
     { name = "bleach", specifier = ">=6.0.0,<7" },
     { name = "boto3", specifier = ">=1.16.63,<2" },
@@ -2301,6 +2318,7 @@ requires-dist = [
     { name = "ipython", specifier = ">=9.13,<10" },
     { name = "mitol-django-apigateway", specifier = "==2026.4.29" },
     { name = "mitol-django-common", specifier = "==2026.6.16.4" },
+    { name = "mitol-django-geoip", specifier = ">=2026.4.2" },
     { name = "mitol-django-google-sheets", specifier = ">=2025.6.13,<2026" },
     { name = "mitol-django-google-sheets-deferrals", specifier = ">=2025.3.17,<2026" },
     { name = "mitol-django-google-sheets-refunds", specifier = ">=2025.6.13,<2026" },
@@ -2319,7 +2337,7 @@ requires-dist = [
     { name = "psycopg", extras = ["c"], specifier = ">=3.2.4,<4" },
     { name = "pycountry", specifier = ">=26.2.16,<27" },
     { name = "pydantic", specifier = ">=2.13.4" },
-    { name = "pyjwt", specifier = "==2.15.1" },
+    { name = "pyjwt", specifier = "==2.15.0" },
     { name = "pynacl", specifier = ">=1.6.2" },
     { name = "pyopenssl", specifier = ">=26,<27" },
     { name = "pyparsing", specifier = ">=3.2,<4" },
@@ -3145,11 +3163,11 @@ wheels = [
 
 [[package]]
 name = "pyjwt"
-version = "2.15.1"
+version = "2.15.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/43/ea/5194e52748b0da83d71e082d75496eaec6e58f419f5e184786ded517e6a9/pyjwt-2.15.1.tar.gz", hash = "sha256:4f259e80cdfb6b3fc18a7de51fd1ef9ec79652f25019bae68975ca2468a34df8", size = 121252, upload-time = "2026-09-28T18:40:42.598Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/02/a5/5197bfd06417837ac079921c66fa6393f1dea3557272a263cebfef69e432/pyjwt-2.15.0.tar.gz", hash = "sha256:b11c5f9791d7bf51c2b39a81ed669f6b2dbbd669df2942f6c60167e9e3d1abe4", size = 120513, upload-time = "2026-09-23T16:56:00.689Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/50/ca/44de4e75f8aadc457f0634be3b542815078ded46dca30efb960edeecad6e/pyjwt-2.15.1-py3-none-any.whl", hash = "sha256:42d59d631f7768a1028a64c7ff581a9bf7519804daf91fc5b6c56e30eec5e193", size = 33860, upload-time = "2026-09-28T18:40:41.429Z" },
+    { url = "https://files.pythonhosted.org/packages/e8/55/40e45bf052ee8ee12a4dfd785519660f8effa7b065442b91646ec6828619/pyjwt-2.15.0-py3-none-any.whl", hash = "sha256:7a3742debf6b879e912dbb9819ceec1594be812452b78c5f2e2dfc56564954f8", size = 33680, upload-time = "2026-09-23T16:55:59.241Z" },
 ]
 
 [[package]]
