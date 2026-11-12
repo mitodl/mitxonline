@@ -269,8 +269,9 @@ Open it in a private window when testing, because a browser that is already
 signed in to Keycloak is not sent to the IdP.
 
 `login_url` is `null` unless `B2B_IDP_LOGIN_CLIENT_ID` and
-`B2B_IDP_LOGIN_REDIRECT_URI` are set. They name the Keycloak client and gateway
-login URL of the app partner learners land in.
+`B2B_IDP_LOGIN_REDIRECT_URI` are set. `B2B_IDP_LOGIN_CLIENT_ID` is the Keycloak
+client the link uses, and `B2B_IDP_LOGIN_REDIRECT_URI` is the gateway login URL
+of the app partner learners land in.
 
 ## Contracts
 
