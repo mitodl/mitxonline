@@ -545,9 +545,11 @@ def _get_source_runs_for_course(  # noqa: PLR0913
             variant_industry=course.default_variant_options.variant_industry,
         )
     else:
+        # Filtered in Python so a prefetched possible_variant_sets is used.
         course_variants = [
             (sv.language, sv.variant_length, sv.variant_industry)
-            for sv in course.possible_variant_sets.filter(active=True).all()
+            for sv in course.possible_variant_sets.all()
+            if sv.active
         ]
 
         if filter_variants:
