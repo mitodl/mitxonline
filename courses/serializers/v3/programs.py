@@ -26,6 +26,7 @@ class SimpleProgramSerializer(serializers.ModelSerializer):
             "program_type",
             "live",
             "display_mode",
+            "has_live_product_page",
         ]
 
 
