@@ -698,7 +698,7 @@ class Command(BaseCommand):
     def _update_letter_grades(rows, *, dry_run):
         """
         Set letter_grade on the CourseRunGrade rows that match the given rows. Grades
-        that already have a letter grade or were set by an admin are not changed.
+        that already have a letter grade are not changed.
 
         Returns:
             int: The number of grades updated, or that would be updated on a dry run
@@ -718,9 +718,7 @@ class Command(BaseCommand):
         with transaction.atomic():
             candidates = (
                 CourseRunGrade.objects.select_for_update()
-                .filter(
-                    user_id__in=user_ids, course_run_id__in=run_ids, set_by_admin=False
-                )
+                .filter(user_id__in=user_ids, course_run_id__in=run_ids)
                 .filter(Q(letter_grade__isnull=True) | Q(letter_grade=""))
             )
             grades = [
