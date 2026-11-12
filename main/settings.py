@@ -1772,3 +1772,17 @@ B2B_IDP_LOGIN_REDIRECT_URI = get_string(
 
 if ECOMMERCE_DEFAULT_PAYMENT_GATEWAY == "None":  # noqa: F405
     ECOMMERCE_DEFAULT_PAYMENT_GATEWAY = MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+
+# User location settings
+
+LOCATION_FORCE_COUNTRY = get_string(
+    name="LOCATION_FORCE_COUNTRY",
+    default=False,
+    description="Force the system to resolve a user's location to this country code.",
+)
+
+LOCATION_FORCE_PROFILE_COUNTRY = get_bool(
+    name="LOCATION_FORCE_PROFILE_COUNTRY",
+    default=False,
+    description="Force the system to always resolve a user's location to the country set in their profile.",
+)

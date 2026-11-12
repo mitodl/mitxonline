@@ -25,11 +25,11 @@ def determine_user_location(request) -> list[UserCalculatedLocation]:
     Because this needs an IP to look up, it requires a request object.
 
     Overrides:
-    - MITOL_FORCE_COUNTRY - if set, force _all_ lookups to a specific country code
-    - MITOL_FORCE_COUNTRY_PROFILE - if set, force _all_ lookups to use the user profile
+    - LOCATION_FORCE_COUNTRY - if set, force _all_ lookups to a specific country code
+    - LOCATION_FORCE_COUNTRY_PROFILE - if set, force _all_ lookups to use the user profile
       This also means that only the "profile" lookup type is returned.
 
-    If both are set, MITOL_FORCE_COUNTRY takes precedence.
+    If both are set, LOCATION_FORCE_COUNTRY takes precedence.
 
     Args:
     - request (HTTPRequest): the request to look up
@@ -39,17 +39,17 @@ def determine_user_location(request) -> list[UserCalculatedLocation]:
 
     calculated_locations = []
 
-    if settings.MITOL_FORCE_COUNTRY:
+    if settings.LOCATION_FORCE_COUNTRY:
         # Return one each for each type of determination so flags that require
         # one or the other (or both) are set appropriately.
         return [
             UserCalculatedLocation(
-                country_code=settings.MITOL_FORCE_COUNTRY,
+                country_code=settings.LOCATION_FORCE_COUNTRY,
                 lookup_type=GEOLOCATION_TYPE_PROFILE,
                 ip="",
             ),
             UserCalculatedLocation(
-                country_code=settings.MITOL_FORCE_COUNTRY,
+                country_code=settings.LOCATION_FORCE_COUNTRY,
                 lookup_type=GEOLOCATION_TYPE_GEOIP,
                 ip="0.0.0.0",  # noqa: S104
             ),
@@ -70,7 +70,7 @@ def determine_user_location(request) -> list[UserCalculatedLocation]:
             )
         )
 
-    if settings.MITOL_UE_FORCE_PROFILE_COUNTRY:
+    if settings.LOCATION_FORCE_PROFILE_COUNTRY:
         return calculated_locations
 
     user_ip, _ = get_client_ip(request)
