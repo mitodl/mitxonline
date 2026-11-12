@@ -70,7 +70,7 @@ def basket_request(user):
 def test_check_basket_purchasable(mocker, basket_request, failing, expected):
     """Each failing purchasability check returns its own error payload."""
 
-    request, basket = basket_request
+    _, basket = basket_request
     for check in (
         "has_user_blocked_products",
         "has_user_purchased_same_courserun",
@@ -78,7 +78,7 @@ def test_check_basket_purchasable(mocker, basket_request, failing, expected):
     ):
         mocker.patch.object(basket, check, return_value=check == failing)
 
-    assert _check_basket_purchasable(request, basket, options={}) == expected
+    assert _check_basket_purchasable(basket, options={}) == expected
 
 
 @pytest.mark.parametrize("discounts_valid", [True, False])
