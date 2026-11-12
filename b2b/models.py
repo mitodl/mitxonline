@@ -38,6 +38,7 @@ from b2b.constants import (
 )
 from courses.models import Program
 from main.models import AuditModel, ValidateOnSaveMixin
+from main.utils import keycloak_realm_url
 from variants.models import SupportedVariant
 
 log = logging.getLogger(__name__)
@@ -1322,11 +1323,7 @@ class OrganizationIdentityProvider(TimestampedModel, ValidateOnSaveMixin):
           OIDC redirect URI) and metadata_url (the SAML SP descriptor)
         """
 
-        # Not urljoin: a leading slash there drops any path in the base URL.
-        realm_url = (
-            f"{settings.KEYCLOAK_BASE_URL.removesuffix('/')}"
-            f"/realms/{settings.KEYCLOAK_REALM_NAME}"
-        )
+        realm_url = keycloak_realm_url()
         endpoint = f"{realm_url}/broker/{self.alias}/endpoint"
 
         if self.protocol != IDP_PROTOCOL_SAML:

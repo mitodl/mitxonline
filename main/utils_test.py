@@ -15,6 +15,7 @@ from main.utils import (
     get_learn_base_url,
     get_learn_product_url,
     get_partitioned_set_difference,
+    keycloak_realm_url,
     parse_supplied_date,
 )
 
@@ -76,6 +77,22 @@ def test_get_learn_base_url(settings, base_url):
     """Test that get_learn_base_url returns the configured MIT_LEARN_BASE_URL setting"""
     settings.MIT_LEARN_BASE_URL = base_url
     assert get_learn_base_url() == base_url
+
+
+@pytest.mark.parametrize(
+    ("base_url", "expected"),
+    [
+        ("https://sso.example.mit.edu", "https://sso.example.mit.edu/realms/olapps"),
+        ("https://sso.example.mit.edu/", "https://sso.example.mit.edu/realms/olapps"),
+        ("https://example.mit.edu/kc", "https://example.mit.edu/kc/realms/olapps"),
+        ("https://example.mit.edu/kc/", "https://example.mit.edu/kc/realms/olapps"),
+    ],
+)
+def test_keycloak_realm_url_keeps_a_path_in_the_base_url(settings, base_url, expected):
+    """A base URL with a path keeps it, with or without a trailing slash."""
+    settings.KEYCLOAK_BASE_URL = base_url
+    settings.KEYCLOAK_REALM_NAME = "olapps"
+    assert keycloak_realm_url() == expected
 
 
 @pytest.mark.parametrize(
