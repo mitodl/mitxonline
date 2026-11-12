@@ -1,6 +1,6 @@
 [project]
 name = "mitxonline"
-version = "2026.11.5.1"
+version = "2026.10.28.1"
 description = "MITx Online"
 authors = [{ name = "MIT ODL" }]
 requires-python = "~=3.11.0"
@@ -74,7 +74,7 @@ dependencies = [
     "python-redis-lock>=4.0.0,<5",
     "django-object-actions>=5.0.0,<6",
     "requests-oauthlib>=2.0.0,<3",
-    "authlib>=1.9.0,<2",
+    "authlib>=1.6.3,<2",
     "trino>=0.336.0,<0.337",
     "granian>=2.5.4,<3",
     "mitol-django-olposthog>=2026.3.6,<2027",
@@ -83,7 +83,8 @@ dependencies = [
     "django-qp[drf]>=0.2.0",
     "pydantic>=2.13.4",
     "pynacl>=1.6.2",
-    "pyjwt==2.15.1",
+    "pyjwt==2.15.0",
+    "mitol-django-geoip>=2026.4.2",
 ]
 
 [dependency-groups]
@@ -129,7 +130,7 @@ constraint-dependencies = ["certifi>=2026.10.19"]  # eMudhra CA compromise: neve
 package = false
 default-groups = ["dev"]
 exclude-newer = "7d"
-required-version = ">=0.12.22,<0.14"
+required-version = ">=0.9.17"
 
 [tool.uv.exclude-newer-package]
 ol-concourse = "0d"
@@ -395,7 +396,7 @@ markers = [
 pythonpath = ["."]
 
 [tool.bumpversion]
-current_version = "2026.11.5.1"
+current_version = "2026.10.28.1"
 commit = false
 tag = false
 parse = "(?P<release>(?:[1-9][0-9]{3})\\.(?:1[0-2]|[1-9])\\.(?:3[0-1]|[12][0-9]|[1-9]))\\.(?P<build>\\d+)"

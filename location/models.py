@@ -51,7 +51,7 @@ class SoftDeleteTimestampedModel(TimestampedModel):
         self.is_active = False
         self.deleted_on = now_in_utc()
         self.save(
-            updated_fields=(
+            update_fields=(
                 "is_active",
                 "deleted_on",
             )

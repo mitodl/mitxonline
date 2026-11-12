@@ -11,6 +11,7 @@ from location.constants import (
 )
 from location.dataclasses import UserCalculatedLocation
 from location.models import LocationFlag
+from users.models import LegalAddress
 
 
 def determine_user_location(request) -> list[UserCalculatedLocation]:
@@ -55,11 +56,10 @@ def determine_user_location(request) -> list[UserCalculatedLocation]:
             ),
         ]
 
-    profile_code = (
-        request.user.legal_address.country_code
-        if request.user.is_authenticated and request.user.legal_address
-        else None
-    )
+    try:
+        profile_code = request.user.legal_address.country
+    except LegalAddress.RelatedObjectDoesNotExist:
+        profile_code = None
 
     if profile_code:
         calculated_locations.append(

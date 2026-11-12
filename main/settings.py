@@ -287,6 +287,7 @@ INSTALLED_APPS = (
     "mitol.olposthog.apps.OlPosthog",
     "mitol.scim.apps.ScimApp",
     # "mitol.oauth_toolkit_extensions.apps.OAuthToolkitExtensionsApp",
+    "mitol.geoip.apps.GeoIPApp",
     "viewflow",
     "openapi",
     "drf_spectacular",
