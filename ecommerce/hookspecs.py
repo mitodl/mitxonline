@@ -78,3 +78,70 @@ def stripe_event(event):
     - Order: the order that was updated in the step
     - False: error state
     """
+
+
+@hookspec(firstresult=True)
+def checkout_validate_basket(request, basket, options):
+    """
+    Check that the user can check out with what's in the basket.
+
+    This is the first pre-flight step in generate_checkout_payload, and runs
+    before any discounts are touched. Checks that are about the user and the
+    products - blocked countries, duplicate purchases, runs that can't be
+    upgraded - belong here.
+
+    This is a first result spec: the first hook to return something stops
+    processing, and checkout returns that result to the caller.
+
+    Args:
+    request (HttpRequest): the current request
+    basket (Basket): the current basket
+    options (dict): options to pass to the individual hooks
+
+    Returns:
+    - dict|None: an error payload (with an "error" key) to stop checkout, or
+      None to continue
+
+    Raises:
+    - ExportComplianceDataError: if the user's profile can't be checked for
+      export compliance and raise_compliance_data_errors is set to True
+    """
+
+
+@hookspec(firstresult=True)
+def checkout_validate_discounts(request, basket):
+    """
+    Check that the discounts applied to the basket are valid.
+
+    This is a first result spec: the first hook to return something stops
+    processing, and checkout returns that result to the caller.
+
+    Args:
+    request (HttpRequest): the current request
+    basket (Basket): the current basket
+
+    Returns:
+    - dict|None: an error payload (with an "error" key) to stop checkout, or
+      None to continue
+    """
+
+
+@hookspec(firstresult=True)
+def checkout_finalize_basket(request, basket):
+    """
+    Perform the last checks on the basket before the order is created.
+
+    This is the last pre-flight step, and always runs. Checks that depend on
+    the final state of the basket, including its discounts, belong here.
+
+    This is a first result spec: the first hook to return something stops
+    processing, and checkout returns that result to the caller.
+
+    Args:
+    request (HttpRequest): the current request
+    basket (Basket): the current basket
+
+    Returns:
+    - dict|None: an error payload (with an "error" key) to stop checkout, or
+      None to continue
+    """

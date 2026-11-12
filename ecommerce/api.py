@@ -29,7 +29,6 @@ from b2b.api import (
     get_active_contracts_from_basket_items,
     is_discount_supplied_for_b2b_purchase,
 )
-from compliance.exceptions import ExportComplianceDataError
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -110,13 +109,8 @@ from main import features
 from main.constants import (
     USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
     USER_MSG_TYPE_B2B_INVALID_BASKET,
-    USER_MSG_TYPE_BASKET_EMPTY,
-    USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
-    USER_MSG_TYPE_DISCOUNT_INVALID,
-    USER_MSG_TYPE_ENROLL_BLOCKED,
-    USER_MSG_TYPE_ENROLL_DUPLICATED,
-    USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
+from main.plugin_manager import get_plugin_manager
 from main.utils import parse_supplied_date
 from openedx.api import create_user
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
@@ -149,7 +143,7 @@ def get_checkout_cancel_url(gateway_type):
     )
 
 
-def _validate_basket_steps_for_b2b(basket):
+def validate_basket_steps_for_b2b(basket):
     """
     Validate the basket for B2B.
 
@@ -190,7 +184,43 @@ def _validate_basket_steps_for_b2b(basket):
     return {}
 
 
-def generate_checkout_payload(  # noqa: PLR0911, PLR0913, C901
+def _run_checkout_preflight(
+    request, basket, *, skip_discount_check=False, raise_compliance_data_errors=False
+):
+    """
+    Run the checkout pre-flight hooks, in order.
+
+    See the checkout_* hookspecs in ecommerce/hookspecs.py for what each step
+    is for. The discount steps are skipped if skip_discount_check is set.
+
+    Returns:
+    - dict|None: the error payload from the first check that failed, or None
+    """
+    from b2b.api import apply_contract_discounts_to_basket  # noqa: PLC0415
+
+    pm = get_plugin_manager()
+
+    if result := pm.hook.checkout_validate_basket(
+        request=request,
+        basket=basket,
+        options={
+            "raise_compliance_data_errors": raise_compliance_data_errors,
+        },
+    ):
+        return result
+
+    if not skip_discount_check:
+        apply_contract_discounts_to_basket(basket)
+
+    if not skip_discount_check and (
+        result := pm.hook.checkout_validate_discounts(request=request, basket=basket)
+    ):
+        return result
+
+    return pm.hook.checkout_finalize_basket(request=request, basket=basket)
+
+
+def generate_checkout_payload(  # noqa: PLR0913
     request,
     *,
     basket=None,
@@ -222,9 +252,6 @@ def generate_checkout_payload(  # noqa: PLR0911, PLR0913, C901
     - raise_compliance_data_errors: raise ExportComplianceDataError rather than
       returning a profile_incomplete payload (default False)
     """
-
-    from b2b.api import apply_contract_discounts_to_basket  # noqa: PLC0415
-
     if basket is None:
         basket = establish_basket(request)
 
@@ -239,65 +266,15 @@ def generate_checkout_payload(  # noqa: PLR0911, PLR0913, C901
         else:
             gateway_type = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 
-    try:
-        has_blocked_products = basket.has_user_blocked_products(basket.user)
-    except ExportComplianceDataError as exc:
-        if raise_compliance_data_errors:
-            raise
-        # The learner can fix this themselves, unlike a compliance denial.
-        log.info(
-            "Checkout blocked on incomplete profile for user=%s: missing %s",
-            basket.user.id,
-            exc.missing_fields,
-        )
-        return {
-            "profile_incomplete": True,
-            "error": USER_MSG_TYPE_PROFILE_INCOMPLETE,
-            "missing_fields": exc.profile_fields,
-        }
+    preflight_error = _run_checkout_preflight(
+        request,
+        basket,
+        skip_discount_check=skip_discount_check,
+        raise_compliance_data_errors=raise_compliance_data_errors,
+    )
 
-    if has_blocked_products:
-        return {
-            "country_blocked": True,
-            "error": USER_MSG_TYPE_ENROLL_BLOCKED,
-        }
-
-    if basket.has_user_purchased_same_courserun(basket.user):
-        return {
-            "purchased_same_courserun": True,
-            "error": USER_MSG_TYPE_ENROLL_DUPLICATED,
-        }
-
-    if basket.has_user_purchased_non_upgradable_courserun():
-        return {
-            "purchased_non_upgradeable_courserun": True,
-            "error": USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
-        }
-
-    if not skip_discount_check:
-        # Pick up contract pricing for anything in the basket that's in one of
-        # the user's contracts, if it isn't there already.
-        apply_contract_discounts_to_basket(basket)
-
-    if not skip_discount_check and not check_basket_discounts_for_validity(basket):
-        # We only allow one discount per basket so clear all of them here.
-        basket.discounts.all().delete()
-        apply_user_discounts(basket)
-        return {
-            "invalid_discounts": True,
-            "error": USER_MSG_TYPE_DISCOUNT_INVALID,
-        }
-
-    b2b_validation_result = _validate_basket_steps_for_b2b(basket)
-
-    if b2b_validation_result:
-        return b2b_validation_result
-
-    if not basket.basket_items.count():
-        return {
-            "basket_empty": True,
-            "error": USER_MSG_TYPE_BASKET_EMPTY,
-        }
+    if preflight_error:
+        return preflight_error
 
     order = PendingOrder.create_from_basket(basket, gateway_type=gateway_type)
     total_price = 0

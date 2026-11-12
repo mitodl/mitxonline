@@ -3899,6 +3899,62 @@ def test_apply_user_discounts_applies_contract_code(public_contract_run):
     assert item.discounted_price == Decimal(10)
 
 
+def test_checkout_swaps_in_unused_contract_code(public_contract_run):
+    """
+    If the basket's one-time contract code was redeemed by someone else, checkout
+    should swap in an unused code before checking the basket's discounts, rather
+    than clearing the code and returning discount-invalid.
+    """
+
+    from ecommerce.api import generate_checkout_payload  # noqa: PLC0415
+
+    contract = public_contract_run["contract"]
+    product = public_contract_run["product"]
+
+    used_code, unused_code = [
+        OneTimeDiscountFactory.create(
+            is_bulk=True,
+            discount_type=DISCOUNT_TYPE_FIXED_PRICE,
+            amount=Decimal(0),
+            b2b_contract=contract,
+        )
+        for _ in range(2)
+    ]
+    for code in (used_code, unused_code):
+        DiscountProduct.objects.create(discount=code, product=product)
+
+    user = _make_contract_user({"c": contract}, ["c"])
+    basket = _basket_with(user, product, contract)
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=used_code,
+        redeemed_basket=basket,
+    )
+
+    # Someone else in the contract uses the code before this learner checks out.
+    other_user = _make_contract_user({"c": contract}, ["c"])
+    DiscountRedemption.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=other_user,
+        redeemed_discount=used_code,
+        redeemed_order=OrderFactory.create(
+            purchaser=other_user, state=OrderStatus.FULFILLED
+        ),
+    )
+    assert not used_code.is_redeemable_by(user, [product])
+
+    result = generate_checkout_payload(_b2b_request(user), basket=basket)
+
+    assert "error" not in result
+    assert DiscountRedemption.objects.filter(
+        redeemed_by=user, redeemed_discount=unused_code
+    ).exists()
+    assert not DiscountRedemption.objects.filter(
+        redeemed_by=user, redeemed_discount=used_code
+    ).exists()
+
+
 @pytest.mark.parametrize("old_contract_state", ["expired", "inactive"])
 def test_move_run_to_retirement_contract_removes_old_contract(old_contract_state):
     """Retirement removes old associations even when related managers hide them."""
