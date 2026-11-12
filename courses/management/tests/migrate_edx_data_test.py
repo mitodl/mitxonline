@@ -382,14 +382,9 @@ def _letter_grade_conn(rows):
 
 
 @pytest.mark.parametrize("blank_letter", [None, ""])
-@pytest.mark.parametrize("set_by_admin", [True, False])
-def test_backfill_letter_grades_fills_blank_grade(blank_letter, set_by_admin):
-    """A grade with no letter grade gets the edX.org letter grade and an audit row,
-    whether or not an admin set the grade
-    """
-    grade = CourseRunGradeFactory.create(
-        letter_grade=blank_letter, set_by_admin=set_by_admin
-    )
+def test_backfill_letter_grades_fills_blank_grade(blank_letter):
+    """A grade with no letter grade gets the edX.org letter grade and an audit row"""
+    grade = CourseRunGradeFactory.create(letter_grade=blank_letter, set_by_admin=False)
 
     Command()._backfill_letter_grades(_letter_grade_conn([(grade, "Pass")]), {})  # noqa: SLF001
 
@@ -403,10 +398,10 @@ def test_backfill_letter_grades_fills_blank_grade(blank_letter, set_by_admin):
 
 @pytest.mark.parametrize(
     ("letter_grade", "set_by_admin"),
-    [("B", False), ("A", True)],
+    [("B", False), ("A", True), (None, True)],
 )
 def test_backfill_letter_grades_keeps_existing_letter_grade(letter_grade, set_by_admin):
-    """Grades that already have a letter grade are not changed"""
+    """Grades that already have a letter grade or were set by an admin are not changed"""
     grade = CourseRunGradeFactory.create(
         letter_grade=letter_grade, set_by_admin=set_by_admin
     )
