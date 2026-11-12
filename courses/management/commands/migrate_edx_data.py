@@ -4,6 +4,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.db.models import Q
 from django.db.models.functions import Lower
+from mitol.common.utils.datetime import now_in_utc
 from reversion.models import Version
 from trino.auth import BasicAuthentication
 from trino.dbapi import connect
@@ -16,6 +17,7 @@ from courses.models import (
     CourseRunCertificate,
     CourseRunEnrollment,
     CourseRunGrade,
+    CourseRunGradeAudit,
     Department,
     Program,
     ProgramCertificate,
@@ -585,6 +587,7 @@ class Command(BaseCommand):
                 course_run_id=row["courserun_id"],
                 grade=row["courserungrade_grade"],
                 passed=row["courserungrade_is_passing"],
+                letter_grade=row.get("courserungrade_letter_grade"),
             )
             for row in rows
         ]
@@ -616,6 +619,18 @@ class Command(BaseCommand):
         )
         return len(new_certificate_objects)
 
+    @staticmethod
+    def _courserun_filter(options):
+        readable_ids = [
+            readable_id.strip()
+            for readable_id in (options.get("courserun_readable_ids") or "").split(",")
+            if readable_id.strip()
+        ]
+        if not readable_ids:
+            return None, []
+        placeholders = ",".join("?" for _ in readable_ids)
+        return f"courserun_readable_id IN ({placeholders})", readable_ids
+
     def _migrate_course_certificates(self, conn, options):
         """
         Migrate certificates from edX to MITx Online. Create CourseRunEnrollment, CourseRunGrade,
@@ -624,12 +639,6 @@ class Command(BaseCommand):
         limit = options.get("limit")
         batch_size = options.get("batch_size", 1000)
         dry_run = options.get("dry_run")
-        courserun_readable_ids = [
-            readable_id.strip()
-            for readable_id in (options.get("courserun_readable_ids") or "").split(",")
-            if readable_id
-        ] or None
-
         cur = conn.cursor()
 
         query = (
@@ -637,16 +646,14 @@ class Command(BaseCommand):
             "WHERE user_mitxonline_id IS NOT NULL AND courserun_id IS NOT NULL "
             "AND courseruncertificate_created_on IS NOT NULL"
         )
-        if courserun_readable_ids:
-            placeholders = [
-                f"'{readable_id}'" for readable_id in courserun_readable_ids
-            ]
-            query += f" AND courserun_readable_id IN ({','.join(placeholders)})"
+        courserun_filter, params = self._courserun_filter(options)
+        if courserun_filter:
+            query += f" AND {courserun_filter}"
 
         if limit is not None:
             query += f" LIMIT {int(limit)}"
 
-        cur.execute(query)
+        cur.execute(query, params)
         columns = [desc[0] for desc in cur.description]
 
         total_enrollments = 0
@@ -686,6 +693,104 @@ class Command(BaseCommand):
                         f"{total_certificates} certificates created"
                     )
                 )
+
+    @staticmethod
+    def _update_letter_grades(rows, *, dry_run):
+        """
+        Set letter_grade on the CourseRunGrade rows that match the given rows. Grades
+        that already have a letter grade are not changed.
+
+        Returns:
+            int: The number of grades updated, or that would be updated on a dry run
+        """
+        letter_by_key = {
+            (row["user_mitxonline_id"], row["courserun_id"]): row[
+                "courserungrade_letter_grade"
+            ]
+            for row in rows
+            if row["courserungrade_letter_grade"]
+        }
+        if not letter_by_key:
+            return 0
+
+        user_ids = {user_id for user_id, _ in letter_by_key}
+        run_ids = {run_id for _, run_id in letter_by_key}
+        with transaction.atomic():
+            candidates = (
+                CourseRunGrade.objects.select_for_update()
+                .filter(user_id__in=user_ids, course_run_id__in=run_ids)
+                .filter(Q(letter_grade__isnull=True) | Q(letter_grade=""))
+            )
+            grades = [
+                grade
+                for grade in candidates
+                if (grade.user_id, grade.course_run_id) in letter_by_key
+            ]
+            if dry_run or not grades:
+                return len(grades)
+
+            # bulk_update skips save_and_log, so the audit rows are written here
+            now = now_in_utc()
+            audits = []
+            for grade in grades:
+                data_before = grade.to_dict()
+                grade.letter_grade = letter_by_key[(grade.user_id, grade.course_run_id)]
+                grade.updated_on = now
+                audits.append(
+                    CourseRunGradeAudit(
+                        course_run_grade=grade,
+                        acting_user=None,
+                        call_stack="migrate_edx_data --type letter_grades",
+                        data_before=data_before,
+                        data_after=grade.to_dict(),
+                    )
+                )
+            CourseRunGrade.objects.bulk_update(grades, ["letter_grade", "updated_on"])
+            CourseRunGradeAudit.objects.bulk_create(audits)
+        return len(grades)
+
+    def _backfill_letter_grades(self, conn, options):
+        """
+        Backfill letter grades from edX.org for CourseRunGrade rows that have none,
+        such as the grades that the course_certificates migration created.
+        """
+        limit = options.get("limit")
+        batch_size = options.get("batch_size", 1000)
+        dry_run = options.get("dry_run")
+        cur = conn.cursor()
+
+        query = (
+            "SELECT user_mitxonline_id, courserun_id, courserungrade_letter_grade "
+            "FROM edxorg_to_mitxonline_letter_grades"
+        )
+        courserun_filter, params = self._courserun_filter(options)
+        if courserun_filter:
+            query += f" WHERE {courserun_filter}"
+
+        if limit is not None:
+            query += f" LIMIT {int(limit)}"
+
+        cur.execute(query, params)
+        columns = [desc[0] for desc in cur.description]
+
+        total_rows = 0
+        total_updated = 0
+        while True:
+            results = cur.fetchmany(batch_size)
+            if not results:
+                break
+
+            rows = [dict(zip(columns, r)) for r in results]
+            total_rows += len(rows)
+            total_updated += self._update_letter_grades(rows, dry_run=dry_run)
+
+        prefix = "[DRY RUN] Would update" if dry_run else "Updated"
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"{prefix} {total_updated} letter grades "
+                f"from {total_rows} edX.org letter grade rows"
+            )
+        )
 
     @staticmethod
     def _bulk_create_program_enrollments(rows, batch_size):
@@ -1198,9 +1303,10 @@ class Command(BaseCommand):
                 "entitlements",
                 "future_enrollments",
                 "repair_migrated_profiles",
+                "letter_grades",
             ],
             default="course_runs",
-            help="Choose which migration to run: course_runs, users, course_certificates, program_certificates, entitlements, future_enrollments, repair_migrated_profiles (default: course_runs)",
+            help="Choose which migration to run: course_runs, users, course_certificates, program_certificates, entitlements, future_enrollments, repair_migrated_profiles, letter_grades (default: course_runs)",
         )
         parser.add_argument("--dry-run", action="store_true")
         parser.add_argument(
@@ -1250,3 +1356,7 @@ class Command(BaseCommand):
         if migrate_type == "future_enrollments":
             self.stdout.write("Migrating the edX future enrollments  ...")
             self._migrate_enrollments(conn, options)
+
+        if migrate_type == "letter_grades":
+            self.stdout.write("Backfilling edX.org letter grades ...")
+            self._backfill_letter_grades(conn, options)

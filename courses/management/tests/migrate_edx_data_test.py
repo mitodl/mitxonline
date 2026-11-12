@@ -1,10 +1,14 @@
 """Tests for migrate_edx_data management command's user migration
-(bulk_create fix and --dry-run) and repair_migrated_profiles type
+(bulk_create fix and --dry-run), repair_migrated_profiles type and letter_grades type
 """
+
+from io import StringIO
 
 import pytest
 
+from courses.factories import CourseRunFactory, CourseRunGradeFactory
 from courses.management.commands.migrate_edx_data import Command
+from courses.models import CourseRunGrade, CourseRunGradeAudit
 from users.factories import UserFactory
 from users.models import LegalAddress, User, UserProfile
 
@@ -18,9 +22,13 @@ class FakeCursor:
         self.description = [(col,) for col in columns]
         self._rows = rows
         self._offset = 0
+        self.query = None
+        self.params = None
 
-    def execute(self, query):
-        """No-op - the fake cursor already has its rows in memory."""
+    def execute(self, query, params=None):
+        """Record the query - the fake cursor already has its rows in memory."""
+        self.query = query
+        self.params = params
 
     def fetchmany(self, size):
         """Return the next slice of rows, matching the DB-API contract."""
@@ -35,10 +43,12 @@ class FakeConnection:
     def __init__(self, columns, rows):
         self._columns = columns
         self._rows = rows
+        self.last_cursor = None
 
     def cursor(self):
         """Return a fresh fake cursor over the same fixed rows."""
-        return FakeCursor(self._columns, self._rows)
+        self.last_cursor = FakeCursor(self._columns, self._rows)
+        return self.last_cursor
 
 
 USER_COLUMNS = [
@@ -330,3 +340,167 @@ def test_migrate_users_dry_run_matches_emails_case_insensitively(capsys):
     Command()._migrate_users(conn, {"dry_run": True, "batch_size": 2})  # noqa: SLF001
 
     assert "[DRY RUN] Would create 1 users" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("letter_grade", ["A", None])
+def test_bulk_create_grades_sets_letter_grade(letter_grade):
+    """Migrated certificate grades get the edX.org letter grade"""
+    user = UserFactory.create()
+    run = CourseRunFactory.create()
+
+    Command._bulk_create_grades(  # noqa: SLF001
+        [
+            {
+                "user_mitxonline_id": user.id,
+                "courserun_id": run.id,
+                "courserungrade_grade": 0.9,
+                "courserungrade_is_passing": True,
+                "courserungrade_letter_grade": letter_grade,
+            }
+        ],
+        batch_size=10,
+    )
+
+    assert (
+        CourseRunGrade.objects.get(user=user, course_run=run).letter_grade
+        == letter_grade
+    )
+
+
+LETTER_GRADE_COLUMNS = [
+    "user_mitxonline_id",
+    "courserun_id",
+    "courserungrade_letter_grade",
+]
+
+
+def _letter_grade_conn(rows):
+    return FakeConnection(
+        columns=LETTER_GRADE_COLUMNS,
+        rows=[(grade.user_id, grade.course_run_id, letter) for grade, letter in rows],
+    )
+
+
+@pytest.mark.parametrize("blank_letter", [None, ""])
+@pytest.mark.parametrize("set_by_admin", [True, False])
+def test_backfill_letter_grades_fills_blank_grade(blank_letter, set_by_admin):
+    """A grade with no letter grade gets the edX.org letter grade and an audit row,
+    whether or not an admin set the grade
+    """
+    grade = CourseRunGradeFactory.create(
+        letter_grade=blank_letter, set_by_admin=set_by_admin
+    )
+
+    Command()._backfill_letter_grades(_letter_grade_conn([(grade, "Pass")]), {})  # noqa: SLF001
+
+    grade.refresh_from_db()
+    assert grade.letter_grade == "Pass"
+    audit = CourseRunGradeAudit.objects.get(course_run_grade=grade)
+    assert audit.acting_user is None
+    assert audit.data_before["letter_grade"] == blank_letter
+    assert audit.data_after["letter_grade"] == "Pass"
+
+
+@pytest.mark.parametrize(
+    ("letter_grade", "set_by_admin"),
+    [("B", False), ("A", True)],
+)
+def test_backfill_letter_grades_keeps_existing_letter_grade(letter_grade, set_by_admin):
+    """Grades that already have a letter grade are not changed"""
+    grade = CourseRunGradeFactory.create(
+        letter_grade=letter_grade, set_by_admin=set_by_admin
+    )
+
+    Command()._backfill_letter_grades(_letter_grade_conn([(grade, "Pass")]), {})  # noqa: SLF001
+
+    grade.refresh_from_db()
+    assert grade.letter_grade == letter_grade
+    assert not CourseRunGradeAudit.objects.filter(course_run_grade=grade).exists()
+
+
+def test_backfill_letter_grades_matches_user_and_run_pairs():
+    """A grade matches only on its own user and run pair, even when its user and its
+    run each appear in other rows of the same batch
+    """
+    run_a, run_b = CourseRunFactory.create_batch(2)
+    user_a, user_b = UserFactory.create_batch(2)
+    grade_a = CourseRunGradeFactory.create(
+        user=user_a, course_run=run_a, letter_grade=None, set_by_admin=False
+    )
+    grade_b = CourseRunGradeFactory.create(
+        user=user_b, course_run=run_b, letter_grade=None, set_by_admin=False
+    )
+    unmatched = CourseRunGradeFactory.create(
+        user=user_a, course_run=run_b, letter_grade=None, set_by_admin=False
+    )
+
+    Command()._backfill_letter_grades(  # noqa: SLF001
+        _letter_grade_conn([(grade_a, "A"), (grade_b, "C")]), {"batch_size": 10}
+    )
+
+    for grade in (grade_a, grade_b, unmatched):
+        grade.refresh_from_db()
+    assert grade_a.letter_grade == "A"
+    assert grade_b.letter_grade == "C"
+    assert unmatched.letter_grade is None
+
+
+def test_backfill_letter_grades_dry_run_does_not_write():
+    """--dry-run counts the grades it would update but does not change them"""
+    grade = CourseRunGradeFactory.create(letter_grade=None, set_by_admin=False)
+    stdout = StringIO()
+
+    Command(stdout=stdout)._backfill_letter_grades(  # noqa: SLF001
+        _letter_grade_conn([(grade, "A")]), {"dry_run": True}
+    )
+
+    assert "Would update 1 letter grades" in stdout.getvalue()
+    grade.refresh_from_db()
+    assert grade.letter_grade is None
+    assert not CourseRunGradeAudit.objects.filter(course_run_grade=grade).exists()
+
+
+@pytest.mark.parametrize(
+    ("options", "expected_clause", "expected_params"),
+    [
+        ({}, None, []),
+        (
+            {
+                "courserun_readable_ids": "course-v1:MITx+A+1T2020, course-v1:MITx+B+1T2020"
+            },
+            " WHERE courserun_readable_id IN (?,?)",
+            ["course-v1:MITx+A+1T2020", "course-v1:MITx+B+1T2020"],
+        ),
+        (
+            {"courserun_readable_ids": "course-v1:MITx+A+1T2020' OR '1'='1"},
+            " WHERE courserun_readable_id IN (?)",
+            ["course-v1:MITx+A+1T2020' OR '1'='1"],
+        ),
+    ],
+)
+def test_backfill_letter_grades_binds_courserun_filter(
+    options, expected_clause, expected_params
+):
+    """--courserun-readable-ids values are bound as parameters, not put in the SQL"""
+    conn = FakeConnection(columns=LETTER_GRADE_COLUMNS, rows=[])
+
+    Command(stdout=StringIO())._backfill_letter_grades(  # noqa: SLF001
+        conn, {**options, "limit": 5}
+    )
+
+    query = conn.last_cursor.query
+    assert query.endswith(f"{expected_clause or ''} LIMIT 5")
+    assert "'" not in query
+    assert conn.last_cursor.params == expected_params
+
+
+def test_migrate_course_certificates_binds_courserun_filter():
+    """The course_certificates migration uses the same bound filter"""
+    conn = FakeConnection(columns=["user_mitxonline_id"], rows=[])
+
+    Command(stdout=StringIO())._migrate_course_certificates(  # noqa: SLF001
+        conn, {"courserun_readable_ids": "course-v1:MITx+A+1T2020"}
+    )
+
+    assert conn.last_cursor.query.endswith(" AND courserun_readable_id IN (?)")
+    assert conn.last_cursor.params == ["course-v1:MITx+A+1T2020"]
