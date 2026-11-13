@@ -5,19 +5,17 @@ import uuid
 from urllib.parse import urlparse
 
 from django.conf import settings
+from django.core.exceptions import PermissionDenied
 from django.http import HttpResponseRedirect
 from django.middleware.csrf import CsrfViewMiddleware, get_token
-from django.urls import reverse
 from django.utils.deprecation import MiddlewareMixin
 
 log = logging.getLogger(__name__)
 
 ANONYMOUS_BASKET_HANDOFF_PARAM = "anonymous_basket_id"
 
-# The id of the basket MIT Learn filled just before handing the browser over,
-# and the marker showing this hand-off has already had one session reset.
+# The id of the basket MIT Learn filled just before handing the browser over.
 EXPECTED_BASKET_PARAM = "basket_id"
-SESSION_RESET_PARAM = "session_reset"
 # len(str(2**63 - 1)): the longest id a bigint primary key can hold.
 MAX_BASKET_ID_DIGITS = 19
 
@@ -131,56 +129,38 @@ class HostBasedCSRFMiddleware(CsrfViewMiddleware):
 
 class BasketOwnerHandoffMiddleware(MiddlewareMixin):
     """
-    Refuse to serve a cart that belongs to someone other than the caller.
+    Refuse a hand-off from Learn whose basket belongs to another user.
 
-    Defence in depth for hq#12763.  Learn fills the basket over MITx Online's
-    API on Learn's own domain -- where the gateway session is Learn's, and
-    correct -- then sends the browser here, where the gateway session is a
-    separate cookie on a separate parent domain and may still name whoever used
-    this browser previously.  Learn therefore passes the id of the basket it just
-    filled, and this compares it against the basket the session it arrived with
-    actually owns.
+    hq#12763: Learn fills the basket over MITx Online's API on Learn's own
+    domain, then sends the browser through ``switch-session`` to the cart here,
+    where the gateway session is a separate cookie on a separate parent domain.
+    ``switch-session`` drops that session so the cart authenticates as whoever
+    holds the Keycloak SSO session.  Learn passes the id of the basket it filled,
+    and this checks that the session that comes back owns it.
 
-    On a mismatch the browser is bounced through ``switch-session``, which
-    discards the stale gateway session so the retry authenticates as the current
-    user.  That bounce happens at most once per hand-off: if the retry still
-    mismatches something other than a stale session is wrong, and looping would
-    be worse than proceeding.  Proceeding is safe -- the caller sees their own
-    session's cart, which is the wrong cart for whoever clicked but never a
-    different person's data.
+    If that basket belongs to someone else, the cart would show their basket,
+    so this answers 403 instead.  Sending the browser through ``switch-session``
+    again would not help: it runs the same gateway route against the same SSO
+    session.  A basket that no longer exists passes through, since checking out
+    deletes it and the back button can return to the hand-off URL.
+
+    Only hand-offs carrying ``basket_id`` are checked.  Opening the cart
+    directly with a stale gateway session still shows the previous user's
+    basket; closing that needs Learn and MITx Online on one gateway session.
 
     Ordered after ``ApisixUserMiddleware`` so ``request.user`` reflects the
     gateway header rather than a possibly stale Django session.
     """
 
     def process_request(self, request):
-        """Bounce a hand-off whose basket the caller's session does not own."""
-        if not self._is_stale_handoff(request):
-            return None
-
-        query_params = request.GET.copy()
-        query_params[SESSION_RESET_PARAM] = "1"
-        # switch-session forwards every parameter other than `next` onto the
-        # destination, so the retry arrives back here carrying the marker above.
-        query_params["next"] = request.path
-        return HttpResponseRedirect(
-            f"{reverse('switch-session')}?{query_params.urlencode()}"
-        )
-
-    @staticmethod
-    def _is_stale_handoff(request):
-        """Whether this request names a basket its session does not own."""
+        """Refuse a hand-off whose basket another user owns."""
         expected_basket_id = request.GET.get(EXPECTED_BASKET_PARAM)
-        # The reset endpoint is where the fix happens; checking there would just
-        # add a hop, and its session is mid-teardown anyway.  Only GET is
-        # bounced: browsers reissue a redirected POST as a GET without its body,
-        # and Learn's hand-off is a plain link.
-        if (
-            not expected_basket_id
-            or request.method != "GET"
-            or request.path.rstrip("/").endswith("/switch-session")
+        # switch-session is where a stale session is expected and dropped, so a
+        # mismatch there is the case it exists to fix.
+        if not expected_basket_id or request.path.rstrip("/").endswith(
+            "/switch-session"
         ):
-            return False
+            return
 
         # isascii() too: str.isdigit() accepts characters like "²" that int()
         # rejects, which would turn a crafted link into a 500 on any page.  The
@@ -197,27 +177,31 @@ class BasketOwnerHandoffMiddleware(MiddlewareMixin):
                 EXPECTED_BASKET_PARAM,
                 expected_basket_id,
             )
-            return False
+            return
 
         if not request.user.is_authenticated:
             # Nothing to compare against.  The route's own auth gate decides
             # whether an anonymous caller may be here at all.
-            return False
+            return
 
         from ecommerce.models import Basket  # noqa: PLC0415
 
-        if Basket.objects.filter(
-            user=request.user, id=int(expected_basket_id)
-        ).exists():
-            return False
+        owner_id = (
+            Basket.objects.filter(id=int(expected_basket_id))
+            .values_list("user_id", flat=True)
+            .first()
+        )
+        # None covers a deleted basket and an anonymous one; neither is another
+        # user's data.
+        if owner_id is None or owner_id == request.user.id:
+            return
 
-        if request.GET.get(SESSION_RESET_PARAM):
-            log.warning(
-                "Basket %s still not owned by %s after a session reset; "
-                "serving this session's own cart instead of bouncing again.",
-                expected_basket_id,
-                request.user.global_id,
-            )
-            return False
-
-        return True
+        # Logged at error so Sentry records it: reaching this means the
+        # switch-session hand-off did not replace the stale session.
+        log.error(
+            "Refusing hand-off: basket %s belongs to user %s, not caller %s",
+            expected_basket_id,
+            owner_id,
+            request.user.id,
+        )
+        raise PermissionDenied

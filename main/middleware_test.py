@@ -3,6 +3,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 from django.contrib.auth.models import AnonymousUser
+from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 
 from ecommerce.factories import BasketFactory
@@ -219,47 +220,45 @@ def test_basket_owner_handoff_passes_when_session_owns_the_basket(
     assert basket_owner_middleware.process_request(request) is None
 
 
-def test_basket_owner_handoff_bounces_when_session_is_a_different_user(
+@pytest.mark.parametrize("method", ["get", "post"])
+def test_basket_owner_handoff_refuses_another_users_basket(
+    rf, basket_owner_middleware, method
+):
+    """The hq#12763 case: the browser came back from switch-session as someone else.
+
+    Learn filled User B's basket over its own domain, but the session here
+    still names User A, so the cart would show A's basket to B.
+    """
+    basket = BasketFactory.create()
+
+    request = getattr(rf, method)(f"/cart/?basket_id={basket.id}")
+    request.user = UserFactory.create()
+
+    with pytest.raises(PermissionDenied):
+        basket_owner_middleware.process_request(request)
+
+
+def test_basket_owner_handoff_ignores_a_forged_reset_marker(
     rf, basket_owner_middleware
 ):
-    """The hq#12763 case: the browser arrived as someone else.
-
-    Learn filled User B's basket over its own domain, then handed the browser
-    here where the gateway session still names User A.  The request must be sent
-    through switch-session rather than rendering A's cart.
-    """
+    """The old `session_reset` query param no longer bypasses the check."""
     basket = BasketFactory.create()
-    other_user = UserFactory.create()
 
-    request = rf.get("/cart/", {"basket_id": basket.id, "ecom-service": "true"})
-    request.user = other_user
+    request = rf.get("/cart/", {"basket_id": basket.id, "session_reset": "1"})
+    request.user = UserFactory.create()
 
-    response = basket_owner_middleware.process_request(request)
-
-    assert response is not None
-    assert response.url.startswith("/switch-session")
-    query = parse_qs(urlparse(response.url).query)
-    assert query["next"] == ["/cart/"]
-    assert query["session_reset"] == ["1"]
-    # Unrelated parameters survive the bounce.
-    assert query["ecom-service"] == ["true"]
-    assert query["basket_id"] == [str(basket.id)]
+    with pytest.raises(PermissionDenied):
+        basket_owner_middleware.process_request(request)
 
 
-def test_basket_owner_handoff_does_not_loop(rf, basket_owner_middleware):
-    """A second mismatch proceeds rather than bouncing forever.
-
-    The caller then sees their own session's cart -- the wrong cart for whoever
-    clicked, but never a different person's data.
-    """
+def test_basket_owner_handoff_passes_a_deleted_basket(rf, basket_owner_middleware):
+    """Checking out deletes the basket; going back to the hand-off URL is fine."""
     basket = BasketFactory.create()
-    other_user = UserFactory.create()
+    basket_id = basket.id
+    basket.delete()
 
-    request = rf.get(
-        "/cart/",
-        {"basket_id": basket.id, "session_reset": "1"},
-    )
-    request.user = other_user
+    request = rf.get("/cart/", {"basket_id": basket_id})
+    request.user = UserFactory.create()
 
     assert basket_owner_middleware.process_request(request) is None
 
@@ -297,41 +296,35 @@ def test_basket_owner_handoff_ignores_out_of_range_basket_id(
     request = rf.get("/cart/", {"basket_id": "9" * 19})
     request.user = UserFactory.create()
 
-    assert basket_owner_middleware.process_request(request) is not None
-
-
-def test_basket_owner_handoff_only_bounces_get(rf, basket_owner_middleware):
-    """A redirected POST comes back as a GET without its body, so leave it be."""
-    basket = BasketFactory.create()
-
-    request = rf.post(f"/cart/?basket_id={basket.id}")
-    request.user = UserFactory.create()
-
     assert basket_owner_middleware.process_request(request) is None
 
 
-def test_basket_owner_handoff_round_trip(client):
-    """The middleware and switch-session agree on the parameters they hand over.
+def test_basket_owner_handoff_through_the_middleware_stack(client):
+    """Learn's hand-off URL passes switch-session, then 403s on a stale cart.
 
-    A mismatched hand-off goes out through switch-session, which drops the
-    session and sends the browser back to the cart carrying the reset marker.
-    Who it comes back as is the gateway's job and not reproducible here.
+    switch-session must not refuse, since a stale session is what it drops.
+    Who the browser comes back as is the gateway's job and not reproducible
+    here, so the cart request reuses a session that does not own the basket.
     """
     basket = BasketFactory.create()
-    client.force_login(UserFactory.create())
+    stale_user = UserFactory.create()
+    client.force_login(stale_user)
 
-    bounce = client.get("/cart/", {"basket_id": basket.id, "ecom-service": "true"})
-    assert urlparse(bounce.url).path.rstrip("/").endswith("/switch-session")
-
-    back = client.get(bounce.url)
+    handoff = client.get(
+        "/switch-session/",
+        {"next": "/cart/", "basket_id": basket.id, "ecom-service": "true"},
+    )
+    assert handoff.status_code == 302
     assert "_auth_user_id" not in client.session
-    target = urlparse(back.url)
+    target = urlparse(handoff.url)
     assert target.path == "/cart/"
     assert parse_qs(target.query) == {
         "basket_id": [str(basket.id)],
         "ecom-service": ["true"],
-        "session_reset": ["1"],
     }
+
+    client.force_login(stale_user)
+    assert client.get(handoff.url).status_code == 403
 
 
 def test_basket_owner_handoff_ignores_anonymous_callers(rf, basket_owner_middleware):
