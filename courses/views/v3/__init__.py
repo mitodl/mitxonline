@@ -245,6 +245,7 @@ class UserProgramEnrollmentsViewSet(
     queryset = (
         ProgramEnrollment.objects.prefetch_related(
             "program",
+            "program__page",
         )
         .select_related("track")
         .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))

@@ -2412,3 +2412,56 @@ def test_course_run_has_b2b_contracts(active):
 
     assert run.has_b2b_contracts is True
     assert run.contract_group_ids == {contract.id}
+
+
+@pytest.mark.parametrize(
+    ("product_live", "page_live", "in_catalog", "expected"),
+    [
+        (True, True, True, True),
+        (True, False, True, False),
+        (False, True, True, False),
+        (True, True, False, False),
+    ],
+)
+@pytest.mark.parametrize(
+    ("product_factory", "page_factory", "field"),
+    [
+        (CourseFactory, CoursePageFactory, "course"),
+        (ProgramFactory, ProgramPageFactory, "program"),
+    ],
+)
+def test_has_live_product_page(  # noqa: PLR0913
+    product_factory,
+    page_factory,
+    field,
+    product_live,
+    page_live,
+    in_catalog,
+    expected,
+):
+    """has_live_product_page needs a live product with a live page in the Learn catalog"""
+    product = product_factory.create(page=None, live=product_live)
+    page_factory.create(
+        **{field: product}, live=page_live, include_in_learn_catalog=in_catalog
+    )
+    product.refresh_from_db()
+
+    assert product.has_live_product_page is expected
+
+
+@pytest.mark.parametrize("product_factory", [CourseFactory, ProgramFactory])
+def test_has_live_product_page_without_page(product_factory):
+    """A live product with no page has no product page to show"""
+    product = product_factory.create(page=None, live=True)
+
+    assert product.has_live_product_page is False
+
+
+@pytest.mark.parametrize(("b2b_only", "expected"), [(False, True), (True, False)])
+def test_program_has_live_product_page_b2b_only(b2b_only, expected):
+    """A B2B-only program has no public product page"""
+    program = ProgramFactory.create(page=None, live=True, b2b_only=b2b_only)
+    ProgramPageFactory.create(program=program, live=True, include_in_learn_catalog=True)
+    program.refresh_from_db()
+
+    assert program.has_live_product_page is expected

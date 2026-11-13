@@ -1144,7 +1144,14 @@ components:
             This is controlled in the CoursePage for the course, and will default
             to False if there isn't one.
           readOnly: true
+        has_live_product_page:
+          type: boolean
+          description: |-
+            Return true if the course has a product page that can be shown: the
+            course and its CoursePage are live and the page is in the Learn catalog.
+          readOnly: true
       required:
+      - has_live_product_page
       - id
       - include_in_learn_catalog
       - readable_id
@@ -1485,7 +1492,15 @@ components:
           - $ref: '#/components/schemas/DisplayModeEnum'
           - $ref: '#/components/schemas/BlankEnum'
           - $ref: '#/components/schemas/NullEnum'
+        has_live_product_page:
+          type: boolean
+          description: |-
+            Return true if the program has a product page that can be shown: the
+            program and its ProgramPage are live, the page is in the Learn catalog,
+            and the program isn't B2B-only.
+          readOnly: true
       required:
+      - has_live_product_page
       - id
       - readable_id
       - title

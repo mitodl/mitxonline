@@ -130,6 +130,7 @@ def test_user_enrollments_detail(
                 "id": enrollment.run.course_id,
                 "readable_id": enrollment.run.course.readable_id,
                 "include_in_learn_catalog": enrollment.run.course.include_in_learn_catalog,
+                "has_live_product_page": enrollment.run.course.has_live_product_page,
                 "title": "Test page",
                 "type": "course",
             },
@@ -209,6 +210,7 @@ def test_user_enrollments_list(
                     "id": enrollment.run.course_id,
                     "readable_id": enrollment.run.course.readable_id,
                     "include_in_learn_catalog": enrollment.run.course.include_in_learn_catalog,
+                    "has_live_product_page": enrollment.run.course.has_live_product_page,
                     "title": "Test page",
                     "type": "course",
                 },
@@ -330,6 +332,7 @@ def test_user_enrollments_list_filter_exclude_b2b(
                     "id": enrollment.run.course_id,
                     "readable_id": enrollment.run.course.readable_id,
                     "include_in_learn_catalog": enrollment.run.course.include_in_learn_catalog,
+                    "has_live_product_page": enrollment.run.course.has_live_product_page,
                     "title": "Test page",
                     "type": "course",
                 },
@@ -410,6 +413,7 @@ def test_user_enrollments_list_filter_exclude_b2b(
                     "id": enrollment.run.course_id,
                     "readable_id": enrollment.run.course.readable_id,
                     "include_in_learn_catalog": enrollment.run.course.include_in_learn_catalog,
+                    "has_live_product_page": enrollment.run.course.has_live_product_page,
                     "title": "Test page",
                     "type": "course",
                 },
@@ -550,7 +554,7 @@ def test_program_enrollments(
 
     assert len(program_enrollments) > 0
 
-    with django_assert_max_num_queries(4):
+    with django_assert_max_num_queries(5):
         resp = user_drf_client.get(reverse("v3:user_program_enrollments_api-list"))
 
     assert resp.status_code == status.HTTP_200_OK
@@ -1111,7 +1115,7 @@ def test_program_enrollments_include_track(
         for tracked in (create_program_with_tracks(), create_program_with_tracks())
     ]
 
-    with django_assert_max_num_queries(4):
+    with django_assert_max_num_queries(5):
         resp = user_drf_client.get(reverse("v3:user_program_enrollments_api-list"))
 
     assert resp.status_code == status.HTTP_200_OK

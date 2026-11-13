@@ -31,6 +31,7 @@ class CourseSerializer(BaseCourseSerializer):
         fields = [
             *BaseCourseSerializer.Meta.fields,
             "include_in_learn_catalog",
+            "has_live_product_page",
         ]
 
 
