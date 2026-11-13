@@ -25,7 +25,6 @@ import RegisterPages from "./pages/register/RegisterPages"
 import EditProfilePage from "./pages/profile/EditProfilePage"
 import AccountSettingsPage from "./pages/settings/AccountSettingsPage"
 import EmailConfirmPage from "./pages/settings/EmailConfirmPage"
-import DashboardPage from "./pages/DashboardPage"
 import CartPage from "./pages/checkout/CartPage"
 import OrderHistory from "./pages/checkout/OrderHistory"
 import OrderReceiptPage from "./pages/checkout/OrderReceiptPage"
@@ -169,11 +168,6 @@ export class App extends React.Component<Props, void> {
             <Route
               path={urljoin(match.url, String(routes.account.confirmEmail))}
               component={EmailConfirmPage}
-            />
-            <PrivateRoute
-              exact
-              path={urljoin(match.url, String(routes.dashboard))}
-              component={DashboardPage}
             />
             <Route
               path={urljoin(match.url, String(routes.cart))}

@@ -115,9 +115,6 @@ export const USER_MSG_TYPE_PAYMENT_DECLINED = "payment-declined"
 export const USER_MSG_TYPE_PAYMENT_ERROR = "payment-error"
 export const USER_MSG_TYPE_PAYMENT_CANCELLED = "payment-cancelled"
 export const USER_MSG_TYPE_PAYMENT_REVIEW = "payment-review"
-export const USER_MSG_TYPE_PAYMENT_ACCEPTED = "payment-accepted"
-export const USER_MSG_TYPE_PAYMENT_ACCEPTED_NO_VALUE =
-  "payment-accepted-no-value"
 export const USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN = "payment-error-unknown"
 export const USER_MSG_TYPE_DISCOUNT_INVALID = "discount-invalid"
 export const USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY =
@@ -128,8 +125,6 @@ export const ALERT_TYPE_SUCCESS = "success"
 export const ALERT_TYPE_DANGER = "danger"
 
 // HTML title for different pages
-export const DASHBOARD_PAGE_TITLE = "Dashboard"
-
 export const LOGIN_EMAIL_PAGE_TITLE = "Sign In"
 export const LOGIN_PASSWORD_PAGE_TITLE = LOGIN_EMAIL_PAGE_TITLE
 

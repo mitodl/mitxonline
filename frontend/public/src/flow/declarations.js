@@ -25,7 +25,6 @@ declare type Settings = {
   posthog_api_host: ?string,
   unified_ecommerce_url: ?string,
   oidc_login_url: ?string,
-  mit_learn_dashboard_url: ?string,
   mit_learn_terms_url: ?string,
   mit_learn_privacy_url: ?string,
   mit_learn_honor_code_url: ?string,

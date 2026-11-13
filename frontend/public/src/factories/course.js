@@ -252,14 +252,6 @@ export const makeCourseRunEnrollment = (): CourseRunEnrollment => ({
   enrollment_mode:         genEnrollmentMode()
 })
 
-export const makeCourseRunEnrollmentWithProduct = (): CourseRunEnrollment => ({
-  // $FlowFixMe
-  id:                      genEnrollmentId.next().value,
-  run:                     makeCourseRunDetailWithProduct(),
-  edx_emails_subscription: true,
-  enrollment_mode:         genEnrollmentMode()
-})
-
 export const makeProgram = (): Program => ({
   id:          genProgramId.next().value,
   title:       casual.text,
@@ -284,57 +276,6 @@ export const makeProgramWithReqTree = (): Program => {
 
   program.req_tree = [
     makeDEDPSampleRequirementsTree(program, program.courses, false, true, true)
-  ]
-
-  return program
-}
-
-export const makeProgramWithOnlyRequirements = (): Program => {
-  const program = makeProgram()
-
-  // for the reqtree stuff to work, the program needs 6 more courses
-  for (let i = 0; i < 6; i++) {
-    program.courses.push(makeCourseDetailWithRuns())
-  }
-
-  program.req_tree = [
-    makeDEDPSampleRequirementsTree(program, program.courses, false, false, true)
-  ]
-
-  return program
-}
-
-export const makeProgramWithOnlyElectives = (): Program => {
-  const program = makeProgram()
-
-  // for the reqtree stuff to work, the program needs 6 more courses
-  for (let i = 0; i < 6; i++) {
-    program.courses.push(makeCourseDetailWithRuns())
-  }
-
-  program.req_tree = [
-    makeDEDPSampleRequirementsTree(program, program.courses, false, true, false)
-  ]
-
-  return program
-}
-
-export const makeProgramWithNoElectivesOrRequirements = (): Program => {
-  const program = makeProgram()
-
-  // for the reqtree stuff to work, the program needs 6 more courses
-  for (let i = 0; i < 6; i++) {
-    program.courses.push(makeCourseDetailWithRuns())
-  }
-
-  program.req_tree = [
-    makeDEDPSampleRequirementsTree(
-      program,
-      program.courses,
-      false,
-      false,
-      false
-    )
   ]
 
   return program

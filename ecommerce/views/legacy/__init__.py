@@ -100,8 +100,6 @@ from main.constants import (
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_ENROLL_FAILED,
-    USER_MSG_TYPE_PAYMENT_ACCEPTED,
-    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
     USER_MSG_TYPE_PAYMENT_CANCELLED,
     USER_MSG_TYPE_PAYMENT_DECLINED,
     USER_MSG_TYPE_PAYMENT_ERROR,
@@ -114,53 +112,6 @@ from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
 
 log = logging.getLogger(__name__)
-
-
-UAI_READABLE_ID_PREFIXES = [
-    "program-v1:UAI+B2C",
-    "course-v1:UAI_B2C",
-]
-
-
-def _has_uai_purchase(order):
-    """Return True if the order includes a program or course run with a UAI prefix."""
-
-    def _has_uai_prefix(readable_id):
-        return any(
-            readable_id.startswith(prefix) for prefix in UAI_READABLE_ID_PREFIXES
-        )
-
-    return any(
-        line.purchased_object
-        and line.purchased_object.readable_id
-        and _has_uai_prefix(line.purchased_object.readable_id)
-        for line in order.lines.all()
-    )
-
-
-def _should_redirect_to_learn(order):
-    """
-    Return True if the user should be redirected to the Learn dashboard
-    after a successful checkout.
-    """
-    if _has_uai_purchase(order):
-        return True
-
-    # NOTE: Retrieve global_id from purchaser rather than request user
-    # because this is used in contexts where the request is anonymous.
-    #
-    # One example is the callback view that processes the payment response from
-    # cybersource. This view is hit via a POST request from a different domain,
-    # which means no samesite (lax, strict) authentication cookies are sent.
-    global_id = order.purchaser.global_id
-    return bool(
-        global_id
-        and is_posthog_enabled(
-            features.REDIRECT_LEARN_DASHBOARD,
-            default=False,
-            opt_unique_id=global_id,
-        )
-    )
 
 
 def _learn_dashboard_redirect(order):
@@ -848,7 +799,10 @@ class CheckoutCallbackView(View):
 
     def post_checkout_redirect(self, order_state, order, request):
         """
-        Redirect the user with a message depending on the provided state.
+        Redirect the user depending on the provided state: to the cart with a
+        message for canceled, errored and declined orders, to the Learn
+        dashboard with the order's details for fulfilled ones, and to the
+        dashboard with an error message for any other state.
 
         Args:
             - order_state (str): the order state to consider
@@ -870,16 +824,7 @@ class CheckoutCallbackView(View):
                 reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_DECLINED}
             )
         elif order_state == OrderStatus.FULFILLED:
-            if _should_redirect_to_learn(order):
-                return _learn_dashboard_redirect(order)
-
-            return redirect_with_user_message(
-                reverse("user-dashboard"),
-                {
-                    "type": USER_MSG_TYPE_PAYMENT_ACCEPTED,
-                    "run": order.lines.first().courseware,
-                },
-            )
+            return _learn_dashboard_redirect(order)
         else:
             processor_response = PaymentGateway.get_formatted_response(
                 settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
@@ -950,20 +895,19 @@ class CheckoutCallbackView(View):
         """
         Process a GET request to this endpoint.
 
-        Stripe just redirects users back to the app. We might get a checkout
-        session ID here, which we can load and check, but for now just redirect
-        back to the dashboard and wait for them to hit the webhook.
+        Stripe just redirects users back to the app, for both successful and
+        canceled checkouts, and the order is fulfilled by the webhook. So only
+        report the order as fulfilled once it is; otherwise just go back to the
+        dashboard.
         """
 
         order_ref = request.session.get("order_reference_number", None)
         if order_ref:
-            order = Order.objects.filter(reference_number=order_ref).first()
-
-            return (
-                _learn_dashboard_redirect(order)
-                if order and _should_redirect_to_learn(order)
-                else HttpResponseRedirect(reverse("user-dashboard"))
-            )
+            order = Order.objects.filter(
+                reference_number=order_ref, state=OrderStatus.FULFILLED
+            ).first()
+            if order:
+                return _learn_dashboard_redirect(order)
 
         return HttpResponseRedirect(reverse("user-dashboard"))
 
@@ -1236,16 +1180,7 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
                 {"type": USER_MSG_TYPE_PROFILE_INCOMPLETE},
             )
         if "no_checkout" in checkout_payload:
-            order = checkout_payload["order"]
-            if _should_redirect_to_learn(order):
-                return _learn_dashboard_redirect(order)
-            return redirect_with_user_message(
-                reverse("user-dashboard"),
-                {
-                    "type": USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
-                    "run": order.lines.first().courseware,
-                },
-            )
+            return _learn_dashboard_redirect(checkout_payload["order"])
         if "purchased_same_courserun" in checkout_payload:
             return redirect_with_user_message(
                 reverse("cart"),

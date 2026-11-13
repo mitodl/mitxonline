@@ -87,9 +87,10 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
           </li>
         ) : null}
         <li {...(menuChildProps.li || {})}>
-          <MixedLink dest={routes.dashboard} aria-label="Dashboard">
+          {/* A full page load, so the server can redirect to MIT Learn */}
+          <a href={routes.dashboard} aria-label="Dashboard">
             {makeNavLink("Dashboard")}
-          </MixedLink>
+          </a>
         </li>
         <li {...(menuChildProps.li || {})}>
           <MixedLink dest={routes.accountSettings} aria-label="Account">
