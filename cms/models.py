@@ -334,8 +334,9 @@ VC_EXAMPLES_URL = "https://example.invalid/vc-examples"
 
 # Opens in a new tab so an author doesn't lose unsaved CMS edits.
 VC_EXAMPLES_LINK = format_html(
-    '<a href="{}" target="_blank" rel="noopener noreferrer">'
-    "See examples of well-written descriptions and criteria</a>.",
+    '<a href="{}" target="_blank" rel="noopener noreferrer" '
+    'style="display:inline-block;margin-top:0.75rem">'
+    "View examples of well-written credential descriptions and criteria</a>.",
     VC_EXAMPLES_URL,
 )
 
