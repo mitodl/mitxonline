@@ -26,9 +26,10 @@ log = logging.getLogger()
 # Postgres appends a DETAIL line to constraint violations that echoes the whole
 # offending row -- on a users table that is the learner's name, email and
 # external UUID.  psycopg puts it in str(exc), so it ships inside the exception
-# value, where no SDK privacy setting reaches it: send_default_pii governs
-# user/cookie/header capture and max_request_body_size governs request bodies,
-# and neither touches exception text.
+# value, where no SDK privacy setting reaches it: data_collection governs
+# user/cookie/header capture and, through http_bodies, whether request bodies
+# are attached at all (max_request_body_size only bounds their size), and
+# neither touches exception text.
 #
 # The newline is matched both raw and as a literal backslash-n: the SDK repr()s
 # frame locals and non-string logging params during serialization, so there the
@@ -55,10 +56,9 @@ SECRET_KEYS = ["client_secret", "clientsecret"]
 
 # APISIX's openid-connect plugin hands the app the logged-in user as request
 # headers: X-Userinfo is base64 JSON with their email and name, the others are
-# their tokens.  With send_default_pii off the SDK still sends every header
-# except Cookie, Authorization, X-Api-Key and the two forwarded-for headers
-# (_wsgi_common._filter_headers), so these go on the denylist.  The scrubber
-# lowercases header names before matching.
+# their tokens.  They go on the scrubber's denylist so they are blanked whatever
+# the SDK's own header filtering lets through.  The scrubber lowercases header
+# names before matching.
 IDENTITY_HEADER_KEYS = [
     "x-userinfo",
     "x-id-token",
@@ -79,17 +79,66 @@ SECRET_PAIR_RE = re.compile(
 )
 
 
-def build_event_scrubber(*, send_default_pii):
+def build_event_scrubber(*, collect_user_info):
     """Return the SDK's scrubber, extended with our secret keys and made recursive.
 
     Recursive because the secret sits nested in frame locals, e.g. the
-    identity provider payload's config["clientSecret"].
+    identity provider payload's config["clientSecret"]. Without user info the
+    SDK's PII denylist (IP address keys) is scrubbed too, as it was when this
+    followed send_default_pii.
     """
     return EventScrubber(
         denylist=[*DEFAULT_DENYLIST, *SECRET_KEYS, *IDENTITY_HEADER_KEYS],
         recursive=True,
-        send_default_pii=send_default_pii,
+        send_default_pii=collect_user_info,
     )
+
+
+def build_data_collection(*, collect_user_info):
+    """Return the data_collection option that replaces send_default_pii.
+
+    Follows sentry_sdk.data_collection._map_from_send_default_pii, the
+    mapping the SDK derives from send_default_pii. Header and query-param
+    terms are the extra keys that mapping filters without user info; the
+    SDK's own sensitive denylist (auth, token, session, csrf, ...) applies in
+    denylist mode either way. Request bodies stay on regardless:
+    max_request_body_size in init_sentry is what bounds them.
+
+    This does not reproduce the old collection exactly:
+
+    - database_query_data is off in both modes. The mapping turns it on with
+      user info, which puts SQL bind params (learner emails and the like) in
+      db.params on Django DB spans; the old path sent none, since it only did
+      so under _experiments.record_sql_params. It also hides Redis command
+      arguments, which the old path sent with user info.
+    - Without user info, cookies are off. The mapping sends them through the
+      denylist, but send_default_pii=False sent no cookies at all
+      (RequestExtractor.extract_into_event).
+    - Without user info, the mapping's terms filter more headers than the old
+      path's fixed list (SENSITIVE_HEADERS in sentry_sdk's _wsgi_common):
+      "via" and "-user" also drop Via and X-Remote-User.
+    - Query strings are filtered in both modes. The old path sent them raw
+      (WSGI's _make_wsgi_event_processor); now the sensitive denylist, plus
+      the terms without user info, applies to their keys.
+    """
+    terms = [] if collect_user_info else ["forwarded", "-ip", "remote-", "via", "-user"]
+    return {
+        "user_info": collect_user_info,
+        "cookies": (
+            {"mode": "denylist", "terms": terms}
+            if collect_user_info
+            else {"mode": "off"}
+        ),
+        "http_headers": {"request": {"mode": "denylist", "terms": terms}},
+        "http_bodies": ["incoming_request", "outgoing_request", "outgoing_response"],
+        "url_query_params": {"mode": "denylist", "terms": terms},
+        "graphql": {"document": collect_user_info, "variables": collect_user_info},
+        "gen_ai": {"inputs": collect_user_info, "outputs": collect_user_info},
+        "database_query_data": False,
+        "queues": collect_user_info,
+        "stack_frame_variables": True,
+        "frame_context_lines": 5,
+    }
 
 
 def scrub_secret_values(text):
@@ -139,7 +188,7 @@ def _scrub_node(node):
 # this code keeps its frames but none of their locals.
 EXPORT_COMPLIANCE_MODULES = ("compliance", "CyberSource", "authenticationsdk")
 
-# send_default_pii also puts the request user's email and username on the
+# Collecting user info also puts the request user's email and username on the
 # event (DjangoIntegration's _set_user_info). compliance.api tags the scope with
 # the checked learner's global_id, which replaces the user on those events.
 EXPORT_COMPLIANCE_USER_TAG = "export_compliance_user"
@@ -203,7 +252,7 @@ def scrub_export_compliance_event(event):
     return event
 
 
-# With send_default_pii off the SDK attaches no user, so Sentry cannot count
+# With user info off the SDK attaches no user, so Sentry cannot count
 # the users an issue affects.  SENTRY_USER_HASH_KEY restores the count without
 # the identity: user.id becomes an HMAC of the user's primary key and nothing
 # else about the user is sent.  The key is the whole privacy property, because
@@ -212,8 +261,8 @@ def scrub_export_compliance_event(event):
 #
 # The write happens in before_send, the last hook to touch an event.  An event
 # processor would run before the SDK's Django user processor, which (if
-# send_default_pii were turned back on) would add email and username next to
-# the hash.
+# user info were turned back on) would add email and username next to the
+# hash.
 USER_HASH_HEX_LENGTH = 16
 
 _current_request = ContextVar("mitxonline_sentry_current_request", default=None)
@@ -304,7 +353,7 @@ def init_sentry(  # noqa: PLR0913
     dsn,
     environment,
     version,
-    send_default_pii,
+    collect_user_info,
     user_hash_key,
     log_level,
     heroku_app_name,
@@ -318,7 +367,8 @@ def init_sentry(  # noqa: PLR0913
         dsn (str): the sentry DSN key
         environment (str): the application environment
         version (str): the version of the application
-        send_default_pii (bool): enable sending PII data to associate users to errors
+        collect_user_info (bool): enable sending user details (email, username,
+            IP address) and other PII-bearing data to associate users to errors
         user_hash_key (str): HMAC key for the hashed user id; empty sends no user
         log_level (str): the sentry log level
         heroku_app_name (str or None): the name of the heroku review app
@@ -344,15 +394,14 @@ def init_sentry(  # noqa: PLR0913
             before_send, user_hash_key=user_hash_key.encode() if user_hash_key else None
         ),
         before_send_transaction=before_send_transaction,
-        # Request bodies are NOT gated on send_default_pii: the SDK sets
-        # request.data unconditionally (RequestExtractor.extract_into_event)
-        # and this is the only control (request_body_within_bounds).  Left
-        # unset it defaults to "medium", i.e. 10,000-byte bodies -- enrollment,
-        # checkout, profile and SCIM payloads.  Set explicitly so the choice is
-        # findable here rather than in a dependency's defaults.
+        data_collection=build_data_collection(collect_user_info=collect_user_info),
+        # Request bodies are NOT gated on user info: data_collection's
+        # http_bodies keeps them on, and request_body_within_bounds makes this
+        # the only size control.  Left unset it defaults to "medium", i.e.
+        # 10,000-byte bodies -- enrollment, checkout, profile and SCIM
+        # payloads.  Set explicitly so the choice is findable here rather than
+        # in a dependency's defaults.
         max_request_body_size="small",
-        event_scrubber=build_event_scrubber(send_default_pii=send_default_pii),
-        send_default_pii=send_default_pii,
         traces_sample_rate=traces_sample_rate,
         profiles_sample_rate=profiles_sample_rate,
         integrations=[
@@ -361,6 +410,15 @@ def init_sentry(  # noqa: PLR0913
             RedisIntegration(),
             LoggingIntegration(level=log_level),
         ],
+    )
+    # Passing data_collection makes sentry_sdk.client._get_options drop the
+    # event_scrubber option, with a warning, so it is set on the client after
+    # init instead. _prepare_event reads it per event and runs it before
+    # serialization. That ordering matters: the serializer repr()s anything
+    # nested past MAX_DATABAG_DEPTH, and no key-based scrub in before_send can
+    # see into that string.
+    sentry_sdk.get_client().options["event_scrubber"] = build_event_scrubber(
+        collect_user_info=collect_user_info
     )
 
     with sentry_sdk.configure_scope() as scope:
