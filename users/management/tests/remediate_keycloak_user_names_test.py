@@ -56,7 +56,7 @@ def test_mitxonline_users_lookup_query_count_is_flat(django_assert_max_num_queri
             [f"kc-{i}" for i in range(5)]
         )
         for user in by_id.values():
-            LearnUserAdapter(user)._resolve_name()  # noqa: SLF001
+            LearnUserAdapter(user, lock_user=False)._resolve_name()  # noqa: SLF001
 
 
 @pytest.mark.django_db

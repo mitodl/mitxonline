@@ -2109,9 +2109,10 @@ wheels = [
 
 [[package]]
 name = "mitol-django-scim"
-version = "2026.4.29"
+version = "2026.11.13"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "certifi" },
     { name = "django" },
     { name = "django-scim2" },
     { name = "django-stubs" },
@@ -2120,9 +2121,9 @@ dependencies = [
     { name = "requests" },
     { name = "strenum" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0d/d0/89115477e5be11f365a4447cb62a1c9702b38a38f5f6d8e2adba3370c493/mitol_django_scim-2026.4.29.tar.gz", hash = "sha256:fc2428b2bf1c288bcaa090b1d7a9b23aedab5733e29f91753ec8d63deb139c63", size = 15172, upload-time = "2026-04-29T21:20:09.47Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/57/92/0a5e2b4a2eb164378a0df2cc1bbb1afc76eed4343d0b8c3e65480e34af57/mitol_django_scim-2026.11.13.tar.gz", hash = "sha256:4de322f4f1848e71428bdafa9495400b7f9e8983ee58c6daa0a4b1c82707ba94", size = 26762, upload-time = "2026-11-13T21:28:42.034Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/81/d5/571c7e0a988f720326d67c1c5116f78e0c80d8d23c3eab3675a004244589/mitol_django_scim-2026.4.29-py3-none-any.whl", hash = "sha256:d28f5f517fa73fc0620b36db401e1a6e7ba52b3963c8d7faed25d9d8f6923115", size = 21346, upload-time = "2026-04-29T21:20:08.547Z" },
+    { url = "https://files.pythonhosted.org/packages/16/fc/a8c6fce0d9bfd32afd91530500e72328ce53b4a517799f037c20dc263869/mitol_django_scim-2026.11.13-py3-none-any.whl", hash = "sha256:6fd13a66772e6e5477b5df1268c9b059d5ecda734f2d1d4cac45decce188ff7d", size = 34576, upload-time = "2026-11-13T21:28:40.74Z" },
 ]
 
 [[package]]
@@ -2310,7 +2311,7 @@ requires-dist = [
     { name = "mitol-django-olposthog", specifier = ">=2026.3.6,<2027" },
     { name = "mitol-django-openedx", specifier = "==2026.4.29" },
     { name = "mitol-django-payment-gateway", specifier = "==2026.8.5" },
-    { name = "mitol-django-scim", specifier = "==2026.4.29" },
+    { name = "mitol-django-scim", specifier = "==2026.11.13" },
     { name = "opentelemetry-instrumentation-celery", specifier = ">=0.52b0" },
     { name = "opentelemetry-instrumentation-django", specifier = ">=0.52b0" },
     { name = "opentelemetry-instrumentation-psycopg", specifier = ">=0.52b0" },

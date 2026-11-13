@@ -255,7 +255,9 @@ class Command(BaseCommand):
 
         Returns (Outcome, row); row is None for Outcome.UP_TO_DATE.
         """
-        adapter = LearnUserAdapter(user)
+        # Read-only, outside a transaction, and the lock would re-fetch the user
+        # and drop the prefetches above.
+        adapter = LearnUserAdapter(user, lock_user=False)
         given_name, family_name = adapter._resolve_name()  # noqa: SLF001
         have_split_name = bool(given_name)
         full_name = (user.name or "").strip()
