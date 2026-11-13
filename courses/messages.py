@@ -5,29 +5,27 @@ from django.conf import settings
 from mail.messages import SiteTemplatedMessage
 
 
-class LearnEmailMixin:
-    """Send (un)enrollment emails from MIT Learn, linking to the MIT Learn dashboard"""
+class LearnDashboardMixin:
+    """Link (un)enrollment emails to the MIT Learn dashboard"""
 
     @classmethod
     def create(cls, **kwargs):
-        """Add the MIT Learn dashboard URL and sender headers"""
-        template_context = kwargs.get("template_context", {})
-        template_context["dashboard_url"] = settings.MIT_LEARN_DASHBOARD_URL
-        kwargs["from_email"] = settings.MIT_LEARN_FROM_EMAIL
-        kwargs["headers"] = {"Reply-To": settings.MIT_LEARN_REPLY_TO_EMAIL}
-
-        kwargs["template_context"] = template_context
+        """Add the MIT Learn dashboard URL to the template context"""
+        kwargs["template_context"] = {
+            **kwargs.get("template_context", {}),
+            "dashboard_url": settings.MIT_LEARN_DASHBOARD_URL,
+        }
         return super().create(**kwargs)
 
 
-class CourseRunEnrollmentMessage(LearnEmailMixin, SiteTemplatedMessage):
+class CourseRunEnrollmentMessage(LearnDashboardMixin, SiteTemplatedMessage):
     """Email message for course enrollment"""
 
     name = "Course Run Enrollment"
     template_name = "mail/course_run_enrollment"
 
 
-class CourseRunUnenrollmentMessage(LearnEmailMixin, SiteTemplatedMessage):
+class CourseRunUnenrollmentMessage(LearnDashboardMixin, SiteTemplatedMessage):
     """Email message for course unenrollment"""
 
     name = "Course Run Unenrollment"
