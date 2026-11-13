@@ -43,7 +43,7 @@ dependencies = [
     "mitol-django-mail==2026.4.29",
     "mitol-django-openedx==2026.4.29",
     "mitol-django-payment-gateway==2026.8.5",
-    "mitol-django-scim==2026.4.29",
+    "mitol-django-scim==2026.11.13",
     "mitol-django-observability>=2026.8.19",
     "opentelemetry-instrumentation-celery>=0.52b0",
     "opentelemetry-instrumentation-django>=0.52b0",

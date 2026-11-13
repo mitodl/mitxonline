@@ -47,6 +47,21 @@ EDX_UNSYNCED_ATTRS = frozenset(
 )
 
 
+class ExternalIdRebindError(exceptions.SCIMException):
+    """
+    A write that would move a bound user to a different externalId.
+
+    A 409 like django_scim's IntegrityError, but not a subclass of it:
+    mitol.scim's views catch IntegrityError, log it at ERROR and replace the
+    detail with a generic constraint message. This refusal is expected and
+    Keycloak retries it, so it should reach the client as sent and stay out of
+    Sentry.
+    """
+
+    status = 409
+    scim_type = "mutability"
+
+
 class LearnUserAdapter(UserAdapter):
     """
     Custom adapter to extend django_scim library.  This is required in order
@@ -54,17 +69,17 @@ class LearnUserAdapter(UserAdapter):
     django_scim library.
     """
 
-    # name.givenName/familyName are deliberately absent here. django_scim's
-    # handle_replace() resolves a PATCH path through this map with a plain
-    # setattr(self.obj, ATTR_MAP[path], value) - it never walks a "__"
-    # double-underscore path into a related object, so a mapping to
+    # name.givenName/familyName are deliberately absent here. mitol.scim's
+    # handle_replace() resolves a PATCH path through this map and writes the
+    # value with setattr(self.obj, ATTR_MAP[path], value) - it never walks a
+    # "__" double-underscore path into a related object, so a mapping to
     # "legal_address__first_name" would silently set a bogus flat attribute
     # of that literal name on the user instead of touching
     # legal_address.first_name, and never raise. from_dict() (used for a
     # full create/replace) already handles name.givenName/familyName
-    # correctly by writing to self.legal_address directly - a PATCH-by-path
-    # replace of just the name is not supported and correctly falls through
-    # to handle_replace's NotImplementedError instead.
+    # correctly by writing to self.legal_address directly. A PATCH replace of
+    # just the name is not supported: handle_replace() logs the unmapped path
+    # at DEBUG and writes nothing.
     ATTR_MAP = {
         ("active", None, None): "is_active",
         ("userName", None, None): "username",
@@ -77,8 +92,10 @@ class LearnUserAdapter(UserAdapter):
     legal_address: LegalAddress
     openedx_user: OpenEdxUser
 
-    def __init__(self, obj, request=None):
-        super().__init__(obj, request=request)
+    def __init__(self, obj, request=None, *, lock_user: bool = True):
+        # lock_user=False comes from mitol.scim's read views (lock_free_adapter)
+        # and its outbound sync, neither of which runs in a transaction.
+        super().__init__(obj, request=request, lock_user=lock_user)
 
         self.user_profile = self.obj.user_profile = getattr(
             self.obj, "user_profile", UserProfile()
@@ -223,14 +240,14 @@ class LearnUserAdapter(UserAdapter):
         it would let a second PUT bind any id.
 
         :param external_id: the externalId from the SCIM payload
-        :raises IntegrityError: the user is already bound to a different id
+        :raises ExternalIdRebindError: the user is already bound to a different id
         """
         if not self.is_new_user and self.obj.global_id:
             if not external_id:
                 return
             if external_id != self.obj.global_id:
                 msg = "externalId does not match the existing user's externalId"
-                raise exceptions.IntegrityError(msg, scim_type="mutability")
+                raise ExternalIdRebindError(msg)
 
         self.obj.scim_external_id = external_id
         # None, not "": global_id is unique and only NULLs don't collide.
