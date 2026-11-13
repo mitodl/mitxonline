@@ -103,5 +103,6 @@ def test_mail_api_refund_email_generation(
     assert f"{order.purchaser.name}" in rendered_template.body
     assert order.reference_number in rendered_template.body
     assert str(refund_amount.quantize(Decimal("0.01"))) in rendered_template.body
-    assert "https://support.learn.mit.edu" in rendered_template.body
-    assert "zendesk" not in rendered_template.body
+    html = rendered_template.alternatives[0][0]
+    assert 'href="https://support.learn.mit.edu"' in html
+    assert "zendesk" not in html
