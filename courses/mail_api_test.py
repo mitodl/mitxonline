@@ -50,10 +50,9 @@ def test_send_course_run_enrollment_email(mocker):
 def test_enrollment_emails_link_to_learn_dashboard(
     settings, mocker, mocked_responses, courseware_id, send_email
 ):
-    """(Un)enrollment emails link to the MIT Learn dashboard and reply to Learn support, UAI course or not"""
+    """(Un)enrollment emails link to the MIT Learn dashboard, UAI course or not"""
     settings.SITE_BASE_URL = "https://mitxonline.example.com"
     settings.MIT_LEARN_DASHBOARD_URL = "https://learn.example.com/dashboard"
-    settings.MIT_LEARN_REPLY_TO_EMAIL = "learn-support@example.com"
     # premailer fetches the base template's web font while inlining CSS
     mocked_responses.get("https://fonts.googleapis.com/css")
     mock_send_message = mocker.patch("mitol.mail.api.send_message")
@@ -65,10 +64,12 @@ def test_enrollment_emails_link_to_learn_dashboard(
     # Static assets (the logo) are still served from MITx Online
     html = message.alternatives[0][0].replace(f"{settings.SITE_BASE_URL}/static/", "")
     assert enrollment.run.course.title in message.subject
+    if send_email is send_course_run_unenrollment_email:
+        # Says which run, for learners in more than one run of the course
+        assert f"starting {enrollment.run.start_date:%B} " in message.body
     assert 'href="https://learn.example.com/dashboard"' in html
     for text in (message.subject, message.body, html):
         assert "mitxonline" not in text.lower()
-    assert message.extra_headers["Reply-To"] == "learn-support@example.com"
 
 
 def test_send_course_run_enrollment_email_error(mocker):
