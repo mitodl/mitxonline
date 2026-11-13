@@ -233,6 +233,27 @@ def test_contract_copy_is_not_opted_in(staff_user):
     assert copy.learner_records_opt_in_recorded_by is None
 
 
+def test_contract_copy_revisions_are_not_opted_in(admin_user, staff_user):
+    """The revisions copied with a contract don't carry its opt-in either."""
+
+    contract = ContractPageFactory.create()
+    opted_in = _edit_form(contract, staff_user, learner_records_opt_in="on").save(
+        commit=False
+    )
+    opted_in.save_revision(user=admin_user)
+
+    copy = contract.copy(update_attrs={"slug": f"{contract.slug}-copy"})
+
+    for revision in copy.revisions.all():
+        assert revision.content["learner_records_opt_in"] is False
+        assert revision.content["learner_records_opt_in_recorded_on"] is None
+        assert revision.content["learner_records_opt_in_recorded_by"] is None
+    latest = copy.get_latest_revision_as_object()
+    assert latest.learner_records_opt_in is False
+    assert latest.learner_records_opt_in_recorded_on is None
+    assert latest.learner_records_opt_in_recorded_by is None
+
+
 @pytest.mark.zeal_allow("wagtailcore.Page", "get()")
 def test_contract_edit_page_shows_who_recorded_the_opt_in(admin_client, staff_user):
     """The stamp is shown read-only beside the opt-in in the Wagtail editor."""
