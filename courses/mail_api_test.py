@@ -11,6 +11,7 @@ from courses.factories import (
 )
 from courses.mail_api import (
     send_course_run_enrollment_email,
+    send_course_run_unenrollment_email,
     send_enrollment_failure_message,
     send_partner_school_sharing_message,
 )
@@ -37,6 +38,37 @@ def test_send_course_run_enrollment_email(mocker):
     mock_sender.build_and_send_message.assert_called_once_with(
         enrollment.user, {"enrollment": enrollment}
     )
+
+
+@pytest.mark.parametrize(
+    "courseware_id", ["course-v1:MITx+6.00x+2026", "course-v1:UAI_SOURCE+UAI.1+2026"]
+)
+@pytest.mark.parametrize(
+    "send_email",
+    [send_course_run_enrollment_email, send_course_run_unenrollment_email],
+)
+def test_enrollment_emails_link_to_learn_dashboard(
+    settings, mocker, mocked_responses, courseware_id, send_email
+):
+    """(Un)enrollment emails link to the MIT Learn dashboard and reply to Learn support, UAI course or not"""
+    settings.SITE_BASE_URL = "https://mitxonline.example.com"
+    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.example.com/dashboard"
+    settings.MIT_LEARN_REPLY_TO_EMAIL = "learn-support@example.com"
+    # premailer fetches the base template's web font while inlining CSS
+    mocked_responses.get("https://fonts.googleapis.com/css")
+    mock_send_message = mocker.patch("mitol.mail.api.send_message")
+    enrollment = CourseRunEnrollmentFactory.create(run__courseware_id=courseware_id)
+
+    send_email(enrollment)
+
+    message = mock_send_message.call_args[0][0]
+    # Static assets (the logo) are still served from MITx Online
+    html = message.alternatives[0][0].replace(f"{settings.SITE_BASE_URL}/static/", "")
+    assert enrollment.run.course.title in message.subject
+    assert 'href="https://learn.example.com/dashboard"' in html
+    for text in (message.subject, message.body, html):
+        assert "mitxonline" not in text.lower()
+    assert message.extra_headers["Reply-To"] == "learn-support@example.com"
 
 
 def test_send_course_run_enrollment_email_error(mocker):

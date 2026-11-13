@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import pycountry
 from dateutil import parser
+from django.conf import settings
 from mitol.mail.api import get_message_sender
 
 from courses.models import CourseRun
@@ -54,6 +55,8 @@ def send_ecommerce_order_receipt(order_record):
                         "id": order.get("id"),
                     },
                     "receipt": receipt,
+                    "dashboard_url": settings.MIT_LEARN_DASHBOARD_URL,
+                    "receipt_url": f"{settings.MIT_LEARN_BASE_URL}/receipt/{order.get('id')}",
                     "purchaser": {
                         "name": purchaser.get("name"),
                         "email": purchaser.get("email"),
