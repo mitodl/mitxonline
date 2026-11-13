@@ -2,37 +2,32 @@
 
 from django.conf import settings
 
-from courses.utils import is_uai_course_run
 from mail.messages import SiteTemplatedMessage
 
 
-class UAIEmailMixin:
-    """Mixin to handle UAI-specific email logic"""
+class LearnEmailMixin:
+    """Send (un)enrollment emails from MIT Learn, linking to the MIT Learn dashboard"""
 
     @classmethod
     def create(cls, **kwargs):
-        """Override to handle UAI-specific logic"""
+        """Add the MIT Learn dashboard URL and sender headers"""
         template_context = kwargs.get("template_context", {})
-        enrollment = template_context.get("enrollment")
-
-        if enrollment and is_uai_course_run(enrollment.run):
-            template_context["is_uai_enrollment"] = True
-            template_context["dashboard_url"] = settings.MIT_LEARN_DASHBOARD_URL
-            kwargs["from_email"] = settings.MIT_LEARN_FROM_EMAIL
-            kwargs["headers"] = {"Reply-To": settings.MIT_LEARN_REPLY_TO_EMAIL}
+        template_context["dashboard_url"] = settings.MIT_LEARN_DASHBOARD_URL
+        kwargs["from_email"] = settings.MIT_LEARN_FROM_EMAIL
+        kwargs["headers"] = {"Reply-To": settings.MIT_LEARN_REPLY_TO_EMAIL}
 
         kwargs["template_context"] = template_context
         return super().create(**kwargs)
 
 
-class CourseRunEnrollmentMessage(UAIEmailMixin, SiteTemplatedMessage):
+class CourseRunEnrollmentMessage(LearnEmailMixin, SiteTemplatedMessage):
     """Email message for course enrollment"""
 
     name = "Course Run Enrollment"
     template_name = "mail/course_run_enrollment"
 
 
-class CourseRunUnenrollmentMessage(UAIEmailMixin, SiteTemplatedMessage):
+class CourseRunUnenrollmentMessage(LearnEmailMixin, SiteTemplatedMessage):
     """Email message for course unenrollment"""
 
     name = "Course Run Unenrollment"
