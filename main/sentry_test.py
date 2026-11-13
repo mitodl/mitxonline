@@ -2,17 +2,29 @@
 
 import json
 import logging
+import re
 from dataclasses import dataclass
+from functools import partial
 
 import pytest
 import sentry_sdk
+from django.core.exceptions import MiddlewareNotUsed
+from django.core.handlers.wsgi import WSGIHandler
+from django.http import HttpResponseServerError
+from django.test import RequestFactory
+from django.urls import path
+from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.transport import Transport
 
 from main.sentry import (
     EXPORT_COMPLIANCE_USER_TAG,
+    SentryUserHashMiddleware,
+    apply_hashed_user,
     before_send,
+    before_send_transaction,
     build_event_scrubber,
+    hash_user_id,
     scrub_export_compliance_event,
     scrub_pg_detail,
     scrub_pg_details,
@@ -421,3 +433,226 @@ def test_other_events_keep_their_user():
     event["tags"] = {EXPORT_COMPLIANCE_USER_TAG: "kc-uuid"}
     scrub_export_compliance_event(event)
     assert event["user"] == LEARNER_USER
+
+
+HASH_KEY = b"test-hash-key"
+
+
+@dataclass
+class FakeUser:
+    """The two attributes apply_hashed_user reads."""
+
+    pk: int
+    is_authenticated: bool = True
+
+
+@dataclass
+class FakeRequest:
+    """A request carrying only a user."""
+
+    user: object
+
+
+class RaisingRequest:
+    """A request whose lazy user fails to load, as when the database is down."""
+
+    @property
+    def user(self):
+        """Raise the way SimpleLazyObject does when the auth lookup fails."""
+        msg = "database unavailable"
+        raise RuntimeError(msg)
+
+
+def _serve(request, func):
+    """Run func inside SentryUserHashMiddleware for request."""
+    return SentryUserHashMiddleware(lambda _request: func())(request)
+
+
+def test_hash_is_keyed_and_truncated():
+    """The id is a 16-hex HMAC that changes with the key and with the user."""
+    digest = hash_user_id(HASH_KEY, 42)
+    assert re.fullmatch(r"[0-9a-f]{16}", digest)
+    assert digest == hash_user_id(HASH_KEY, 42)
+    assert digest != hash_user_id(b"another-key", 42)
+    assert digest != hash_user_id(HASH_KEY, 43)
+
+
+@pytest.mark.parametrize(
+    ("request_", "expected"),
+    [
+        (FakeRequest(FakeUser(42)), {"id": hash_user_id(HASH_KEY, 42)}),
+        (FakeRequest(FakeUser(42, is_authenticated=False)), None),
+        (RaisingRequest(), None),
+    ],
+)
+def test_user_is_replaced_by_the_hash_or_dropped(settings, request_, expected):
+    """Whatever the SDK attached is gone; only the hash of an authenticated user remains."""
+    settings.SENTRY_USER_HASH_KEY = HASH_KEY.decode()
+    event = {"user": dict(LEARNER_USER, ip_address="192.0.2.1")}
+    _serve(request_, lambda: apply_hashed_user(event, HASH_KEY))
+    assert event.get("user") == expected
+
+
+def test_event_outside_a_request_carries_no_user():
+    """A Celery task or an outer middleware has no request, so no user at all."""
+    event = {"user": dict(LEARNER_USER)}
+    apply_hashed_user(event, HASH_KEY)
+    assert "user" not in event
+
+
+def test_middleware_opts_out_without_a_key(settings):
+    """No key, no middleware: Django drops it from the chain."""
+    settings.SENTRY_USER_HASH_KEY = ""
+    with pytest.raises(MiddlewareNotUsed):
+        SentryUserHashMiddleware(lambda _request: None)
+
+
+def test_middleware_releases_the_request(settings):
+    """The request is not left behind for the next event on this thread."""
+    settings.SENTRY_USER_HASH_KEY = HASH_KEY.decode()
+    _serve(FakeRequest(FakeUser(42)), lambda: None)
+    event = {}
+    apply_hashed_user(event, HASH_KEY)
+    assert "user" not in event
+
+
+def test_export_compliance_global_id_wins_over_the_hash(settings):
+    """A compliance event names the checked learner, who may not be the requester."""
+    settings.SENTRY_USER_HASH_KEY = HASH_KEY.decode()
+    event = _exception_event("compliance.api")
+    event["tags"] = {EXPORT_COMPLIANCE_USER_TAG: "kc-uuid"}
+    _serve(
+        FakeRequest(FakeUser(42)),
+        lambda: before_send(event, {}, user_hash_key=HASH_KEY),
+    )
+    assert event["user"] == {"id": "kc-uuid"}
+
+
+def test_transactions_carry_no_user():
+    """A transaction finishes after the middleware, so its user is dropped."""
+    event = {"type": "transaction", "user": dict(LEARNER_USER)}
+    assert "user" not in before_send_transaction(event, {})
+
+
+def test_transactions_lose_the_export_compliance_tag():
+    """A transaction has no use for the checked learner's global_id."""
+    event = {
+        "type": "transaction",
+        "tags": {EXPORT_COMPLIANCE_USER_TAG: "kc-uuid", "other": "kept"},
+    }
+    assert before_send_transaction(event, {})["tags"] == {"other": "kept"}
+
+
+def test_real_sdk_sends_only_the_hash(settings):
+    """Through the real SDK, even with send_default_pii on, the event's user is the hash."""
+    settings.SENTRY_USER_HASH_KEY = HASH_KEY.decode()
+    transport = FakeTransport()
+    sentry_sdk.init(
+        dsn="https://k@o0.ingest.sentry.io/0",
+        transport=transport,
+        before_send=partial(before_send, user_hash_key=HASH_KEY),
+        send_default_pii=True,
+        default_integrations=False,
+    )
+    try:
+        with sentry_sdk.new_scope() as scope:
+            scope.set_user(dict(LEARNER_USER, ip_address="192.0.2.1"))
+            _serve(
+                FakeRequest(FakeUser(42)),
+                lambda: sentry_sdk.capture_message("boom"),
+            )
+        sentry_sdk.flush()
+    finally:
+        sentry_sdk.get_global_scope().set_client(None)
+    assert [event["user"] for event in transport.events] == [
+        {"id": hash_user_id(HASH_KEY, 42)}
+    ]
+
+
+def test_other_events_lose_the_export_compliance_tag():
+    """A later error in the same request must not tie the hash to a global_id."""
+    event = _exception_event("courses.api")
+    event["tags"] = {EXPORT_COMPLIANCE_USER_TAG: "kc-uuid", "other": "kept"}
+    scrub_export_compliance_event(event)
+    assert event["tags"] == {"other": "kept"}
+
+
+APISIX_IDENTITY_HEADERS = {
+    "X-Userinfo": "eyJlbWFpbCI6ICJsZWFybmVyQGV4YW1wbGUuaW52YWxpZCJ9",
+    "X-Id-Token": "id.token.value",
+    "X-Access-Token": "access.token.value",
+    "X-Refresh-Token": "refresh.token.value",
+}
+
+
+def test_scrubber_blanks_apisix_identity_headers():
+    """The headers APISIX authenticates the user with are blanked; others stay."""
+    event = {"request": {"headers": {**APISIX_IDENTITY_HEADERS, "Accept": "*/*"}}}
+    build_event_scrubber(send_default_pii=False).scrub_event(event)
+    headers = event["request"]["headers"]
+    assert headers["Accept"] == "*/*"
+    assert not set(APISIX_IDENTITY_HEADERS.values()) & {
+        value for value in headers.values() if isinstance(value, str)
+    }
+
+
+def _raising_view(request):
+    """Stand in for an authenticated view that fails."""
+    request.user = FakeUser(42)
+    msg = "boom"
+    raise RuntimeError(msg)
+
+
+def _server_error(_request):
+    """Skip the site's 500 template, which needs a full request context."""
+    return HttpResponseServerError()
+
+
+urlpatterns = [path("boom/", _raising_view)]
+handler500 = _server_error
+
+
+# The handler's request_finished signal closes old database connections.
+@pytest.mark.django_db
+def test_real_django_request_sends_only_the_hash(settings):
+    """Through the WSGI handler DjangoIntegration wraps: hashed user, no identity headers."""
+    settings.SENTRY_USER_HASH_KEY = HASH_KEY.decode()
+    settings.MIDDLEWARE = ["main.sentry.SentryUserHashMiddleware"]
+    settings.ROOT_URLCONF = __name__
+    transport = FakeTransport()
+    sentry_sdk.init(
+        dsn="https://k@o0.ingest.sentry.io/0",
+        transport=transport,
+        before_send=partial(before_send, user_hash_key=HASH_KEY),
+        event_scrubber=build_event_scrubber(send_default_pii=False),
+        send_default_pii=False,
+        default_integrations=False,
+        integrations=[DjangoIntegration()],
+    )
+    try:
+        headers = {
+            f"HTTP_{name.upper().replace('-', '_')}": value
+            for name, value in APISIX_IDENTITY_HEADERS.items()
+        }
+        environ = RequestFactory()._base_environ(PATH_INFO="/boom/", **headers)  # noqa: SLF001
+        WSGIHandler()(environ, lambda _status, _headers: None)
+        sentry_sdk.flush()
+    finally:
+        sentry_sdk.get_global_scope().set_client(None)
+    [event] = transport.events
+    assert event["user"] == {"id": hash_user_id(HASH_KEY, 42)}
+    assert not set(APISIX_IDENTITY_HEADERS.values()) & set(
+        map(str, event["request"]["headers"].values())
+    )
+
+
+def test_export_compliance_log_event_keeps_the_global_id():
+    """compliance.api's log.error has no frames; its logger name marks it."""
+    event = {
+        "logger": "compliance.api",
+        "user": {"id": "hashed"},
+        "tags": {EXPORT_COMPLIANCE_USER_TAG: "kc-uuid"},
+    }
+    scrub_export_compliance_event(event)
+    assert event["user"] == {"id": "kc-uuid"}
+    assert event["tags"] == {EXPORT_COMPLIANCE_USER_TAG: "kc-uuid"}

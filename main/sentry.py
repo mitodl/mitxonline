@@ -1,10 +1,16 @@
 """Sentry setup and configuration"""
 
+import hashlib
+import hmac
 import logging
 import re
+from contextvars import ContextVar
+from functools import partial
 
 import sentry_sdk
 from celery.exceptions import WorkerLostError
+from django.conf import settings
+from django.core.exceptions import MiddlewareNotUsed
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
@@ -47,6 +53,20 @@ def scrub_pg_detail(text):
 # first and captured frame locals the second.
 SECRET_KEYS = ["client_secret", "clientsecret"]
 
+# APISIX's openid-connect plugin hands the app the logged-in user as request
+# headers: X-Userinfo is base64 JSON with their email and name, the others are
+# their tokens.  With send_default_pii off the SDK still sends every header
+# except Cookie, Authorization, X-Api-Key and the two forwarded-for headers
+# (_wsgi_common._filter_headers), so these go on the denylist.  The scrubber
+# lowercases header names before matching.
+IDENTITY_HEADER_KEYS = [
+    "x-userinfo",
+    "x-id-token",
+    "x-access-token",
+    "x-refresh-token",
+    "x-raw-id-token",
+]
+
 # Key matching cannot reach a secret inside a string: requests' frames hold the
 # JSON body it sent as bytes, and objects in frame locals arrive repr()d. This
 # blanks the value of any client-secret pair in JSON or repr form, including
@@ -66,7 +86,7 @@ def build_event_scrubber(*, send_default_pii):
     identity provider payload's config["clientSecret"].
     """
     return EventScrubber(
-        denylist=[*DEFAULT_DENYLIST, *SECRET_KEYS],
+        denylist=[*DEFAULT_DENYLIST, *SECRET_KEYS, *IDENTITY_HEADER_KEYS],
         recursive=True,
         send_default_pii=send_default_pii,
     )
@@ -147,12 +167,17 @@ def _is_export_compliance_event(event, frames):
     The exception's own module catches ExportComplianceError, which
     courses.api raises after verify_user_with_exports has returned, so none of
     its frames are in compliance code while its caller still holds the result
-    (and the raw CyberSource response) in its locals.
+    (and the raw CyberSource response) in its locals.  A log.error from
+    compliance code carries no frames at all, so its logger name counts too.
     """
     exceptions = (event.get("exception") or {}).get("values") or []
-    return any(
-        _is_export_compliance_module(frame.get("module")) for frame in frames
-    ) or any(_is_export_compliance_module(value.get("module")) for value in exceptions)
+    return (
+        _is_export_compliance_module(event.get("logger"))
+        or any(_is_export_compliance_module(frame.get("module")) for frame in frames)
+        or any(
+            _is_export_compliance_module(value.get("module")) for value in exceptions
+        )
+    )
 
 
 def scrub_export_compliance_event(event):
@@ -163,6 +188,10 @@ def scrub_export_compliance_event(event):
     """
     frames = list(_iter_stacktrace_frames(event))
     if not _is_export_compliance_event(event, frames):
+        # set_tag lasts the whole request, so a later unrelated error would
+        # carry the learner's global_id next to their hashed user id and tie
+        # the two together for good.
+        (event.get("tags") or {}).pop(EXPORT_COMPLIANCE_USER_TAG, None)
         return event
     for frame in frames:
         frame.pop("vars", None)
@@ -174,13 +203,74 @@ def scrub_export_compliance_event(event):
     return event
 
 
-def before_send(event, hint):
+# With send_default_pii off the SDK attaches no user, so Sentry cannot count
+# the users an issue affects.  SENTRY_USER_HASH_KEY restores the count without
+# the identity: user.id becomes an HMAC of the user's primary key and nothing
+# else about the user is sent.  The key is the whole privacy property, because
+# primary keys are small sequential integers and an unkeyed hash of one is
+# reversed by enumeration.  Rotating it makes every user look new.
+#
+# The write happens in before_send, the last hook to touch an event.  An event
+# processor would run before the SDK's Django user processor, which (if
+# send_default_pii were turned back on) would add email and username next to
+# the hash.
+USER_HASH_HEX_LENGTH = 16
+
+_current_request = ContextVar("mitxonline_sentry_current_request", default=None)
+
+
+def hash_user_id(key, user_pk):
+    """Return the keyed, truncated digest that stands in for a user id."""
+    digest = hmac.new(key, str(user_pk).encode(), hashlib.sha256).hexdigest()
+    return digest[:USER_HASH_HEX_LENGTH]
+
+
+def apply_hashed_user(event, key):
+    """Replace the event's user with the hashed id of the requesting user.
+
+    The user is dropped before request.user is read: that attribute is lazy and
+    can raise (the database may be what failed), and an event sent outside a
+    request (a Celery task, an outer middleware) must carry no user rather than
+    whatever the SDK attached.  The user is read at send time because DRF
+    authenticates token requests inside the view.
+    """
+    event.pop("user", None)
+    try:
+        user = getattr(_current_request.get(), "user", None)
+        if user is not None and user.is_authenticated:
+            event["user"] = {"id": hash_user_id(key, user.pk)}
+    except Exception:  # noqa: BLE001
+        log.warning("Could not read the user to hash for Sentry", exc_info=True)
+    return event
+
+
+class SentryUserHashMiddleware:
+    """Expose the request being served to apply_hashed_user."""
+
+    def __init__(self, get_response):
+        """Opt out of the middleware chain when no hash key is configured."""
+        if not settings.SENTRY_USER_HASH_KEY:
+            raise MiddlewareNotUsed
+        self.get_response = get_response
+
+    def __call__(self, request):
+        """Record the request for the duration of the inner handlers."""
+        token = _current_request.set(request)
+        try:
+            return self.get_response(request)
+        finally:
+            _current_request.reset(token)
+
+
+def before_send(event, hint, *, user_hash_key=None):
     """
     Filter or transform events before they're sent to Sentry
 
     Args:
         event (dict): event object
         hint (dict): event hints, see https://docs.sentry.io/platforms/python/#hints
+        user_hash_key (bytes or None): HMAC key for the hashed user id, or None
+            to leave the event's user alone
 
     Returns:
         dict or None: returns the modified event or None to filter out the event
@@ -190,7 +280,23 @@ def before_send(event, hint):
         if isinstance(exc_value, SHUTDOWN_ERRORS):
             # so we don't want to report expected shutdown errors to sentry
             return None
+    if user_hash_key:
+        apply_hashed_user(event, user_hash_key)
+    # After the hash, so an export compliance event keeps the checked learner's
+    # global_id (which may not be the requesting user) or loses its user.
     return scrub_pg_details(scrub_export_compliance_event(event))
+
+
+def before_send_transaction(event, _hint):
+    """Keep users and the export compliance tag off transactions.
+
+    The SDK finishes a request's transaction after the middleware has returned,
+    so there is no request to hash a user from, and a transaction has no use for
+    the checked learner's global_id that compliance.api tags the request with.
+    """
+    event.pop("user", None)
+    (event.get("tags") or {}).pop(EXPORT_COMPLIANCE_USER_TAG, None)
+    return event
 
 
 def init_sentry(  # noqa: PLR0913
@@ -199,6 +305,7 @@ def init_sentry(  # noqa: PLR0913
     environment,
     version,
     send_default_pii,
+    user_hash_key,
     log_level,
     heroku_app_name,
     traces_sample_rate,
@@ -212,6 +319,7 @@ def init_sentry(  # noqa: PLR0913
         environment (str): the application environment
         version (str): the version of the application
         send_default_pii (bool): enable sending PII data to associate users to errors
+        user_hash_key (str): HMAC key for the hashed user id; empty sends no user
         log_level (str): the sentry log level
         heroku_app_name (str or None): the name of the heroku review app
         traces_sample_rate (int): int between 0 and 100 for the sample rate
@@ -232,7 +340,10 @@ def init_sentry(  # noqa: PLR0913
         dsn=dsn,
         environment=environment,
         release=version,
-        before_send=before_send,
+        before_send=partial(
+            before_send, user_hash_key=user_hash_key.encode() if user_hash_key else None
+        ),
+        before_send_transaction=before_send_transaction,
         # Request bodies are NOT gated on send_default_pii: the SDK sets
         # request.data unconditionally (RequestExtractor.extract_into_event)
         # and this is the only control (request_body_within_bounds).  Left
