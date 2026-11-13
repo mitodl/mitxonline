@@ -1956,7 +1956,7 @@ wheels = [
 
 [[package]]
 name = "mitol-django-geoip"
-version = "2026.10.30"
+version = "2026.11.13"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
@@ -1965,9 +1965,9 @@ dependencies = [
     { name = "faker" },
     { name = "mitol-django-common" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/54/b1/0d50d51b9153761bbcfb619f89a153c2cd8871d4d8de5c9d1abacdd95279/mitol_django_geoip-2026.10.30.tar.gz", hash = "sha256:402f4d7329225330124d58f0d6197e9dd8b77e01729212d25a8167cdb5e001b9", size = 9888, upload-time = "2026-10-30T12:55:37.405Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8f/dd/35122b5e4e5c921001f4409edf595dad99a3c3ebf5ff2f62402b63d59925/mitol_django_geoip-2026.11.13.tar.gz", hash = "sha256:aadf479444600d4419122f7ff199bf3474cd07438c9628687b18195509ecf760", size = 10117, upload-time = "2026-11-13T19:54:31.675Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e1/bf/e0ce991140f9a240763724c7ef8840a93974b6ea4ebf2d9aeffb16ffdba5/mitol_django_geoip-2026.10.30-py3-none-any.whl", hash = "sha256:a559e81edf6fe7b8af7d883024105e0ab322c9697fc60c87bcbf1226dc83dc0c", size = 15916, upload-time = "2026-10-30T12:55:36.378Z" },
+    { url = "https://files.pythonhosted.org/packages/06/03/baa6a4adccd7d46010266f6797dba13c591fd709c51cb8e2b7572622f4c9/mitol_django_geoip-2026.11.13-py3-none-any.whl", hash = "sha256:e7f2f4f39766becb11d0aec55fcdd8039e68ca47c51c8ff4aa95517be96fc809", size = 16052, upload-time = "2026-11-13T19:54:30.489Z" },
 ]
 
 [[package]]
@@ -2319,7 +2319,7 @@ requires-dist = [
     { name = "ipython", specifier = ">=9.13,<10" },
     { name = "mitol-django-apigateway", specifier = "==2026.4.29" },
     { name = "mitol-django-common", specifier = "==2026.10.29" },
-    { name = "mitol-django-geoip", specifier = ">=2026.10.30" },
+    { name = "mitol-django-geoip", specifier = ">=2026.11.13" },
     { name = "mitol-django-google-sheets", specifier = ">=2025.6.13,<2026" },
     { name = "mitol-django-google-sheets-deferrals", specifier = ">=2025.3.17,<2026" },
     { name = "mitol-django-google-sheets-refunds", specifier = ">=2025.6.13,<2026" },

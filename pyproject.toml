@@ -84,7 +84,7 @@ dependencies = [
     "pydantic>=2.13.4",
     "pynacl>=1.6.2",
     "pyjwt==2.15.1",
-    "mitol-django-geoip>=2026.10.30",
+    "mitol-django-geoip>=2026.11.13",
 ]
 
 [dependency-groups]
