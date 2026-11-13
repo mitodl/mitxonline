@@ -700,7 +700,7 @@ class Command(BaseCommand):
             CourseRunCertificate(
                 user_id=row["user_mitxonline_id"],
                 course_run_id=row["courserun_id"],
-                issue_date=row["courseruncertificate_created_on"],
+                issue_date=_warehouse_datetime(row["courseruncertificate_created_on"]),
                 certificate_page_revision_id=row["certificate_page_revision_id"],
             )
             for row in rows
@@ -929,7 +929,7 @@ class Command(BaseCommand):
             ProgramCertificate(
                 user_id=row["user_mitxonline_id"],
                 program_id=row["program_id"],
-                issue_date=row["program_certificate_issued_on"],
+                issue_date=_warehouse_datetime(row["program_certificate_issued_on"]),
                 certificate_page_revision_id=row["certificate_page_revision_id"],
             )
             for row in rows

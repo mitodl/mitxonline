@@ -708,3 +708,44 @@ def test_migrate_course_certificates_binds_courserun_filter():
     [(query, params)] = conn.executed
     assert query.endswith(" AND courserun_readable_id IN (%s)")
     assert params == ["course-v1:MITx+A+1T2020"]
+
+
+@pytest.mark.parametrize(
+    ("helper", "model", "date_column", "id_column"),
+    [
+        (
+            "_bulk_create_certificates",
+            "CourseRunCertificate",
+            "courseruncertificate_created_on",
+            "courserun_id",
+        ),
+        (
+            "_bulk_create_program_certificates",
+            "ProgramCertificate",
+            "program_certificate_issued_on",
+            "program_id",
+        ),
+    ],
+)
+def test_bulk_create_certificates_reads_naive_issue_date_as_utc(
+    mocker, helper, model, date_column, id_column
+):
+    """StarRocks sends certificate dates naive, in the session's UTC time zone"""
+    bulk_create = mocker.patch.object(
+        getattr(migrate_edx_data, model).objects, "bulk_create"
+    )
+
+    getattr(Command, helper)(
+        [
+            {
+                "user_mitxonline_id": 1,
+                id_column: 2,
+                date_column: datetime(2024, 5, 6, 7, 8, 9),  # noqa: DTZ001
+                "certificate_page_revision_id": None,
+            }
+        ],
+        batch_size=10,
+    )
+
+    [certificate] = bulk_create.call_args.args[0]
+    assert certificate.issue_date == datetime(2024, 5, 6, 7, 8, 9, tzinfo=UTC)
