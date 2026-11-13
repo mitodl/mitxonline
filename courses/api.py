@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import logging
 import re
 import time
@@ -21,6 +22,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Exists, OuterRef, Prefetch, Q
+from django.utils.crypto import get_random_string
 from django_countries import countries
 from edx_api.course_list.constants import BATCH_SIZE as COURSE_LIST_BATCH_SIZE
 from mitol.common.utils import now_in_utc
@@ -2393,6 +2395,39 @@ ACHIEVEMENT_TYPE_MAP = {
     "course_run": "Course",
     "program": "Program",
 }
+SALT_CHARACTER_LENGTH = 32
+
+
+def get_salt() -> str:
+    return get_random_string(SALT_CHARACTER_LENGTH)
+
+
+def get_hashed_username(user_name: str, salt: str) -> str:
+    # https://www.imsglobal.org/spec/ob/v3p0#org.1edtech.ob.v3p0.derived.identityhash.class
+    # The IdentityHash is a sha256 hash of the concatenation of the user name and salt.
+    hashed_user_name = hashlib.sha256(f"{user_name}{salt}".encode()).hexdigest()
+    return f"sha256${hashed_user_name}"
+
+
+def get_hashed_identity_object_for_user(user_name: str) -> dict:
+    if is_enabled(features.USE_HASHED_USER_NAME_FOR_VERIFIABLE_CREDENTIALS):
+        salt = get_salt()
+        identity_hash = get_hashed_username(user_name, salt)
+        return {
+            "type": "IdentityObject",
+            "identityHash": identity_hash,
+            "identityType": "name",
+            "hashed": True,
+            "salt": salt,
+        }
+
+    return {
+        "type": "IdentityObject",
+        "identityHash": user_name,
+        "identityType": "name",
+        "hashed": False,
+        "salt": "not-used",
+    }
 
 
 def get_verifiable_credentials_payload(
@@ -2446,7 +2481,8 @@ def get_verifiable_credentials_payload(
         cert_page_description = certificate_page.verifiable_credential_description
 
     achievement_type = ACHIEVEMENT_TYPE_MAP[cert_type]
-    user_name = certificate.user.name
+    identity_object = get_hashed_identity_object_for_user(certificate.user.name)
+
     valid_from = (
         certificate.issue_date.strftime("%Y-%m-%dT%H:%M:%SZ")
         if certificate.issue_date
@@ -2476,15 +2512,7 @@ def get_verifiable_credentials_payload(
             "type": ["AchievementSubject"],
             "activityStartDate": activity_start_date,
             "activityEndDate": activity_end_date,
-            "identifier": [
-                {
-                    "type": "IdentityObject",
-                    "identityHash": user_name,
-                    "identityType": "name",
-                    "hashed": False,
-                    "salt": "not-used",
-                }
-            ],
+            "identifier": [identity_object],
             "achievement": {
                 # The ID is supposed to be an unambiguous URI corresponding to the course or program.
                 # For now, we will just use the URL if we have it, but we need to figure out the proper way to do this
@@ -2497,7 +2525,7 @@ def get_verifiable_credentials_payload(
                     "narrative": narrative
                 },
                 "description": cert_page_description
-                or f"{user_name} has successfully completed all modules and earned a {achievement_type} Certificate in {certificate_name}.",
+                or f"The learner has successfully completed all modules and earned a {achievement_type} Certificate in {certificate_name}.",
                 "name": certificate_name,
             },
         },
