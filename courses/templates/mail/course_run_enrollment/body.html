@@ -10,26 +10,12 @@
                       <p style="margin: 0 0 10px;">Dear {{ user.name }},</p>
                       <p style="margin: 0 0 10px;">
                         You have been enrolled in
-                        {% if is_uai_enrollment %}
-                          {{ enrollment.run.course.title }}. It should now appear on your <a href="{{ dashboard_url }}" style="color: #A31F34; text-decoration: underline;">Learn Dashboard</a>.
-                        {% else %}
-                          {{ enrollment.run.course_number }} {{ enrollment.run.course.title }}. The course should now appear on your <a href="{{ base_url }}{% url 'user-dashboard' %}">{{ site_name }} dashboard</a>.
-                        {% endif %}
+                          {{ enrollment.run.course_number }} {{ enrollment.run.course.title }}. The course should now appear on your <a href="{{ dashboard_url }}">{{ site_name }} dashboard</a>.
                       </p>
-                      {% if is_uai_enrollment %}
-                      <p style="margin: 0 0 10px;">
-                        Welcome and thanks!<br />
-                        <strong>MIT Learn Team</strong>
-                      </p>
-                      {% endif %}
                   </td>
               </tr>
           </table>
       </td>
   </tr>
 <!-- 1 Column Text + Button : END -->
-{% endblock %}
-
-{% block footer-address %}
-{% include "mail/partials/_uai_footer.html" %}
 {% endblock %}
