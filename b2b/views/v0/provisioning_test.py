@@ -1,5 +1,7 @@
 """Tests for the staff-only B2B provisioning API's HTTP surface."""
 
+from urllib.parse import parse_qs, urlsplit
+
 import faker
 import pytest
 from authlib.integrations.base_client.errors import OAuthError
@@ -925,17 +927,21 @@ def test_list_organizations_filters_on_onboarding_state(staff_drf_client):
     assert [org["org_key"] for org in response.json()["results"]] == [live.org_key]
 
 
-@pytest.mark.parametrize(
-    ("base_url", "realm_url"),
-    [
-        ("https://sso.example.mit.edu", "https://sso.example.mit.edu/realms/olapps"),
-        ("https://sso.example.mit.edu/", "https://sso.example.mit.edu/realms/olapps"),
-        (
-            "https://sso.example.mit.edu/auth",
-            "https://sso.example.mit.edu/auth/realms/olapps",
-        ),
-    ],
-)
+REALM_URL_CASES = [
+    ("https://sso.example.mit.edu", "https://sso.example.mit.edu/realms/olapps"),
+    ("https://sso.example.mit.edu/", "https://sso.example.mit.edu/realms/olapps"),
+    (
+        "https://sso.example.mit.edu/auth",
+        "https://sso.example.mit.edu/auth/realms/olapps",
+    ),
+    (
+        "https://sso.example.mit.edu/auth/",
+        "https://sso.example.mit.edu/auth/realms/olapps",
+    ),
+]
+
+
+@pytest.mark.parametrize(("base_url", "realm_url"), REALM_URL_CASES)
 def test_identity_provider_includes_the_service_provider_details(
     staff_drf_client, settings, base_url, realm_url
 ):
@@ -955,6 +961,71 @@ def test_identity_provider_includes_the_service_provider_details(
         "redirect_uri": f"{realm_url}/broker/exampleu/endpoint",
         "metadata_url": f"{realm_url}/broker/exampleu/endpoint/descriptor",
     }
+
+
+@pytest.mark.parametrize(("base_url", "realm_url"), REALM_URL_CASES)
+def test_identity_provider_includes_a_login_url_with_its_alias_as_the_hint(
+    staff_drf_client, settings, base_url, realm_url
+):
+    """The gateway drops kc_idp_hint, so the link goes to Keycloak directly."""
+
+    settings.KEYCLOAK_BASE_URL = base_url
+    settings.KEYCLOAK_REALM_NAME = "olapps"
+    settings.B2B_IDP_LOGIN_CLIENT_ID = "learn-client"
+    settings.B2B_IDP_LOGIN_REDIRECT_URI = "https://api.learn.example.mit.edu/login"
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+
+    response = staff_drf_client.get(
+        _identity_provider_url(organization.org_key, "exampleu")
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    login_url = urlsplit(response.json()["login_url"])
+    assert login_url._replace(query="").geturl() == (
+        f"{realm_url}/protocol/openid-connect/auth"
+    )
+    assert parse_qs(login_url.query) == {
+        "response_type": ["code"],
+        "client_id": ["learn-client"],
+        "redirect_uri": ["https://api.learn.example.mit.edu/login"],
+        "scope": ["openid profile email organization:*"],
+        "kc_idp_hint": ["exampleu"],
+    }
+
+
+def test_login_url_escapes_the_alias(settings):
+    """Nothing restricts an alias's characters, so it can't add parameters."""
+
+    settings.B2B_IDP_LOGIN_CLIENT_ID = "learn-client"
+    settings.B2B_IDP_LOGIN_REDIRECT_URI = "https://api.learn.example.mit.edu/login"
+
+    login_url = OrganizationIdentityProvider(alias="a&client_id=b").login_url
+
+    query = parse_qs(urlsplit(login_url).query)
+    assert query["kc_idp_hint"] == ["a&client_id=b"]
+    assert query["client_id"] == ["learn-client"]
+
+
+@pytest.mark.parametrize(
+    "unset", ["B2B_IDP_LOGIN_CLIENT_ID", "B2B_IDP_LOGIN_REDIRECT_URI"]
+)
+def test_identity_provider_has_no_login_url_without_a_login_client(
+    staff_drf_client, settings, unset
+):
+    """A link missing its client or redirect URI would fail at Keycloak."""
+
+    settings.B2B_IDP_LOGIN_CLIENT_ID = "learn-client"
+    settings.B2B_IDP_LOGIN_REDIRECT_URI = "https://api.learn.example.mit.edu/login"
+    setattr(settings, unset, None)
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+
+    response = staff_drf_client.get(
+        _identity_provider_url(organization.org_key, "exampleu")
+    )
+
+    assert response.json()["login_url"] is None
 
 
 def _mapper(protocol, user_attribute, **source):

@@ -15,8 +15,8 @@ const TRANSITION_WARNINGS: Partial<Record<IdpLifecycleState, string>> = {
     draft: "The identity provider will be disabled in Keycloak.",
 };
 
-const Copyable: React.FC<{ value: string | null }> = ({ value }) =>
-    value ? <Typography.Text copyable code>{value}</Typography.Text> : <Typography.Text type="secondary">n/a</Typography.Text>;
+const Copyable: React.FC<{ value: string | null; empty?: string }> = ({ value, empty = "n/a" }) =>
+    value ? <Typography.Text copyable code>{value}</Typography.Text> : <Typography.Text type="secondary">{empty}</Typography.Text>;
 
 // What an operator hands the partner's IT team to configure their side.
 const ServiceProviderDetails: React.FC<{ idp: IOrganizationIdentityProvider }> = ({ idp }) => (
@@ -38,6 +38,17 @@ const ServiceProviderDetails: React.FC<{ idp: IOrganizationIdentityProvider }> =
                 <Copyable value={idp.service_provider.redirect_uri} />
             </Descriptions.Item>
         )}
+        <Descriptions.Item label="Login link">
+            <Copyable value={idp.login_url} empty="Login client not configured" />
+            {idp.login_url ? (
+                <div>
+                    <Typography.Text type="secondary">
+                        Signs a user in through this identity provider once it is in Testing or Active. Open it in a
+                        private window to test.
+                    </Typography.Text>
+                </div>
+            ) : null}
+        </Descriptions.Item>
         <Descriptions.Item label="Metadata source">
             <Typography.Text style={{ wordBreak: "break-all" }}>
                 {idp.metadata_source.trimStart().startsWith("<") ? "Pasted XML document" : idp.metadata_source}

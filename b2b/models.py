@@ -2,6 +2,7 @@
 
 import logging
 from decimal import Decimal
+from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib import admin
@@ -1327,6 +1328,46 @@ class OrganizationIdentityProvider(TimestampedModel, ValidateOnSaveMixin):
         ),
     )
     metadata_fetched_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def login_url(self):
+        """
+        Return a link that signs a user in through this IdP.
+
+        The API gateway builds the normal login request and doesn't forward
+        kc_idp_hint, so /login/?kc_idp_hint=<alias> never reaches Keycloak.
+        This goes to Keycloak directly instead: the hint sends the browser to
+        this IdP, and Keycloak then redirects to the gateway's login route,
+        which starts its own login and completes it from the Keycloak session
+        the user now has. The code Keycloak appends to that redirect is unused.
+
+        Partners without email-domain routing give their learners a link of
+        this shape, built by hand. The realm's browser flow checks the Keycloak
+        session cookie before the IdP redirector, so a browser that is already
+        signed in to Keycloak never reaches the IdP.
+
+        Returns:
+        - str: the link, or None when the login client isn't configured
+        """
+
+        if not (
+            settings.B2B_IDP_LOGIN_CLIENT_ID and settings.B2B_IDP_LOGIN_REDIRECT_URI
+        ):
+            return None
+
+        query = urlencode(
+            {
+                "response_type": "code",
+                "client_id": settings.B2B_IDP_LOGIN_CLIENT_ID,
+                "redirect_uri": settings.B2B_IDP_LOGIN_REDIRECT_URI,
+                # The scope partners' hand-built links send. The hint sends the
+                # browser to the IdP before the organization step that reads it.
+                "scope": "openid profile email organization:*",
+                "kc_idp_hint": self.alias,
+            }
+        )
+
+        return f"{keycloak_realm_url()}/protocol/openid-connect/auth?{query}"
 
     @property
     def service_provider(self):
