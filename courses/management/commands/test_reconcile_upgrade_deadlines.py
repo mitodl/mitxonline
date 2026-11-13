@@ -188,10 +188,7 @@ def test_fix_continues_past_a_run_that_fails_validation(mock_verified_mode):
     """
     now = now_in_utc().replace(microsecond=0)
     edx_deadline = now + timedelta(days=30)
-    broken, valid = sorted(
-        CourseRunFactory.create_batch(2, live=True, upgrade_deadline=None),
-        key=lambda run: run.courseware_id,
-    )
+    broken, valid = CourseRunFactory.create_batch(2, live=True, upgrade_deadline=None)
     # An expiration date before the end date fails clean(). update() skips it,
     # the way older rows got into this state.
     type(broken).objects.filter(pk=broken.pk).update(
@@ -201,10 +198,12 @@ def test_fix_continues_past_a_run_that_fails_validation(mock_verified_mode):
 
     rows, err = _run_command(all=True, fix=True, expect_failure=True)
 
-    assert [(row["courseware_id"], row["fixed"]) for row in rows] == [
-        (broken.courseware_id, "failed"),
-        (valid.courseware_id, "yes"),
-    ]
+    # The command's row order comes from the database's collation, which can
+    # differ from Python's codepoint order, so rows are matched by id.
+    assert {row["courseware_id"]: row["fixed"] for row in rows} == {
+        broken.courseware_id: "failed",
+        valid.courseware_id: "yes",
+    }
     assert f"{broken.courseware_id}: could not save" in err
     assert "Fixed: 1, failed: 1" in err
     broken.refresh_from_db()
@@ -258,22 +257,30 @@ def test_one_failure_does_not_stop_the_report(mock_verified_mode, fix):
     the end so a script can tell.
     """
     deadline = now_in_utc().replace(microsecond=0) + timedelta(days=10)
-    runs = sorted(
-        CourseRunFactory.create_batch(2, live=True, upgrade_deadline=deadline),
-        key=lambda run: run.courseware_id,
+    failing, healthy = CourseRunFactory.create_batch(
+        2, live=True, upgrade_deadline=deadline
     )
-    mock_verified_mode.side_effect = [HTTPError("boom"), _verified_mode(deadline)]
+
+    def fake_verified_mode(courseware_id, **kwargs):
+        if courseware_id == failing.courseware_id:
+            msg = "boom"
+            raise HTTPError(msg)
+        return _verified_mode(deadline)
+
+    mock_verified_mode.side_effect = fake_verified_mode
 
     rows, err = _run_command(all=True, fix=fix, expect_failure=True)
 
-    assert [(row["status"], row["fixed"]) for row in rows] == [
-        ("error", ""),
-        ("ok", ""),
-    ]
-    assert f"{runs[0].courseware_id}: HTTPError: boom" in err
+    # The command's row order comes from the database's collation, which can
+    # differ from Python's codepoint order, so rows are matched by id.
+    assert {row["courseware_id"]: (row["status"], row["fixed"]) for row in rows} == {
+        failing.courseware_id: ("error", ""),
+        healthy.courseware_id: ("ok", ""),
+    }
+    assert f"{failing.courseware_id}: HTTPError: boom" in err
     assert "error: 1" in err
-    runs[0].refresh_from_db()
-    assert runs[0].upgrade_deadline == deadline
+    failing.refresh_from_db()
+    assert failing.upgrade_deadline == deadline
 
 
 def test_programming_errors_are_not_swallowed(mock_verified_mode):
