@@ -5390,7 +5390,7 @@ def test_course_run_certificate_verifiable_credentials_signing_payload(
                 "criteria": {
                     "narrative": mock_certificate_page.verifiable_credential_criteria
                 },
-                "description": "John Doe has successfully completed all modules and earned a Course Certificate in Introduction to Python.",
+                "description": "The learner has successfully completed all modules and earned a Course Certificate in Introduction to Python.",
                 "name": "Introduction to Python",
                 "image": {
                     "id": "https://example.com/thumbnail.jpg",
@@ -5505,7 +5505,7 @@ def test_program_certificate_verifiable_credentials_signing_payload(
                 "criteria": {
                     "narrative": mock_certificate_page.verifiable_credential_criteria
                 },
-                "description": "Jane Smith has successfully completed all modules and earned a Program Certificate in Universal AI.",
+                "description": "The learner has successfully completed all modules and earned a Program Certificate in Universal AI.",
                 "name": "Universal AI",
                 "image": {
                     "id": "https://example.com/program-thumbnail.jpg",
@@ -5611,7 +5611,7 @@ def test_verifiable_credentials_payload_description(  # noqa: PLR0913
     expected_description = (
         description
         if expect_custom_description
-        else f"{certificate.user.name} has successfully completed all modules and earned a {achievement_type} Certificate in {certificate_name}."
+        else f"The learner has successfully completed all modules and earned a {achievement_type} Certificate in {certificate_name}."
     )
     assert (
         payload["credentialSubject"]["achievement"]["description"]
