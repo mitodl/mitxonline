@@ -500,6 +500,21 @@ KEYCLOAK_ADMIN_CLIENT_SECRET = get_string(
     description="The client secret for the admin client.",
 )
 
+KEYCLOAK_MEMBERSHIP_CLIENT_ID = get_string(
+    name="KEYCLOAK_MEMBERSHIP_CLIENT_ID",
+    default=None,
+    description=(
+        "The client ID of the service account that adds users to Keycloak "
+        "organizations during enrollment."
+    ),
+)
+
+KEYCLOAK_MEMBERSHIP_CLIENT_SECRET = get_string(
+    name="KEYCLOAK_MEMBERSHIP_CLIENT_SECRET",
+    default=None,
+    description="The client secret for KEYCLOAK_MEMBERSHIP_CLIENT_ID.",
+)
+
 KEYCLOAK_ADMIN_CLIENT_SCOPES = get_string(
     name="KEYCLOAK_ADMIN_CLIENT_SCOPES",
     default=None,
