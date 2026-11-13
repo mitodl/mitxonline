@@ -20,3 +20,7 @@ EXPORT_COMPLIANCE_CHECK_ENABLED = "enable_export_compliance"
 # without exposing a half-finished workflow to content authors. Does not gate
 # the credential fields that already exist and function.
 ENABLE_CREDENTIAL_METADATA_AUTHORING = "mitxonline-credential-metadata-authoring"
+
+USE_HASHED_USER_NAME_FOR_VERIFIABLE_CREDENTIALS = (
+    "mitxonline-use-hashed-user-name-for-verifiable-credentials"
+)
