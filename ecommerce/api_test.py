@@ -883,6 +883,29 @@ def test_auto_refund_request_claims_request_before_gateway_call(
     assert statuses == [RefundRequestStatus.APPROVED]
 
 
+def test_auto_refund_request_second_request_for_order_waits_for_first(
+    fulfilled_transaction, auto_refund_gateway
+):
+    """A second pending request is skipped while the first one's refund is running."""
+    order = fulfilled_transaction.order
+    first, second = _refund_request(order), _refund_request(order)
+    gateway_response = auto_refund_gateway.return_value
+    nested_results = []
+
+    def refund_second_during_first(*_args, **_kwargs):
+        nested_results.append(auto_refund_request(second.id))
+        return gateway_response
+
+    auto_refund_gateway.side_effect = refund_second_during_first
+
+    assert auto_refund_request(first.id) == (True, "")
+
+    assert nested_results == [(False, "")]
+    auto_refund_gateway.assert_called_once()
+    second.refresh_from_db()
+    assert second.status == RefundRequestStatus.PENDING
+
+
 def test_auto_refund_request_gateway_failure_stays_pending(
     mocker, fulfilled_transaction, caplog
 ):

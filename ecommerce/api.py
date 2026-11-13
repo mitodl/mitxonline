@@ -964,7 +964,8 @@ def auto_refund_request(refund_request_id: int) -> tuple[bool, str]:
 
     The order row is locked while the request is checked and claimed
     (marked approved), and that is committed before the gateway is called, so
-    concurrent or repeated runs see a non-pending request and do nothing. The
+    concurrent or repeated runs see a non-pending request, or another request
+    for the order already being refunded, and do nothing. The
     refund itself runs outside that transaction, so the refund record is
     committed as soon as the gateway responds. If the refund fails, the
     request goes back to pending for support.
@@ -985,6 +986,11 @@ def auto_refund_request(refund_request_id: int) -> tuple[bool, str]:
             # through the gateway, so they go to support without an attempt.
             or order.total_price_paid <= 0
             or not _has_gateway_refundable_payment(order)
+            # Claiming a request only protects that request. Another request
+            # for this order already being refunded would double-refund it.
+            or order.refund_requests.filter(status=RefundRequestStatus.APPROVED)
+            .exclude(pk=refund_request.pk)
+            .exists()
         ):
             return False, ""
 
