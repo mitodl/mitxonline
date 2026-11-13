@@ -3,7 +3,17 @@
 {% load wagtailcore_tags %}
 {% load static wagtail_img_src feature_img_src %}
 
-{% block title %}{{ site_name }} | {{ page.title }}{% endblock %}
+{# Learners reach this form from MIT Learn, so it carries MIT Learn's name, #}
+{# header and footer rather than the site-wide MITxOnline ones. #}
+{% block title %}MIT Learn | {{ page.title }}{% endblock %}
+
+{% block headercontent %}
+  {% include "flexiblepricing/partials/learn_header.html" %}
+{% endblock %}
+
+{% block footer %}
+  {% include "flexiblepricing/partials/learn_footer.html" %}
+{% endblock %}
 
 {% block content %}
 <div id="main" class="main-page-content">
@@ -138,7 +148,7 @@
                 </a>
               {% endif %}
             {% elif page.selected_program %}
-              <a href="/dashboard" class="btn btn-primary btn-gradient-red-to-blue flexible-price-certificate-btn">
+              <a href="{{ mit_learn_dashboard_url }}" class="btn btn-primary btn-gradient-red-to-blue flexible-price-certificate-btn">
               Go to Dashboard
               </a>
             {% endif %}
@@ -173,15 +183,16 @@
 </div>
 
 <script type="text/javascript">
-  $(document).ready(function() {
-        $("#your_income").on("focus", function() {
-            $(this).on("keydown", function(e) {
-                //disable up/down keyboard for increment
-                if (e.keyCode === 38 || e.keyCode === 40) {
-                    e.preventDefault();
-                }
-            });
-        });
+  {# Plain JS: jQuery comes from a bundle that loads after this block. #}
+  (function() {
+    var income = document.getElementById("your_income");
+    if (!income) return;
+    income.addEventListener("keydown", function(e) {
+      // disable up/down keyboard for increment
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        e.preventDefault();
+      }
     });
+  })();
 </script>
 {% endblock %}

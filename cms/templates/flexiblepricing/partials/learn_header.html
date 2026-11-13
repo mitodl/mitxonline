@@ -1,0 +1,11 @@
+{% load static %}
+<header class="site-header d-flex flex-column learn-header">
+  <nav class="order-1 sub-nav navbar top-navbar nowrap" aria-label="MIT Learn">
+    <div class="top-branding">
+      <a href="{{ mit_learn_base_url }}" class="logo-link">
+        <img src="{% static 'images/mit-learn.png' %}" alt="MIT Learn" class="learn-logo" width="143" height="26" />
+      </a>
+    </div>
+    <a href="{{ mit_learn_dashboard_url }}" class="top-nav-link">Dashboard</a>
+  </nav>
+</header>
