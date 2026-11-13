@@ -35,6 +35,10 @@ from openedx.api import repair_faulty_edx_user
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import GENDER_CHOICES, LegalAddress, User, UserProfile
 
+# StarRocks fails a query whose result is still being read query_timeout seconds
+# after it started (default 300), and the results below are streamed while each
+# batch is written to the database, so a large type would outlive the default.
+STARROCKS_QUERY_TIMEOUT_SECONDS = 24 * 60 * 60
 WAREHOUSE_TRINO = "trino"
 WAREHOUSE_STARROCKS = "starrocks"
 WAREHOUSE_REQUIRED_SETTINGS = {
@@ -102,9 +106,15 @@ def _connect_to_starrocks():
         # pymysql skips the hostname check when ssl_ca is unset, even
         # with ssl_verify_identity=True, so a context is passed instead.
         ssl=ssl.create_default_context(),
+        # Stream rows as fetchmany asks for them, as the Trino client does;
+        # the default cursor reads the whole result into memory at execute.
+        cursorclass=pymysql.cursors.SSCursor,
         # StarRocks renders a timestamp with time zone in the session's
         # time zone, and sends it without one.
-        init_command="SET time_zone = '+00:00'",
+        init_command=(
+            "SET time_zone = '+00:00', "
+            f"query_timeout = {STARROCKS_QUERY_TIMEOUT_SECONDS}"
+        ),
     )
 
 

@@ -154,7 +154,8 @@ def test_connect_uses_starrocks_settings(settings, mocker):
         user="reader",
         password="secret",  # noqa: S106
         ssl=mocker.ANY,
-        init_command="SET time_zone = '+00:00'",
+        cursorclass=pymysql.cursors.SSCursor,
+        init_command="SET time_zone = '+00:00', query_timeout = 86400",
     )
     trino_connect.assert_not_called()
 
