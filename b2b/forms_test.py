@@ -1,7 +1,10 @@
 """Tests for the B2B Wagtail admin forms."""
 
+from datetime import timedelta
+
 import pytest
 from django.urls import reverse
+from mitol.common.utils import now_in_utc
 from wagtail.test.utils.form_data import inline_formset, nested_form_data, rich_text
 
 from b2b.constants import CONTRACT_MEMBERSHIP_MANAGED
@@ -80,16 +83,17 @@ def test_contract_form_keeps_the_stamp_on_unrelated_edits(admin_user, staff_user
     _edit_form(contract, staff_user, learner_records_opt_in="on").save()
     contract.refresh_from_db()
     recorded_on = contract.learner_records_opt_in_recorded_on
+    expire_at = now_in_utc() + timedelta(days=30)
 
     _edit_form(
         contract,
         admin_user,
         learner_records_opt_in="on",
-        google_sheet_target_tab="Codes",
+        expire_at=expire_at,
     ).save()
 
     contract.refresh_from_db()
-    assert contract.google_sheet_target_tab == "Codes"
+    assert contract.expire_at == expire_at
     assert contract.learner_records_opt_in_recorded_by == staff_user
     assert contract.learner_records_opt_in_recorded_on == recorded_on
 
@@ -176,11 +180,12 @@ def test_contract_draft_withdrawal_keeps_its_stamp(admin_user, staff_user, user)
     draft = contract.get_latest_revision_as_object()
     withdrawn_on = draft.learner_records_opt_in_recorded_on
 
-    edited = _edit_form(draft, user, google_sheet_target_tab="Codes").save(commit=False)
+    expire_at = now_in_utc() + timedelta(days=30)
+    edited = _edit_form(draft, user, expire_at=expire_at).save(commit=False)
     edited.save_revision(user=user).publish()
 
     contract.refresh_from_db()
-    assert contract.google_sheet_target_tab == "Codes"
+    assert contract.expire_at == expire_at
     assert contract.learner_records_opt_in is False
     assert contract.learner_records_opt_in_recorded_by == admin_user
     assert contract.learner_records_opt_in_recorded_on == withdrawn_on
