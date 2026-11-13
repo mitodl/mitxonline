@@ -1,5 +1,7 @@
 """Courses API tests"""
 
+import hashlib
+import json
 import logging
 from copy import deepcopy
 from datetime import datetime, timedelta
@@ -69,6 +71,8 @@ from courses.api import (
     get_audit_program_enrollments_for_upgrade,
     get_certificate_grade_eligible_runs,
     get_eligible_program_certificate_candidates,
+    get_hashed_identity_object_for_user,
+    get_hashed_username,
     get_verifiable_credentials_payload,
     import_courserun_from_edx,
     manage_course_run_certificate_access,
@@ -5617,6 +5621,151 @@ def test_verifiable_credentials_payload_description(  # noqa: PLR0913
         payload["credentialSubject"]["achievement"]["description"]
         == expected_description
     )
+
+
+def test_get_hashed_username():
+    """
+    get_hashed_username returns an Open Badges 3.0 IdentityHash: "sha256$" followed
+    by the hex SHA-256 digest of the name with the salt appended.
+    """
+    assert (
+        get_hashed_username("Jane Doe", "abcdefghijklmnopqrstuvwxyz012345")
+        == "sha256$95a12d12031b6f8848ff69394aca24204fad1cc9c2c6b4840db61f3566ed7dd1"
+    )
+
+
+@pytest.mark.parametrize(
+    ("flag_enabled", "expected_identity_object"),
+    [
+        (
+            True,
+            {
+                "type": "IdentityObject",
+                "identityHash": "sha256$95a12d12031b6f8848ff69394aca24204fad1cc9c2c6b4840db61f3566ed7dd1",
+                "identityType": "name",
+                "hashed": True,
+                "salt": "abcdefghijklmnopqrstuvwxyz012345",
+            },
+        ),
+        (
+            False,
+            {
+                "type": "IdentityObject",
+                "identityHash": "Jane Doe",
+                "identityType": "name",
+                "hashed": False,
+                "salt": "not-used",
+            },
+        ),
+    ],
+)
+def test_get_hashed_identity_object_for_user(
+    settings, mocker, flag_enabled, expected_identity_object
+):
+    """
+    With the flag on the identity object carries a salted hash of the name; with
+    the flag off it carries the plaintext name and no salt is generated.
+    """
+    settings.FEATURES[features.USE_HASHED_USER_NAME_FOR_VERIFIABLE_CREDENTIALS] = (
+        flag_enabled
+    )
+    mock_get_salt = mocker.patch(
+        "courses.api.get_salt", return_value="abcdefghijklmnopqrstuvwxyz012345"
+    )
+
+    assert get_hashed_identity_object_for_user("Jane Doe") == expected_identity_object
+    assert mock_get_salt.called == flag_enabled
+
+
+def test_get_hashed_identity_object_for_user_is_verifiable(settings):
+    """
+    A verifier holding the learner's name and the published salt can reproduce the
+    identity hash, and each call uses a new salt so the hashes are not linkable.
+    """
+    settings.FEATURES[features.USE_HASHED_USER_NAME_FOR_VERIFIABLE_CREDENTIALS] = True
+    user_name = "Jane Doe"
+    first = get_hashed_identity_object_for_user(user_name)
+    second = get_hashed_identity_object_for_user(user_name)
+
+    for identity_object in (first, second):
+        algorithm, digest = identity_object["identityHash"].split("$")
+        assert algorithm == "sha256"
+        assert (
+            digest
+            == hashlib.sha256(
+                f"{user_name}{identity_object['salt']}".encode()
+            ).hexdigest()
+        )
+    assert first["salt"] != second["salt"]
+    assert first["identityHash"] != second["identityHash"]
+
+
+@pytest.mark.parametrize("is_program", [True, False])
+@pytest.mark.parametrize("flag_enabled", [True, False])
+def test_verifiable_credentials_payload_identity_object(
+    mocker, settings, is_program, flag_enabled
+):
+    """
+    The credential subject's identifier is a salted hash of the learner's name when
+    the flag is enabled. With the flag disabled the plaintext name is used as before.
+    """
+    settings.FEATURES[features.USE_HASHED_USER_NAME_FOR_VERIFIABLE_CREDENTIALS] = (
+        flag_enabled
+    )
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_user")
+    mocker.patch("hubspot_sync.api.upsert_custom_properties")
+    mock_enrollment = Mock()
+    mock_enrollment.created_on = datetime(
+        2024, 1, 15, 10, 30, 0, tzinfo=ZoneInfo("UTC")
+    )
+    mocker.patch(
+        "courses.api.CourseRunEnrollment.all_objects.get",
+        return_value=mock_enrollment,
+    )
+    mocker.patch(
+        "courses.api.ProgramEnrollment.all_objects.get",
+        return_value=mock_enrollment,
+    )
+    mocker.patch("courses.api.get_thumbnail_url", return_value="")
+    mocker.patch(
+        "courses.api.get_salt", return_value="abcdefghijklmnopqrstuvwxyz012345"
+    )
+    settings.ENVIRONMENT = "production"
+
+    certificate = (
+        ProgramCertificateFactory.create()
+        if is_program
+        else CourseRunCertificateFactory.create()
+    )
+    user_name = "Jane Doe"
+    certificate.user.name = user_name
+    certificate.user.save()
+
+    mock_certificate_page = Mock()
+    mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
+    mock_certificate_page.verifiable_credential_description = None
+    mock_certificate_page.product_name = ""
+
+    payload = get_verifiable_credentials_payload(certificate, mock_certificate_page)
+
+    identifiers = payload["credentialSubject"]["identifier"]
+    if flag_enabled:
+        assert identifiers[0] == {
+            "type": "IdentityObject",
+            "identityHash": "sha256$95a12d12031b6f8848ff69394aca24204fad1cc9c2c6b4840db61f3566ed7dd1",
+            "identityType": "name",
+            "hashed": True,
+            "salt": "abcdefghijklmnopqrstuvwxyz012345",
+        }
+        assert user_name not in json.dumps(payload)
+    else:
+        assert identifiers[0] == {
+            "type": "IdentityObject",
+            "identityHash": user_name,
+            "identityType": "name",
+            "hashed": False,
+            "salt": "not-used",
+        }
 
 
 @pytest.mark.parametrize(
