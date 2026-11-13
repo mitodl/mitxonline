@@ -17,6 +17,8 @@
     },
     "resolutions": {
         "cheerio": "1.0.0-rc.12",
-        "@types/react": "^17"
+        "@types/react": "^17",
+        "mocha/minimatch": "^4.2.6",
+        "@typescript-eslint/typescript-estree/minimatch": "^9.0.9"
     }
 }
