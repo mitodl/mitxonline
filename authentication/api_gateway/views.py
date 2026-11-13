@@ -33,7 +33,11 @@ from main.constants import (
     USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_PROFILE_CREATED,
 )
-from main.utils import encode_json_cookie_value, is_success_response
+from main.utils import (
+    encode_json_cookie_value,
+    is_success_response,
+    keycloak_realm_url,
+)
 from main.versioning import NoVersioning
 from users.models import UserProfile
 
@@ -226,15 +230,7 @@ class AccountActionStartView(RedirectView):
             "kc_action": self.ACTION_MAPPING[action],
         }
 
-        return "".join(
-            [
-                settings.KEYCLOAK_BASE_URL.removesuffix("/"),
-                "/realms/",
-                settings.KEYCLOAK_REALM_NAME,
-                "/protocol/openid-connect/auth?",
-                urlencode(qs),
-            ]
-        )
+        return f"{keycloak_realm_url()}/protocol/openid-connect/auth?{urlencode(qs)}"
 
 
 class AccountActionCallbackView(RedirectView):

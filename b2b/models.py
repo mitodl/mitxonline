@@ -2,7 +2,6 @@
 
 import logging
 from decimal import Decimal
-from urllib.parse import urljoin
 
 from django.conf import settings
 from django.contrib import admin
@@ -41,6 +40,7 @@ from b2b.constants import (
 from b2b.exceptions import SourceCourseIncompleteError
 from courses.models import Program
 from main.models import AuditModel, ValidateOnSaveMixin
+from main.utils import keycloak_realm_url
 from variants.models import SupportedVariant
 
 log = logging.getLogger(__name__)
@@ -1343,9 +1343,7 @@ class OrganizationIdentityProvider(TimestampedModel, ValidateOnSaveMixin):
           OIDC redirect URI) and metadata_url (the SAML SP descriptor)
         """
 
-        realm_url = urljoin(
-            settings.KEYCLOAK_BASE_URL, f"/realms/{settings.KEYCLOAK_REALM_NAME}"
-        )
+        realm_url = keycloak_realm_url()
         endpoint = f"{realm_url}/broker/{self.alias}/endpoint"
 
         if self.protocol != IDP_PROTOCOL_SAML:
