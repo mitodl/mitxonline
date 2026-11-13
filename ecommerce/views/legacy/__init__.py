@@ -799,7 +799,10 @@ class CheckoutCallbackView(View):
 
     def post_checkout_redirect(self, order_state, order, request):
         """
-        Redirect the user with a message depending on the provided state.
+        Redirect the user depending on the provided state: to the cart with a
+        message for canceled, errored and declined orders, to the Learn
+        dashboard with the order's details for fulfilled ones, and to the
+        dashboard with an error message for any other state.
 
         Args:
             - order_state (str): the order state to consider

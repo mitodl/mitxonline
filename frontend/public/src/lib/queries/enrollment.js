@@ -3,8 +3,6 @@ import { pathOr } from "ramda"
 import { getCsrfOptions, nextState } from "./util"
 import { emptyOrNil } from "../util"
 
-export const enrollmentsSelector = pathOr(null, ["entities", "enrollments"])
-export const enrollmentSelector = pathOr(null, ["entities", "enrollment"])
 export const programEnrollmentsSelector = pathOr(null, [
   "entities",
   "program_enrollments"
@@ -14,7 +12,6 @@ export const learnerRecordSelector = pathOr(null, [
   "learner_record"
 ])
 
-export const enrollmentQueryKey = "enrollment"
 export const programEnrollmentsQueryKey = "program_enrollments"
 export const learnerRecordQueryKey = "learner_record"
 
@@ -26,17 +23,6 @@ export const programEnrollmentsQuery = () => ({
   }),
   update: {
     program_enrollments: nextState
-  }
-})
-
-export const enrollmentQuery = () => ({
-  queryKey:  enrollmentQuery,
-  url:       "/api/v1/enrollments/${enrollmentId}",
-  transform: json => ({
-    enrollment: json
-  }),
-  update: {
-    enrollment: nextState
   }
 })
 
@@ -69,11 +55,6 @@ export const deactivateEnrollmentMutation = (enrollmentId: number) => ({
     method: "DELETE"
   },
   update: {
-    enrollments: prevEnrollments => {
-      return emptyOrNil(prevEnrollments) ?
-        [] :
-        prevEnrollments.filter(enrollment => enrollment.id !== enrollmentId)
-    },
     program_enrollments: prevProgramEnrollments => {
       return emptyOrNil(prevProgramEnrollments) ?
         [] :

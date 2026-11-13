@@ -14,8 +14,6 @@ import {
   USER_MSG_TYPE_PAYMENT_CANCELLED,
   USER_MSG_TYPE_PAYMENT_ERROR,
   USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
-  USER_MSG_TYPE_PAYMENT_ACCEPTED,
-  USER_MSG_TYPE_PAYMENT_ACCEPTED_NO_VALUE,
   USER_MSG_TYPE_PAYMENT_REVIEW,
   USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
   USER_MSG_TYPE_DISCOUNT_INVALID,
@@ -104,18 +102,6 @@ export function parseStoredUserMessage(
     // Probably won't hit this in production, but here to cover all possible cases
     alertType = ALERT_TYPE_SUCCESS
     msgText = "Payment is pending review."
-    break
-  case USER_MSG_TYPE_PAYMENT_ACCEPTED:
-    alertType = ALERT_TYPE_SUCCESS
-    msgText = userMsgJson.run ?
-      `Success! You are now enrolled for the paid version of ${userMsgJson.run}.` :
-      null
-    break
-  case USER_MSG_TYPE_PAYMENT_ACCEPTED_NO_VALUE:
-    alertType = ALERT_TYPE_SUCCESS
-    msgText = userMsgJson.run ?
-      `Success! You are now enrolled for the certificate version of ${userMsgJson.run}.` :
-      null
     break
   case USER_MSG_TYPE_DISCOUNT_INVALID:
     alertType = ALERT_TYPE_DANGER

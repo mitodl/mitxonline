@@ -1,36 +1,11 @@
 // sass-lint:disable mixins-before-declarations
 
 $featureImgWidth: 200px;
-$featureImgHeight: 120px;
-$featureImgMobileWidth: 345px;
 $featureImgMobileHeight: 223px;
-$sidenav-bg: #f5f5f5;
-$sidenav-separator: rgba(255, 255, 255, 0.2);
-
-$program-badge-fg: #305987;
-$program-badge-bg: #DBF2F3;
-
-$enrolled-verified-fg: #3E775D;
-$enrolled-verified-bg: #DBF3E9;
-
-$enrolled-passed-bg: #3E775D;
-$enrolled-passed-fg: #ffffff;
 
 .enrolled-items {
   a {
     color: $footer-blue-bg;
-  }
-  .hide-element {
-    // hidden elements for screenreaders only
-    border: 0;
-    clip: rect(1px 1px 1px 1px); /* IE6, IE7 */
-    clip: rect(1px, 1px, 1px, 1px);
-    height: 1px;
-    margin: -1px;
-    overflow: hidden;
-    padding: 0;
-    position: absolute;
-    width: 1px;
   }
 
   .card {
@@ -38,19 +13,6 @@ $enrolled-passed-fg: #ffffff;
     margin-bottom: 20px;
     padding: 0;
     box-shadow: 0px 2px 3px 0px rgba(18, 38, 49, 0.15);
-
-    &.no-enrollments {
-      flex-direction: column;
-
-      a {
-        color: black;
-        text-decoration: underline;
-      }
-
-      p {
-        margin: 0;
-      }
-    }
 
     h2 {
       font-size: 20px;
@@ -106,137 +68,6 @@ $enrolled-passed-fg: #ffffff;
         object-fit: cover;
       }
     }
-
-    .course-card-text-details {
-      padding: 0 0 0 20px;
-
-      @include media-breakpoint-down(sm)  {
-        padding: 15px 0px 15px 0px;
-        gap: 15px;
-
-        h2 {
-          margin: 0;
-        }
-      }
-
-      .detail {
-        color: $gray;
-
-        strong {
-          color: $primary;
-        }
-      }
-    }
-
-    div.row.certificate-row {
-      padding: 0;
-
-      @include media-breakpoint-down(sm)  {
-        gap: 20px;
-        border: 1px 0px 0px 0px;
-      }
-    }
-  }
-
-  .dropdown-toggle.menu-button {
-    height: fit-content;
-    border-color: transparent;
-    background-color: inherit;
-
-    span {
-      vertical-align: -webkit-baseline-middle;
-    }
-  }
-
-  .dropdown-toggle.menu-button::after {
-    display: none;
-  }
-
-  .no-enrollments h2 {
-    font-size: 25px !important;
-    margin-bottom: 30px !important;
-  }
-
-  .no-enrollments p {
-    margin-bottom: 0 !important;
-  }
-
-  button.dot-menu {
-    vertical-align: -webkit-baseline-middle;
-  }
-
-  .certificate-container {
-    margin: 0;
-    padding: 0;
-  }
-
-  .unenroll-denied-msg .tooltip {
-    width: 250px;
-  }
-
-  .enrollment-mode-container {
-    span.badge {
-      font-weight: normal;
-      font-size: .85rem;
-      padding: 0.35rem !important;
-      margin-bottom: .25rem !important;
-      margin-right: .5rem;
-
-    }
-
-    .badge-enrolled-verified {
-      color: $enrolled-verified-fg;
-      border-color: $enrolled-verified-fg;
-      background-color: $enrolled-verified-bg;
-    }
-
-    .badge-enrolled-passed {
-      color: $enrolled-passed-fg;
-      background-color: $enrolled-passed-bg;
-    }
-
-    span.badge.badge-red {
-        color: $red-darker;
-        background-color: #FAE8E8;
-      }
-
-    span.badge.badge-green {
-        color: $green-darker;
-        background-color: #DBF3E9;
-      }
-
-    span.badge.badge-program {
-      color: $program-badge-fg;
-      background-color: $program-badge-bg;
-    }
-  }
-
-  .upgrade-item-description {
-    width: 100%;
-    flex-direction: row !important;
-    padding: 15px 30px;
-    border-top: $home-page-border-grey;
-    background: $home-page-grey-lite;
-
-    @include media-breakpoint-down(sm) {
-      padding: 20px 15px;
-    }
-
-    div.certificate-upgrade-message {
-      padding-left: 30px;
-      width: 80%;
-      font-size: 16px;
-      line-height: 30px;
-
-      @include media-breakpoint-down(md) {
-        height: auto;
-        width: auto;
-      }
-
-      strong {
-        color: $brand-darker-bg;
-      }
-    }
   }
 
   .enrollment-extra-links {
@@ -254,57 +85,13 @@ $enrolled-passed-fg: #ffffff;
     a:hover {
       text-decoration: none;
     }
-
-    a.view-certificate {
-      margin: auto 5px;
-    }
-
-    form button.btn-primary {
-      font-size: 14px;
-      padding: 9px 18px;
-      min-width: 145px;
-    }
-
-    .pricing-links {
-      display: flex;
-      margin-left: auto;
-
-      form button.btn-primary {
-        font-size: 14px;
-        padding: 0 18px;
-        margin-top: 0;
-        font-weight: 500;
-        height: 36px;
-        @include media-breakpoint-down(sm) {
-          height: auto;
-        }
-      }
-
-      .financial-assist-link {
-        margin: auto 23px auto auto;
-      }
-    }
   }
-  .goto-course-wrapper {
-    a {
-      width: fit-content;
-    }
-  }
-  .get-cert-button-container button, .finaid-link-container, a.btn-primary {
+
+  a.btn-primary {
     font-size: 14px;
 
     @include media-breakpoint-down(sm) {
       width: 100%;
     }
   }
-
-  .finaid-link-container {
-    width: 100%;
-    padding: 0;
-    margin: 0;
-    margin-top: 10px;
-    text-align: center;
-    color: $brand-darker-bg;
-  }
-
 }

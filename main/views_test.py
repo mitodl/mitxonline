@@ -23,9 +23,10 @@ def test_cms_signin_redirect_to_site_signin(client):
 
 
 @pytest.mark.parametrize("url_name", ["user-dashboard", "staff-dashboard"])
-def test_never_cache_react_views(staff_client, url_name):
+def test_never_cache_views(staff_client, url_name):
     """
-    Test that our react views instruct any clients not to cache the response
+    Test that the staff dashboard and the dashboard redirect instruct clients
+    not to cache the response
     """
     response = staff_client.get(reverse(url_name))
 
