@@ -35,6 +35,7 @@ from cms.factories import (
     ResourcePageFactory,
 )
 from cms.models import (
+    VC_EXAMPLES_URL,
     CertificatePage,
     CoursePage,
     FlexiblePricingRequestSubmission,
@@ -1721,3 +1722,17 @@ def test_generate_with_ai_panel_loads_script():
     bound = panel.get_bound_panel(instance=CertificatePage(), form=form)
 
     assert "js/credential_metadata_admin.js" in str(bound.media)
+
+
+def test_certificate_page_vc_panels_link_to_examples():
+    """Both credential fields link to the examples doc, opening in a new tab."""
+    panels = {
+        p.field_name: p
+        for p in CertificatePage.content_panels[4].children
+        if hasattr(p, "field_name")
+    }
+    for name in ("verifiable_credential_description", "verifiable_credential_criteria"):
+        help_text = str(panels[name].help_text)
+        assert f'href="{VC_EXAMPLES_URL}"' in help_text
+        assert 'target="_blank"' in help_text
+        assert "noopener" in help_text

@@ -21,6 +21,7 @@ from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.functional import cached_property
+from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.text import slugify
 from mitol.common.utils.datetime import now_in_utc
@@ -327,6 +328,19 @@ class CourseProgramChildPage(Page):
         raise Http404
 
 
+# Placeholder: must be replaced with the stable URL of the credential metadata
+# examples doc (mitodl/hq#13681) before this merges.
+VC_EXAMPLES_URL = "https://example.invalid/vc-examples"
+
+# Opens in a new tab so an author doesn't lose unsaved CMS edits.
+VC_EXAMPLES_LINK = format_html(
+    '<a href="{}" target="_blank" rel="noopener noreferrer" '
+    'style="display:inline-block;margin-top:0.75rem">'
+    "View examples of well-written credential descriptions and criteria</a>.",
+    VC_EXAMPLES_URL,
+)
+
+
 class GenerateWithAIFieldPanel(FieldPanel):
     """A FieldPanel with a "Generate with AI" button that fills it from MIT Learn.
 
@@ -478,6 +492,16 @@ class CertificatePage(CourseProgramChildPage):
                     metadata_field="description",
                     hide_without_flag=True,
                     widget=Textarea,
+                    # Panel-level so the link doesn't need a migration; this
+                    # overrides the model field's help_text, which is left as is.
+                    help_text=format_html(
+                        "1-2 sentences describing the course or program. This "
+                        "language serves as a template applied to the credential "
+                        "for every learner who completes the course and earns a "
+                        "certificate, so it should not include a specific "
+                        "learner's name. {}",
+                        VC_EXAMPLES_LINK,
+                    ),
                 ),
                 # Set on the panel, not the field: panel help text carries
                 # markup and isn't migration-tracked, so this copy can be
@@ -495,8 +519,9 @@ class CertificatePage(CourseProgramChildPage):
                         "<strong>Distinguished</strong> between symbolic and "
                         "modern machine learning. If it is not supplied, no "
                         "verifiable credential will be provisioned for those "
-                        "certificates."
-                    ),
+                        "certificates. "
+                    )
+                    + VC_EXAMPLES_LINK,
                 ),
             ],
             heading="Verifiable Credential",
