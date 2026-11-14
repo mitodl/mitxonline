@@ -1093,6 +1093,52 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         assert run_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
         assert run_enrollment.active is True
 
+    def test_unenrolls_run_without_audit_track(self, mocker, program_setup):
+        """A verified run with no audit mode is unenrolled, not downgraded."""
+        program_setup.run.enrollment_modes.filter(
+            mode_slug=EDX_ENROLLMENT_AUDIT_MODE
+        ).delete()
+        run_enrollment = CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.unenroll_edx_course_run")
+        mocker.patch("courses.api.mail_api.send_course_run_unenrollment_email")
+
+        _, downgraded_runs = downgrade_program_enrollment_and_verified_runs(
+            program_setup.user, program_setup.program
+        )
+
+        assert downgraded_runs == []
+        run_enrollment.refresh_from_db()
+        assert run_enrollment.active is False
+        assert run_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
+
+    def test_downgrades_run_in_nested_program(self, mocker, program_setup):
+        """Runs in programs nested in the purchased program are downgraded too."""
+        nested_program = ProgramFactory.create()
+        nested_run = CourseRunFactory.create()
+        nested_program.add_requirement(nested_run.course)
+        program_setup.program.add_program_requirement(nested_program)
+        run_enrollment = CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=nested_run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+
+        _, downgraded_runs = downgrade_program_enrollment_and_verified_runs(
+            program_setup.user, program_setup.program
+        )
+
+        assert downgraded_runs == [run_enrollment]
+        run_enrollment.refresh_from_db()
+        assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+
     def test_downgrades_zero_value_verified_run_enrollment(self, mocker, program_setup):
         """
         A course-run enrollment backed by a PaidCourseRun whose order was

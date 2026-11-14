@@ -761,8 +761,9 @@ def undo_program_course_run_verification(enrollment):
 def downgrade_program_enrollment_and_verified_runs(user, program):
     """
     Downgrade a user's ProgramEnrollment to audit, and downgrade the
-    program's course-run enrollments that are verified only because of the
-    program purchase.
+    course-run enrollments (including those in nested programs) that are
+    verified only because of the program purchase. Programs and runs with no
+    audit track are unenrolled instead of downgraded.
 
     A course run's verified enrollment is left alone (not downgraded) if
     either:
@@ -804,23 +805,30 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
         and program_enrollment.active
         and program_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
     ):
-        downgraded_program_enrollments = create_program_enrollments(
-            user, [program], enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+        downgraded_program_enrollment = _downgrade_or_deactivate_program_enrollment(
+            user, program
         )
-        downgraded_program_enrollment = first_or_none(downgraded_program_enrollments)
-        if downgraded_program_enrollment is not None:
-            # create_program_enrollments has no change_status kwarg, so tag
-            # the refund onto the enrollment directly - active stays True,
-            # this is audit-trail/reporting only (e.g. HubSpot sync), not a
-            # deactivation.
-            downgraded_program_enrollment.change_status = ENROLL_CHANGE_STATUS_REFUNDED
-            downgraded_program_enrollment.save_and_log(None)
 
-    verified_run_enrollments = CourseRunEnrollment.get_program_run_enrollments(
-        user=user, program=program
-    ).filter(enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE, b2b_contract__isnull=True)
+    # Programs nested in this one (at any depth) carry verified enrollments
+    # because of this purchase too; handle them the same way.
+    nested_program_ids = Program.expand_nested_program_ids([program.id]) - {program.id}
+    nested_enrollments = ProgramEnrollment.objects.filter(
+        user=user,
+        program_id__in=nested_program_ids,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        b2b_contract__isnull=True,
+    ).select_related("program")
+    for nested_enrollment in nested_enrollments:
+        _downgrade_or_deactivate_program_enrollment(user, nested_enrollment.program)
 
-    eligible_runs = []
+    verified_run_enrollments = CourseRunEnrollment.objects.filter(
+        user=user,
+        run__course__in=program.courses_qset_recursive,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        b2b_contract__isnull=True,
+    ).select_related("run")
+
+    audit_runs = []
     for run_enrollment in verified_run_enrollments:
         run = run_enrollment.run
         if (
@@ -836,14 +844,22 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
             .exists()
         ):
             continue
-        eligible_runs.append(run)
+        if run.has_free_audit:
+            audit_runs.append(run)
+        else:
+            # No audit track to fall back to, so the learner is unenrolled.
+            deactivate_run_enrollment(
+                run_enrollment,
+                ENROLL_CHANGE_STATUS_REFUNDED,
+                keep_failed_enrollments=True,
+            )
 
-    if not eligible_runs:
+    if not audit_runs:
         return downgraded_program_enrollment, []
 
     downgraded_run_enrollments, _ = create_run_enrollments(
         user,
-        eligible_runs,
+        audit_runs,
         mode=EDX_ENROLLMENT_AUDIT_MODE,
         change_status=ENROLL_CHANGE_STATUS_REFUNDED,
         keep_failed_enrollments=True,
@@ -851,6 +867,37 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
     )
 
     return downgraded_program_enrollment, downgraded_run_enrollments
+
+
+def _downgrade_or_deactivate_program_enrollment(user, program):
+    """
+    Move a user's verified ProgramEnrollment back to audit, or deactivate it
+    if the program has no audit track.
+
+    Returns:
+        ProgramEnrollment | None: the downgraded enrollment, or None if it was
+        deactivated (or there was nothing to change)
+    """
+    if not program.has_free_audit:
+        enrollment = ProgramEnrollment.objects.filter(
+            user=user, program=program
+        ).first()
+        if enrollment is not None:
+            enrollment.deactivate_and_save(ENROLL_CHANGE_STATUS_REFUNDED, no_user=True)
+        return None
+
+    downgraded_enrollments = create_program_enrollments(
+        user, [program], enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+    downgraded_enrollment = first_or_none(downgraded_enrollments)
+    if downgraded_enrollment is not None:
+        # create_program_enrollments has no change_status kwarg, so tag
+        # the refund onto the enrollment directly - active stays True,
+        # this is audit-trail/reporting only (e.g. HubSpot sync), not a
+        # deactivation.
+        downgraded_enrollment.change_status = ENROLL_CHANGE_STATUS_REFUNDED
+        downgraded_enrollment.save_and_log(None)
+    return downgraded_enrollment
 
 
 def deactivate_run_enrollment(
