@@ -57,8 +57,8 @@ def test_delayed_order_receipt_sends_email(  # noqa: PLR0913
 
 
 @pytest.mark.skip_nplusone_check
-def test_delayed_order_refund_sends_email(
-    settings, mocker, user, products, user_client
+def test_delayed_order_refund_sends_email(  # noqa: PLR0913
+    settings, mocker, user, products, user_client, django_capture_on_commit_callbacks
 ):
     """
     Tests that the Order model is properly calling the order refund email task
@@ -76,9 +76,12 @@ def test_delayed_order_refund_sends_email(
     transaction_data = {"id": "refunded-transaction"}
     refund_amount = order.total_price_paid / 2
     order_flow = order.get_object_flow()
-    order_flow.refund(
-        api_response_data=transaction_data, amount=refund_amount, reason="testing"
-    )
+    with django_capture_on_commit_callbacks(execute=True):
+        order_flow.refund(
+            api_response_data=transaction_data,
+            amount=refund_amount,
+            reason="testing",
+        )
 
     mock_send_refund_email.assert_called()
 

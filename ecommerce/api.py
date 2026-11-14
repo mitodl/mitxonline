@@ -98,6 +98,8 @@ from ecommerce.models import (
     OrderStatus,
     PendingOrder,
     Product,
+    RefundRequest,
+    RefundRequestStatus,
     StripeEventLog,
     Transaction,
     UserDiscount,
@@ -932,6 +934,67 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
     return True, message
 
 
+def auto_refund_request(refund_request_id: int) -> tuple[bool, str]:
+    """
+    Refund the order behind a pending refund request when it qualifies for
+    automatic approval (`Order.is_auto_refund_eligible`) and its payment can be
+    refunded through the gateway, and mark the request approved. The learner is
+    unenrolled, as on the Google Sheets path.
+
+    The order row is locked while the request is checked and claimed
+    (marked approved), and that is committed before the gateway is called, so
+    concurrent or repeated runs see a non-pending request, or another request
+    for the order already being refunded, and do nothing. The
+    refund itself runs outside that transaction, so the refund record is
+    committed as soon as the gateway responds. If the refund fails, the
+    request goes back to pending for support.
+
+    Returns:
+        (auto_refunded, error): error is set only when a refund was attempted
+        and failed; the request is then left pending for support.
+    """
+    with transaction.atomic():
+        refund_request = RefundRequest.objects.get(pk=refund_request_id)
+        order = Order.objects.select_for_update().get(pk=refund_request.order_id)
+        # Re-read under the lock: another task may have decided it already.
+        refund_request.refresh_from_db()
+        if (
+            refund_request.status != RefundRequestStatus.PENDING
+            or not order.is_auto_refund_eligible
+            # Stripe, admin-fulfilled, PayPal and $0 orders can't be refunded
+            # through the gateway, so they go to support without an attempt.
+            or order.total_price_paid <= 0
+            or not _has_gateway_refundable_payment(order)
+            # Claiming a request only protects that request. Another request
+            # for this order already being refunded would double-refund it.
+            or order.refund_requests.filter(status=RefundRequestStatus.APPROVED)
+            .exclude(pk=refund_request.pk)
+            .exists()
+        ):
+            return False, ""
+
+        refund_request.status = RefundRequestStatus.APPROVED
+        refund_request.save(update_fields=["status", "updated_on"])
+
+    try:
+        refunded, message = refund_order(
+            order_id=order.id,
+            refund_reason=f"Auto-approved refund request {refund_request.id}",
+            unenroll=True,
+        )
+        if not refunded:
+            raise Exception(message)  # noqa: TRY002, TRY301
+    except Exception as exc:
+        log.exception(
+            "Automatic refund failed for refund request %s; leaving it pending",
+            refund_request_id,
+        )
+        refund_request.status = RefundRequestStatus.PENDING
+        refund_request.save(update_fields=["status", "updated_on"])
+        return False, str(exc)
+    return True, ""
+
+
 def find_paid_program_order_for_zero_value_order(order: Order) -> Order | None:
     """
     Find the order where the learner actually paid for the program.
@@ -1039,7 +1102,7 @@ def record_order_refund(
 
     # If unenroll requested, perform unenrollment after successful refund
     if unenroll:
-        perform_downgrade_from_order.delay(order.id)
+        transaction.on_commit(lambda: perform_downgrade_from_order.delay(order.id))
 
     return refund_transaction
 

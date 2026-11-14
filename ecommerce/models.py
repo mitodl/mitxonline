@@ -954,7 +954,8 @@ class OrderFlow:
             reason=reason,
         )
 
-        send_order_refund_email.delay(self.order.id)
+        # Queue after commit so the worker can see the refund transaction.
+        transaction.on_commit(lambda: send_order_refund_email.delay(self.order.id))
 
         return refund_transaction
 
@@ -1250,6 +1251,31 @@ class Order(TimestampedModel):
             OrderRefundStatus.ELIGIBLE
             if self.is_within_refund_window
             else OrderRefundStatus.WINDOW_CLOSED
+        )
+
+    @property
+    def is_auto_refund_eligible(self):
+        """
+        True when a refund request for this order can be approved and refunded
+        without a person reviewing it: fulfilled, not B2B, inside the refund
+        window, and none of the cases that need a decision.
+
+        Those are an order that received a paid-amount-off ("complete your
+        program") discount, and one that funded such a discount on another
+        order. Whether the payment can be refunded through the gateway is
+        checked separately, in `auto_refund_request`. Program orders are held back too: refunding
+        them with unenrollment mishandles nested programs (hq#13818), so they
+        stay manual until that is fixed.
+        """
+        return (
+            self.state == OrderStatus.FULFILLED
+            and not self.is_b2b_order
+            and self.is_within_refund_window
+            and not self.purchased_programs
+            and not self.discounts.filter(
+                redeemed_discount__discount_type=DISCOUNT_TYPE_PAID_AMOUNT_OFF
+            ).exists()
+            and not self.funds_fulfilled_redemption
         )
 
     def _generate_reference_number(self):
