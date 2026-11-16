@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import logging
 import operator
-import random
 from collections import defaultdict
-from datetime import timedelta
 from functools import reduce
 from typing import TYPE_CHECKING, Tuple, Union  # noqa: UP035
 from urllib.parse import urlencode, urljoin
@@ -15,20 +13,17 @@ import requests
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.core.cache import caches
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.files.base import ContentFile
-from django.db.models import Case, IntegerField, Q, When
+from django.db.models import Q
 from django.db.models.functions import Length, Substr
 from django.utils.text import slugify
-from mitol.common.utils import now_in_utc
 from wagtail.blocks import StreamValue
 from wagtail.images.models import Image
 from wagtail.models import Site
 from wagtail.rich_text import RichText
 
 from cms import models as cms_models
-from cms import utils as cms_utils
 from cms.constants import (
     CERTIFICATE_INDEX_SLUG,
     INSTRUCTOR_INDEX_SLUG,
@@ -41,9 +36,6 @@ from courses.models import (
     ProgramRequirementNodeType,
     RelatedProgram,
     default_program_queryset,
-)
-from courses.utils import (
-    get_enrollable_courseruns_qs,
 )
 
 if TYPE_CHECKING:
@@ -482,88 +474,6 @@ def create_default_courseware_page(
     page.refresh_from_db()
 
     return page
-
-
-def create_featured_items():
-    """
-    Pulls a new set of featured items for the CMS home page.
-    Used only by cron task or management command.
-    """
-    redis_cache = caches["redis"]
-
-    now = now_in_utc()
-    end_of_day = now + timedelta(days=1)
-
-    valid_course_ids = set(
-        cms_models.CoursePage.objects.filter(live=True).values_list(
-            "course_id", flat=True
-        )
-    )
-
-    if not valid_course_ids:
-        return []
-
-    enrollable_courses_qs = Course.objects.select_related("page").filter(
-        id__in=valid_course_ids, live=True
-    )
-    enrollable_courseruns = (
-        get_enrollable_courseruns_qs(end_of_day, enrollable_courses_qs)
-        .select_related("course")
-        .prefetch_related("course__page")
-    )
-
-    if not enrollable_courseruns.exists():
-        return []
-
-    self_paced_runs = []
-    regular_runs = []
-
-    for courserun in enrollable_courseruns:
-        if courserun.is_self_paced:
-            self_paced_runs.append(courserun)
-        else:
-            regular_runs.append(courserun)
-
-    random.shuffle(self_paced_runs)
-    self_paced_course_ids = [run.course_id for run in self_paced_runs[:2]]
-
-    random.shuffle(regular_runs)
-    selected_regular_runs = regular_runs[:20]
-
-    future_runs = []
-    started_course_ids = []
-
-    for courserun in selected_regular_runs:
-        if courserun.start_date >= now:
-            future_runs.append(courserun)
-        else:
-            started_course_ids.append(courserun.course_id)
-
-    future_runs.sort(key=lambda cr: cr.start_date)
-    future_course_ids = [run.course_id for run in future_runs]
-
-    all_course_ids = self_paced_course_ids + future_course_ids + started_course_ids
-
-    if not all_course_ids:
-        return []
-
-    ordering = Case(
-        *[When(id=cid, then=pos) for pos, cid in enumerate(all_course_ids)],
-        output_field=IntegerField(),
-    )
-
-    # Store only course IDs to avoid pickling issues and ensure fresh data on retrieval
-    # Use timeout=None so the cache never auto-expires; stale data is better than no data.
-    redis_cache.set(
-        cms_utils.get_featured_items_cache_key(), all_course_ids, timeout=None
-    )
-
-    return list(
-        Course.objects.filter(id__in=all_course_ids)
-        .select_related("page")
-        .prefetch_related("courseruns")
-        .order_by(ordering)
-    )
 
 
 def _form_url(page: Page | None, slug: str | None) -> str:
