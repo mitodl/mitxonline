@@ -58,7 +58,7 @@ def determine_user_location(request) -> list[UserCalculatedLocation]:
 
     try:
         profile_code = request.user.legal_address.country
-    except LegalAddress.RelatedObjectDoesNotExist:
+    except (LegalAddress.user.RelatedObjectDoesNotExist, AttributeError):
         profile_code = None
 
     if profile_code:

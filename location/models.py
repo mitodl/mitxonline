@@ -131,23 +131,231 @@ class LocationFlag(SoftDeleteTimestampedModel, ValidateOnSaveMixin):
 
 
 # Rule Models
+# These are named for what they do, in this general format:
+#   LocationTypeMatchSetLocationFlag
+# so ProfileMatchAnyLocationFlag means "using user's profile, match if any
+# location matches".
 
 
-class OnlyProfileLocationFlag(LocationFlag):
-    """Implements the rules for profile-only flags."""
+class ProfileMatchAnyLocationFlag(LocationFlag):
+    """
+    Implements the rules for profile-only flags.
+
+    Rule:
+        - Types: Profile (LegalAddress) only
+        - Matches: Any
+        - Default: Flag Not Set
+
+        For only the location data derived from the user's profile, set the flag
+        if any locations match the flag location. If there are no matches or the
+        user has no applicable location data, the flag is not set.
+
+    In practice, this should only ever consider a single location, because this
+    app only allows a single LegalAddress for a given User.
+    """
+
+    def is_applicable(self, location_data: list[UserCalculatedLocation]):
+        """Pull profile locations, check them against the flag."""
+
+        profile_locations = [
+            location_datum
+            for location_datum in location_data
+            if location_datum.lookup_type == GEOLOCATION_TYPE_PROFILE
+        ]
+
+        decisions = [(pd.country_code == self.country_code) for pd in profile_locations]
+
+        return any(decisions)
+
+    class Meta:
+        """Set the model as a proxy."""
+
+        proxy = True
+
+
+class ProfileMatchAllLocationFlag(LocationFlag):
+    """
+    Implements the rules for profile-only flags.
+
+    Rule:
+        - Types: Profile (LegalAddress) only
+        - Matches: All
+        - Default: Flag Not Set
+
+        For only the location data derived from the user's profile, set the flag
+        if all locations match the flag location. The flag is not set if there
+        are no matches, no locations, or if any individual location doesn't match.
+
+    This is more of an example case - there's only ever one LegalAddress, so this
+    or OnlyProfileMatchAnyLocationFlag are basically the same result (right now).
+    """
+
+    def is_applicable(self, location_data: list[UserCalculatedLocation]):
+        """Pull profile locations, check them against the flag."""
+
+        profile_locations = [
+            location_datum
+            for location_datum in location_data
+            if location_datum.lookup_type == GEOLOCATION_TYPE_PROFILE
+        ]
+
+        decisions = [(pd.country_code == self.country_code) for pd in profile_locations]
+
+        return all(decisions)
+
+    class Meta:
+        """Set the model as a proxy."""
+
+        proxy = True
+
+
+class GeoIPMatchAnyLocationFlag(LocationFlag):
+    """
+    Implements the rules for GeoIP-only flags.
+
+    Rule:
+        - Types: GeoIP only
+        - Matches: Any
+        - Default: Flag Not Set
+
+        For only the location data derived from the user's IP address (looked up
+        via MaxMind GeoIP databases), set the flag if any locations match the flag location. The flag is not set if there are no matches or no locations.
+
+    In practice, this should only ever consider a single location, because a user
+    only connects via a single IP transport, at least as far as the request calling
+    this is concerned. (For this reason there is no "all" rule.)
+    """
+
+    def is_applicable(self, location_data: list[UserCalculatedLocation]):
+        """Pull GeoIP locations, check them against the flag."""
+
+        geoip_locations = [
+            location_datum
+            for location_datum in location_data
+            if location_datum.lookup_type == GEOLOCATION_TYPE_GEOIP
+        ]
+
+        decisions = [
+            (gips.country_code == self.country_code) for gips in geoip_locations
+        ]
+
+        return any(decisions)
+
+    class Meta:
+        """Set the model as a proxy."""
+
+        proxy = True
+
+
+class ProfileAndGeoIPMatchAnyLocationFlag(LocationFlag):
+    """
+    Implements the rules for profile-and-GeoIP flags.
+
+    Rule:
+        - Types: Profile location and GeoIP
+        - Matches: Any
+        - Default: Flag Not Set
+
+        For only the location data derived from the user's IP address (looked up
+        via MaxMind GeoIP databases) and via the user's profile (LegalAddress),
+        set the flag if any locations match the flag location. The flag is not
+        set if there are no matches or no locations.
+    """
+
+    def is_applicable(self, location_data: list[UserCalculatedLocation]):
+        """Set the flag if the location matches any profile or GeoIP."""
+
+        loc_types = (
+            GEOLOCATION_TYPE_GEOIP,
+            GEOLOCATION_TYPE_PROFILE,
+        )
+
+        applicable_locations = [
+            location_datum
+            for location_datum in location_data
+            if location_datum.lookup_type in loc_types
+        ]
+
+        decisions = [
+            (al.country_code == self.country_code) for al in applicable_locations
+        ]
+
+        return any(decisions)
+
+    class Meta:
+        """Set the model as a proxy."""
+
+        proxy = True
+
+
+class ProfileAndGeoIPMatchAllLocationFlag(LocationFlag):
+    """
+    Implements the rules for profile-and-GeoIP flags.
+
+    Rule:
+        - Types: Profile location and GeoIP
+        - Matches: All
+        - Default: Flag Not Set
+
+        For only the location data derived from the user's IP address (looked up
+        via MaxMind GeoIP databases) and via the user's profile (LegalAddress),
+        set the flag if all locations match the flag location. The flag is not
+        set if there are no location data or if any location doesn't match.
+
+    This checks for any combination of Profile and GeoIP. If there's just one,
+    that's fine - we can match with that. RequireProfileGeoIPMatchAllLocationFlag
+    **requires** there be a profile _and_ a GeoIP, if you want one that is more
+    restrictive.
+    """
+
+    def is_applicable(self, location_data: list[UserCalculatedLocation]):
+        """Set the flag if the location matches any profile or GeoIP."""
+
+        loc_types = (
+            GEOLOCATION_TYPE_GEOIP,
+            GEOLOCATION_TYPE_PROFILE,
+        )
+
+        applicable_locations = [
+            location_datum
+            for location_datum in location_data
+            if location_datum.lookup_type in loc_types
+        ]
+
+        decisions = [
+            (al.country_code == self.country_code) for al in applicable_locations
+        ]
+
+        return all(decisions)
+
+    class Meta:
+        """Set the model as a proxy."""
+
+        proxy = True
+
+
+class AnyTypeMatchAnyLocationFlag(LocationFlag):
+    """
+    Implements the rules for any location type flags.
+
+    Rule:
+        - Types: Any
+        - Matches: Any
+        - Default: Flag Not Set
+
+        For **any** location data passed in, test against the flag location and
+        set the flag if any match. The flag is not set if there are no locations
+        or no matches.
+
+    This is a more generic flag - it does not care how the location was derived.
+    """
 
     def is_applicable(self, location_data: list[UserCalculatedLocation]):
         """If the user profile matches the flag's country, then the flag is set."""
 
-        decisions = [
-            (
-                ld.lookup_type == GEOLOCATION_TYPE_PROFILE
-                and ld.country_code == self.country_code
-            )
-            for ld in location_data
-        ]
+        decisions = [(ld.country_code == self.country_code) for ld in location_data]
 
-        return all(decisions)
+        return any(decisions)
 
     class Meta:
         """Set the model as a proxy."""
@@ -155,56 +363,21 @@ class OnlyProfileLocationFlag(LocationFlag):
         proxy = True
 
 
-class OnlyGeoIPLocationFlag(LocationFlag):
-    """Implements the rules for GeoIP-only flags."""
+class AnyTypeMatchAllLocationFlag(LocationFlag):
+    """
+    Implements the rules for any location type flags.
 
-    def is_applicable(self, location_data: list[UserCalculatedLocation]):
-        """If the GeoIP location matches the flag's country, then the flag is set."""
+    Rule:
+        - Types: Any
+        - Matches: All
+        - Default: Flag Not Set
 
-        decisions = [
-            (
-                ld.lookup_type == GEOLOCATION_TYPE_GEOIP
-                and ld.country_code == self.country_code
-            )
-            for ld in location_data
-        ]
+        For **any** location data passed in, test against the flag location and
+        set the flag if all match. The flag is not set if there are no locations
+        or if any location does not match.
 
-        return all(decisions)
-
-    class Meta:
-        """Set the model as a proxy."""
-
-        proxy = True
-
-
-class ProfileAndGeoIPLocationFlag(LocationFlag):
-    """Implements the rules for profile-and-GeoIP flags."""
-
-    def is_applicable(self, location_data: list[UserCalculatedLocation]):
-        """If the user profile matches the flag's country, then the flag is set."""
-
-        decisions = [
-            (
-                ld.lookup_type
-                in (
-                    GEOLOCATION_TYPE_PROFILE,
-                    GEOLOCATION_TYPE_GEOIP,
-                )
-                and ld.country_code == self.country_code
-            )
-            for ld in location_data
-        ]
-
-        return all(decisions)
-
-    class Meta:
-        """Set the model as a proxy."""
-
-        proxy = True
-
-
-class MatchAnyLocationFlag(LocationFlag):
-    """Implements the rules for profile-and-GeoIP flags."""
+    This is a more generic flag - it does not care how the location was derived.
+    """
 
     def is_applicable(self, location_data: list[UserCalculatedLocation]):
         """If the user profile matches the flag's country, then the flag is set."""
@@ -212,6 +385,60 @@ class MatchAnyLocationFlag(LocationFlag):
         decisions = [(ld.country_code == self.country_code) for ld in location_data]
 
         return all(decisions)
+
+    class Meta:
+        """Set the model as a proxy."""
+
+        proxy = True
+
+
+class RequireProfileGeoIPMatchAllLocationFlag(LocationFlag):
+    """
+    Implements the rules for profile and GeoIP required type flags.
+
+    Rule:
+        - Types: Profile, GeoIP
+        - Matches: All
+        - Default: Flag Not Set
+
+        Set the flag if a profile and GeoIP location are present, and if all match
+        the flag location. The flag is not set if locations of the required types
+        aren't present, or if any of them don't match, or if there is no location
+        data at all.
+    """
+
+    def is_applicable(self, location_data: list[UserCalculatedLocation]):
+        """Check for a geoIP and profile location, then check their locations."""
+
+        geoip_locations = [
+            location_datum
+            for location_datum in location_data
+            if location_datum.lookup_type == GEOLOCATION_TYPE_GEOIP
+        ]
+        profile_locations = [
+            location_datum
+            for location_datum in location_data
+            if location_datum.lookup_type == GEOLOCATION_TYPE_GEOIP
+        ]
+
+        # Short circuit - if we don't have either of these, we don't set the flag.
+        if len(geoip_locations) == 0 or len(profile_locations) == 0:
+            return False
+
+        match_geoips = [
+            ld_match
+            for ld_match in geoip_locations
+            if ld_match.country_code == self.country_code
+        ]
+        match_profiles = [
+            ld_match
+            for ld_match in profile_locations
+            if ld_match.country_code == self.country_code
+        ]
+
+        return len(geoip_locations) == len(match_geoips) and len(
+            profile_locations
+        ) == len(match_profiles)
 
     class Meta:
         """Set the model as a proxy."""

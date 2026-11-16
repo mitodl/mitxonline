@@ -1,4 +1,4 @@
-"""Constants for location."""
+````````                `````````````       """Constants for location."""
 
 # Geolocation mechanisms
 
@@ -13,34 +13,52 @@ GEOLOCATION_TYPES = [
 GEOLOCATION_CHOICES = zip(GEOLOCATION_TYPES, GEOLOCATION_TYPES)
 
 # Flag determination rules
-# These set how to determine the user's location when checking for a location
-# flag. For example, if there's a flag for tax for "Country X" and the flag is
-# set to use "only-profile", the flag only counts if the user's profile states
-# that they're in "Country X", even if we can tell that the user's physically in
-# "Country X" via GeoIP.
+# These are the different ways the flag may be set for a given user. They map to
+# a proxy model (of LocationFlag) - each has an "is_applicable" method that
+# contains the actual logic.
 
-LOCATION_FLAG_RULE_ONLY_PROFILE = "only-profile"
-LOCATION_FLAG_RULE_ONLY_PROFILE_NAME = "Only match on the user's profile location."
-LOCATION_FLAG_RULE_ONLY_GEOIP = "only-geoip"
-LOCATION_FLAG_RULE_ONLY_GEOIP_NAME = "Only match on the user's GeoIP location."
-LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP = "require-profile-geoip"
-LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP_NAME = (
-    "Only match if the location matches both profile and GeoIP."
+LOCATION_FLAG_RULE_MATCH_PROFILE_ANY = "profile-any"
+LOCATION_FLAG_RULE_MATCH_PROFILE_ANY_NAME = "Check any of the user's profile locations."
+LOCATION_FLAG_RULE_MATCH_PROFILE_ALL = "profile-all"
+LOCATION_FLAG_RULE_MATCH_PROFILE_ALL_NAME = "Check all of the user's profile locations."
+LOCATION_FLAG_RULE_MATCH_GEOIP_ANY = "geoip-any"
+LOCATION_FLAG_RULE_MATCH_GEOIP_ANY_NAME = "Check any of the user's GeoIP locations."
+LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ANY = "profile-geoip-any"
+LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ANY_NAME = (
+    "Check if any profile or GeoIP location match."
 )
-LOCATION_FLAG_RULE_REQUIRE_ANY = "require-any"
-LOCATION_FLAG_RULE_REQUIRE_ANY_NAME = "Match if any lookup is successful."
+LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ALL = "profile-geoip-all"
+LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ALL_NAME = (
+    "Ensure all profile or GeoIP location match."
+)
+
+LOCATION_FLAG_RULE_MATCH_ANY = "require-any"
+LOCATION_FLAG_RULE_MATCH_ANY_NAME = "Check any of the derived locations for a match, regardless of source."
+LOCATION_FLAG_RULE_MATCH_ALL = "require-any"
+LOCATION_FLAG_RULE_MATCH_ALL_NAME = "Ensure all of the derived locations match, regardless of source."
+
+LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP_MATCH_ALL = "require-profile-geoip-all"
+LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP_MATCH_ALL_NAME = "Require a GeoIP and a profile location exist, and check that all of them match the flag location."
 
 LOCATION_FLAG_RULES = [
-    LOCATION_FLAG_RULE_ONLY_PROFILE,
-    LOCATION_FLAG_RULE_ONLY_GEOIP,
-    LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP,
-    LOCATION_FLAG_RULE_REQUIRE_ANY,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_ANY,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_ALL,
+    LOCATION_FLAG_RULE_MATCH_GEOIP_ANY,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ANY,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ALL,
+    LOCATION_FLAG_RULE_MATCH_ANY,
+    LOCATION_FLAG_RULE_MATCH_ALL,
+    LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP_MATCH_ALL,
 ]
 LOCATION_FLAG_RULES_NAMES = [
-    LOCATION_FLAG_RULE_ONLY_PROFILE_NAME,
-    LOCATION_FLAG_RULE_ONLY_GEOIP_NAME,
-    LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP_NAME,
-    LOCATION_FLAG_RULE_REQUIRE_ANY_NAME,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_ANY_NAME,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_ALL_NAME,
+    LOCATION_FLAG_RULE_MATCH_GEOIP_ANY_NAME,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ANY_NAME,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ALL_NAME,
+    LOCATION_FLAG_RULE_MATCH_ANY_NAME,
+    LOCATION_FLAG_RULE_MATCH_ALL_NAME,
+    LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP_MATCH_ALL_NAME,
 ]
 LOCATION_FLAG_RULE_CHOICES = zip(LOCATION_FLAG_RULES, LOCATION_FLAG_RULES_NAMES)
 
