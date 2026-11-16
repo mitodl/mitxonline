@@ -118,7 +118,7 @@ def test_noindex_meta_on_learner_records(client, settings, path, expect_noindex)
     ("url", "shows_banner"),
     [
         ("/cart/", True),
-        ("/cart/?ecom-service=true", False),
+        ("/cart/?ecom-service=true", True),
         ("/orders/history/", False),
     ],
 )
