@@ -279,8 +279,16 @@ header.learn-header {
     display: flex;
   }
 
-  // No Catalog link sits to its left here, so drop the divider.
+  // No Catalog link sits to its left here, so drop the divider, and keep the
+  // height that link gives the site header so the bar and the dropdown's
+  // position match it.
   .top-user-menu {
     border-left: 0;
+  }
+
+  @include media-breakpoint-up(md) {
+    .full-screen-top-menu {
+      min-height: 47px;
+    }
   }
 }
