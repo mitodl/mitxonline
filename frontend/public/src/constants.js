@@ -116,6 +116,8 @@ export const USER_MSG_TYPE_PAYMENT_ERROR = "payment-error"
 export const USER_MSG_TYPE_PAYMENT_CANCELLED = "payment-cancelled"
 export const USER_MSG_TYPE_PAYMENT_REVIEW = "payment-review"
 export const USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN = "payment-error-unknown"
+export const USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING =
+  "payment-pending-processing"
 export const USER_MSG_TYPE_DISCOUNT_INVALID = "discount-invalid"
 export const USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY =
   "required-enrollment-code-empty"

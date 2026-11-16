@@ -43,6 +43,7 @@ from ecommerce.constants import (
     ALL_PAYMENT_TYPES,
     ALL_REDEMPTION_TYPES,
     CHECKOUT_CANCEL_ROUTE_MAP,
+    CHECKOUT_RESULT_ROUTES_WITH_REFERENCE,
     CHECKOUT_SUCCESS_ROUTE_MAP,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
@@ -121,27 +122,49 @@ from openedx.tasks import create_user_from_id
 log = logging.getLogger(__name__)
 
 
-def get_checkout_success_url(gateway_type):
+def _get_checkout_return_url(route_map, gateway_type, reference_number):
+    """
+    Build an absolute return URL for the gateway from the given route map.
+
+    Routes that identify the order in the URL get the reference number built
+    in; the others (CyberSource's callback) are returned as-is.
+    """
+
+    route = route_map[gateway_type]
+
+    if route in CHECKOUT_RESULT_ROUTES_WITH_REFERENCE:
+        if not reference_number:
+            msg = f"Gateway {gateway_type} requires an order reference number"
+            raise ValidationError(msg)
+
+        path = reverse(route, kwargs={"reference_number": reference_number})
+    else:
+        path = reverse(route)
+
+    return urljoin(settings.SITE_BASE_URL, path)
+
+
+def get_checkout_success_url(gateway_type, reference_number=None):
     """Get the success endpoint for the gateway type."""
 
     if gateway_type not in CHECKOUT_SUCCESS_ROUTE_MAP:
         msg = f"Gateway {gateway_type} has no success route mapped"
         raise ValidationError(msg)
 
-    return urljoin(
-        settings.SITE_BASE_URL, reverse(CHECKOUT_SUCCESS_ROUTE_MAP[gateway_type])
+    return _get_checkout_return_url(
+        CHECKOUT_SUCCESS_ROUTE_MAP, gateway_type, reference_number
     )
 
 
-def get_checkout_cancel_url(gateway_type):
+def get_checkout_cancel_url(gateway_type, reference_number=None):
     """Get the cancel endpoint for the gateway type."""
 
     if gateway_type not in CHECKOUT_CANCEL_ROUTE_MAP:
         msg = f"Gateway {gateway_type} has no cancel route mapped"
         raise ValidationError(msg)
 
-    return urljoin(
-        settings.SITE_BASE_URL, reverse(CHECKOUT_CANCEL_ROUTE_MAP[gateway_type])
+    return _get_checkout_return_url(
+        CHECKOUT_CANCEL_ROUTE_MAP, gateway_type, reference_number
     )
 
 
@@ -324,8 +347,8 @@ def generate_checkout_payload(  # noqa: PLR0913
     payload = PaymentGateway.start_payment(
         gateway_type,
         gateway_order,
-        get_checkout_success_url(gateway_type),
-        get_checkout_cancel_url(gateway_type),
+        get_checkout_success_url(gateway_type, order.reference_number),
+        get_checkout_cancel_url(gateway_type, order.reference_number),
         merchant_fields=[basket.id],
     )
 

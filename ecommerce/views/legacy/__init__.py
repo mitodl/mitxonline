@@ -104,6 +104,7 @@ from main.constants import (
     USER_MSG_TYPE_PAYMENT_DECLINED,
     USER_MSG_TYPE_PAYMENT_ERROR,
     USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
+    USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
     USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 from main.utils import redirect_with_user_message
@@ -114,10 +115,57 @@ from users.models import User
 log = logging.getLogger(__name__)
 
 
-def _learn_dashboard_redirect(order):
+UAI_READABLE_ID_PREFIXES = [
+    "program-v1:UAI+B2C",
+    "course-v1:UAI_B2C",
+]
+
+
+def _has_uai_purchase(order):
+    """Return True if the order includes a program or course run with a UAI prefix."""
+
+    def _has_uai_prefix(readable_id):
+        return any(
+            readable_id.startswith(prefix) for prefix in UAI_READABLE_ID_PREFIXES
+        )
+
+    return any(
+        line.purchased_object
+        and line.purchased_object.readable_id
+        and _has_uai_prefix(line.purchased_object.readable_id)
+        for line in order.lines.all()
+    )
+
+
+def _should_redirect_to_learn(order):
+    """
+    Return True if the user should be redirected to the Learn dashboard
+    after a successful checkout.
+    """
+    if _has_uai_purchase(order):
+        return True
+
+    # NOTE: Retrieve global_id from purchaser rather than request user
+    # because this is used in contexts where the request is anonymous.
+    #
+    # One example is the callback view that processes the payment response from
+    # cybersource. This view is hit via a POST request from a different domain,
+    # which means no samesite (lax, strict) authentication cookies are sent.
+    global_id = order.purchaser.global_id
+    return bool(
+        global_id
+        and is_posthog_enabled(
+            features.REDIRECT_LEARN_DASHBOARD,
+            default=False,
+            opt_unique_id=global_id,
+        )
+    )
+
+
+def _learn_dashboard_redirect(order, order_status=OrderStatus.FULFILLED):
     """Build an HttpResponseRedirect to the Learn dashboard with order info."""
     return HttpResponseRedirect(
-        f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
+        f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status={order_status}&order_id={order.id}"
     )
 
 
@@ -910,6 +958,52 @@ class CheckoutCallbackView(View):
                 return _learn_dashboard_redirect(order)
 
         return HttpResponseRedirect(reverse("user-dashboard"))
+
+
+class CheckoutResultSuccessView(View):
+    """
+    Landing page for a user returning from a successful Stripe checkout.
+
+    Stripe sends the actual result of the transaction to the webhook
+    asynchronously, so landing here doesn't mean the payment went through.
+    This only redirects the user to their dashboard with a message saying the
+    payment is being processed; it doesn't touch the order.
+    """
+
+    def get(self, request, reference_number):
+        """Redirect the user to the appropriate dashboard."""
+
+        order = (
+            Order.objects.filter(
+                reference_number=reference_number, purchaser=request.user
+            ).first()
+            if request.user.is_authenticated
+            else None
+        )
+
+        if order and _should_redirect_to_learn(order):
+            return _learn_dashboard_redirect(order, order_status=OrderStatus.PENDING)
+
+        return redirect_with_user_message(
+            reverse("user-dashboard"),
+            {"type": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING},
+        )
+
+
+class CheckoutResultCancelView(View):
+    """
+    Landing page for a user who cancelled a Stripe checkout.
+
+    This only redirects the user back to the cart; the order is left for the
+    webhook to resolve when Stripe expires the checkout session.
+    """
+
+    def get(self, request, reference_number):  # noqa: ARG002
+        """Redirect the user to the cart with the payment cancelled message."""
+
+        return redirect_with_user_message(
+            reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_CANCELLED}
+        )
 
 
 # Add a serializer for the cybersource payment response
