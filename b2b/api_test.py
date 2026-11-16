@@ -19,6 +19,7 @@ from django.test import RequestFactory
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
 from requests import ConnectionError as RequestsConnectionError
+from requests import HTTPError, Response
 
 from b2b import factories
 from b2b.api import (
@@ -1477,11 +1478,12 @@ def test_b2b_org_attach_calls_keycloak(mocked_b2b_org_attach, has_id):
 @pytest.mark.parametrize(
     "error",
     [
+        HTTPError(response=Response()),
         RequestsConnectionError(),
         OAuthError(error="invalid_client"),
         KeycloakAdminImproperlyConfiguredError("KEYCLOAK_MEMBERSHIP_CLIENT_ID"),
     ],
-    ids=["unreachable", "token", "settings"],
+    ids=["http", "unreachable", "token", "settings"],
 )
 def test_b2b_org_attach_failure_leaves_the_member_for_the_push(mocker, caplog, error):
     """
