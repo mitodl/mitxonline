@@ -59,6 +59,17 @@ def _in_visit_order(runs):
     )
 
 
+def _pinned_batch(count, **kwargs):
+    """Two runs with the ids from the CI failure (throwaway probe)."""
+    return [
+        CourseRunFactory.create(courseware_id=cid, **kwargs)
+        for cid in (
+            "course-v1:PyT+CRa-my-affect+R550",
+            "course-v1:PyT+CRadd-life-day-put+R551",
+        )
+    ]
+
+
 def _run_command(*, expect_failure=False, **kwargs):
     """
     Run the command and return its CSV rows (without the header) and stderr.
@@ -198,9 +209,7 @@ def test_fix_continues_past_a_run_that_fails_validation(mock_verified_mode):
     """
     now = now_in_utc().replace(microsecond=0)
     edx_deadline = now + timedelta(days=30)
-    broken, valid = _in_visit_order(
-        CourseRunFactory.create_batch(2, live=True, upgrade_deadline=None)
-    )
+    broken, valid = _in_visit_order(_pinned_batch(2, live=True, upgrade_deadline=None))
     # An expiration date before the end date fails clean(). update() skips it,
     # the way older rows got into this state.
     type(broken).objects.filter(pk=broken.pk).update(
@@ -267,9 +276,7 @@ def test_one_failure_does_not_stop_the_report(mock_verified_mode, fix):
     the end so a script can tell.
     """
     deadline = now_in_utc().replace(microsecond=0) + timedelta(days=10)
-    runs = _in_visit_order(
-        CourseRunFactory.create_batch(2, live=True, upgrade_deadline=deadline)
-    )
+    runs = _in_visit_order(_pinned_batch(2, live=True, upgrade_deadline=deadline))
     mock_verified_mode.side_effect = [HTTPError("boom"), _verified_mode(deadline)]
 
     rows, err = _run_command(all=True, fix=fix, expect_failure=True)
