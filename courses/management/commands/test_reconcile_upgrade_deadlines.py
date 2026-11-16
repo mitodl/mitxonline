@@ -12,6 +12,7 @@ from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError
 
 from courses.factories import CourseRunFactory
+from courses.models import CourseRun
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE, UpgradeDeadlineSyncResult
 
 pytestmark = [pytest.mark.django_db]
@@ -181,6 +182,18 @@ def test_fix_leaves_unfixable_runs_alone(mock_verified_mode, status_offsets):
     assert rows[0]["fixed"] == ""
 
 
+def _in_command_order(runs):
+    """
+    Order runs the way the command does, in the database. Python's sort can
+    disagree with a locale-collated Postgres when ids differ at a hyphen.
+    """
+    return list(
+        CourseRun.objects.filter(pk__in=[run.pk for run in runs]).order_by(
+            "courseware_id"
+        )
+    )
+
+
 def test_fix_continues_past_a_run_that_fails_validation(mock_verified_mode):
     """
     CourseRun.save() runs clean(), which can reject a run for reasons unrelated
@@ -188,9 +201,8 @@ def test_fix_continues_past_a_run_that_fails_validation(mock_verified_mode):
     """
     now = now_in_utc().replace(microsecond=0)
     edx_deadline = now + timedelta(days=30)
-    broken, valid = sorted(
-        CourseRunFactory.create_batch(2, live=True, upgrade_deadline=None),
-        key=lambda run: run.courseware_id,
+    broken, valid = _in_command_order(
+        CourseRunFactory.create_batch(2, live=True, upgrade_deadline=None)
     )
     # An expiration date before the end date fails clean(). update() skips it,
     # the way older rows got into this state.
@@ -258,9 +270,8 @@ def test_one_failure_does_not_stop_the_report(mock_verified_mode, fix):
     the end so a script can tell.
     """
     deadline = now_in_utc().replace(microsecond=0) + timedelta(days=10)
-    runs = sorted(
-        CourseRunFactory.create_batch(2, live=True, upgrade_deadline=deadline),
-        key=lambda run: run.courseware_id,
+    runs = _in_command_order(
+        CourseRunFactory.create_batch(2, live=True, upgrade_deadline=deadline)
     )
     mock_verified_mode.side_effect = [HTTPError("boom"), _verified_mode(deadline)]
 
