@@ -1,5 +1,6 @@
 """Tests for B2B API functions."""
 
+import logging
 from datetime import timedelta
 from decimal import Decimal
 from uuid import uuid4
@@ -9,6 +10,7 @@ import faker
 import freezegun
 import pytest
 import reversion
+from authlib.integrations.base_client.errors import OAuthError
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import caches
@@ -16,7 +18,7 @@ from django.core.exceptions import ValidationError
 from django.test import RequestFactory
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
-from requests import HTTPError, Response
+from requests import ConnectionError as RequestsConnectionError
 
 from b2b import factories
 from b2b.api import (
@@ -54,7 +56,10 @@ from b2b.constants import (
     CONTRACT_MEMBERSHIP_MANAGED,
     ONBOARDING_STATE_ORG_CREATED,
 )
-from b2b.exceptions import SourceCourseIncompleteError
+from b2b.exceptions import (
+    KeycloakAdminImproperlyConfiguredError,
+    SourceCourseIncompleteError,
+)
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.models import (
     ContractPage,
@@ -1469,21 +1474,54 @@ def test_b2b_org_attach_calls_keycloak(mocked_b2b_org_attach, has_id):
     assert (membership.added_to_keycloak_at is not None) is bool(has_id)
 
 
-def test_b2b_org_attach_failure_leaves_the_member_for_the_push(mocker):
-    """A member Keycloak refused has no timestamp, so the periodic push retries."""
+@pytest.mark.parametrize(
+    "error",
+    [
+        RequestsConnectionError(),
+        OAuthError(error="invalid_client"),
+        KeycloakAdminImproperlyConfiguredError("KEYCLOAK_MEMBERSHIP_CLIENT_ID"),
+    ],
+    ids=["unreachable", "token", "settings"],
+)
+def test_b2b_org_attach_failure_leaves_the_member_for_the_push(mocker, caplog, error):
+    """
+    A member Keycloak refused still gets the org's contracts and has no
+    timestamp, so the periodic push retries Keycloak.
+    """
 
-    response = Response()
-    response.status_code = 500
-    mocker.patch(
-        "b2b.api.add_user_org_membership", side_effect=HTTPError(response=response)
-    )
+    attach = mocker.patch("b2b.api.add_user_org_membership", side_effect=error)
+    add_contracts = mocker.patch("b2b.models.OrganizationPage.add_user_contracts")
+    user = UserFactory.create()
 
     membership = process_add_org_membership(
-        UserFactory.create(), OrganizationPageFactory.create(), keep_until_seen=True
+        user,
+        OrganizationPageFactory.create(sso_organization_id=uuid4()),
+        keep_until_seen=True,
     )
 
+    attach.assert_called_once()
+    add_contracts.assert_called_once_with(user)
     membership.refresh_from_db()
     assert membership.keep_until_seen is True
+    assert membership.added_to_keycloak_at is None
+    [record] = [r for r in caplog.records if r.levelno == logging.ERROR]
+    assert record.exc_info[1] is error
+
+
+def test_b2b_org_attach_unexpected_error_keeps_contracts(mocker):
+    """An unexpected Keycloak error propagates, but contracts are already added."""
+
+    error = ValueError("token response is not a JSON object")
+    mocker.patch("b2b.api.add_user_org_membership", side_effect=error)
+    add_contracts = mocker.patch("b2b.models.OrganizationPage.add_user_contracts")
+    user = UserFactory.create()
+    org = OrganizationPageFactory.create(sso_organization_id=uuid4())
+
+    with pytest.raises(ValueError, match="JSON object"):
+        process_add_org_membership(user, org, keep_until_seen=True)
+
+    add_contracts.assert_called_once_with(user)
+    membership = UserOrganization.objects.get(user=user, organization=org)
     assert membership.added_to_keycloak_at is None
 
 
