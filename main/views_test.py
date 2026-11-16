@@ -6,6 +6,7 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 
+from cms.models import SiteBanner
 from users.factories import UserFactory
 
 pytestmark = [
@@ -111,3 +112,20 @@ def test_noindex_meta_on_learner_records(client, settings, path, expect_noindex)
         assert '<meta name="robots" content="noindex">' in content
     else:
         assert '<meta name="robots" content="noindex">' not in content
+
+
+@pytest.mark.parametrize(
+    ("url", "shows_banner"),
+    [
+        ("/cart/", True),
+        ("/cart/?ecom-service=true", False),
+        ("/orders/history/", False),
+    ],
+)
+def test_site_banner_on_checkout_pages(user_client, url, shows_banner):
+    """Of the headerless checkout pages, only the cart shows the site banner."""
+    banner = SiteBanner.objects.create(message="<p>Sale</p>")
+
+    content = user_client.get(url).content.decode()
+
+    assert (f'data-banner-id="{banner.id}"' in content) is shows_banner
