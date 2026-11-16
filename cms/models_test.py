@@ -719,13 +719,18 @@ def test_flex_pricing_form_is_branded_mit_learn(mocker, settings):
     course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
     flex_form = FlexiblePricingFormFactory(selected_course=course_page.course)
 
+    user = UserFactory.create(name="Pat Learner")
     content = generate_flexible_pricing_response(
-        mocker, UserFactory.create(), flex_form
+        mocker, user, flex_form
     ).rendered_content
 
     assert f"<title>MIT Learn | {flex_form.title}</title>" in content
     assert 'href="https://learn.example.com" class="logo-link"' in content
-    assert 'href="https://learn.example.com/dashboard"' in content
+    # The user menu has what MIT Learn's menu shows learners, and nothing else.
+    assert "Pat Learner" in content
+    assert '<a href="https://learn.example.com/dashboard">Dashboard</a>' in content
+    assert f'<a href="{reverse("logout")}">Log Out</a>' in content
+    assert "Order History" not in content
     assert 'href="https://support.learn.mit.edu/"' in content
     assert "mitxonline.zendesk.com" not in content
     assert "mitxonline.mit.edu" not in content
