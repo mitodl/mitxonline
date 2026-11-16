@@ -2,10 +2,11 @@
 Tests for the OpenTelemetry setup that runs in deployed environments.
 
 mitol-django-observability turns tracing on in AppConfig.ready() when an OTLP
-endpoint is configured, then auto-instruments Django, psycopg, redis, requests and
-celery. Tests run without an endpoint, so none of that runs in the suite, and an
-instrumentor that fails only logs a warning. An OpenTelemetry upgrade that breaks
-setup would ship silently and leave production with no traces.
+endpoint is configured or DEBUG is on, then auto-instruments Django, psycopg,
+redis, requests and celery. pytest-env sets DEBUG=False and no endpoint, so none
+of that runs in the suite, and an exporter or instrumentor that fails only logs
+a warning. An OpenTelemetry upgrade that breaks setup would ship silently and
+leave production with no traces.
 
 Instrumentation patches libraries and sets a process-wide tracer provider that
 can't be unset, so the check runs in a fresh interpreter. Nothing is exported:
@@ -24,7 +25,7 @@ from django.conf import settings
 RESULT_MARKER = "TELEMETRY_RESULT="
 
 SCRIPT = f"""
-import json, os, sys
+import json, os
 import django
 
 django.setup()
@@ -88,7 +89,6 @@ if isinstance(provider, TracerProvider):
     ]
 
 print("{RESULT_MARKER}" + json.dumps(result), flush=True)
-sys.stdout.flush()
 os._exit(0)
 """
 
@@ -97,8 +97,7 @@ def _run_with_telemetry_enabled():
     """Boot Django in a fresh interpreter with an OTLP endpoint configured."""
     env = {
         **os.environ,
-        "DJANGO_SETTINGS_MODULE": "main.settings",
-        # Unroutable on purpose; the process exits before anything is exported.
+        # Nothing listens here; the process exits before anything is exported.
         "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": "http://127.0.0.1:9/v1/traces",
         "OTEL_SERVICE_NAME": "mitxonline-telemetry-test",
     }
@@ -124,6 +123,7 @@ def test_telemetry_instruments_and_traces_requests():
     """With an endpoint set, startup should instrument every library and trace requests."""
     result, output = _run_with_telemetry_enabled()
 
+    assert "failed to configure OTLP exporter" not in output
     assert "Failed to auto-instrument" not in output
     assert result["provider"] == "TracerProvider"
     assert result["service_name"] == "mitxonline-telemetry-test"

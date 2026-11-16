@@ -88,7 +88,7 @@ def test_render_inlined_email_templates(user):
 
     Every TemplatedMessage (receipts, enrollment and B2B emails) renders through
     it, using premailer, lxml and cssutils for the inlining and bs4 and html5lib
-    for the text body. Other tests only check the text body.
+    for the text body. No other test checks mitol-mail's inlined HTML.
     """
     user.name = "Jane Smith"
     context = context_for_user(user=user, extra_context={"url": "http://example.com"})

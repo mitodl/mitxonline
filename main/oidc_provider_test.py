@@ -1,11 +1,13 @@
 """
 End-to-end tests for MITx Online's OpenID Connect provider.
 
-Open edX signs learners in through the django-oauth-toolkit provider mounted at
-/oauth2/. The id_token it returns is signed with OIDC_RSA_PRIVATE_KEY by jwcrypto,
-which uses cryptography. Nothing else in the suite runs that flow, so these tests
-are what catch an upgrade of cryptography, jwcrypto, oauthlib or
-django-oauth-toolkit that breaks signing, the published keys or token use.
+django-oauth-toolkit is mounted at /oauth2/ and signs id_tokens with
+OIDC_RSA_PRIVATE_KEY through jwcrypto, which uses cryptography. Open edX uses
+this provider for plain OAuth2, not OIDC, so no id_tokens are issued in
+production today; the only RS256 application is Refine Admin. Nothing else in
+the suite runs the flow, so these tests are what catch an upgrade of
+cryptography, jwcrypto, oauthlib or django-oauth-toolkit that breaks signing,
+the published keys or token use before an OIDC client starts relying on it.
 """
 
 import json
@@ -25,9 +27,9 @@ pytestmark = [
     pytest.mark.skip_nplusone_check,
 ]
 
-CLIENT_ID = "test-openedx-client"
-CLIENT_SECRET = "test-openedx-secret"  # noqa: S105
-REDIRECT_URI = "https://openedx.example.com/auth/complete/ol-oauth2/"
+CLIENT_ID = "test-oidc-client"
+CLIENT_SECRET = "test-oidc-secret"  # noqa: S105
+REDIRECT_URI = "https://client.example.com/oidc/callback/"
 
 
 @pytest.fixture(scope="module")
@@ -37,7 +39,8 @@ def oidc_private_key_pem():
         rsa.generate_private_key(public_exponent=65537, key_size=2048)
         .private_bytes(
             serialization.Encoding.PEM,
-            serialization.PrivateFormat.PKCS8,
+            # PKCS1, the format of the deployed key.
+            serialization.PrivateFormat.TraditionalOpenSSL,
             serialization.NoEncryption(),
         )
         .decode()
@@ -54,10 +57,10 @@ def oidc_settings(settings, oidc_private_key_pem):
 
 
 @pytest.fixture
-def openedx_application(oidc_settings):
-    """An authorization-code client configured like the Open edX one."""
+def oidc_application(oidc_settings):
+    """A confidential authorization-code client that signs id_tokens with RS256."""
     return Application.objects.create(
-        name="test-openedx",
+        name="test-oidc",
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
         client_type=Application.CLIENT_CONFIDENTIAL,
@@ -97,7 +100,7 @@ def _get_id_token(client):
 
 
 def test_id_token_verifies_against_published_keys(
-    openedx_application,
+    oidc_application,
     user_client,
     user,
 ):
@@ -119,7 +122,7 @@ def test_id_token_verifies_against_published_keys(
 
 
 def test_userinfo_accepts_the_access_token(
-    openedx_application,
+    oidc_application,
     user_client,
     client,
     user,
@@ -137,7 +140,7 @@ def test_userinfo_accepts_the_access_token(
 
 
 def test_id_token_is_rejected_with_another_key(
-    openedx_application,
+    oidc_application,
     user_client,
 ):
     """Verification should fail against a key the provider didn't sign with."""
