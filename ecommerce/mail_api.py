@@ -101,12 +101,16 @@ def send_ecommerce_refund_message(order_record):
         log.exception("Error sending order refund email.")
 
 
-def send_refund_request_notification(refund_request):
+def send_refund_request_notification(
+    refund_request, *, auto_refunded=False, auto_refund_error=""
+):
     """
     Send a notification email to customer service when a learner submits a refund request.
 
     Args:
         refund_request: A RefundRequest instance.
+        auto_refunded: True if the request was refunded automatically; False if it needs review.
+        auto_refund_error: Why an attempted automatic refund failed, if it did.
     """
     from django.conf import settings  # noqa: PLC0415
 
@@ -121,6 +125,8 @@ def send_refund_request_notification(refund_request):
                     "order": refund_request.order,
                     "user": refund_request.user,
                     "line": line,
+                    "auto_refunded": auto_refunded,
+                    "auto_refund_error": auto_refund_error,
                 },
             )
     except:  # noqa: E722

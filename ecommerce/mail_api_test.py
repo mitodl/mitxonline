@@ -68,8 +68,8 @@ def test_mail_api_receipt_generation(  # noqa: PLR0913
 
 @pytest.mark.skip_nplusone_check
 @responses.activate
-def test_mail_api_refund_email_generation(
-    settings, mocker, user, products, user_client
+def test_mail_api_refund_email_generation(  # noqa: PLR0913
+    settings, mocker, user, products, user_client, django_capture_on_commit_callbacks
 ):
     """
     Tests email generation for the refund message. Generates a fulfilled order,
@@ -84,9 +84,12 @@ def test_mail_api_refund_email_generation(
     transaction_data = {"id": "refunded-transaction"}
     refund_amount = order.total_price_paid / 2
     order_flow = order.get_object_flow()
-    transaction = order_flow.refund(  # noqa: F841
-        api_response_data=transaction_data, amount=refund_amount, reason="testing"
-    )
+    with django_capture_on_commit_callbacks(execute=True):
+        order_flow.refund(
+            api_response_data=transaction_data,
+            amount=refund_amount,
+            reason="testing",
+        )
 
     mock_send_message.assert_called()
 
