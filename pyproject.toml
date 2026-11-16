@@ -38,7 +38,7 @@ dependencies = [
     "hubspot-api-client>=12.0.0,<13",
     "ipython>=9.13,<10",
     "mitol-django-apigateway==2026.4.29",
-    "mitol-django-common==2026.6.16.4",
+    "mitol-django-common==2026.10.29",
     "mitol-django-hubspot-api==2026.4.29",
     "mitol-django-mail==2026.4.29",
     "mitol-django-openedx==2026.4.29",
@@ -84,6 +84,7 @@ dependencies = [
     "pydantic>=2.13.4",
     "pynacl>=1.6.2",
     "pyjwt==2.15.1",
+    "mitol-django-geoip>=2026.11.13",
 ]
 
 [dependency-groups]
