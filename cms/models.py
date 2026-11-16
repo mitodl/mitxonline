@@ -328,9 +328,8 @@ class CourseProgramChildPage(Page):
         raise Http404
 
 
-# Placeholder: must be replaced with the stable URL of the credential metadata
-# examples doc (mitodl/hq#13681) before this merges.
-VC_EXAMPLES_URL = "https://example.invalid/vc-examples"
+# CMS page (ResourcePage) with example descriptions and criteria, mitodl/hq#13681.
+VC_EXAMPLES_URL = "/credential-examples/"
 
 # Opens in a new tab so an author doesn't lose unsaved CMS edits.
 VC_EXAMPLES_LINK = format_html(
