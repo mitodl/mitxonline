@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import operator
 import re
 import time
 from collections import Counter, defaultdict, namedtuple
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
+from functools import reduce
 from traceback import format_exc
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
@@ -68,6 +70,7 @@ from courses.models import (
     Department,
     EnrollmentMode,
     PaidCourseRun,
+    PaidProgram,
     PartnerSchool,
     Program,
     ProgramCertificate,
@@ -377,7 +380,11 @@ def create_run_enrollments(  # noqa: C901, PLR0913
 
 
 def create_program_enrollments(
-    user, programs, *, enrollment_mode=EDX_DEFAULT_ENROLLMENT_MODE
+    user,
+    programs,
+    *,
+    enrollment_mode=EDX_DEFAULT_ENROLLMENT_MODE,
+    skip_export_compliance_check=False,
 ):
     """
     Creates local records of a user's enrollment in programs
@@ -388,13 +395,16 @@ def create_program_enrollments(
 
     Kwargs:
         enrollment_mode (str): The mode the enrollment should be in
+        skip_export_compliance_check (bool): Skip the export compliance check
+            (e.g. when downgrading an existing enrollment, not creating access)
 
     Returns:
         list of ProgramEnrollment: A list of enrollment objects that were successfully created
     """
     successful_enrollments = []
     for program in programs:
-        _verify_exports_compliance_for_enrollment(user, program)
+        if not skip_export_compliance_check:
+            _verify_exports_compliance_for_enrollment(user, program)
 
         try:
             enrollment, created = ProgramEnrollment.all_objects.get_or_create(
@@ -811,7 +821,8 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
 
     # Programs nested in this one (at any depth) carry verified enrollments
     # because of this purchase too; handle them the same way.
-    nested_program_ids = Program.expand_nested_program_ids([program.id]) - {program.id}
+    program_tree_ids = Program.expand_nested_program_ids([program.id])
+    nested_program_ids = program_tree_ids - {program.id}
     nested_enrollments = ProgramEnrollment.objects.filter(
         user=user,
         program_id__in=nested_program_ids,
@@ -819,6 +830,10 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
         b2b_contract__isnull=True,
     ).select_related("program")
     for nested_enrollment in nested_enrollments:
+        # Leave a nested program alone if the learner bought it separately.
+        # The order being refunded is no longer fulfilled, so it doesn't count.
+        if PaidProgram.fulfilled_paid_program_exists(user, nested_enrollment.program):
+            continue
         _downgrade_or_deactivate_program_enrollment(user, nested_enrollment.program)
 
     verified_run_enrollments = CourseRunEnrollment.objects.filter(
@@ -827,6 +842,20 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
         enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
         b2b_contract__isnull=True,
     ).select_related("run")
+
+    # Zero-value orders for runs in nested programs redeem a discount named
+    # after the nested program, so match every program in the tree.
+    program_prefix_filter = reduce(
+        operator.or_,
+        (
+            Q(
+                order__discounts__redeemed_discount__discount_code__startswith=readable_id
+            )
+            for readable_id in Program.objects.filter(
+                id__in=program_tree_ids
+            ).values_list("readable_id", flat=True)
+        ),
+    )
 
     audit_runs = []
     for run_enrollment in verified_run_enrollments:
@@ -837,10 +866,7 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
                 course_run=run,
                 order__state=OrderStatus.FULFILLED,
             )
-            .exclude(
-                order__total_price_paid=0,
-                order__discounts__redeemed_discount__discount_code__startswith=program.readable_id,
-            )
+            .exclude(program_prefix_filter, order__total_price_paid=0)
             .exists()
         ):
             continue
@@ -880,14 +906,19 @@ def _downgrade_or_deactivate_program_enrollment(user, program):
     """
     if not program.has_free_audit:
         enrollment = ProgramEnrollment.objects.filter(
-            user=user, program=program
+            user=user,
+            program=program,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
         ).first()
         if enrollment is not None:
             enrollment.deactivate_and_save(ENROLL_CHANGE_STATUS_REFUNDED, no_user=True)
         return None
 
     downgraded_enrollments = create_program_enrollments(
-        user, [program], enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+        user,
+        [program],
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        skip_export_compliance_check=True,
     )
     downgraded_enrollment = first_or_none(downgraded_enrollments)
     if downgraded_enrollment is not None:
