@@ -1525,19 +1525,6 @@ HUBSPOT_TASK_DELAY = get_int(
     description="Number of milliseconds to wait between consecutive Hubspot calls",
 )
 
-# HomePage Hubspot Form Settings
-HUBSPOT_HOME_PAGE_FORM_GUID = get_string(
-    name="HUBSPOT_HOME_PAGE_FORM_GUID",
-    default="",
-    description="Hubspot ID for the home page contact form",
-)
-
-HUBSPOT_PORTAL_ID = get_string(
-    name="HUBSPOT_PORTAL_ID",
-    default="",
-    description="Hubspot Portal ID",
-)
-
 UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = get_string(
     name="UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN",
     default=None,

@@ -13,7 +13,8 @@ import redis_lock
 from django.conf import settings
 from django.core.cache import caches
 from django.core.serializers import serialize
-from django.http import HttpRequest, HttpResponseRedirect
+from django.http import HttpRequest, HttpResponsePermanentRedirect, HttpResponseRedirect
+from django.utils.cache import add_never_cache_headers
 from mitol.common.utils.urls import remove_password_from_url
 from rest_framework import status
 
@@ -43,6 +44,21 @@ def get_learn_product_url(product_type: str, readable_id: str) -> str:
         str: the absolute MIT Learn URL for the given product
     """
     return f"{get_learn_base_url()}/{product_type}/{readable_id}"
+
+
+def learn_redirect(request: HttpRequest, url: str) -> HttpResponsePermanentRedirect:
+    """
+    Permanently redirect to an MIT Learn page that replaces an MITx Online one,
+    passing the query string through.
+
+    Browsers cache a 301 indefinitely unless told otherwise, so the response
+    carries never-cache headers.
+    """
+    if query_string := request.META.get("QUERY_STRING"):
+        url = f"{url}?{query_string}"
+    response = HttpResponsePermanentRedirect(url)
+    add_never_cache_headers(response)
+    return response
 
 
 def keycloak_realm_url() -> str:

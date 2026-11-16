@@ -52,11 +52,7 @@ if TYPE_CHECKING:
     from courses.models import ProgramQuerySet
 
 log = logging.getLogger(__name__)
-DEFAULT_HOMEPAGE_PROPS = dict(  # noqa: C408
-    title="Home Page",
-    hero_title="Lorem ipsum dolor",
-    hero_subtitle="Enim ad minim veniam, quis nostrud exercitation",
-)
+DEFAULT_HOMEPAGE_PROPS = dict(title="Home Page")  # noqa: C408
 DEFAULT_SITE_PROPS = dict(hostname="localhost", port=80)  # noqa: C408
 COURSE_INDEX_PAGE_PROPERTIES = dict(title="Courses")  # noqa: C408
 RESOURCE_PAGE_TITLES = [
@@ -484,13 +480,6 @@ def create_default_courseware_page(
 
     page.save()
     page.refresh_from_db()
-
-    if isinstance(courseware, Course):
-        homepage = cms_models.HomePage.objects.first()
-
-        cms_models.HomeProductLink.objects.create(
-            page=homepage, course_product_page=page
-        )
 
     return page
 

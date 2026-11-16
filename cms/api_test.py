@@ -10,7 +10,7 @@ from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from mitol.common.utils.datetime import now_in_utc
 from wagtail.models import Page
-from wagtail_factories import PageFactory
+from wagtail_factories import ImageFactory, PageFactory
 
 from cms import utils as cms_utils
 from cms.api import (
@@ -37,14 +37,12 @@ from cms.models import (
     CourseIndexPage,
     CoursePage,
     HomePage,
-    HomeProductLink,
     ProgramIndexPage,
     ProgramPage,
     ResourcePage,
 )
 from courses.factories import CourseFactory, CourseRunFactory, ProgramFactory
 from courses.models import Program, default_program_queryset
-from main.utils import get_learn_product_url
 
 # resolve_financial_assistance_form_urls does a fixed number of queries:
 # course pages, programs, related programs, program pages, live forms. This is
@@ -114,10 +112,8 @@ def test_get_wagtail_img_src(settings):
     settings.SITE_BASE_URL = "http://mitxonline.test"
     img_filename = "path/to/my-image.jpg"
     img_hash = "abc123"
-    home_page = HomePageFactory.build(
-        hero__file__filename=img_filename, hero__file_hash=img_hash
-    )
-    img_src = get_wagtail_img_src(home_page.hero)
+    image = ImageFactory.build(file__filename=img_filename, file_hash=img_hash)
+    img_src = get_wagtail_img_src(image)
     assert img_src == f"http://mitxonline.test/mediatest/{img_filename}?v={img_hash}"
 
 
@@ -198,88 +194,6 @@ def test_ensure_program_product_index(mocker):
     # Make sure the function is idempotent
     ensure_program_product_index()
     assert list(program_index_children_qset.all()) == [existing_program_page.page_ptr]
-
-
-@pytest.mark.django_db
-def test_home_page_featured_products(mocker):
-    """Test home page is loading featured product"""
-    home_page = HomePageFactory.create()
-    patched_get_home_page = mocker.patch(  # noqa: F841
-        "cms.api.get_home_page", return_value=home_page
-    )
-    course_page = CoursePageFactory.create(parent=home_page)
-    # make sure featured products are listing
-    HomeProductLink.objects.create(page=home_page, course_product_page=course_page)
-    featured_products = home_page.products
-    assert len(featured_products) == 1
-    run = course_page.product.first_unexpired_run
-    assert featured_products == [
-        {
-            "title": course_page.title,
-            "description": course_page.description,
-            "feature_image": course_page.feature_image,
-            "start_date": run.start_date if run is not None else None,
-            "url_path": get_learn_product_url(
-                "courses", course_page.product.readable_id
-            ),
-            "is_program": False,
-            "is_self_paced": run.is_self_paced if run is not None else None,
-            "program_type": None,
-        }
-    ]
-
-
-@pytest.mark.django_db
-def test_home_page_featured_products_sorting(mocker):
-    """Tests that featured products are sorted in ascending order by start_date"""
-    home_page = HomePageFactory.create()
-    patched_get_home_page = mocker.patch(  # noqa: F841
-        "cms.api.get_home_page", return_value=home_page
-    )
-
-    now = now_in_utc()
-    earlier_date = now - timedelta(days=30)
-    later_date = now + timedelta(days=30)
-
-    course_page_1 = CoursePageFactory.create(parent=home_page)
-    course_page_2 = CoursePageFactory.create(parent=home_page)
-
-    CourseRunFactory.create(
-        course=course_page_1.product, start_date=later_date, live=True
-    )
-    CourseRunFactory.create(
-        course=course_page_2.product, start_date=earlier_date, live=True
-    )
-
-    HomeProductLink.objects.create(page=home_page, course_product_page=course_page_1)
-    HomeProductLink.objects.create(page=home_page, course_product_page=course_page_2)
-
-    featured_products = home_page.products
-    assert len(featured_products) == 2
-
-    assert featured_products[0]["title"] == course_page_2.title
-    assert featured_products[1]["title"] == course_page_1.title
-
-
-@pytest.mark.django_db
-def test_home_page_featured_products_published_only():
-    """Tests that featured products contain only published products/pages in the HomePage"""
-    home_page = HomePageFactory.create()
-    course_pages = CoursePageFactory.create_batch(2, parent=home_page)
-    program_pages = ProgramPageFactory.create_batch(2, parent=home_page)
-    unpublished_course_page = CoursePageFactory.create(parent=home_page, live=False)
-    unpublished_program_page = ProgramPageFactory.create(parent=home_page, live=False)
-
-    for course_page in course_pages + [unpublished_course_page]:  # noqa: RUF005
-        HomeProductLink.objects.create(page=home_page, course_product_page=course_page)
-
-    for program_page in program_pages + [unpublished_program_page]:  # noqa: RUF005
-        HomeProductLink.objects.create(page=home_page, course_product_page=program_page)
-
-    featured_products = home_page.products
-    assert len(featured_products) == 4
-    assert unpublished_course_page not in featured_products
-    assert unpublished_program_page not in featured_products
 
 
 @pytest.mark.django_db
