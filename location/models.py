@@ -10,10 +10,14 @@ from location.constants import (
     GEOLOCATION_TYPE_GEOIP,
     GEOLOCATION_TYPE_PROFILE,
     LOCATION_FLAG_RULE_CHOICES,
-    LOCATION_FLAG_RULE_ONLY_GEOIP,
-    LOCATION_FLAG_RULE_ONLY_PROFILE,
-    LOCATION_FLAG_RULE_REQUIRE_ANY,
-    LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP,
+    LOCATION_FLAG_RULE_MATCH_ALL,
+    LOCATION_FLAG_RULE_MATCH_ANY,
+    LOCATION_FLAG_RULE_MATCH_GEOIP_ANY,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_ALL,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_ANY,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ALL,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ANY,
+    LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP_MATCH_ALL,
     LOCATION_FLAG_TYPE_CHOICES,
 )
 from location.dataclasses import UserCalculatedLocation
@@ -115,10 +119,14 @@ class LocationFlag(SoftDeleteTimestampedModel, ValidateOnSaveMixin):
         """Get the rule model for the specified type."""
 
         mapping = {
-            LOCATION_FLAG_RULE_ONLY_PROFILE: OnlyProfileLocationFlag,
-            LOCATION_FLAG_RULE_ONLY_GEOIP: OnlyGeoIPLocationFlag,
-            LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP: ProfileAndGeoIPLocationFlag,
-            LOCATION_FLAG_RULE_REQUIRE_ANY: MatchAnyLocationFlag,
+            LOCATION_FLAG_RULE_MATCH_PROFILE_ANY: ProfileMatchAnyLocationFlag,
+            LOCATION_FLAG_RULE_MATCH_PROFILE_ALL: ProfileMatchAllLocationFlag,
+            LOCATION_FLAG_RULE_MATCH_GEOIP_ANY: GeoIPMatchAnyLocationFlag,
+            LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ANY: ProfileAndGeoIPMatchAnyLocationFlag,
+            LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ALL: ProfileAndGeoIPMatchAllLocationFlag,
+            LOCATION_FLAG_RULE_MATCH_ANY: AnyTypeMatchAnyLocationFlag,
+            LOCATION_FLAG_RULE_MATCH_ALL: AnyTypeMatchAllLocationFlag,
+            LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP_MATCH_ALL: RequireProfileGeoIPMatchAllLocationFlag,
         }
 
         if location_flag.determination_rule not in mapping:
@@ -187,7 +195,7 @@ class ProfileMatchAllLocationFlag(LocationFlag):
         are no matches, no locations, or if any individual location doesn't match.
 
     This is more of an example case - there's only ever one LegalAddress, so this
-    or OnlyProfileMatchAnyLocationFlag are basically the same result (right now).
+    and ProfileMatchAnyLocationFlag are basically the same result (right now).
     """
 
     def is_applicable(self, location_data: list[UserCalculatedLocation]):
@@ -201,7 +209,7 @@ class ProfileMatchAllLocationFlag(LocationFlag):
 
         decisions = [(pd.country_code == self.country_code) for pd in profile_locations]
 
-        return all(decisions)
+        return bool(decisions) and all(decisions)
 
     class Meta:
         """Set the model as a proxy."""
@@ -256,8 +264,8 @@ class ProfileAndGeoIPMatchAnyLocationFlag(LocationFlag):
         - Matches: Any
         - Default: Flag Not Set
 
-        For only the location data derived from the user's IP address (looked up
-        via MaxMind GeoIP databases) and via the user's profile (LegalAddress),
+        For the location data derived from the user's IP address (looked up
+        via MaxMind GeoIP databases) and from the user's profile (LegalAddress),
         set the flag if any locations match the flag location. The flag is not
         set if there are no matches or no locations.
     """
@@ -297,8 +305,8 @@ class ProfileAndGeoIPMatchAllLocationFlag(LocationFlag):
         - Matches: All
         - Default: Flag Not Set
 
-        For only the location data derived from the user's IP address (looked up
-        via MaxMind GeoIP databases) and via the user's profile (LegalAddress),
+        For the location data derived from the user's IP address (looked up
+        via MaxMind GeoIP databases) and from the user's profile (LegalAddress),
         set the flag if all locations match the flag location. The flag is not
         set if there are no location data or if any location doesn't match.
 
@@ -309,7 +317,7 @@ class ProfileAndGeoIPMatchAllLocationFlag(LocationFlag):
     """
 
     def is_applicable(self, location_data: list[UserCalculatedLocation]):
-        """Set the flag if the location matches any profile or GeoIP."""
+        """Set the flag if all profile and GeoIP locations match."""
 
         loc_types = (
             GEOLOCATION_TYPE_GEOIP,
@@ -326,7 +334,7 @@ class ProfileAndGeoIPMatchAllLocationFlag(LocationFlag):
             (al.country_code == self.country_code) for al in applicable_locations
         ]
 
-        return all(decisions)
+        return bool(decisions) and all(decisions)
 
     class Meta:
         """Set the model as a proxy."""
@@ -351,7 +359,7 @@ class AnyTypeMatchAnyLocationFlag(LocationFlag):
     """
 
     def is_applicable(self, location_data: list[UserCalculatedLocation]):
-        """If the user profile matches the flag's country, then the flag is set."""
+        """Set the flag if any location matches, regardless of source."""
 
         decisions = [(ld.country_code == self.country_code) for ld in location_data]
 
@@ -380,11 +388,11 @@ class AnyTypeMatchAllLocationFlag(LocationFlag):
     """
 
     def is_applicable(self, location_data: list[UserCalculatedLocation]):
-        """If the user profile matches the flag's country, then the flag is set."""
+        """Set the flag if all locations match, regardless of source."""
 
         decisions = [(ld.country_code == self.country_code) for ld in location_data]
 
-        return all(decisions)
+        return bool(decisions) and all(decisions)
 
     class Meta:
         """Set the model as a proxy."""
@@ -418,7 +426,7 @@ class RequireProfileGeoIPMatchAllLocationFlag(LocationFlag):
         profile_locations = [
             location_datum
             for location_datum in location_data
-            if location_datum.lookup_type == GEOLOCATION_TYPE_GEOIP
+            if location_datum.lookup_type == GEOLOCATION_TYPE_PROFILE
         ]
 
         # Short circuit - if we don't have either of these, we don't set the flag.

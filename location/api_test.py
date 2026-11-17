@@ -8,9 +8,9 @@ from location.api import determine_user_flags, determine_user_location
 from location.constants import (
     GEOLOCATION_TYPE_GEOIP,
     GEOLOCATION_TYPE_PROFILE,
-    LOCATION_FLAG_RULE_ONLY_GEOIP,
-    LOCATION_FLAG_RULE_ONLY_PROFILE,
-    LOCATION_FLAG_RULE_REQUIRE_ANY,
+    LOCATION_FLAG_RULE_MATCH_ANY,
+    LOCATION_FLAG_RULE_MATCH_GEOIP_ANY,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_ANY,
     LOCATION_FLAG_TYPE_BLOCKED,
     LOCATION_FLAG_TYPE_TAX,
 )
@@ -162,7 +162,7 @@ def test_determine_user_flags_no_locations(settings, mock_geoip):
 
     settings.LOCATION_FORCE_PROFILE_COUNTRY = True
     LocationFlagFactory.create(
-        country_code="US", determination_rule=LOCATION_FLAG_RULE_REQUIRE_ANY
+        country_code="US", determination_rule=LOCATION_FLAG_RULE_MATCH_ANY
     )
 
     assert determine_user_flags(_make_request()) == []
@@ -174,23 +174,23 @@ def test_determine_user_flags(mock_geoip):
     request = _make_request(_make_user("US"))
 
     profile_flag = LocationFlagFactory.create(
-        country_code="US", determination_rule=LOCATION_FLAG_RULE_ONLY_PROFILE
+        country_code="US", determination_rule=LOCATION_FLAG_RULE_MATCH_PROFILE_ANY
     )
     geoip_flag = LocationFlagFactory.create(
-        country_code="CA", determination_rule=LOCATION_FLAG_RULE_ONLY_GEOIP
+        country_code="CA", determination_rule=LOCATION_FLAG_RULE_MATCH_GEOIP_ANY
     )
     # Matches the country, but the rule doesn't pass
     LocationFlagFactory.create(
-        country_code="US", determination_rule=LOCATION_FLAG_RULE_ONLY_GEOIP
+        country_code="US", determination_rule=LOCATION_FLAG_RULE_MATCH_GEOIP_ANY
     )
     # Doesn't match the country
     LocationFlagFactory.create(
-        country_code="FR", determination_rule=LOCATION_FLAG_RULE_REQUIRE_ANY
+        country_code="FR", determination_rule=LOCATION_FLAG_RULE_MATCH_ANY
     )
     # Inactive
     LocationFlagFactory.create(
         country_code="US",
-        determination_rule=LOCATION_FLAG_RULE_REQUIRE_ANY,
+        determination_rule=LOCATION_FLAG_RULE_MATCH_ANY,
         is_active=False,
     )
 
@@ -210,7 +210,7 @@ def test_determine_user_flags_flag_type(settings, flag_type):
     flags = {
         type_: LocationFlagFactory.create(
             country_code="US",
-            determination_rule=LOCATION_FLAG_RULE_REQUIRE_ANY,
+            determination_rule=LOCATION_FLAG_RULE_MATCH_ANY,
             flag_type=type_,
         )
         for type_ in (LOCATION_FLAG_TYPE_TAX, LOCATION_FLAG_TYPE_BLOCKED)

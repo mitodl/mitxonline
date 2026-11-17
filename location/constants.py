@@ -1,4 +1,4 @@
-````````                `````````````       """Constants for location."""
+"""Constants for location."""
 
 # Geolocation mechanisms
 
@@ -32,10 +32,14 @@ LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ALL_NAME = (
     "Ensure all profile or GeoIP location match."
 )
 
-LOCATION_FLAG_RULE_MATCH_ANY = "require-any"
-LOCATION_FLAG_RULE_MATCH_ANY_NAME = "Check any of the derived locations for a match, regardless of source."
-LOCATION_FLAG_RULE_MATCH_ALL = "require-any"
-LOCATION_FLAG_RULE_MATCH_ALL_NAME = "Ensure all of the derived locations match, regardless of source."
+LOCATION_FLAG_RULE_MATCH_ANY = "any-type-any"
+LOCATION_FLAG_RULE_MATCH_ANY_NAME = (
+    "Check any of the derived locations for a match, regardless of source."
+)
+LOCATION_FLAG_RULE_MATCH_ALL = "any-type-all"
+LOCATION_FLAG_RULE_MATCH_ALL_NAME = (
+    "Ensure all of the derived locations match, regardless of source."
+)
 
 LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP_MATCH_ALL = "require-profile-geoip-all"
 LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP_MATCH_ALL_NAME = "Require a GeoIP and a profile location exist, and check that all of them match the flag location."

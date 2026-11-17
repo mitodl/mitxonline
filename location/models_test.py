@@ -4,20 +4,30 @@ import pytest
 
 from location.constants import (
     GEOLOCATION_TYPE_GEOIP,
+    GEOLOCATION_TYPE_NONE,
     GEOLOCATION_TYPE_PROFILE,
-    LOCATION_FLAG_RULE_ONLY_GEOIP,
-    LOCATION_FLAG_RULE_ONLY_PROFILE,
-    LOCATION_FLAG_RULE_REQUIRE_ANY,
-    LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP,
+    LOCATION_FLAG_RULE_MATCH_ALL,
+    LOCATION_FLAG_RULE_MATCH_ANY,
+    LOCATION_FLAG_RULE_MATCH_GEOIP_ANY,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_ALL,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_ANY,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ALL,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ANY,
+    LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP_MATCH_ALL,
+    LOCATION_FLAG_RULES,
 )
 from location.dataclasses import UserCalculatedLocation
 from location.factories import LocationFlagFactory
 from location.models import (
+    AnyTypeMatchAllLocationFlag,
+    AnyTypeMatchAnyLocationFlag,
+    GeoIPMatchAnyLocationFlag,
     LocationFlag,
-    MatchAnyLocationFlag,
-    OnlyGeoIPLocationFlag,
-    OnlyProfileLocationFlag,
-    ProfileAndGeoIPLocationFlag,
+    ProfileAndGeoIPMatchAllLocationFlag,
+    ProfileAndGeoIPMatchAnyLocationFlag,
+    ProfileMatchAllLocationFlag,
+    ProfileMatchAnyLocationFlag,
+    RequireProfileGeoIPMatchAllLocationFlag,
 )
 
 pytestmark = pytest.mark.django_db
@@ -40,6 +50,13 @@ def _geoip(country_code):
     )
 
 
+def _other_type(country_code):
+    """Make a location that is neither profile- nor GeoIP-based."""
+    return UserCalculatedLocation(
+        country_code=country_code, lookup_type=GEOLOCATION_TYPE_NONE, ip=""
+    )
+
+
 # Location data scenarios, keyed by a readable ID. The flag country is US.
 LOCATION_SCENARIOS = {
     "profile-match-geoip-match": [_profile(FLAG_COUNTRY), _geoip(FLAG_COUNTRY)],
@@ -50,58 +67,118 @@ LOCATION_SCENARIOS = {
     "geoip-match-only": [_geoip(FLAG_COUNTRY)],
     "profile-match-geoip-unknown": [_profile(FLAG_COUNTRY), _geoip(None)],
     "no-locations": [],
+    # Multiple locations of a single type - separates the "any" and "all" rules
+    "profile-match-profile-other": [_profile(FLAG_COUNTRY), _profile(OTHER_COUNTRY)],
+    "geoip-match-geoip-other": [_geoip(FLAG_COUNTRY), _geoip(OTHER_COUNTRY)],
+    # Locations of another type - separates profile+GeoIP from any-type rules
+    "profile-match-othertype-other": [
+        _profile(FLAG_COUNTRY),
+        _other_type(OTHER_COUNTRY),
+    ],
+    "othertype-match-only": [_other_type(FLAG_COUNTRY)],
+    "profile-match-geoip-match-othertype-other": [
+        _profile(FLAG_COUNTRY),
+        _geoip(FLAG_COUNTRY),
+        _other_type(OTHER_COUNTRY),
+    ],
 }
 
-# Expected applicability for each rule, per scenario above.
+# The scenarios above in which each rule should set the flag. The flag should
+# not be set for any scenario not listed for a rule.
 RULE_EXPECTATIONS = {
-    LOCATION_FLAG_RULE_ONLY_PROFILE: {
-        "profile-match-geoip-match": True,
-        "profile-match-geoip-other": True,
-        "profile-other-geoip-match": False,
-        "profile-other-geoip-other": False,
-        "profile-match-only": True,
-        "geoip-match-only": False,
-        "profile-match-geoip-unknown": True,
-        "no-locations": False,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_ANY: {
+        "profile-match-geoip-match",
+        "profile-match-geoip-other",
+        "profile-match-only",
+        "profile-match-geoip-unknown",
+        "profile-match-profile-other",
+        "profile-match-othertype-other",
+        "profile-match-geoip-match-othertype-other",
     },
-    LOCATION_FLAG_RULE_ONLY_GEOIP: {
-        "profile-match-geoip-match": True,
-        "profile-match-geoip-other": False,
-        "profile-other-geoip-match": True,
-        "profile-other-geoip-other": False,
-        "profile-match-only": False,
-        "geoip-match-only": True,
-        "profile-match-geoip-unknown": False,
-        "no-locations": False,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_ALL: {
+        "profile-match-geoip-match",
+        "profile-match-geoip-other",
+        "profile-match-only",
+        "profile-match-geoip-unknown",
+        "profile-match-othertype-other",
+        "profile-match-geoip-match-othertype-other",
     },
-    LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP: {
-        "profile-match-geoip-match": True,
-        "profile-match-geoip-other": False,
-        "profile-other-geoip-match": False,
-        "profile-other-geoip-other": False,
-        "profile-match-only": False,
-        "geoip-match-only": False,
-        "profile-match-geoip-unknown": False,
-        "no-locations": False,
+    LOCATION_FLAG_RULE_MATCH_GEOIP_ANY: {
+        "profile-match-geoip-match",
+        "profile-other-geoip-match",
+        "geoip-match-only",
+        "geoip-match-geoip-other",
+        "profile-match-geoip-match-othertype-other",
     },
-    LOCATION_FLAG_RULE_REQUIRE_ANY: {
-        "profile-match-geoip-match": True,
-        "profile-match-geoip-other": True,
-        "profile-other-geoip-match": True,
-        "profile-other-geoip-other": False,
-        "profile-match-only": True,
-        "geoip-match-only": True,
-        "profile-match-geoip-unknown": True,
-        "no-locations": False,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ANY: {
+        "profile-match-geoip-match",
+        "profile-match-geoip-other",
+        "profile-other-geoip-match",
+        "profile-match-only",
+        "geoip-match-only",
+        "profile-match-geoip-unknown",
+        "profile-match-profile-other",
+        "geoip-match-geoip-other",
+        "profile-match-othertype-other",
+        "profile-match-geoip-match-othertype-other",
+    },
+    LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ALL: {
+        "profile-match-geoip-match",
+        "profile-match-only",
+        "geoip-match-only",
+        "profile-match-othertype-other",
+        "profile-match-geoip-match-othertype-other",
+    },
+    LOCATION_FLAG_RULE_MATCH_ANY: {
+        "profile-match-geoip-match",
+        "profile-match-geoip-other",
+        "profile-other-geoip-match",
+        "profile-match-only",
+        "geoip-match-only",
+        "profile-match-geoip-unknown",
+        "profile-match-profile-other",
+        "geoip-match-geoip-other",
+        "profile-match-othertype-other",
+        "othertype-match-only",
+        "profile-match-geoip-match-othertype-other",
+    },
+    LOCATION_FLAG_RULE_MATCH_ALL: {
+        "profile-match-geoip-match",
+        "profile-match-only",
+        "geoip-match-only",
+        "othertype-match-only",
+    },
+    LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP_MATCH_ALL: {
+        "profile-match-geoip-match",
+        "profile-match-geoip-match-othertype-other",
     },
 }
 
 RULE_MODELS = {
-    LOCATION_FLAG_RULE_ONLY_PROFILE: OnlyProfileLocationFlag,
-    LOCATION_FLAG_RULE_ONLY_GEOIP: OnlyGeoIPLocationFlag,
-    LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP: ProfileAndGeoIPLocationFlag,
-    LOCATION_FLAG_RULE_REQUIRE_ANY: MatchAnyLocationFlag,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_ANY: ProfileMatchAnyLocationFlag,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_ALL: ProfileMatchAllLocationFlag,
+    LOCATION_FLAG_RULE_MATCH_GEOIP_ANY: GeoIPMatchAnyLocationFlag,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ANY: ProfileAndGeoIPMatchAnyLocationFlag,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ALL: ProfileAndGeoIPMatchAllLocationFlag,
+    LOCATION_FLAG_RULE_MATCH_ANY: AnyTypeMatchAnyLocationFlag,
+    LOCATION_FLAG_RULE_MATCH_ALL: AnyTypeMatchAllLocationFlag,
+    LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP_MATCH_ALL: RequireProfileGeoIPMatchAllLocationFlag,
 }
+
+
+def test_rule_constants_are_unique():
+    """Each rule needs a distinct value, or two rules map to the same model."""
+
+    assert len(set(LOCATION_FLAG_RULES)) == len(LOCATION_FLAG_RULES)
+
+
+def test_all_rules_covered():
+    """Every rule should have a rule model and test expectations."""
+
+    assert set(RULE_MODELS) == set(LOCATION_FLAG_RULES)
+    assert set(RULE_EXPECTATIONS) == set(LOCATION_FLAG_RULES)
+    for expected in RULE_EXPECTATIONS.values():
+        assert expected <= set(LOCATION_SCENARIOS)
 
 
 def test_soft_delete():
@@ -164,7 +241,7 @@ def test_evaluate_unsaved():
 
     flag = LocationFlagFactory.build(
         country_code=FLAG_COUNTRY,
-        determination_rule=LOCATION_FLAG_RULE_REQUIRE_ANY,
+        determination_rule=LOCATION_FLAG_RULE_MATCH_ANY,
     )
 
     assert flag.evaluate(LOCATION_SCENARIOS["profile-match-geoip-match"]) is False
@@ -179,6 +256,6 @@ def test_evaluate(rule, scenario):
         country_code=FLAG_COUNTRY, determination_rule=rule
     )
 
-    assert (
-        flag.evaluate(LOCATION_SCENARIOS[scenario]) is RULE_EXPECTATIONS[rule][scenario]
+    assert flag.evaluate(LOCATION_SCENARIOS[scenario]) is (
+        scenario in RULE_EXPECTATIONS[rule]
     )
