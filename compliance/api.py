@@ -455,8 +455,9 @@ def verify_user_with_exports(user, run) -> ExportComplianceResult:
     a prior failed check for this user.
     """
     # Lets main.sentry identify the learner on an error event without the
-    # email and username send_default_pii would attach. Set before the cache
-    # lookup so a process checking many learners never reports the last one.
+    # email and username data_collection's user_info would attach. Set before
+    # the cache lookup so a process checking many learners never reports the
+    # last one.
     sentry_sdk.set_tag(EXPORT_COMPLIANCE_USER_TAG, user.global_id)
 
     cached_log = get_latest_export_compliance_log(user, run)
