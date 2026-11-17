@@ -221,7 +221,7 @@ describe("Top-level App", () => {
     assert.isFalse(inner.find("Header").exists())
   })
 
-  it("renders header on dashboard page", async () => {
+  it("renders header on account settings page", async () => {
     helper.handleRequestStub.returns(anonymousUser)
     renderPage = helper.configureMountRenderer(
       App,
@@ -230,7 +230,7 @@ describe("Top-level App", () => {
       {
         match:    { url: routes.root },
         location: {
-          pathname: "/dashboard/"
+          pathname: routes.accountSettings
         }
       }
     )
