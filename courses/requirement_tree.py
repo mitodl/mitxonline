@@ -2,6 +2,7 @@
 
 from collections import Counter, defaultdict
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
 
 from mitol.common.utils.queryset import is_prefetched
 
@@ -288,6 +289,21 @@ def _requirement_nodes(program: Program) -> list[ProgramRequirement]:
     return list(nodes)
 
 
+def _requirement_root_and_children(program: Program):
+    """
+    Return the program's requirements root (None if it has none) and each
+    node's children, keyed by the parent's materialized path.
+    """
+    root = None
+    children = defaultdict(list)
+    for node in _requirement_nodes(program):
+        if node.is_root:
+            root = node
+        else:
+            children[node.path[: -ProgramRequirement.steplen]].append(node)
+    return root, children
+
+
 def is_requirement_tree_satisfied(
     program: Program,
     *,
@@ -309,14 +325,7 @@ def is_requirement_tree_satisfied(
     Returns:
         bool: False when the program has no requirements root.
     """
-    root = None
-    children = defaultdict(list)
-    for node in _requirement_nodes(program):
-        if node.is_root:
-            root = node
-        else:
-            children[node.path[: -ProgramRequirement.steplen]].append(node)
-
+    root, children = _requirement_root_and_children(program)
     if root is None:
         return False
 
@@ -334,3 +343,104 @@ def is_requirement_tree_satisfied(
         return False
 
     return _satisfied(root)
+
+
+@dataclass
+class RequirementResult:
+    """
+    How a learner stands against one node of a program's requirement tree.
+
+    Attributes:
+        label: what the node is, e.g. a course's readable id and title.
+        satisfied: whether the learner meets this node.
+        detail: for a group, how many items are met; for an unmet course or
+            program, why it isn't met.
+        children: the results for the node's children (and, for a required
+            program evaluated through its own tree, that tree's groups).
+    """
+
+    label: str
+    satisfied: bool
+    detail: str = ""
+    children: list["RequirementResult"] = field(default_factory=list)
+
+    def unmet_leaves(self) -> list["RequirementResult"]:
+        """The unmet courses and programs under this node, in tree order."""
+        if self.satisfied:
+            return []
+        if not self.children:
+            return [self]
+        return [leaf for child in self.children for leaf in child.unmet_leaves()]
+
+    def format_lines(self, indent: int = 0) -> list[str]:
+        """Render this result and its children as indented lines."""
+        mark = "✓" if self.satisfied else "✗"
+        line = f"{'  ' * indent}{mark} {self.label}"
+        if self.detail:
+            line = f"{line}: {self.detail}"
+        lines = [line]
+        for child in self.children:
+            lines.extend(child.format_lines(indent + 1))
+        return lines
+
+
+def _group_label(node: ProgramRequirement) -> str:
+    title = (node.title or "").strip()
+    if node.is_track:
+        return f'Track "{title}"' if title else "Track"
+    return f'"{title}"' if title else "Group"
+
+
+def explain_requirement_tree(
+    program: Program,
+    *,
+    explain_leaf: Callable[[ProgramRequirement], RequirementResult],
+) -> RequirementResult | None:
+    """
+    Evaluate the program's requirement tree like is_requirement_tree_satisfied,
+    but return each node's result instead of a single bool.
+
+    Groups and tracks are evaluated here, by the same rules; every child is
+    evaluated (no short-circuiting), so the result shows everything that's unmet.
+
+    Args:
+        program: the program whose tree is evaluated.
+        explain_leaf: called with each course or program node; returns its result.
+
+    Returns:
+        RequirementResult | None: the root's result, labeled with the program;
+        None when the program has no requirements root.
+    """
+    root, children = _requirement_root_and_children(program)
+    if root is None:
+        return None
+
+    def _explain(node):
+        if node.is_course or node.is_program:
+            return explain_leaf(node)
+        results = [_explain(child) for child in children[node.path]]
+        met = sum(1 for result in results if result.satisfied)
+        # Same order as is_requirement_tree_satisfied, so the two always agree.
+        if node.is_root or node.is_all_of_operator or node.is_track:
+            detail = f"all {len(results)} needed, {met} met"
+            satisfied = met == len(results)
+        elif node.is_min_number_of_operator:
+            needed = int(node.operator_value)
+            detail = f"at least {needed} of {len(results)} needed, {met} met"
+            satisfied = met >= needed
+        else:
+            return RequirementResult(
+                label=_group_label(node),
+                satisfied=False,
+                detail="group has no operator, so it can't be met",
+                children=results,
+            )
+        if node.is_root:
+            label = f"{program.title} ({program.readable_id})"
+        else:
+            label = _group_label(node)
+        return RequirementResult(
+            label=label, satisfied=satisfied, detail=detail, children=results
+        )
+
+    return _explain(root)
