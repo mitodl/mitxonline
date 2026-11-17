@@ -699,7 +699,7 @@ MIT_LEARN_API_BASE_URL = get_string(
 MIT_LEARN_DASHBOARD_URL = get_string(
     name="MIT_LEARN_DASHBOARD_URL",
     default=f"{MIT_LEARN_BASE_URL}/dashboard",
-    description="MIT Learn dashboard URL that learner emails link to",
+    description="MIT Learn dashboard URL, used for email links and /dashboard/ redirects",
 )
 
 MIT_LEARN_TERMS_URL = get_string(

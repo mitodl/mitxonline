@@ -10,12 +10,12 @@
                       <p style="margin: 0 0 10px;">Dear {{ user.name }},</p>
                       <p style="margin: 0 0 10px;">
                         You have been unenrolled from
-                          {% if enrollment.run.start_date %}
-                            {{ enrollment.run.course_number }} {{ enrollment.run.course.title }} starting {{ enrollment.run.start_date|date:"F j, Y"}}.
-                          {% else %}
-                            {{ enrollment.run.course_number }} {{ enrollment.run.course.title }}.
-                          {% endif %}
-                          The course will no longer appear on your <a href="{{ dashboard_url }}">{{ site_name }} dashboard</a>.
+                        {% if enrollment.run.start_date %}
+                          {{ enrollment.run.course_number }} {{ enrollment.run.course.title }} starting {{ enrollment.run.start_date|date:"F j, Y"}}.
+                        {% else %}
+                          {{ enrollment.run.course_number }} {{ enrollment.run.course.title }}.
+                        {% endif %}
+                        The course will no longer appear on your <a href="{{ dashboard_url }}">{{ site_name }} dashboard</a>.
                       </p>
                   </td>
               </tr>
