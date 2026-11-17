@@ -778,7 +778,10 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
     A course run's verified enrollment is left alone (not downgraded) if
     either:
     - it's a B2B-provisioned run (has a b2b_contracts entry) - governed by
-      its contract, not this payment, or
+      its contract, not this payment,
+    - its course belongs to another program (this program's tree or an
+      ancestor/sibling) that the learner has a fulfilled PaidProgram for, so
+      the learner is still entitled to it, or
     - the learner has a separate PaidCourseRun for it backed by a fulfilled
       order that isn't attributable to this program purchase - either a
       genuine, independent purchase of that specific run (total_price_paid
@@ -857,9 +860,22 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
         ),
     )
 
+    # Courses another fulfilled program purchase still covers, e.g. a nested
+    # program bought separately or a parent program that also contains the run.
+    # The refunded order is already out of FULFILLED state, so it isn't counted.
+    covered_course_ids = set()
+    for paid_program in PaidProgram.objects.filter(
+        user=user, order__state=OrderStatus.FULFILLED
+    ).select_related("program"):
+        covered_course_ids.update(
+            paid_program.program.courses_qset_recursive.values_list("id", flat=True)
+        )
+
     audit_runs = []
     for run_enrollment in verified_run_enrollments:
         run = run_enrollment.run
+        if run.course_id in covered_course_ids:
+            continue
         if (
             PaidCourseRun.objects.filter(
                 user=user,

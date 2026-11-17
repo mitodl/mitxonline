@@ -1216,6 +1216,68 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         nested_enrollment.refresh_from_db()
         assert nested_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
 
+    def test_preserves_run_in_independently_purchased_nested_program(
+        self, mocker, nested_setup
+    ):
+        """
+        Refunding the parent leaves runs of a separately bought nested
+        program verified, even when their only order is a $0 program-linked one.
+        """
+        run_enrollment = CourseRunEnrollmentFactory.create(
+            user=nested_setup.user,
+            run=nested_setup.nested_run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        self._paid_course_run(
+            nested_setup.user,
+            nested_setup.nested_run,
+            total_price_paid=Decimal("0.00"),
+            discount_code=f"{nested_setup.nested_program.readable_id}-{uuid4()}",
+        )
+        PaidProgram.objects.create(
+            user=nested_setup.user,
+            program=nested_setup.nested_program,
+            order=OrderFactory.create(
+                purchaser=nested_setup.user, state=OrderStatus.FULFILLED
+            ),
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        _, downgraded_runs = downgrade_program_enrollment_and_verified_runs(
+            nested_setup.user, nested_setup.program
+        )
+
+        assert downgraded_runs == []
+        run_enrollment.refresh_from_db()
+        assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        assert run_enrollment.active is True
+
+    def test_preserves_run_covered_by_paid_parent_program(self, mocker, nested_setup):
+        """Refunding a nested program leaves its runs verified while a paid parent covers them."""
+        run_enrollment = CourseRunEnrollmentFactory.create(
+            user=nested_setup.user,
+            run=nested_setup.nested_run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        PaidProgram.objects.create(
+            user=nested_setup.user,
+            program=nested_setup.program,
+            order=OrderFactory.create(
+                purchaser=nested_setup.user, state=OrderStatus.FULFILLED
+            ),
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        _, downgraded_runs = downgrade_program_enrollment_and_verified_runs(
+            nested_setup.user, nested_setup.nested_program
+        )
+
+        assert downgraded_runs == []
+        run_enrollment.refresh_from_db()
+        assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+
     def test_downgrades_nested_program_zero_value_run(self, mocker, nested_setup):
         """A $0 order redeeming the nested program's discount is program-linked."""
         run_enrollment = CourseRunEnrollmentFactory.create(
