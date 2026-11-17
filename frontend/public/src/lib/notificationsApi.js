@@ -106,8 +106,6 @@ export function parseStoredUserMessage(
     alertType = ALERT_TYPE_SUCCESS
     msgText = "Payment is pending review."
     break
-<<<<<<< HEAD
-=======
   case USER_MSG_TYPE_PAYMENT_ACCEPTED:
     alertType = ALERT_TYPE_SUCCESS
     msgText = userMsgJson.run ?
@@ -125,7 +123,6 @@ export function parseStoredUserMessage(
     msgText =
         "Thank you! Your payment is being processed. Your enrollment will be updated once it is complete."
     break
->>>>>>> db984a7d6 (Split the Stripe checkout return into success and cancel endpoints)
   case USER_MSG_TYPE_DISCOUNT_INVALID:
     alertType = ALERT_TYPE_DANGER
     msgText = `The discount that was applied to your cart is no longer valid. If this is unexpected, please contact customer support at ${SETTINGS.support_email}.`
