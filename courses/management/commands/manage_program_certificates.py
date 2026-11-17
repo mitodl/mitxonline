@@ -21,12 +21,25 @@ Check the usages of this command below:
 
 5. Generate Program certificate for all enrolled users in the program who have earned it
 ./mange.py manage_program_certificates --create -—program=<program_readable_id>
+
+When a certificate isn't created, the command says why. If the program's
+requirements aren't met, it lists each requirement and why it isn't met. In
+bulk mode (no --user) it prints a count per reason; pass -v 2 to list each
+skipped user with the requirements they're missing, or -v 3 for each skipped
+user's full requirement breakdown.
 """
+
+from collections import Counter
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
-from courses.api import generate_program_certificate, manage_program_certificate_access
+from courses.api import (
+    ProgramCertificateSkipReason,
+    explain_program_requirements,
+    generate_program_certificate_with_result,
+    manage_program_certificate_access,
+)
 from courses.models import Program, ProgramEnrollment
 from users.api import fetch_user
 
@@ -77,7 +90,7 @@ class Command(BaseCommand):
 
         super().add_arguments(parser)
 
-    def handle(self, *args, **options):  # pylint: disable=too-many-locals  # noqa: ARG002, C901
+    def handle(self, *args, **options):  # pylint: disable=too-many-locals  # noqa: ARG002
         """Handle command execution"""
 
         revoke = options.get("revoke")
@@ -132,44 +145,105 @@ class Command(BaseCommand):
 
         # Handle the creation of the program certificate.
         elif create:
+            verbosity = options.get("verbosity", 1)
             if user:
-                # If -f or --force argument is provided, we'll forcefully generate the program certificate
-                certificate, created_cert = generate_program_certificate(
-                    user=user, program=program, force_create=force_create
-                )
-                success_result = True
-
-                if created_cert:
-                    cert_status = "created"
-                elif certificate and not created_cert:
-                    cert_status = "already exists"
-                else:
-                    success_result = False
-                    cert_status = (
-                        "ignored, certificates for required courses are missing, use "
-                        "-f or --force argument to forcefully create a program certificate"
-                    )
-
-                result_summary = f"Certificate: {cert_status}"
-
-                result = f"Processed user {user.edx_username} ({user.email}) in program {program.readable_id}. Result - {result_summary}"
-                result_output = self.style.SUCCESS(result)
-                if not success_result:
-                    result_output = self.style.ERROR(result)
-                self.stdout.write(result_output)
+                self._create_for_user(user, program, force_create=force_create)
             else:
-                # generate certificates for all enrolled users
-                enrollments = ProgramEnrollment.objects.filter(program=program)
-                cert_count = 0
-                for enrollment in enrollments:
-                    certificate, created_cert = generate_program_certificate(
-                        user=enrollment.user, program=program
-                    )
-                    if created_cert:
-                        cert_count += 1
+                self._create_for_enrollments(program, verbosity=verbosity)
 
+    def _requirement_lines(self, user, program, *, unmet_only):
+        """Lines describing the user's standing against the program's requirements."""
+        result = explain_program_requirements(user, program)
+        if result is None:
+            return ["The program has no requirements set up."]
+        if unmet_only:
+            leaves = result.unmet_leaves()
+            if not leaves:
+                return []
+            return [
+                f"  Missing: {leaf.label}"
+                + (f" ({leaf.detail})" if leaf.detail else "")
+                for leaf in leaves
+            ]
+        return [f"  {line}" for line in result.format_lines()]
+
+    def _create_for_user(self, user, program, *, force_create):
+        result = generate_program_certificate_with_result(
+            user=user, program=program, force_create=force_create
+        )
+        prefix = (
+            f"Processed user {user.edx_username} ({user.email}) in program "
+            f"{program.readable_id}. Result - Certificate: "
+        )
+        if result.created:
+            self.stdout.write(self.style.SUCCESS(f"{prefix}created"))
+            return
+        if result.certificate is not None:
+            self.stdout.write(self.style.SUCCESS(f"{prefix}already exists"))
+            return
+
+        message = f"{prefix}not created, {result.skip_reason}."
+        if result.skip_reason == ProgramCertificateSkipReason.REQUIREMENTS_NOT_MET:
+            message += (
+                " Use -f or --force to create the certificate anyway.\nRequirements:"
+            )
+        elif result.skip_reason == ProgramCertificateSkipReason.NO_VERIFIED_ENROLLMENT:
+            message += " Use -f or --force to create the certificate anyway."
+        self.stdout.write(self.style.ERROR(message))
+        if result.skip_reason == ProgramCertificateSkipReason.REQUIREMENTS_NOT_MET:
+            for line in self._requirement_lines(user, program, unmet_only=False):
+                self.stdout.write(line)
+
+    def _create_for_enrollments(self, program, *, verbosity):
+        """Generate certificates for all enrolled users, reporting who was skipped and why."""
+        enrollments = ProgramEnrollment.objects.filter(program=program).select_related(
+            "user"
+        )
+        created_count = 0
+        existing_count = 0
+        skipped = Counter()
+        for enrollment in enrollments:
+            result = generate_program_certificate_with_result(
+                user=enrollment.user, program=program
+            )
+            if result.created:
+                created_count += 1
+                continue
+            if result.certificate is not None:
+                existing_count += 1
+                continue
+
+            skipped[result.skip_reason] += 1
+            if verbosity >= 2:  # noqa: PLR2004
+                learner = enrollment.user
                 self.stdout.write(
-                    self.style.SUCCESS(
-                        f"Successfully created {cert_count} certificates for program {program.readable_id}"
+                    self.style.WARNING(
+                        f"Skipped {learner.edx_username} ({learner.email}): "
+                        f"{result.skip_reason}"
                     )
                 )
+                if (
+                    result.skip_reason
+                    == ProgramCertificateSkipReason.REQUIREMENTS_NOT_MET
+                ):
+                    for line in self._requirement_lines(
+                        learner,
+                        program,
+                        unmet_only=verbosity < 3,  # noqa: PLR2004
+                    ):
+                        self.stdout.write(line)
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Successfully created {created_count} certificates for program "
+                f"{program.readable_id}"
+            )
+        )
+        if existing_count:
+            self.stdout.write(f"{existing_count} enrolled user(s) already had one.")
+        for reason, count in skipped.most_common():
+            self.stdout.write(self.style.WARNING(f"Skipped {count} user(s): {reason}."))
+        if skipped and verbosity < 2:  # noqa: PLR2004
+            self.stdout.write(
+                "Run with -v 2 to list each skipped user and what they're missing."
+            )

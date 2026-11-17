@@ -1,7 +1,10 @@
 """Tests for Program Certificates management command"""
 
+from io import StringIO
+
 import factory
 import pytest
+from django.core.management import call_command
 from django.core.management.base import CommandError
 
 from courses.factories import (
@@ -215,3 +218,77 @@ def test_program_certificate_management_force_create(
     )
 
     assert generated_certificates.count() == 1
+
+
+def _program_needing(course):
+    """A program whose only requirement is the given course."""
+    program = ProgramFactory.create()
+    program.add_requirement(course)
+    return program
+
+
+def _call_create(program, user=None, verbosity=1):
+    out = StringIO()
+    options = {"create": True, "program": program.readable_id, "verbosity": verbosity}
+    if user is not None:
+        options["user"] = user.edx_username
+    call_command("manage_program_certificates", stdout=out, **options)
+    return out.getvalue()
+
+
+def test_program_certificate_management_create_lists_missing_requirements(user):
+    """A user who hasn't met the requirements is told which ones are missing and why"""
+    course = CourseFactory.create()
+    program = _program_needing(course)
+    ProgramEnrollment.objects.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    output = _call_create(program, user=user)
+
+    assert "Certificate: not created, program requirements are not met." in output
+    assert "Use -f or --force" in output
+    assert f"✗ {course.readable_id} {course.title}: not enrolled in any run" in output
+    assert ProgramCertificate.objects.filter(user=user, program=program).count() == 0
+
+
+def test_program_certificate_management_create_reports_skip_reason(user):
+    """A skip that isn't about requirements says what it is"""
+    program = _program_needing(CourseFactory.create())
+
+    output = _call_create(program, user=user)
+
+    assert "Certificate: not created, no verified enrollment in the program." in output
+    assert "Requirements:" not in output
+
+
+@pytest.mark.parametrize("verbosity", [1, 2, 3])
+def test_program_certificate_management_bulk_create_reports_skips(verbosity):
+    """Bulk creation counts skips by reason and, with -v 2 or more, lists each user"""
+    course = CourseFactory.create()
+    program = _program_needing(course)
+    audit_user, verified_user = UserFactory.create_batch(2)
+    ProgramEnrollment.objects.create(
+        user=audit_user, program=program, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+    ProgramEnrollment.objects.create(
+        user=verified_user,
+        program=program,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
+
+    output = _call_create(program, verbosity=verbosity)
+
+    assert (
+        f"Successfully created 0 certificates for program {program.readable_id}"
+        in output
+    )
+    assert "Skipped 1 user(s): no verified enrollment in the program." in output
+    assert "Skipped 1 user(s): program requirements are not met." in output
+    listed = f"Skipped {verified_user.edx_username} ({verified_user.email})"
+    missing = f"Missing: {course.readable_id} {course.title} (not enrolled in any run)"
+    breakdown = f"✗ {course.readable_id} {course.title}: not enrolled in any run"
+    assert (listed in output) is (verbosity >= 2)
+    assert (missing in output) is (verbosity == 2)
+    assert (breakdown in output) is (verbosity == 3)
+    assert ("Run with -v 2" in output) is (verbosity == 1)
