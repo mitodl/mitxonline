@@ -982,7 +982,7 @@ class CheckoutResultSuccessView(View):
         )
 
         if order and _should_redirect_to_learn(order):
-            return _learn_dashboard_redirect(order, order_status=OrderStatus.PENDING)
+            return _learn_dashboard_redirect(order, order_status=order.state)
 
         return redirect_with_user_message(
             reverse("user-dashboard"),
@@ -990,7 +990,7 @@ class CheckoutResultSuccessView(View):
         )
 
 
-class CheckoutResultCancelView(View):
+class CheckoutResultCancelView(LoginRequiredMixin, View):
     """
     Landing page for a user who cancelled a Stripe checkout.
 
