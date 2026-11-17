@@ -254,7 +254,7 @@ def scrub_export_compliance_event(event):
     return event
 
 
-# With send_default_pii off the SDK attaches no user, so Sentry cannot count
+# With user info off the SDK attaches no user, so Sentry cannot count
 # the users an issue affects.  SENTRY_USER_HASH_KEY restores the count without
 # the identity: user.id becomes an HMAC of the user's primary key and nothing
 # else about the user is sent.  The key is the whole privacy property, because
@@ -263,7 +263,7 @@ def scrub_export_compliance_event(event):
 #
 # The write happens in before_send, the last hook to touch an event.  An event
 # processor would run before the SDK's Django user processor, which (if
-# send_default_pii were turned back on) would add email and username next to
+# user info were turned back on) would add email and username next to
 # the hash.
 USER_HASH_HEX_LENGTH = 16
 
