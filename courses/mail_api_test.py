@@ -61,9 +61,12 @@ def test_enrollment_emails_link_to_learn_dashboard(
     send_email(enrollment)
 
     message = mock_send_message.call_args[0][0]
-    # Static assets (the logo) are still served from MITx Online
+    # Static assets (the logos) are still served from MITx Online
     html = message.alternatives[0][0].replace(f"{settings.SITE_BASE_URL}/static/", "")
-    assert enrollment.run.course.title in message.subject
+    run = enrollment.run
+    assert f"{run.course_number} {run.course.title}" in message.subject
+    assert message.from_email == settings.MITOL_MAIL_FROM_EMAIL
+    assert message.extra_headers == {"Reply-To": settings.MITOL_MAIL_REPLY_TO_ADDRESS}
     if send_email is send_course_run_unenrollment_email:
         # Says which run, for learners in more than one run of the course
         assert f"starting {enrollment.run.start_date:%B} " in message.body

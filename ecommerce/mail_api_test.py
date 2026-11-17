@@ -65,7 +65,7 @@ def test_mail_api_receipt_generation(  # noqa: PLR0913
     lines = order.lines.all()
     assert str(lines[0].unit_price) in rendered_template.body
 
-    # Static assets (the logo) are still served from MITx Online
+    # Static assets (the logos) are still served from MITx Online
     html = rendered_template.alternatives[0][0].replace(
         f"{settings.SITE_BASE_URL}/static/", ""
     )
