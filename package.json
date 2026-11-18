@@ -5,10 +5,10 @@
         "frontend/*"
     ],
     "scripts": {
-        "build": "yarn workspaces foreach run build"
+        "build": "yarn workspaces foreach --all run build"
     },
     "version": "0.0.0",
-    "packageManager": "yarn@3.8.7",
+    "packageManager": "yarn@4.18.1",
     "dependencies": {
         "react-content-loader": "^6.2.1",
         "redux-query": "3.3.1",
