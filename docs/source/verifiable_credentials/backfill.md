@@ -18,10 +18,12 @@ When a certificate is issued, any error in these steps is logged to Sentry (`Err
 
 Two admin pages have a backfill action:
 
-| Admin page | Action label | Certificates processed |
-|---|---|---|
-| Courses › Programs (`/admin/courses/program/`) | *Backfill verifiable credentials for program certificates* | Active `ProgramCertificate`s for the selected programs with no credential |
-| Courses › Course runs (`/admin/courses/courserun/`) | *Backfill verifiable credentials for course run certificates* | Active `CourseRunCertificate`s for the selected runs with no credential |
+| Admin page | Action label | Certificates processed                                                           |
+|---|---|----------------------------------------------------------------------------------|
+| Courses › Programs (`/admin/courses/program/`) | *Backfill verifiable credentials for program certificates* | Active `ProgramCertificate` records for the selected programs with no credential |
+| Courses › Course runs (`/admin/courses/courserun/`) | *Backfill verifiable credentials for course run certificates* | Active `CourseRunCertificate` records for the selected runs with no credential   |
+
+![Backfill action selected in the Programs admin Action dropdown](images/admin-backfill-action.jpg)
 
 To use it:
 
