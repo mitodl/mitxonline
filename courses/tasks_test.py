@@ -11,6 +11,7 @@ from courses.factories import (
     LearnerProgramRecordShareFactory,
 )
 from courses.tasks import (
+    downgrade_enrollments,
     generate_course_certificates,
     generate_program_certificates,
     send_partner_school_email,
@@ -199,3 +200,15 @@ def test_sync_courserun_upgrade_deadline_retries_read_timeouts(mocker):
 
     with pytest.raises(Retry):
         sync_courserun_upgrade_deadline.delay(run.id)
+
+
+def test_downgrade_enrollments(mocker):
+    """The task downgrades the given enrollments via downgrade_learners"""
+    enrollments = CourseRunEnrollmentFactory.create_batch(2)
+    mock_downgrade = mocker.patch(
+        "courses.api.downgrade_learners", return_value=([], [], [])
+    )
+
+    downgrade_enrollments.delay([e.id for e in enrollments])
+
+    assert set(mock_downgrade.call_args.args[0]) == set(enrollments)

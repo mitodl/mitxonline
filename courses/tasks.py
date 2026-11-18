@@ -166,3 +166,29 @@ def upgrade_eligible_program_enrollments():
     enrollments = get_audit_program_enrollments_for_upgrade()
     for enrollment in enrollments:
         upgrade_program_enrollment_if_eligible(enrollment)
+
+
+@app.task(acks_late=True)
+def downgrade_enrollments(enrollment_ids):
+    """
+    Downgrade the given course run enrollments from verified to audit, locally
+    and in edX. Run in the background so a large admin selection doesn't hit
+    the request timeout.
+    """
+    from courses.api import downgrade_learners
+
+    enrollments = CourseRunEnrollment.all_objects.filter(
+        id__in=enrollment_ids
+    ).select_related("user", "run")
+    downgraded, failed, skipped = downgrade_learners(enrollments)
+    log.info(
+        "Downgraded %d enrollment(s) from verified to audit, %d failed, %d skipped",
+        len(downgraded),
+        len(failed),
+        len(skipped),
+    )
+    if failed:
+        log.error(
+            "Failed to downgrade enrollment(s) %s",
+            [enrollment.id for enrollment in failed],
+        )

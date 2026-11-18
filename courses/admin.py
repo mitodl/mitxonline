@@ -25,7 +25,6 @@ from courses.api import (
     VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA,
     create_run_enrollments,
     create_verifiable_credential,
-    downgrade_learners,
     summarize_verifiable_credential_certificate_statuses,
     undo_program_course_run_verification,
 )
@@ -60,6 +59,7 @@ from courses.models import (
     RelatedProgram,
     VerifiableCredential,
 )
+from courses.tasks import downgrade_enrollments
 from main.admin import (
     AuditableModelAdmin,
     DisplayOnlyAdminMixin,
@@ -1052,32 +1052,19 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
     def downgrade_enrollment(self, request, queryset):
         """
         Admin action to downgrade the selected enrollments from verified to
-        audit, locally and in edX. Inactive and non-verified enrollments are
-        skipped.
+        audit, locally and in edX. Runs in the background, since a large
+        selection takes longer than a request may last. Inactive and
+        non-verified enrollments are skipped.
         """
-        downgraded, failed, skipped = downgrade_learners(
-            queryset.select_related("user", "run")
+        enrollment_ids = list(queryset.values_list("id", flat=True))
+        downgrade_enrollments.delay(enrollment_ids)
+        self.message_user(
+            request,
+            f"Queued {len(enrollment_ids)} enrollment(s) to be downgraded from "
+            "verified to audit. Inactive and non-verified ones are skipped. "
+            "Refresh this page in a few minutes to see the result.",
+            messages.SUCCESS,
         )
-        if downgraded:
-            self.message_user(
-                request,
-                f"Downgraded {len(downgraded)} enrollment(s) from verified to audit.",
-                messages.SUCCESS,
-            )
-        if failed:
-            emails = ", ".join(enrollment.user.email for enrollment in failed)
-            self.message_user(
-                request,
-                f"Failed to downgrade {len(failed)} enrollment(s): {emails}. "
-                "Check the logs for details.",
-                messages.ERROR,
-            )
-        if skipped:
-            self.message_user(
-                request,
-                f"Skipped {len(skipped)} enrollment(s) that weren't active and verified.",
-                messages.WARNING,
-            )
 
     @admin.action(description="Undo verification from program entitlement")
     def undo_program_entitlement_verification(self, request, queryset):

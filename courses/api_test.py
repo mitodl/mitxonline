@@ -1620,6 +1620,51 @@ def test_downgrade_learners(mocker):
     assert inactive.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
 
 
+def test_downgrade_learners_rereads_each_row(mocker):
+    """A learner who unenrolled after the batch was loaded is skipped, not reactivated"""
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+    stale = CourseRunEnrollmentFactory.create(
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    CourseRunEnrollment.all_objects.filter(id=stale.id).update(active=False)
+
+    downgraded, failed, skipped = downgrade_learners([stale])
+
+    assert (downgraded, failed, skipped) == ([], [], [stale])
+    patched_edx_enroll.assert_not_called()
+    stale.refresh_from_db()
+    assert stale.active is False
+
+
+def test_downgrade_learners_resets_repair_retries(mocker):
+    """
+    A new downgrade resets an exhausted repair retry count, so the repair job
+    retries the edX downgrade if it fails.
+    """
+    mocker.patch("courses.api.enroll_in_edx_course_runs", side_effect=HTTPError)
+    enrollment = CourseRunEnrollmentFactory.create(
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE, edx_enrollment_retry_count=99
+    )
+
+    _, failed, _ = downgrade_learners([enrollment])
+
+    assert failed == [enrollment]
+    enrollment.refresh_from_db()
+    assert enrollment.edx_enrollment_retry_count == 0
+    assert enrollment.edx_enrolled is False
+    assert enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+
+
+def test_downgrade_learners_local_failure_is_a_failure(mocker):
+    """A failed local downgrade counts as failed even if edX succeeded"""
+    mocker.patch("courses.api.downgrade_learner", return_value=([], True))
+    enrollment = CourseRunEnrollmentFactory.create(
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    assert downgrade_learners([enrollment]) == ([], [enrollment], [])
+
+
 def test_country_blocked_error_message(user):
     """The exception stringifies to a readable message."""
     course = CourseFactory.create()
@@ -6474,6 +6519,21 @@ class TestUndoProgramCourseRunVerification:
         assert enrollment.active is False
         assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
         mock_edx.assert_not_called()
+
+    def test_local_downgrade_failure_rolls_back_orders(self, mocker, enrollment):
+        """
+        If the local downgrade fails, the order cancellation is rolled back
+        rather than leaving the learner verified with no order behind it.
+        """
+        order = self._run_order(enrollment, redemption_type=REDEMPTION_TYPE_INTERNAL)
+        mocker.patch("courses.api.downgrade_learner", return_value=([], True))
+
+        with pytest.raises(ValueError, match="couldn't be downgraded locally"):
+            undo_program_course_run_verification(enrollment)
+
+        order.refresh_from_db()
+        assert order.state == OrderStatus.FULFILLED
+        assert PaidCourseRun.objects.filter(order=order).exists()
 
     def test_refuses_non_verified_enrollment(self, mock_edx, enrollment):
         """Only a verified enrollment can be undone"""

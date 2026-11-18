@@ -551,15 +551,9 @@ def test_undo_program_entitlement_verification_action_inactive(mocker, admin_cli
 
 
 def test_downgrade_enrollment_action(mocker, admin_client):
-    """The downgrade action downgrades every selected enrollment and reports each outcome"""
-    downgraded = CourseRunEnrollmentFactory.create_batch(2)
-    failed = CourseRunEnrollmentFactory.create()
-    skipped = CourseRunEnrollmentFactory.create()
-    mock_downgrade = mocker.patch(
-        "courses.admin.downgrade_learners",
-        return_value=(downgraded, [failed], [skipped]),
-    )
-    selected = [*downgraded, failed, skipped]
+    """The downgrade action queues every selected enrollment for a background downgrade"""
+    selected = CourseRunEnrollmentFactory.create_batch(3)
+    mock_task = mocker.patch("courses.admin.downgrade_enrollments.delay")
 
     response = admin_client.post(
         reverse("admin:courses_courserunenrollment_changelist"),
@@ -570,10 +564,6 @@ def test_downgrade_enrollment_action(mocker, admin_client):
         follow=True,
     )
 
-    assert set(mock_downgrade.call_args.args[0]) == set(selected)
+    assert sorted(mock_task.call_args.args[0]) == sorted(e.id for e in selected)
     message_texts = [str(m) for m in response.context["messages"]]
-    assert "Downgraded 2 enrollment(s) from verified to audit." in message_texts
-    assert any(
-        "Failed to downgrade 1" in t and failed.user.email in t for t in message_texts
-    )
-    assert any("Skipped 1 enrollment(s)" in t for t in message_texts)
+    assert any("Queued 3 enrollment(s)" in t for t in message_texts)

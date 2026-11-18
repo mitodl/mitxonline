@@ -688,8 +688,9 @@ def downgrade_learners(enrollments):
     Downgrade each active verified enrollment to audit, via downgrade_learner.
 
     Inactive enrollments are skipped rather than downgraded, since
-    downgrade_learner would reactivate them. One enrollment failing doesn't
-    stop the rest.
+    downgrade_learner would reactivate them. Each row is re-read just before
+    it's checked, so a learner who unenrolls while a long batch runs isn't
+    reactivated. One enrollment failing doesn't stop the rest.
 
     Args:
         enrollments (iterable of CourseRunEnrollment): the enrollments to downgrade
@@ -700,14 +701,21 @@ def downgrade_learners(enrollments):
     """
     downgraded, failed, skipped = [], [], []
     for enrollment in enrollments:
+        enrollment.refresh_from_db(fields=["active", "enrollment_mode"])
         if (
             not enrollment.active
             or enrollment.enrollment_mode != EDX_ENROLLMENT_VERIFIED_MODE
         ):
             skipped.append(enrollment)
             continue
+        # A fresh attempt: if edX fails, the repair job should retry it even
+        # if an earlier failure had used up the retries.
+        if enrollment.edx_enrollment_retry_count:
+            enrollment.edx_enrollment_retry_count = 0
+            enrollment.save(update_fields=["edx_enrollment_retry_count"])
         try:
-            _, edx_success = downgrade_learner(enrollment)
+            local_enrollments, edx_success = downgrade_learner(enrollment)
+            success = bool(local_enrollments) and edx_success
         except Exception:
             log.exception(
                 "Failed to downgrade enrollment %s for user %s in %s",
@@ -715,8 +723,8 @@ def downgrade_learners(enrollments):
                 enrollment.user.email,
                 enrollment.run.courseware_id,
             )
-            edx_success = False
-        (downgraded if edx_success else failed).append(enrollment)
+            success = False
+        (downgraded if success else failed).append(enrollment)
     return downgraded, failed, skipped
 
 
@@ -749,7 +757,8 @@ def undo_program_course_run_verification(enrollment):
         ValueError: if the enrollment isn't verified, is
             B2B-provisioned, isn't backed by a program entitlement order, or is
             also backed by some other fulfilled order (e.g. a real purchase of
-            the run)
+            the run), or if the local downgrade fails (the order changes are
+            rolled back)
     """
     user, run = enrollment.user, enrollment.run
     if enrollment.enrollment_mode != EDX_ENROLLMENT_VERIFIED_MODE:
@@ -790,7 +799,15 @@ def undo_program_course_run_verification(enrollment):
             user=user, course_run=run, order__in=entitlement_orders
         ).delete()
         if enrollment.active:
-            _, edx_success = downgrade_learner(enrollment)
+            local_enrollments, edx_success = downgrade_learner(enrollment)
+            if not local_enrollments:
+                # Roll back the order cancellations rather than leave the
+                # learner verified with no order behind it.
+                msg = (
+                    f"{user.email}'s enrollment in {run.courseware_id} couldn't "
+                    "be downgraded locally; its orders were left unchanged"
+                )
+                raise ValueError(msg)
         else:
             enrollment.update_mode_and_save(EDX_ENROLLMENT_AUDIT_MODE, no_user=True)
             edx_success = True
@@ -887,6 +904,7 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
         mode=EDX_ENROLLMENT_AUDIT_MODE,
         change_status=ENROLL_CHANGE_STATUS_REFUNDED,
         keep_failed_enrollments=True,
+        skip_compliance_check=True,
         skip_country_block_check=True,
     )
 
