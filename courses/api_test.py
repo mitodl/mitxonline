@@ -52,6 +52,7 @@ from courses.api import (
     VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA,
     VERIFIABLE_CREDENTIAL_STATUS_ENABLED,
     VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA,
+    ProgramCertificateSkipReason,
     _has_earned_program_cert,
     check_course_modes,
     check_enrollment_eligibility,
@@ -62,10 +63,12 @@ from courses.api import (
     defer_enrollment,
     downgrade_learner,
     downgrade_program_enrollment_and_verified_runs,
+    explain_program_requirements,
     generate_course_run_certificates,
     generate_missing_program_certificates,
     generate_openedx_course_url,
     generate_program_certificate,
+    generate_program_certificate_with_result,
     get_audit_program_enrollments_for_upgrade,
     get_certificate_grade_eligible_runs,
     get_eligible_program_certificate_candidates,
@@ -6477,3 +6480,190 @@ class TestUndoProgramCourseRunVerification:
             undo_program_course_run_verification(enrollment)
 
         mock_edx.assert_not_called()
+
+
+@pytest.fixture
+def core_and_electives_program():
+    """A program needing courses 0 and 1, and at least 1 of courses 2 and 3."""
+    program = ProgramFactory.create()
+    courses = CourseFactory.create_batch(4)
+    root = program.requirements_root
+    core = root.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Core",
+    )
+    electives = root.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=1,
+        title="Electives",
+        elective_flag=True,
+    )
+    for course in courses[:2]:
+        core.add_child(node_type=ProgramRequirementNodeType.COURSE, course=course)
+    for course in courses[2:]:
+        electives.add_child(node_type=ProgramRequirementNodeType.COURSE, course=course)
+    return program, courses
+
+
+def _details_by_course(result):
+    return {
+        leaf.label.split(" ")[0]: leaf.detail
+        for group in result.children
+        for leaf in group.children
+    }
+
+
+def test_explain_program_requirements_gives_each_unmet_course_a_reason(
+    user, core_and_electives_program
+):
+    """Each unmet course says why it doesn't count, and the result matches eligibility"""
+    program, courses = core_and_electives_program
+    # Course 0: passed with a certificate.
+    passed_run = CourseRunFactory.create(course=courses[0])
+    CourseRunEnrollmentFactory.create(user=user, run=passed_run)
+    CourseRunCertificateFactory.create(user=user, course_run=passed_run)
+    # Course 1: has a certificate, but the enrollment was deferred.
+    deferred_run = CourseRunFactory.create(course=courses[1])
+    CourseRunEnrollmentFactory.create(
+        user=user, run=deferred_run, change_status=ENROLL_CHANGE_STATUS_DEFERRED
+    )
+    CourseRunCertificateFactory.create(user=user, course_run=deferred_run)
+    # Course 2: passing grade in a run that offers verified, with no certificate.
+    graded_run = CourseRunFactory.create(course=courses[2])
+    CourseRunEnrollmentFactory.create(user=user, run=graded_run)
+    CourseRunGradeFactory.create(user=user, course_run=graded_run, passed=True)
+    # Course 3: not enrolled.
+
+    result = explain_program_requirements(user, program)
+
+    assert result.satisfied is False
+    assert result.satisfied is _has_earned_program_cert(user, program)
+    assert [group.satisfied for group in result.children] == [False, False]
+    details = _details_by_course(result)
+    assert details[courses[0].readable_id] == ""
+    assert details[courses[1].readable_id] == (
+        f'enrollment in {deferred_run.courseware_id} is marked "deferred" '
+        "(active), so it doesn't count"
+    )
+    assert details[courses[2].readable_id] == (
+        f"passed {graded_run.courseware_id}, but it offers the verified track, "
+        "so a course certificate is needed"
+    )
+    assert details[courses[3].readable_id] == "not enrolled in any run"
+
+
+def test_explain_program_requirements_other_course_reasons(
+    user, core_and_electives_program
+):
+    """Revoked certificates, inactive enrollments and missing grades are each reported"""
+    program, courses = core_and_electives_program
+    revoked_run = CourseRunFactory.create(course=courses[0])
+    CourseRunEnrollmentFactory.create(user=user, run=revoked_run)
+    CourseRunCertificateFactory.create(
+        user=user, course_run=revoked_run, is_revoked=True
+    )
+    inactive_run = CourseRunFactory.create(course=courses[1])
+    CourseRunEnrollmentFactory.create(user=user, run=inactive_run, active=False)
+    ungraded_run = CourseRunFactory.create(course=courses[2])
+    CourseRunEnrollmentFactory.create(user=user, run=ungraded_run)
+    # An audit-only run counts on a passing grade alone.
+    audit_mode = EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)
+    audit_run = CourseRunFactory.create(
+        course=courses[3], enrollment_modes=[audit_mode]
+    )
+    CourseRunEnrollmentFactory.create(user=user, run=audit_run)
+    CourseRunGradeFactory.create(user=user, course_run=audit_run, passed=True)
+
+    result = explain_program_requirements(user, program)
+
+    assert result.satisfied is False
+    assert _has_earned_program_cert(user, program) is False
+    assert [group.satisfied for group in result.children] == [False, True]
+    details = _details_by_course(result)
+    assert details[courses[0].readable_id] == (
+        f"certificate in {revoked_run.courseware_id} is revoked"
+    )
+    assert details[courses[1].readable_id] == (
+        f"enrollment in {inactive_run.courseware_id} is inactive"
+    )
+    assert details[courses[2].readable_id] == (
+        f"enrolled in {ungraded_run.courseware_id} with no course certificate "
+        "or passing grade"
+    )
+    assert details[courses[3].readable_id] == ""
+
+
+def test_explain_program_requirements_required_programs(user):
+    """A paid required program needs its certificate; an unpaid one shows its own tree"""
+    # ProgramFactory's default verified mode requires payment.
+    paid_program = ProgramFactory.create()
+    unpaid_program = ProgramFactory.create(
+        enrollment_modes=[
+            EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)
+        ]
+    )
+    unpaid_course = CourseFactory.create()
+    unpaid_program.add_requirement(unpaid_course)
+    program = ProgramFactory.create()
+    program.add_program_requirement(paid_program)
+    program.add_program_requirement(unpaid_program)
+
+    result = explain_program_requirements(user, program)
+
+    assert result.satisfied is False
+    assert _has_earned_program_cert(user, program) is False
+    paid_result, unpaid_result = result.children[0].children
+    assert paid_result.satisfied is False
+    assert paid_result.detail == "no program certificate"
+    assert unpaid_result.satisfied is False
+    assert [leaf.label for leaf in unpaid_result.unmet_leaves()] == [
+        f"{unpaid_course.readable_id} {unpaid_course.title}"
+    ]
+
+    ProgramCertificateFactory.create(user=user, program=paid_program)
+    paid_result = explain_program_requirements(user, program).children[0].children[0]
+    assert paid_result.satisfied is True
+
+
+def test_explain_program_requirements_without_requirements(user):
+    """A program with no requirements root has nothing to explain"""
+    program = ProgramFactory.create()
+    program.all_requirements.all().delete()
+
+    assert explain_program_requirements(user, program) is None
+
+
+def test_generate_program_certificate_with_result_skip_reasons(
+    user, core_and_electives_program, mocker
+):
+    """Each reason for not returning a certificate is reported"""
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_user")
+    program, _ = core_and_electives_program
+
+    result = generate_program_certificate_with_result(user, program)
+    assert result == (
+        None,
+        False,
+        ProgramCertificateSkipReason.NO_VERIFIED_ENROLLMENT,
+    )
+
+    ProgramEnrollmentFactory.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    result = generate_program_certificate_with_result(user, program)
+    assert result == (None, False, ProgramCertificateSkipReason.REQUIREMENTS_NOT_MET)
+
+    program.certificates_disabled = True
+    program.save()
+    result = generate_program_certificate_with_result(user, program, force_create=True)
+    assert result == (
+        None,
+        False,
+        ProgramCertificateSkipReason.CERTIFICATES_DISABLED,
+    )
+    assert generate_program_certificate(user, program, force_create=True) == (
+        None,
+        False,
+    )
