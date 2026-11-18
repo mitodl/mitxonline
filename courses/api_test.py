@@ -61,6 +61,7 @@ from courses.api import (
     deactivate_run_enrollment,
     defer_enrollment,
     downgrade_learner,
+    downgrade_learners,
     downgrade_program_enrollment_and_verified_runs,
     generate_course_run_certificates,
     generate_missing_program_certificates,
@@ -1559,7 +1560,10 @@ def test_create_run_enrollments_skips_country_check_when_requested(
 
 
 def test_downgrade_learner_skips_country_block(mocker, user):
-    """Refund downgrades must still work for a learner whose country is blocked."""
+    """
+    Refund downgrades must still work for a learner whose country is blocked
+    or who can't be export-compliance screened.
+    """
     run = CourseRunFactory.create()
     BlockedCountryFactory.create(course=run.course, country=user.legal_address.country)
     enrollment = CourseRunEnrollmentFactory.create(
@@ -1572,6 +1576,48 @@ def test_downgrade_learner_skips_country_block(mocker, user):
     downgrade_learner(enrollment)
 
     assert patched_create.call_args.kwargs["skip_country_block_check"] is True
+    assert patched_create.call_args.kwargs["skip_compliance_check"] is True
+
+
+def test_downgrade_learners(mocker):
+    """
+    Active verified enrollments are downgraded in edX and locally; inactive and
+    audit ones are skipped, and an edX failure is reported without stopping the
+    rest.
+    """
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api")
+    verified = CourseRunEnrollmentFactory.create(
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    edx_failure = CourseRunEnrollmentFactory.create(
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    inactive = CourseRunEnrollmentFactory.create(
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE, active=False
+    )
+    audit = CourseRunEnrollmentFactory.create(enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE)
+
+    def fail_for_one_user(user, runs, mode):
+        if user == edx_failure.user:
+            raise HTTPError
+
+    patched_edx_enroll.side_effect = fail_for_one_user
+
+    downgraded, failed, skipped = downgrade_learners(
+        [verified, edx_failure, inactive, audit]
+    )
+
+    assert downgraded == [verified]
+    assert failed == [edx_failure]
+    assert skipped == [inactive, audit]
+    assert patched_edx_enroll.call_count == 2
+    for enrollment in (verified, edx_failure):
+        enrollment.refresh_from_db()
+        assert enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+    inactive.refresh_from_db()
+    assert inactive.active is False
+    assert inactive.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
 
 
 def test_country_blocked_error_message(user):

@@ -671,13 +671,53 @@ def downgrade_learner(enrollment):
 
     # Forcing the enrollment here - if the refund comes after the end date
     # for the course for whatever reason, we still want to revert the mode.
+    # Downgrading only reduces access, so neither the country block nor the
+    # export compliance screening applies.
     return create_run_enrollments(
         user=enrollment.user,
         runs=[enrollment.run],
         keep_failed_enrollments=True,
         mode=EDX_ENROLLMENT_AUDIT_MODE,
+        skip_compliance_check=True,
         skip_country_block_check=True,
     )
+
+
+def downgrade_learners(enrollments):
+    """
+    Downgrade each active verified enrollment to audit, via downgrade_learner.
+
+    Inactive enrollments are skipped rather than downgraded, since
+    downgrade_learner would reactivate them. One enrollment failing doesn't
+    stop the rest.
+
+    Args:
+        enrollments (iterable of CourseRunEnrollment): the enrollments to downgrade
+
+    Returns:
+        tuple[list, list, list] of CourseRunEnrollment: the downgraded, failed
+        and skipped enrollments
+    """
+    downgraded, failed, skipped = [], [], []
+    for enrollment in enrollments:
+        if (
+            not enrollment.active
+            or enrollment.enrollment_mode != EDX_ENROLLMENT_VERIFIED_MODE
+        ):
+            skipped.append(enrollment)
+            continue
+        try:
+            _, edx_success = downgrade_learner(enrollment)
+        except Exception:
+            log.exception(
+                "Failed to downgrade enrollment %s for user %s in %s",
+                enrollment.id,
+                enrollment.user.email,
+                enrollment.run.courseware_id,
+            )
+            edx_success = False
+        (downgraded if edx_success else failed).append(enrollment)
+    return downgraded, failed, skipped
 
 
 def undo_program_course_run_verification(enrollment):

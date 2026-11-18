@@ -548,3 +548,32 @@ def test_undo_program_entitlement_verification_action_inactive(mocker, admin_cli
 
     message_texts = [str(m) for m in response.context["messages"]]
     assert any("left inactive" in t and "mitxonline-test-2" in t for t in message_texts)
+
+
+def test_downgrade_enrollment_action(mocker, admin_client):
+    """The downgrade action downgrades every selected enrollment and reports each outcome"""
+    downgraded = CourseRunEnrollmentFactory.create_batch(2)
+    failed = CourseRunEnrollmentFactory.create()
+    skipped = CourseRunEnrollmentFactory.create()
+    mock_downgrade = mocker.patch(
+        "courses.admin.downgrade_learners",
+        return_value=(downgraded, [failed], [skipped]),
+    )
+    selected = [*downgraded, failed, skipped]
+
+    response = admin_client.post(
+        reverse("admin:courses_courserunenrollment_changelist"),
+        {
+            "action": "downgrade_enrollment",
+            "_selected_action": [str(enrollment.id) for enrollment in selected],
+        },
+        follow=True,
+    )
+
+    assert set(mock_downgrade.call_args.args[0]) == set(selected)
+    message_texts = [str(m) for m in response.context["messages"]]
+    assert "Downgraded 2 enrollment(s) from verified to audit." in message_texts
+    assert any(
+        "Failed to downgrade 1" in t and failed.user.email in t for t in message_texts
+    )
+    assert any("Skipped 1 enrollment(s)" in t for t in message_texts)
