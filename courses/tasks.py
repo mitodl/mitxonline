@@ -196,12 +196,14 @@ def downgrade_enrollments(enrollment_ids):
         ):
             skipped += 1
             continue
-        # A fresh attempt: if edX fails, the repair job should retry it even
-        # if an earlier failure had used up the retries.
-        enrollment.edx_enrollment_retry_count = 0
-        enrollment.save(update_fields=["edx_enrollment_retry_count"])
         try:
             local_enrollments, edx_success = downgrade_learner(enrollment)
+            if not edx_success:
+                # The row is audit now; give the repair job fresh retries to
+                # push audit to edX, even if an earlier failure used them up.
+                CourseRunEnrollment.all_objects.filter(id=enrollment_id).update(
+                    edx_enrollment_retry_count=0
+                )
         except Exception:
             log.exception("Failed to downgrade enrollment %s", enrollment_id)
             local_enrollments, edx_success = [], False

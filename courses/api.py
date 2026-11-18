@@ -672,7 +672,7 @@ def downgrade_learner(enrollment):
     # Forcing the enrollment here - if the refund comes after the end date
     # for the course for whatever reason, we still want to revert the mode.
     # Downgrading only reduces access, so neither the country block nor the
-    # export compliance screening applies.
+    # export compliance screening applies, and no enrollment email is sent.
     return create_run_enrollments(
         user=enrollment.user,
         runs=[enrollment.run],
@@ -680,6 +680,7 @@ def downgrade_learner(enrollment):
         mode=EDX_ENROLLMENT_AUDIT_MODE,
         skip_compliance_check=True,
         skip_country_block_check=True,
+        skip_enrollment_emails=True,
     )
 
 
