@@ -52,7 +52,7 @@
     "yup": "0.31.1"
   },
   "engines": {
-    "node": ">=17.8 <18"
+    "node": ">=20.18"
   },
   "scripts": {
     "build": "node ../../node_modules/.bin/webpack --bail",
