@@ -12,14 +12,18 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.views.generic import TemplateView
 from mitol.common.admin import TimestampedModelAdmin
-from mitol.payment_gateway.models import StripeWebhookSecret, StripeWebhookSecretRoute
+from mitol.payment_gateway.models import (
+    StripePaymentMethodType,
+    StripeWebhookSecret,
+    StripeWebhookSecretRoute,
+)
 from reversion.admin import VersionAdmin
 from viewflow import fsm
 
 from ecommerce.api import refund_order
 from ecommerce.constants import REDEMPTION_TYPE_INTERNAL
 from ecommerce.discount_sources import fulfilled_redemptions_funded_by
-from ecommerce.forms import AdminRefundOrderForm
+from ecommerce.forms import AdminRefundOrderForm, StripePaymentMethodTypeAdminForm
 from ecommerce.models import (
     Basket,
     BasketDiscount,
@@ -637,3 +641,21 @@ class StripeWebhookSecretAdmin(admin.ModelAdmin):
         """Return the all_objects manager."""
 
         return StripeWebhookSecret.all_objects
+
+
+@admin.register(StripePaymentMethodType)
+class StripePaymentMethodTypeAdmin(admin.ModelAdmin):
+    """Admin for the StripePaymentMethodType model from payment_gateway."""
+
+    model = StripePaymentMethodType
+    form = StripePaymentMethodTypeAdminForm
+    list_display = [
+        "name",
+        "gateway",
+        "is_default",
+        "stripe_type",
+        "stripe_id",
+    ]
+    list_filter = [
+        "is_default",
+    ]
