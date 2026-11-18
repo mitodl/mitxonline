@@ -24,7 +24,16 @@ from location.dataclasses import UserCalculatedLocation
 from main.models import ValidateOnSaveMixin
 
 
-class ActiveObjectManager(models.Manager):
+class SoftDeleteQuerySet(models.QuerySet):
+    """QuerySet that soft-deletes instead of removing rows."""
+
+    def delete(self):
+        """Mark the matched rows inactive rather than deleting them."""
+
+        return self.update(is_active=False, deleted_on=now_in_utc())
+
+
+class ActiveObjectManager(models.Manager.from_queryset(SoftDeleteQuerySet)):
     """Query manager for active objects"""
 
     def get_queryset(self):
@@ -39,7 +48,7 @@ class SoftDeleteTimestampedModel(TimestampedModel):
     is_active = models.BooleanField(blank=True, default=True)
 
     objects = ActiveObjectManager()
-    all_objects = models.Manager()
+    all_objects = SoftDeleteQuerySet.as_manager()
 
     def clean(self):
         """Ensure the deleted_on field is set if is_active=False."""
@@ -133,7 +142,7 @@ class LocationFlag(SoftDeleteTimestampedModel, ValidateOnSaveMixin):
             msg = f"Rule {location_flag.determination_rule} has no rule model."
             raise ValueError(msg)
 
-        return mapping[location_flag.determination_rule].objects.get(
+        return mapping[location_flag.determination_rule].all_objects.get(
             pk=location_flag.pk
         )
 

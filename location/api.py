@@ -109,7 +109,7 @@ def determine_user_flags(request, *, flag_type=None):
 
     Args:
     - request (Request): the current request
-    - flag_type (None or list): a list of flagged countries
+    - flag_type (None or str): the flag type to filter on (one of LOCATION_FLAG_TYPES)
 
     Returns:
     - list[LocationFlag]: The matching flags

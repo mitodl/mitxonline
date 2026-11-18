@@ -46,19 +46,10 @@ def _make_request(user=None):
     return request
 
 
-def _make_user(country):
-    """Make a user with a legal address in the given country."""
-
-    user = UserFactory.create()
-    user.legal_address.country = country
-    user.legal_address.save()
-    return user
-
-
 def test_determine_user_location(mock_geoip):
     """Location should come from both the profile and GeoIP."""
 
-    request = _make_request(_make_user("US"))
+    request = _make_request(UserFactory.create(legal_address__country="US"))
 
     assert determine_user_location(request) == [
         UserCalculatedLocation(
@@ -96,7 +87,7 @@ def test_determine_user_location_no_legal_address(mock_geoip):
 def test_determine_user_location_blank_country(mock_geoip):
     """Users without a country in their legal address should only get a GeoIP location."""
 
-    request = _make_request(_make_user(""))
+    request = _make_request(UserFactory.create(legal_address__country=""))
 
     assert determine_user_location(request) == [
         UserCalculatedLocation(
@@ -114,7 +105,9 @@ def test_determine_user_location_force_country(
 
     settings.LOCATION_FORCE_COUNTRY = "FR"
     settings.LOCATION_FORCE_PROFILE_COUNTRY = force_profile
-    request = _make_request(_make_user("US") if authenticated else None)
+    request = _make_request(
+        UserFactory.create(legal_address__country="US") if authenticated else None
+    )
 
     assert determine_user_location(request) == [
         UserCalculatedLocation(
@@ -134,7 +127,9 @@ def test_determine_user_location_force_profile(settings, mock_geoip, authenticat
     """LOCATION_FORCE_PROFILE_COUNTRY should skip the GeoIP lookup."""
 
     settings.LOCATION_FORCE_PROFILE_COUNTRY = True
-    request = _make_request(_make_user("US") if authenticated else None)
+    request = _make_request(
+        UserFactory.create(legal_address__country="US") if authenticated else None
+    )
 
     expected = (
         [
@@ -171,7 +166,7 @@ def test_determine_user_flags_no_locations(settings, mock_geoip):
 def test_determine_user_flags(mock_geoip):
     """Only flags that match the user's location and pass their rule should be returned."""
 
-    request = _make_request(_make_user("US"))
+    request = _make_request(UserFactory.create(legal_address__country="US"))
 
     profile_flag = LocationFlagFactory.create(
         country_code="US", determination_rule=LOCATION_FLAG_RULE_MATCH_PROFILE_ANY

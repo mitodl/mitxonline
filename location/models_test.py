@@ -194,6 +194,32 @@ def test_soft_delete():
     assert LocationFlag.all_objects.filter(pk=flag.pk).exists()
 
 
+@pytest.mark.parametrize("manager_name", ["objects", "all_objects"])
+def test_queryset_soft_delete(manager_name):
+    """Deleting through a queryset should deactivate rows rather than remove them."""
+
+    flags = LocationFlagFactory.create_batch(2)
+    manager = getattr(LocationFlag, manager_name)
+    manager.filter(pk__in=[flag.pk for flag in flags]).delete()
+
+    for flag in flags:
+        flag.refresh_from_db()
+        assert flag.is_active is False
+        assert flag.deleted_on is not None
+    assert not LocationFlag.objects.filter(pk__in=[f.pk for f in flags]).exists()
+
+
+def test_evaluate_deleted_flag():
+    """Evaluating a soft-deleted flag should still work via the rule model."""
+
+    flag = LocationFlagFactory.create(
+        country_code=FLAG_COUNTRY, determination_rule=LOCATION_FLAG_RULE_MATCH_ANY
+    )
+    flag.delete()
+
+    assert flag.evaluate(LOCATION_SCENARIOS["profile-match-geoip-match"]) is True
+
+
 def test_clean_sets_deleted_on():
     """Saving an inactive flag without a deleted_on date should set one."""
 
