@@ -6,6 +6,12 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages import get_messages
 from django.test import RequestFactory
 from django.urls import NoReverseMatch, reverse
+from mitol.payment_gateway.constants import (
+    MITOL_PAYMENT_GATEWAY_STRIPE,
+    STRIPE_PAYMENT_METHOD_TYPE_BUILTIN,
+    STRIPE_PAYMENT_METHOD_TYPE_CUSTOM,
+)
+from mitol.payment_gateway.models import StripePaymentMethodType
 from reversion.models import Version
 
 from courses.factories import CourseRunFactory
@@ -366,3 +372,134 @@ def test_discount_admin_locks_redemption_type_for_internal_discounts(
     )
 
     assert ("redemption_type" in readonly) is locked
+
+
+def _stripe_payment_method_type_url(obj=None):
+    """Return the admin add URL, or the change URL for the given object."""
+
+    if obj is None:
+        return reverse("admin:payment_gateway_stripepaymentmethodtype_add")
+
+    return reverse(
+        "admin:payment_gateway_stripepaymentmethodtype_change", args=[obj.pk]
+    )
+
+
+def test_stripe_payment_method_type_admin_form_fields(client, admin_user):
+    """The add form should show the Stripe fields, not gateway or gateway_data."""
+
+    _login_admin(client, admin_user)
+
+    response = client.get(_stripe_payment_method_type_url())
+
+    assert response.status_code == 200
+    form_fields = response.context["adminform"].form.fields
+    assert set(form_fields) == {"name", "stripe_type", "stripe_id", "is_default"}
+
+
+def test_stripe_payment_method_type_admin_create(client, admin_user):
+    """Creating a payment method should store the Stripe fields in gateway_data."""
+
+    _login_admin(client, admin_user)
+
+    response = client.post(
+        _stripe_payment_method_type_url(),
+        {
+            "name": "Test method",
+            "stripe_type": STRIPE_PAYMENT_METHOD_TYPE_CUSTOM,
+            "stripe_id": "cpmt_123",
+            "is_default": "on",
+            # These aren't on the form, so they should be ignored.
+            "gateway": "not-stripe",
+            "gateway_data": '{"type": "builtin", "id": "card"}',
+        },
+    )
+
+    assert response.status_code == 302
+    method = StripePaymentMethodType.objects.get(name="Test method")
+    assert method.gateway == MITOL_PAYMENT_GATEWAY_STRIPE
+    assert method.gateway_data == {
+        "type": STRIPE_PAYMENT_METHOD_TYPE_CUSTOM,
+        "id": "cpmt_123",
+    }
+    assert method.is_default is True
+
+
+def test_stripe_payment_method_type_admin_change(client, admin_user):
+    """The change form should load and save the Stripe fields."""
+
+    _login_admin(client, admin_user)
+    method = StripePaymentMethodType.objects.create(
+        name="Card",
+        gateway_data={"type": STRIPE_PAYMENT_METHOD_TYPE_BUILTIN, "id": "card"},
+    )
+
+    response = client.get(_stripe_payment_method_type_url(method))
+
+    form = response.context["adminform"].form
+    assert form.initial["stripe_type"] == STRIPE_PAYMENT_METHOD_TYPE_BUILTIN
+    assert form.initial["stripe_id"] == "card"
+
+    response = client.post(
+        _stripe_payment_method_type_url(method),
+        {
+            "name": "Card",
+            "stripe_type": STRIPE_PAYMENT_METHOD_TYPE_BUILTIN,
+            "stripe_id": "us_bank_account",
+        },
+    )
+
+    assert response.status_code == 302
+    method.refresh_from_db()
+    assert method.gateway_data == {
+        "type": STRIPE_PAYMENT_METHOD_TYPE_BUILTIN,
+        "id": "us_bank_account",
+    }
+    assert method.is_default is False
+
+
+@pytest.mark.parametrize(
+    ("stripe_type", "stripe_id"),
+    [
+        (STRIPE_PAYMENT_METHOD_TYPE_CUSTOM, "card"),
+        (STRIPE_PAYMENT_METHOD_TYPE_BUILTIN, "cpmt_123"),
+    ],
+)
+def test_stripe_payment_method_type_admin_invalid_data(
+    client, admin_user, stripe_type, stripe_id
+):
+    """Model validation errors should show on the form instead of crashing."""
+
+    _login_admin(client, admin_user)
+
+    response = client.post(
+        _stripe_payment_method_type_url(),
+        {"name": "Bad method", "stripe_type": stripe_type, "stripe_id": stripe_id},
+    )
+
+    assert response.status_code == 200
+    assert response.context["adminform"].form.non_field_errors()
+    assert not StripePaymentMethodType.objects.filter(name="Bad method").exists()
+
+
+def test_stripe_payment_method_type_admin_duplicate_name(client, admin_user):
+    """A name already used by another Stripe payment method should be rejected."""
+
+    _login_admin(client, admin_user)
+    StripePaymentMethodType.objects.create(
+        name="Card",
+        gateway_data={"type": STRIPE_PAYMENT_METHOD_TYPE_BUILTIN, "id": "card"},
+    )
+
+    response = client.post(
+        _stripe_payment_method_type_url(),
+        {
+            "name": "Card",
+            "stripe_type": STRIPE_PAYMENT_METHOD_TYPE_BUILTIN,
+            "stripe_id": "card",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "name" in response.context["adminform"].form.errors
+    assert StripePaymentMethodType.objects.filter(name="Card").count() == 1
