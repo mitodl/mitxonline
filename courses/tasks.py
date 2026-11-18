@@ -15,6 +15,7 @@ from courses.models import (
     LearnerProgramRecordShare,
 )
 from main.celery import app
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 
 log = logging.getLogger(__name__)
 
@@ -174,21 +175,46 @@ def downgrade_enrollments(enrollment_ids):
     Downgrade the given course run enrollments from verified to audit, locally
     and in edX. Run in the background so a large admin selection doesn't hit
     the request timeout.
-    """
-    from courses.api import downgrade_learners
 
-    enrollments = CourseRunEnrollment.all_objects.filter(
-        id__in=enrollment_ids
-    ).select_related("user", "run")
-    downgraded, failed, skipped = downgrade_learners(enrollments)
+    Inactive and non-verified enrollments are skipped, since downgrade_learner
+    would reactivate an inactive one. Each row is re-read just before it's
+    checked, so a learner who unenrolls while the batch runs isn't reactivated.
+    """
+    from courses.api import downgrade_learner
+
+    downgraded, failed, skipped = 0, [], 0
+    for enrollment_id in enrollment_ids:
+        enrollment = (
+            CourseRunEnrollment.all_objects.select_related("user", "run")
+            .filter(id=enrollment_id)
+            .first()
+        )
+        if (
+            enrollment is None
+            or not enrollment.active
+            or enrollment.enrollment_mode != EDX_ENROLLMENT_VERIFIED_MODE
+        ):
+            skipped += 1
+            continue
+        # A fresh attempt: if edX fails, the repair job should retry it even
+        # if an earlier failure had used up the retries.
+        enrollment.edx_enrollment_retry_count = 0
+        enrollment.save(update_fields=["edx_enrollment_retry_count"])
+        try:
+            local_enrollments, edx_success = downgrade_learner(enrollment)
+        except Exception:
+            log.exception("Failed to downgrade enrollment %s", enrollment_id)
+            local_enrollments, edx_success = [], False
+        if local_enrollments and edx_success:
+            downgraded += 1
+        else:
+            failed.append(enrollment_id)
+
     log.info(
         "Downgraded %d enrollment(s) from verified to audit, %d failed, %d skipped",
-        len(downgraded),
+        downgraded,
         len(failed),
-        len(skipped),
+        skipped,
     )
     if failed:
-        log.error(
-            "Failed to downgrade enrollment(s) %s",
-            [enrollment.id for enrollment in failed],
-        )
+        log.error("Failed to downgrade enrollment(s) %s", failed)
