@@ -104,18 +104,6 @@ export function parseStoredUserMessage(
     alertType = ALERT_TYPE_SUCCESS
     msgText = "Payment is pending review."
     break
-  case USER_MSG_TYPE_PAYMENT_ACCEPTED:
-    alertType = ALERT_TYPE_SUCCESS
-    msgText = userMsgJson.run ?
-      `Success! You are now enrolled for the paid version of ${userMsgJson.run}.` :
-      null
-    break
-  case USER_MSG_TYPE_PAYMENT_ACCEPTED_NO_VALUE:
-    alertType = ALERT_TYPE_SUCCESS
-    msgText = userMsgJson.run ?
-      `Success! You are now enrolled for the certificate version of ${userMsgJson.run}.` :
-      null
-    break
   case USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING:
     alertType = ALERT_TYPE_SUCCESS
     msgText =
