@@ -7,6 +7,7 @@
 import { assert } from "chai"
 import sinon from "sinon"
 import videojs from "video.js"
+import { parse as parseMpd } from "mpd-parser"
 
 const YOUTUBE_CONFIG = {
   techOrder: ["youtube", "html5"],
@@ -16,6 +17,19 @@ const YOUTUBE_CONFIG = {
   controls: false,
   youtube:  { ytControls: 2, cc_load_policy: 1, cc_lang_pref: 1 }
 }
+
+// The smallest DASH manifest mpd-parser turns into a playlist.
+const MPD = `<?xml version="1.0"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static" mediaPresentationDuration="PT10S" minBufferTime="PT2S">
+  <Period>
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="720p" bandwidth="2000000" width="1280" height="720" codecs="avc1.64001f">
+        <BaseURL>video-720p.mp4</BaseURL>
+        <SegmentBase indexRange="0-100" />
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>`
 
 const HTML5_CONFIG = {
   techOrder: ["html5"],
@@ -57,6 +71,25 @@ describe("video.js player setup", () => {
 
   it("loads the HTTP streaming handler", () => {
     assert.isOk(videojs.Vhs)
+  })
+
+  it("parses a DASH manifest through xmldom", () => {
+    const manifest = parseMpd(MPD, {
+      manifestUri: "https://example.com/video.mpd"
+    })
+
+    assert.equal(manifest.duration, 10)
+    assert.lengthOf(manifest.playlists, 1)
+    const [playlist] = manifest.playlists
+    assert.equal(playlist.attributes.BANDWIDTH, 2000000)
+    assert.deepEqual(playlist.attributes.RESOLUTION, {
+      width:  1280,
+      height: 720
+    })
+    assert.equal(
+      playlist.sidx.resolvedUri,
+      "https://example.com/video-720p.mp4"
+    )
   })
   ;[
     ["YouTube", YOUTUBE_CONFIG, false],
