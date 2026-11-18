@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [2026.11.18.2] - 2026-11-18
+
+### Changes
+
+- **Keep contracts when the Keycloak membership call fails** (#4298) by tmacey@mit.edu
+- **Update @xmldom/xmldom, minimatch, brace-expansion and fast-uri for security fixes** (#4273) by 1447295+shaidar@users.noreply.github.com
+- **Read the edX migration tables from StarRocks or Trino, chosen by a setting** (#4270) by tmacey@mit.edu
+- **feat: show the site banner when ecom-service is set** (#4299) by christopher.chudzicki@gmail.com
+- **Move Sentry from send_default_pii to data_collection** (#4239) by jkachel@mit.edu
+- **Add tests for the OIDC provider, telemetry setup and email CSS inlining** (#4271) by 1447295+shaidar@users.noreply.github.com
+- **fix: brand the financial aid form pages as MIT Learn** (#4265) by 88967643+Anas12091101@users.noreply.github.com
+- **feat: always send /dashboard/ to MIT Learn and remove the legacy dashboard** (#4278) by 88967643+Anas12091101@users.noreply.github.com
+- **Assert uv.lock stays on revision 5** (#4288) by rhysyngsun@users.noreply.github.com
+- **Take run order from the database in reconcile_upgrade_deadlines tests** (#4295) by christopher.chudzicki@gmail.com
+
 ## [2026.11.16.1] - 2026-11-16
 
 ### Changes
