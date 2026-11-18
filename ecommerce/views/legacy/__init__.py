@@ -115,53 +115,6 @@ from users.models import User
 log = logging.getLogger(__name__)
 
 
-UAI_READABLE_ID_PREFIXES = [
-    "program-v1:UAI+B2C",
-    "course-v1:UAI_B2C",
-]
-
-
-def _has_uai_purchase(order):
-    """Return True if the order includes a program or course run with a UAI prefix."""
-
-    def _has_uai_prefix(readable_id):
-        return any(
-            readable_id.startswith(prefix) for prefix in UAI_READABLE_ID_PREFIXES
-        )
-
-    return any(
-        line.purchased_object
-        and line.purchased_object.readable_id
-        and _has_uai_prefix(line.purchased_object.readable_id)
-        for line in order.lines.all()
-    )
-
-
-def _should_redirect_to_learn(order):
-    """
-    Return True if the user should be redirected to the Learn dashboard
-    after a successful checkout.
-    """
-    if _has_uai_purchase(order):
-        return True
-
-    # NOTE: Retrieve global_id from purchaser rather than request user
-    # because this is used in contexts where the request is anonymous.
-    #
-    # One example is the callback view that processes the payment response from
-    # cybersource. This view is hit via a POST request from a different domain,
-    # which means no samesite (lax, strict) authentication cookies are sent.
-    global_id = order.purchaser.global_id
-    return bool(
-        global_id
-        and is_posthog_enabled(
-            features.REDIRECT_LEARN_DASHBOARD,
-            default=False,
-            opt_unique_id=global_id,
-        )
-    )
-
-
 def _learn_dashboard_redirect(order, order_status=OrderStatus.FULFILLED):
     """Build an HttpResponseRedirect to the Learn dashboard with order info."""
     return HttpResponseRedirect(
@@ -981,7 +934,7 @@ class CheckoutResultSuccessView(View):
             else None
         )
 
-        if order and _should_redirect_to_learn(order):
+        if order:
             return _learn_dashboard_redirect(order, order_status=order.state)
 
         return redirect_with_user_message(

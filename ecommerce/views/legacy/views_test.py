@@ -2212,13 +2212,12 @@ def test_checkout_result_routes_resolve_to_new_views(route):
     assert match.func.view_class is not CheckoutCallbackView
 
 
-def test_checkout_result_success_redirects_to_dashboard(user, user_client, mocker):
-    """The success handler redirects with the pending message and leaves the order alone."""
+def test_checkout_result_success_redirects_to_dashboard(user, client):
+    """Hitting the success endpoint redirects to the dashboard if unauthenticated."""
 
-    mocker.patch("ecommerce.views.legacy._should_redirect_to_learn", return_value=False)
     order = OrderFactory.create(purchaser=user, state=OrderStatus.PENDING)
 
-    resp = user_client.get(
+    resp = client.get(
         reverse(
             "checkout-result-success",
             kwargs={"reference_number": order.reference_number},
@@ -2235,13 +2234,10 @@ def test_checkout_result_success_redirects_to_dashboard(user, user_client, mocke
     assert not order.transactions.exists()
 
 
-def test_checkout_result_success_redirects_to_learn(
-    settings, user, user_client, mocker
-):
+def test_checkout_result_success_redirects_to_learn(settings, user, user_client):
     """Orders that go to the Learn dashboard are sent there as pending, not fulfilled."""
 
     settings.MIT_LEARN_DASHBOARD_URL = "https://learn.mit.edu/dashboard"
-    mocker.patch("ecommerce.views.legacy._should_redirect_to_learn", return_value=True)
     order = OrderFactory.create(purchaser=user, state=OrderStatus.PENDING)
 
     resp = user_client.get(
@@ -2262,13 +2258,10 @@ def test_checkout_result_success_redirects_to_learn(
 
 @pytest.mark.parametrize("is_anonymous", [True, False])
 def test_checkout_result_success_ignores_other_users_orders(
-    user, user_client, mocker, is_anonymous
+    user, user_client, is_anonymous
 ):
     """Another user's reference number (or no login) gets the plain dashboard redirect."""
 
-    mock_should_redirect = mocker.patch(
-        "ecommerce.views.legacy._should_redirect_to_learn", return_value=True
-    )
     order = OrderFactory.create(state=OrderStatus.PENDING)
     client = Client() if is_anonymous else user_client
 
@@ -2284,7 +2277,6 @@ def test_checkout_result_success_ignores_other_users_orders(
     assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
         {"type": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING}
     )
-    mock_should_redirect.assert_not_called()
 
 
 def test_checkout_result_cancel_redirects_to_cart(user, user_client):
