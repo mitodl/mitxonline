@@ -1,6 +1,6 @@
 # Backfilling Verifiable Credentials
 
-This page covers when verifiable credentials are created automatically, the ways to create them for certificates that don't have one, and what to [check before](#checking-certificate-page-configuration) and after a backfill.
+This page covers when verifiable credentials are created automatically, the ways to create them for certificates that don't have one, and what to [check before](#checking-certificate-page-configuration) a backfill.
 
 ## How credentials are normally created
 
@@ -31,7 +31,7 @@ To use it:
 2. Open the Programs or Course runs list, tick the rows you want, choose the backfill action from the **Action** dropdown, and click **Go**.
 3. Read the message shown at the top of the page:
    - **Info**: `Successfully requested verifiable credential backfill for N program certificates.` (or `courserun certificates`). *N* counts every certificate that had no credential, **including ones skipped because their page isn't eligible**, so be advised that it isn't a count of credentials created.
-   - **Warning**: the same message plus `...but encountered errors for certificates with IDs: [...]`. The IDs are the primary keys of the certificates which encountered errors while provisioning. Look up the details in Sentry (`Error creating verifiable credential for certificate <uuid>`).
+   - **Warning**: the same message plus `...but encountered errors for certificates with IDs: [...]`. The IDs are the UUIDs of the certificates which encountered errors while provisioning. Look up the details in Sentry (`Error creating verifiable credential for certificate <uuid>`).
 
 Things to know:
 
@@ -45,7 +45,7 @@ Things to know:
 The following commands can be run from a web or celery worker container.
 
 ```bash
-# Dry run: list the certificates for a program by courseware ID which would be processed, without creating any credentials. Note that this output will include certificates without correctly configured CertificatePages.
+# Dry run: list the certificates for a program by courseware ID which would be processed, without creating any credentials. Note that this output will include certificates which already have verifiable credentials as well as those without correctly configured CertificatePages.
 manage.py backfill_verifiable_credentials --type program --ids program-v1:MITx+DEDP
 
 # Execute backfill for a program by courseware ID, pausing half a second between signer calls
