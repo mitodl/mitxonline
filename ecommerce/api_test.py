@@ -3137,37 +3137,58 @@ def _stripe_order_with_checkout_session(user, **kwargs):
 
 
 @pytest.mark.parametrize(
-    "stripe_status",
+    ("stripe_status", "payment_intent_id"),
     [
-        STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
-        STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
-        STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
-        None,
+        (STRIPE_OVERALL_CHECKOUT_STATUS_PAID, "pi_test_return"),
+        (STRIPE_OVERALL_CHECKOUT_STATUS_PAID, ""),
+        (STRIPE_OVERALL_CHECKOUT_STATUS_PENDING, ""),
+        (STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED, ""),
+        (None, ""),
     ],
 )
-def test_resolve_returned_stripe_order(mocker, user, stripe_status):
+def test_resolve_returned_stripe_order(mocker, user, stripe_status, payment_intent_id):
     """
-    A returning order is fulfilled only when Stripe says it's paid. A status
-    of None means the Stripe lookup failed, which leaves the order alone.
+    A returning order is fulfilled only when Stripe says it's paid, and the
+    payment is recorded so a refund can find the order by its PaymentIntent.
+    A paid session without a PaymentIntent, or a failed Stripe lookup (status
+    None), leaves the order for the webhook.
     """
 
+    paid_session = {
+        "id": "cs_test_return",
+        "object": STRIPE_OBJECT_CHECKOUT_SESSION,
+        "amount_total": 17500,
+        "payment_intent": (
+            {"id": payment_intent_id, "object": "payment_intent"}
+            if payment_intent_id
+            else None
+        ),
+    }
     mock_status = mocker.patch(
         "ecommerce.api.process_stripe_checkout_session_status",
-        return_value={"status": stripe_status, "transaction": {"id": "cs_test"}},
+        return_value={
+            "status": stripe_status,
+            "payment_intent_id": payment_intent_id,
+            "transaction": paid_session,
+        },
         side_effect=None if stripe_status else APIConnectionError("Stripe is down"),
     )
-    mock_fulfill = mocker.patch("ecommerce.api.fulfill_pending_order")
-    order = _stripe_order_with_checkout_session(user)
+    mocker.patch("ecommerce.api.sync_hubspot_deal")
+    order = _stripe_order_with_checkout_session(
+        user, total_price_paid=Decimal("175.00")
+    )
 
     result = resolve_returned_stripe_order(order)
 
     mock_status.assert_called_once_with("cs_test_return")
-    if stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
-        mock_fulfill.assert_called_once_with(order.id, {"id": "cs_test"}, None)
-        assert result == mock_fulfill.return_value
+    if stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_PAID and payment_intent_id:
+        assert result.state == OrderStatus.FULFILLED
+        payment = result.transactions.get(transaction_id=payment_intent_id)
+        assert payment.amount == Decimal("175.00")
+        assert find_order_for_stripe_payment_intent(payment_intent_id) == order
     else:
-        mock_fulfill.assert_not_called()
-        assert result == order
+        assert result.state == OrderStatus.PENDING
+        assert result.transactions.count() == 1
 
 
 @pytest.mark.parametrize("has_checkout_session", [True, False])
