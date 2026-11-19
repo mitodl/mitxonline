@@ -1437,9 +1437,19 @@ def existing_edx_enrollment(
             The results of enrollments via the edx API client
     """
     enrollments_client = enrollments_client or get_edx_api_enrollments_client()
-    edx_enrollments = enrollments_client.get_enrollments(
-        course_id=course_id, usernames=[user.edx_username]
-    )
+    if use_edx_enrollments_v2():
+        # v2's admin list is always throttled, at 120 requests a minute for
+        # staff, and every check goes through the one service user. The
+        # per-user list is only throttled while the LMS has
+        # RateLimitConfiguration enabled.
+        enrollment = enrollments_client.get_student_enrollments(
+            username=user.edx_username, include_inactive=True
+        ).get_enrollment_for_course(course_id)
+        edx_enrollments = [] if enrollment is None else [enrollment]
+    else:
+        edx_enrollments = enrollments_client.get_enrollments(
+            course_id=course_id, usernames=[user.edx_username]
+        )
     for enrollment in edx_enrollments:
         if enrollment.mode == mode and enrollment.is_active == is_active:
             return enrollment

@@ -18,6 +18,7 @@ from django.core.exceptions import ImproperlyConfigured
 from edx_api.course_detail.models import CourseMode
 from edx_api.course_runs.exceptions import CourseRunAPIError
 from edx_api.enrollments import CourseEnrollmentsV2
+from edx_api.enrollments.models import Enrollments
 from freezegun import freeze_time
 from mitol.common.utils.datetime import now_in_utc
 from mitol.common.utils.user import _reformat_for_username, usernameify
@@ -1291,7 +1292,7 @@ def test_enroll_in_edx_course_runs_v2(mocker, enrollments_v2_settings):
         "openedx.api.get_edx_api_enrollments_client"
     )
     enrollments_client = patched_enrollments_client.return_value
-    enrollments_client.get_enrollments.return_value = []
+    enrollments_client.get_student_enrollments.return_value = Enrollments([])
     enrollments_client.create_student_enrollment.return_value = mocker.Mock(
         is_active=True
     )
@@ -2418,6 +2419,64 @@ def test_existing_edx_enrollment(  # noqa: PLR0913
             )
             is None
         )
+
+
+@pytest.mark.parametrize(
+    ("edx_is_active", "edx_mode", "mode", "is_active", "found"),
+    [
+        (True, EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_AUDIT_MODE, True, True),
+        (False, EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_AUDIT_MODE, False, True),
+        (False, EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_AUDIT_MODE, True, False),
+        (True, EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE, True, False),
+    ],
+)
+@responses.activate
+def test_existing_edx_enrollment_v2(  # noqa: PLR0913
+    enrollments_v2_settings, user, edx_is_active, edx_mode, mode, is_active, found
+):
+    """
+    Over v2, existing_edx_enrollment checks the learner's own enrollment list,
+    inactive enrollments included, rather than the always-throttled admin list
+    """
+    run_id = "course-v1:a+b+c"
+    responses.add(
+        responses.POST,
+        f"http://example.com{OPENEDX_OAUTH2_ACCESS_TOKEN_PATH}",
+        json={"access_token": "a_jwt", "expires_in": 3600},
+    )
+    responses.add(
+        responses.GET,
+        f"http://example.com{CourseEnrollmentsV2.enrollment_url}",
+        match=[
+            responses.matchers.query_param_matcher(
+                {"user": user.edx_username, "page_size": "100"}
+            )
+        ],
+        json={
+            "results": [
+                {
+                    "course_details": {"course_id": "course-v1:other+run+x"},
+                    "mode": mode,
+                    "is_active": is_active,
+                    "user": user.edx_username,
+                },
+                {
+                    "course_details": {"course_id": run_id},
+                    "mode": edx_mode,
+                    "is_active": edx_is_active,
+                    "user": user.edx_username,
+                },
+            ],
+            "next": None,
+        },
+    )
+
+    enrollment = existing_edx_enrollment(user, run_id, mode, is_active=is_active)
+
+    assert (enrollment is not None) is found
+    if found:
+        assert enrollment.course_id == run_id
+    assert responses.calls[-1].request.headers["Authorization"] == "jwt a_jwt"
 
 
 def test_bulk_retire_edx_users(mocker):
