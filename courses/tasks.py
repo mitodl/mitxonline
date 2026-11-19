@@ -5,6 +5,7 @@ Tasks for the courses app
 
 import logging
 
+from django.db import transaction
 from django.db.models import Q
 from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError, RequestException
@@ -197,13 +198,17 @@ def downgrade_enrollments(enrollment_ids):
             skipped += 1
             continue
         try:
-            local_enrollments, edx_success = downgrade_learner(enrollment)
-            if not edx_success:
-                # The row is audit now; give the repair job fresh retries to
-                # push audit to edX, even if an earlier failure used them up.
-                CourseRunEnrollment.all_objects.filter(id=enrollment_id).update(
-                    edx_enrollment_retry_count=0
-                )
+            # One transaction, so the audit mode and the retry reset below
+            # commit together: a crash between them can't leave an audit row
+            # that the repair job has given up on.
+            with transaction.atomic():
+                local_enrollments, edx_success = downgrade_learner(enrollment)
+                if not edx_success:
+                    # Give the repair job fresh retries to push audit to edX,
+                    # even if an earlier failure used them up.
+                    CourseRunEnrollment.all_objects.filter(id=enrollment_id).update(
+                        edx_enrollment_retry_count=0
+                    )
         except Exception:
             log.exception("Failed to downgrade enrollment %s", enrollment_id)
             local_enrollments, edx_success = [], False
