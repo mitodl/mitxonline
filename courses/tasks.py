@@ -5,7 +5,6 @@ Tasks for the courses app
 
 import logging
 
-from django.db import transaction
 from django.db.models import Q
 from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError, RequestException
@@ -179,33 +178,17 @@ def downgrade_enrollments(enrollment_ids):
 
     Inactive and non-verified enrollments are skipped, since downgrade_learner
     would reactivate an inactive one. Each row is re-read just before it's
-    checked, so a learner who unenrolls while the batch runs isn't reactivated.
+    checked, so a learner who unenrolled earlier in the batch is skipped.
     """
     from courses.api import downgrade_learner
-    from openedx.api import repair_faulty_edx_user
 
-    enrollments = CourseRunEnrollment.all_objects.select_related("user", "run")
     downgraded, failed, skipped = 0, [], 0
     for enrollment_id in enrollment_ids:
-        enrollment = enrollments.filter(id=enrollment_id).first()
-        if (
-            enrollment is not None
-            and enrollment.active
-            and enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
-            and not enrollment.user.openedx_user_exists
-        ):
-            # Create the learner's edX account before the transaction below:
-            # edX registration calls back with an OAuth token written here,
-            # which it can't read until that write is committed. If this fails,
-            # the downgrade still happens locally and the repair job pushes it.
-            try:
-                repair_faulty_edx_user(enrollment.user)
-            except Exception:
-                log.exception(
-                    "Failed to create the edX user for enrollment %s", enrollment_id
-                )
-            # That can take a while, so read the row again before checking it.
-            enrollment = enrollments.filter(id=enrollment_id).first()
+        enrollment = (
+            CourseRunEnrollment.all_objects.select_related("user", "run")
+            .filter(id=enrollment_id)
+            .first()
+        )
         if (
             enrollment is None
             or not enrollment.active
@@ -214,17 +197,13 @@ def downgrade_enrollments(enrollment_ids):
             skipped += 1
             continue
         try:
-            # One transaction, so the audit mode and the retry reset below
-            # commit together: a crash between them can't leave an audit row
-            # that the repair job has given up on.
-            with transaction.atomic():
-                local_enrollments, edx_success = downgrade_learner(enrollment)
-                if not edx_success:
-                    # Give the repair job fresh retries to push audit to edX,
-                    # even if an earlier failure used them up.
-                    CourseRunEnrollment.all_objects.filter(id=enrollment_id).update(
-                        edx_enrollment_retry_count=0
-                    )
+            local_enrollments, edx_success = downgrade_learner(enrollment)
+            if not edx_success:
+                # Give the repair job fresh retries to push audit to edX,
+                # even if an earlier failure used them up.
+                CourseRunEnrollment.all_objects.filter(id=enrollment_id).update(
+                    edx_enrollment_retry_count=0
+                )
         except Exception:
             log.exception("Failed to downgrade enrollment %s", enrollment_id)
             local_enrollments, edx_success = [], False

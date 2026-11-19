@@ -10,7 +10,6 @@ from courses.factories import (
     CourseRunFactory,
     LearnerProgramRecordShareFactory,
 )
-from courses.models import CourseRunEnrollment
 from courses.tasks import (
     downgrade_enrollments,
     generate_course_certificates,
@@ -24,7 +23,6 @@ from openedx.constants import (
     EDX_ENROLLMENT_VERIFIED_MODE,
     UpgradeDeadlineSyncResult,
 )
-from users.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -249,61 +247,46 @@ def test_downgrade_enrollments(mocker):
     assert inactive.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
 
 
-def test_downgrade_enrollments_logs_local_failure(mocker):
-    """A failed local downgrade is logged as a failure even if edX succeeded"""
-    mocker.patch("courses.api.downgrade_learner", return_value=([], True))
+def test_downgrade_enrollments_reports_failures(mocker):
+    """
+    A downgrade that raises, fails locally or fails in edX is reported as
+    failed without stopping the rest, and an unknown id is skipped.
+    """
+    raises, local_failure, edx_failure, succeeds = (
+        CourseRunEnrollmentFactory.create_batch(
+            4, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        )
+    )
+    results = {
+        raises.id: ValueError,
+        local_failure.id: ([], True),
+        edx_failure.id: ([edx_failure], False),
+        succeeds.id: ([succeeds], True),
+    }
+
+    def fake_downgrade(enrollment):
+        result = results[enrollment.id]
+        if result is ValueError:
+            raise result
+        return result
+
+    mocker.patch("courses.api.downgrade_learner", side_effect=fake_downgrade)
     mock_log = mocker.patch("courses.tasks.log")
-    enrollment = CourseRunEnrollmentFactory.create(
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+
+    downgrade_enrollments.delay(
+        [raises.id, local_failure.id, edx_failure.id, succeeds.id, 0]
     )
 
-    downgrade_enrollments.delay([enrollment.id])
-
+    mock_log.exception.assert_called_once_with(
+        "Failed to downgrade enrollment %s", raises.id
+    )
+    mock_log.info.assert_called_once_with(
+        "Downgraded %d enrollment(s) from verified to audit, %d failed, %d skipped",
+        1,
+        3,
+        1,
+    )
     mock_log.error.assert_called_once_with(
-        "Failed to downgrade enrollment(s) %s", [enrollment.id]
+        "Failed to downgrade enrollment(s) %s",
+        [raises.id, local_failure.id, edx_failure.id],
     )
-
-
-@pytest.mark.parametrize("repair_fails", [False, True])
-def test_downgrade_enrollments_creates_edx_user_first(mocker, repair_fails):
-    """
-    A learner without an edX account gets one before the downgrade's
-    transaction opens, and a failure there doesn't stop the local downgrade.
-    """
-    mocker.patch("courses.api.enroll_in_edx_course_runs")
-    patched_repair = mocker.patch(
-        "openedx.api.repair_faulty_edx_user",
-        side_effect=HTTPError if repair_fails else None,
-    )
-    enrollment = CourseRunEnrollmentFactory.create(
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-        user=UserFactory.create(no_openedx_user=True),
-    )
-
-    downgrade_enrollments.delay([enrollment.id])
-
-    patched_repair.assert_called_once_with(enrollment.user)
-    enrollment.refresh_from_db()
-    assert enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
-
-
-def test_downgrade_enrollments_rechecks_after_creating_edx_user(mocker):
-    """A learner who unenrolls while their edX account is created is skipped"""
-    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
-    enrollment = CourseRunEnrollmentFactory.create(
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-        user=UserFactory.create(no_openedx_user=True),
-    )
-    mocker.patch(
-        "openedx.api.repair_faulty_edx_user",
-        side_effect=lambda _user: CourseRunEnrollment.all_objects.filter(
-            id=enrollment.id
-        ).update(active=False),
-    )
-
-    downgrade_enrollments.delay([enrollment.id])
-
-    patched_edx_enroll.assert_not_called()
-    enrollment.refresh_from_db()
-    assert enrollment.active is False
-    assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE

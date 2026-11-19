@@ -1560,7 +1560,7 @@ def test_create_run_enrollments_skips_country_check_when_requested(
 
 def test_downgrade_learner_skips_country_block(mocker, user):
     """
-    Refund downgrades must still work for a learner whose country is blocked
+    Downgrades must still work for a learner whose country is blocked
     or who can't be export-compliance screened, and never send an enrollment
     email.
     """
