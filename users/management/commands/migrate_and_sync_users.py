@@ -279,7 +279,9 @@ class Command(BaseCommand):
         """
         to_sync, blocked = [], []
         for user in candidates:
-            adapter = LearnUserAdapter(user)
+            # Read-only, outside a transaction, and the lock would re-fetch the
+            # user and drop the prefetches from _get_candidates.
+            adapter = LearnUserAdapter(user, lock_user=False)
             given_name, family_name = adapter._resolve_name()  # noqa: SLF001
             legal_address_complete = bool(
                 user.legal_address.first_name and user.legal_address.last_name
