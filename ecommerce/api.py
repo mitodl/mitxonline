@@ -1262,6 +1262,64 @@ def _retrieve_pending_cybersource_orders(orders):
     )
 
 
+def get_stripe_checkout_session_id(order) -> str | None:
+    """
+    Get the ID of the Stripe CheckoutSession logged for the order.
+
+    generate_checkout_payload logs the session as a Transaction when it creates
+    it, so it can be looked up again later.
+    """
+
+    session_transaction = order.transactions.filter(
+        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+        data__object=STRIPE_OBJECT_CHECKOUT_SESSION,
+    ).first()
+
+    return session_transaction.data.get("id") if session_transaction else None
+
+
+def resolve_returned_stripe_order(order):
+    """
+    Ask Stripe whether a pending order was paid, and fulfill it if so.
+
+    Stripe sends the learner back to checkout-result-callback at about the
+    same time as the checkout.session.completed webhook, and either can arrive
+    first. Checking here lets the return report the purchase without waiting
+    for the webhook. If Stripe can't be reached the order is left for the
+    webhook, so the learner's redirect doesn't fail. Orders that aren't
+    pending, or have no CheckoutSession (e.g. CyberSource orders), are
+    returned as they are.
+
+    Returns:
+    - Order, with its current state
+    """
+
+    if order.state != OrderStatus.PENDING:
+        return order
+
+    session_id = get_stripe_checkout_session_id(order)
+
+    if not session_id:
+        return order
+
+    try:
+        session = process_stripe_checkout_session_status(session_id)
+    except stripe.StripeError:
+        log.exception(
+            "Couldn't check CheckoutSession %s for returning order %s",
+            session_id,
+            order.reference_number,
+        )
+        return order
+
+    if session["status"] != STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
+        return order
+
+    basket = Basket.objects.filter(user=order.purchaser).first()
+
+    return fulfill_pending_order(order.id, session["transaction"], basket)
+
+
 def _retrieve_pending_stripe_orders(orders):
     """
     Retrieve current status for Stripe orders.
@@ -1280,25 +1338,9 @@ def _retrieve_pending_stripe_orders(orders):
     # later in event processing.
 
     for order in orders:
-        checkout_session_transactions = order.transactions.filter(
-            reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION
-        )
+        checkout_session_id = get_stripe_checkout_session_id(order)
 
-        if not checkout_session_transactions.exists():
-            log.info(
-                "Order %s (ref %s) has no apparent CheckoutSession logged.",
-                order.id,
-                order.reference_number,
-            )
-            continue
-
-        session_transaction = checkout_session_transactions.first()
-        checkout_session_id = session_transaction.data.get("id")
-
-        if (
-            session_transaction.data.get("object") != STRIPE_OBJECT_CHECKOUT_SESSION
-            or not checkout_session_id
-        ):
+        if not checkout_session_id:
             log.info(
                 "Order %s (ref %s) has no apparent CheckoutSession logged.",
                 order.id,

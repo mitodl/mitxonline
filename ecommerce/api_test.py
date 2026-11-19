@@ -80,6 +80,7 @@ from ecommerce.api import (
     process_stripe_refund_updated,
     quote_user_price,
     refund_order,
+    resolve_returned_stripe_order,
     unenroll_learner_from_order,
 )
 from ecommerce.constants import (
@@ -3118,6 +3119,72 @@ def test_fulfill_pending_order(mocker, user, state, fulfilled):
     fulfill_pending_order(order.id, {"id": "cs_test"})
 
     assert mock_fulfill.called is fulfilled
+
+
+def _stripe_order_with_checkout_session(user, **kwargs):
+    """Create a pending Stripe order with its CheckoutSession logged."""
+
+    order = OrderFactory.create(
+        purchaser=user, gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE, **kwargs
+    )
+    TransactionFactory.create(
+        order=order,
+        transaction_id="cs_test_return",
+        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+        data={"object": STRIPE_OBJECT_CHECKOUT_SESSION, "id": "cs_test_return"},
+    )
+    return order
+
+
+@pytest.mark.parametrize(
+    "stripe_status",
+    [
+        STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+        STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
+        STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
+        None,
+    ],
+)
+def test_resolve_returned_stripe_order(mocker, user, stripe_status):
+    """
+    A returning order is fulfilled only when Stripe says it's paid. A status
+    of None means the Stripe lookup failed, which leaves the order alone.
+    """
+
+    mock_status = mocker.patch(
+        "ecommerce.api.process_stripe_checkout_session_status",
+        return_value={"status": stripe_status, "transaction": {"id": "cs_test"}},
+        side_effect=None if stripe_status else APIConnectionError("Stripe is down"),
+    )
+    mock_fulfill = mocker.patch("ecommerce.api.fulfill_pending_order")
+    order = _stripe_order_with_checkout_session(user)
+
+    result = resolve_returned_stripe_order(order)
+
+    mock_status.assert_called_once_with("cs_test_return")
+    if stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
+        mock_fulfill.assert_called_once_with(order.id, {"id": "cs_test"}, None)
+        assert result == mock_fulfill.return_value
+    else:
+        mock_fulfill.assert_not_called()
+        assert result == order
+
+
+@pytest.mark.parametrize("has_checkout_session", [True, False])
+def test_resolve_returned_stripe_order_skips_lookup(mocker, user, has_checkout_session):
+    """
+    Stripe isn't asked about orders that aren't pending, or that have no
+    CheckoutSession to look up.
+    """
+
+    mock_status = mocker.patch("ecommerce.api.process_stripe_checkout_session_status")
+    if has_checkout_session:
+        order = _stripe_order_with_checkout_session(user, state=OrderStatus.CANCELED)
+    else:
+        order = OrderFactory.create(purchaser=user)
+
+    assert resolve_returned_stripe_order(order) == order
+    mock_status.assert_not_called()
 
 
 def test_process_stripe_checkout_expired(bootstrapped_verified_program):
