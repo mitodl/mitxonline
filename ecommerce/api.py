@@ -496,6 +496,34 @@ def fulfill_completed_order(
         basket.delete()
 
 
+def fulfill_pending_order(order_id, payment_data, basket=None):
+    """
+    Fulfill an order if it's still pending.
+
+    The Stripe webhook, the checkout return and the stale order cull can each
+    find the same order paid at about the same time. The fulfill transition
+    only checks the state of the Order it's given, so this locks the row and
+    re-reads it first, and only the first caller fulfills the order.
+
+    Args:
+    - order_id (int): the order to fulfill
+    - payment_data (dict): payment data to record on the order's transaction
+    - basket (Basket): the purchaser's basket, deleted if it matches the order
+
+    Returns:
+    - Order, with its current state
+    """
+
+    with transaction.atomic():
+        order = Order.objects.select_for_update().get(pk=order_id)
+
+        if order.state == OrderStatus.PENDING:
+            fulfill_completed_order(order, payment_data, basket)
+            order.refresh_from_db()
+
+    return order
+
+
 def get_order_from_cybersource_payment_response(request):
     payment_data = request.POST
     converted_order = PaymentGateway.get_gateway_class(
@@ -760,7 +788,7 @@ def cull_stale_pending_orders():
     log.info("Culled stale pending orders: %s", deleted)
 
 
-def _check_stale_stripe_orders(orders):  # noqa: C901
+def _check_stale_stripe_orders(orders):
     """
     Check the CheckoutSession of each stale Stripe order with Stripe, so a
     paid order whose webhook never got processed isn't deleted.
@@ -838,23 +866,12 @@ def _check_stale_stripe_orders(orders):  # noqa: C901
             )
             continue
 
-        locked_order = Order.objects.select_for_update().get(pk=order.id)
-        if locked_order.state in [
-            OrderStatus.FULFILLED,
-            OrderStatus.CANCELED,
-            OrderStatus.ERRORED,
-            OrderStatus.REFUNDED,
-            OrderStatus.DECLINED,
-        ]:
-            continue
-
         log.debug(
             "Stale order %s was paid in Stripe, fulfilling it",
-            locked_order.reference_number,
+            order.reference_number,
         )
 
-        with transaction.atomic():
-            fulfill_completed_order(locked_order, session["transaction"])
+        fulfill_pending_order(order.id, session["transaction"])
 
     return keep_ids
 
@@ -2342,9 +2359,7 @@ def process_stripe_checkout_completed(event):
     else:
         basket = Basket.objects.filter(user=order.purchaser).first()
 
-        fulfill_completed_order(order, event.to_dict(for_json=True), basket)
-
-        order.refresh_from_db()
+        order = fulfill_pending_order(order.id, event.to_dict(for_json=True), basket)
 
     return order
 

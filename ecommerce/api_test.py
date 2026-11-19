@@ -67,6 +67,7 @@ from ecommerce.api import (
     find_paid_program_order_for_zero_value_order,
     fulfill_completed_order,
     fulfill_order_from_cybersource_transaction,
+    fulfill_pending_order,
     generate_checkout_payload,
     get_anonymous_basket_id,
     get_auto_apply_discounts_for_basket,
@@ -2749,6 +2750,45 @@ def test_cull_stale_pending_orders_checks_stripe(mocker, settings, user, stripe_
         mock_fulfill.assert_not_called()
 
 
+@pytest.mark.django_db(transaction=True)
+def test_cull_stale_pending_orders_fulfills_outside_a_transaction(
+    mocker, settings, user
+):
+    """
+    The cull runs from a Celery task in autocommit mode, so fulfilling a paid
+    stale order has to open its own transaction for the row lock.
+    """
+    settings.PENDING_ORDER_CULL_AGE_DAYS = 60
+    mocker.patch(
+        "ecommerce.api.process_stripe_checkout_session_status",
+        return_value={
+            "status": STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+            "transaction": {"id": "cs_test"},
+        },
+    )
+    mock_fulfill = mocker.patch("ecommerce.models.OrderFlow.fulfill")
+    mocker.patch("ecommerce.api.sync_hubspot_deal")
+
+    order = OrderFactory.create(
+        purchaser=user, gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE
+    )
+    TransactionFactory.create(
+        order=order,
+        transaction_id="cs_test_stale",
+        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+        data={"object": STRIPE_OBJECT_CHECKOUT_SESSION, "id": "cs_test_stale"},
+    )
+    Order.objects.filter(pk=order.pk).update(
+        created_on=now_in_utc() - timedelta(days=61)
+    )
+
+    cull_stale_pending_orders()
+
+    mock_fulfill.assert_called_once_with(
+        {"id": "cs_test"}, already_enrolled=False, skip_receipt=False
+    )
+
+
 def test_log_stripe_event():
     """Test that the event logging functionality works as expected."""
 
@@ -3026,6 +3066,58 @@ def test_process_stripe_checkout_completed(  # noqa: PLR0913
         assert updated_order.state == OrderStatus.CANCELED
     else:
         assert updated_order.state == OrderStatus.ERRORED
+
+
+def test_process_stripe_checkout_completed_already_fulfilled(
+    mocker, bootstrapped_verified_program
+):
+    """
+    A completed checkout for an order that's already fulfilled (e.g. by the
+    checkout return) leaves it alone.
+    """
+
+    *_, cr_product = bootstrapped_verified_program
+
+    product_version = Version.objects.get_for_object(cr_product).get()
+    order_line = LineFactory.create(
+        product_version=product_version,
+        order__gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+        order__state=OrderStatus.FULFILLED,
+    )
+    mocker.patch(
+        "ecommerce.api._get_stripe_checkout_session_v1",
+        side_effect=lambda: MockedCheckoutSessionClient(
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_PAID,
+            STRIPE_PAYMENT_INTENT_STATUS_SUCCEEDED,
+            "",
+            order_line.order.reference_number,
+        ),
+    )
+    mock_fulfill = mocker.patch("ecommerce.models.OrderFlow.fulfill")
+
+    updated_order = process_stripe_checkout_completed(
+        _configure_checkout_session_object(order_line)
+    )
+
+    mock_fulfill.assert_not_called()
+    assert updated_order.state == OrderStatus.FULFILLED
+
+
+@pytest.mark.parametrize(
+    ("state", "fulfilled"),
+    [(OrderStatus.PENDING, True), (OrderStatus.FULFILLED, False)],
+)
+def test_fulfill_pending_order(mocker, user, state, fulfilled):
+    """Only a pending order gets fulfilled."""
+
+    mock_fulfill = mocker.patch("ecommerce.models.OrderFlow.fulfill")
+    mocker.patch("ecommerce.api.sync_hubspot_deal")
+    order = OrderFactory.create(purchaser=user, state=state)
+
+    fulfill_pending_order(order.id, {"id": "cs_test"})
+
+    assert mock_fulfill.called is fulfilled
 
 
 def test_process_stripe_checkout_expired(bootstrapped_verified_program):
