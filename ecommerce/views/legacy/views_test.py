@@ -802,6 +802,12 @@ def test_checkout_result_get_reports_only_fulfilled_orders(
     else:
         assert resp.url == reverse("user-dashboard")
 
+    # The reference is used once, so coming back later doesn't report the
+    # old order again.
+    assert "order_reference_number" not in user_client.session
+    resp = user_client.get(reverse("checkout-result-callback"))
+    assert resp.url == reverse("user-dashboard")
+
 
 @pytest.mark.parametrize(
     "cart_exists, cart_empty",  # noqa: PT006

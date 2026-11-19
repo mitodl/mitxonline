@@ -901,7 +901,7 @@ class CheckoutCallbackView(View):
         dashboard.
         """
 
-        order_ref = request.session.get("order_reference_number", None)
+        order_ref = request.session.pop("order_reference_number", None)
         if order_ref:
             order = Order.objects.filter(
                 reference_number=order_ref, state=OrderStatus.FULFILLED
