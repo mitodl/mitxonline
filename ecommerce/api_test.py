@@ -65,6 +65,7 @@ from ecommerce.api import (
     find_paid_program_order_for_zero_value_order,
     fulfill_completed_order,
     fulfill_order_from_cybersource_transaction,
+    fulfill_pending_order,
     generate_checkout_payload,
     get_anonymous_basket_id,
     get_auto_apply_discounts_for_basket,
@@ -75,6 +76,7 @@ from ecommerce.api import (
     process_stripe_refund_updated,
     quote_user_price,
     refund_order,
+    resolve_returned_stripe_order,
     unenroll_learner_from_order,
 )
 from ecommerce.constants import (
@@ -2691,24 +2693,32 @@ def test_cull_stale_pending_orders(settings, user):
 
 
 @pytest.mark.parametrize(
-    "stripe_status",
+    ("stripe_status", "payment_intent_id"),
     [
-        STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
-        STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
-        STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
-        None,
+        (STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED, ""),
+        (STRIPE_OVERALL_CHECKOUT_STATUS_PAID, "pi_test_stale"),
+        (STRIPE_OVERALL_CHECKOUT_STATUS_PAID, ""),
+        (STRIPE_OVERALL_CHECKOUT_STATUS_PENDING, ""),
+        (None, ""),
     ],
 )
-def test_cull_stale_pending_orders_checks_stripe(mocker, settings, user, stripe_status):
+def test_cull_stale_pending_orders_checks_stripe(
+    mocker, settings, user, stripe_status, payment_intent_id
+):
     """
     Stale Stripe orders should be checked with Stripe first: only cancelled
-    sessions are culled, paid ones are resolved, and the rest are kept. A
+    sessions are culled, paid ones are resolved, and the rest are kept. A paid
+    session with no PaymentIntent to record the payment under is kept too. A
     status of None means the Stripe lookup failed.
     """
     settings.PENDING_ORDER_CULL_AGE_DAYS = 60
     mock_status = mocker.patch(
         "ecommerce.api.process_stripe_checkout_session_status",
-        return_value={"status": stripe_status, "transaction": {"id": "cs_test"}},
+        return_value={
+            "status": stripe_status,
+            "payment_intent_id": payment_intent_id,
+            "transaction": {"id": "cs_test"},
+        },
         side_effect=None if stripe_status else APIConnectionError("Stripe is down"),
     )
     mock_fulfill = mocker.patch("ecommerce.models.OrderFlow.fulfill")
@@ -2737,12 +2747,52 @@ def test_cull_stale_pending_orders_checks_stripe(mocker, settings, user, stripe_
     assert Order.objects.filter(pk=order.pk).exists() is not (
         stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED
     )
-    if stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
+    if stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_PAID and payment_intent_id:
         mock_fulfill.assert_called_once_with(
             {"id": "cs_test"}, already_enrolled=False, skip_receipt=False
         )
     else:
         mock_fulfill.assert_not_called()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_cull_stale_pending_orders_fulfills_outside_a_transaction(
+    mocker, settings, user
+):
+    """
+    The cull runs from a Celery task in autocommit mode, so fulfilling a paid
+    stale order has to open its own transaction for the row lock.
+    """
+    settings.PENDING_ORDER_CULL_AGE_DAYS = 60
+    mocker.patch(
+        "ecommerce.api.process_stripe_checkout_session_status",
+        return_value={
+            "status": STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+            "payment_intent_id": "pi_test_stale",
+            "transaction": {"id": "cs_test"},
+        },
+    )
+    mock_fulfill = mocker.patch("ecommerce.models.OrderFlow.fulfill")
+    mocker.patch("ecommerce.api.sync_hubspot_deal")
+
+    order = OrderFactory.create(
+        purchaser=user, gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE
+    )
+    TransactionFactory.create(
+        order=order,
+        transaction_id="cs_test_stale",
+        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+        data={"object": STRIPE_OBJECT_CHECKOUT_SESSION, "id": "cs_test_stale"},
+    )
+    Order.objects.filter(pk=order.pk).update(
+        created_on=now_in_utc() - timedelta(days=61)
+    )
+
+    cull_stale_pending_orders()
+
+    mock_fulfill.assert_called_once_with(
+        {"id": "cs_test"}, already_enrolled=False, skip_receipt=False
+    )
 
 
 def test_log_stripe_event():
@@ -3022,6 +3072,145 @@ def test_process_stripe_checkout_completed(  # noqa: PLR0913
         assert updated_order.state == OrderStatus.CANCELED
     else:
         assert updated_order.state == OrderStatus.ERRORED
+
+
+def test_process_stripe_checkout_completed_already_fulfilled(
+    mocker, bootstrapped_verified_program
+):
+    """
+    A completed checkout for an order that's already fulfilled (e.g. by the
+    checkout return) leaves it alone.
+    """
+
+    *_, cr_product = bootstrapped_verified_program
+
+    product_version = Version.objects.get_for_object(cr_product).get()
+    order_line = LineFactory.create(
+        product_version=product_version,
+        order__gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+        order__state=OrderStatus.FULFILLED,
+    )
+    mocker.patch(
+        "ecommerce.api._get_stripe_checkout_session_v1",
+        side_effect=lambda: MockedCheckoutSessionClient(
+            STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+            STRIPE_PAYMENT_STATUS_PAID,
+            STRIPE_PAYMENT_INTENT_STATUS_SUCCEEDED,
+            "",
+            order_line.order.reference_number,
+        ),
+    )
+    mock_fulfill = mocker.patch("ecommerce.models.OrderFlow.fulfill")
+
+    updated_order = process_stripe_checkout_completed(
+        _configure_checkout_session_object(order_line)
+    )
+
+    mock_fulfill.assert_not_called()
+    assert updated_order.state == OrderStatus.FULFILLED
+
+
+@pytest.mark.parametrize(
+    ("state", "fulfilled"),
+    [(OrderStatus.PENDING, True), (OrderStatus.FULFILLED, False)],
+)
+def test_fulfill_pending_order(mocker, user, state, fulfilled):
+    """Only a pending order gets fulfilled."""
+
+    mock_fulfill = mocker.patch("ecommerce.models.OrderFlow.fulfill")
+    mocker.patch("ecommerce.api.sync_hubspot_deal")
+    order = OrderFactory.create(purchaser=user, state=state)
+
+    fulfill_pending_order(order.id, {"id": "cs_test"})
+
+    assert mock_fulfill.called is fulfilled
+
+
+def _stripe_order_with_checkout_session(user, **kwargs):
+    """Create a pending Stripe order with its CheckoutSession logged."""
+
+    order = OrderFactory.create(
+        purchaser=user, gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE, **kwargs
+    )
+    TransactionFactory.create(
+        order=order,
+        transaction_id="cs_test_return",
+        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+        data={"object": STRIPE_OBJECT_CHECKOUT_SESSION, "id": "cs_test_return"},
+    )
+    return order
+
+
+@pytest.mark.parametrize(
+    ("stripe_status", "payment_intent_id"),
+    [
+        (STRIPE_OVERALL_CHECKOUT_STATUS_PAID, "pi_test_return"),
+        (STRIPE_OVERALL_CHECKOUT_STATUS_PAID, ""),
+        (STRIPE_OVERALL_CHECKOUT_STATUS_PENDING, ""),
+        (STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED, ""),
+        (None, ""),
+    ],
+)
+def test_resolve_returned_stripe_order(mocker, user, stripe_status, payment_intent_id):
+    """
+    A returning order is fulfilled only when Stripe says it's paid, and the
+    payment is recorded so a refund can find the order by its PaymentIntent.
+    A paid session without a PaymentIntent, or a failed Stripe lookup (status
+    None), leaves the order for the webhook.
+    """
+
+    paid_session = {
+        "id": "cs_test_return",
+        "object": STRIPE_OBJECT_CHECKOUT_SESSION,
+        "amount_total": 17500,
+        "payment_intent": (
+            {"id": payment_intent_id, "object": "payment_intent"}
+            if payment_intent_id
+            else None
+        ),
+    }
+    mock_status = mocker.patch(
+        "ecommerce.api.process_stripe_checkout_session_status",
+        return_value={
+            "status": stripe_status,
+            "payment_intent_id": payment_intent_id,
+            "transaction": paid_session,
+        },
+        side_effect=None if stripe_status else APIConnectionError("Stripe is down"),
+    )
+    mocker.patch("ecommerce.api.sync_hubspot_deal")
+    order = _stripe_order_with_checkout_session(
+        user, total_price_paid=Decimal("175.00")
+    )
+
+    result = resolve_returned_stripe_order(order)
+
+    mock_status.assert_called_once_with("cs_test_return")
+    if stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_PAID and payment_intent_id:
+        assert result.state == OrderStatus.FULFILLED
+        payment = result.transactions.get(transaction_id=payment_intent_id)
+        assert payment.amount == Decimal("175.00")
+        assert find_order_for_stripe_payment_intent(payment_intent_id) == order
+    else:
+        assert result.state == OrderStatus.PENDING
+        assert result.transactions.count() == 1
+
+
+@pytest.mark.parametrize("has_checkout_session", [True, False])
+def test_resolve_returned_stripe_order_skips_lookup(mocker, user, has_checkout_session):
+    """
+    Stripe isn't asked about orders that aren't pending, or that have no
+    CheckoutSession to look up.
+    """
+
+    mock_status = mocker.patch("ecommerce.api.process_stripe_checkout_session_status")
+    if has_checkout_session:
+        order = _stripe_order_with_checkout_session(user, state=OrderStatus.CANCELED)
+    else:
+        order = OrderFactory.create(purchaser=user)
+
+    assert resolve_returned_stripe_order(order) == order
+    mock_status.assert_not_called()
 
 
 def test_process_stripe_checkout_expired(bootstrapped_verified_program):

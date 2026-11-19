@@ -809,6 +809,44 @@ def test_checkout_result_get_reports_only_fulfilled_orders(
     assert resp.url == reverse("user-dashboard")
 
 
+@pytest.mark.parametrize("paid", [True, False])
+def test_checkout_result_get_resolves_pending_order(
+    mocker, settings, user, user_client, paid
+):
+    """
+    If the learner gets back before the webhook has fulfilled the order, the
+    order is checked with Stripe, and reported as fulfilled if it was paid.
+    """
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.PENDING)
+
+    def resolve(returned_order):
+        if paid:
+            Order.objects.filter(pk=returned_order.pk).update(
+                state=OrderStatus.FULFILLED
+            )
+            returned_order.refresh_from_db()
+        return returned_order
+
+    mock_resolve = mocker.patch(
+        "ecommerce.api.resolve_returned_stripe_order", side_effect=resolve
+    )
+    session = user_client.session
+    session["order_reference_number"] = order.reference_number
+    session.save()
+    user_client.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
+
+    resp = user_client.get(reverse("checkout-result-callback"))
+
+    mock_resolve.assert_called_once_with(order)
+    if paid:
+        assert (
+            resp.url
+            == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
+        )
+    else:
+        assert resp.url == reverse("user-dashboard")
+
+
 @pytest.mark.parametrize(
     "cart_exists, cart_empty",  # noqa: PT006
     [(True, False), (True, True), (False, True)],

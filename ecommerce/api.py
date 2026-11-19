@@ -473,6 +473,34 @@ def fulfill_completed_order(
         basket.delete()
 
 
+def fulfill_pending_order(order_id, payment_data, basket=None):
+    """
+    Fulfill an order if it's still pending.
+
+    The Stripe webhook, the checkout return and the stale order cull can each
+    find the same order paid at about the same time. The fulfill transition
+    only checks the state of the Order it's given, so this locks the row and
+    re-reads it first, and only the first caller fulfills the order.
+
+    Args:
+    - order_id (int): the order to fulfill
+    - payment_data (dict): payment data to record on the order's transaction
+    - basket (Basket): the purchaser's basket, deleted if it matches the order
+
+    Returns:
+    - Order, with its current state
+    """
+
+    with transaction.atomic():
+        order = Order.objects.select_for_update().get(pk=order_id)
+
+        if order.state == OrderStatus.PENDING:
+            fulfill_completed_order(order, payment_data, basket)
+            order.refresh_from_db()
+
+    return order
+
+
 def get_order_from_cybersource_payment_response(request):
     payment_data = request.POST
     converted_order = PaymentGateway.get_gateway_class(
@@ -737,7 +765,7 @@ def cull_stale_pending_orders():
     log.info("Culled stale pending orders: %s", deleted)
 
 
-def _check_stale_stripe_orders(orders):  # noqa: C901
+def _check_stale_stripe_orders(orders):
     """
     Check the CheckoutSession of each stale Stripe order with Stripe, so a
     paid order whose webhook never got processed isn't deleted.
@@ -806,32 +834,26 @@ def _check_stale_stripe_orders(orders):  # noqa: C901
 
         keep_ids.add(order.id)
 
-        if session["status"] != STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
+        # A paid session needs a PaymentIntent to record the payment under.
+        if (
+            session["status"] != STRIPE_OVERALL_CHECKOUT_STATUS_PAID
+            or not session["payment_intent_id"]
+        ):
             log.info(
-                "Keeping stale order %s: CheckoutSession %s is %s",
+                "Keeping stale order %s: CheckoutSession %s is %s, PaymentIntent %s",
                 order.reference_number,
                 session_id,
                 session["status"],
+                session["payment_intent_id"] or "none",
             )
-            continue
-
-        locked_order = Order.objects.select_for_update().get(pk=order.id)
-        if locked_order.state in [
-            OrderStatus.FULFILLED,
-            OrderStatus.CANCELED,
-            OrderStatus.ERRORED,
-            OrderStatus.REFUNDED,
-            OrderStatus.DECLINED,
-        ]:
             continue
 
         log.debug(
             "Stale order %s was paid in Stripe, fulfilling it",
-            locked_order.reference_number,
+            order.reference_number,
         )
 
-        with transaction.atomic():
-            fulfill_completed_order(locked_order, session["transaction"])
+        fulfill_pending_order(order.id, session["transaction"])
 
     return keep_ids
 
@@ -1222,6 +1244,69 @@ def _retrieve_pending_cybersource_orders(orders):
     )
 
 
+def get_stripe_checkout_session_id(order) -> str | None:
+    """
+    Get the ID of the Stripe CheckoutSession logged for the order.
+
+    generate_checkout_payload logs the session as a Transaction when it creates
+    it, so it can be looked up again later.
+    """
+
+    session_transaction = order.transactions.filter(
+        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+        data__object=STRIPE_OBJECT_CHECKOUT_SESSION,
+    ).first()
+
+    return session_transaction.data.get("id") if session_transaction else None
+
+
+def resolve_returned_stripe_order(order):
+    """
+    Ask Stripe whether a pending order was paid, and fulfill it if so.
+
+    Stripe waits up to 10 seconds for the checkout.session.completed webhook
+    to be answered before it sends the learner back to
+    checkout-result-callback, so the order is usually fulfilled by then. When
+    the webhook is slow, fails or is delayed, checking here lets the return
+    report the purchase anyway. If Stripe can't be reached, or the session has
+    no PaymentIntent to record the payment under, the order is left for the
+    webhook so the learner's redirect doesn't fail. Orders that aren't
+    pending, or have no CheckoutSession (e.g. CyberSource orders), are
+    returned as they are.
+
+    Returns:
+    - Order, with its current state
+    """
+
+    if order.state != OrderStatus.PENDING:
+        return order
+
+    session_id = get_stripe_checkout_session_id(order)
+
+    if not session_id:
+        return order
+
+    try:
+        session = process_stripe_checkout_session_status(session_id)
+    except stripe.StripeError:
+        log.exception(
+            "Couldn't check CheckoutSession %s for returning order %s",
+            session_id,
+            order.reference_number,
+        )
+        return order
+
+    if (
+        session["status"] != STRIPE_OVERALL_CHECKOUT_STATUS_PAID
+        or not session["payment_intent_id"]
+    ):
+        return order
+
+    basket = Basket.objects.filter(user=order.purchaser).first()
+
+    return fulfill_pending_order(order.id, session["transaction"], basket)
+
+
 def _retrieve_pending_stripe_orders(orders):
     """
     Retrieve current status for Stripe orders.
@@ -1240,25 +1325,9 @@ def _retrieve_pending_stripe_orders(orders):
     # later in event processing.
 
     for order in orders:
-        checkout_session_transactions = order.transactions.filter(
-            reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION
-        )
+        checkout_session_id = get_stripe_checkout_session_id(order)
 
-        if not checkout_session_transactions.exists():
-            log.info(
-                "Order %s (ref %s) has no apparent CheckoutSession logged.",
-                order.id,
-                order.reference_number,
-            )
-            continue
-
-        session_transaction = checkout_session_transactions.first()
-        checkout_session_id = session_transaction.data.get("id")
-
-        if (
-            session_transaction.data.get("object") != STRIPE_OBJECT_CHECKOUT_SESSION
-            or not checkout_session_id
-        ):
+        if not checkout_session_id:
             log.info(
                 "Order %s (ref %s) has no apparent CheckoutSession logged.",
                 order.id,
@@ -2319,9 +2388,7 @@ def process_stripe_checkout_completed(event):
     else:
         basket = Basket.objects.filter(user=order.purchaser).first()
 
-        fulfill_completed_order(order, event.to_dict(for_json=True), basket)
-
-        order.refresh_from_db()
+        order = fulfill_pending_order(order.id, event.to_dict(for_json=True), basket)
 
     return order
 

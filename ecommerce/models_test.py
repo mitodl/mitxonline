@@ -12,7 +12,10 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from freezegun import freeze_time
 from mitol.common.utils import now_in_utc
-from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+from mitol.payment_gateway.constants import (
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+    MITOL_PAYMENT_GATEWAY_STRIPE,
+)
 from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
@@ -30,6 +33,7 @@ from courses.models import (
     CourseRunEnrollmentAudit,
     ProgramEnrollment,
 )
+from ecommerce.api import find_order_for_stripe_payment_intent
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
@@ -41,6 +45,8 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_PROGRAM_CHILD_PURCHASE,
     REDEMPTION_TYPE_UNLIMITED,
     REFUND_WINDOW_DAYS,
+    STRIPE_OBJECT_CHECKOUT_SESSION,
+    STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
     ZERO_PAYMENT_DATA,
 )
 from ecommerce.discount_sources import resolve_program_child_purchase
@@ -521,6 +527,44 @@ def test_create_transaction_cybersource_amount(payment_data):
 
     txn = Transaction.objects.get(transaction_id=payment_data["transaction_id"])
     assert txn.amount == Decimal("175.00")
+
+
+@pytest.mark.parametrize("expanded", [True, False])
+def test_create_transaction_stripe_paid_checkout_session(expanded):
+    """
+    A paid CheckoutSession is recorded as its own payment under the
+    PaymentIntent, not folded into the initial CheckoutSession transaction,
+    which has the same session ID.
+    """
+
+    order = OrderFactory.create(
+        state=OrderStatus.FULFILLED,
+        total_price_paid=Decimal("175.00"),
+        gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+    )
+    order_flow = order.get_object_flow()
+    session = {
+        "id": "cs_test_paid",
+        "object": STRIPE_OBJECT_CHECKOUT_SESSION,
+        "amount_total": 17500,
+        "payment_intent": None,
+    }
+    order_flow.create_transaction(
+        session, reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION
+    )
+
+    payment_intent = {"id": "pi_test_paid", "object": "payment_intent"}
+    order_flow.create_transaction(
+        {
+            **session,
+            "payment_intent": payment_intent if expanded else payment_intent["id"],
+        }
+    )
+
+    txn = order.transactions.get(transaction_id="pi_test_paid")
+    assert txn.amount == Decimal("175.00")
+    assert order.transactions.count() == 2
+    assert find_order_for_stripe_payment_intent("pi_test_paid") == order
 
 
 @pytest.mark.parametrize(
