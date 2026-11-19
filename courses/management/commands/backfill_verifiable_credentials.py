@@ -30,7 +30,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "-f",
             "--force",
-            type=bool,
+            action="store_true",
             help="If specified, will regenerate credentials even if they already exist",
             default=False,
         )
