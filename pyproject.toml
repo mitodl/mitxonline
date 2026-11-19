@@ -42,7 +42,7 @@ dependencies = [
     "mitol-django-hubspot-api==2026.4.29",
     "mitol-django-mail==2026.4.29",
     "mitol-django-openedx==2026.4.29",
-    "mitol-django-payment-gateway==2026.11.18",
+    "mitol-django-payment-gateway==2026.11.19",
     "mitol-django-scim==2026.4.29",
     "mitol-django-observability>=2026.8.19",
     "opentelemetry-instrumentation-celery>=0.52b0",
