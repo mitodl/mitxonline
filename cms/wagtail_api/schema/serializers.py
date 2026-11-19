@@ -298,7 +298,7 @@ class ProgramPageItemSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(str)
     def get_description(self, instance):
-        """The description shown on the home page and product page."""
+        """The description shown on the product page."""
         if instance.description:
             return bleach.clean(instance.description, tags={}, strip=True)
         return ""

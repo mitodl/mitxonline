@@ -1002,14 +1002,6 @@ REPAIR_OPENEDX_USERS_FREQUENCY = get_int(
 )
 REPAIR_OPENEDX_USERS_OFFSET = int(REPAIR_OPENEDX_USERS_FREQUENCY / 2)
 
-REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ = get_int(
-    name="REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ",
-    default=180,
-    description="How many seconds between refreshing featured items for the homepage cache",
-)
-
-REFRESH_FEATURED_HOMEPAGE_ITEMS_OFFSET = int(REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ / 2)
-
 KEYCLOAK_ORG_SYNC_FREQUENCY = get_int(
     name="KEYCLOAK_ORG_SYNC_FREQUENCY",
     default=86400,
@@ -1072,13 +1064,6 @@ CELERY_BEAT_SCHEDULE = {
             day_of_week=CRON_COURSE_CERTIFICATES_DAYS,
             day_of_month="*",
             month_of_year="*",
-        ),
-    },
-    "refresh-featured-homepage-items": {
-        "task": "cms.tasks.refresh_featured_homepage_items",
-        "schedule": OffsettingSchedule(
-            run_every=timedelta(seconds=REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ),
-            offset=timedelta(seconds=REFRESH_FEATURED_HOMEPAGE_ITEMS_OFFSET),
         ),
     },
     "sync-keycloak": {
@@ -1517,19 +1502,6 @@ HUBSPOT_TASK_DELAY = get_int(
     name="HUBSPOT_TASK_DELAY",
     default=60,
     description="Number of milliseconds to wait between consecutive Hubspot calls",
-)
-
-# HomePage Hubspot Form Settings
-HUBSPOT_HOME_PAGE_FORM_GUID = get_string(
-    name="HUBSPOT_HOME_PAGE_FORM_GUID",
-    default="",
-    description="Hubspot ID for the home page contact form",
-)
-
-HUBSPOT_PORTAL_ID = get_string(
-    name="HUBSPOT_PORTAL_ID",
-    default="",
-    description="Hubspot Portal ID",
 )
 
 UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = get_string(

@@ -44,11 +44,8 @@ In MITx Online
 6. Open the Courses folder under Home Page.
 7. Select Add Child Page.
 8. Fill out the form. The course you added in steps 1-4 should appear. (If not, double-check your settings in Django Admin.) Publish the page when ready.
-9. Open the Home Page, and select Edit.
-10. Under the Featured Products section, select Add. You will be given a button to choose a page, and the page chooser there should list the page you created.
-11. Publish the Home Page when ready.
 
-You should now be able to see the course under the hero image on the MITx Online homepage, and navigating into the course should give you the option to Enroll. (At this point, you won't have a Product set up, so enrolling now should just enroll you in the course.)
+You should now be able to navigate to the course page and enroll. (At this point, you won't have a Product set up, so enrolling now should just enroll you in the course.)
 
 Setting Up a Product
 ####################

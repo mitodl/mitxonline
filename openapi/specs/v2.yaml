@@ -969,7 +969,7 @@ components:
           maxLength: 255
         description:
           type: string
-          description: The description shown on the home page and product page.
+          description: The description shown on the product page.
         length:
           type: string
           description: A short description indicating how long it takes to complete
@@ -2219,7 +2219,7 @@ components:
           readOnly: true
         description:
           type: string
-          description: The description shown on the home page and product page.
+          description: The description shown on the product page.
           readOnly: true
         live:
           type: boolean
@@ -2272,7 +2272,7 @@ components:
           maxLength: 255
         description:
           type: string
-          description: The description shown on the home page and product page.
+          description: The description shown on the product page.
           readOnly: true
         length:
           type: string
