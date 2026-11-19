@@ -43,12 +43,18 @@ WORKDIR /src
 RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
     uv sync --frozen --no-install-project --no-dev
 
+ENV XDG_CACHE_HOME=/tmp/.cache
+
+# The dev dependencies, installed before any source so a source edit reuses them.
+FROM deps AS deps-dev
+
+RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
+    uv sync --frozen --no-install-project
+
 FROM deps AS code
 
 COPY . /src
 WORKDIR /src
-
-ENV XDG_CACHE_HOME=/tmp/.cache
 
 # ─── Node / frontend asset build ─────────────────────────────────────────────
 FROM node:20.18 AS node
@@ -88,16 +94,14 @@ COPY --from=node /src/frontend/staff-dashboard/build /src/frontend/staff-dashboa
 COPY --from=node /src/webpack-stats /src/webpack-stats
 
 # ─── Local-dev target (ol-infrastructure local-dev k8s/Tilt stack) ───────────
-# Runtime user owns /src (live-synced source), plus dev deps (pytest, ipdb, …)
-# and watchfiles for granian --reload.
-FROM production AS local-dev
+# Dev deps (pytest, ipdb, …) and watchfiles for granian --reload, plus
+# production's /src: the source and the compiled frontend. FROM deps-dev, not
+# production: production holds the source, so every source edit would reinstall
+# the dev deps on top of it. The command and PORT come from the k8s manifest.
+FROM deps-dev AS local-dev
 
-USER root
-RUN chown -R mitodl:mitodl /src
-USER mitodl
-
-RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
-    uv sync --frozen --no-install-project
+# Owned by mitodl because Tilt's live update writes synced files as mitodl.
+COPY --from=production --chown=mitodl:mitodl /src /src
 
 FROM code AS jupyter-notebook
 
