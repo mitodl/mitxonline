@@ -1,21 +1,17 @@
 """Constants for location."""
 
+from location.dataclasses import LocationFlagRule
+
 # Geolocation mechanisms
 
 GEOLOCATION_TYPE_PROFILE = "profile"
 GEOLOCATION_TYPE_GEOIP = "geoip"
 GEOLOCATION_TYPE_NONE = "none"
-GEOLOCATION_TYPES = [
-    GEOLOCATION_TYPE_PROFILE,
-    GEOLOCATION_TYPE_GEOIP,
-    GEOLOCATION_TYPE_NONE,
-]
-GEOLOCATION_CHOICES = zip(GEOLOCATION_TYPES, GEOLOCATION_TYPES)
 
 # Flag determination rules
-# These are the different ways the flag may be set for a given user. They map to
-# a proxy model (of LocationFlag) - each has an "is_applicable" method that
-# contains the actual logic.
+# These are the different ways the flag may be set for a given user. Each maps
+# to a LocationFlagRule in LOCATION_FLAG_RULE_DEFINITIONS below, which
+# LocationFlag.evaluate uses to decide whether the flag is set.
 
 LOCATION_FLAG_RULE_MATCH_PROFILE_ANY = "profile-any"
 LOCATION_FLAG_RULE_MATCH_PROFILE_ANY_NAME = "Check any of the user's profile locations."
@@ -64,7 +60,7 @@ LOCATION_FLAG_RULES_NAMES = [
     LOCATION_FLAG_RULE_MATCH_ALL_NAME,
     LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP_MATCH_ALL_NAME,
 ]
-LOCATION_FLAG_RULE_CHOICES = zip(LOCATION_FLAG_RULES, LOCATION_FLAG_RULES_NAMES)
+LOCATION_FLAG_RULE_CHOICES = list(zip(LOCATION_FLAG_RULES, LOCATION_FLAG_RULES_NAMES))
 
 # Flagged countries constants
 # We can flag a country for tax assessment, or for access control.
@@ -75,4 +71,37 @@ LOCATION_FLAG_TYPES = [
     LOCATION_FLAG_TYPE_TAX,
     LOCATION_FLAG_TYPE_BLOCKED,
 ]
-LOCATION_FLAG_TYPE_CHOICES = zip(LOCATION_FLAG_TYPES, LOCATION_FLAG_TYPES)
+LOCATION_FLAG_TYPE_CHOICES = list(zip(LOCATION_FLAG_TYPES, LOCATION_FLAG_TYPES))
+
+# How each rule is evaluated:
+# - lookup_types: the location types the rule considers (None means all types)
+# - match_all: whether all considered locations must match (vs. any of them)
+# - require_all_types: whether each of lookup_types must have at least one location
+# A rule never sets the flag if there are no locations to consider.
+
+_PROFILE_ONLY = frozenset({GEOLOCATION_TYPE_PROFILE})
+_GEOIP_ONLY = frozenset({GEOLOCATION_TYPE_GEOIP})
+_PROFILE_AND_GEOIP = frozenset({GEOLOCATION_TYPE_PROFILE, GEOLOCATION_TYPE_GEOIP})
+
+LOCATION_FLAG_RULE_DEFINITIONS = {
+    LOCATION_FLAG_RULE_MATCH_PROFILE_ANY: LocationFlagRule(
+        lookup_types=_PROFILE_ONLY, match_all=False
+    ),
+    LOCATION_FLAG_RULE_MATCH_PROFILE_ALL: LocationFlagRule(
+        lookup_types=_PROFILE_ONLY, match_all=True
+    ),
+    LOCATION_FLAG_RULE_MATCH_GEOIP_ANY: LocationFlagRule(
+        lookup_types=_GEOIP_ONLY, match_all=False
+    ),
+    LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ANY: LocationFlagRule(
+        lookup_types=_PROFILE_AND_GEOIP, match_all=False
+    ),
+    LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ALL: LocationFlagRule(
+        lookup_types=_PROFILE_AND_GEOIP, match_all=True
+    ),
+    LOCATION_FLAG_RULE_MATCH_ANY: LocationFlagRule(lookup_types=None, match_all=False),
+    LOCATION_FLAG_RULE_MATCH_ALL: LocationFlagRule(lookup_types=None, match_all=True),
+    LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP_MATCH_ALL: LocationFlagRule(
+        lookup_types=_PROFILE_AND_GEOIP, match_all=True, require_all_types=True
+    ),
+}

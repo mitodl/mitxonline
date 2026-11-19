@@ -1,11 +1,15 @@
 """Tests for location models."""
 
 import pytest
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 
 from location.constants import (
     GEOLOCATION_TYPE_GEOIP,
     GEOLOCATION_TYPE_NONE,
     GEOLOCATION_TYPE_PROFILE,
+    LOCATION_FLAG_RULE_CHOICES,
+    LOCATION_FLAG_RULE_DEFINITIONS,
     LOCATION_FLAG_RULE_MATCH_ALL,
     LOCATION_FLAG_RULE_MATCH_ANY,
     LOCATION_FLAG_RULE_MATCH_GEOIP_ANY,
@@ -15,20 +19,13 @@ from location.constants import (
     LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ANY,
     LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP_MATCH_ALL,
     LOCATION_FLAG_RULES,
+    LOCATION_FLAG_TYPE_BLOCKED,
+    LOCATION_FLAG_TYPE_CHOICES,
+    LOCATION_FLAG_TYPE_TAX,
 )
 from location.dataclasses import UserCalculatedLocation
 from location.factories import LocationFlagFactory
-from location.models import (
-    AnyTypeMatchAllLocationFlag,
-    AnyTypeMatchAnyLocationFlag,
-    GeoIPMatchAnyLocationFlag,
-    LocationFlag,
-    ProfileAndGeoIPMatchAllLocationFlag,
-    ProfileAndGeoIPMatchAnyLocationFlag,
-    ProfileMatchAllLocationFlag,
-    ProfileMatchAnyLocationFlag,
-    RequireProfileGeoIPMatchAllLocationFlag,
-)
+from location.models import LocationFlag
 
 pytestmark = pytest.mark.django_db
 
@@ -154,28 +151,17 @@ RULE_EXPECTATIONS = {
     },
 }
 
-RULE_MODELS = {
-    LOCATION_FLAG_RULE_MATCH_PROFILE_ANY: ProfileMatchAnyLocationFlag,
-    LOCATION_FLAG_RULE_MATCH_PROFILE_ALL: ProfileMatchAllLocationFlag,
-    LOCATION_FLAG_RULE_MATCH_GEOIP_ANY: GeoIPMatchAnyLocationFlag,
-    LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ANY: ProfileAndGeoIPMatchAnyLocationFlag,
-    LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ALL: ProfileAndGeoIPMatchAllLocationFlag,
-    LOCATION_FLAG_RULE_MATCH_ANY: AnyTypeMatchAnyLocationFlag,
-    LOCATION_FLAG_RULE_MATCH_ALL: AnyTypeMatchAllLocationFlag,
-    LOCATION_FLAG_RULE_REQUIRE_PROFILE_GEOIP_MATCH_ALL: RequireProfileGeoIPMatchAllLocationFlag,
-}
-
 
 def test_rule_constants_are_unique():
-    """Each rule needs a distinct value, or two rules map to the same model."""
+    """Each rule needs a distinct value, or two rules share a definition."""
 
     assert len(set(LOCATION_FLAG_RULES)) == len(LOCATION_FLAG_RULES)
 
 
 def test_all_rules_covered():
-    """Every rule should have a rule model and test expectations."""
+    """Every rule should have a rule definition and test expectations."""
 
-    assert set(RULE_MODELS) == set(LOCATION_FLAG_RULES)
+    assert set(LOCATION_FLAG_RULE_DEFINITIONS) == set(LOCATION_FLAG_RULES)
     assert set(RULE_EXPECTATIONS) == set(LOCATION_FLAG_RULES)
     for expected in RULE_EXPECTATIONS.values():
         assert expected <= set(LOCATION_SCENARIOS)
@@ -242,35 +228,113 @@ def test_active_manager():
     assert set(LocationFlag.all_objects.all()) == {active, inactive}
 
 
-@pytest.mark.parametrize(("rule", "rule_model"), RULE_MODELS.items())
-def test_get_rule_model_for_object(rule, rule_model):
-    """The rule model should be the proxy model that matches the rule."""
+def test_evaluate_invalid_rule():
+    """A rule without a rule definition should raise a ValueError."""
 
-    flag = LocationFlagFactory.create(determination_rule=rule)
-    result = LocationFlag.get_rule_model_for_object(flag)
-
-    assert isinstance(result, rule_model)
-    assert result.pk == flag.pk
-
-
-def test_get_rule_model_for_object_invalid_rule():
-    """A rule without a rule model should raise a ValueError."""
-
-    flag = LocationFlag(determination_rule="not-a-rule")
+    flag = LocationFlag(determination_rule="not-a-rule", country_code=FLAG_COUNTRY)
 
     with pytest.raises(ValueError, match="not-a-rule"):
-        LocationFlag.get_rule_model_for_object(flag)
+        flag.evaluate(LOCATION_SCENARIOS["profile-match-geoip-match"])
 
 
 def test_evaluate_unsaved():
-    """An unsaved flag should never be applicable."""
+    """An unsaved flag should evaluate its rule like a saved one."""
 
     flag = LocationFlagFactory.build(
         country_code=FLAG_COUNTRY,
         determination_rule=LOCATION_FLAG_RULE_MATCH_ANY,
     )
 
-    assert flag.evaluate(LOCATION_SCENARIOS["profile-match-geoip-match"]) is False
+    assert flag.evaluate(LOCATION_SCENARIOS["profile-match-geoip-match"]) is True
+
+
+def test_evaluate_no_extra_queries(django_assert_num_queries):
+    """Evaluating flags shouldn't re-fetch them from the database."""
+
+    for rule in LOCATION_FLAG_RULES:
+        LocationFlagFactory.create(country_code=FLAG_COUNTRY, determination_rule=rule)
+
+    with django_assert_num_queries(1):
+        for flag in LocationFlag.objects.all():
+            flag.evaluate(LOCATION_SCENARIOS["profile-match-geoip-match"])
+
+
+def test_choices_are_reusable():
+    """The choices lists should be reusable, not one-shot iterators."""
+
+    assert list(LOCATION_FLAG_RULE_CHOICES) == list(LOCATION_FLAG_RULE_CHOICES) != []
+    assert list(LOCATION_FLAG_TYPE_CHOICES) == list(LOCATION_FLAG_TYPE_CHOICES) != []
+
+
+def test_soft_delete_updates_timestamp():
+    """Soft-deleting an instance should bump updated_on."""
+
+    flag = LocationFlagFactory.create()
+    original_updated_on = flag.updated_on
+
+    assert flag.delete(using="default", keep_parents=False) == (
+        1,
+        {"location.LocationFlag": 1},
+    )
+
+    flag.refresh_from_db()
+    assert flag.updated_on > original_updated_on
+
+
+def test_queryset_soft_delete_updates_timestamp():
+    """Soft-deleting through a queryset should bump updated_on."""
+
+    flag = LocationFlagFactory.create()
+    original_updated_on = flag.updated_on
+
+    LocationFlag.objects.filter(pk=flag.pk).delete()
+
+    flag.refresh_from_db()
+    assert flag.updated_on > original_updated_on
+
+
+def test_clean_clears_deleted_on_on_reactivation():
+    """Reactivating a deleted flag should clear deleted_on."""
+
+    flag = LocationFlagFactory.create()
+    flag.delete()
+    flag.refresh_from_db()
+
+    flag.is_active = True
+    flag.save()
+
+    flag.refresh_from_db()
+    assert flag.deleted_on is None
+
+
+def test_flag_type_required():
+    """A flag must have a flag type."""
+
+    flag = LocationFlagFactory.build(flag_type="")
+
+    with pytest.raises(ValidationError, match="flag_type"):
+        flag.save()
+
+
+def test_unique_active_flags():
+    """Only one active flag may exist per type, rule, and location."""
+
+    params = {
+        "flag_type": LOCATION_FLAG_TYPE_TAX,
+        "determination_rule": LOCATION_FLAG_RULE_MATCH_ANY,
+        "country_code": FLAG_COUNTRY,
+    }
+    first = LocationFlagFactory.create(**params)
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        LocationFlagFactory.create(**params)
+
+    # A different type is fine
+    LocationFlagFactory.create(**{**params, "flag_type": LOCATION_FLAG_TYPE_BLOCKED})
+
+    # So is a duplicate of a deleted flag
+    first.delete()
+    LocationFlagFactory.create(**params)
 
 
 @pytest.mark.parametrize("rule", RULE_EXPECTATIONS.keys())

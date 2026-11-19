@@ -281,8 +281,8 @@ INSTALLED_APPS = (
     "sheets",
     "compliance",
     "openedx",
-    # must be after "users" to pick up custom user model
     "location",
+    # must be after "users" to pick up custom user model
     "ecommerce",
     "flexiblepricing",
     "micromasters_import",
@@ -1777,7 +1777,7 @@ if ECOMMERCE_DEFAULT_PAYMENT_GATEWAY == "None":  # noqa: F405
 
 LOCATION_FORCE_COUNTRY = get_string(
     name="LOCATION_FORCE_COUNTRY",
-    default=False,
+    default="",
     description="Force the system to resolve a user's location to this country code.",
 )
 

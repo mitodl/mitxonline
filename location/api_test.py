@@ -8,6 +8,7 @@ from location.api import determine_user_flags, determine_user_location
 from location.constants import (
     GEOLOCATION_TYPE_GEOIP,
     GEOLOCATION_TYPE_PROFILE,
+    LOCATION_FLAG_RULE_MATCH_ALL,
     LOCATION_FLAG_RULE_MATCH_ANY,
     LOCATION_FLAG_RULE_MATCH_GEOIP_ANY,
     LOCATION_FLAG_RULE_MATCH_PROFILE_ANY,
@@ -27,7 +28,7 @@ USER_IP = "8.8.8.8"
 def location_settings(settings):
     """Reset the location override settings."""
 
-    settings.LOCATION_FORCE_COUNTRY = False
+    settings.LOCATION_FORCE_COUNTRY = ""
     settings.LOCATION_FORCE_PROFILE_COUNTRY = False
 
 
@@ -94,6 +95,62 @@ def test_determine_user_location_blank_country(mock_geoip):
             country_code="CA", lookup_type=GEOLOCATION_TYPE_GEOIP, ip=USER_IP
         ),
     ]
+
+
+def test_determine_user_location_no_ip(mocker, mock_geoip):
+    """If there's no client IP, skip the GeoIP lookup rather than erroring."""
+
+    mocker.patch("location.api.get_client_ip", return_value=(None, False))
+    request = _make_request(UserFactory.create(legal_address__country="US"))
+
+    assert determine_user_location(request) == [
+        UserCalculatedLocation(
+            country_code="US", lookup_type=GEOLOCATION_TYPE_PROFILE, ip=""
+        ),
+    ]
+    mock_geoip.assert_not_called()
+
+
+def test_determine_user_location_geoip_unknown(mock_geoip):
+    """An IP that GeoIP can't place shouldn't produce a GeoIP location."""
+
+    mock_geoip.return_value = None
+    request = _make_request(UserFactory.create(legal_address__country="US"))
+
+    assert determine_user_location(request) == [
+        UserCalculatedLocation(
+            country_code="US", lookup_type=GEOLOCATION_TYPE_PROFILE, ip=""
+        ),
+    ]
+
+
+def test_determine_user_flags_geoip_unknown(mock_geoip):
+    """An unknown GeoIP location shouldn't block an "all" rule from matching."""
+
+    mock_geoip.return_value = None
+    request = _make_request(UserFactory.create(legal_address__country="US"))
+    flag = LocationFlagFactory.create(
+        country_code="US", determination_rule=LOCATION_FLAG_RULE_MATCH_ALL
+    )
+
+    assert determine_user_flags(request) == [flag]
+
+
+@pytest.mark.parametrize("force_country", [True, False])
+def test_determine_user_location_normalizes_case(settings, mock_geoip, force_country):
+    """Country codes should be uppercased so they match flags."""
+
+    mock_geoip.return_value = "ca"
+    if force_country:
+        settings.LOCATION_FORCE_COUNTRY = "fr"
+    user = UserFactory.create()
+    # Set this directly; the factory/serializer path may normalize it already.
+    user.legal_address.country = "us"
+    user.legal_address.save()
+
+    codes = [loc.country_code for loc in determine_user_location(_make_request(user))]
+
+    assert codes == (["FR", "FR"] if force_country else ["US", "CA"])
 
 
 @pytest.mark.parametrize("force_profile", [True, False])

@@ -11,7 +11,7 @@ from location.constants import (
 )
 from location.dataclasses import UserCalculatedLocation
 from location.models import LocationFlag
-from users.models import LegalAddress
+from users.models import User
 
 
 def determine_user_location(request) -> list[UserCalculatedLocation]:
@@ -27,7 +27,7 @@ def determine_user_location(request) -> list[UserCalculatedLocation]:
 
     Overrides:
     - LOCATION_FORCE_COUNTRY - if set, force _all_ lookups to a specific country code
-    - LOCATION_FORCE_COUNTRY_PROFILE - if set, force _all_ lookups to use the user profile
+    - LOCATION_FORCE_PROFILE_COUNTRY - if set, force _all_ lookups to use the user profile
       This also means that only the "profile" lookup type is returned.
 
     If both are set, LOCATION_FORCE_COUNTRY takes precedence.
@@ -35,22 +35,23 @@ def determine_user_location(request) -> list[UserCalculatedLocation]:
     Args:
     - request (HTTPRequest): the request to look up
     Returns:
-    - UserCalculatedLocation: the location data for the user, if any
+    - list[UserCalculatedLocation]: the location data for the user (empty if none)
     """
 
     calculated_locations = []
 
     if settings.LOCATION_FORCE_COUNTRY:
+        forced_code = settings.LOCATION_FORCE_COUNTRY.upper()
         # Return one each for each type of determination so flags that require
         # one or the other (or both) are set appropriately.
         return [
             UserCalculatedLocation(
-                country_code=settings.LOCATION_FORCE_COUNTRY,
+                country_code=forced_code,
                 lookup_type=GEOLOCATION_TYPE_PROFILE,
                 ip="",
             ),
             UserCalculatedLocation(
-                country_code=settings.LOCATION_FORCE_COUNTRY,
+                country_code=forced_code,
                 lookup_type=GEOLOCATION_TYPE_GEOIP,
                 ip="0.0.0.0",  # noqa: S104
             ),
@@ -58,13 +59,14 @@ def determine_user_location(request) -> list[UserCalculatedLocation]:
 
     try:
         profile_code = request.user.legal_address.country
-    except (LegalAddress.user.RelatedObjectDoesNotExist, AttributeError):
+    except (User.legal_address.RelatedObjectDoesNotExist, AttributeError):
+        # AttributeError covers AnonymousUser, which has no legal_address.
         profile_code = None
 
     if profile_code:
         calculated_locations.append(
             UserCalculatedLocation(
-                country_code=profile_code,
+                country_code=profile_code.upper(),
                 lookup_type=GEOLOCATION_TYPE_PROFILE,
                 ip="",
             )
@@ -74,15 +76,18 @@ def determine_user_location(request) -> list[UserCalculatedLocation]:
         return calculated_locations
 
     user_ip, _ = get_client_ip(request)
-    geoip_code = ip_to_country_code(user_ip)
+    # Skip the GeoIP entry if there's no IP or GeoIP can't place it, so an
+    # unknown location doesn't count as a mismatch for the "all" rules.
+    geoip_code = ip_to_country_code(user_ip) if user_ip else None
 
-    calculated_locations.append(
-        UserCalculatedLocation(
-            country_code=geoip_code,
-            lookup_type=GEOLOCATION_TYPE_GEOIP,
-            ip=user_ip,
+    if geoip_code:
+        calculated_locations.append(
+            UserCalculatedLocation(
+                country_code=geoip_code.upper(),
+                lookup_type=GEOLOCATION_TYPE_GEOIP,
+                ip=user_ip,
+            )
         )
-    )
 
     return calculated_locations
 
