@@ -23,6 +23,7 @@ from openedx.constants import (
     EDX_ENROLLMENT_VERIFIED_MODE,
     UpgradeDeadlineSyncResult,
 )
+from users.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -260,3 +261,26 @@ def test_downgrade_enrollments_logs_local_failure(mocker):
     mock_log.error.assert_called_once_with(
         "Failed to downgrade enrollment(s) %s", [enrollment.id]
     )
+
+
+@pytest.mark.parametrize("repair_fails", [False, True])
+def test_downgrade_enrollments_creates_edx_user_first(mocker, repair_fails):
+    """
+    A learner without an edX account gets one before the downgrade's
+    transaction opens, and a failure there doesn't stop the local downgrade.
+    """
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    patched_repair = mocker.patch(
+        "openedx.api.repair_faulty_edx_user",
+        side_effect=HTTPError if repair_fails else None,
+    )
+    enrollment = CourseRunEnrollmentFactory.create(
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        user=UserFactory.create(no_openedx_user=True),
+    )
+
+    downgrade_enrollments.delay([enrollment.id])
+
+    patched_repair.assert_called_once_with(enrollment.user)
+    enrollment.refresh_from_db()
+    assert enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE

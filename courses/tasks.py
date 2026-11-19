@@ -182,6 +182,7 @@ def downgrade_enrollments(enrollment_ids):
     checked, so a learner who unenrolls while the batch runs isn't reactivated.
     """
     from courses.api import downgrade_learner
+    from openedx.api import repair_faulty_edx_user
 
     downgraded, failed, skipped = 0, [], 0
     for enrollment_id in enrollment_ids:
@@ -197,6 +198,17 @@ def downgrade_enrollments(enrollment_ids):
         ):
             skipped += 1
             continue
+        if not enrollment.user.openedx_user_exists:
+            # Create the learner's edX account before the transaction below:
+            # edX registration calls back with an OAuth token written here,
+            # which it can't read until that write is committed. If this fails,
+            # the downgrade still happens locally and the repair job pushes it.
+            try:
+                repair_faulty_edx_user(enrollment.user)
+            except Exception:
+                log.exception(
+                    "Failed to create the edX user for enrollment %s", enrollment_id
+                )
         try:
             # One transaction, so the audit mode and the retry reset below
             # commit together: a crash between them can't leave an audit row
