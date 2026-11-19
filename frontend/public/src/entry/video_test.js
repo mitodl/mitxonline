@@ -18,12 +18,11 @@ const YOUTUBE_CONFIG = {
   youtube:  { ytControls: 2, cc_load_policy: 1, cc_lang_pref: 1 }
 }
 
-// The smallest DASH manifest mpd-parser turns into a playlist.
-const MPD = `<?xml version="1.0"?>
-<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static" mediaPresentationDuration="PT10S" minBufferTime="PT2S">
+// A DASH manifest with only what the assertions below read.
+const MPD = `<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" mediaPresentationDuration="PT10S">
   <Period>
     <AdaptationSet mimeType="video/mp4">
-      <Representation id="720p" bandwidth="2000000" width="1280" height="720" codecs="avc1.64001f">
+      <Representation bandwidth="2000000" width="1280" height="720">
         <BaseURL>video-720p.mp4</BaseURL>
         <SegmentBase indexRange="0-100" />
       </Representation>
