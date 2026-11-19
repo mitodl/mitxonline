@@ -7,10 +7,10 @@ This page covers when verifiable credentials are created automatically, the ways
 Every path, automatic or manual, goes through `courses.api.create_verifiable_credential()`. It:
 
 1. Finds the `CertificatePage` that the certificate's `certificate_page_revision` belongs to and reads the page's latest published version. It does not use the revision that was in place when the certificate was issued, so fixing a page later lets you backfill certificates issued earlier.
-2. Checks that the page is eligible (at the time of writing, this means the certificate page having a value for `verifiable_credential_criteria` and `should_provision_verifiable_credential=True`. If those are not populated, it returns without doing anything and without raising an error.
+2. Checks that the page is eligible - at the time of writing, this means the certificate page having a value for `verifiable_credential_criteria` and `should_provision_verifiable_credential=True`. If those are not populated, it returns without doing anything and without raising an error.
 3. Builds the credential payload: the learner's current name, the course or program URL, the page's criteria (and its description, if the `mitxonline-credential-metadata-authoring` feature flag is on), the feature image, the enrollment date and the certificate issue date.
 4. Sends the payload to the signer at `VERIFIABLE_CREDENTIAL_SIGNER_URL`, authenticating with `VERIFIABLE_CREDENTIAL_BEARER_TOKEN`.
-5. Saves the signed response as a `VerifiableCredential` record and links it to the certificate via one-to-one field.
+5. Saves the signed response as a `VerifiableCredential` record and links it to the certificate via a one-to-one field.
 
 When a certificate is issued, any error in these steps is logged to Sentry (`Error creating verifiable credential for certificate <uuid>`) and then swallowed. The certificate is still issued, just without a credential. The backfill tools pass `raise_on_error=True`, so they can report which certificates failed.
 
@@ -40,7 +40,7 @@ Things to know:
 
 ### Management command
 
-`backfill_verifiable_credentials` is designed for individual and bulk backfills that can't easily be performed via the UI and requiring production shell access. For full option reference consult the command itself. A few examples are shown below.
+`backfill_verifiable_credentials` is designed for individual and bulk backfills that can't easily be performed via the UI and which require production shell access. For full option reference consult the command itself. A few examples are shown below.
 
 The following commands can be run from a web or celery worker container.
 
@@ -52,7 +52,7 @@ manage.py backfill_verifiable_credentials --type program --ids program-v1:MITx+D
 manage.py backfill_verifiable_credentials --type program --ids program-v1:MITx+DEDP \
     --execute --sleep 0.5
 
-# Backfill all certificates for a set of courses by comma-separated courseware IDs.
+# Backfill all certificates for a set of courses by comma-separated course run IDs.
 manage.py backfill_verifiable_credentials --type course --ids course-v1:MITx+14.73x+1T2024,course-v1:MITx+14.73x+3T2024 --execute
 
 # Backfill a single certificate by its UUID, forcing a reissue if it already has a credential. This is useful for correcting the criteria text or after a learner changes their name.
