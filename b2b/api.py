@@ -12,6 +12,7 @@ from uuid import uuid4
 
 import requests
 import reversion
+from authlib.integrations.base_client.errors import OAuthError
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
@@ -38,7 +39,10 @@ from b2b.constants import (
     RETIREMENT_ORG_KEY,
     RETIREMENT_ORG_NAME,
 )
-from b2b.exceptions import SourceCourseIncompleteError
+from b2b.exceptions import (
+    KeycloakAdminImproperlyConfiguredError,
+    SourceCourseIncompleteError,
+)
 from b2b.keycloak_admin_api import KCAM_ORGANIZATIONS, get_keycloak_model
 from b2b.keycloak_admin_dataclasses import OrganizationRepresentation
 from b2b.mail import ENROLLMENT_CODE_ASSINGMENT_TAG
@@ -2567,17 +2571,28 @@ def process_add_org_membership(user, organization, *, keep_until_seen=False):
     if created:
         obj.keep_until_seen = keep_until_seen
         obj.save()
+        # get_or_create has already committed the row, so a retry after an
+        # error below sees created=False. Contracts go first so that no
+        # Keycloak failure can leave the member without them; the
+        # unconfirmed-member push retries Keycloak for added_to_keycloak_at=None.
+        organization.add_user_contracts(user)
         try:
             if organization.attach_user(user):
                 obj.added_to_keycloak_at = now_in_utc()
                 obj.save(update_fields=["added_to_keycloak_at"])
         # requests' ConnectionError and Timeout are not the builtin
         # ConnectionError, so Keycloak being unreachable needs the second one.
-        except (ConnectionError, requests.exceptions.RequestException):
+        # A rejected client secret (OAuthError) or missing credentials
+        # (KeycloakAdminImproperlyConfiguredError) fail before any request.
+        except (
+            ConnectionError,
+            requests.exceptions.RequestException,
+            OAuthError,
+            KeycloakAdminImproperlyConfiguredError,
+        ):
             log.exception(
                 "Could not attach %s to Keycloak org for %s", user, organization
             )
-        organization.add_user_contracts(user)
 
     return obj
 

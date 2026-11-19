@@ -6,7 +6,6 @@ from django.conf import settings
 from django.contrib.auth.views import redirect_to_login
 from django.http import (
     HttpResponseNotFound,
-    HttpResponsePermanentRedirect,
     HttpResponseServerError,
 )
 from django.shortcuts import render
@@ -14,6 +13,8 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.cache import never_cache
 from rest_framework.pagination import LimitOffsetPagination
+
+from main.utils import learn_redirect
 
 
 def get_base_context(request):  # noqa: ARG001
@@ -38,16 +39,12 @@ def index(request, **kwargs):
     return render(request, "index.html", context=context)
 
 
-@never_cache
 def dashboard(request, **kwargs):  # noqa: ARG001
     """
     Permanently redirect to the MIT Learn dashboard, which replaced the legacy
-    MITx Online dashboard. Query parameters are passed through.
+    MITx Online dashboard.
     """
-    redirect_url = settings.MIT_LEARN_DASHBOARD_URL
-    if qs := request.META.get("QUERY_STRING"):
-        redirect_url = f"{redirect_url}?{qs}"
-    return HttpResponsePermanentRedirect(redirect_url)
+    return learn_redirect(request, settings.MIT_LEARN_DASHBOARD_URL)
 
 
 @never_cache

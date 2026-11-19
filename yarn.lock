@@ -13946,7 +13946,6 @@ __metadata:
     sass: "npm:1.49.11"
     sass-loader: "npm:12.6.0"
     sinon: "npm:4.5.0"
-    slick-carousel: "npm:^1.8.1"
     style-loader: "npm:3.3.4"
     styled-components: "npm:4.4.1"
     url-join: "npm:4.0.1"
@@ -18798,15 +18797,6 @@ __metadata:
   version: 4.0.0
   resolution: "slash@npm:4.0.0"
   checksum: 10/da8e4af73712253acd21b7853b7e0dbba776b786e82b010a5bfc8b5051a1db38ed8aba8e1e8f400dd2c9f373be91eb1c42b66e91abb407ff42b10feece5e1d2d
-  languageName: node
-  linkType: hard
-
-"slick-carousel@npm:^1.8.1":
-  version: 1.8.1
-  resolution: "slick-carousel@npm:1.8.1"
-  peerDependencies:
-    jquery: ">=1.8.0"
-  checksum: 10/b383e6f96b3bec573522467cfeeac1fce22d1cd53a68f5699cd3d62f0167777116b925dc48fbe64979a7a830777e4440036b8a7d4575c9ff8d18c3dd141b1ea2
   languageName: node
   linkType: hard
 

@@ -24,7 +24,6 @@ from courses.factories import CourseFactory, ProgramFactory
 class HomePageFactory(wagtail_factories.PageFactory):
     """HomePage factory class"""
 
-    hero = factory.SubFactory(wagtail_factories.ImageFactory)
     title = "Home Page"
 
     class Meta:
