@@ -51,7 +51,7 @@
     "yup": "0.31.1"
   },
   "engines": {
-    "node": ">=17.8 <18"
+    "node": ">=20.18"
   },
   "scripts": {
     "build": "node ../../node_modules/.bin/webpack --bail",
@@ -64,7 +64,7 @@
     "fmt": "LOG_LEVEL= prettier-eslint --write --no-semi --ignore 'src/flow/**/*.js' 'src/**/*.js'",
     "fmt:check": "LOG_LEVEL= prettier-eslint --list-different --no-semi --ignore 'src/flow/**/*.js' 'src/**/*.js'"
   },
-  "packageManager": "yarn@3.8.7",
+  "packageManager": "yarn@4.18.1",
   "browserslist": [
     "> 1%"
   ],

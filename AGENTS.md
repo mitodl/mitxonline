@@ -81,7 +81,7 @@ yarn fmt:check         # Check formatting
 **Build:**
 ```bash
 # From project root
-yarn workspaces foreach run build
+yarn workspaces foreach --all run build
 
 # From frontend/public directory
 yarn build             # Production build
