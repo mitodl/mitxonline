@@ -896,7 +896,7 @@ class CheckoutCallbackView(View):
         Process a GET request to this endpoint.
 
         Stripe redirects users back to the app for both successful and
-        canceled checkouts, at about the same time as it sends the webhook
+        canceled checkouts, after waiting up to 10 seconds for the webhook
         that fulfills the order. If the order is still pending, ask Stripe
         whether it was paid, and only report the order as fulfilled once it
         is; otherwise go back to the dashboard.
