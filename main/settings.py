@@ -1584,8 +1584,6 @@ MITOL_APIGATEWAY_USERINFO_MODEL_MAP = {
     },
 }
 
-MITOL_APIGATEWAY_USERINFO_ID_SEARCH_FIELD = "global_id"
-
 # MITOL_APIGATEWAY_USERINFO_CREATE (default True) and
 # MITOL_APIGATEWAY_USERINFO_UPDATE (default False) are read from the environment
 # by mitol.apigateway.settings. Declaring them here again raises at import.
