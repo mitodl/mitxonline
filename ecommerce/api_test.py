@@ -46,6 +46,7 @@ from ecommerce.api import (
     _retrieve_pending_cybersource_orders,
     apply_discount_to_basket,
     apply_user_discounts,
+    auto_refund_request,
     check_and_process_pending_orders_for_resolution,
     check_basket_discounts_for_validity,
     check_for_double_spent_sources,
@@ -82,6 +83,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     REDEMPTION_TYPE_INTERNAL,
+    REFUND_WINDOW_DAYS,
     STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
     STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED,
     STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
@@ -144,10 +146,13 @@ from ecommerce.models import (
     OrderStatus,
     PendingOrder,
     Product,
+    RefundRequest,
+    RefundRequestStatus,
     StripeEventLog,
     Transaction,
     UserDiscount,
 )
+from ecommerce.tasks import process_refund_request
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import (
     FlexiblePriceFactory,
@@ -380,7 +385,13 @@ def test_cybersource_order_no_transaction(fulfilled_order):
         (ProcessorResponse.STATE_DUPLICATE, False),
     ],
 )
-def test_order_refund_success(mocker, order_state, unenroll, fulfilled_transaction):
+def test_order_refund_success(
+    mocker,
+    order_state,
+    unenroll,
+    fulfilled_transaction,
+    django_capture_on_commit_callbacks,
+):
     """Test that appropriate data is created for a successful refund and it's state changes to REFUNDED"""
     sample_response_data = {
         "id": "12345",  # it only has id in refund response, no transaction_id
@@ -410,9 +421,10 @@ def test_order_refund_success(mocker, order_state, unenroll, fulfilled_transacti
 
         return
     else:
-        refund_success, _ = refund_order(
-            order_id=fulfilled_transaction.order.id, unenroll=unenroll
-        )
+        with django_capture_on_commit_callbacks(execute=True):
+            refund_success, _ = refund_order(
+                order_id=fulfilled_transaction.order.id, unenroll=unenroll
+            )
 
     # There should be two transaction objects (One for payment and other for refund)
     assert (
@@ -451,7 +463,9 @@ def test_order_refund_success(mocker, order_state, unenroll, fulfilled_transacti
 
 
 @pytest.mark.parametrize("unenroll", [True, False])
-def test_order_refund_success_with_ref_num(mocker, unenroll, fulfilled_transaction):
+def test_order_refund_success_with_ref_num(
+    mocker, unenroll, fulfilled_transaction, django_capture_on_commit_callbacks
+):
     """Test a successful refund based only on reference number"""
     sample_response_data = {
         "id": "12345",
@@ -472,9 +486,11 @@ def test_order_refund_success_with_ref_num(mocker, unenroll, fulfilled_transacti
         "mitol.payment_gateway.api.PaymentGateway.start_refund",
         return_value=sample_response,
     )
-    refund_success, message = refund_order(
-        reference_number=fulfilled_transaction.order.reference_number, unenroll=unenroll
-    )
+    with django_capture_on_commit_callbacks(execute=True):
+        refund_success, message = refund_order(
+            reference_number=fulfilled_transaction.order.reference_number,
+            unenroll=unenroll,
+        )
     # There should be two transaction objects (One for payment and other for refund)
     assert (
         Transaction.objects.filter(
@@ -789,6 +805,205 @@ def test_paypal_refunds(fulfilled_paypal_transaction):
     with pytest.raises(Exception) as exc:  # noqa: PT011, PT012
         refund_order(order_id=fulfilled_paypal_transaction.order.id)
         assert "PayPal" in exc
+
+
+@pytest.fixture
+def auto_refund_gateway(mocker):
+    """Stub the gateway to accept refunds, and the downgrade task."""
+    mocker.patch("ecommerce.tasks.perform_downgrade_from_order.delay")
+    return mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.start_refund",
+        return_value=ProcessorResponse(
+            state=ProcessorResponse.STATE_PENDING,
+            response_data={"id": "12345"},
+            transaction_id="1234",
+            message="",
+            response_code="",
+        ),
+    )
+
+
+def _refund_request(order):
+    return RefundRequest.objects.create(
+        order=order, user=order.purchaser, consent_given=True
+    )
+
+
+def test_auto_refund_request_refunds_and_approves(
+    mocker, fulfilled_transaction, auto_refund_gateway
+):
+    """An in-window order is refunded with unenrollment and the request approved."""
+    order = fulfilled_transaction.order
+    request = _refund_request(order)
+    refund_mock = mocker.patch("ecommerce.api.refund_order", wraps=refund_order)
+
+    assert auto_refund_request(request.id) == (True, "")
+
+    refund_mock.assert_called_once()
+    assert refund_mock.call_args.kwargs["unenroll"] is True
+    request.refresh_from_db()
+    order.refresh_from_db()
+    assert request.status == RefundRequestStatus.APPROVED
+    assert order.state == OrderStatus.REFUNDED
+    assert order.refund_status == "completed"
+
+
+def test_auto_refund_request_repeat_refunds_once(
+    fulfilled_transaction, auto_refund_gateway
+):
+    """A second request for an order already refunded never reaches the gateway."""
+    order = fulfilled_transaction.order
+    first, second = _refund_request(order), _refund_request(order)
+
+    assert auto_refund_request(first.id)[0] is True
+    assert auto_refund_request(second.id) == (False, "")
+    assert auto_refund_request(first.id) == (False, "")
+
+    auto_refund_gateway.assert_called_once()
+    second.refresh_from_db()
+    assert second.status == RefundRequestStatus.PENDING
+
+
+def test_auto_refund_request_claims_request_before_gateway_call(
+    mocker, fulfilled_transaction, auto_refund_gateway
+):
+    """The request is already approved, and committed, when the gateway is called."""
+    request = _refund_request(fulfilled_transaction.order)
+    statuses = []
+    gateway_response = auto_refund_gateway.return_value
+
+    def record_status(*_args, **_kwargs):
+        statuses.append(RefundRequest.objects.get(pk=request.pk).status)
+        return gateway_response
+
+    auto_refund_gateway.side_effect = record_status
+
+    assert auto_refund_request(request.id) == (True, "")
+
+    assert statuses == [RefundRequestStatus.APPROVED]
+
+
+def test_auto_refund_request_second_request_for_order_waits_for_first(
+    fulfilled_transaction, auto_refund_gateway
+):
+    """A second pending request is skipped while the first one's refund is running."""
+    order = fulfilled_transaction.order
+    first, second = _refund_request(order), _refund_request(order)
+    gateway_response = auto_refund_gateway.return_value
+    nested_results = []
+
+    def refund_second_during_first(*_args, **_kwargs):
+        nested_results.append(auto_refund_request(second.id))
+        return gateway_response
+
+    auto_refund_gateway.side_effect = refund_second_during_first
+
+    assert auto_refund_request(first.id) == (True, "")
+
+    assert nested_results == [(False, "")]
+    auto_refund_gateway.assert_called_once()
+    second.refresh_from_db()
+    assert second.status == RefundRequestStatus.PENDING
+
+
+def test_auto_refund_request_gateway_failure_stays_pending(
+    mocker, fulfilled_transaction, caplog
+):
+    """A gateway error leaves the request pending, returns the error and logs it."""
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.start_refund",
+        side_effect=ApiException(status=500, reason="gateway down"),
+    )
+    downgrade_mock = mocker.patch("ecommerce.tasks.perform_downgrade_from_order.delay")
+    order = fulfilled_transaction.order
+    request = _refund_request(order)
+
+    refunded, error = auto_refund_request(request.id)
+
+    assert refunded is False
+    assert "gateway down" in error
+    request.refresh_from_db()
+    order.refresh_from_db()
+    assert request.status == RefundRequestStatus.PENDING
+    assert order.state == OrderStatus.FULFILLED
+    assert not downgrade_mock.called
+    assert "Automatic refund failed" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "window_closed",
+        "paypal",
+        "stripe",
+        "admin_fulfilled",
+        "paid_amount_off",
+        "funds_credit",
+        "program",
+    ],
+)
+def test_auto_refund_request_ineligible_orders_stay_manual(
+    user, auto_refund_gateway, case
+):
+    """Orders failing any auto-approval condition are untouched."""
+    if case == "program":
+        line = make_purchase(user, ProgramFactory.create(), Decimal("100.00"))
+    else:
+        line = make_purchase(
+            user,
+            CourseRunFactory.create(start_date=now_in_utc() - timedelta(days=400)),
+            Decimal("100.00"),
+        )
+    order = line.order
+    TransactionFactory.create(
+        order=order,
+        transaction_type=TRANSACTION_TYPE_PAYMENT,
+        data={
+            "paypal": {"req_amount": 100, "paypal_token": "EC-1"},
+            # Stripe payments have no CyberSource request fields
+            "stripe": {"id": "pi_123"},
+            "admin_fulfilled": {**ADMIN_FULFILLED_PAYMENT_DATA},
+        }.get(case, {"req_amount": 100, "req_currency": "USD"}),
+    )
+    if case == "window_closed":
+        Order.objects.filter(pk=order.pk).update(
+            created_on=now_in_utc() - timedelta(days=REFUND_WINDOW_DAYS + 30)
+        )
+    elif case == "paid_amount_off":
+        DiscountRedemptionFactory.create(
+            redeemed_discount=PaidAmountOffDiscountFactory.create(),
+            redeemed_order=order,
+        )
+    elif case == "funds_credit":
+        DiscountRedemptionFactory.create(
+            redeemed_discount=PaidAmountOffDiscountFactory.create(),
+            source_line=line,
+            redeemed_order=OrderFactory.create(state=OrderStatus.FULFILLED),
+        )
+    request = _refund_request(order)
+
+    assert auto_refund_request(request.id) == (False, "")
+
+    assert not auto_refund_gateway.called
+    request.refresh_from_db()
+    assert request.status == RefundRequestStatus.PENDING
+    assert Order.objects.get(pk=order.pk).state == OrderStatus.FULFILLED
+
+
+@pytest.mark.parametrize("auto_refunded", [True, False])
+def test_process_refund_request_task_notifies_support(mocker, auto_refunded):
+    """Support's email says whether the request was auto-refunded."""
+    request = _refund_request(OrderFactory.create(state=OrderStatus.FULFILLED))
+    mocker.patch(
+        "ecommerce.api.auto_refund_request", return_value=(auto_refunded, "boom")
+    )
+    send_mock = mocker.patch("ecommerce.mail_api.send_refund_request_notification")
+
+    process_refund_request(request.id)
+
+    send_mock.assert_called_once_with(
+        request, auto_refunded=auto_refunded, auto_refund_error="boom"
+    )
 
 
 def test_unenrollment_unenrolls_learner(mocker, user):
@@ -3018,7 +3233,9 @@ def test_find_order_for_stripe_payment_intent_no_match():
     "event_type", [STRIPE_EVENT_REFUND_UPDATED, STRIPE_EVENT_CHARGE_REFUND_UPDATED]
 )
 @pytest.mark.parametrize("amount", [1000, 500])
-def test_process_stripe_refund_updated(mocker, event_type, amount):
+def test_process_stripe_refund_updated(
+    mocker, event_type, amount, django_capture_on_commit_callbacks
+):
     """A succeeded refund should refund the order and downgrade the learner."""
 
     downgrade_task_mock = mocker.patch(
@@ -3027,7 +3244,8 @@ def test_process_stripe_refund_updated(mocker, event_type, amount):
     order = _create_stripe_order_with_payment()
     event = _configure_refund_event(event_type, amount=amount)
 
-    result = process_stripe_refund_updated(event)
+    with django_capture_on_commit_callbacks(execute=True):
+        result = process_stripe_refund_updated(event)
 
     assert result == order
     assert result.state == OrderStatus.REFUNDED
@@ -3042,7 +3260,9 @@ def test_process_stripe_refund_updated(mocker, event_type, amount):
     downgrade_task_mock.assert_called_once_with(order.id)
 
 
-def test_process_stripe_refund_updated_both_events(mocker):
+def test_process_stripe_refund_updated_both_events(
+    mocker, django_capture_on_commit_callbacks
+):
     """Stripe sends two events per refund; only one should refund the order."""
 
     downgrade_task_mock = mocker.patch(
@@ -3050,18 +3270,19 @@ def test_process_stripe_refund_updated_both_events(mocker):
     )
     order = _create_stripe_order_with_payment()
 
-    assert (
-        process_stripe_refund_updated(
-            _configure_refund_event(STRIPE_EVENT_REFUND_UPDATED)
+    with django_capture_on_commit_callbacks(execute=True):
+        assert (
+            process_stripe_refund_updated(
+                _configure_refund_event(STRIPE_EVENT_REFUND_UPDATED)
+            )
+            == order
         )
-        == order
-    )
-    assert (
-        process_stripe_refund_updated(
-            _configure_refund_event(STRIPE_EVENT_CHARGE_REFUND_UPDATED)
+        assert (
+            process_stripe_refund_updated(
+                _configure_refund_event(STRIPE_EVENT_CHARGE_REFUND_UPDATED)
+            )
+            is True
         )
-        is True
-    )
 
     assert (
         order.transactions.filter(transaction_type=TRANSACTION_TYPE_REFUND).count() == 1

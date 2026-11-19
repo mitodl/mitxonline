@@ -1,0 +1,26 @@
+{% load static %}
+{# Mirrors MIT Learn's header: its logo, and for a signed-in learner a menu #}
+{# with only Dashboard and Log Out, the items Learn shows its learners. #}
+<header class="site-header d-flex flex-column learn-header">
+  <nav class="order-1 sub-nav navbar top-navbar nowrap" aria-label="MIT Learn">
+    <div class="top-branding">
+      <a href="{{ mit_learn_base_url }}" class="logo-link">
+        <img src="{% static 'images/mit-learn.png' %}" alt="MIT Learn" width="143" height="26" />
+      </a>
+    </div>
+    {% if user.is_authenticated %}
+      <div class="full-screen-top-menu">
+        <div class="top-user-menu dropdown">
+          <button class="dropdown-toggle user-menu-button" id="learnUserMenu" type="button"
+                  data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            {{ user.name|default:user.email }}
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="learnUserMenu">
+            <li class="dropdown-item"><a href="{{ mit_learn_dashboard_url }}">Dashboard</a></li>
+            <li class="dropdown-item"><a href="{% url 'logout' %}">Log Out</a></li>
+          </ul>
+        </div>
+      </div>
+    {% endif %}
+  </nav>
+</header>

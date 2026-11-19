@@ -28,7 +28,7 @@ If you need to get the B2B system set up, see the docs here: [docs/source/config
 
 Running, testing, and administering this app follows the same patterns as our other web apps.
 
-*Note: for js tests, run the commands in `frontend/public`, or run via `yarn workspaces foreach run <command>` from the root.
+*Note: for js tests, run the commands in `frontend/public`, or run via `yarn workspaces foreach --all run <command>` from the root.
 
 [See the common OL web app guide](http://mitodl.github.io/handbook/how-to/common-web-app-guide.html#running-and-accessing-the-app).
 

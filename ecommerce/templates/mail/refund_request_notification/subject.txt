@@ -1,1 +1,1 @@
-Refund Request Submitted – Order {{ order.reference_number }}
+{% if auto_refunded %}Refund Request Auto-Refunded{% else %}Refund Request Needs Review{% endif %} – Order {{ order.reference_number }}

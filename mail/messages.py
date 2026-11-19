@@ -1,5 +1,6 @@
 """Shared base classes for mitol-mail TemplatedMessage subclasses"""
 
+from django.conf import settings
 from mitol.mail.messages import TemplatedMessage
 
 from mail.constants import EMAIL_SITE_NAME
@@ -11,7 +12,8 @@ class SiteTemplatedMessage(TemplatedMessage):
 
     Overrides the "site_name" template context so these emails always say
     "MIT Learn", regardless of settings.SITE_NAME (which also drives
-    non-email UI and can be overridden per-environment).
+    non-email UI and can be overridden per-environment), and gives them
+    the MIT Learn dashboard URL to link to.
     """
 
     @staticmethod
@@ -19,4 +21,5 @@ class SiteTemplatedMessage(TemplatedMessage):
         return {
             **TemplatedMessage.get_base_template_context(),
             "site_name": EMAIL_SITE_NAME,
+            "dashboard_url": settings.MIT_LEARN_DASHBOARD_URL,
         }

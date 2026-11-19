@@ -51,14 +51,13 @@ WORKDIR /src
 ENV XDG_CACHE_HOME=/tmp/.cache
 
 # ─── Node / frontend asset build ─────────────────────────────────────────────
-FROM node:17.9 AS node
+FROM node:20.18 AS node
 
 WORKDIR /src
 # Only the build inputs, so a backend-only change reuses this stage. The
 # webpack and craco configs read nothing outside frontend/ except the root
 # node_modules, and write their manifests to webpack-stats/.
 COPY package.json yarn.lock .yarnrc.yml /src/
-COPY .yarn/plugins /src/.yarn/plugins
 COPY .yarn/releases /src/.yarn/releases
 COPY frontend /src/frontend
 

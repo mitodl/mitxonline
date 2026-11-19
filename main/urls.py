@@ -94,8 +94,6 @@ urlpatterns = [
     path("api/v2/", wagtail_api_router.urls),
     path("", include(wagtail_urls)),
     path("", include("cms.urls")),
-    # Example view
-    path("", index, name="main-index"),
 ] + (
     static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

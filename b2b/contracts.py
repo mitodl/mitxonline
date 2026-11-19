@@ -23,7 +23,11 @@ from b2b.constants import (
     PROVISIONING_ACTION_CONTRACT_VARIANT_ADDED,
     PROVISIONING_ACTION_CONTRACT_VARIANT_UPDATED,
 )
-from b2b.exceptions import ContractVariantError, SourceCourseIncompleteError
+from b2b.exceptions import (
+    ContractProgramOrderError,
+    ContractVariantError,
+    SourceCourseIncompleteError,
+)
 from b2b.models import ContractPage, ContractProgramItem, OrganizationPage
 from b2b.provisioning import _audit
 from b2b.tasks import queue_enrollment_code_check
@@ -54,6 +58,7 @@ class CoursewareAddition:
 
     runs_added: int = 0
     courses_without_source_run: int = 0
+    courses_with_invalid_key: int = 0
     skipped_reason: str = ""
 
 
@@ -83,10 +88,13 @@ def create_contract(  # noqa: PLR0913
     membership_type: str,
     description: str = "",
     welcome_message: str = "",
+    welcome_message_extra: str = "",
     contract_start=None,
     contract_end=None,
     max_learners: int | None = None,
     enrollment_fixed_price=None,
+    google_sheet_target: str = "",
+    google_sheet_target_tab: str = "Sheet1",
 ) -> ContractPage:
     """
     Create a contract under an organization, with a default variant set.
@@ -100,10 +108,13 @@ def create_contract(  # noqa: PLR0913
         organization=organization,
         description=description,
         welcome_message=welcome_message,
+        welcome_message_extra=welcome_message_extra,
         contract_start=contract_start,
         contract_end=contract_end,
         max_learners=max_learners,
         enrollment_fixed_price=enrollment_fixed_price,
+        google_sheet_target=google_sheet_target,
+        google_sheet_target_tab=google_sheet_target_tab,
     )
     organization.add_child(instance=contract)
     contract.save()
@@ -127,7 +138,7 @@ def add_courseware_to_contract(  # noqa: PLR0913
     Add a program, course or course run to a contract.
 
     - A program gets contract runs for each of its courses that has a source
-      run, and is linked to the contract.
+      run with a valid course key, and is linked to the contract.
     - A course gets contract runs from its source runs.
     - An existing run is attached as it is. A run already in another contract
       is left there and reported as skipped: a run can legitimately belong to
@@ -135,7 +146,8 @@ def add_courseware_to_contract(  # noqa: PLR0913
       learners' courseware with it.
 
     Runs are created for the variant sets in filter_variants, which defaults to
-    the contract's active variant sets. no_reruns defaults to True, unlike
+    the contract's active variant sets. A contract with no active variant sets
+    gets no runs. no_reruns defaults to True, unlike
     create_contract_run, so repeating a call does not mint another run.
     org_prefix defaults to the organization's own prefix.
     """
@@ -144,7 +156,7 @@ def add_courseware_to_contract(  # noqa: PLR0913
         filter_variants = list(contract.active_variant_options())
 
     if courseware.is_program:
-        runs_added, no_source = contract.add_program_courses(
+        runs_added, no_source, invalid_key = contract.add_program_courses(
             courseware,
             skip_edx=skip_edx,
             no_reruns=no_reruns,
@@ -154,7 +166,9 @@ def add_courseware_to_contract(  # noqa: PLR0913
             filter_variants=filter_variants,
         )
         return CoursewareAddition(
-            runs_added=runs_added, courses_without_source_run=no_source
+            runs_added=runs_added,
+            courses_without_source_run=no_source,
+            courses_with_invalid_key=invalid_key,
         )
 
     if courseware.is_run:
@@ -330,6 +344,31 @@ def remove_courseware_from_contract(
     return [(run, _remove_run_from_contract(contract, run)) for run in runs]
 
 
+@transaction.atomic
+def set_contract_program_order(contract: ContractPage, readable_ids: list[str]):
+    """
+    Put the contract's programs in the given order.
+
+    readable_ids must name each of the contract's programs once, so a program
+    linked or unlinked since the caller read the list is refused rather than
+    silently left out of the order or added to the contract.
+    """
+
+    items = {
+        item.program.readable_id: item
+        for item in ContractProgramItem.objects.select_for_update(of=("self",))
+        .select_related("program")
+        .filter(contract=contract)
+    }
+    if len(readable_ids) != len(set(readable_ids)) or set(readable_ids) != set(items):
+        msg = "The order must list each of the contract's programs once."
+        raise ContractProgramOrderError(msg)
+
+    for sort_order, readable_id in enumerate(readable_ids):
+        items[readable_id].sort_order = sort_order
+    ContractProgramItem.objects.bulk_update(items.values(), ["sort_order"])
+
+
 def expected_enrollment_code_count(contract: ContractPage) -> int:
     """
     Return how many enrollment codes the contract should have.
@@ -361,6 +400,18 @@ def queue_enrollment_code_check_if_required(contract: ContractPage):
 
     if contract.requires_enrollment_codes:
         queue_enrollment_code_check.delay(contract.id)
+
+
+def clear_sheet_locations(contract: ContractPage):
+    """
+    Forget where the contract's codes are in its Google Sheet.
+
+    Called when the sheet or tab changes. With no locations left, the next
+    sheet update writes every code out to the new sheet from the top, and
+    keeps doing so until a write succeeds.
+    """
+
+    Discount.objects.filter(b2b_contract=contract).update(b2b_sheet_location="")
 
 
 def get_contract_setup_status(contract: ContractPage) -> dict:

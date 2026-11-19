@@ -1,10 +1,17 @@
+import json
+import logging
+
 import pytest
-from django_scim import exceptions
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
+from mitol.scim.adapters import lock_free_adapter
+from mitol.scim.constants import SchemaURI
 from mitol.scim.requests import InMemoryHttpRequest
 
 from users.adapters import (
     EDX_SYNC_ATTRS,
     EDX_UNSYNCED_ATTRS,
+    ExternalIdRebindError,
     LearnUserAdapter,
 )
 from users.factories import UserFactory
@@ -23,7 +30,7 @@ def _adapter(user):
 def test_attr_map_has_no_orm_style_double_underscore_paths():
     """ATTR_MAP values are consumed via a plain setattr() by both
     django_scim's (django_scim.adapters.SCIMUser.handle_replace) and mitol's
-    (mitol.scim.adapters.UserAdapter._handle_resplace_nested_path) PATCH
+    (mitol.scim.adapters.UserAdapter._handle_replace_nested_path) PATCH
     add/replace dispatch - neither walks a "__" double-underscore path into
     a related object. A mapped value containing "__" (e.g. the
     "legal_address__first_name" this PR removed) would silently set a
@@ -34,6 +41,34 @@ def test_attr_map_has_no_orm_style_double_underscore_paths():
     """
     for target in LearnUserAdapter.ATTR_MAP.values():
         assert "__" not in target
+
+
+def test_lock_free_adapter_reads_without_locking():
+    """mitol.scim's read views build the adapter through lock_free_adapter(),
+    which passes lock_user=False, and must not take a row lock
+    """
+    user = UserFactory.create()
+
+    with CaptureQueriesContext(connection) as queries:
+        data = lock_free_adapter(LearnUserAdapter)(
+            user, InMemoryHttpRequest.stub()
+        ).to_dict()
+
+    assert data["userName"] == user.username
+    assert not [q for q in queries if "FOR UPDATE" in q["sql"]]
+
+
+def test_null_full_name_replace_keeps_the_name():
+    """scim-for-keycloak sends a removed fullName as a replace with null; name
+    is NOT NULL, so the stored value stays instead of the save failing
+    """
+    user = UserFactory.create(name="Joe Smith")
+    adapter = LearnUserAdapter(user)
+
+    adapter.handle_replace(adapter.split_path("fullName"), None, {"op": "replace"})
+
+    user.refresh_from_db()
+    assert user.name == "Joe Smith"
 
 
 def test_learn_user_adapter_to_dict_uses_legal_address_name():
@@ -483,11 +518,41 @@ def test_from_dict_refuses_rebinding_global_id():
     """A PUT can't move a user to a different Keycloak identity"""
     user = UserFactory.create(global_id="keycloak-1", scim_external_id="keycloak-1")
 
-    with pytest.raises(exceptions.IntegrityError):
+    with pytest.raises(ExternalIdRebindError):
         _put_external_id(user, "keycloak-2")
 
     user.refresh_from_db()
     assert (user.global_id, user.scim_external_id) == ("keycloak-1", "keycloak-1")
+
+
+def test_put_rebind_returns_its_own_409(client, caplog):
+    """The refusal reaches Keycloak with its detail and scimType, and isn't
+    logged at ERROR (which Sentry would turn into an event per retry), because
+    mitol.scim's views redact and log every IntegrityError
+    """
+    client.force_login(UserFactory.create(is_staff=True))
+    user = UserFactory.create(global_id="keycloak-1", scim_external_id="keycloak-1")
+
+    response = client.put(
+        f"/scim/v2/Users/{user.id}",
+        data=json.dumps(
+            {
+                "schemas": [SchemaURI.USER],
+                "userName": user.username,
+                "externalId": "keycloak-2",
+                "emails": [{"value": user.email, "primary": True}],
+            }
+        ),
+        content_type="application/scim+json",
+    )
+
+    body = response.json()
+    assert response.status_code == 409
+    assert body.get("scimType") == "mutability"
+    assert "externalId does not match" in body["detail"]
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+    user.refresh_from_db()
+    assert user.global_id == "keycloak-1"
 
 
 @pytest.mark.parametrize("global_id", ["", "keycloak-1"])
@@ -510,7 +575,7 @@ def test_from_dict_without_external_id_keeps_global_id(external_id):
 
     user.refresh_from_db()
     assert (user.global_id, user.scim_external_id) == ("keycloak-1", "keycloak-1")
-    with pytest.raises(exceptions.IntegrityError):
+    with pytest.raises(ExternalIdRebindError):
         _put_external_id(user, "keycloak-2")
 
 

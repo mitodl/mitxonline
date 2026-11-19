@@ -35,7 +35,7 @@ export const OrganizationForm: React.FC<IOrganizationFormProps> = ({ formProps, 
                     label="Org key prefix"
                     name="org_key_prefix"
                     rules={[{ max: 30 }, ORG_KEY_RULE]}
-                    extra="Prepended to the org key in courseware IDs. UAI_ runs send enrollment email as MIT Learn and are flagged as UAI in HubSpot. Leave blank for no prefix."
+                    extra="Prepended to the org key in courseware IDs. UAI_ runs are flagged as UAI in HubSpot. Leave blank for no prefix."
                 >
                     <AutoComplete options={COMMON_ORG_KEY_PREFIXES} placeholder="No prefix" allowClear />
                 </Form.Item>

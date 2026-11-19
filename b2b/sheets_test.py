@@ -11,8 +11,11 @@ from mitol.google_sheets.constants import GOOGLE_SHEET_FIRST_ROW
 from b2b import factories
 from b2b.api import ensure_contract_run_products, ensure_enrollment_codes_exist
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE, CONTRACT_MEMBERSHIP_MANAGED
-from b2b.models import DiscountContractAttachmentRedemption
+from b2b.models import ContractPage, DiscountContractAttachmentRedemption
 from b2b.sheets import ContractEnrollmentCodesSheetHandler
+from b2b.tasks import (
+    queue_contract_sheet_update_post_save,
+)
 from courses.factories import CourseRunFactory
 from ecommerce.factories import OneTimeDiscountFactory
 from users.factories import UserFactory
@@ -381,3 +384,76 @@ def test_update_sheet(contract_with_sheet_courseruns_handler_mocks):
 
     handler.update_sheet()
     assert handler.update_code.call_count == contract.max_learners
+
+
+@pytest.mark.parametrize(
+    ("written_before", "products_active", "only_update", "expected"),
+    [
+        (False, True, False, "write"),
+        (True, True, False, "update"),
+        # A written code still counts when its run's product is inactive, so
+        # the sheet it is in isn't overwritten.
+        (True, False, False, "update"),
+        # The scheduled sweep leaves an unwritten sheet for the code check, so
+        # it can't write the codes without a header first.
+        (False, True, True, None),
+        (True, True, True, "update"),
+    ],
+)
+def test_sheet_update_task_picks_write_or_update(  # noqa: PLR0913
+    mocker,
+    contract_with_sheet_courseruns,
+    written_before,
+    products_active,
+    only_update,
+    expected,
+):
+    """
+    The codes are written from scratch only while none of the contract's codes
+    has a sheet location, and never by the scheduled sweep. Otherwise they're
+    updated in place.
+    """
+
+    contract, _ = contract_with_sheet_courseruns
+    if written_before:
+        discount = contract.get_discounts().first()
+        discount.b2b_sheet_location = "4"
+        discount.save()
+    if not products_active:
+        contract.get_products().update(is_active=False)
+    write_codes = mocker.patch.object(
+        ContractEnrollmentCodesSheetHandler, "write_codes", return_value=0
+    )
+    update_sheet = mocker.patch.object(
+        ContractEnrollmentCodesSheetHandler, "update_sheet", return_value=0
+    )
+
+    queue_contract_sheet_update_post_save(contract.id, only_update=only_update)
+
+    assert write_codes.called is (expected == "write")
+    assert update_sheet.called is (expected == "update")
+
+
+@pytest.mark.parametrize("write", ["write_codes", "update_sheet"])
+def test_sheet_change_during_a_write_keeps_the_locations_cleared(
+    contract_with_sheet_courseruns_handler_mocks, write
+):
+    """
+    A write that started before the contract's sheet changed doesn't save the
+    old sheet's rows over the cleared locations.
+    """
+
+    contract, _, handler = contract_with_sheet_courseruns_handler_mocks
+    handler.update_code = MagicMock(side_effect=lambda *_args, **_kwargs: 9)
+    ContractPage.objects.filter(pk=contract.pk).update(
+        google_sheet_target=f"{contract.google_sheet_target}-new"
+    )
+
+    getattr(handler, write)()
+
+    assert (
+        not contract.get_discounts()
+        .exclude(b2b_sheet_location="")
+        .exclude(b2b_sheet_location__isnull=True)
+        .exists()
+    )
