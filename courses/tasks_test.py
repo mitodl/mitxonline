@@ -10,6 +10,7 @@ from courses.factories import (
     CourseRunFactory,
     LearnerProgramRecordShareFactory,
 )
+from courses.models import CourseRunEnrollment
 from courses.tasks import (
     downgrade_enrollments,
     generate_course_certificates,
@@ -284,3 +285,25 @@ def test_downgrade_enrollments_creates_edx_user_first(mocker, repair_fails):
     patched_repair.assert_called_once_with(enrollment.user)
     enrollment.refresh_from_db()
     assert enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+
+
+def test_downgrade_enrollments_rechecks_after_creating_edx_user(mocker):
+    """A learner who unenrolls while their edX account is created is skipped"""
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+    enrollment = CourseRunEnrollmentFactory.create(
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        user=UserFactory.create(no_openedx_user=True),
+    )
+    mocker.patch(
+        "openedx.api.repair_faulty_edx_user",
+        side_effect=lambda _user: CourseRunEnrollment.all_objects.filter(
+            id=enrollment.id
+        ).update(active=False),
+    )
+
+    downgrade_enrollments.delay([enrollment.id])
+
+    patched_edx_enroll.assert_not_called()
+    enrollment.refresh_from_db()
+    assert enrollment.active is False
+    assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE

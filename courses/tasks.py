@@ -184,21 +184,16 @@ def downgrade_enrollments(enrollment_ids):
     from courses.api import downgrade_learner
     from openedx.api import repair_faulty_edx_user
 
+    enrollments = CourseRunEnrollment.all_objects.select_related("user", "run")
     downgraded, failed, skipped = 0, [], 0
     for enrollment_id in enrollment_ids:
-        enrollment = (
-            CourseRunEnrollment.all_objects.select_related("user", "run")
-            .filter(id=enrollment_id)
-            .first()
-        )
+        enrollment = enrollments.filter(id=enrollment_id).first()
         if (
-            enrollment is None
-            or not enrollment.active
-            or enrollment.enrollment_mode != EDX_ENROLLMENT_VERIFIED_MODE
+            enrollment is not None
+            and enrollment.active
+            and enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+            and not enrollment.user.openedx_user_exists
         ):
-            skipped += 1
-            continue
-        if not enrollment.user.openedx_user_exists:
             # Create the learner's edX account before the transaction below:
             # edX registration calls back with an OAuth token written here,
             # which it can't read until that write is committed. If this fails,
@@ -209,6 +204,15 @@ def downgrade_enrollments(enrollment_ids):
                 log.exception(
                     "Failed to create the edX user for enrollment %s", enrollment_id
                 )
+            # That can take a while, so read the row again before checking it.
+            enrollment = enrollments.filter(id=enrollment_id).first()
+        if (
+            enrollment is None
+            or not enrollment.active
+            or enrollment.enrollment_mode != EDX_ENROLLMENT_VERIFIED_MODE
+        ):
+            skipped += 1
+            continue
         try:
             # One transaction, so the audit mode and the retry reset below
             # commit together: a crash between them can't leave an audit row
