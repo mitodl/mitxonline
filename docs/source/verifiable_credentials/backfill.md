@@ -56,7 +56,7 @@ manage.py backfill_verifiable_credentials --type program --ids program-v1:MITx+D
 manage.py backfill_verifiable_credentials --type course --ids course-v1:MITx+14.73x+1T2024,course-v1:MITx+14.73x+3T2024 --execute
 
 # Backfill a single certificate by its UUID, forcing a reissue if it already has a credential. This is useful for correcting the criteria text or after a learner changes their name.
-manage.py backfill_verifiable_credentials --uuid 3f1c0e2a-0000-0000-0000-000000000000 --execute --force true
+manage.py backfill_verifiable_credentials --uuid 3f1c0e2a-0000-0000-0000-000000000000 --execute --force
 ```
 
 Note that `--force` deletes the existing credential non-transactionally *before* requesting a new one.
