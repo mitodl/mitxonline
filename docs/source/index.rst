@@ -15,6 +15,7 @@ Welcome to MITx Online Documentation's documentation!
    configuration/index
    ecommerce/index
    commands/index
+   verifiable_credentials/index
 
 Indices and tables
 ==================
