@@ -857,12 +857,17 @@ def _check_stale_stripe_orders(orders):
 
         keep_ids.add(order.id)
 
-        if session["status"] != STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
+        # A paid session needs a PaymentIntent to record the payment under.
+        if (
+            session["status"] != STRIPE_OVERALL_CHECKOUT_STATUS_PAID
+            or not session["payment_intent_id"]
+        ):
             log.info(
-                "Keeping stale order %s: CheckoutSession %s is %s",
+                "Keeping stale order %s: CheckoutSession %s is %s, PaymentIntent %s",
                 order.reference_number,
                 session_id,
                 session["status"],
+                session["payment_intent_id"] or "none",
             )
             continue
 
